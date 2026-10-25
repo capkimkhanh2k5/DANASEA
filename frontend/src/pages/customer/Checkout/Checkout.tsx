@@ -583,7 +583,7 @@ export function Checkout() {
                     ) : (
                       <>
                         <span className="material-symbols-outlined text-[20px]">lock</span>
-                        <span>Xác nhận &amp; Thanh toán {finalTotal.toLocaleString('vi-VN')}₫</span>
+                        <span>Xác nhận &amp; Thanh toán</span>
                       </>
                     )}
                   </button>
