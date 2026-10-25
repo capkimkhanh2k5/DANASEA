@@ -187,11 +187,14 @@ export function ExperienceDetail() {
   const localizedSafetyRules = useMemo(() => {
     const raw = service?.safetyRules || '';
     if (raw.toLowerCase().includes('max wave') || raw.toLowerCase().includes('weather-sensitive')) {
-      const wave = raw.match(/max wave:\s*([\d.]+m)/i)?.[1] || '0.8m';
-      const wind = raw.match(/max wind:\s*([\d.]+\s*km\/h)/i)?.[1] || '5km/h';
-      return `Sóng biển ≤ ${wave}, gió ≤ ${wind}. Bắt buộc mặc áo phao và tuân thủ an toàn hàng hải.`;
+      const wave = raw.match(/max wave:\s*([\d.]+m)/i)?.[1] || '0.80m';
+      const wind = raw.match(/max wind:\s*([\d.]+\s*km\/h)/i)?.[1] || '5.00km/h';
+      return `Sóng biển ≤ ${wave}, gió ≤ ${wind}`;
     }
-    return raw || 'Sóng biển ≤ 1.0m, gió ≤ 15km/h. Bắt buộc mặc áo phao và tuân thủ an toàn hàng hải.';
+    if (raw.includes('Bắt buộc') || raw.includes('áo phao')) {
+      return raw.split('.')[0].trim();
+    }
+    return raw || 'Sóng biển ≤ 0.80m, gió ≤ 5.00km/h';
   }, [service?.safetyRules]);
 
   const localizedWaiverContent = useMemo(() => {
@@ -619,28 +622,24 @@ export function ExperienceDetail() {
                 <div className="pt-3.5 border-t border-slate-100 space-y-2.5">
                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Thông tin vận hành</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-xs sm:text-sm">
-                    <div className="flex items-baseline gap-2 text-slate-700">
+                    <div className="flex items-baseline gap-2 text-slate-600">
                       <span className="text-slate-500 whitespace-nowrap shrink-0">Thời lượng:</span>
-                      <span className="font-semibold text-slate-900">{service.duration || 120} phút / ca</span>
+                      <span className="font-normal text-slate-800">{service.duration || 120} phút / ca</span>
                     </div>
-                    <div className="flex items-baseline gap-2 text-slate-700">
+                    <div className="flex items-baseline gap-2 text-slate-600">
                       <span className="text-slate-500 whitespace-nowrap shrink-0">Sức chứa:</span>
-                      <span className="font-semibold text-slate-900">Tối đa {service.capacity || 15} người / ca</span>
+                      <span className="font-normal text-slate-800">Tối đa {service.capacity || 15} người / ca</span>
                     </div>
-                    <div className="flex items-baseline gap-2 text-slate-700 sm:col-span-2">
+                    <div className="flex items-baseline gap-2 text-slate-600 sm:col-span-2">
                       <span className="text-slate-500 whitespace-nowrap shrink-0">Điều kiện thời tiết:</span>
-                      <span className="font-semibold text-slate-900">{localizedSafetyRules}</span>
-                    </div>
-                    <div className="flex items-baseline gap-2 text-slate-700 sm:col-span-2 min-w-0">
-                      <span className="text-slate-500 whitespace-nowrap shrink-0">Điểm tập trung:</span>
-                      <span className="font-semibold text-slate-900 truncate" title={service.address}>{service.address || 'Ven biển Đà Nẵng'}</span>
+                      <span className="font-normal text-slate-800">{localizedSafetyRules}</span>
                     </div>
                     {service.businessName && (
-                      <div className="flex items-baseline gap-2 text-slate-700 sm:col-span-2 min-w-0">
+                      <div className="flex items-baseline gap-2 text-slate-600 sm:col-span-2 min-w-0">
                         <span className="text-slate-500 whitespace-nowrap shrink-0">Đơn vị tổ chức:</span>
-                        <span className="font-semibold text-slate-900 truncate">{service.businessName}</span>
+                        <span className="font-normal text-slate-800 truncate">{service.businessName}</span>
                         {service.badgeTier && (
-                          <span className="text-[11px] font-bold text-teal-800 bg-teal-50 border border-teal-200/70 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
+                          <span className="text-[11px] font-medium text-teal-800 bg-teal-50 border border-teal-200/70 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
                             {service.badgeTier === 'VERIFIED' ? 'Đã xác minh' : service.badgeTier}
                           </span>
                         )}
