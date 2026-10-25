@@ -227,14 +227,9 @@ export function PaymentResult() {
             {/* TICKETS COLUMN (8 cols) */}
             <div className="lg:col-span-8 flex flex-col gap-space-lg">
               <div className="flex items-center justify-between border-b pb-space-sm border-slate-100">
-                <div>
-                  <h3 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">
-                    Vé điện tử check-in ({order.items.length} dịch vụ)
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Xuất trình mã QR tại điểm đón hoặc quầy điều hành cano để quét vé vào cổng
-                  </p>
-                </div>
+                <h3 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">
+                  Check-in
+                </h3>
               </div>
 
               {/* TICKET LIST */}
