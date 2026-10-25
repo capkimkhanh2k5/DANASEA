@@ -290,7 +290,7 @@ export function Checkout() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-label-sm text-[11px] text-emerald-600 font-bold uppercase tracking-wider">Bước 1 - Hoàn thành</p>
-                  <p className="font-headline-sm text-xs font-bold text-slate-800 truncate">Giỏ trải nghiệm ({items.length} mục)</p>
+                  <p className="font-headline-sm text-xs font-bold text-slate-800 truncate">Giỏ trải nghiệm</p>
                 </div>
               </div>
               <div className="flex items-center gap-space-sm p-space-xs rounded-xl bg-cyan-50/80 border border-cyan-200 shadow-sm p-2">

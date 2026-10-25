@@ -35,7 +35,7 @@ export function Cart() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-label-sm text-[11px] text-cyan-600 font-bold uppercase tracking-wider">Bước 1</p>
-                  <p className="font-headline-sm text-xs font-bold text-cyan-900 truncate">Giỏ trải nghiệm ({items.length} mục)</p>
+                  <p className="font-headline-sm text-xs font-bold text-cyan-900 truncate">Giỏ trải nghiệm</p>
                 </div>
               </div>
 
