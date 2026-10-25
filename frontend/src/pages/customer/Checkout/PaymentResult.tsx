@@ -175,36 +175,27 @@ export function PaymentResult() {
 
           {/* MAIN GRID: TICKETS & ORDER SUMMARY */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
-            {/* TICKETS COLUMN (8 cols) */}
-            <div className="lg:col-span-8 flex flex-col gap-space-lg">
-              <div className="flex items-center justify-between border-b pb-space-sm border-slate-100">
+            {/* TICKETS COLUMN (8 cols): Single Unified Card */}
+            <div className="lg:col-span-8 bg-surface-container-lowest rounded-2xl shadow-sm border border-slate-100 p-space-xl flex flex-col">
+              {/* Card Header: Check-in */}
+              <div className="flex items-center justify-between border-b pb-space-sm border-slate-100 mb-space-lg">
                 <h3 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">
                   Check-in
                 </h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-800 font-label-sm text-xs font-bold border border-cyan-100">
+                  {order.items.length} Vé dịch vụ
+                </span>
               </div>
 
-              {/* TICKET LIST */}
-              {order.items.map((item, index) => (
-                <article
-                  key={item.id || index}
-                  className="bg-surface-container-lowest rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col transition-all hover:shadow-md"
-                >
-                  {/* Ticket Header Bar */}
-                  <div className="bg-slate-50/80 px-space-lg py-space-sm border-b border-slate-100 flex flex-wrap items-center justify-between gap-space-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      <span className="text-xs text-emerald-700 uppercase font-bold tracking-wider">
-                        ĐÃ XÁC NHẬN • SẴN SÀNG CHECK-IN
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                      <span>Mã vé:</span>
-                      <span className="font-bold text-slate-900 font-mono">#{item.ticketCode}</span>
-                    </div>
-                  </div>
-
-                  {/* Ticket Main Content Body */}
-                  <div className="p-space-lg grid grid-cols-1 md:grid-cols-12 gap-space-lg items-center">
+              {/* TICKET LIST - Separated by clean horizontal divider */}
+              <div className="flex flex-col divide-y divide-slate-100">
+                {order.items.map((item, index) => (
+                  <div
+                    key={item.id || index}
+                    className={`grid grid-cols-1 md:grid-cols-12 gap-space-lg items-center ${
+                      index > 0 ? "pt-space-lg" : ""
+                    } ${index < order.items.length - 1 ? "pb-space-lg" : ""}`}
+                  >
                     {/* Left details */}
                     <div className="md:col-span-7 flex flex-col gap-space-md">
                       <div className="flex items-start gap-space-sm">
@@ -302,8 +293,8 @@ export function PaymentResult() {
                       </p>
                     </div>
                   </div>
-                </article>
-              ))}
+                ))}
+              </div>
             </div>
 
             {/* SIDEBAR SUMMARY & ACTIONS (4 cols) */}
