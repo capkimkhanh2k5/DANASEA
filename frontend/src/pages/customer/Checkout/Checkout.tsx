@@ -303,21 +303,24 @@ export function Checkout() {
             
             {/* LEFT COLUMN: Checkout Forms (7 Cols on Desktop) */}
             <div className="lg:col-span-7 flex flex-col gap-space-xl">
-              {/* Countdown Sticky/Accent Banner */}
-              <div className="w-full rounded-2xl bg-gradient-to-r from-teal-900 to-cyan-900 text-white p-space-md shadow-md flex items-start sm:items-center justify-between gap-space-md flex-col sm:flex-row">
-                <div className="flex items-center gap-space-sm">
-                  <div className="w-10 h-10 rounded-full bg-white/10 text-cyan-300 flex items-center justify-center flex-shrink-0 shadow-sm">
-                    <span className="material-symbols-outlined text-[22px]">timer</span>
+              {/* Countdown Hold Timer Banner */}
+              <div className="w-full rounded-xl bg-cyan-50/80 border border-cyan-200/80 px-4 py-3 shadow-xs flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-cyan-100 text-cyan-700 flex items-center justify-center flex-shrink-0">
+                    <span className="material-symbols-outlined text-[18px]">timer</span>
                   </div>
-                  <div>
-                    <p className="font-headline-sm text-sm sm:text-base text-white leading-snug">
-                      Khóa chỗ ưu tiên trong: <span className="font-black text-cyan-300 font-mono text-xl sm:text-2xl" id="checkout-timer">{formatTime(countdown)}</span>
-                    </p>
-                    <p className="font-body-sm text-xs text-cyan-200/80 leading-tight">
-                      {isHolding ? 'Đang xác thực giữ chỗ với máy chủ...' : 'Slot trải nghiệm đang được bảo lưu an toàn. Hết thời gian, hệ thống tự động nhường cho du khách khác.'}
-                    </p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xs sm:text-sm text-slate-700 font-medium">Thời gian giữ chỗ:</span>
+                    <span className="font-bold text-cyan-700 font-mono text-base sm:text-lg" id="checkout-timer">{formatTime(countdown)}</span>
                   </div>
                 </div>
+                {isHolding ? (
+                  <span className="text-xs text-cyan-600 animate-pulse font-medium">Đang giữ chỗ...</span>
+                ) : bookingHold ? (
+                  <div className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-200 whitespace-nowrap">
+                    ✓ Đã giữ chỗ
+                  </div>
+                ) : null}
               </div>
 
               {paymentError && (
