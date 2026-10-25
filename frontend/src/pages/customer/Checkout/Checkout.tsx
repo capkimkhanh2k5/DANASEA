@@ -471,7 +471,7 @@ export function Checkout() {
               <div className="w-full h-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-md border border-slate-100 flex flex-col">
                 <div className="flex flex-col gap-space-md">
                   <div className="flex items-center justify-between border-b pb-space-sm border-slate-100">
-                    <h3 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Tóm tắt trải nghiệm biển</h3>
+                    <h3 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Tóm tắt</h3>
                     <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-800 font-label-sm text-xs font-bold border border-cyan-100">
                       {items.length} Dịch vụ
                     </span>
