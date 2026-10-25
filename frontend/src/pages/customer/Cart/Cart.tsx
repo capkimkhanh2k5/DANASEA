@@ -22,7 +22,7 @@ export function Cart() {
               <div className="flex items-center gap-space-xs font-label-md text-xs text-slate-500">
                 <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate('/')}>DANASEA</span>
                 <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-                <span className="text-cyan-700 font-bold">Giỏ trải nghiệm biển</span>
+                <span className="text-cyan-700 font-bold">Giỏ hàng</span>
               </div>
             </div>
 
@@ -35,7 +35,7 @@ export function Cart() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-label-sm text-[11px] text-cyan-600 font-bold uppercase tracking-wider">Bước 1</p>
-                  <p className="font-headline-sm text-xs font-bold text-cyan-900 truncate">Giỏ trải nghiệm</p>
+                  <p className="font-headline-sm text-xs font-bold text-cyan-900 truncate">Giỏ hàng</p>
                 </div>
               </div>
 

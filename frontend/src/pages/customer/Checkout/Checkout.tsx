@@ -277,7 +277,7 @@ export function Checkout() {
               <div className="flex items-center gap-space-xs font-label-md text-xs text-slate-500">
                 <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate('/')}>DANASEA</span>
                 <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-                <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate('/cart')}>Giỏ trải nghiệm biển</span>
+                <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate('/cart')}>Giỏ hàng</span>
                 <span className="material-symbols-outlined text-[14px]">chevron_right</span>
                 <span className="text-cyan-700 font-bold">Thông tin &amp; Thanh toán</span>
               </div>
@@ -287,14 +287,14 @@ export function Checkout() {
               <div 
                 onClick={() => navigate('/cart')}
                 className="flex items-center gap-space-sm rounded-xl bg-slate-50 border border-slate-100 p-2 cursor-pointer hover:bg-slate-100/90 hover:border-slate-300 transition-all group"
-                title="Quay lại Bước 1: Giỏ trải nghiệm để xem hoặc chỉnh sửa dịch vụ"
+                title="Quay lại Bước 1: Giỏ hàng để xem hoặc chỉnh sửa dịch vụ"
               >
                 <div className="w-8 h-8 rounded-full bg-emerald-600 group-hover:bg-emerald-700 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm transition-colors">
                   <span className="material-symbols-outlined text-[18px]">check</span>
                 </div>
                 <div className="min-w-0">
                   <p className="font-label-sm text-[11px] text-emerald-600 group-hover:text-emerald-700 font-bold uppercase tracking-wider transition-colors">Bước 1 - Hoàn thành</p>
-                  <p className="font-headline-sm text-xs font-bold text-slate-800 group-hover:text-cyan-800 truncate transition-colors">Giỏ trải nghiệm</p>
+                  <p className="font-headline-sm text-xs font-bold text-slate-800 group-hover:text-cyan-800 truncate transition-colors">Giỏ hàng</p>
                 </div>
               </div>
               <div className="flex items-center gap-space-sm p-space-xs rounded-xl bg-cyan-50/80 border border-cyan-200 shadow-sm p-2">

@@ -123,7 +123,7 @@ export function PaymentResult() {
                 </span>
                 <span className="material-symbols-outlined text-[14px]">chevron_right</span>
                 <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate("/cart")}>
-                  Giỏ trải nghiệm biển
+                  Giỏ hàng
                 </span>
                 <span className="material-symbols-outlined text-[14px]">chevron_right</span>
                 <span className="text-cyan-700 font-bold">Nhận vé điện tử QR</span>
@@ -137,7 +137,7 @@ export function PaymentResult() {
                 </div>
                 <div className="min-w-0">
                   <p className="font-label-sm text-[11px] text-emerald-600 font-bold uppercase tracking-wider">Bước 1 - Hoàn thành</p>
-                  <p className="font-headline-sm text-xs font-bold text-slate-800 truncate">Giỏ trải nghiệm</p>
+                  <p className="font-headline-sm text-xs font-bold text-slate-800 truncate">Giỏ hàng</p>
                 </div>
               </div>
 
