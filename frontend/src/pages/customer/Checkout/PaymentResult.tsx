@@ -349,26 +349,33 @@ export function PaymentResult() {
                 </div>
               </div>
 
-              {/* Navigation Action Buttons Card */}
-              <div className="bg-surface-container-lowest p-space-xl rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-3">
-                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-400">Hành động tiếp theo</h4>
-                <button
-                  onClick={() => navigate("/")}
-                  type="button"
-                  className="w-full py-3.5 px-4 rounded-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.01]"
-                >
-                  <span className="material-symbols-outlined text-[18px]">explore</span>
-                  <span>Tiếp tục khám phá trải nghiệm khác</span>
-                </button>
-
-                <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                  <span>Cần hỗ trợ đơn hàng?</span>
-                  <a className="text-cyan-700 font-bold hover:underline flex items-center gap-1" href="tel:19008468">
-                    <span className="material-symbols-outlined text-[15px]">call</span>
-                    <span>Hotline: 1900 8468</span>
-                  </a>
-                </div>
               </div>
+            </div>
+                    {/* BOTTOM ACTIONS BAR: Clean footer row beneath the two cards */}
+          <div className="mt-space-2xl pt-space-lg border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>Cần hỗ trợ về vé hoặc lịch trình?</span>
+              <a className="text-cyan-700 font-bold hover:underline flex items-center gap-1" href="tel:19008468">
+                <span className="material-symbols-outlined text-[15px]">call</span>
+                <span>Hotline: 1900 8468</span>
+              </a>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate("/profile/orders")}
+                type="button"
+                className="px-5 py-3 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Xem đơn hàng của tôi
+              </button>
+              <button
+                onClick={() => navigate("/")}
+                type="button"
+                className="px-6 py-3 rounded-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer hover:scale-[1.01]"
+              >
+                Tiếp tục khám phá trải nghiệm
+              </button>
             </div>
           </div>
         </div>
