@@ -563,7 +563,7 @@ export function Checkout() {
                     )}
                   </div>
                   
-                  {/* Pricing Breakdown pushed up directly below Promo Code */}
+                  {/* Subtotal & Promo breakdown directly below Promo Code */}
                   <div className="flex flex-col gap-2 pt-3 border-t border-slate-100 text-xs text-slate-600">
                     <div className="flex justify-between items-center text-sm">
                       <span>Tạm tính</span>
@@ -579,24 +579,25 @@ export function Checkout() {
                       <span>Phí dịch vụ</span>
                       <span className="text-emerald-600 font-medium">Miễn phí</span>
                     </div>
-                    <div className="flex justify-between items-baseline pt-space-md border-t border-slate-100 mt-space-xs">
-                      <div>
-                        <span className="text-sm font-bold text-slate-900">Tổng thanh toán:</span>
-                        <p className="text-[11px] text-slate-400">Đã bao gồm thuế &amp; bảo hiểm</p>
-                      </div>
-                      <span className="text-2xl sm:text-3xl leading-tight text-cyan-700 font-black tracking-tight">
-                        {finalTotal.toLocaleString('vi-VN')}₫
-                      </span>
-                    </div>
                   </div>
                 </div>
 
-                {/* Balance empty space is absorbed here, pushing button flush to bottom */}
-                <div className="mt-auto pt-6">
+                {/* Balance empty space is absorbed above, Total Payment sits right above button */}
+                <div className="mt-auto pt-4 flex flex-col gap-4">
+                  <div className="flex justify-between items-baseline pt-3 border-t border-slate-100">
+                    <div>
+                      <span className="text-sm font-bold text-slate-900">Tổng thanh toán:</span>
+                      <p className="text-[11px] text-slate-400">Đã bao gồm thuế &amp; bảo hiểm</p>
+                    </div>
+                    <span className="text-2xl sm:text-3xl leading-tight text-cyan-700 font-black tracking-tight">
+                      {finalTotal.toLocaleString('vi-VN')}₫
+                    </span>
+                  </div>
+
                   <button 
                     onClick={handlePayment} 
                     disabled={isProcessingPayment}
-                    className={`w-full py-4 rounded-full font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    className={`w-full py-4 rounded-full font-bold text-sm shadow-md transition-all flex items-center justify-center cursor-pointer ${
                       !isProcessingPayment
                         ? 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-cyan-600/25'
                         : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
@@ -604,15 +605,12 @@ export function Checkout() {
                     type="button"
                   >
                     {isProcessingPayment ? (
-                      <>
+                      <span className="flex items-center gap-2">
                         <span className="material-symbols-outlined animate-spin text-[20px]">refresh</span>
                         <span>Đang xử lý thanh toán...</span>
-                      </>
+                      </span>
                     ) : (
-                      <>
-                        <span className="material-symbols-outlined text-[20px]">lock</span>
-                        <span>Xác nhận &amp; Thanh toán</span>
-                      </>
+                      <span>Xác nhận &amp; Thanh toán</span>
                     )}
                   </button>
                 </div>
