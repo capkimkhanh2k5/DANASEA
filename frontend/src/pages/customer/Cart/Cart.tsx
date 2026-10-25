@@ -280,10 +280,6 @@ export function Cart() {
                   <span className="material-symbols-outlined text-[20px]">credit_card</span>
                   <span>Tiến hành đặt chỗ &amp; thanh toán</span>
                 </button>
-                <p className="text-center text-slate-400 text-[11px] mt-1 flex items-center justify-center gap-1">
-                  <span className="material-symbols-outlined text-[14px]">lock</span>
-                  Thanh toán bảo mật chuẩn SSL 256-bit
-                </p>
               </div>
               
               <div className="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-2 border border-slate-100">
