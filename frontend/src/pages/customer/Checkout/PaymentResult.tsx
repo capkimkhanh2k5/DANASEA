@@ -155,19 +155,108 @@ export function PaymentResult() {
 
         {/* Main Content Body */}
         <div className="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-space-xl sm:py-space-2xl w-full">
-          {/* SUCCESS HERO BANNER */}
+          {/* SUCCESS HERO BANNER WITH ANIMATED CHECKMARK DRAW */}
           <div className="flex flex-col items-center text-center mb-space-2xl">
-            <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shadow-md mb-3">
-              <span className="material-symbols-outlined text-[36px]">verified</span>
+            {/* Inline CSS Keyframe Animations for Checkmark Draw */}
+            <style>{`
+              @keyframes checkmark-circle {
+                0% {
+                  stroke-dashoffset: 160;
+                  transform: rotate(-90deg);
+                }
+                100% {
+                  stroke-dashoffset: 0;
+                  transform: rotate(0deg);
+                }
+              }
+              @keyframes checkmark-check {
+                0% {
+                  stroke-dashoffset: 40;
+                  opacity: 0;
+                }
+                40% {
+                  opacity: 1;
+                }
+                100% {
+                  stroke-dashoffset: 0;
+                  opacity: 1;
+                }
+              }
+              @keyframes checkmark-scale {
+                0%, 100% {
+                  transform: scale(1);
+                }
+                50% {
+                  transform: scale(1.08);
+                }
+              }
+              @keyframes hero-fade-up {
+                0% {
+                  opacity: 0;
+                  transform: translateY(10px);
+                }
+                100% {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+              .anim-check-circle {
+                stroke-dasharray: 160;
+                stroke-dashoffset: 160;
+                animation: checkmark-circle 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+                transform-origin: 50% 50%;
+              }
+              .anim-check-tick {
+                stroke-dasharray: 40;
+                stroke-dashoffset: 40;
+                animation: checkmark-check 0.4s 0.45s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+              }
+              .anim-check-container {
+                animation: checkmark-scale 0.4s 0.75s ease-in-out both;
+              }
+              .anim-fade-up-1 {
+                opacity: 0;
+                animation: hero-fade-up 0.5s 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+              }
+              .anim-fade-up-2 {
+                opacity: 0;
+                animation: hero-fade-up 0.5s 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+              }
+            `}</style>
+
+            {/* Animated Green Circle Checkmark */}
+            <div className="relative mb-3 flex items-center justify-center">
+              <div className="absolute w-20 h-20 rounded-full bg-emerald-100/50 animate-ping opacity-25 pointer-events-none" />
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center shadow-lg shadow-emerald-500/10 anim-check-container relative z-10">
+                <svg className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-600" viewBox="0 0 52 52">
+                  <circle
+                    className="anim-check-circle"
+                    cx="26"
+                    cy="26"
+                    r="23"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="3.5"
+                  />
+                  <path
+                    className="anim-check-tick"
+                    fill="none"
+                    stroke="#059669"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M15 27l7 7 15-15"
+                  />
+                </svg>
+              </div>
             </div>
 
-
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight max-w-2xl">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight max-w-2xl anim-fade-up-1">
               Thanh toán &amp; Xác nhận đặt chỗ thành công!
             </h1>
 
             {/* Notification Notice */}
-            <div className="mt-3 p-2 px-4 rounded-xl bg-cyan-50/60 border border-cyan-100 text-slate-700 inline-flex items-center gap-2 text-xs sm:text-sm">
+            <div className="mt-3 p-2 px-4 rounded-xl bg-cyan-50/60 border border-cyan-100 text-slate-700 inline-flex items-center gap-2 text-xs sm:text-sm anim-fade-up-2">
               <span className="material-symbols-outlined text-cyan-700 text-[18px] flex-shrink-0">mark_email_read</span>
               <span>Vé đã được gửi về email</span>
             </div>
