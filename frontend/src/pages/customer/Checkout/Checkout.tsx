@@ -293,24 +293,11 @@ export function Checkout() {
             
             {/* LEFT COLUMN: Checkout Forms (7 Cols on Desktop) */}
             <div className="lg:col-span-7 flex flex-col gap-space-xl">
-              {/* Countdown Hold Timer Banner */}
-              <div className="w-full rounded-xl bg-cyan-50/80 border border-cyan-200/80 px-4 py-3 shadow-xs flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-cyan-100 text-cyan-700 flex items-center justify-center flex-shrink-0">
-                    <span className="material-symbols-outlined text-[18px]">timer</span>
-                  </div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xs sm:text-sm text-slate-700 font-medium">Thời gian giữ chỗ:</span>
-                    <span className="font-bold text-cyan-700 font-mono text-base sm:text-lg" id="checkout-timer">{formatTime(countdown)}</span>
-                  </div>
-                </div>
-                {isHolding ? (
-                  <span className="text-xs text-cyan-600 animate-pulse font-medium">Đang giữ chỗ...</span>
-                ) : bookingHold ? (
-                  <div className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-200 whitespace-nowrap">
-                    ✓ Đã giữ chỗ
-                  </div>
-                ) : null}
+              {/* Hold Timer Line - No Background, Black Outline Icon */}
+              <div className="flex items-center gap-2 text-slate-900 px-1 -mb-1">
+                <span className="material-symbols-outlined text-slate-900 text-[20px]">timer</span>
+                <span className="text-sm font-medium text-slate-800">Thời gian giữ chỗ:</span>
+                <span className="font-bold text-slate-900 font-mono text-base sm:text-lg" id="checkout-timer">{formatTime(countdown)}</span>
               </div>
 
               {/* ID display between timer and customer info without background */}
