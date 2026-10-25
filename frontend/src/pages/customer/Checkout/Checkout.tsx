@@ -253,10 +253,6 @@ export function Checkout() {
                 <span className="material-symbols-outlined text-[14px]">chevron_right</span>
                 <span className="text-cyan-700 font-bold">Thông tin &amp; Thanh toán</span>
               </div>
-              <div className="flex items-center gap-space-xs px-3 py-1 rounded-full bg-cyan-50 text-cyan-800 text-xs font-medium border border-cyan-100">
-                <span className="w-2 h-2 rounded-full bg-cyan-600 animate-ping"></span>
-                <span>Mã phiên giữ chỗ: <strong>DNS-{sessionCode}</strong></span>
-              </div>
             </div>
             {/* Stepper Component */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-space-sm items-center">
@@ -315,6 +311,11 @@ export function Checkout() {
                     ✓ Đã giữ chỗ
                   </div>
                 ) : null}
+              </div>
+
+              {/* ID display between timer and customer info without background */}
+              <div className="text-xs text-slate-500 font-mono -mt-2 -mb-2 px-1">
+                ID: <span className="font-semibold text-slate-700">DNS-{sessionCode}</span>
               </div>
 
               {paymentError && (
