@@ -56,7 +56,7 @@ export function Cart() {
               {items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 bg-surface-container-lowest rounded-2xl shadow-sm text-center px-4">
                   <div className="w-16 h-16 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center mb-4">
-                    <span className="material-symbols-outlined text-[36px]">shopping_bag</span>
+                    <span className="material-symbols-outlined text-[36px]">shopping_cart</span>
                   </div>
                   <h2 className="font-headline-sm text-xl font-bold text-slate-800 mb-2">Giỏ hàng của bạn đang trống</h2>
                   <p className="text-on-surface-variant text-sm mb-6 max-w-md">

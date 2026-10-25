@@ -111,7 +111,7 @@ export function Header() {
             </Link>
             
             <Link to="/cart" aria-label="Giỏ hàng" className="relative w-10 h-10 rounded-full flex items-center justify-center bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors">
-              <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
+              <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
               {cartItemCount > 0 && (
                 <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-secondary text-on-secondary font-label-sm text-[10px] flex items-center justify-center leading-none">{cartItemCount}</span>
               )}
