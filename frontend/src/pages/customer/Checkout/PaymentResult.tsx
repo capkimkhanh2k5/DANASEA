@@ -136,7 +136,7 @@ export function PaymentResult() {
                   <span className="material-symbols-outlined text-[18px]">check</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="font-label-sm text-[11px] text-slate-400 uppercase tracking-wider">Bước 1</p>
+                  <p className="font-label-sm text-[11px] text-emerald-600 font-bold uppercase tracking-wider">Bước 1 - Hoàn thành</p>
                   <p className="font-headline-sm text-xs font-bold text-slate-800 truncate">Giỏ trải nghiệm</p>
                 </div>
               </div>
@@ -146,17 +146,17 @@ export function PaymentResult() {
                   <span className="material-symbols-outlined text-[18px]">check</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="font-label-sm text-[11px] text-slate-400 uppercase tracking-wider">Bước 2</p>
+                  <p className="font-label-sm text-[11px] text-emerald-600 font-bold uppercase tracking-wider">Bước 2 - Hoàn thành</p>
                   <p className="font-headline-sm text-xs font-bold text-slate-800 truncate">Thông tin &amp; Thanh toán</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-space-sm rounded-xl bg-cyan-50/80 border border-cyan-200 shadow-sm p-2">
-                <div className="w-8 h-8 rounded-full bg-cyan-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm">
-                  <span>3</span>
+                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm">
+                  <span className="material-symbols-outlined text-[18px]">check</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="font-label-sm text-[11px] text-cyan-600 font-bold uppercase tracking-wider">Bước 3 • Hoàn tất</p>
+                  <p className="font-label-sm text-[11px] text-emerald-600 font-bold uppercase tracking-wider">Bước 3 - Hoàn thành</p>
                   <p className="font-headline-sm text-xs font-bold text-cyan-900 truncate">Nhận vé điện tử QR</p>
                 </div>
               </div>

@@ -289,7 +289,7 @@ export function Checkout() {
                   <span className="material-symbols-outlined text-[18px]">check</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="font-label-sm text-[11px] text-slate-400 uppercase tracking-wider">Bước 1</p>
+                  <p className="font-label-sm text-[11px] text-emerald-600 font-bold uppercase tracking-wider">Bước 1 - Hoàn thành</p>
                   <p className="font-headline-sm text-xs font-bold text-slate-800 truncate">Giỏ trải nghiệm ({items.length} mục)</p>
                 </div>
               </div>
@@ -298,7 +298,7 @@ export function Checkout() {
                   <span>2</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="font-label-sm text-[11px] text-cyan-600 font-bold uppercase tracking-wider">Bước 2 • Đang thực hiện</p>
+                  <p className="font-label-sm text-[11px] text-cyan-600 font-bold uppercase tracking-wider">Bước 2</p>
                   <p className="font-headline-sm text-xs font-bold text-cyan-900 truncate">Thông tin &amp; Thanh toán</p>
                 </div>
               </div>
