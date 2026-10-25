@@ -289,10 +289,10 @@ export function Checkout() {
 
         {/* Main Checkout Workflow Area */}
         <main className="w-full max-w-[1280px] mx-auto px-margin-desktop py-space-xl">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-2xl items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-2xl items-stretch">
             
             {/* LEFT COLUMN: Checkout Forms (7 Cols on Desktop) */}
-            <div className="lg:col-span-7 flex flex-col gap-space-xl">
+            <div className="lg:col-span-7 flex flex-col h-full">
               {paymentError && (
                 <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium flex items-center gap-2">
                   <span className="material-symbols-outlined text-amber-600">info</span>
@@ -301,7 +301,7 @@ export function Checkout() {
               )}
 
               {/* Unified Checkout Form Card */}
-              <div className="w-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-sm border border-slate-100 flex flex-col gap-space-xl">
+              <div className="w-full h-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-sm border border-slate-100 flex flex-col justify-between gap-space-xl">
                 {/* Hold Timer & ID Header Inside Card */}
                 <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-3">
                   <div className="flex items-center gap-2 text-slate-900">
@@ -463,9 +463,9 @@ export function Checkout() {
             </div>
 
             {/* RIGHT COLUMN: Sticky Order Summary & Price Breakdown (5 Cols on Desktop) */}
-            <div className="lg:col-span-5 flex flex-col gap-space-lg sticky top-24">
+            <div className="lg:col-span-5 flex flex-col h-full">
               {/* Booking Summary Card */}
-              <div className="w-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-md border border-slate-100 flex flex-col gap-space-lg">
+              <div className="w-full h-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-md border border-slate-100 flex flex-col justify-between gap-space-lg">
                 <div className="flex items-center justify-between border-b pb-space-sm border-slate-100">
                   <h3 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Tóm tắt trải nghiệm biển</h3>
                   <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-800 font-label-sm text-xs font-bold border border-cyan-100">
@@ -543,7 +543,8 @@ export function Checkout() {
                   )}
                 </div>
                 
-                <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
+                <div className="flex flex-col gap-space-lg mt-auto pt-2">
+                  <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
                   <div className="flex justify-between items-center text-sm">
                     <span>Tạm tính</span>
                     <span className="text-slate-900 font-semibold">{rawTotal.toLocaleString('vi-VN')}₫</span>
@@ -591,6 +592,7 @@ export function Checkout() {
                     </>
                   )}
                 </button>
+                </div>
               </div>
             </div>
           </div>
