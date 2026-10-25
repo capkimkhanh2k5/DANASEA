@@ -283,15 +283,14 @@ export function Cart() {
                 <button 
                   onClick={handleCheckout} 
                   disabled={items.length === 0}
-                  className={`w-full py-4 rounded-full font-bold text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer ${
+                  className={`w-full py-4 rounded-full font-bold text-sm flex items-center justify-center shadow-md transition-all cursor-pointer ${
                     items.length > 0 
                       ? 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-cyan-600/20' 
                       : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                   }`} 
                   type="button"
                 >
-                  <span className="material-symbols-outlined text-[20px]">credit_card</span>
-                  <span>Tiến hành đặt chỗ &amp; thanh toán</span>
+                  Tiến hành đặt chỗ &amp; thanh toán
                 </button>
               </div>
             </aside>

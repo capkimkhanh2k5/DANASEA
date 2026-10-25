@@ -871,17 +871,16 @@ export function ExperienceDetail() {
                     <button
                       type="button"
                       onClick={() => navigate('/cart')}
-                      className="w-full py-3.5 px-6 rounded-full font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-98 shadow-cyan-600/20"
+                      className="w-full py-3.5 px-6 rounded-full font-bold text-sm shadow-md flex items-center justify-center transition-all cursor-pointer bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-98 shadow-cyan-600/20"
                     >
-                      <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
-                      <span>Xem giỏ hàng</span>
+                      Xem giỏ hàng
                     </button>
                   ) : (
                     <button
                       type="button"
                       onClick={handleAddToCart}
                       disabled={!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked) || isAdding}
-                      className={`w-full py-3.5 px-6 rounded-full font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      className={`w-full py-3.5 px-6 rounded-full font-bold text-sm shadow-md flex items-center justify-center transition-all cursor-pointer ${
                         isAdding
                           ? 'bg-cyan-600 text-white scale-98'
                           : (!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked))
@@ -889,12 +888,7 @@ export function ExperienceDetail() {
                           : 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-98 shadow-cyan-600/20'
                       }`}
                     >
-                      {isAdding ? (
-                        <span className="material-symbols-outlined animate-spin text-[20px]">refresh</span>
-                      ) : (
-                        <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
-                      )}
-                      <span>{isAdding ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}</span>
+                      {isAdding ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}
                     </button>
                   )}
 
