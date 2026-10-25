@@ -437,7 +437,7 @@ export function ExperienceDetail() {
           <div className="w-full flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-amber-50/80 border border-amber-200/70 text-amber-900 text-xs shadow-2xs">
             <span className="material-symbols-outlined text-amber-600 text-[16px] shrink-0">health_and_safety</span>
             <p className="leading-tight">
-              <strong className="font-semibold text-amber-950">Lưu ý an toàn:</strong> Bắt buộc mặc áo phao, đủ sức khỏe tham gia và tuân thủ huấn luyện viên. Hoàn 100% nếu hủy trước 24h hoặc do biển động theo lệnh cảng vụ.
+              <strong className="font-semibold text-amber-950">Lưu ý:</strong> Bắt buộc mặc áo phao, đủ sức khỏe tham gia và tuân thủ huấn luyện viên. Hoàn 100% nếu hủy trước 24h hoặc do biển động theo lệnh cảng vụ.
             </p>
           </div>
 
