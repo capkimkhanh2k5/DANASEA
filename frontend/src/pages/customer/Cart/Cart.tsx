@@ -242,14 +242,6 @@ export function Cart() {
 
             {/* Right Column: Sticky Order Summary */}
             <aside className="lg:col-span-4 flex flex-col gap-space-md lg:sticky lg:top-28">
-              <div className="p-space-md rounded-xl bg-cyan-50 border border-cyan-100 flex items-center gap-space-sm">
-                <span className="material-symbols-outlined text-cyan-700 text-[24px] flex-shrink-0">verified_user</span>
-                <div className="flex-1">
-                  <p className="font-label-sm text-xs text-cyan-900 font-bold uppercase tracking-wider">Bảo vệ đặt chỗ 100%</p>
-                  <p className="font-body-sm text-xs text-cyan-800 mt-0.5">Cam kết giữ đúng slot và hoàn tiền nếu thời tiết biển không thuận lợi.</p>
-                </div>
-              </div>
-
               <div className="p-space-lg rounded-2xl bg-surface-container-lowest shadow-sm border border-slate-100 flex flex-col gap-space-md">
                 <h2 className="font-headline-sm text-lg font-bold text-slate-900 pb-space-xs border-b border-slate-100">
                   Tóm tắt đơn hàng
@@ -274,6 +266,15 @@ export function Cart() {
                     <p className="font-headline-lg text-2xl text-cyan-700 font-black leading-none">
                       {getTotalPrice().toLocaleString('vi-VN')}₫
                     </p>
+                  </div>
+                </div>
+
+                {/* Bảo vệ đặt chỗ 100% tích hợp gọn gàng bên trong ô tóm tắt đơn hàng */}
+                <div className="p-space-md rounded-xl bg-cyan-50/70 border border-cyan-100 flex items-center gap-space-sm mt-1">
+                  <span className="material-symbols-outlined text-cyan-700 text-[22px] flex-shrink-0">verified_user</span>
+                  <div className="flex-1">
+                    <p className="font-label-sm text-xs text-cyan-900 font-bold uppercase tracking-wider">Bảo vệ đặt chỗ 100%</p>
+                    <p className="font-body-sm text-xs text-cyan-800 mt-0.5">Cam kết giữ đúng slot và hoàn tiền nếu thời tiết biển không thuận lợi.</p>
                   </div>
                 </div>
               </div>
