@@ -165,10 +165,27 @@ export function ExperienceDetail() {
     return Array.from(dateSet).sort();
   }, [service]);
 
-  // Slots for the currently chosen date
+  // Slots for the currently chosen date, deduplicated by slotId and time window
   const slotsForSelectedDate: StructuredSlotDto[] = useMemo(() => {
     if (!service || !service.slots || !selectedDate) return [];
-    return service.slots.filter((s) => s.date === selectedDate);
+    const seenSlotIds = new Set<string>();
+    const seenTimeRanges = new Set<string>();
+    const uniqueSlots: StructuredSlotDto[] = [];
+
+    for (const slot of service.slots) {
+      if (slot.date !== selectedDate) continue;
+
+      const timeKey = `${slot.startTime.slice(0, 5)}-${slot.endTime.slice(0, 5)}`;
+      if (seenSlotIds.has(slot.slotId) || seenTimeRanges.has(timeKey)) {
+        continue;
+      }
+
+      seenSlotIds.add(slot.slotId);
+      seenTimeRanges.add(timeKey);
+      uniqueSlots.push(slot);
+    }
+
+    return uniqueSlots;
   }, [service, selectedDate]);
 
   // Active slot object
@@ -775,7 +792,7 @@ export function ExperienceDetail() {
                             >
                               <div className="flex flex-col">
                                 <span className={`text-sm font-bold ${isSelected ? 'text-cyan-800' : 'text-slate-800'}`}>
-                                  {slot.startTime} - {slot.endTime}
+                                  {slot.startTime.slice(0, 5)} - {slot.endTime.slice(0, 5)}
                                 </span>
                                 <span className="text-[11px] text-slate-500 mt-0.5">
                                   {isFull ? 'Đã hết chỗ' : `Còn ${remain} chỗ trống (Tổng ${slot.capacity})`}
