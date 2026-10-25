@@ -332,42 +332,33 @@ export function Checkout() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
                     <div className="flex flex-col gap-1.5">
                       <label className="font-label-md text-xs font-semibold text-slate-700">Họ và tên *</label>
-                      <div className="relative flex items-center">
-                        <span className="material-symbols-outlined absolute left-4 text-slate-400 text-[20px]">person</span>
-                        <input 
-                          className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
-                          type="text" 
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          placeholder="Nhập họ và tên du khách"
-                        />
-                      </div>
+                      <input 
+                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
+                        type="text" 
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Nhập họ và tên du khách"
+                      />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <label className="font-label-md text-xs font-semibold text-slate-700">Số điện thoại liên hệ *</label>
-                      <div className="relative flex items-center">
-                        <span className="material-symbols-outlined absolute left-4 text-slate-400 text-[20px]">call</span>
-                        <input 
-                          className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
-                          type="tel" 
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          placeholder="Số điện thoại Zalo nhận vé"
-                        />
-                      </div>
+                      <input 
+                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
+                        type="tel" 
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="Số điện thoại Zalo nhận vé"
+                      />
                     </div>
                     <div className="flex flex-col gap-1.5 md:col-span-2">
                       <label className="font-label-md text-xs font-semibold text-slate-700">Địa chỉ Email nhận mã QR *</label>
-                      <div className="relative flex items-center">
-                        <span className="material-symbols-outlined absolute left-4 text-slate-400 text-[20px]">mail</span>
-                        <input 
-                          className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
-                          type="email" 
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="Email nhận hóa đơn điện tử"
-                        />
-                      </div>
+                      <input 
+                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
+                        type="email" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Email nhận hóa đơn điện tử"
+                      />
                     </div>
                     <div className="flex flex-col gap-1.5 md:col-span-2">
                       <label className="font-label-md text-xs font-semibold text-slate-700">Ghi chú đặc biệt (tùy chọn)</label>
