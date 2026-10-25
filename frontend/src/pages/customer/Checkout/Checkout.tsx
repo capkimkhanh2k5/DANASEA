@@ -456,133 +456,137 @@ export function Checkout() {
             {/* RIGHT COLUMN: Sticky Order Summary & Price Breakdown (5 Cols on Desktop) */}
             <div className="lg:col-span-5 flex flex-col h-full">
               {/* Booking Summary Card */}
-              <div className="w-full h-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-md border border-slate-100 flex flex-col justify-between gap-space-lg">
-                <div className="flex items-center justify-between border-b pb-space-sm border-slate-100">
-                  <h3 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Tóm tắt trải nghiệm biển</h3>
-                  <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-800 font-label-sm text-xs font-bold border border-cyan-100">
-                    {items.length} Dịch vụ
-                  </span>
-                </div>
+              <div className="w-full h-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-md border border-slate-100 flex flex-col">
                 <div className="flex flex-col gap-space-md">
-                  {items.map((item) => {
-                    const title = item.serviceName || 'Trải nghiệm biển';
-                    const image = item.thumbnailUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800';
-                    const location = item.locationName || 'Đà Nẵng';
-                    const dateStr = item.selectedDate || item.date || 'Hôm nay';
-                    const timeStr = item.timeSlot || '08:00 - 10:00';
-
-                    return (
-                      <div key={item.id} className="flex gap-space-sm items-start border-b pb-space-md border-slate-100 last:border-0 last:pb-0">
-                        <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
-                          <img className="w-full h-full object-cover" alt={title} src={image} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700 text-[10px] font-bold">{location}</span>
-                            <span className="font-bold text-sm text-slate-900">{(item.unitPrice * item.quantity).toLocaleString('vi-VN')}₫</span>
-                          </div>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-900 leading-tight mt-1 truncate">{title}</h4>
-                          <p className="text-[11px] text-slate-500 mt-0.5">{timeStr} • {dateStr}</p>
-                          <div className="flex items-center justify-between mt-1 text-slate-500 text-[11px]">
-                            <span>{item.unitPrice.toLocaleString('vi-VN')}₫ × {item.quantity} khách</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                
-                {/* Promo Code Input */}
-                <div className="pt-2 border-t border-slate-100">
-                  <label className="text-xs font-semibold text-slate-700 block mb-1.5">Mã ưu đãi / Khuyến mãi</label>
-                  {appliedPromoCode ? (
-                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-emerald-600 text-sm">check_circle</span>
-                        <span className="font-bold text-emerald-800">{appliedPromoCode}</span>
-                        <span className="text-emerald-700">(-{discountAmount.toLocaleString('vi-VN')}₫)</span>
-                      </div>
-                      <button
-                        onClick={handleRemovePromo}
-                        className="text-red-500 hover:text-red-700 font-medium cursor-pointer"
-                        type="button"
-                      >
-                        Gỡ bỏ
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={promoInput}
-                          onChange={(e) => setPromoInput(e.target.value)}
-                          placeholder="Nhập DANASEA10 hoặc HE2024"
-                          className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 uppercase focus:outline-none focus:ring-1 focus:ring-cyan-600"
-                        />
-                        <button
-                          onClick={handleApplyPromo}
-                          disabled={isApplyingPromo || !promoInput.trim()}
-                          type="button"
-                          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors"
-                        >
-                          {isApplyingPromo ? 'Đang kiểm tra...' : 'Áp dụng'}
-                        </button>
-                      </div>
-                      {promoError && <p className="text-[11px] text-red-500">{promoError}</p>}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="flex flex-col gap-space-lg mt-auto pt-2">
-                  <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600">
-                  <div className="flex justify-between items-center text-sm">
-                    <span>Tạm tính</span>
-                    <span className="text-slate-900 font-semibold">{rawTotal.toLocaleString('vi-VN')}₫</span>
-                  </div>
-                  {appliedPromoCode && (
-                    <div className="flex justify-between items-center text-sm text-emerald-600 font-bold">
-                      <span>Ưu đãi áp dụng ({appliedPromoCode})</span>
-                      <span>-{discountAmount.toLocaleString('vi-VN')}₫</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center text-xs text-slate-500">
-                    <span>Phí dịch vụ</span>
-                    <span className="text-emerald-600 font-medium">Miễn phí</span>
-                  </div>
-                  <div className="flex justify-between items-baseline pt-space-md border-t border-slate-100 mt-space-xs">
-                    <div>
-                      <span className="text-sm font-bold text-slate-900">Tổng thanh toán:</span>
-                      <p className="text-[11px] text-slate-400">Đã bao gồm thuế &amp; bảo hiểm</p>
-                    </div>
-                    <span className="text-2xl sm:text-3xl leading-tight text-cyan-700 font-black tracking-tight">
-                      {finalTotal.toLocaleString('vi-VN')}₫
+                  <div className="flex items-center justify-between border-b pb-space-sm border-slate-100">
+                    <h3 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Tóm tắt trải nghiệm biển</h3>
+                    <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-800 font-label-sm text-xs font-bold border border-cyan-100">
+                      {items.length} Dịch vụ
                     </span>
                   </div>
+                  <div className="flex flex-col gap-space-md">
+                    {items.map((item) => {
+                      const title = item.serviceName || 'Trải nghiệm biển';
+                      const image = item.thumbnailUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800';
+                      const location = item.locationName || 'Đà Nẵng';
+                      const dateStr = item.selectedDate || item.date || 'Hôm nay';
+                      const timeStr = item.timeSlot || '08:00 - 10:00';
+
+                      return (
+                        <div key={item.id} className="flex gap-space-sm items-start border-b pb-space-md border-slate-100 last:border-0 last:pb-0">
+                          <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
+                            <img className="w-full h-full object-cover" alt={title} src={image} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700 text-[10px] font-bold">{location}</span>
+                              <span className="font-bold text-sm text-slate-900">{(item.unitPrice * item.quantity).toLocaleString('vi-VN')}₫</span>
+                            </div>
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-900 leading-tight mt-1 truncate">{title}</h4>
+                            <p className="text-[11px] text-slate-500 mt-0.5">{timeStr} • {dateStr}</p>
+                            <div className="flex items-center justify-between mt-1 text-slate-500 text-[11px]">
+                              <span>{item.unitPrice.toLocaleString('vi-VN')}₫ × {item.quantity} khách</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Promo Code Input */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <label className="text-xs font-semibold text-slate-700 block mb-1.5">Mã ưu đãi / Khuyến mãi</label>
+                    {appliedPromoCode ? (
+                      <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-emerald-600 text-sm">check_circle</span>
+                          <span className="font-bold text-emerald-800">{appliedPromoCode}</span>
+                          <span className="text-emerald-700">(-{discountAmount.toLocaleString('vi-VN')}₫)</span>
+                        </div>
+                        <button
+                          onClick={handleRemovePromo}
+                          className="text-red-500 hover:text-red-700 font-medium cursor-pointer"
+                          type="button"
+                        >
+                          Gỡ bỏ
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={promoInput}
+                            onChange={(e) => setPromoInput(e.target.value)}
+                            placeholder="Nhập DANASEA10 hoặc HE2024"
+                            className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 uppercase focus:outline-none focus:ring-1 focus:ring-cyan-600"
+                          />
+                          <button
+                            onClick={handleApplyPromo}
+                            disabled={isApplyingPromo || !promoInput.trim()}
+                            type="button"
+                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                          >
+                            {isApplyingPromo ? 'Đang kiểm tra...' : 'Áp dụng'}
+                          </button>
+                        </div>
+                        {promoError && <p className="text-[11px] text-red-500">{promoError}</p>}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Pricing Breakdown pushed up directly below Promo Code */}
+                  <div className="flex flex-col gap-2 pt-3 border-t border-slate-100 text-xs text-slate-600">
+                    <div className="flex justify-between items-center text-sm">
+                      <span>Tạm tính</span>
+                      <span className="text-slate-900 font-semibold">{rawTotal.toLocaleString('vi-VN')}₫</span>
+                    </div>
+                    {appliedPromoCode && (
+                      <div className="flex justify-between items-center text-sm text-emerald-600 font-bold">
+                        <span>Ưu đãi áp dụng ({appliedPromoCode})</span>
+                        <span>-{discountAmount.toLocaleString('vi-VN')}₫</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-xs text-slate-500">
+                      <span>Phí dịch vụ</span>
+                      <span className="text-emerald-600 font-medium">Miễn phí</span>
+                    </div>
+                    <div className="flex justify-between items-baseline pt-space-md border-t border-slate-100 mt-space-xs">
+                      <div>
+                        <span className="text-sm font-bold text-slate-900">Tổng thanh toán:</span>
+                        <p className="text-[11px] text-slate-400">Đã bao gồm thuế &amp; bảo hiểm</p>
+                      </div>
+                      <span className="text-2xl sm:text-3xl leading-tight text-cyan-700 font-black tracking-tight">
+                        {finalTotal.toLocaleString('vi-VN')}₫
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                <button 
-                  onClick={handlePayment} 
-                  disabled={isProcessingPayment}
-                  className={`w-full py-4 rounded-full font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                    !isProcessingPayment
-                      ? 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-cyan-600/25'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                  }`} 
-                  type="button"
-                >
-                  {isProcessingPayment ? (
-                    <>
-                      <span className="material-symbols-outlined animate-spin text-[20px]">refresh</span>
-                      <span>Đang xử lý thanh toán...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[20px]">lock</span>
-                      <span>Xác nhận &amp; Thanh toán {finalTotal.toLocaleString('vi-VN')}₫</span>
-                    </>
-                  )}
-                </button>
+                {/* Balance empty space is absorbed here, pushing button flush to bottom */}
+                <div className="mt-auto pt-6">
+                  <button 
+                    onClick={handlePayment} 
+                    disabled={isProcessingPayment}
+                    className={`w-full py-4 rounded-full font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      !isProcessingPayment
+                        ? 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-cyan-600/25'
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                    }`} 
+                    type="button"
+                  >
+                    {isProcessingPayment ? (
+                      <>
+                        <span className="material-symbols-outlined animate-spin text-[20px]">refresh</span>
+                        <span>Đang xử lý thanh toán...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[20px]">lock</span>
+                        <span>Xác nhận &amp; Thanh toán {finalTotal.toLocaleString('vi-VN')}₫</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
