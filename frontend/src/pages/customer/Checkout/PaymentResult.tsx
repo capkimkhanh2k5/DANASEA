@@ -35,7 +35,6 @@ export function PaymentResult() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [order, setOrder] = useState<OrderSnapshot | null>(null);
-  const [copied, setCopied] = useState(false);
   const [savedTicketId, setSavedTicketId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,13 +86,7 @@ export function PaymentResult() {
   const displayEmail = order.customerEmail || order.email || "khachhang@danasea.vn";
   const displayPhone = order.customerPhone || order.phone || "0912 345 678";
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(order.orderCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
-  const handleSaveTicket = (ticketCode: string) => {
+    const handleSaveTicket = (ticketCode: string) => {
     setSavedTicketId(ticketCode);
     setTimeout(() => setSavedTicketId(null), 3000);
   };
@@ -176,33 +169,6 @@ export function PaymentResult() {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight max-w-2xl">
               Thanh toán &amp; Xác nhận đặt chỗ thành công!
             </h1>
-
-            {/* Meta Order Badges */}
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-xs text-slate-700 border border-slate-200">
-                <span className="text-slate-500">Mã đơn:</span>
-                <span className="font-bold text-cyan-800 font-mono">{order.orderCode}</span>
-                <button
-                  onClick={handleCopyCode}
-                  className="hover:text-cyan-700 transition-colors ml-0.5 cursor-pointer"
-                  title="Sao chép mã đơn"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[15px]">{copied ? "check" : "content_copy"}</span>
-                </button>
-                {copied && <span className="text-[10px] text-emerald-600 font-bold ml-1">Đã chép!</span>}
-              </div>
-
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-xs text-slate-700 border border-slate-200">
-                <span className="material-symbols-outlined text-[15px] text-slate-500">schedule</span>
-                <span>{order.paidAt}</span>
-              </div>
-
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-xs text-slate-700 border border-slate-200">
-                <span className="material-symbols-outlined text-[15px] text-slate-500">account_balance_wallet</span>
-                <span>{getProviderLabel(order.paymentProvider)}</span>
-              </div>
-            </div>
 
             {/* Notification Notice */}
             <div className="mt-4 p-3 px-5 rounded-2xl bg-cyan-50/60 border border-cyan-100 text-slate-700 flex items-center gap-2.5 max-w-xl text-left text-xs sm:text-sm">
