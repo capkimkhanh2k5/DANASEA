@@ -37,8 +37,6 @@ export function Checkout() {
   const [promoError, setPromoError] = useState<string>("");
   const [isApplyingPromo, setIsApplyingPromo] = useState<boolean>(false);
 
-  // Waiver acceptance
-  const [waiverAccepted, setWaiverAccepted] = useState<boolean>(true);
 
   // Payment processing state
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
@@ -194,10 +192,6 @@ export function Checkout() {
 
   // Submit Payment Handler
   const handlePayment = async () => {
-    if (!waiverAccepted) {
-      alert("Vui lòng đồng ý với Cam kết an toàn & Miễn trừ trách nhiệm trước khi thanh toán.");
-      return;
-    }
 
     setIsProcessingPayment(true);
     setPaymentError(null);
@@ -475,47 +469,6 @@ export function Checkout() {
                   </label>
                 </div>
               </section>
-
-              {/* Section 3: Ocean Safety & Marine Regulations Acknowledgment */}
-              <section className="w-full rounded-2xl bg-surface-container-low p-space-xl shadow-sm border border-slate-100 flex flex-col gap-space-md">
-                <div className="flex items-center gap-space-sm">
-                  <div className="w-8 h-8 rounded-full bg-cyan-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-                    <span className="material-symbols-outlined text-[20px]">assignment_turned_in</span>
-                  </div>
-                  <div>
-                    <h2 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Cam kết an toàn biển &amp; Miễn trừ trách nhiệm</h2>
-                    <p className="font-body-sm text-xs text-slate-500">Quy định cứu sinh bắt buộc theo giấy phép cảng vụ hàng hải Đà Nẵng</p>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-space-md">
-                  {items.map((item, i) => {
-                    const title = item.serviceName || 'Trải nghiệm biển';
-                    const location = item.locationName || 'Đà Nẵng';
-                    return (
-                      <div key={item.id} className="p-space-md rounded-xl bg-surface-container-lowest border border-slate-200 flex flex-col gap-space-xs">
-                        <div className="flex items-center gap-2 font-label-lg text-xs font-bold text-slate-800">
-                          <span className="material-symbols-outlined text-[16px] text-cyan-600">verified_user</span> 
-                          <span>{i + 1}. Miễn trừ trách nhiệm: {title}</span>
-                        </div>
-                        <p className="font-body-sm text-xs text-slate-600 leading-relaxed bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                          Tôi xác nhận đã có đủ sức khỏe thể chất, cam kết bắt buộc mặc áo phao và tuân thủ tuyệt đối mọi hướng dẫn của huấn luyện viên DANASEA tại khu vực {location}.
-                        </p>
-                      </div>
-                    );
-                  })}
-                  <label className="flex items-start gap-space-xs cursor-pointer pt-space-2xs">
-                    <input 
-                      className="mt-0.5 w-4 h-4 accent-cyan-600 cursor-pointer rounded" 
-                      type="checkbox" 
-                      checked={waiverAccepted}
-                      onChange={(e) => setWaiverAccepted(e.target.checked)}
-                    />
-                    <span className="font-label-md text-xs text-slate-700 font-medium">
-                      Tôi đã đọc, hiểu rõ và đồng ý với toàn bộ quy chuẩn an toàn &amp; điều khoản miễn trừ trách nhiệm *
-                    </span>
-                  </label>
-                </div>
-              </section>
             </div>
 
             {/* RIGHT COLUMN: Sticky Order Summary & Price Breakdown (5 Cols on Desktop) */}
@@ -627,9 +580,9 @@ export function Checkout() {
 
                 <button 
                   onClick={handlePayment} 
-                  disabled={isProcessingPayment || !waiverAccepted}
+                  disabled={isProcessingPayment}
                   className={`w-full py-4 rounded-full font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer ${
-                    waiverAccepted && !isProcessingPayment
+                    !isProcessingPayment
                       ? 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-cyan-600/25'
                       : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                   }`} 
