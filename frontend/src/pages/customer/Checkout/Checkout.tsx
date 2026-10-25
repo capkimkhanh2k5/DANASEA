@@ -455,10 +455,7 @@ export function Checkout() {
                       <span className="material-symbols-outlined text-blue-600">credit_card</span>
                     </label>
 
-                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80 text-xs text-slate-600 flex items-start gap-2 mt-1">
-                      <span className="material-symbols-outlined text-cyan-600 text-base shrink-0 mt-0.5">info</span>
-                      <span>Sau khi nhấn thanh toán, hệ thống sẽ chuyển hướng an toàn đến cổng thanh toán đã chọn (VNPay Sandbox hoặc PayPal) để quý khách quét mã QR ngân hàng hoặc xác nhận giao dịch.</span>
-                    </div>
+                    
                   </div>
                 </div>
               </div>
