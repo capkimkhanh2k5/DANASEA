@@ -278,7 +278,7 @@ export function ExperienceDetail() {
         serviceId: service.id,
         slotId: activeSlot.slotId,
         optionId: selectedOption?.id || activeSlot.optionId,
-        locationName: service.address || 'Đà Nẵng',
+        locationName: 'Đà Nẵng',
         vendorName: service.businessName || 'DANASEA Official Partner',
         quantity: qty,
         unitPrice: unitPrice,
@@ -402,15 +402,7 @@ export function ExperienceDetail() {
                   <span className="material-symbols-outlined text-[18px] text-cyan-600">visibility</span>
                   <span>{service.viewCount || 1500} lượt xem</span>
                 </div>
-                {service.address && (
-                  <>
-                    <span className="text-slate-300">•</span>
-                    <div className="flex items-center gap-1 text-slate-700 truncate max-w-xs sm:max-w-md">
-                      <span className="material-symbols-outlined text-[18px] text-cyan-600 shrink-0">location_on</span>
-                      <span className="truncate">{service.address}</span>
-                    </div>
-                  </>
-                )}
+
               </div>
             </div>
 
