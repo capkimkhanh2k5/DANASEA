@@ -383,7 +383,7 @@ export function ExperienceDetail() {
           {/* Title & Quick Actions Header */}
           <section className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div className="flex flex-col gap-2 flex-1 min-w-0 pr-4">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-snug">
+              <h1 className="text-xl sm:text-2xl lg:text-[26px] font-bold text-slate-900 tracking-tight leading-snug">
                 {service.name}
               </h1>
               <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs sm:text-sm text-slate-600">
