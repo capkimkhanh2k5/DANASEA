@@ -14,42 +14,58 @@ export function Cart() {
   return (
     <main className="w-full pt-20 bg-surface flex-1">
       <div className="flex flex-col w-full">
-        <section className="max-w-[1280px] w-full mx-auto px-margin-mobile md:px-margin-desktop py-space-xl">
-          {/* Breadcrumb & Booking Stepper */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-space-lg mb-space-2xl">
-            <div className="flex flex-col gap-space-2xs">
-              <div className="flex items-center gap-2 text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
-                <Link className="hover:text-primary transition-colors" to="/">Trang chủ</Link>
+        {/* Sub-Header Progress Stepper Bar (Synchronized with Step 2) */}
+        <section className="w-full bg-surface-container-lowest/80 backdrop-blur-md shadow-sm border-b border-slate-100">
+          <div className="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-space-md">
+            {/* Breadcrumb Navigation */}
+            <div className="flex items-center justify-between gap-space-md flex-wrap mb-space-sm">
+              <div className="flex items-center gap-space-xs font-label-md text-xs text-slate-500">
+                <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate('/')}>DANASEA</span>
                 <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-                <span className="text-secondary font-bold">Giỏ hàng của bạn</span>
-              </div>
-              <div className="flex items-baseline gap-space-sm">
-                <h1 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">Hành Trình Của Bạn</h1>
-                <span className="px-space-sm py-0.5 rounded-full bg-secondary/10 text-secondary font-label-sm text-label-sm font-bold">
-                  {items.length} trải nghiệm đã chọn
-                </span>
+                <span className="text-cyan-700 font-bold">Giỏ trải nghiệm biển</span>
               </div>
             </div>
-            {/* Stepper Pills */}
-            <div className="flex items-center gap-space-xs bg-surface-container-low p-1.5 rounded-full shadow-sm overflow-x-auto">
-              <div className="flex items-center gap-2 px-space-md py-1.5 rounded-full bg-secondary text-on-secondary font-label-md text-label-md shadow-sm whitespace-nowrap">
-                <span className="w-5 h-5 rounded-full bg-on-secondary/20 flex items-center justify-center text-[11px] font-bold">1</span>
-                <span>Giỏ trải nghiệm</span>
+
+            {/* Stepper Component */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-space-sm items-center">
+              {/* Step 1: Active in Cart */}
+              <div className="flex items-center gap-space-sm rounded-xl bg-cyan-50/80 border border-cyan-200 shadow-sm p-2">
+                <div className="w-8 h-8 rounded-full bg-cyan-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm">
+                  <span>1</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-label-sm text-[11px] text-cyan-600 font-bold uppercase tracking-wider">Bước 1 • Đang thực hiện</p>
+                  <p className="font-headline-sm text-xs font-bold text-cyan-900 truncate">Giỏ trải nghiệm ({items.length} mục)</p>
+                </div>
               </div>
-              <div className="w-6 h-0.5 bg-surface-container-high rounded-full"></div>
-              <div className="flex items-center gap-2 px-space-md py-1.5 rounded-full text-on-surface-variant font-label-md text-label-md opacity-60 whitespace-nowrap">
-                <span className="w-5 h-5 rounded-full bg-surface-container-highest flex items-center justify-center text-[11px] font-bold">2</span>
-                <span>Thông tin &amp; Thanh toán</span>
+
+              {/* Step 2: Next */}
+              <div className="flex items-center gap-space-sm rounded-xl bg-slate-50/60 opacity-60 p-2">
+                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center flex-shrink-0 font-bold">
+                  <span>2</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-label-sm text-[11px] text-slate-400 uppercase tracking-wider">Bước 2</p>
+                  <p className="font-headline-sm text-xs text-slate-500 truncate">Thông tin &amp; Thanh toán</p>
+                </div>
               </div>
-              <div className="w-6 h-0.5 bg-surface-container-high rounded-full"></div>
-              <div className="flex items-center gap-2 px-space-md py-1.5 rounded-full text-on-surface-variant font-label-md text-label-md opacity-60 whitespace-nowrap">
-                <span className="w-5 h-5 rounded-full bg-surface-container-highest flex items-center justify-center text-[11px] font-bold">3</span>
-                <span>Vé điện tử QR</span>
+
+              {/* Step 3: Final */}
+              <div className="flex items-center gap-space-sm rounded-xl bg-slate-50/60 opacity-60 p-2">
+                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center flex-shrink-0 font-bold">
+                  <span>3</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-label-sm text-[11px] text-slate-400 uppercase tracking-wider">Bước 3</p>
+                  <p className="font-headline-sm text-xs text-slate-500 truncate">Nhận vé điện tử QR</p>
+                </div>
               </div>
             </div>
           </div>
+        </section>
 
-          {/* Main Content Layout */}
+        {/* Main Content Layout */}
+        <section className="max-w-[1280px] w-full mx-auto px-margin-mobile md:px-margin-desktop py-space-xl">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
             {/* Left Column: Experiences List */}
             <div className="lg:col-span-8 flex flex-col gap-space-lg">

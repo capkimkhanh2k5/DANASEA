@@ -21,30 +21,51 @@ export function PaymentResult() {
   return (
     <>
       <main className="w-full pt-20 bg-surface flex-1"><div className="flex flex-col w-full">
-{/* Top Stepper Indicator */}
-<section className="w-full bg-surface-container-low py-space-md">
-<div className="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop">
-<div className="flex items-center justify-between max-w-2xl mx-auto">
-<div className="flex items-center gap-space-xs text-secondary">
-<span className="w-7 h-7 rounded-full bg-secondary text-on-secondary font-label-md text-label-md flex items-center justify-center">
-<span className="material-symbols-outlined text-[16px]">check</span>
-</span>
-<span className="font-label-md text-label-md hidden sm:inline">1. Chọn trải nghiệm</span>
-</div>
-<div className="h-0.5 w-12 sm:w-20 bg-secondary rounded-full"></div>
-<div className="flex items-center gap-space-xs text-secondary">
-<span className="w-7 h-7 rounded-full bg-secondary text-on-secondary font-label-md text-label-md flex items-center justify-center">
-<span className="material-symbols-outlined text-[16px]">check</span>
-</span>
-<span className="font-label-md text-label-md hidden sm:inline">2. Thanh toán an toàn</span>
-</div>
-<div className="h-0.5 w-12 sm:w-20 bg-primary-container rounded-full"></div>
-<div className="flex items-center gap-space-xs text-on-surface">
-<span className="w-7 h-7 rounded-full bg-primary-container text-on-primary font-label-md text-label-md flex items-center justify-center shadow-md">3</span>
-<span className="font-label-md text-label-md font-bold">3. Nhận vé QR</span>
-</div>
-</div>
-</div>
+{/* Sub-Header Progress Stepper Bar (Synchronized with Step 1 & 2) */}
+<section className="w-full bg-surface-container-lowest/80 backdrop-blur-md shadow-sm border-b border-slate-100">
+  <div className="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-space-md">
+    <div className="flex items-center justify-between gap-space-md flex-wrap mb-space-sm">
+      <div className="flex items-center gap-space-xs font-label-md text-xs text-slate-500">
+        <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate('/')}>DANASEA</span>
+        <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+        <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate('/cart')}>Giỏ trải nghiệm biển</span>
+        <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+        <span className="text-cyan-700 font-bold">Nhận vé điện tử QR</span>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-space-sm items-center">
+      <div className="flex items-center gap-space-sm rounded-xl bg-slate-50 border border-slate-100 p-2">
+        <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm">
+          <span className="material-symbols-outlined text-[18px]">check</span>
+        </div>
+        <div className="min-w-0">
+          <p className="font-label-sm text-[11px] text-slate-400 uppercase tracking-wider">Bước 1</p>
+          <p className="font-headline-sm text-xs font-bold text-slate-800 truncate">Giỏ trải nghiệm</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-space-sm rounded-xl bg-slate-50 border border-slate-100 p-2">
+        <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm">
+          <span className="material-symbols-outlined text-[18px]">check</span>
+        </div>
+        <div className="min-w-0">
+          <p className="font-label-sm text-[11px] text-slate-400 uppercase tracking-wider">Bước 2</p>
+          <p className="font-headline-sm text-xs font-bold text-slate-800 truncate">Thông tin &amp; Thanh toán</p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-space-sm rounded-xl bg-cyan-50/80 border border-cyan-200 shadow-sm p-2">
+        <div className="w-8 h-8 rounded-full bg-cyan-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm">
+          <span>3</span>
+        </div>
+        <div className="min-w-0">
+          <p className="font-label-sm text-[11px] text-cyan-600 font-bold uppercase tracking-wider">Bước 3 • Hoàn tất</p>
+          <p className="font-headline-sm text-xs font-bold text-cyan-900 truncate">Nhận vé điện tử QR</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 {/* Main Content Body */}
 <div className="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-space-xl sm:py-space-2xl w-full">
