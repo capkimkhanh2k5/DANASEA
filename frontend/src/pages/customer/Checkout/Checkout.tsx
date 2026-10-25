@@ -293,18 +293,6 @@ export function Checkout() {
             
             {/* LEFT COLUMN: Checkout Forms (7 Cols on Desktop) */}
             <div className="lg:col-span-7 flex flex-col gap-space-xl">
-              {/* Hold Timer Line - No Background, Black Outline Icon */}
-              <div className="flex items-center gap-2 text-slate-900 px-1 -mb-1">
-                <span className="material-symbols-outlined text-slate-900 text-[20px]">timer</span>
-                <span className="text-sm font-medium text-slate-800">Thời gian giữ chỗ:</span>
-                <span className="font-bold text-slate-900 font-mono text-base sm:text-lg" id="checkout-timer">{formatTime(countdown)}</span>
-              </div>
-
-              {/* ID display between timer and customer info without background */}
-              <div className="text-xs text-slate-500 font-mono -mt-2 -mb-2 px-1">
-                ID: <span className="font-semibold text-slate-700">DNS-{sessionCode}</span>
-              </div>
-
               {paymentError && (
                 <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium flex items-center gap-2">
                   <span className="material-symbols-outlined text-amber-600">info</span>
@@ -314,6 +302,18 @@ export function Checkout() {
 
               {/* Unified Checkout Form Card */}
               <div className="w-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-sm border border-slate-100 flex flex-col gap-space-xl">
+                {/* Hold Timer & ID Header Inside Card */}
+                <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-3">
+                  <div className="flex items-center gap-2 text-slate-900">
+                    <span className="material-symbols-outlined text-slate-900 text-[20px]">timer</span>
+                    <span className="text-sm font-medium text-slate-800">Thời gian giữ chỗ:</span>
+                    <span className="font-bold text-slate-900 font-mono text-base" id="checkout-timer">{formatTime(countdown)}</span>
+                  </div>
+                  <div className="text-sm font-mono text-slate-700">
+                    ID: <span className="font-bold text-slate-900">DNS-{sessionCode}</span>
+                  </div>
+                </div>
+
                 {/* Part 1: Customer Information */}
                 <div className="flex flex-col gap-space-lg">
                   <div className="flex items-center justify-between border-b pb-space-xs border-slate-100">
