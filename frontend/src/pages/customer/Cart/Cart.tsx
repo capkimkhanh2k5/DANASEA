@@ -246,9 +246,7 @@ export function Cart() {
                     <span className="font-semibold text-slate-900">{getTotalPrice().toLocaleString('vi-VN')}₫</span>
                   </div>
                   <div className="flex items-center justify-between text-emerald-700 font-medium">
-                    <span className="flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[16px]">local_offer</span> Phí dịch vụ DANASEA
-                    </span>
+                    <span>Phí dịch vụ</span>
                     <span>Miễn phí</span>
                   </div>
                 </div>

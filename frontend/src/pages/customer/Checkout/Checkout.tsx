@@ -556,7 +556,7 @@ export function Checkout() {
                     </div>
                   )}
                   <div className="flex justify-between items-center text-xs text-slate-500">
-                    <span>Phí quản lý &amp; cứu sinh</span>
+                    <span>Phí dịch vụ</span>
                     <span className="text-emerald-600 font-medium">Miễn phí</span>
                   </div>
                   <div className="flex justify-between items-baseline pt-space-md border-t border-slate-100 mt-space-xs">
