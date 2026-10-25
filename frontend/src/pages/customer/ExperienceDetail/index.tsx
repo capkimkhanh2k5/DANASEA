@@ -24,6 +24,8 @@ export function ExperienceDetail() {
   const [showAddSuccess, setShowAddSuccess] = useState<boolean>(false);
 
   const addItem = useCartStore((state) => state.addItem);
+  const cartItems = useCartStore((state) => state.items);
+
   const { toggleWishlist, isInWishlist } = useWishlistStore();
 
   // Gallery slider state for the large main image
@@ -182,6 +184,13 @@ export function ExperienceDetail() {
   // Capacity validation
   const maxCapacity = activeSlot ? activeSlot.availableCapacity : 10;
   const isSoldOut = activeSlot ? activeSlot.availableCapacity <= 0 : false;
+
+  const isItemInCart = useMemo(() => {
+    if (!service || !activeSlot) return false;
+    return cartItems.some(
+      (item) => item.serviceId === service.id && item.slotId === activeSlot.slotId
+    );
+  }, [cartItems, service?.id, activeSlot?.slotId]);
 
   // Pure Vietnamese normalizers for demo/seed data
   const localizedSafetyRules = useMemo(() => {
@@ -842,35 +851,41 @@ export function ExperienceDetail() {
                   </div>
 
                   {/* Actions */}
-                  <button
-                    type="button"
-                    onClick={handleAddToCart}
-                    disabled={!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked) || isAdding}
-                    className={`w-full py-3.5 px-6 rounded-full font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                      isAdding
-                        ? 'bg-cyan-600 text-white scale-98'
-                        : (!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked))
-                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                        : 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-98 shadow-cyan-600/20'
-                    }`}
-                  >
-                    {isAdding ? (
-                      <span className="material-symbols-outlined animate-spin text-[20px]">refresh</span>
-                    ) : (
-                      <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
-                    )}
-                    <span>{isAdding ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}</span>
-                  </button>
+                  {isItemInCart ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/cart')}
+                      className="w-full py-3.5 px-6 rounded-full font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-98 shadow-cyan-600/20"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
+                      <span>Xem giỏ hàng</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleAddToCart}
+                      disabled={!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked) || isAdding}
+                      className={`w-full py-3.5 px-6 rounded-full font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                        isAdding
+                          ? 'bg-cyan-600 text-white scale-98'
+                          : (!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked))
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                          : 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-98 shadow-cyan-600/20'
+                      }`}
+                    >
+                      {isAdding ? (
+                        <span className="material-symbols-outlined animate-spin text-[20px]">refresh</span>
+                      ) : (
+                        <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
+                      )}
+                      <span>{isAdding ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}</span>
+                    </button>
+                  )}
 
                   {showAddSuccess && (
-                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between gap-1.5 animate-fade-in">
-                      <div className="flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
-                        <span>Đã thêm vào giỏ!</span>
-                      </div>
-                      <Link to="/cart" className="text-cyan-700 hover:text-cyan-800 font-bold underline flex items-center gap-0.5">
-                        Xem giỏ hàng →
-                      </Link>
+                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 animate-fade-in">
+                      <span className="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
+                      <span>Đã thêm vào giỏ!</span>
                     </div>
                   )}
                 </div>
