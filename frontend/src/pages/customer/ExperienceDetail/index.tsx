@@ -463,11 +463,18 @@ export function ExperienceDetail() {
                     style={{ transform: `translateX(-${activeImageIndex * 100}%)` }}
                   >
                     {allImages.map((imgUrl, imgIdx) => (
-                      <div key={imgIdx} className="w-full h-full shrink-0 relative overflow-hidden">
+                      <div key={imgIdx} className="w-full h-full shrink-0 relative overflow-hidden flex items-center justify-center bg-slate-900/90">
+                        {/* Ambient Frosted Blur Backdrop to fill container naturally */}
+                        <img
+                          src={imgUrl}
+                          aria-hidden="true"
+                          className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-45 scale-110 pointer-events-none select-none"
+                        />
+                        {/* Crisp Foreground Image - Preserves 100% full view without cropping or stretching */}
                         <img
                           src={imgUrl}
                           alt={`${service.name} - ${imgIdx + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                          className="relative z-10 w-full h-full object-contain select-none transition-transform duration-500 ease-out"
                           loading={imgIdx === 0 ? 'eager' : 'lazy'}
                         />
                       </div>
