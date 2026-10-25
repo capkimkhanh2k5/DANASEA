@@ -82,10 +82,6 @@ export function PaymentResult() {
   }, [searchParams]);
 
   if (!order) return null;
-
-  const displayEmail = order.customerEmail || order.email || "khachhang@danasea.vn";
-  const displayPhone = order.customerPhone || order.phone || "0912 345 678";
-
     const handleSaveTicket = (ticketCode: string) => {
     setSavedTicketId(ticketCode);
     setTimeout(() => setSavedTicketId(null), 3000);
@@ -171,13 +167,9 @@ export function PaymentResult() {
             </h1>
 
             {/* Notification Notice */}
-            <div className="mt-4 p-3 px-5 rounded-2xl bg-cyan-50/60 border border-cyan-100 text-slate-700 flex items-center gap-2.5 max-w-xl text-left text-xs sm:text-sm">
-              <span className="material-symbols-outlined text-cyan-700 text-[22px] flex-shrink-0">mark_email_read</span>
-              <p className="leading-snug">
-                Vé điện tử QR và thông tin xác nhận đã được gửi về email{" "}
-                <strong className="text-cyan-900 underline">{displayEmail}</strong> &amp; SĐT{" "}
-                <strong className="text-slate-900">{displayPhone}</strong>.
-              </p>
+            <div className="mt-3 p-2 px-4 rounded-xl bg-cyan-50/60 border border-cyan-100 text-slate-700 inline-flex items-center gap-2 text-xs sm:text-sm">
+              <span className="material-symbols-outlined text-cyan-700 text-[18px] flex-shrink-0">mark_email_read</span>
+              <span>Vé đã được gửi về email</span>
             </div>
           </div>
 
