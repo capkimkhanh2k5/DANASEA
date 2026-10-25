@@ -172,13 +172,6 @@ export function PaymentResult() {
               <span className="material-symbols-outlined text-[36px]">verified</span>
             </div>
 
-            <div className="flex items-center gap-space-xs mb-2">
-              <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold tracking-wider uppercase border border-emerald-200">
-                Thanh toán hoàn tất
-              </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-              <span className="text-xs text-slate-500 font-medium">Hóa đơn điện tử hợp lệ</span>
-            </div>
 
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight max-w-2xl">
               Thanh toán &amp; Xác nhận đặt chỗ thành công!
