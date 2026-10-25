@@ -85,9 +85,7 @@ export function Cart() {
                     >
                       <div className="w-full md:w-56 h-44 rounded-xl overflow-hidden flex-shrink-0 relative bg-slate-100">
                         <img className="w-full h-full object-cover" alt={title} src={image} />
-                        <span className="absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white font-label-sm text-[11px] font-semibold">
-                          {location}
-                        </span>
+
                       </div>
                       <div className="flex-1 flex flex-col justify-between gap-space-sm min-w-0">
                         <div className="flex flex-col gap-1">
