@@ -281,14 +281,6 @@ export function Cart() {
                   <span>Tiến hành đặt chỗ &amp; thanh toán</span>
                 </button>
               </div>
-              
-              <div className="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-2 border border-slate-100">
-                <h3 className="font-label-md text-xs font-bold text-slate-700">Chính sách bảo vệ du khách</h3>
-                <ul className="text-xs text-slate-500 flex flex-col gap-1 list-disc pl-4">
-                  <li>Được đổi ca trải nghiệm miễn phí trước 24 giờ.</li>
-                  <li>Hoàn 100% nếu biển động theo lệnh cảng vụ Đà Nẵng.</li>
-                </ul>
-              </div>
             </aside>
           </div>
         </section>
