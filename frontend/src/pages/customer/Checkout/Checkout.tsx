@@ -325,151 +325,154 @@ export function Checkout() {
                 </div>
               )}
 
-              {/* Section 1: Customer Information */}
-              <section className="w-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-sm border border-slate-100 flex flex-col gap-space-lg">
-                <div className="flex items-center justify-between border-b pb-space-xs border-slate-100">
-                  <div className="flex items-center gap-space-sm">
-                    <div className="w-7 h-7 rounded-full bg-cyan-600 text-white flex items-center justify-center font-bold text-xs">1</div>
-                    <h2 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Thông tin người đặt vé</h2>
+              {/* Unified Checkout Form Card */}
+              <div className="w-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-sm border border-slate-100 flex flex-col gap-space-xl">
+                {/* Part 1: Customer Information */}
+                <div className="flex flex-col gap-space-lg">
+                  <div className="flex items-center justify-between border-b pb-space-xs border-slate-100">
+                    <div className="flex items-center gap-space-sm">
+                      <div className="w-7 h-7 rounded-full bg-cyan-600 text-white flex items-center justify-center font-bold text-xs">1</div>
+                      <h2 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Thông tin người đặt vé</h2>
+                    </div>
+                    {isAuthenticated ? (
+                      <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                        <span className="material-symbols-outlined text-[14px]">verified_user</span> Đã đồng bộ tài khoản
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-500">Khách vãng lai</span>
+                    )}
                   </div>
-                  {isAuthenticated ? (
-                    <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                      <span className="material-symbols-outlined text-[14px]">verified_user</span> Đã đồng bộ tài khoản
-                    </span>
-                  ) : (
-                    <span className="text-xs text-slate-500">Khách vãng lai</span>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="font-label-md text-xs font-semibold text-slate-700">Họ và tên *</label>
-                    <div className="relative flex items-center">
-                      <span className="material-symbols-outlined absolute left-4 text-slate-400 text-[20px]">person</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-label-md text-xs font-semibold text-slate-700">Họ và tên *</label>
+                      <div className="relative flex items-center">
+                        <span className="material-symbols-outlined absolute left-4 text-slate-400 text-[20px]">person</span>
+                        <input 
+                          className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
+                          type="text" 
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          placeholder="Nhập họ và tên du khách"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-label-md text-xs font-semibold text-slate-700">Số điện thoại liên hệ *</label>
+                      <div className="relative flex items-center">
+                        <span className="material-symbols-outlined absolute left-4 text-slate-400 text-[20px]">call</span>
+                        <input 
+                          className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
+                          type="tel" 
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="Số điện thoại Zalo nhận vé"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
+                      <label className="font-label-md text-xs font-semibold text-slate-700">Địa chỉ Email nhận mã QR *</label>
+                      <div className="relative flex items-center">
+                        <span className="material-symbols-outlined absolute left-4 text-slate-400 text-[20px]">mail</span>
+                        <input 
+                          className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
+                          type="email" 
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="Email nhận hóa đơn điện tử"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
+                      <label className="font-label-md text-xs font-semibold text-slate-700">Ghi chú đặc biệt (tùy chọn)</label>
                       <input 
-                        className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
+                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
                         type="text" 
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="Nhập họ và tên du khách"
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Yêu cầu áo phao trẻ em, hỗ trợ chụp ảnh..."
                       />
                     </div>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="font-label-md text-xs font-semibold text-slate-700">Số điện thoại liên hệ *</label>
-                    <div className="relative flex items-center">
-                      <span className="material-symbols-outlined absolute left-4 text-slate-400 text-[20px]">call</span>
-                      <input 
-                        className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
-                        type="tel" 
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="Số điện thoại Zalo nhận vé"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1.5 md:col-span-2">
-                    <label className="font-label-md text-xs font-semibold text-slate-700">Địa chỉ Email nhận mã QR *</label>
-                    <div className="relative flex items-center">
-                      <span className="material-symbols-outlined absolute left-4 text-slate-400 text-[20px]">mail</span>
-                      <input 
-                        className="w-full pl-11 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
-                        type="email" 
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Email nhận hóa đơn điện tử"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1.5 md:col-span-2">
-                    <label className="font-label-md text-xs font-semibold text-slate-700">Ghi chú đặc biệt (tùy chọn)</label>
-                    <input 
-                      className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
-                      type="text" 
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Yêu cầu áo phao trẻ em, hỗ trợ chụp ảnh..."
-                    />
                   </div>
                 </div>
-              </section>
 
-              {/* Section 2: Payment Methods */}
-              <section className="w-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-sm border border-slate-100 flex flex-col gap-space-lg">
-                <div className="flex items-center justify-between border-b pb-space-xs border-slate-100">
-                  <div className="flex items-center gap-space-sm">
-                    <div className="w-7 h-7 rounded-full bg-cyan-600 text-white flex items-center justify-center font-bold text-xs">2</div>
-                    <h2 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Phương thức thanh toán</h2>
+                {/* Part 2: Payment Methods */}
+                <div className="flex flex-col gap-space-lg pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between border-b pb-space-xs border-slate-100">
+                    <div className="flex items-center gap-space-sm">
+                      <div className="w-7 h-7 rounded-full bg-cyan-600 text-white flex items-center justify-center font-bold text-xs">2</div>
+                      <h2 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Phương thức thanh toán</h2>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-space-sm">
+                    <label 
+                      onClick={() => setPaymentProvider("VNPAY")}
+                      className={`p-space-md rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                        paymentProvider === "VNPAY" ? "border-cyan-500 bg-cyan-50/50 shadow-sm" : "border-slate-200 bg-slate-50 hover:bg-slate-100/70"
+                      }`}
+                    >
+                      <div className="flex items-center gap-space-sm">
+                        <input 
+                          checked={paymentProvider === "VNPAY"} 
+                          onChange={() => setPaymentProvider("VNPAY")}
+                          className="w-4 h-4 accent-cyan-600 cursor-pointer" 
+                          name="payment_method" 
+                          type="radio" 
+                          value="VNPAY"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-lg text-sm font-bold text-slate-800">Cổng VNPAY (QR Pay / Thẻ ATM &amp; Thẻ Quốc tế)</span>
+                          <span className="px-2 py-0.5 rounded-full bg-cyan-600 text-white font-label-sm text-[10px] font-bold">Khuyên dùng</span>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-cyan-600">qr_code_scanner</span>
+                    </label>
+
+                    <label 
+                      onClick={() => setPaymentProvider("MOMO")}
+                      className={`p-space-md rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                        paymentProvider === "MOMO" ? "border-cyan-500 bg-cyan-50/50 shadow-sm" : "border-slate-200 bg-slate-50 hover:bg-slate-100/70"
+                      }`}
+                    >
+                      <div className="flex items-center gap-space-sm">
+                        <input 
+                          checked={paymentProvider === "MOMO"} 
+                          onChange={() => setPaymentProvider("MOMO")}
+                          className="w-4 h-4 accent-cyan-600 cursor-pointer" 
+                          name="payment_method" 
+                          type="radio" 
+                          value="MOMO"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-lg text-sm font-bold text-slate-800">Ví điện tử MoMo</span>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-pink-600">account_balance_wallet</span>
+                    </label>
+
+                    <label 
+                      onClick={() => setPaymentProvider("SEPAY")}
+                      className={`p-space-md rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                        paymentProvider === "SEPAY" ? "border-cyan-500 bg-cyan-50/50 shadow-sm" : "border-slate-200 bg-slate-50 hover:bg-slate-100/70"
+                      }`}
+                    >
+                      <div className="flex items-center gap-space-sm">
+                        <input 
+                          checked={paymentProvider === "SEPAY"} 
+                          onChange={() => setPaymentProvider("SEPAY")}
+                          className="w-4 h-4 accent-cyan-600 cursor-pointer" 
+                          name="payment_method" 
+                          type="radio" 
+                          value="SEPAY"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-lg text-sm font-bold text-slate-800">Chuyển khoản ngân hàng VietQR 24/7 (SePay)</span>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-indigo-600">account_balance</span>
+                    </label>
                   </div>
                 </div>
-                <div className="flex flex-col gap-space-sm">
-                  <label 
-                    onClick={() => setPaymentProvider("VNPAY")}
-                    className={`p-space-md rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                      paymentProvider === "VNPAY" ? "border-cyan-500 bg-cyan-50/50 shadow-sm" : "border-slate-200 bg-slate-50 hover:bg-slate-100/70"
-                    }`}
-                  >
-                    <div className="flex items-center gap-space-sm">
-                      <input 
-                        checked={paymentProvider === "VNPAY"} 
-                        onChange={() => setPaymentProvider("VNPAY")}
-                        className="w-4 h-4 accent-cyan-600 cursor-pointer" 
-                        name="payment_method" 
-                        type="radio" 
-                        value="VNPAY"
-                      />
-                      <div className="flex items-center gap-2">
-                        <span className="font-label-lg text-sm font-bold text-slate-800">Cổng VNPAY (QR Pay / Thẻ ATM &amp; Thẻ Quốc tế)</span>
-                        <span className="px-2 py-0.5 rounded-full bg-cyan-600 text-white font-label-sm text-[10px] font-bold">Khuyên dùng</span>
-                      </div>
-                    </div>
-                    <span className="material-symbols-outlined text-cyan-600">qr_code_scanner</span>
-                  </label>
-
-                  <label 
-                    onClick={() => setPaymentProvider("MOMO")}
-                    className={`p-space-md rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                      paymentProvider === "MOMO" ? "border-cyan-500 bg-cyan-50/50 shadow-sm" : "border-slate-200 bg-slate-50 hover:bg-slate-100/70"
-                    }`}
-                  >
-                    <div className="flex items-center gap-space-sm">
-                      <input 
-                        checked={paymentProvider === "MOMO"} 
-                        onChange={() => setPaymentProvider("MOMO")}
-                        className="w-4 h-4 accent-cyan-600 cursor-pointer" 
-                        name="payment_method" 
-                        type="radio" 
-                        value="MOMO"
-                      />
-                      <div className="flex items-center gap-2">
-                        <span className="font-label-lg text-sm font-bold text-slate-800">Ví điện tử MoMo</span>
-                      </div>
-                    </div>
-                    <span className="material-symbols-outlined text-pink-600">account_balance_wallet</span>
-                  </label>
-
-                  <label 
-                    onClick={() => setPaymentProvider("SEPAY")}
-                    className={`p-space-md rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                      paymentProvider === "SEPAY" ? "border-cyan-500 bg-cyan-50/50 shadow-sm" : "border-slate-200 bg-slate-50 hover:bg-slate-100/70"
-                    }`}
-                  >
-                    <div className="flex items-center gap-space-sm">
-                      <input 
-                        checked={paymentProvider === "SEPAY"} 
-                        onChange={() => setPaymentProvider("SEPAY")}
-                        className="w-4 h-4 accent-cyan-600 cursor-pointer" 
-                        name="payment_method" 
-                        type="radio" 
-                        value="SEPAY"
-                      />
-                      <div className="flex items-center gap-2">
-                        <span className="font-label-lg text-sm font-bold text-slate-800">Chuyển khoản ngân hàng VietQR 24/7 (SePay)</span>
-                      </div>
-                    </div>
-                    <span className="material-symbols-outlined text-indigo-600">account_balance</span>
-                  </label>
-                </div>
-              </section>
+              </div>
             </div>
 
             {/* RIGHT COLUMN: Sticky Order Summary & Price Breakdown (5 Cols on Desktop) */}
