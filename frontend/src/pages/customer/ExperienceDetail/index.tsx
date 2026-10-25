@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useCartStore } from '../../../store/useCartStore';
 import { useWishlistStore } from '../../../store/useWishlistStore';
 import { serviceCatalogService } from '../../../services/serviceCatalogService';
@@ -265,6 +265,9 @@ export function ExperienceDetail() {
       addItem({
         serviceId: service.id,
         slotId: activeSlot.slotId,
+        optionId: selectedOption?.id || activeSlot.optionId,
+        locationName: service.address || 'Đà Nẵng',
+        vendorName: service.businessName || 'DANASEA Official Partner',
         quantity: qty,
         unitPrice: unitPrice,
         serviceName: `${service.name}${selectedOption ? ` (${selectedOption.name})` : ''}`,
@@ -861,9 +864,14 @@ export function ExperienceDetail() {
                   </button>
 
                   {showAddSuccess && (
-                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold text-center flex items-center justify-center gap-1.5 animate-fade-in">
-                      <span className="material-symbols-outlined text-sm">check_circle</span>
-                      <span>Đã thêm vé vào giỏ hàng thành công!</span>
+                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between gap-1.5 animate-fade-in">
+                      <div className="flex items-center gap-1.5">
+                        <span className="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
+                        <span>Đã thêm vào giỏ!</span>
+                      </div>
+                      <Link to="/cart" className="text-cyan-700 hover:text-cyan-800 font-bold underline flex items-center gap-0.5">
+                        Xem giỏ hàng →
+                      </Link>
                     </div>
                   )}
                 </div>
