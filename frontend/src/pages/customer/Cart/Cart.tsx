@@ -274,7 +274,7 @@ export function Cart() {
                   <span className="material-symbols-outlined text-cyan-700 text-[22px] flex-shrink-0">verified_user</span>
                   <div className="flex-1">
                     <p className="font-label-sm text-xs text-cyan-900 font-bold uppercase tracking-wider">Bảo vệ đặt chỗ 100%</p>
-                    <p className="font-body-sm text-xs text-cyan-800 mt-0.5">Cam kết giữ đúng slot và hoàn tiền nếu thời tiết biển không thuận lợi.</p>
+                    <p className="font-body-sm text-xs text-cyan-800 mt-0.5">Cam kết hoàn tiền nếu thời tiết không thuận lợi.</p>
                   </div>
                 </div>
               </div>
