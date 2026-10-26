@@ -408,7 +408,7 @@ export function Orders() {
         return <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold">ĐÃ HỦY</span>;
       case "REFUNDED":
       case "PARTIALLY_REFUNDED":
-        return <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold">ĐÃ HOÀN TIỀN</span>;
+        return null;
       default:
         return <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold">{s}</span>;
     }
@@ -621,7 +621,7 @@ export function Orders() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Đơn hàng:</span>
                             <span className="text-base font-bold text-slate-900 font-mono">{orderCode}</span>
-                            {getStatusBadge(masterOrder.status || "PENDING")}
+                            {!hasRefund && getStatusBadge(masterOrder.status || "PENDING")}
                             {hasRefund && (
                               <span
                                 className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 border ${
@@ -686,11 +686,10 @@ export function Orders() {
                             <button
                               type="button"
                               onClick={() => setViewingRefundOrder({ order: masterOrder, refunds })}
-                              className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+                              className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold border border-slate-200 shadow-xs transition-colors cursor-pointer"
                               title="Xem chi tiết biên nhận hoàn tiền"
                             >
-                              <span className="material-symbols-outlined text-[16px]">receipt_long</span>
-                              <span>Chi tiết hoàn tiền</span>
+                              Chi tiết hoàn tiền
                             </button>
                           )}
 
