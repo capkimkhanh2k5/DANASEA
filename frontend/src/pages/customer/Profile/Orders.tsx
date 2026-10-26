@@ -410,21 +410,8 @@ export function Orders() {
         {/* Top Header Banner */}
         <div className="relative w-full overflow-hidden border-b border-cyan-100/60 bg-white/80 backdrop-blur-md">
           <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 lg:px-12 py-6">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Vé của tôi</h1>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="px-4 py-2 rounded-xl bg-cyan-50/80 border border-cyan-200 text-center">
-                  <span className="block text-lg font-bold text-cyan-700">{tabCounts.upcoming}</span>
-                  <span className="text-[11px] text-cyan-600 font-medium">Sắp diễn ra</span>
-                </div>
-                <div className="px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-center">
-                  <span className="block text-lg font-bold text-slate-800">{tabCounts.completed}</span>
-                  <span className="text-[11px] text-slate-500 font-medium">Đã hoàn thành</span>
-                </div>
-              </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Vé của tôi</h1>
             </div>
 
             {/* Filter Tabs */}
