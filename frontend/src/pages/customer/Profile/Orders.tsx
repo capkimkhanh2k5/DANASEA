@@ -557,15 +557,14 @@ export function Orders() {
                 <span className="material-symbols-outlined text-[32px]">sailing</span>
               </div>
               <h3 className="text-lg font-bold text-slate-900">Chưa có đơn đặt tour nào</h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Bạn chưa có đơn đặt trong mục này. Hãy khám phá ngay các trải nghiệm lặn biển, cano, chèo SUP hấp dẫn tại Đà Nẵng!
-              </p>
-              <button
-                onClick={() => navigate("/")}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-xs font-bold hover:shadow-md cursor-pointer transition-all"
-              >
-                Khám phá tour biển ngay
-              </button>
+              <div>
+                <button
+                  onClick={() => navigate("/")}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-xs font-bold hover:shadow-md cursor-pointer transition-all"
+                >
+                  Khám phá ngay
+                </button>
+              </div>
             </div>
           )}
 
