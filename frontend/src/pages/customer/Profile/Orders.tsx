@@ -662,13 +662,6 @@ export function Orders() {
                             </button>
                           )}
 
-                          {hasRefund && (
-                            <span className="px-3 py-2 rounded-xl bg-amber-50/80 border border-amber-200/80 text-amber-700 text-xs font-bold flex items-center gap-1.5">
-                              <span className="material-symbols-outlined text-[16px]">hourglass_top</span>
-                              <span>{latestRefund?.status === "COMPLETED" ? "Đã hoàn tiền" : "Đang xử lý hoàn"}</span>
-                            </span>
-                          )}
-
                           {masterStatus === "PENDING_PAYMENT" && (
                             <button
                               onClick={() => navigate(`/checkout`)}
