@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FEATURED_SERVICES, MOCK_IMAGES } from "../../../mockData";
 import {
@@ -67,6 +67,39 @@ export function Wishlist() {
   
   // State for active filter
   const [activeFilter, setActiveFilter] = useState("all");
+
+  // Single-row horizontal scroll navigation
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', checkScroll, { passive: true });
+    window.addEventListener('resize', checkScroll);
+    return () => {
+      el.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [checkScroll]);
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (!scrollRef.current) return;
+    const distance = 280;
+    scrollRef.current.scrollBy({
+      left: direction === 'left' ? -distance : distance,
+      behavior: 'smooth',
+    });
+  };
 
   // Compile all known experiences across mock data & home catalog
   const allAvailableServices = useMemo<WishlistItem[]>(() => {
@@ -203,41 +236,76 @@ export function Wishlist() {
         {/* Main Content Container */}
         <section className="max-w-[1440px] mx-auto w-full px-4 sm:px-8 lg:px-12 py-8">
           {/* Header & Category Filter Section */}
-          <div className="flex flex-col gap-5 mb-8">
+          <div className="flex flex-col gap-4 mb-8">
             {/* Title only */}
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               Hoạt động đã lưu
             </h1>
 
-            {/* Quick Category Filter Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none flex-wrap">
-              {CATEGORY_FILTERS.map((cat) => {
-                const isActive = activeFilter === cat.id;
-                const count = categoryCounts[cat.id] ?? 0;
-                return (
+            {/* Quick Category Filter Pills - 1 row with navigation buttons */}
+            <div className="relative w-full flex items-center group">
+              {/* Left Scroll Button */}
+              {canScrollLeft && (
+                <div className="absolute left-0 top-0 bottom-0 z-10 flex items-center pr-6 bg-gradient-to-r from-slate-50 via-slate-50/90 to-transparent">
                   <button
-                    key={cat.id}
                     type="button"
-                    onClick={() => setActiveFilter(cat.id)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-                      isActive
-                        ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm shadow-cyan-500/25 ring-1 ring-cyan-500/30"
-                        : "bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200/80"
-                    }`}
+                    onClick={() => handleScroll('left')}
+                    aria-label="Cuộn sang trái"
+                    className="w-8 h-8 rounded-full bg-white shadow-md border border-slate-200 text-slate-700 hover:text-cyan-600 hover:scale-105 active:scale-95 flex items-center justify-center transition-all cursor-pointer"
                   >
-                    <span>{cat.name}</span>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-semibold transition-colors ${
+                    <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Scrollable Pills Container (Strictly 1 row: flex-nowrap) */}
+              <div
+                ref={scrollRef}
+                className="flex items-center gap-2 overflow-x-auto py-1 scroll-smooth flex-nowrap w-full scrollbar-none"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+              >
+                {CATEGORY_FILTERS.map((cat) => {
+                  const isActive = activeFilter === cat.id;
+                  const count = categoryCounts[cat.id] ?? 0;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setActiveFilter(cat.id)}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
                         isActive
-                          ? "bg-white/20 text-white"
-                          : "bg-slate-100 text-slate-500"
+                          ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm shadow-cyan-500/25 ring-1 ring-cyan-500/30"
+                          : "bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200/80"
                       }`}
                     >
-                      {count}
-                    </span>
+                      <span>{cat.name}</span>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full font-semibold transition-colors ${
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Right Scroll Button */}
+              {canScrollRight && (
+                <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center pl-6 bg-gradient-to-l from-slate-50 via-slate-50/90 to-transparent">
+                  <button
+                    type="button"
+                    onClick={() => handleScroll('right')}
+                    aria-label="Cuộn sang phải"
+                    className="w-8 h-8 rounded-full bg-white shadow-md border border-slate-200 text-slate-700 hover:text-cyan-600 hover:scale-105 active:scale-95 flex items-center justify-center transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">chevron_right</span>
                   </button>
-                );
-              })}
+                </div>
+              )}
             </div>
           </div>
 
