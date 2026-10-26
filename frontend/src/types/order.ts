@@ -72,8 +72,10 @@ export interface PaymentIntentResponse {
   provider: string;
   amount: number;
   status: string;
-  paymentUrl: string;
-  expiresAt: string;
+  paymentReference: string;
+  paymentUrl?: string;
+  createdAt?: string;
+  expiresAt?: string;
 }
 
 export interface PaymentResponse {

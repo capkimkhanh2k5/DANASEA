@@ -45,14 +45,24 @@ export function Checkout() {
   // Payment processing state
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [showQrModal, setShowQrModal] = useState<boolean>(false);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const handleCopy = (text: string, field: string) => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    }
+  };
 
   // Redirect if cart is empty (unless navigating to payment result)
   const isNavigatingToResultRef = useRef<boolean>(false);
   useEffect(() => {
-    if (items.length === 0 && !isNavigatingToResultRef.current && !isProcessingPayment) {
+    if (items.length === 0 && !isNavigatingToResultRef.current && !isProcessingPayment && !showQrModal) {
       navigate('/cart');
     }
-  }, [items, navigate, isProcessingPayment]);
+  }, [items, navigate, isProcessingPayment, showQrModal]);
 
   // Sync user info if auth updates
   useEffect(() => {
@@ -221,16 +231,21 @@ export function Checkout() {
           provider: paymentProvider,
         });
 
-        // 3. If Gateway redirect URL is provided, redirect; otherwise navigate to result page
-        if (payRes.paymentUrl && payRes.paymentUrl.startsWith("http")) {
-          window.location.href = payRes.paymentUrl;
+        // 3. Backend returns paymentReference (which contains the gateway redirect URL)
+        const gatewayUrl = payRes.paymentReference || payRes.paymentUrl;
+        if (gatewayUrl && (gatewayUrl.startsWith("http://") || gatewayUrl.startsWith("https://"))) {
+          window.location.href = gatewayUrl;
+          return;
         } else {
-          navigate(`/checkout/result?orderId=${orderRes.id}&status=success`);
+          setIsProcessingPayment(false);
+          setPaymentError("Không nhận được liên kết thanh toán từ cổng. Vui lòng thử lại hoặc chọn phương thức khác.");
+          return;
         }
-        return;
       } catch (err: any) {
         console.error('[Checkout] Lỗi khi tạo đơn hàng thật:', err);
-        setPaymentError(err.response?.data?.message || "Không thể khởi tạo giao dịch. Đang chuyển sang chế độ thanh toán dự phòng...");
+        setIsProcessingPayment(false);
+        setPaymentError(err.response?.data?.message || "Không thể khởi tạo giao dịch thanh toán. Vui lòng kiểm tra lại kết nối và thử lại.");
+        return;
       }
     }
 
@@ -264,12 +279,9 @@ export function Checkout() {
     };
     sessionStorage.setItem('danasea_last_order', JSON.stringify(orderSnapshot));
 
-    // Graceful fallback for offline / demo mode
-    triggerDemoLoading(2000, "Đang xử lý giao dịch vé tour...", "Hệ thống đang khóa chỗ cano và sinh mã vé QR");
-    setTimeout(() => {
-      isNavigatingToResultRef.current = true;
-      navigate('/checkout/result?status=success');
-    }, 1800);
+    // Show Payment QR Modal for user to scan and pay instead of auto-jumping to success
+    setIsProcessingPayment(false);
+    setShowQrModal(true);
   };
 
   if (items.length === 0 && !isNavigatingToResultRef.current) return null;
@@ -630,6 +642,141 @@ export function Checkout() {
             </div>
           </div>
         </main>
+
+        {/* Payment QR Modal */}
+        {showQrModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden flex flex-col max-h-[92vh]">
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-teal-700 via-cyan-700 to-sky-700 px-6 py-4 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[22px] text-white">qr_code_2</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base leading-tight">Mã QR Thanh toán</h3>
+                    <p className="text-[11px] text-cyan-100 font-medium">Quét bằng ứng dụng Ngân hàng hoặc Ví điện tử</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowQrModal(false)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/90 transition-colors cursor-pointer"
+                  title="Đóng modal"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-4">
+                {/* Hold countdown notice */}
+                <div className="flex items-center justify-between bg-amber-50 border border-amber-200/80 rounded-xl px-3.5 py-2 text-xs text-amber-800">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <span className="material-symbols-outlined text-[16px] text-amber-600 animate-pulse">timer</span>
+                    <span>Thời gian giữ vé còn lại:</span>
+                  </span>
+                  <span className="font-mono font-bold text-amber-900 bg-amber-100/80 px-2 py-0.5 rounded">
+                    {formatTime(countdown)}
+                  </span>
+                </div>
+
+                {/* QR Code Container */}
+                <div className="flex flex-col items-center justify-center p-4 bg-gradient-to-b from-slate-50 to-cyan-50/30 rounded-2xl border border-slate-200/80 shadow-inner">
+                  <div className="p-2 bg-white rounded-xl shadow-md border border-slate-100">
+                    <img
+                      src={`https://img.vietqr.io/image/MB-0912345678-compact2.png?amount=${finalTotal}&addInfo=DNS${sessionCode || '89412'}&accountName=CONG%20TY%20DANASEA`}
+                      alt="Mã QR thanh toán ngân hàng"
+                      className="w-56 h-56 object-contain rounded-lg"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 mt-2.5 text-[11px] font-semibold text-slate-500">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>VietQR Napas 247 • Tự động nhận diện thanh toán</span>
+                  </div>
+                </div>
+
+                {/* Transfer Details Card */}
+                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/70 space-y-2.5 text-xs">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                    <span className="text-slate-500">Số tiền thanh toán</span>
+                    <span className="font-headline-sm font-bold text-base text-cyan-700">
+                      {finalTotal.toLocaleString('vi-VN')} đ
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Ngân hàng thụ hưởng</span>
+                    <span className="font-bold text-slate-800">MB Bank (Quân Đội)</span>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Số tài khoản</span>
+                    <div className="flex items-center gap-1.5 font-mono font-bold text-slate-800">
+                      <span>0912 345 678</span>
+                      <button
+                        onClick={() => handleCopy('0912345678', 'stk')}
+                        className="p-1 hover:bg-slate-200 rounded text-cyan-600 transition-colors"
+                        title="Sao chép số tài khoản"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {copiedField === 'stk' ? 'check' : 'content_copy'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">Chủ tài khoản</span>
+                    <span className="font-bold text-slate-800">CONG TY DANASEA</span>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+                    <span className="text-slate-500">Nội dung chuyển khoản</span>
+                    <div className="flex items-center gap-1.5 font-mono font-bold text-cyan-700 bg-cyan-100/60 px-2 py-0.5 rounded">
+                      <span>DNS-{sessionCode || '89412'}</span>
+                      <button
+                        onClick={() => handleCopy(`DNS-${sessionCode || '89412'}`, 'nd')}
+                        className="p-0.5 hover:bg-cyan-200/80 rounded transition-colors"
+                        title="Sao chép nội dung chuyển khoản"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {copiedField === 'nd' ? 'check' : 'content_copy'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+                  Vui lòng giữ nguyên <strong className="text-slate-700">nội dung chuyển khoản</strong> để hệ thống đối soát và kích hoạt vé tự động trong 30 giây.
+                </p>
+              </div>
+
+              {/* Modal Footer Actions */}
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col gap-2">
+                <button
+                  onClick={() => {
+                    isNavigatingToResultRef.current = true;
+                    navigate('/checkout/result?status=success');
+                  }}
+                  className="w-full py-3 rounded-full font-bold text-sm bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white shadow-md shadow-cyan-600/25 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
+                >
+                  <span className="material-symbols-outlined text-[18px]">verified</span>
+                  <span>Tôi đã thanh toán xong</span>
+                </button>
+                <button
+                  onClick={() => setShowQrModal(false)}
+                  className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                >
+                  Đổi phương thức thanh toán
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
 
       </div>
