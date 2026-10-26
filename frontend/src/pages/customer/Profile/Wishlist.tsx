@@ -329,11 +329,17 @@ export function Wishlist() {
                       <button 
                         aria-label="Bỏ lưu khỏi danh sách" 
                         title="Bỏ lưu khỏi danh sách yêu thích"
-                        className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white text-red-500 ring-2 ring-red-100 flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer" 
+                        className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/50 backdrop-blur-md hover:bg-white/75 border border-white/50 shadow-sm flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer group/heart" 
                         onClick={(e) => handleRemove(e, service)} 
                         type="button"
                       >
-                        <span className="material-symbols-outlined text-[22px] text-red-500" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
+                        <svg 
+                          className="w-5 h-5 text-rose-500 fill-rose-500 drop-shadow-sm transition-transform duration-200 group-hover/heart:scale-110" 
+                          viewBox="0 0 24 24" 
+                          fill="currentColor"
+                        >
+                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                        </svg>
                       </button>
                     </div>
 
