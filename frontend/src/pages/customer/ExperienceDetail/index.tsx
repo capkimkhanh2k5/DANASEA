@@ -269,6 +269,13 @@ export function ExperienceDetail() {
       const wind = raw.match(/max wind:\s*([\d.]+\s*km\/h)/i)?.[1] || '5.00km/h';
       return `Sóng biển ≤ ${wave}, gió ≤ ${wind}`;
     }
+    if (
+      raw.toLowerCase().includes('standard marine safety') ||
+      raw.toLowerCase().includes('life jackets') ||
+      raw.toLowerCase().includes('worn at all times')
+    ) {
+      return 'Phù hợp điều kiện thời tiết thông thường (Biển êm, bắt buộc mặc áo phao)';
+    }
     if (raw.includes('Bắt buộc') || raw.includes('áo phao')) {
       return raw.split('.')[0].trim();
     }
