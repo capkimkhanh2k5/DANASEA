@@ -1,8 +1,11 @@
+import { useCartStore } from "../../../store/useCartStore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 
 interface OrderItemSnapshot {
   id: string;
+  serviceId?: string;
+  slotId?: string;
   serviceName: string;
   thumbnailUrl: string;
   unitPrice: number;
@@ -34,6 +37,7 @@ interface OrderSnapshot {
 export function PaymentResult() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { items: cartItems, addItem, clearCart } = useCartStore();
   const [order, setOrder] = useState<OrderSnapshot | null>(null);
   const [savedTicketId, setSavedTicketId] = useState<string | null>(null);
   const [showDevSwitcher, setShowDevSwitcher] = useState<boolean>(true);
@@ -107,6 +111,54 @@ export function PaymentResult() {
     setOrder(fallbackOrder);
   }, [searchParams]);
 
+  // Only clear cart when payment is confirmed SUCCESSFUL
+  useEffect(() => {
+    if (isSuccess && cartItems.length > 0) {
+      clearCart();
+    }
+  }, [isSuccess, cartItems.length, clearCart]);
+
+  // Safely restore cart items when user retries or changes payment method
+  const handleRetryCheckout = () => {
+    if (cartItems.length === 0 && order?.items && order.items.length > 0) {
+      order.items.forEach((item) => {
+        addItem({
+          serviceId: item.serviceId || "4b79c4cd-a138-59ca-83c3-d396c1208ac4",
+          slotId: item.slotId || "slot-demo-1",
+          serviceName: item.serviceName,
+          thumbnailUrl: item.thumbnailUrl,
+          date: item.date,
+          timeSlot: item.timeSlot,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+          locationName: item.locationName,
+          vendorName: item.vendorName,
+        });
+      });
+    }
+    navigate("/checkout");
+  };
+
+  const handleReturnToCart = () => {
+    if (cartItems.length === 0 && order?.items && order.items.length > 0) {
+      order.items.forEach((item) => {
+        addItem({
+          serviceId: item.serviceId || "4b79c4cd-a138-59ca-83c3-d396c1208ac4",
+          slotId: item.slotId || "slot-demo-1",
+          serviceName: item.serviceName,
+          thumbnailUrl: item.thumbnailUrl,
+          date: item.date,
+          timeSlot: item.timeSlot,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+          locationName: item.locationName,
+          vendorName: item.vendorName,
+        });
+      });
+    }
+    navigate("/cart");
+  };
+
   if (!order) return null;
 
   const handleSaveTicket = (ticketCode: string) => {
@@ -140,7 +192,7 @@ export function PaymentResult() {
                   DANASEA
                 </span>
                 <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-                <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate("/cart")}>
+                <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={handleReturnToCart}>
                   Giỏ hàng
                 </span>
                 <span className="material-symbols-outlined text-[14px]">chevron_right</span>
@@ -153,7 +205,7 @@ export function PaymentResult() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-space-sm items-center">
               {/* Step 1 */}
               <div 
-                onClick={() => navigate("/cart")}
+                onClick={handleReturnToCart}
                 className="flex items-center gap-space-sm rounded-xl bg-slate-50 border border-slate-100 p-2 cursor-pointer hover:bg-slate-100/90 hover:border-slate-300 transition-all group"
                 title="Quay lại Giỏ hàng"
               >
@@ -168,7 +220,7 @@ export function PaymentResult() {
 
               {/* Step 2 */}
               <div 
-                onClick={() => navigate("/checkout")}
+                onClick={handleRetryCheckout}
                 className={`flex items-center gap-space-sm rounded-xl border p-2 cursor-pointer transition-all ${
                   isSuccess 
                     ? "bg-slate-50 border-slate-100 hover:bg-slate-100/90" 
@@ -602,14 +654,14 @@ export function PaymentResult() {
                 {/* Retry action buttons */}
                 <div className="pt-2 flex flex-col sm:flex-row gap-3">
                   <button
-                    onClick={() => navigate("/cart")}
+                    onClick={handleReturnToCart}
                     type="button"
                     className="flex-1 py-3 px-4 rounded-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer text-center"
                   >
                     Quay về giỏ hàng
                   </button>
                   <button
-                    onClick={() => navigate("/checkout")}
+                    onClick={handleRetryCheckout}
                     type="button"
                     className="flex-1 py-3 px-4 rounded-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer hover:scale-[1.01] text-center"
                   >
@@ -693,7 +745,7 @@ export function PaymentResult() {
                     <span>Hotline: 1900 8468</span>
                   </a>
                   <button
-                    onClick={() => navigate("/checkout")}
+                    onClick={handleRetryCheckout}
                     type="button"
                     className="flex-1 py-3 px-4 rounded-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer hover:scale-[1.01] text-center"
                   >
@@ -774,7 +826,7 @@ export function PaymentResult() {
               </button>
 
               <button
-                onClick={() => navigate("/checkout")}
+                onClick={handleRetryCheckout}
                 className="w-full text-left px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-medium transition-colors cursor-pointer flex items-center justify-between"
                 type="button"
               >

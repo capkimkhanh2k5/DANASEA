@@ -222,8 +222,6 @@ export function Checkout() {
           provider: paymentProvider,
         });
 
-        clearCart();
-
         // 3. If Gateway redirect URL is provided, redirect; otherwise navigate to result page
         if (payRes.paymentUrl && payRes.paymentUrl.startsWith("http")) {
           window.location.href = payRes.paymentUrl;
@@ -247,6 +245,8 @@ export function Checkout() {
       paymentProvider: paymentProvider,
       items: items.map((item, idx) => ({
         id: item.id || `item-${idx}`,
+        serviceId: item.serviceId,
+        slotId: item.slotId,
         serviceName: item.serviceName || 'Trải nghiệm biển Đà Nẵng',
         thumbnailUrl: item.thumbnailUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5',
         unitPrice: item.unitPrice,
@@ -269,7 +269,6 @@ export function Checkout() {
     triggerDemoLoading(2000, "Đang xử lý giao dịch vé tour...", "Hệ thống đang khóa chỗ cano và sinh mã vé QR");
     setTimeout(() => {
       isNavigatingToResultRef.current = true;
-      clearCart();
       navigate('/checkout/result?status=success');
     }, 1800);
   };
