@@ -742,10 +742,6 @@ export function Checkout() {
                     </div>
                   </div>
                 </div>
-
-                <p className="text-[11px] text-slate-500 text-center leading-relaxed">
-                  Vui lòng giữ nguyên <strong className="text-slate-700">nội dung chuyển khoản</strong> để hệ thống đối soát và kích hoạt vé tự động trong 30 giây.
-                </p>
               </div>
 
               {/* Modal Footer Actions */}
