@@ -30,7 +30,6 @@ export function Checkout() {
   // Payment Method
   const [paymentProvider, setPaymentProvider] = useState<PaymentProviderType>("VNPAY");
 
-  const [showDevSwitcher, setShowDevSwitcher] = useState<boolean>(true);
 
   // Slot Holding Status (Scenario 4 - 15-minute slot timeout)
   const isHoldExpired = countdown <= 0;
@@ -632,63 +631,6 @@ export function Checkout() {
           </div>
         </main>
 
-        {/* Floating Scenario Switcher for Step 2 testing */}
-        {showDevSwitcher && (
-          <aside 
-            className="fixed bottom-6 right-6 z-40 bg-slate-900/95 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-md max-w-xs text-xs flex flex-col gap-2 select-none animate-in fade-in slide-in-from-bottom-4 duration-300"
-            aria-label="Dev Scenario Switcher"
-          >
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-700 gap-4">
-              <div className="flex items-center gap-1.5 font-bold text-cyan-400">
-                <span className="material-symbols-outlined text-[16px]">tune</span>
-                <span>Kiểm tra Bước 2 (Preview)</span>
-              </div>
-              <button 
-                onClick={() => setShowDevSwitcher(false)} 
-                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
-                title="Đóng thanh kịch bản"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[16px]">close</span>
-              </button>
-            </div>
-
-            <p className="text-[10px] text-slate-400 leading-tight">
-              Công cụ test nhanh kịch bản kiểm soát giữ chỗ 15p (Sẽ tự động xóa sau khi duyệt):
-            </p>
-
-            <div className="grid grid-cols-1 gap-1.5 pt-1">
-              <button
-                onClick={() => setCountdown(0)}
-                className={`w-full text-left px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-between ${
-                  isHoldExpired ? "bg-rose-600 text-white font-bold" : "bg-slate-800 hover:bg-slate-700 text-slate-200"
-                }`}
-                type="button"
-              >
-                <span>4. Hết hạn 15p (Slot timeout)</span>
-                {isHoldExpired && <span className="material-symbols-outlined text-[14px]">check</span>}
-              </button>
-
-              <button
-                onClick={() => setCountdown(900)}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-colors cursor-pointer flex items-center justify-between"
-                type="button"
-              >
-                <span>Khôi phục thời gian 15 phút</span>
-                <span className="material-symbols-outlined text-[14px]">refresh</span>
-              </button>
-
-              <button
-                onClick={() => navigate("/checkout/result?status=success")}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-medium transition-colors cursor-pointer flex items-center justify-between"
-                type="button"
-              >
-                <span>Chuyển tới Bước 3 (Kết quả)</span>
-                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-              </button>
-            </div>
-          </aside>
-        )}
 
       </div>
     </main>

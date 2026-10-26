@@ -40,7 +40,6 @@ export function PaymentResult() {
   const { items: cartItems, addItem, clearCart } = useCartStore();
   const [order, setOrder] = useState<OrderSnapshot | null>(null);
   const [savedTicketId, setSavedTicketId] = useState<string | null>(null);
-  const [showDevSwitcher, setShowDevSwitcher] = useState<boolean>(true);
 
   // Status detection from URL params (e.g. from VNPay or simulation)
   const statusParam = searchParams.get("status");
@@ -758,84 +757,6 @@ export function PaymentResult() {
 
         </div>
 
-        {/* ==================== TEMPORARY DEV SCENARIO SWITCHER ==================== */}
-        {showDevSwitcher && (
-          <aside aria-label="Bộ chuyển kịch bản thử nghiệm" className="fixed bottom-4 right-4 z-50 bg-slate-900/95 backdrop-blur-md text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 flex flex-col gap-2 max-w-xs animate-fade-in text-xs">
-            <div className="flex items-center justify-between pb-1.5 border-b border-slate-700 gap-4">
-              <div className="flex items-center gap-1.5 font-bold text-cyan-400">
-                <span className="material-symbols-outlined text-[16px]">tune</span>
-                <span>Kiểm tra kịch bản (Preview)</span>
-              </div>
-              <button 
-                onClick={() => setShowDevSwitcher(false)} 
-                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
-                title="Đóng thanh chuyển kịch bản"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[16px]">close</span>
-              </button>
-            </div>
-
-            <p className="text-[10px] text-slate-400 leading-tight">
-              Bấm nhanh để xem trước giao diện các trường hợp phản hồi từ cổng thanh toán:
-            </p>
-
-            <div className="grid grid-cols-1 gap-1.5 pt-1">
-              <button
-                onClick={() => setSearchParams({ status: "success" })}
-                className={`w-full text-left px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-between ${
-                  isSuccess ? "bg-emerald-600 text-white" : "bg-slate-800 hover:bg-slate-700 text-slate-200"
-                }`}
-                type="button"
-              >
-                <span>1. Thành công 100% (QR Vé)</span>
-                {isSuccess && <span className="material-symbols-outlined text-[14px]">check</span>}
-              </button>
-
-              <button
-                onClick={() => setSearchParams({ status: "cancelled", vnp_ResponseCode: "24" })}
-                className={`w-full text-left px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-between ${
-                  isCancelled ? "bg-amber-600 text-white" : "bg-slate-800 hover:bg-slate-700 text-slate-200"
-                }`}
-                type="button"
-              >
-                <span>2. Khách hủy trên cổng (Mã 24)</span>
-                {isCancelled && <span className="material-symbols-outlined text-[14px]">check</span>}
-              </button>
-
-              <button
-                onClick={() => setSearchParams({ status: "failed", vnp_ResponseCode: "51" })}
-                className={`w-full text-left px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-between ${
-                  isFailed && responseCodeParam === "51" ? "bg-rose-600 text-white" : "bg-slate-800 hover:bg-slate-700 text-slate-200"
-                }`}
-                type="button"
-              >
-                <span>3. Lỗi thẻ không đủ số dư (Mã 51)</span>
-                {isFailed && responseCodeParam === "51" && <span className="material-symbols-outlined text-[14px]">check</span>}
-              </button>
-
-              <button
-                onClick={() => setSearchParams({ status: "failed", vnp_ResponseCode: "10" })}
-                className={`w-full text-left px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-between ${
-                  isFailed && responseCodeParam === "10" ? "bg-rose-600 text-white" : "bg-slate-800 hover:bg-slate-700 text-slate-200"
-                }`}
-                type="button"
-              >
-                <span>4. Lỗi nhập sai OTP (Mã 10)</span>
-                {isFailed && responseCodeParam === "10" && <span className="material-symbols-outlined text-[14px]">check</span>}
-              </button>
-
-              <button
-                onClick={handleRetryCheckout}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 font-medium transition-colors cursor-pointer flex items-center justify-between"
-                type="button"
-              >
-                <span>5. Về Bước 2 (Kiểm tra hết hạn 15p)</span>
-                <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-              </button>
-            </div>
-          </aside>
-        )}
 
       </div>
     </main>
