@@ -706,13 +706,13 @@ export function Checkout() {
               {/* Modal Body: Horizontal 2-Column Layout */}
               <div className="p-6 overflow-y-auto">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                  {/* Left Column: QR Code (Single Card, no nested double wrapper) */}
+                  {/* Left Column: QR Code (Single Card, tightly wrapping the image) */}
                   <div className="flex flex-col items-center justify-center">
-                    <div className="p-2.5 bg-white rounded-2xl shadow-sm border border-slate-200/90 flex items-center justify-center w-full max-w-[280px]">
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden w-full max-w-[270px]">
                       <img
                         src={`https://img.vietqr.io/image/MB-0912345678-compact2.png?amount=${finalTotal}&addInfo=DNS${sessionCode || '89412'}&accountName=CONG%20TY%20DANASEA`}
                         alt="Mã QR thanh toán ngân hàng"
-                        className="w-full h-auto aspect-square object-contain rounded-xl"
+                        className="w-full h-auto block"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
@@ -720,22 +720,22 @@ export function Checkout() {
                     </div>
                   </div>
 
-                  {/* Right Column: Countdown, Transfer Details & Action */}
-                  <div className="flex flex-col gap-3.5">
-                    {/* Hold countdown notice */}
-                    <div className="flex items-center justify-between bg-amber-50 border border-amber-200/80 rounded-xl px-3.5 py-2 text-xs text-amber-800">
-                      <span className="flex items-center gap-1.5 font-medium">
-                        <span className="material-symbols-outlined text-[16px] text-amber-600 animate-pulse">timer</span>
+                  {/* Right Column: Unified Single Information Card */}
+                  <div className="bg-slate-50/90 rounded-2xl p-4 sm:p-5 border border-slate-200/80 flex flex-col gap-3 text-xs">
+                    {/* 1. Hold Countdown Row (Clean text, no yellow bg) */}
+                    <div className="flex items-center justify-between pb-2.5 border-b border-slate-200/80">
+                      <span className="flex items-center gap-1.5 font-medium text-slate-600">
+                        <span className="material-symbols-outlined text-[16px] text-slate-500">timer</span>
                         <span>Thời gian giữ vé:</span>
                       </span>
-                      <span className="font-mono font-bold text-amber-900 bg-amber-100/80 px-2 py-0.5 rounded">
+                      <span className="font-mono font-bold text-slate-800 text-sm">
                         {formatTime(countdown)}
                       </span>
                     </div>
 
-                    {/* Transfer Details Card */}
-                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/70 space-y-2.5 text-xs">
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                    {/* 2. Transfer Details Section */}
+                    <div className="space-y-2.5 py-0.5">
+                      <div className="flex items-center justify-between">
                         <span className="text-slate-500">Số tiền thanh toán</span>
                         <span className="font-headline-sm font-bold text-base text-cyan-700">
                           {finalTotal.toLocaleString('vi-VN')} đ
@@ -769,7 +769,7 @@ export function Checkout() {
                         <span className="font-bold text-slate-800">CONG TY DANASEA</span>
                       </div>
 
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+                      <div className="flex items-center justify-between">
                         <span className="text-slate-500">Nội dung chuyển khoản</span>
                         <div className="flex items-center gap-1.5 font-mono font-bold text-cyan-700 bg-cyan-100/60 px-2 py-0.5 rounded">
                           <span>DNS-{sessionCode || '89412'}</span>
@@ -787,15 +787,17 @@ export function Checkout() {
                       </div>
                     </div>
 
-                    {/* Change Payment Method Button */}
-                    <button
-                      onClick={() => setShowQrModal(false)}
-                      type="button"
-                      className="w-full py-2.5 rounded-xl font-bold text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
-                      <span>Đổi phương thức thanh toán</span>
-                    </button>
+                    {/* 3. Action Button Section (Separated by divider) */}
+                    <div className="pt-2.5 border-t border-slate-200/80">
+                      <button
+                        onClick={() => setShowQrModal(false)}
+                        type="button"
+                        className="w-full py-2.5 rounded-xl font-bold text-xs bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99] shadow-2xs"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                        <span>Đổi phương thức thanh toán</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
