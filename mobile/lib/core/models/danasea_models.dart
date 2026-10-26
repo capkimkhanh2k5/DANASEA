@@ -290,7 +290,7 @@ enum SubOrderStatus {
   refunded,
 }
 
-enum PaymentProvider { vnpay, momo, sepay }
+enum PaymentProvider { vnpay, momo, sepay, paypal }
 
 enum PaymentStatus { pending, success, failed, refunded }
 

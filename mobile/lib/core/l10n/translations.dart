@@ -1438,4 +1438,54 @@ const englishTranslations = <String, String>{
   "Chưa có yêu cầu hoàn tiền nào trên hệ thống.":
       "No refund requests found.",
   "Danh sách yêu cầu hoàn tiền ({0})": "Refund requests ({0})",
+  "PayPal Quốc tế": "PayPal International",
+  "Thanh toán quốc tế an toàn qua tài khoản PayPal":
+      "Secure international payment via PayPal account",
+  "Đang khởi tạo thanh toán...": "Initializing payment...",
+  "Không tải được thông tin đơn hàng để thanh toán.":
+      "Unable to load order details for payment.",
+  "Chưa xác định được kết quả tạo thanh toán trước đó. Vui lòng bấm làm mới trạng thái thanh toán trước khi thử lại.":
+      "Previous payment creation result is uncertain. Please refresh payment status before trying again.",
+  "Cần có đơn hàng thực tế từ giữ chỗ để khởi tạo thanh toán trên máy chủ.":
+      "A server order created from a reservation hold is required to initiate payment.",
+  "Chưa xác định được kết quả khởi tạo thanh toán. Vui lòng kiểm tra trạng thái đơn hàng trước khi thử lại.":
+      "Payment initialization result is uncertain. Please check order status before trying again.",
+  "Đơn hàng #{0} đang chờ thanh toán": "Order #{0} is awaiting payment",
+  "Giao dịch gần nhất: {0} • {1}": "Latest transaction: {0} • {1}",
+  "Xem trạng thái": "View status",
+  "Thanh toán đơn hàng": "Pay for order",
+  "Không thể tải chi tiết giao dịch thanh toán.":
+      "Unable to load payment transaction details.",
+  "Đang chờ xác nhận thanh toán": "Awaiting payment confirmation",
+  "Yêu cầu thanh toán đã được khởi tạo trên máy chủ. Vui lòng hoàn tất trên cổng thanh toán và kiểm tra lại trạng thái.":
+      "Payment intent has been created on the server. Please complete it on the payment gateway and refresh status.",
+  "Không tải được trạng thái thanh toán. Vui lòng thử lại.":
+      "Unable to load payment status. Please try again.",
+  "Mã thanh toán:": "Payment ID:",
+  "Trạng thái thanh toán:": "Payment status:",
+  "Hạn thanh toán:": "Payment deadline:",
+  "Số lần giao dịch:": "Transaction count:",
+  "Ghi chú hệ thống:": "System note:",
+  "Tổng tiền cần thanh toán:": "Total amount due:",
+  "Liên kết thanh toán từ cổng {0}": "Payment link from {0}",
+  "Sao chép liên kết thanh toán": "Copy payment link",
+  "Đã sao chép liên kết thanh toán!": "Payment link copied!",
+  "Xác nhận đơn PayPal (Capture)": "Confirm PayPal Order (Capture)",
+  "Sau khi chấp thuận thanh toán trên PayPal, nhập hoặc xác nhận mã PayPal Order ID để hoàn tất thu tiền.":
+      "After approving payment on PayPal, enter or confirm the PayPal Order ID to capture payment.",
+  "Mã đơn PayPal (PayPal Order ID)": "PayPal Order ID",
+  "Vui lòng nhập mã đơn PayPal (PayPal Order ID).":
+      "Please enter the PayPal Order ID.",
+  "Không tìm thấy mã giao dịch thanh toán.": "Payment ID not found.",
+  "Xác nhận thanh toán PayPal thành công!":
+      "PayPal payment captured successfully!",
+  "Chưa xác định được kết quả capture PayPal. Vui lòng kiểm tra trạng thái thanh toán trước khi thử lại.":
+      "PayPal capture result is uncertain. Please check payment status before trying again.",
+  "Chưa xác định được kết quả capture PayPal. Vui lòng bấm Kiểm tra trạng thái thanh toán trước khi gửi lại.":
+      "PayPal capture result is uncertain. Please tap Check payment status before submitting again.",
+  "Đang xác nhận PayPal...": "Confirming PayPal...",
+  "Xác nhận thanh toán PayPal": "Confirm PayPal payment",
+  "Đang kiểm tra trạng thái...": "Checking status...",
+  "Kiểm tra trạng thái thanh toán": "Check payment status",
+  "Đang chờ xác nhận": "Awaiting confirmation",
 };

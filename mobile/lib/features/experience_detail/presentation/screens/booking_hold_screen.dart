@@ -6,6 +6,7 @@ import '../../../../core/data/booking_repository.dart';
 import '../../../../core/data/order_repository.dart';
 import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/models/danasea_models.dart';
+import '../../../checkout/presentation/screens/checkout_screen.dart';
 import '../../../orders/presentation/screens/order_detail_screen.dart';
 
 /// Separate booking flow; existing detail and legacy booking layouts stay intact.
@@ -134,7 +135,9 @@ class _BookingHoldScreenState extends State<BookingHoldScreen> {
       await Navigator.push<void>(
         context,
         MaterialPageRoute(
-          builder: (_) => OrderDetailScreen(masterOrder: order),
+          builder: (_) => order.status == MasterOrderStatus.pendingPayment
+              ? CheckoutScreen(masterOrder: order)
+              : OrderDetailScreen(masterOrder: order),
         ),
       );
     }, creatingOrder: true);

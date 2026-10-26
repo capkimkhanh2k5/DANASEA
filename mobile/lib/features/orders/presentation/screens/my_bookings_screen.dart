@@ -7,6 +7,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/app_pill_button.dart';
+import '../../../checkout/presentation/screens/checkout_screen.dart';
+import '../../../../core/models/danasea_models.dart';
 import 'order_detail_screen.dart';
 
 const _statuses = {
@@ -298,7 +300,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       await Navigator.push<void>(
         context,
         MaterialPageRoute(
-          builder: (_) => OrderDetailScreen(masterOrder: order),
+          builder: (_) => order.status == MasterOrderStatus.pendingPayment
+              ? CheckoutScreen(masterOrder: order)
+              : OrderDetailScreen(masterOrder: order),
         ),
       );
     } on AuthFailure catch (e) {

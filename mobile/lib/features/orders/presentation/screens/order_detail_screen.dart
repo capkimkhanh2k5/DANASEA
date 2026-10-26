@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/order_repository.dart';
+import '../../../../core/data/payment_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../checkout/presentation/screens/checkout_screen.dart';
 import '../../../checkout/presentation/screens/e_ticket_qr_screen.dart';
+import '../../../checkout/presentation/screens/payment_result_screen.dart';
 import '../../../refund_dispute/presentation/screens/cancel_booking_screen.dart';
 import '../../../refund_dispute/presentation/screens/create_dispute_screen.dart';
 import '../../../refund_dispute/presentation/screens/refund_tracking_screen.dart';
@@ -29,11 +32,13 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final OrderRepository _repository = OrderRepository();
+  final PaymentRepository _paymentRepository = PaymentRepository();
   MasterOrderModel? _order;
   List<OrderPaymentRecord> _payments = [];
   List<RefundModel> _refunds = [];
   bool _loading = true;
   bool _loadingReceipt = false;
+  bool _openingPayment = false;
   String? _error;
   int _generation = 0;
 
@@ -57,7 +62,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         for (final sub in order.subOrders) sub.id: sub.serviceName,
       };
       final results = await Future.wait<dynamic>([
-        _repository.payments(order.id),
+        _paymentRepository.getOrderPayments(order.id),
         _repository.refunds(order.id, subOrderServiceNames: serviceNames),
       ]);
       if (!mounted || generation != _generation) return;
@@ -113,6 +118,53 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         return 'Đã hoàn thành';
       case MasterOrderStatus.cancelled:
         return 'Đã hủy';
+    }
+  }
+
+  Future<void> _openPaymentDetail(
+    MasterOrderModel order,
+    OrderPaymentRecord summary,
+  ) async {
+    if (_openingPayment) return;
+    setState(() => _openingPayment = true);
+    try {
+      final detail = await _paymentRepository.getPaymentDetail(summary.id);
+      if (!mounted) return;
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentResultScreen(
+            masterOrder: order,
+            provider: PaymentRepository.providerFromBackend(detail.provider),
+            isSuccess: detail.status.toUpperCase() == 'SUCCESS',
+            initialPayment: detail,
+            paymentId: detail.id,
+          ),
+        ),
+      );
+      if (mounted) _loadDetail();
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: LocalizedText(e.message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText(
+              'Không thể tải chi tiết giao dịch thanh toán.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingPayment = false);
     }
   }
 
@@ -585,6 +637,45 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                   ),
                                 ],
                               ),
+                              if (masterOrder.status ==
+                                  MasterOrderStatus.pendingPayment) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      minimumSize: const Size(
+                                        double.infinity,
+                                        44,
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      await Navigator.push<void>(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => CheckoutScreen(
+                                            masterOrder: masterOrder,
+                                          ),
+                                        ),
+                                      );
+                                      if (mounted) _loadDetail();
+                                    },
+                                    icon: const Icon(
+                                      Icons.payment,
+                                      size: 18,
+                                      color: Colors.white,
+                                    ),
+                                    label: const LocalizedText(
+                                      'Thanh toán đơn hàng',
+                                      style: TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
                               if (_payments.isNotEmpty) ...[
                                 const Divider(height: 16),
                                 LocalizedText(
@@ -596,11 +687,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                                 ),
                                 const SizedBox(height: 6),
                                 for (final p in _payments)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
-                                    child: _buildPriceRow(
-                                      '${p.provider} • ${p.status}',
-                                      _formatPrice(p.amount),
+                                  InkWell(
+                                    onTap: _openingPayment
+                                        ? null
+                                        : () => _openPaymentDetail(
+                                            masterOrder,
+                                            p,
+                                          ),
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 4,
+                                      ),
+                                      child: _buildPriceRow(
+                                        '${p.provider} • ${p.status}',
+                                        _formatPrice(p.amount),
+                                      ),
                                     ),
                                   ),
                               ],

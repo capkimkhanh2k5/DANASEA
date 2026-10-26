@@ -8,7 +8,8 @@ import '../l10n/app_localizations.dart';
 class AuthFailure implements Exception {
   final String message;
   final int status;
-  AuthFailure(this.message, [this.status = 0]);
+  final Map<String, dynamic>? payload;
+  AuthFailure(this.message, [this.status = 0, this.payload]);
   @override
   String toString() => message;
 }
@@ -124,6 +125,7 @@ class AuthSession {
           (body is Map ? body['message']?.toString() : null) ??
               'Không thể thực hiện yêu cầu. Vui lòng thử lại.',
           response.statusCode,
+          body is Map<String, dynamic> ? body : null,
         );
       }
       for (final cookie in response.cookies) {

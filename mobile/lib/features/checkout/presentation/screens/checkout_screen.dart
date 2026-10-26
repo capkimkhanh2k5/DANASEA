@@ -1,6 +1,8 @@
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/data/mock_database_data.dart';
+import '../../../../core/auth/auth_session.dart';
+import '../../../../core/data/order_repository.dart';
+import '../../../../core/data/payment_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
@@ -11,10 +13,14 @@ import 'payment_result_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final List<CartItemData> selectedItems;
+  final MasterOrderModel? masterOrder;
+  final String? orderId;
 
   const CheckoutScreen({
     super.key,
-    required this.selectedItems,
+    this.selectedItems = const [],
+    this.masterOrder,
+    this.orderId,
   });
 
   @override
@@ -22,11 +28,37 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
+  final OrderRepository _orderRepository = OrderRepository();
+  final PaymentRepository _paymentRepository = PaymentRepository();
+
   PaymentProvider _selectedProvider = PaymentProvider.vnpay;
   bool _waiverAccepted = false;
   final TextEditingController _discountController = TextEditingController();
-  int _discountAmount = 0;
-  String? _appliedCode;
+
+  MasterOrderModel? _order;
+  List<OrderPaymentRecord> _existingPayments = const [];
+  bool _loadingOrder = false;
+  bool _submitting = false;
+  final Set<PaymentProvider> _uncertainProviders = <PaymentProvider>{};
+  final Map<PaymentProvider, String> _idempotencyKeys =
+      <PaymentProvider, String>{};
+  String? _error;
+
+  String? get _targetOrderId => widget.orderId ?? widget.masterOrder?.id;
+
+  @override
+  void initState() {
+    super.initState();
+    _order = widget.masterOrder;
+    if (_order != null) {
+      _waiverAccepted = _order!.subOrders.every(
+        (s) => !s.waiverRequired || s.waiverAccepted,
+      );
+    }
+    if (_targetOrderId != null && _targetOrderId!.isNotEmpty) {
+      _loadOrderAndPaymentStatus();
+    }
+  }
 
   @override
   void dispose() {
@@ -34,13 +66,68 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.dispose();
   }
 
-  int get _subtotal =>
-      widget.selectedItems.fold(0, (sum, item) => sum + item.subtotal);
+  Future<void> _loadOrderAndPaymentStatus() async {
+    final targetId = _targetOrderId;
+    if (targetId == null || targetId.isEmpty) return;
+    setState(() {
+      _loadingOrder = true;
+      _error = null;
+    });
+    try {
+      final results = await Future.wait<dynamic>([
+        _orderRepository.detail(targetId),
+        _paymentRepository.getOrderStatus(targetId),
+      ]);
+      if (!mounted) return;
+      final loadedOrder = results[0] as MasterOrderModel;
+      final payments = results[1] as List<OrderPaymentRecord>;
+      setState(() {
+        _order = loadedOrder;
+        _existingPayments = payments;
+        _waiverAccepted = loadedOrder.subOrders.every(
+          (s) => !s.waiverRequired || s.waiverAccepted,
+        );
+      });
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        setState(() => _error = e.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error = 'Không tải được thông tin đơn hàng để thanh toán.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingOrder = false);
+      }
+    }
+  }
 
-  int get _finalTotal => (_subtotal - _discountAmount).clamp(0, 999999999);
+  int get _subtotal {
+    if (_order != null) {
+      return _order!.subtotalAmount;
+    }
+    return widget.selectedItems.fold(0, (sum, item) => sum + item.subtotal);
+  }
 
-  String _formatPrice(int price) {
-    final str = price.toString();
+  int get _discountAmount {
+    if (_order != null) {
+      return _order!.discountAmount;
+    }
+    return 0;
+  }
+
+  int get _finalTotal {
+    if (_order != null) {
+      return _order!.totalAmount;
+    }
+    return (_subtotal - _discountAmount).clamp(0, 999999999);
+  }
+
+  String _formatPrice(num price) {
+    final str = price.round().toString();
     final buffer = StringBuffer();
     int count = 0;
     for (int i = str.length - 1; i >= 0; i--) {
@@ -54,29 +141,62 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   void _applyDiscount() {
-    final code = _discountController.text.trim().toUpperCase();
-    if (code == 'DANASEA2024') {
-      setState(() {
-        _discountAmount = 40000;
-        _appliedCode = code;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: LocalizedText('Áp dụng mã giảm giá DANASEA2024 thành công (-40.000 đ)!'),
-          backgroundColor: AppColors.secondary,
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: LocalizedText(
+          'Mã giảm giá được áp dụng khi tạo đơn hàng từ giữ chỗ. Chức năng xem trước mã giảm giá sẽ được nối ở bước tiếp theo.',
         ),
-      );
-    } else {
+        backgroundColor: AppColors.primary,
+      ),
+    );
+  }
+
+  Future<void> _processPayment() async {
+    if (_submitting) return;
+    if (_uncertainProviders.contains(_selectedProvider)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: LocalizedText('Mã giảm giá không hợp lệ hoặc đã hết hạn.'),
+          content: LocalizedText(
+            'Chưa xác định được kết quả tạo thanh toán trước đó. Vui lòng bấm làm mới trạng thái thanh toán trước khi thử lại.',
+          ),
           backgroundColor: AppColors.error,
         ),
       );
+      return;
     }
-  }
 
-  void _processPayment() {
+    final order = _order;
+    if (order == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText(
+            'Cần có đơn hàng thực tế từ giữ chỗ để khởi tạo thanh toán trên máy chủ.',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (order.status == MasterOrderStatus.paid ||
+        order.status == MasterOrderStatus.partiallyCompleted ||
+        order.status == MasterOrderStatus.completed) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentResultScreen(
+            masterOrder: order,
+            provider: _selectedProvider,
+            isSuccess: true,
+            initialPayment: _existingPayments.isNotEmpty
+                ? _existingPayments.first
+                : null,
+          ),
+        ),
+      );
+      return;
+    }
+
     if (!_waiverAccepted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -89,62 +209,106 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    // Build Master Order & Sub Orders according to PostgreSQL Schema
-    final now = DateTime.now();
-    final orderId = 'DNS-${(1000 + (now.millisecondsSinceEpoch % 9000))}';
+    final idempotencyKey = _idempotencyKeys.putIfAbsent(
+      _selectedProvider,
+      () => PaymentRepository.generateIdempotencyKey('pay'),
+    );
 
-    final subOrders = widget.selectedItems.asMap().entries.map((entry) {
-      final idx = entry.key + 1;
-      final item = entry.value;
-      return SubOrderModel(
-        id: '$orderId-$idx',
-        masterOrderId: orderId,
-        vendorId: item.service.vendorId,
-        vendorName: item.service.vendorName,
-        serviceId: item.service.id,
-        serviceName: item.service.name,
-        serviceImageUrl: item.service.imageUrls.isNotEmpty
-            ? item.service.imageUrls.first
-            : '',
-        locationName: item.service.locationName,
-        slotId: item.slot.id,
-        slotDate: item.slot.date,
-        slotTime: '${item.slot.startTime} - ${item.slot.endTime}',
-        quantity: item.quantity,
-        unitPrice: item.service.price,
-        subtotalAmount: item.subtotal,
-        status: SubOrderStatus.confirmed,
-        waiverAccepted: true,
-        waiverAcceptedAt: now,
-        qrSecret: 'qr-sec-${DateTime.now().millisecondsSinceEpoch}-$idx',
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    try {
+      final intent = await _paymentRepository.createIntent(
+        orderId: order.id,
+        provider: _selectedProvider,
+        idempotencyKey: idempotencyKey,
       );
-    }).toList();
+      OrderPaymentRecord? detail;
+      try {
+        detail = await _paymentRepository.getPaymentDetail(intent.paymentId);
+      } catch (_) {}
 
-    final masterOrder = MasterOrderModel(
-      id: orderId,
-      customerId: MockDatabaseData.currentUser.id,
-      status: MasterOrderStatus.paid,
-      totalAmount: _finalTotal,
-      discountAmount: _discountAmount,
-      discountCode: _appliedCode,
-      createdAt: now,
-      subOrders: subOrders,
-    );
+      if (!mounted) return;
+      final confirmedSuccess =
+          detail?.status.toUpperCase() == 'SUCCESS' ||
+          intent.status.toUpperCase() == 'SUCCESS';
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PaymentResultScreen(
-          masterOrder: masterOrder,
-          provider: _selectedProvider,
+      await Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentResultScreen(
+            masterOrder: order,
+            provider: _selectedProvider,
+            isSuccess: confirmedSuccess,
+            paymentIntent: intent,
+            initialPayment: detail,
+            paymentId: intent.paymentId,
+          ),
         ),
-      ),
-    );
+      );
+    } on AuthFailure catch (e) {
+      if (!mounted) return;
+      String message = e.message;
+      final payload = e.payload;
+      if (payload != null &&
+          payload['code']?.toString() == 'WAIVER_ACCEPTANCE_REQUIRED') {
+        final missing = payload['missingSubOrders'];
+        if (missing is List && missing.isNotEmpty) {
+          final names = missing
+              .whereType<Map<String, dynamic>>()
+              .map((m) => m['serviceName']?.toString() ?? m['subOrderId']?.toString() ?? '')
+              .where((s) => s.isNotEmpty)
+              .join(', ');
+          if (names.isNotEmpty) {
+            message = '$message ($names)';
+          }
+        }
+      }
+      setState(() {
+        _error = message;
+        if (e.status == 0 || e.status >= 500) {
+          _uncertainProviders.add(_selectedProvider);
+        }
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: LocalizedText(message),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      const msg =
+          'Chưa xác định được kết quả khởi tạo thanh toán. Vui lòng kiểm tra trạng thái đơn hàng trước khi thử lại.';
+      setState(() {
+        _error = msg;
+        _uncertainProviders.add(_selectedProvider);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText(msg),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = MockDatabaseData.currentUser;
+    final profile = AuthSession.instance.profile;
+    final fullName = (profile?['fullName']?.toString() ?? '').trim();
+    final email = (profile?['email']?.toString() ?? '').trim();
+    final phone = (profile?['phone']?.toString() ?? '').trim();
+    final order = _order;
+    final itemCount = order != null
+        ? order.subOrders.length
+        : widget.selectedItems.length;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -153,7 +317,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.onSurface),
-          onPressed: () => Navigator.pop(context),
+          onPressed: _submitting ? null : () => Navigator.pop(context),
         ),
         title: Column(
           children: [
@@ -170,167 +334,452 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ],
         ),
         centerTitle: true,
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Icon(Icons.lock_outline, color: AppColors.secondary),
-          ),
+        actions: [
+          if (_targetOrderId != null)
+            IconButton(
+              icon: const Icon(Icons.refresh, color: AppColors.secondary),
+              onPressed: (_loadingOrder || _submitting)
+                  ? null
+                  : () {
+                      _uncertainProviders.clear();
+                      _loadOrderAndPaymentStatus();
+                    },
+            )
+          else
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Icon(Icons.lock_outline, color: AppColors.secondary),
+            ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppShapes.gutterMobile),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. COUNTDOWN INVENTORY LOCK BANNER
-            Container(
-              padding: const EdgeInsets.all(AppShapes.spaceSm),
-              decoration: BoxDecoration(
-                color: AppColors.secondaryFixed.withValues(alpha: 0.4),
-                borderRadius: AppShapes.radiusDefault,
-              ),
-              child: Row(
+      body: _loadingOrder && order == null
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(AppShapes.gutterMobile),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 1. COUNTDOWN INVENTORY LOCK BANNER
                   Container(
-                    width: 32,
-                    height: 32,
-                    decoration: const BoxDecoration(
-                      color: AppColors.secondary,
-                      shape: BoxShape.circle,
+                    padding: const EdgeInsets.all(AppShapes.spaceSm),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondaryFixed.withValues(alpha: 0.4),
+                      borderRadius: AppShapes.radiusDefault,
                     ),
-                    child: const Icon(Icons.timer,
-                        size: 18, color: AppColors.onSecondary),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: AppColors.secondary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.timer,
+                            size: 18,
+                            color: AppColors.onSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              LocalizedText(
+                                'Thời gian giữ chỗ',
+                                style: AppTypography.labelSm(
+                                  color: AppColors.secondary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              LocalizedText(
+                                order != null
+                                    ? 'Đơn hàng #${order.id} đang chờ thanh toán'
+                                    : 'Chỗ được khóa tạm thời trên hệ thống',
+                                style: AppTypography.bodySm(
+                                  color: AppColors.onSurfaceVariant,
+                                ).copyWith(fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLowest,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: LocalizedText(
+                            order != null ? order.status.name.toUpperCase() : 'HOLD',
+                            style: AppTypography.labelSm(
+                              color: AppColors.secondary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
+                  if (_error != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppShapes.spaceSm),
+                      decoration: BoxDecoration(
+                        color: AppColors.errorContainer,
+                        borderRadius: AppShapes.radiusDefault,
+                      ),
+                      child: LocalizedText(
+                        _error!,
+                        style: AppTypography.bodySm(color: AppColors.error),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+
+                  // 2. CUSTOMER INFO CARD
+                  Container(
+                    padding: const EdgeInsets.all(AppShapes.spaceSm),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLowest,
+                      borderRadius: AppShapes.radiusDefault,
+                      border: Border.all(color: AppColors.borderSubtle),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        LocalizedText(
-                          'Thời gian giữ chỗ',
-                          style: AppTypography.labelSm(
-                            color: AppColors.secondary,
-                            fontWeight: FontWeight.w700,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.badge_outlined,
+                                    size: 18,
+                                    color: AppColors.secondary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: LocalizedText(
+                                      'Thông tin người đặt',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.labelLg(
+                                        color: AppColors.onSurface,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            LocalizedText(
+                              'Từ hồ sơ',
+                              style: AppTypography.labelSm(
+                                color: AppColors.secondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLow,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            children: [
+                              _buildContactRow(
+                                Icons.person,
+                                fullName.isNotEmpty
+                                    ? fullName
+                                    : (order != null
+                                          ? '#${order.customerId}'
+                                          : 'Khách hàng DANASEA'),
+                              ),
+                              if (phone.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                _buildContactRow(Icons.phone, phone),
+                              ],
+                              if (email.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                _buildContactRow(Icons.email, email),
+                              ],
+                            ],
                           ),
                         ),
-                        LocalizedText(
-                          'Chỗ được khóa tạm thời trên hệ thống',
-                          style: AppTypography.bodySm(
-                            color: AppColors.onSurfaceVariant,
-                          ).copyWith(fontSize: 11),
-                        ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+
+                  // 3. ORDER SUMMARY BY PROVIDER
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.all(AppShapes.spaceSm),
                     decoration: BoxDecoration(
                       color: AppColors.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: AppShapes.radiusDefault,
+                      border: Border.all(color: AppColors.borderSubtle),
                     ),
-                    child: LocalizedText(
-                      '09:42',
-                      style: AppTypography.labelLg(
-                        color: AppColors.secondary,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 2. CUSTOMER INFO CARD
-            Container(
-              padding: const EdgeInsets.all(AppShapes.spaceSm),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: AppShapes.radiusDefault,
-                border: Border.all(color: AppColors.borderSubtle),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Icon(Icons.badge_outlined,
-                                size: 18, color: AppColors.secondary),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: LocalizedText(
-                                'Thông tin người đặt',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: AppTypography.labelLg(
-                                  color: AppColors.onSurface,
-                                ),
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.sailing,
+                                    size: 18,
+                                    color: AppColors.secondary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: LocalizedText(
+                                      'Tóm tắt dịch vụ biển',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.labelLg(
+                                        color: AppColors.onSurface,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            LocalizedText(
+                              '$itemCount dịch vụ',
+                              style: AppTypography.labelSm(
+                                color: AppColors.onSurfaceVariant,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      LocalizedText(
-                        'Từ hồ sơ',
-                        style: AppTypography.labelSm(
-                          color: AppColors.secondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildContactRow(Icons.person, user.fullName),
-                        const SizedBox(height: 6),
-                        _buildContactRow(
-                            Icons.phone, user.phone ?? '0905 123 456'),
-                        const SizedBox(height: 6),
-                        _buildContactRow(Icons.email, user.email),
+                        const SizedBox(height: 10),
+                        if (order != null)
+                          ...order.subOrders.map((sub) {
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: SizedBox(
+                                      width: 48,
+                                      height: 48,
+                                      child: sub.serviceImageUrl.isNotEmpty
+                                          ? Image.network(
+                                              sub.serviceImageUrl,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, _, _) =>
+                                                  Container(
+                                                    color: AppColors
+                                                        .surfaceContainerHigh,
+                                                    child: const Icon(
+                                                      Icons.sailing,
+                                                      size: 20,
+                                                      color:
+                                                          AppColors.secondary,
+                                                    ),
+                                                  ),
+                                            )
+                                          : Container(
+                                              color: AppColors
+                                                  .surfaceContainerHigh,
+                                              child: const Icon(
+                                                Icons.sailing,
+                                                size: 20,
+                                                color: AppColors.secondary,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        LocalizedText(
+                                          sub.serviceName,
+                                          style: AppTypography.labelMd(
+                                            color: AppColors.onSurface,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        LocalizedText(
+                                          '${sub.vendorName} • ${sub.quantity} khách',
+                                          style: AppTypography.bodySm(
+                                            color: AppColors.onSurfaceVariant,
+                                          ).copyWith(fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  LocalizedText(
+                                    _formatPrice(sub.finalAmount),
+                                    style: AppTypography.labelMd(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          })
+                        else
+                          ...widget.selectedItems.map((item) {
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceContainerLow,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: SizedBox(
+                                      width: 48,
+                                      height: 48,
+                                      child: Image.network(
+                                        item.service.imageUrls.isNotEmpty
+                                            ? item.service.imageUrls.first
+                                            : '',
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        LocalizedText(
+                                          item.service.name,
+                                          style: AppTypography.labelMd(
+                                            color: AppColors.onSurface,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        LocalizedText(
+                                          '${item.service.vendorName} • ${item.quantity} khách',
+                                          style: AppTypography.bodySm(
+                                            color: AppColors.onSurfaceVariant,
+                                          ).copyWith(fontSize: 11),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  LocalizedText(
+                                    _formatPrice(item.subtotal),
+                                    style: AppTypography.labelMd(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
                       ],
                     ),
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
-            // 3. ORDER SUMMARY BY PROVIDER
-            Container(
-              padding: const EdgeInsets.all(AppShapes.spaceSm),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: AppShapes.radiusDefault,
-                border: Border.all(color: AppColors.borderSubtle),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
+                  // 4. DISCOUNT CODE SECTION
+                  Container(
+                    padding: const EdgeInsets.all(AppShapes.spaceSm),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLowest,
+                      borderRadius: AppShapes.radiusDefault,
+                      border: Border.all(color: AppColors.borderSubtle),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.confirmation_number_outlined,
+                          size: 20,
+                          color: AppColors.secondary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _discountController,
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: InputDecoration(
+                              hintText: tr(
+                                context,
+                                'Mã giảm giá (ví dụ DANASEA2024)',
+                              ),
+                              hintStyle: AppTypography.bodySm(
+                                color: AppColors.outline,
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondary,
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          onPressed: _applyDiscount,
+                          child: LocalizedText(
+                            'Áp dụng',
+                            style: AppTypography.labelSm(color: Colors.white),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 5. PAYMENT METHOD SELECTION (VNPAY, PAYPAL, MOMO, SEPAY)
+                  Container(
+                    padding: const EdgeInsets.all(AppShapes.spaceSm),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLowest,
+                      borderRadius: AppShapes.radiusDefault,
+                      border: Border.all(color: AppColors.borderSubtle),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            const Icon(Icons.sailing,
-                                size: 18, color: AppColors.secondary),
+                            const Icon(
+                              Icons.payment,
+                              size: 18,
+                              color: AppColors.secondary,
+                            ),
                             const SizedBox(width: 6),
-                            Flexible(
+                            Expanded(
                               child: LocalizedText(
-                                'Tóm tắt dịch vụ biển',
-                                overflow: TextOverflow.ellipsis,
+                                'Phương thức thanh toán',
                                 style: AppTypography.labelLg(
                                   color: AppColors.onSurface,
                                 ),
@@ -338,278 +787,212 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      LocalizedText(
-                        '${widget.selectedItems.length} dịch vụ',
-                        style: AppTypography.labelSm(
-                          color: AppColors.onSurfaceVariant,
+                        const SizedBox(height: 10),
+                        _buildPaymentRadio(
+                          provider: PaymentProvider.vnpay,
+                          title: 'VNPAY Cổng thanh toán',
+                          subtitle:
+                              'Hỗ trợ thẻ ATM nội địa, QR Pay, Visa/Mastercard',
+                          icon: Icons.credit_card,
                         ),
-                      ),
-                    ],
+                        _buildPaymentRadio(
+                          provider: PaymentProvider.paypal,
+                          title: 'PayPal Quốc tế',
+                          subtitle:
+                              'Thanh toán quốc tế an toàn qua tài khoản PayPal',
+                          icon: Icons.public,
+                        ),
+                        _buildPaymentRadio(
+                          provider: PaymentProvider.momo,
+                          title: 'Ví điện tử MoMo',
+                          subtitle: 'Quét mã MoMo thanh toán liền mạch',
+                          icon: Icons.account_balance_wallet,
+                        ),
+                        _buildPaymentRadio(
+                          provider: PaymentProvider.sepay,
+                          title: 'Chuyển khoản VietQR (SePay)',
+                          subtitle: 'Xác nhận giao dịch tự động 24/7',
+                          icon: Icons.qr_code,
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  ...widget.selectedItems.map((item) {
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(8),
+                  if (_existingPayments.isNotEmpty && order != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(AppShapes.spaceSm),
                       decoration: BoxDecoration(
                         color: AppColors.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: AppShapes.radiusDefault,
+                        border: Border.all(color: AppColors.borderSubtle),
                       ),
                       child: Row(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: SizedBox(
-                              width: 48,
-                              height: 48,
-                              child: Image.network(
-                                item.service.imageUrls.isNotEmpty
-                                    ? item.service.imageUrls.first
-                                    : '',
-                                fit: BoxFit.cover,
+                          const Icon(
+                            Icons.history,
+                            size: 18,
+                            color: AppColors.secondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: LocalizedText(
+                              'Giao dịch gần nhất: ${_existingPayments.first.provider} • ${_existingPayments.first.status}',
+                              style: AppTypography.bodySm(
+                                color: AppColors.onSurface,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                LocalizedText(
-                                  item.service.name,
-                                  style: AppTypography.labelMd(
-                                    color: AppColors.onSurface,
-                                    fontWeight: FontWeight.w700,
+                          TextButton(
+                            onPressed: () {
+                              final latest = _existingPayments.first;
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PaymentResultScreen(
+                                    masterOrder: order,
+                                    provider:
+                                        PaymentRepository.providerFromBackend(
+                                          latest.provider,
+                                        ),
+                                    isSuccess:
+                                        latest.status.toUpperCase() ==
+                                        'SUCCESS',
+                                    initialPayment: latest,
+                                    paymentId: latest.id,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                LocalizedText(
-                                  '${item.service.vendorName} • ${item.quantity} khách',
-                                  style: AppTypography.bodySm(
-                                    color: AppColors.onSurfaceVariant,
-                                  ).copyWith(fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                          LocalizedText(
-                            _formatPrice(item.subtotal),
-                            style: AppTypography.labelMd(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
+                              );
+                            },
+                            child: const LocalizedText('Xem trạng thái'),
                           ),
                         ],
                       ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 4. DISCOUNT CODE SECTION
-            Container(
-              padding: const EdgeInsets.all(AppShapes.spaceSm),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: AppShapes.radiusDefault,
-                border: Border.all(color: AppColors.borderSubtle),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.confirmation_number_outlined,
-                      size: 20, color: AppColors.secondary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _discountController,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: InputDecoration(
-                        hintText: tr(context, 'Mã giảm giá (ví dụ DANASEA2024)'),
-                        hintStyle:
-                            AppTypography.bodySm(color: AppColors.outline),
-                        border: InputBorder.none,
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    onPressed: _applyDiscount,
-                    child: LocalizedText(
-                      'Áp dụng',
-                      style: AppTypography.labelSm(color: Colors.white),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 5. PAYMENT METHOD SELECTION (VNPAY, MOMO, SEPAY)
-            Container(
-              padding: const EdgeInsets.all(AppShapes.spaceSm),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: AppShapes.radiusDefault,
-                border: Border.all(color: AppColors.borderSubtle),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.payment,
-                          size: 18, color: AppColors.secondary),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: LocalizedText(
-                          'Phương thức thanh toán',
-                          style: AppTypography.labelLg(
-                            color: AppColors.onSurface,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  _buildPaymentRadio(
-                    provider: PaymentProvider.vnpay,
-                    title: 'VNPAY Cổng thanh toán',
-                    subtitle: 'Hỗ trợ thẻ ATM nội địa, QR Pay, Visa/Mastercard',
-                    icon: Icons.credit_card,
-                  ),
-                  _buildPaymentRadio(
-                    provider: PaymentProvider.momo,
-                    title: 'Ví điện tử MoMo',
-                    subtitle: 'Quét mã MoMo thanh toán liền mạch',
-                    icon: Icons.account_balance_wallet,
-                  ),
-                  _buildPaymentRadio(
-                    provider: PaymentProvider.sepay,
-                    title: 'Chuyển khoản VietQR (SePay)',
-                    subtitle: 'Xác nhận giao dịch tự động 24/7',
-                    icon: Icons.qr_code,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 6. WAIVER AGREEMENT CHECKBOX
-            Container(
-              padding: const EdgeInsets.all(AppShapes.spaceSm),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: AppShapes.radiusDefault,
-                border: Border.all(
-                  color: _waiverAccepted
-                      ? AppColors.secondary
-                      : AppColors.borderSubtle,
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Checkbox(
-                    value: _waiverAccepted,
-                    activeColor: AppColors.secondary,
-                    onChanged: (val) {
-                      setState(() => _waiverAccepted = val ?? false);
-                    },
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: LocalizedText(
-                        'Tôi xác nhận đủ điều kiện sức khỏe và đồng ý với Cam kết miễn trừ trách nhiệm khi tham gia các hoạt động thể thao biển tại Đà Nẵng.',
-                        style: AppTypography.bodySm(
-                          color: AppColors.onSurface,
-                        ).copyWith(fontSize: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // 7. SUMMARY & CONFIRM BUTTON
-            Container(
-              padding: const EdgeInsets.all(AppShapes.spaceSm),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: AppShapes.radiusDefault,
-                border: Border.all(color: AppColors.borderSubtle),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      LocalizedText('Tạm tính:',
-                          style: AppTypography.bodySm(
-                              color: AppColors.onSurfaceVariant)),
-                      LocalizedText(_formatPrice(_subtotal),
-                          style: AppTypography.labelMd(
-                              color: AppColors.onSurface)),
-                    ],
-                  ),
-                  if (_discountAmount > 0) ...[
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        LocalizedText('Giảm giá ($_appliedCode):',
-                            style: AppTypography.bodySm(
-                                color: AppColors.secondary)),
-                        LocalizedText('- ${_formatPrice(_discountAmount)}',
-                            style: AppTypography.labelMd(
-                                color: AppColors.secondary)),
-                      ],
                     ),
                   ],
-                  const Divider(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: LocalizedText('Tổng thanh toán:',
-                            style: AppTypography.labelLg(
-                                color: AppColors.onSurface)),
+                  const SizedBox(height: 16),
+
+                  // 6. WAIVER AGREEMENT CHECKBOX
+                  Container(
+                    padding: const EdgeInsets.all(AppShapes.spaceSm),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: AppShapes.radiusDefault,
+                      border: Border.all(
+                        color: _waiverAccepted
+                            ? AppColors.secondary
+                            : AppColors.borderSubtle,
                       ),
-                      const SizedBox(width: 8),
-                      LocalizedText(
-                        _formatPrice(_finalTotal),
-                        style: AppTypography.headlineSm(
-                          color: AppColors.primary,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                          value: _waiverAccepted,
+                          activeColor: AppColors.secondary,
+                          onChanged: (val) {
+                            setState(() => _waiverAccepted = val ?? false);
+                          },
                         ),
-                      ),
-                    ],
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: LocalizedText(
+                              'Tôi xác nhận đủ điều kiện sức khỏe và đồng ý với Cam kết miễn trừ trách nhiệm khi tham gia các hoạt động thể thao biển tại Đà Nẵng.',
+                              style: AppTypography.bodySm(
+                                color: AppColors.onSurface,
+                              ).copyWith(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 14),
-                  AppPillButton(
-                    label: 'Xác nhận thanh toán ${_formatPrice(_finalTotal)}',
-                    variant: AppButtonVariant.primary,
-                    width: double.infinity,
-                    onPressed: _processPayment,
+                  const SizedBox(height: 20),
+
+                  // 7. SUMMARY & CONFIRM BUTTON
+                  Container(
+                    padding: const EdgeInsets.all(AppShapes.spaceSm),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLowest,
+                      borderRadius: AppShapes.radiusDefault,
+                      border: Border.all(color: AppColors.borderSubtle),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            LocalizedText(
+                              'Tạm tính:',
+                              style: AppTypography.bodySm(
+                                color: AppColors.onSurfaceVariant,
+                              ),
+                            ),
+                            LocalizedText(
+                              _formatPrice(_subtotal),
+                              style: AppTypography.labelMd(
+                                color: AppColors.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_discountAmount > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              LocalizedText(
+                                'Giảm giá (${order?.discountCode ?? 'DISCOUNT'}):',
+                                style: AppTypography.bodySm(
+                                  color: AppColors.secondary,
+                                ),
+                              ),
+                              LocalizedText(
+                                '- ${_formatPrice(_discountAmount)}',
+                                style: AppTypography.labelMd(
+                                  color: AppColors.secondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const Divider(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: LocalizedText(
+                                'Tổng thanh toán:',
+                                style: AppTypography.labelLg(
+                                  color: AppColors.onSurface,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            LocalizedText(
+                              _formatPrice(_finalTotal),
+                              style: AppTypography.headlineSm(
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        AppPillButton(
+                          label: _submitting
+                              ? 'Đang khởi tạo thanh toán...'
+                              : 'Xác nhận thanh toán ${_formatPrice(_finalTotal)}',
+                          variant: AppButtonVariant.primary,
+                          width: double.infinity,
+                          isLoading: _submitting,
+                          onPressed: _submitting ? null : _processPayment,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -641,7 +1024,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }) {
     final isSelected = _selectedProvider == provider;
     return InkWell(
-      onTap: () => setState(() => _selectedProvider = provider),
+      onTap: _submitting
+          ? null
+          : () => setState(() => _selectedProvider = provider),
       borderRadius: BorderRadius.circular(8),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
