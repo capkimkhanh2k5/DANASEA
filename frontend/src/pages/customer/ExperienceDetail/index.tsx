@@ -28,8 +28,9 @@ export function ExperienceDetail() {
 
   const { toggleWishlist, isInWishlist } = useWishlistStore();
 
-  // Gallery slider state for the large main image
-  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+  // Gallery slider state for the large main image (Seamless Infinite Carousel)
+  const [trackIndex, setTrackIndex] = useState<number>(1);
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(true);
   const [isHoveringGallery, setIsHoveringGallery] = useState<boolean>(false);
 
   // Lightbox Modal state for full-screen image preview
@@ -238,25 +239,80 @@ export function ExperienceDetail() {
     return ['https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800'];
   }, [service?.imageUrls]);
 
-  // Auto-play loop every 3.5 seconds in circular cycle (pauses when hovering)
+  // Infinite Carousel Slides Track: [cloneLast, ...allImages, cloneFirst]
+  const slides = useMemo(() => {
+    if (allImages.length <= 1) return allImages;
+    return [allImages[allImages.length - 1], ...allImages, allImages[0]];
+  }, [allImages]);
+
+  // Sync track position when images list changes
+  useEffect(() => {
+    setTrackIndex(allImages.length > 1 ? 1 : 0);
+    setIsTransitioning(false);
+    const raf = requestAnimationFrame(() => setIsTransitioning(true));
+    return () => cancelAnimationFrame(raf);
+  }, [allImages.length]);
+
+  // Active Real Image Index (0..N-1) for dots, badge counter and thumbnail strip
+  const activeRealIndex = useMemo(() => {
+    if (allImages.length <= 1) return 0;
+    return (trackIndex - 1 + allImages.length) % allImages.length;
+  }, [trackIndex, allImages.length]);
+
+  // Handle transition end for seamless infinite wrap-around
+  const handleTransitionEnd = () => {
+    if (allImages.length <= 1) return;
+    if (trackIndex === slides.length - 1) {
+      // Reached cloned first image at the end -> jump instantly to real first image without animation
+      setIsTransitioning(false);
+      setTrackIndex(1);
+    } else if (trackIndex === 0) {
+      // Reached cloned last image at the beginning -> jump instantly to real last image without animation
+      setIsTransitioning(false);
+      setTrackIndex(allImages.length);
+    }
+  };
+
+  // Re-enable transition smoothly after instant snap
+  useEffect(() => {
+    if (!isTransitioning) {
+      const raf = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsTransitioning(true);
+        });
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [isTransitioning]);
+
+  // Auto-play loop every 3.5 seconds in continuous forward direction (pauses when hovering)
   useEffect(() => {
     if (allImages.length <= 1 || isHoveringGallery) return;
 
     const timer = setInterval(() => {
-      setActiveImageIndex((prev) => (prev + 1) % allImages.length);
+      setTrackIndex((prev) => prev + 1);
     }, 3500);
 
     return () => clearInterval(timer);
   }, [allImages.length, isHoveringGallery]);
 
-  const handlePrevImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+  const handlePrevImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (allImages.length <= 1) return;
+    setIsTransitioning(true);
+    setTrackIndex((prev) => prev - 1);
   };
 
-  const handleNextImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveImageIndex((prev) => (prev + 1) % allImages.length);
+  const handleNextImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (allImages.length <= 1) return;
+    setIsTransitioning(true);
+    setTrackIndex((prev) => prev + 1);
+  };
+
+  const handleSelectImage = (realIdx: number) => {
+    setIsTransitioning(true);
+    setTrackIndex(allImages.length > 1 ? realIdx + 1 : 0);
   };
 
   // Keyboard navigation & body scroll lock for Lightbox Modal
@@ -458,21 +514,24 @@ export function ExperienceDetail() {
               
               {/* Photo Gallery: Main Carousel + Small Thumbnail Strip Directly Below */}
               <section className="w-full bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col gap-2.5">
-                {/* Large Main Carousel Image with Auto-play, Zoom Popup & Prev/Next Navigation */}
+                {/* Large Main Carousel Image with Seamless Infinite Loop Auto-play, Zoom Popup & Navigation */}
                 <div
-                  onClick={() => handleOpenLightbox(activeImageIndex)}
+                  onClick={() => handleOpenLightbox(activeRealIndex)}
                   className="relative group overflow-hidden rounded-xl h-[320px] sm:h-[420px] bg-black select-none cursor-pointer"
                   onMouseEnter={() => setIsHoveringGallery(true)}
                   onMouseLeave={() => setIsHoveringGallery(false)}
                   title="Bấm vào để phóng to xem ảnh"
                 >
-                  {/* Smooth Sliding Carousel Track */}
+                  {/* Smooth Infinite Sliding Carousel Track */}
                   <div
-                    className="flex w-full h-full transition-transform duration-500 ease-out"
-                    style={{ transform: `translateX(-${activeImageIndex * 100}%)` }}
+                    onTransitionEnd={handleTransitionEnd}
+                    className={`flex w-full h-full ${
+                      isTransitioning ? 'transition-transform duration-500 ease-out' : ''
+                    }`}
+                    style={{ transform: `translateX(-${trackIndex * 100}%)` }}
                   >
-                    {allImages.map((imgUrl, imgIdx) => (
-                      <div key={imgIdx} className="w-full h-full shrink-0 relative overflow-hidden flex items-center justify-center bg-slate-900/90">
+                    {slides.map((imgUrl, sIdx) => (
+                      <div key={sIdx} className="w-full h-full shrink-0 relative overflow-hidden flex items-center justify-center bg-slate-900/90">
                         {/* Ambient Frosted Blur Backdrop to fill container naturally */}
                         <img
                           src={imgUrl}
@@ -482,9 +541,9 @@ export function ExperienceDetail() {
                         {/* Crisp Foreground Image - Preserves 100% full view without cropping or stretching */}
                         <img
                           src={imgUrl}
-                          alt={`${service.name} - ${imgIdx + 1}`}
-                          className="relative z-10 w-full h-full object-contain select-none transition-transform duration-500 ease-out"
-                          loading={imgIdx === 0 ? 'eager' : 'lazy'}
+                          alt={`${service.name} - slide ${sIdx + 1}`}
+                          className="relative z-10 w-full h-full object-contain select-none"
+                          loading={sIdx <= 2 ? 'eager' : 'lazy'}
                         />
                       </div>
                     ))}
@@ -539,7 +598,7 @@ export function ExperienceDetail() {
 
                   {/* Compact Pure Black Counter Badge - Always visible */}
                   <div className="absolute bottom-3 right-3 px-2 py-0.5 rounded-full bg-black/75 backdrop-blur-xs text-white/95 text-[10px] font-medium tracking-wide shadow-xs z-10 pointer-events-none">
-                    {activeImageIndex + 1} / {allImages.length}
+                    {activeRealIndex + 1} / {allImages.length}
                   </div>
 
                   {/* Indicator Dots - Always visible */}
@@ -554,13 +613,13 @@ export function ExperienceDetail() {
                         onClick={(e) => {
                           e.stopPropagation();
                           if (allImages.length > 1) {
-                            setActiveImageIndex(dotIdx);
+                            handleSelectImage(dotIdx);
                           }
                         }}
                         className={`transition-all duration-300 rounded-full ${
                           allImages.length <= 1 ? 'cursor-default' : 'cursor-pointer'
                         } ${
-                          activeImageIndex === dotIdx
+                          activeRealIndex === dotIdx
                             ? 'w-5 h-1.5 bg-white shadow-xs'
                             : 'w-1.5 h-1.5 bg-white/40 hover:bg-white/70'
                         }`}
@@ -592,12 +651,12 @@ export function ExperienceDetail() {
                   {/* Dải các thẻ ảnh phụ nhỏ */}
                   <div className="flex-1 flex items-center gap-2 overflow-x-auto py-1 scrollbar-none scroll-smooth">
                     {allImages.map((imgUrl, idx) => {
-                      const isCurrentActive = activeImageIndex === idx;
+                      const isCurrentActive = activeRealIndex === idx;
                       return (
                         <button
                           key={idx}
                           type="button"
-                          onClick={() => setActiveImageIndex(idx)}
+                          onClick={() => handleSelectImage(idx)}
                           className={`relative shrink-0 w-20 h-14 sm:w-24 sm:h-16 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
                             isCurrentActive
                               ? 'ring-2 ring-cyan-500 border-transparent shadow-xs scale-102'
