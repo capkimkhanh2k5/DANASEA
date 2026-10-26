@@ -204,16 +204,6 @@ export function Wishlist() {
     return allAvailableServices.filter(item => wishlistIds.includes(item.id));
   }, [allAvailableServices, wishlistIds]);
 
-  // Compute item count per category
-  const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: wishlist.length };
-    for (const cat of CATEGORY_FILTERS) {
-      if (cat.id === 'all') continue;
-      counts[cat.id] = wishlist.filter(item => matchesCategory(item.categoryId || item.category, cat.id)).length;
-    }
-    return counts;
-  }, [wishlist]);
-
   const handleRemove = (e: React.MouseEvent, item: WishlistItem) => {
     e.stopPropagation();
     removeFromWishlist(item.id, item.name);
@@ -266,28 +256,18 @@ export function Wishlist() {
               >
                 {CATEGORY_FILTERS.map((cat) => {
                   const isActive = activeFilter === cat.id;
-                  const count = categoryCounts[cat.id] ?? 0;
                   return (
                     <button
                       key={cat.id}
                       type="button"
                       onClick={() => setActiveFilter(cat.id)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 whitespace-nowrap shrink-0 cursor-pointer ${
                         isActive
                           ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm shadow-cyan-500/25 ring-1 ring-cyan-500/30"
                           : "bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200/80"
                       }`}
                     >
-                      <span>{cat.name}</span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-semibold transition-colors ${
-                          isActive
-                            ? "bg-white/20 text-white"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        {count}
-                      </span>
+                      {cat.name}
                     </button>
                   );
                 })}
