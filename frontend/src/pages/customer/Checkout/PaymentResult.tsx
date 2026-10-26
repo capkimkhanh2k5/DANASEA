@@ -665,7 +665,7 @@ export function PaymentResult() {
                     type="button"
                     className="flex-1 py-3 px-4 rounded-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer hover:scale-[1.01] text-center"
                   >
-                    Thanh toán lại ngay
+                    Thanh toán lại
                   </button>
                 </div>
               </div>
