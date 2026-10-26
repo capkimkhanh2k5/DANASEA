@@ -27,7 +27,8 @@ export interface BookingHoldResponse {
   customerId: string;
   status: string;
   totalAmount: number;
-  expiresAt: string;
+  expiresAt?: string;
+  holdExpiresAt?: string;
   items: BookingHoldItemResponse[];
 }
 

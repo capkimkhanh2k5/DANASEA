@@ -87,8 +87,9 @@ export function Checkout() {
         .holdBooking({ items: holdItems })
         .then((res) => {
           setBookingHold(res);
-          if (res.expiresAt) {
-            const expireDate = new Date(res.expiresAt).getTime();
+          const expireTime = res.holdExpiresAt || res.expiresAt;
+          if (expireTime) {
+            const expireDate = new Date(expireTime).getTime();
             const now = Date.now();
             const diffSec = Math.max(0, Math.floor((expireDate - now) / 1000));
             if (diffSec > 0) setCountdown(diffSec);
@@ -205,14 +206,27 @@ export function Checkout() {
     setIsProcessingPayment(true);
     setPaymentError(null);
 
-    // If real backend booking is active and user is logged in
-    if (bookingHold?.bookingId && isAuthenticated) {
+    // If user is authenticated, execute the real backend workflow
+    if (isAuthenticated) {
       try {
         triggerDemoLoading(3000, "Đang xử lý đơn hàng & kết nối cổng thanh toán...", "Hệ thống đang bảo lưu mã vé và khởi tạo giao dịch an toàn");
 
+        let activeHold = bookingHold;
+        if (!activeHold?.bookingId) {
+          const holdItems = items.map((i) => ({
+            slotId: i.slotId,
+            quantity: i.quantity,
+            optionId: i.optionId,
+            participantsCount: i.quantity,
+            allowSplit: false,
+          }));
+          activeHold = await bookingService.holdBooking({ items: holdItems });
+          setBookingHold(activeHold);
+        }
+
         // 1. Create Master Order
         const orderRes = await orderService.createOrder({
-          bookingId: bookingHold.bookingId,
+          bookingId: activeHold.bookingId,
           discountCode: appliedPromoCode || undefined,
         });
 
