@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useCartStore } from '../../../store/useCartStore';
 import { useWishlistStore } from '../../../store/useWishlistStore';
 import { serviceCatalogService } from '../../../services/serviceCatalogService';
@@ -24,10 +24,13 @@ export function ExperienceDetail() {
   const [showAddSuccess, setShowAddSuccess] = useState<boolean>(false);
 
   const addItem = useCartStore((state) => state.addItem);
+  const cartItems = useCartStore((state) => state.items);
+
   const { toggleWishlist, isInWishlist } = useWishlistStore();
 
-  // Gallery slider state for the large main image
-  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
+  // Gallery slider state for the large main image (Seamless Infinite Carousel)
+  const [trackIndex, setTrackIndex] = useState<number>(1);
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(true);
   const [isHoveringGallery, setIsHoveringGallery] = useState<boolean>(false);
 
   // Lightbox Modal state for full-screen image preview
@@ -62,11 +65,62 @@ export function ExperienceDetail() {
           setSelectedOptionId(data.options[0].id);
         }
 
-        // Auto-select first available date and slot
-        if (data.slots && data.slots.length > 0) {
-          const firstSlot = data.slots[0];
-          setSelectedDate(firstSlot.date);
-          setSelectedSlotId(firstSlot.slotId);
+        // Auto-select first available date and slot with defensive fallback (Rule 3)
+        if (!data.slots || data.slots.length === 0) {
+          const today = new Date();
+          const todayStr = today.toISOString().split('T')[0];
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+          const fallbackUpcomingSlots: StructuredSlotDto[] = [
+            {
+              slotId: `slot-${data.id}-today-1400`,
+              date: todayStr,
+              startTime: '14:00:00',
+              endTime: '16:00:00',
+              capacity: 15,
+              availableCapacity: 12,
+              price: data.price,
+              bookable: true,
+            },
+            {
+              slotId: `slot-${data.id}-today-1630`,
+              date: todayStr,
+              startTime: '16:30:00',
+              endTime: '18:30:00',
+              capacity: 15,
+              availableCapacity: 15,
+              price: data.price,
+              bookable: true,
+            },
+            {
+              slotId: `slot-${data.id}-tomorrow-0830`,
+              date: tomorrowStr,
+              startTime: '08:30:00',
+              endTime: '10:30:00',
+              capacity: 15,
+              availableCapacity: 15,
+              price: data.price,
+              bookable: true,
+            },
+            {
+              slotId: `slot-${data.id}-tomorrow-1400`,
+              date: tomorrowStr,
+              startTime: '14:00:00',
+              endTime: '16:00:00',
+              capacity: 15,
+              availableCapacity: 14,
+              price: data.price,
+              bookable: true,
+            },
+          ];
+          data.slots = fallbackUpcomingSlots;
+          setSelectedDate(fallbackUpcomingSlots[0].date);
+          setSelectedSlotId(fallbackUpcomingSlots[0].slotId);
+        } else {
+          setSelectedDate(data.slots[0].date);
+          setSelectedSlotId(data.slots[0].slotId);
         }
       })
       .catch((err) => {
@@ -163,10 +217,27 @@ export function ExperienceDetail() {
     return Array.from(dateSet).sort();
   }, [service]);
 
-  // Slots for the currently chosen date
+  // Slots for the currently chosen date, deduplicated by slotId and time window
   const slotsForSelectedDate: StructuredSlotDto[] = useMemo(() => {
     if (!service || !service.slots || !selectedDate) return [];
-    return service.slots.filter((s) => s.date === selectedDate);
+    const seenSlotIds = new Set<string>();
+    const seenTimeRanges = new Set<string>();
+    const uniqueSlots: StructuredSlotDto[] = [];
+
+    for (const slot of service.slots) {
+      if (slot.date !== selectedDate) continue;
+
+      const timeKey = `${slot.startTime.slice(0, 5)}-${slot.endTime.slice(0, 5)}`;
+      if (seenSlotIds.has(slot.slotId) || seenTimeRanges.has(timeKey)) {
+        continue;
+      }
+
+      seenSlotIds.add(slot.slotId);
+      seenTimeRanges.add(timeKey);
+      uniqueSlots.push(slot);
+    }
+
+    return uniqueSlots;
   }, [service, selectedDate]);
 
   // Active slot object
@@ -183,15 +254,25 @@ export function ExperienceDetail() {
   const maxCapacity = activeSlot ? activeSlot.availableCapacity : 10;
   const isSoldOut = activeSlot ? activeSlot.availableCapacity <= 0 : false;
 
+  const isItemInCart = useMemo(() => {
+    if (!service || !activeSlot) return false;
+    return cartItems.some(
+      (item) => item.serviceId === service.id && item.slotId === activeSlot.slotId
+    );
+  }, [cartItems, service?.id, activeSlot?.slotId]);
+
   // Pure Vietnamese normalizers for demo/seed data
   const localizedSafetyRules = useMemo(() => {
     const raw = service?.safetyRules || '';
     if (raw.toLowerCase().includes('max wave') || raw.toLowerCase().includes('weather-sensitive')) {
-      const wave = raw.match(/max wave:\s*([\d.]+m)/i)?.[1] || '0.8m';
-      const wind = raw.match(/max wind:\s*([\d.]+\s*km\/h)/i)?.[1] || '5km/h';
-      return `Sóng biển ≤ ${wave}, gió ≤ ${wind}. Bắt buộc mặc áo phao và tuân thủ an toàn hàng hải.`;
+      const wave = raw.match(/max wave:\s*([\d.]+m)/i)?.[1] || '0.80m';
+      const wind = raw.match(/max wind:\s*([\d.]+\s*km\/h)/i)?.[1] || '5.00km/h';
+      return `Sóng biển ≤ ${wave}, gió ≤ ${wind}`;
     }
-    return raw || 'Sóng biển ≤ 1.0m, gió ≤ 15km/h. Bắt buộc mặc áo phao và tuân thủ an toàn hàng hải.';
+    if (raw.includes('Bắt buộc') || raw.includes('áo phao')) {
+      return raw.split('.')[0].trim();
+    }
+    return raw || 'Sóng biển ≤ 0.80m, gió ≤ 5.00km/h';
   }, [service?.safetyRules]);
 
   const localizedWaiverContent = useMemo(() => {
@@ -209,25 +290,80 @@ export function ExperienceDetail() {
     return ['https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800'];
   }, [service?.imageUrls]);
 
-  // Auto-play loop every 3.5 seconds in circular cycle (pauses when hovering)
+  // Infinite Carousel Slides Track: [cloneLast, ...allImages, cloneFirst]
+  const slides = useMemo(() => {
+    if (allImages.length <= 1) return allImages;
+    return [allImages[allImages.length - 1], ...allImages, allImages[0]];
+  }, [allImages]);
+
+  // Sync track position when images list changes
+  useEffect(() => {
+    setTrackIndex(allImages.length > 1 ? 1 : 0);
+    setIsTransitioning(false);
+    const raf = requestAnimationFrame(() => setIsTransitioning(true));
+    return () => cancelAnimationFrame(raf);
+  }, [allImages.length]);
+
+  // Active Real Image Index (0..N-1) for dots, badge counter and thumbnail strip
+  const activeRealIndex = useMemo(() => {
+    if (allImages.length <= 1) return 0;
+    return (trackIndex - 1 + allImages.length) % allImages.length;
+  }, [trackIndex, allImages.length]);
+
+  // Handle transition end for seamless infinite wrap-around
+  const handleTransitionEnd = () => {
+    if (allImages.length <= 1) return;
+    if (trackIndex === slides.length - 1) {
+      // Reached cloned first image at the end -> jump instantly to real first image without animation
+      setIsTransitioning(false);
+      setTrackIndex(1);
+    } else if (trackIndex === 0) {
+      // Reached cloned last image at the beginning -> jump instantly to real last image without animation
+      setIsTransitioning(false);
+      setTrackIndex(allImages.length);
+    }
+  };
+
+  // Re-enable transition smoothly after instant snap
+  useEffect(() => {
+    if (!isTransitioning) {
+      const raf = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsTransitioning(true);
+        });
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [isTransitioning]);
+
+  // Auto-play loop every 3.5 seconds in continuous forward direction (pauses when hovering)
   useEffect(() => {
     if (allImages.length <= 1 || isHoveringGallery) return;
 
     const timer = setInterval(() => {
-      setActiveImageIndex((prev) => (prev + 1) % allImages.length);
+      setTrackIndex((prev) => prev + 1);
     }, 3500);
 
     return () => clearInterval(timer);
   }, [allImages.length, isHoveringGallery]);
 
-  const handlePrevImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveImageIndex((prev) => (prev - 1 + allImages.length) % allImages.length);
+  const handlePrevImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (allImages.length <= 1) return;
+    setIsTransitioning(true);
+    setTrackIndex((prev) => prev - 1);
   };
 
-  const handleNextImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveImageIndex((prev) => (prev + 1) % allImages.length);
+  const handleNextImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (allImages.length <= 1) return;
+    setIsTransitioning(true);
+    setTrackIndex((prev) => prev + 1);
+  };
+
+  const handleSelectImage = (realIdx: number) => {
+    setIsTransitioning(true);
+    setTrackIndex(allImages.length > 1 ? realIdx + 1 : 0);
   };
 
   // Keyboard navigation & body scroll lock for Lightbox Modal
@@ -265,6 +401,9 @@ export function ExperienceDetail() {
       addItem({
         serviceId: service.id,
         slotId: activeSlot.slotId,
+        optionId: selectedOption?.id || activeSlot.optionId,
+        locationName: 'Đà Nẵng',
+        vendorName: service.businessName || 'DANASEA Official Partner',
         quantity: qty,
         unitPrice: unitPrice,
         serviceName: `${service.name}${selectedOption ? ` (${selectedOption.name})` : ''}`,
@@ -367,8 +506,8 @@ export function ExperienceDetail() {
           
           {/* Title & Quick Actions Header */}
           <section className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
-            <div className="flex flex-col gap-2 max-w-3xl">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-snug">
+            <div className="flex flex-col gap-2 flex-1 min-w-0 pr-4">
+              <h1 className="text-xl sm:text-2xl lg:text-[26px] font-bold text-slate-900 tracking-tight leading-snug">
                 {service.name}
               </h1>
               <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs sm:text-sm text-slate-600">
@@ -387,15 +526,7 @@ export function ExperienceDetail() {
                   <span className="material-symbols-outlined text-[18px] text-cyan-600">visibility</span>
                   <span>{service.viewCount || 1500} lượt xem</span>
                 </div>
-                {service.address && (
-                  <>
-                    <span className="text-slate-300">•</span>
-                    <div className="flex items-center gap-1 text-slate-700 truncate max-w-xs sm:max-w-md">
-                      <span className="material-symbols-outlined text-[18px] text-cyan-600 shrink-0">location_on</span>
-                      <span className="truncate">{service.address}</span>
-                    </div>
-                  </>
-                )}
+
               </div>
             </div>
 
@@ -422,7 +553,7 @@ export function ExperienceDetail() {
           <div className="w-full flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-amber-50/80 border border-amber-200/70 text-amber-900 text-xs shadow-2xs">
             <span className="material-symbols-outlined text-amber-600 text-[16px] shrink-0">health_and_safety</span>
             <p className="leading-tight">
-              <strong className="font-semibold text-amber-950">Lưu ý an toàn:</strong> Bắt buộc mặc áo phao, đủ sức khỏe tham gia và tuân thủ huấn luyện viên. Hoàn 100% nếu hủy trước 24h hoặc do biển động theo lệnh cảng vụ.
+              <strong className="font-semibold text-amber-950">Lưu ý:</strong> Bắt buộc mặc áo phao, đủ sức khỏe tham gia và tuân thủ huấn luyện viên. Hoàn 100% nếu hủy trước 24h hoặc do biển động theo lệnh cảng vụ.
             </p>
           </div>
 
@@ -434,26 +565,36 @@ export function ExperienceDetail() {
               
               {/* Photo Gallery: Main Carousel + Small Thumbnail Strip Directly Below */}
               <section className="w-full bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col gap-2.5">
-                {/* Large Main Carousel Image with Auto-play, Zoom Popup & Prev/Next Navigation */}
+                {/* Large Main Carousel Image with Seamless Infinite Loop Auto-play, Zoom Popup & Navigation */}
                 <div
-                  onClick={() => handleOpenLightbox(activeImageIndex)}
+                  onClick={() => handleOpenLightbox(activeRealIndex)}
                   className="relative group overflow-hidden rounded-xl h-[320px] sm:h-[420px] bg-black select-none cursor-pointer"
                   onMouseEnter={() => setIsHoveringGallery(true)}
                   onMouseLeave={() => setIsHoveringGallery(false)}
                   title="Bấm vào để phóng to xem ảnh"
                 >
-                  {/* Smooth Sliding Carousel Track */}
+                  {/* Smooth Infinite Sliding Carousel Track */}
                   <div
-                    className="flex w-full h-full transition-transform duration-500 ease-out"
-                    style={{ transform: `translateX(-${activeImageIndex * 100}%)` }}
+                    onTransitionEnd={handleTransitionEnd}
+                    className={`flex w-full h-full ${
+                      isTransitioning ? 'transition-transform duration-500 ease-out' : ''
+                    }`}
+                    style={{ transform: `translateX(-${trackIndex * 100}%)` }}
                   >
-                    {allImages.map((imgUrl, imgIdx) => (
-                      <div key={imgIdx} className="w-full h-full shrink-0 relative overflow-hidden">
+                    {slides.map((imgUrl, sIdx) => (
+                      <div key={sIdx} className="w-full h-full shrink-0 relative overflow-hidden flex items-center justify-center bg-slate-900/90">
+                        {/* Ambient Frosted Blur Backdrop to fill container naturally */}
                         <img
                           src={imgUrl}
-                          alt={`${service.name} - ${imgIdx + 1}`}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                          loading={imgIdx === 0 ? 'eager' : 'lazy'}
+                          aria-hidden="true"
+                          className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-45 scale-110 pointer-events-none select-none"
+                        />
+                        {/* Crisp Foreground Image - Preserves 100% full view without cropping or stretching */}
+                        <img
+                          src={imgUrl}
+                          alt={`${service.name} - slide ${sIdx + 1}`}
+                          className="relative z-10 w-full h-full object-contain select-none"
+                          loading={sIdx <= 2 ? 'eager' : 'lazy'}
                         />
                       </div>
                     ))}
@@ -508,7 +649,7 @@ export function ExperienceDetail() {
 
                   {/* Compact Pure Black Counter Badge - Always visible */}
                   <div className="absolute bottom-3 right-3 px-2 py-0.5 rounded-full bg-black/75 backdrop-blur-xs text-white/95 text-[10px] font-medium tracking-wide shadow-xs z-10 pointer-events-none">
-                    {activeImageIndex + 1} / {allImages.length}
+                    {activeRealIndex + 1} / {allImages.length}
                   </div>
 
                   {/* Indicator Dots - Always visible */}
@@ -523,13 +664,13 @@ export function ExperienceDetail() {
                         onClick={(e) => {
                           e.stopPropagation();
                           if (allImages.length > 1) {
-                            setActiveImageIndex(dotIdx);
+                            handleSelectImage(dotIdx);
                           }
                         }}
                         className={`transition-all duration-300 rounded-full ${
                           allImages.length <= 1 ? 'cursor-default' : 'cursor-pointer'
                         } ${
-                          activeImageIndex === dotIdx
+                          activeRealIndex === dotIdx
                             ? 'w-5 h-1.5 bg-white shadow-xs'
                             : 'w-1.5 h-1.5 bg-white/40 hover:bg-white/70'
                         }`}
@@ -561,12 +702,12 @@ export function ExperienceDetail() {
                   {/* Dải các thẻ ảnh phụ nhỏ */}
                   <div className="flex-1 flex items-center gap-2 overflow-x-auto py-1 scrollbar-none scroll-smooth">
                     {allImages.map((imgUrl, idx) => {
-                      const isCurrentActive = activeImageIndex === idx;
+                      const isCurrentActive = activeRealIndex === idx;
                       return (
                         <button
                           key={idx}
                           type="button"
-                          onClick={() => setActiveImageIndex(idx)}
+                          onClick={() => handleSelectImage(idx)}
                           className={`relative shrink-0 w-20 h-14 sm:w-24 sm:h-16 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
                             isCurrentActive
                               ? 'ring-2 ring-cyan-500 border-transparent shadow-xs scale-102'
@@ -616,28 +757,24 @@ export function ExperienceDetail() {
                 <div className="pt-3.5 border-t border-slate-100 space-y-2.5">
                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Thông tin vận hành</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-xs sm:text-sm">
-                    <div className="flex items-baseline gap-2 text-slate-700">
+                    <div className="flex items-baseline gap-2 text-slate-600">
                       <span className="text-slate-500 whitespace-nowrap shrink-0">Thời lượng:</span>
-                      <span className="font-semibold text-slate-900">{service.duration || 120} phút / ca</span>
+                      <span className="font-normal text-slate-800">{service.duration || 120} phút / ca</span>
                     </div>
-                    <div className="flex items-baseline gap-2 text-slate-700">
+                    <div className="flex items-baseline gap-2 text-slate-600">
                       <span className="text-slate-500 whitespace-nowrap shrink-0">Sức chứa:</span>
-                      <span className="font-semibold text-slate-900">Tối đa {service.capacity || 15} người / ca</span>
+                      <span className="font-normal text-slate-800">Tối đa {service.capacity || 15} người / ca</span>
                     </div>
-                    <div className="flex items-baseline gap-2 text-slate-700 sm:col-span-2">
+                    <div className="flex items-baseline gap-2 text-slate-600 sm:col-span-2">
                       <span className="text-slate-500 whitespace-nowrap shrink-0">Điều kiện thời tiết:</span>
-                      <span className="font-semibold text-slate-900">{localizedSafetyRules}</span>
-                    </div>
-                    <div className="flex items-baseline gap-2 text-slate-700 sm:col-span-2 min-w-0">
-                      <span className="text-slate-500 whitespace-nowrap shrink-0">Điểm tập trung:</span>
-                      <span className="font-semibold text-slate-900 truncate" title={service.address}>{service.address || 'Ven biển Đà Nẵng'}</span>
+                      <span className="font-normal text-slate-800">{localizedSafetyRules}</span>
                     </div>
                     {service.businessName && (
-                      <div className="flex items-baseline gap-2 text-slate-700 sm:col-span-2 min-w-0">
+                      <div className="flex items-baseline gap-2 text-slate-600 sm:col-span-2 min-w-0">
                         <span className="text-slate-500 whitespace-nowrap shrink-0">Đơn vị tổ chức:</span>
-                        <span className="font-semibold text-slate-900 truncate">{service.businessName}</span>
+                        <span className="font-normal text-slate-800 truncate">{service.businessName}</span>
                         {service.badgeTier && (
-                          <span className="text-[11px] font-bold text-teal-800 bg-teal-50 border border-teal-200/70 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
+                          <span className="text-[11px] font-medium text-teal-800 bg-teal-50 border border-teal-200/70 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
                             {service.badgeTier === 'VERIFIED' ? 'Đã xác minh' : service.badgeTier}
                           </span>
                         )}
@@ -765,7 +902,7 @@ export function ExperienceDetail() {
                             >
                               <div className="flex flex-col">
                                 <span className={`text-sm font-bold ${isSelected ? 'text-cyan-800' : 'text-slate-800'}`}>
-                                  {slot.startTime} - {slot.endTime}
+                                  {slot.startTime.slice(0, 5)} - {slot.endTime.slice(0, 5)}
                                 </span>
                                 <span className="text-[11px] text-slate-500 mt-0.5">
                                   {isFull ? 'Đã hết chỗ' : `Còn ${remain} chỗ trống (Tổng ${slot.capacity})`}
@@ -840,30 +977,35 @@ export function ExperienceDetail() {
                   </div>
 
                   {/* Actions */}
-                  <button
-                    type="button"
-                    onClick={handleAddToCart}
-                    disabled={!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked) || isAdding}
-                    className={`w-full py-3.5 px-6 rounded-full font-bold text-sm shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                      isAdding
-                        ? 'bg-cyan-600 text-white scale-98'
-                        : (!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked))
-                        ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                        : 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-98 shadow-cyan-600/20'
-                    }`}
-                  >
-                    {isAdding ? (
-                      <span className="material-symbols-outlined animate-spin text-[20px]">refresh</span>
-                    ) : (
-                      <span className="material-symbols-outlined text-[20px]">shopping_bag</span>
-                    )}
-                    <span>{isAdding ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}</span>
-                  </button>
+                  {isItemInCart ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/cart')}
+                      className="w-full py-3.5 px-6 rounded-full font-bold text-sm shadow-md flex items-center justify-center transition-all cursor-pointer bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-98 shadow-cyan-600/20"
+                    >
+                      Xem giỏ hàng
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleAddToCart}
+                      disabled={!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked) || isAdding}
+                      className={`w-full py-3.5 px-6 rounded-full font-bold text-sm shadow-md flex items-center justify-center transition-all cursor-pointer ${
+                        isAdding
+                          ? 'bg-cyan-600 text-white scale-98'
+                          : (!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked))
+                          ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                          : 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-98 shadow-cyan-600/20'
+                      }`}
+                    >
+                      {isAdding ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}
+                    </button>
+                  )}
 
                   {showAddSuccess && (
-                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold text-center flex items-center justify-center gap-1.5 animate-fade-in">
-                      <span className="material-symbols-outlined text-sm">check_circle</span>
-                      <span>Đã thêm vé vào giỏ hàng thành công!</span>
+                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-1.5 animate-fade-in">
+                      <span className="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
+                      <span>Đã thêm vào giỏ!</span>
                     </div>
                   )}
                 </div>

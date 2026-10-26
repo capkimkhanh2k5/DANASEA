@@ -31,8 +31,8 @@ export function CategoryExperienceCarousel({
   // Smooth page transition handler
   const handleNavigate = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
-      (document as any).startViewTransition(() => {
+    if (typeof document !== 'undefined' && document.startViewTransition) {
+      document.startViewTransition(() => {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
         navigate(linkHref);
       });
@@ -172,7 +172,7 @@ export function CategoryExperienceCarousel({
 
               return (
                 <div
-                  key={item.id}
+                  key={`${item.id}-${idx}`}
                   className="flex-[0_0_100%] sm:flex-[0_0_50%] md:flex-[0_0_33.333%] lg:flex-[0_0_25%] min-w-0 pl-4 sm:pl-5 select-none flex flex-col relative py-2"
                   style={{ zIndex: isThisHovered ? 20 : 1 }}
                 >

@@ -106,7 +106,7 @@ export function FlashSaleSection({ experiences = FLASH_SALE_EXPERIENCES }: Flash
 
           return (
             <div
-              key={item.id}
+              key={`${item.id}-${idx}`}
               onMouseEnter={() => setHoveredCardId(item.id)}
               onMouseLeave={() => setHoveredCardId(null)}
               style={{

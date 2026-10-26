@@ -1,49 +1,112 @@
 import { useNavigate } from "react-router-dom";
 import { useCartStore } from "../../../store/useCartStore";
+import { useAuthStore } from "../../../store/useAuthStore";
 import { useLoadingStore } from "../../../store/useLoadingStore";
-import { FEATURED_SERVICES, MOCK_IMAGES } from "../../../mockData";
-import { useState, useEffect } from "react";
+import { bookingService } from "../../../services/bookingService";
+import { orderService } from "../../../services/orderService";
+import { paymentService } from "../../../services/paymentService";
+import type { BookingHoldResponse } from "../../../types/booking";
+import type { DiscountPreviewResponse, PaymentProviderType } from "../../../types/order";
+import { useState, useEffect, useRef } from "react";
 
 export function Checkout() {
   const navigate = useNavigate();
-  const { items, getTotalPrice, clearCart } = useCartStore();
-  const [countdown, setCountdown] = useState(600); // 10 minutes
+  const { items, getTotalPrice } = useCartStore();
+  const { user, isAuthenticated } = useAuthStore();
+  const { triggerDemoLoading } = useLoadingStore();
+
+  // Booking Hold State
+  const [bookingHold, setBookingHold] = useState<BookingHoldResponse | null>(null);
+  const [_isHolding, setIsHolding] = useState<boolean>(false);
+  const [countdown, setCountdown] = useState<number>(900); // 15 minutes default
   const [sessionCode] = useState(() => Math.floor(10000 + Math.random() * 90000));
-  const [promoInput, setPromoInput] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discount: number } | null>(null);
-  const [promoError, setPromoError] = useState("");
 
-  const handleApplyPromo = () => {
-    setPromoError("");
-    const code = promoInput.trim().toUpperCase();
-    if (!code) return;
-    if (code === "DANASEA10" || code === "HE2024") {
-      const discount = Math.round(getTotalPrice() * 0.1);
-      setAppliedPromo({ code, discount });
-    } else if (code === "BIENXANH") {
-      setAppliedPromo({ code, discount: 50000 });
-    } else {
-      setPromoError("Mã khuyến mãi không hợp lệ hoặc đã hết lượt dùng");
-    }
-  };
+  // Customer Contact Info State
+  const [fullName, setFullName] = useState<string>(user?.fullName || "Khách Hàng DANASEA");
+  const [phone, setPhone] = useState<string>(user?.phone || "0912 345 678");
+  const [email, setEmail] = useState<string>(user?.email || "khachhang@danasea.vn");
+  const [notes, setNotes] = useState<string>("");
 
-  const handleRemovePromo = () => {
-    setAppliedPromo(null);
-    setPromoInput("");
-    setPromoError("");
-  };
+  // Payment Method
+  const [paymentProvider, setPaymentProvider] = useState<PaymentProviderType>("VNPAY");
 
-  const finalTotal = Math.max(0, getTotalPrice() - (appliedPromo?.discount || 0));
 
+  // Slot Holding Status (Scenario 4 - 15-minute slot timeout)
+  const isHoldExpired = countdown <= 0;
+
+  // Promo Code State
+  const [promoInput, setPromoInput] = useState<string>("");
+  const [discountPreview, setDiscountPreview] = useState<DiscountPreviewResponse | null>(null);
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  const [promoError, setPromoError] = useState<string>("");
+  const [isApplyingPromo, setIsApplyingPromo] = useState<boolean>(false);
+
+
+  // Payment processing state
+  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  // Redirect if cart is empty
   useEffect(() => {
-    if (items.length === 0) {
+    if (items.length === 0 && !isProcessingPayment) {
       navigate('/cart');
     }
-  }, [items, navigate]);
+  }, [items, navigate, isProcessingPayment]);
 
+  // Sync user info if auth updates
+  useEffect(() => {
+    if (user) {
+      if (user.fullName) setFullName(user.fullName);
+      if (user.phone) setPhone(user.phone);
+      if (user.email) setEmail(user.email);
+    }
+  }, [user]);
+
+  // Request backend slot hold on mount
+  const holdRequestedRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (items.length === 0 || holdRequestedRef.current) return;
+    holdRequestedRef.current = true;
+
+    // Check if slot IDs look like real UUIDs
+    const validUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const holdItems = items.map((i) => ({
+      slotId: i.slotId,
+      quantity: i.quantity,
+      optionId: i.optionId,
+      participantsCount: i.quantity,
+      allowSplit: false,
+    }));
+
+    const allUuids = holdItems.every((item) => validUuidRegex.test(item.slotId));
+
+    if (allUuids && isAuthenticated) {
+      setIsHolding(true);
+      bookingService
+        .holdBooking({ items: holdItems })
+        .then((res) => {
+          setBookingHold(res);
+          const expireTime = res.holdExpiresAt || res.expiresAt;
+          if (expireTime) {
+            const expireDate = new Date(expireTime).getTime();
+            const now = Date.now();
+            const diffSec = Math.max(0, Math.floor((expireDate - now) / 1000));
+            if (diffSec > 0) setCountdown(diffSec);
+          }
+        })
+        .catch((err) => {
+          console.warn('[Checkout] Không thể giữ chỗ qua API, dùng chế độ giữ chỗ cục bộ:', err);
+        })
+        .finally(() => {
+          setIsHolding(false);
+        });
+    }
+  }, [items, isAuthenticated]);
+
+  // 15-minute countdown timer
   useEffect(() => {
     const timer = setInterval(() => {
-      setCountdown(prev => {
+      setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
           return 0;
@@ -60,296 +123,588 @@ export function Checkout() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const { triggerDemoLoading } = useLoadingStore();
+  // Promo Code Handler
+  const handleApplyPromo = async () => {
+    setPromoError("");
+    const code = promoInput.trim().toUpperCase();
+    if (!code) return;
 
-  const handlePayment = () => {
-    // Seamless liquid wave transition for payment processing & QR ticket issuance
-    triggerDemoLoading(2000, "Đang xử lý giao dịch vé tour...", "Hệ thống đang khóa chỗ cano và sinh mã vé QR");
-    setTimeout(() => {
-      clearCart();
-      navigate('/checkout/result');
-    }, 1800);
+    setIsApplyingPromo(true);
+
+    // If real bookingHold exists, verify with backend API
+    if (bookingHold?.bookingId) {
+      try {
+        const preview = await orderService.previewDiscount({
+          bookingId: bookingHold.bookingId,
+          code,
+        });
+
+        if (preview.valid) {
+          setDiscountPreview(preview);
+          setAppliedPromoCode(code);
+          setIsApplyingPromo(false);
+          return;
+        } else {
+          setPromoError(preview.message || "Mã khuyến mãi không hợp lệ hoặc không áp dụng cho đơn này.");
+          setIsApplyingPromo(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('[Checkout] Lỗi xác thực voucher từ server, kiểm tra mã dự phòng:', err);
+      }
+    }
+
+    // Client-side fallback voucher codes
+    if (code === "DANASEA10" || code === "HE2024") {
+      const discount = Math.round(getTotalPrice() * 0.1);
+      setDiscountPreview({
+        valid: true,
+        code,
+        originalTotalAmount: getTotalPrice(),
+        totalDiscountAmount: discount,
+        finalPayableAmount: Math.max(0, getTotalPrice() - discount),
+      });
+      setAppliedPromoCode(code);
+    } else if (code === "BIENXANH") {
+      const discount = 50000;
+      setDiscountPreview({
+        valid: true,
+        code,
+        originalTotalAmount: getTotalPrice(),
+        totalDiscountAmount: discount,
+        finalPayableAmount: Math.max(0, getTotalPrice() - discount),
+      });
+      setAppliedPromoCode(code);
+    } else {
+      setPromoError("Mã khuyến mãi không hợp lệ hoặc đã hết lượt dùng.");
+    }
+
+    setIsApplyingPromo(false);
+  };
+
+  const handleRemovePromo = () => {
+    setDiscountPreview(null);
+    setAppliedPromoCode(null);
+    setPromoInput("");
+    setPromoError("");
+  };
+
+  // Calculate final total
+  const rawTotal = getTotalPrice();
+  const discountAmount = discountPreview?.totalDiscountAmount || 0;
+  const finalTotal = Math.max(0, rawTotal - discountAmount);
+
+  // Submit Payment Handler
+  const handlePayment = async () => {
+
+    if (isHoldExpired) {
+      setPaymentError("Thời gian giữ chỗ 15 phút đã kết thúc. Vui lòng quay lại giỏ hàng để cập nhật lại suất trống.");
+      return;
+    }
+
+    setIsProcessingPayment(true);
+    setPaymentError(null);
+
+    // If user is authenticated, execute the real backend workflow
+    if (isAuthenticated) {
+      try {
+        triggerDemoLoading(3000, "Đang xử lý đơn hàng & kết nối cổng thanh toán...", "Hệ thống đang bảo lưu mã vé và khởi tạo giao dịch an toàn");
+
+        let activeHold = bookingHold;
+        if (!activeHold?.bookingId) {
+          const holdItems = items.map((i) => ({
+            slotId: i.slotId,
+            quantity: i.quantity,
+            optionId: i.optionId,
+            participantsCount: i.quantity,
+            allowSplit: false,
+          }));
+          activeHold = await bookingService.holdBooking({ items: holdItems });
+          setBookingHold(activeHold);
+        }
+
+        // 1. Create Master Order
+        const orderRes = await orderService.createOrder({
+          bookingId: activeHold.bookingId,
+          discountCode: appliedPromoCode || undefined,
+        });
+
+        // 2. Synchronize safety waiver acceptance for all sub-orders requiring it
+        const orderSubOrders = orderRes.items || orderRes.subOrders || [];
+        const pendingWaivers = orderSubOrders.filter(
+          (sub) => sub.waiverRequired && !sub.waiverAccepted
+        );
+
+        if (pendingWaivers.length > 0) {
+          await Promise.all(
+            pendingWaivers.map((sub) => {
+              const subId = sub.id || sub.subOrderId;
+              if (!subId) return Promise.resolve();
+              return orderService.acceptSubOrderWaiver(subId, {
+                accepted: true,
+                version: sub.waiverVersion || 1,
+                language: sub.waiverLanguage || 'VI',
+              });
+            })
+          );
+        }
+
+        // 3. Create Payment Intent
+        let payRes;
+        try {
+          payRes = await paymentService.createPaymentIntent(orderRes.id, {
+            provider: paymentProvider,
+          });
+        } catch (paymentErr) {
+          const apiErr = paymentErr as {
+            response?: {
+              data?: {
+                errorCode?: string;
+                missingWaivers?: Array<{
+                  subOrderId: string;
+                  waiverVersion?: number;
+                  contentLanguage?: string;
+                }>;
+              };
+            };
+          };
+          // Guardrail: If Backend returned WAIVER_ACCEPTANCE_REQUIRED with missingWaivers list, accept and retry
+          if (
+            apiErr.response?.data?.errorCode === 'WAIVER_ACCEPTANCE_REQUIRED' &&
+            Array.isArray(apiErr.response?.data?.missingWaivers)
+          ) {
+            const missing = apiErr.response.data.missingWaivers;
+            await Promise.all(
+              missing.map((m: { subOrderId: string; waiverVersion?: number; contentLanguage?: string }) =>
+                orderService.acceptSubOrderWaiver(m.subOrderId, {
+                  accepted: true,
+                  version: m.waiverVersion || 1,
+                  language: m.contentLanguage || 'VI',
+                })
+              )
+            );
+            // Retry creating payment intent
+            payRes = await paymentService.createPaymentIntent(orderRes.id, {
+              provider: paymentProvider,
+            });
+          } else {
+            throw paymentErr;
+          }
+        }
+
+        // 4. Backend returns paymentReference (which contains the gateway redirect URL)
+        const gatewayUrl = payRes.paymentReference || payRes.paymentUrl;
+        if (gatewayUrl && (gatewayUrl.startsWith("http://") || gatewayUrl.startsWith("https://"))) {
+          
+          // Save order snapshot for Step 3 (PaymentResult) when returning from VNPay gateway
+          const orderSnapshot = {
+            orderCode: `DNS-${sessionCode || Math.floor(10000 + Math.random() * 90000)}`,
+            customerName: fullName.trim() || "Khách Hàng DANASEA",
+            customerPhone: phone.trim() || "0912 345 678",
+            customerEmail: email.trim() || "khachhang@danasea.vn",
+            specialRequest: notes.trim(),
+            paymentProvider: paymentProvider,
+            items: items.map((item, idx) => ({
+              id: item.id || `item-${idx}`,
+              serviceId: item.serviceId,
+              slotId: item.slotId,
+              serviceName: item.serviceName || 'Trải nghiệm biển Đà Nẵng',
+              thumbnailUrl: item.thumbnailUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5',
+              unitPrice: item.unitPrice,
+              quantity: item.quantity,
+              date: item.selectedDate || item.date || 'Hôm nay',
+              timeSlot: item.timeSlot || '08:00 - 10:00',
+              locationName: item.locationName || 'Bán đảo Sơn Trà, Đà Nẵng',
+              vendorName: item.vendorName || 'DanaSea Marine Club',
+              ticketCode: `TKT-${sessionCode || '89412'}-0${idx + 1}`
+            })),
+            rawTotal: rawTotal,
+            discountAmount: discountAmount,
+            appliedPromoCode: appliedPromoCode,
+            finalTotal: finalTotal,
+            paidAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' • ' + new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          };
+          sessionStorage.setItem('danasea_last_order', JSON.stringify(orderSnapshot));
+          window.location.href = gatewayUrl;
+          return;
+        } else {
+          setIsProcessingPayment(false);
+          setPaymentError("Không nhận được liên kết thanh toán từ cổng VNPay. Vui lòng thử lại hoặc chọn phương thức khác.");
+          return;
+        }
+      } catch (err) {
+        const error = err as { response?: { data?: { message?: string } } };
+        console.error('[Checkout] Lỗi khi tạo đơn hàng thật:', err);
+        setIsProcessingPayment(false);
+        setPaymentError(error.response?.data?.message || "Không thể khởi tạo giao dịch thanh toán. Vui lòng kiểm tra lại kết nối và thử lại.");
+        return;
+      }
+    } else {
+      setIsProcessingPayment(false);
+      setPaymentError("Vui lòng đăng nhập tài khoản Khách hàng để tiến hành thanh toán vé.");
+      return;
+    }
   };
 
   if (items.length === 0) return null;
 
   return (
-    <main className="w-full pt-20 bg-surface flex-1"><div className="flex flex-col w-full">
-      {/* Sub-Header Progress Stepper Bar */}
-      <section className="w-full bg-surface-container-lowest/80 backdrop-blur-md shadow-sm">
-        <div className="max-w-[1280px] mx-auto px-margin-desktop py-space-md">
-          {/* Breadcrumb & Status Overline */}
-          <div className="flex items-center justify-between gap-space-md flex-wrap mb-space-sm">
-            <div className="flex items-center gap-space-xs font-label-md text-label-md text-on-surface-variant">
-              <span className="hover:text-secondary cursor-pointer" onClick={() => navigate('/')}>DANASEA</span>
-              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="hover:text-secondary cursor-pointer" onClick={() => navigate('/cart')}>Giỏ trải nghiệm biển</span>
-              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="text-secondary font-bold">Thông tin & Thanh toán</span>
+    <main className="w-full pt-20 bg-surface flex-1">
+      <div className="flex flex-col w-full">
+        {/* Sub-Header Progress Stepper Bar */}
+        <section className="w-full bg-surface-container-lowest/80 backdrop-blur-md shadow-sm border-b border-slate-100">
+          <div className="max-w-[1280px] mx-auto px-margin-desktop py-space-md">
+            {/* Breadcrumb & Status Overline */}
+            <div className="flex items-center justify-between gap-space-md flex-wrap mb-space-sm">
+              <div className="flex items-center gap-space-xs font-label-md text-xs text-slate-500">
+                <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate('/')}>DANASEA</span>
+                <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+                <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate('/cart')}>Giỏ hàng</span>
+                <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+                <span className="text-cyan-700 font-bold">Thông tin &amp; Thanh toán</span>
+              </div>
             </div>
-            <div className="flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-surface-container text-tertiary font-label-sm text-label-sm">
-              <span className="w-2 h-2 rounded-full bg-secondary animate-ping"></span>
-              <span className="">Phiên giao dịch mã: <strong>DNS-{sessionCode}</strong></span>
+            {/* Stepper Component */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-space-sm items-center">
+              <div 
+                onClick={() => navigate('/cart')}
+                className="flex items-center gap-space-sm rounded-xl bg-slate-50 border border-slate-100 p-2 cursor-pointer hover:bg-slate-100/90 hover:border-slate-300 transition-all group"
+                title="Quay lại Bước 1: Giỏ hàng để xem hoặc chỉnh sửa dịch vụ"
+              >
+                <div className="w-8 h-8 rounded-full bg-emerald-600 group-hover:bg-emerald-700 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm transition-colors">
+                  <span className="material-symbols-outlined text-[18px]">check</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-label-sm text-[11px] text-emerald-600 group-hover:text-emerald-700 font-bold uppercase tracking-wider transition-colors">Bước 1 - Hoàn thành</p>
+                  <p className="font-headline-sm text-xs font-bold text-slate-800 group-hover:text-cyan-800 truncate transition-colors">Giỏ hàng</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-space-sm p-space-xs rounded-xl bg-cyan-50/80 border border-cyan-200 shadow-sm p-2">
+                <div className="w-8 h-8 rounded-full bg-cyan-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm">
+                  <span>2</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-label-sm text-[11px] text-cyan-600 font-bold uppercase tracking-wider">Bước 2</p>
+                  <p className="font-headline-sm text-xs font-bold text-cyan-900 truncate">Thông tin &amp; Thanh toán</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-space-sm p-space-xs rounded-xl bg-slate-50/60 opacity-60 p-2">
+                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center flex-shrink-0 font-bold">
+                  <span>3</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-label-sm text-[11px] text-slate-400 uppercase tracking-wider">Bước 3</p>
+                  <p className="font-headline-sm text-xs text-slate-500 truncate">Nhận vé điện tử QR</p>
+                </div>
+              </div>
             </div>
           </div>
-          {/* Stepper Component */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-space-sm items-center">
-            <div className="flex items-center gap-space-sm p-space-xs rounded-lg bg-surface-container-low">
-              <div className="w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center flex-shrink-0 font-label-lg shadow-sm">
-                <span className="material-symbols-outlined text-[18px]">check</span>
-              </div>
-              <div className="min-w-0">
-                <p className="font-label-sm text-label-sm text-secondary uppercase tracking-wider">Bước 1</p>
-                <p className="font-headline-sm text-[15px] leading-tight text-on-surface truncate">Giỏ trải nghiệm ({items.length} mục)</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-space-sm p-space-xs rounded-lg bg-secondary/10 shadow-sm">
-              <div className="w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center flex-shrink-0 font-label-lg shadow-sm">
-                <span className="font-bold">2</span>
-              </div>
-              <div className="min-w-0">
-                <p className="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">Bước 2 • Đang thực hiện</p>
-                <p className="font-headline-sm text-[15px] leading-tight text-secondary font-bold truncate">Thông tin & Thanh toán</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-space-sm p-space-xs rounded-lg bg-surface-container-low/60 opacity-60">
-              <div className="w-8 h-8 rounded-full bg-surface-container-highest text-on-surface-variant flex items-center justify-center flex-shrink-0 font-label-lg">
-                <span className="font-bold">3</span>
-              </div>
-              <div className="min-w-0">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Bước 3</p>
-                <p className="font-headline-sm text-[15px] leading-tight text-on-surface-variant truncate">Nhận vé điện tử QR</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Main Checkout Workflow Area */}
-      <main className="w-full max-w-[1280px] mx-auto px-margin-desktop py-space-xl">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-2xl items-start">
-          
-          {/* LEFT COLUMN: Checkout Forms (7 Cols on Desktop) */}
-          <div className="lg:col-span-7 flex flex-col gap-space-xl">
-            {/* Countdown Sticky/Accent Banner */}
-            <div className="w-full rounded-lg bg-primary-fixed p-space-md shadow-md flex items-start sm:items-center justify-between gap-space-md flex-col sm:flex-row">
-              <div className="flex items-center gap-space-sm">
-                <div className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <span className="material-symbols-outlined text-[22px]">timer</span>
+        {/* Main Checkout Workflow Area */}
+        <main className="w-full max-w-[1280px] mx-auto px-margin-desktop py-space-xl">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-2xl items-stretch">
+            
+            {/* LEFT COLUMN: Checkout Forms (7 Cols on Desktop) */}
+            <div className="lg:col-span-7 flex flex-col h-full">
+              {paymentError && (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium flex items-center gap-2">
+                  <span className="material-symbols-outlined text-amber-600">info</span>
+                  <span>{paymentError}</span>
                 </div>
-                <div>
-                  <p className="font-headline-sm text-[17px] text-on-primary-fixed leading-snug">
-                    Giữ slot trải nghiệm trong: <span className="font-extrabold text-primary font-display-hero text-[22px]" id="checkout-timer">{formatTime(countdown)}</span> phút
-                  </p>
-                  <p className="font-body-sm text-body-sm text-on-primary-fixed-variant leading-tight">
-                    Slot trải nghiệm đang được khóa riêng. Hết thời gian, hệ thống tự động nhường cho du khách khác.
-                  </p>
-                </div>
-              </div>
+              )}
 
-            </div>
-
-            {/* Section 1: Customer Information */}
-            <section className="w-full rounded-lg bg-surface-container-lowest p-space-xl shadow-sm flex flex-col gap-space-lg">
-              <div className="flex items-center justify-between border-b pb-space-xs border-surface-container">
-                <div className="flex items-center gap-space-sm">
-                  <div className="w-7 h-7 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-bold text-label-md">1</div>
-                  <h2 className="font-headline-sm text-headline-sm text-on-surface">Thông tin người đặt</h2>
-                </div>
-                <span className="font-label-sm text-label-sm text-secondary flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">verified_user</span> Đồng bộ tài khoản</span>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-label-md text-label-md text-on-surface">Họ và tên *</label>
-                  <div className="relative flex items-center">
-                    <span className="material-symbols-outlined absolute left-4 text-on-surface-variant text-[20px]">person</span>
-                    <input className="w-full pl-11 pr-4 py-3 rounded-full bg-surface-container-low font-body-md text-on-surface outline-none" readOnly type="text" defaultValue="Khách Hàng DANASEA"/>
+              {/* Unified Checkout Form Card */}
+              <div className="w-full h-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-sm border border-slate-100 flex flex-col justify-between gap-space-xl">
+                {/* Hold Timer & ID Header Inside Card */}
+                <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-3">
+                  {isHoldExpired ? (
+                    <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
+                      <span className="material-symbols-outlined text-rose-600 text-[20px]">timer_off</span>
+                      <span id="checkout-timer">Hết thời gian giữ chỗ</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-slate-900">
+                      <span className="material-symbols-outlined text-slate-900 text-[20px]">timer</span>
+                      <span className="text-sm font-medium text-slate-800">Thời gian giữ chỗ:</span>
+                      <span className="font-bold font-mono text-base text-slate-900" id="checkout-timer">
+                        {formatTime(countdown)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="text-sm font-mono text-slate-700">
+                    ID: <span className="font-bold text-slate-900">DNS-{sessionCode}</span>
                   </div>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-label-md text-label-md text-on-surface">Số điện thoại *</label>
-                  <div className="relative flex items-center">
-                    <span className="material-symbols-outlined absolute left-4 text-on-surface-variant text-[20px]">call</span>
-                    <input className="w-full pl-11 pr-4 py-3 rounded-full bg-surface-container-low font-body-md text-on-surface outline-none" readOnly type="tel" defaultValue="0912 345 678"/>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5 md:col-span-2">
-                  <label className="font-label-md text-label-md text-on-surface">Địa chỉ Email *</label>
-                  <div className="relative flex items-center">
-                    <span className="material-symbols-outlined absolute left-4 text-on-surface-variant text-[20px]">mail</span>
-                    <input className="w-full pl-11 pr-4 py-3 rounded-full bg-surface-container-low font-body-md text-on-surface outline-none" readOnly type="email" defaultValue="khachhang@example.com"/>
-                  </div>
-                </div>
-              </div>
-            </section>
 
-            {/* Section 3: Payment Methods */}
-            <section className="w-full rounded-lg bg-surface-container-lowest p-space-xl shadow-sm flex flex-col gap-space-lg">
-              <div className="flex items-center justify-between border-b pb-space-xs border-surface-container">
-                <div className="flex items-center gap-space-sm">
-                  <div className="w-7 h-7 rounded-full bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center font-bold text-label-md">2</div>
-                  <h2 className="font-headline-sm text-headline-sm text-on-surface">Phương thức thanh toán</h2>
-                </div>
-              </div>
-              <div className="flex flex-col gap-space-sm">
-                <label className="p-space-md rounded-lg bg-surface-container-low hover:bg-surface-container cursor-pointer transition-all flex items-center justify-between">
-                  <div className="flex items-center gap-space-sm">
-                    <input defaultChecked className="w-5 h-5 accent-secondary cursor-pointer" name="payment_method" type="radio" value="VNPAY"/>
-                    <div className="flex items-center gap-2">
-                      <span className="font-label-lg text-label-lg text-on-surface">Cổng VNPAY (QR Pay / Thẻ ATM & Quốc tế)</span>
-                      <span className="px-space-sm py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label-sm text-[11px] font-bold">Khuyên dùng</span>
+                {/* Part 1: Customer Information */}
+                <div className="flex flex-col gap-space-lg">
+                  <div className="flex items-center justify-between border-b pb-space-xs border-slate-100">
+                    <div className="flex items-center gap-space-sm">
+                      <div className="w-7 h-7 rounded-full bg-cyan-600 text-white flex items-center justify-center font-bold text-xs">1</div>
+                      <h2 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Thông tin người đặt vé</h2>
+                    </div>
+                    {isAuthenticated ? (
+                      <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                        <span className="material-symbols-outlined text-[14px]">verified_user</span> Đã đồng bộ tài khoản
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-500">Khách vãng lai</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-label-md text-xs font-semibold text-slate-700">Họ và tên *</label>
+                      <input 
+                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
+                        type="text" 
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Nhập họ và tên du khách"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-label-md text-xs font-semibold text-slate-700">Số điện thoại liên hệ *</label>
+                      <input 
+                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
+                        type="tel" 
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="Số điện thoại Zalo nhận vé"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
+                      <label className="font-label-md text-xs font-semibold text-slate-700">Địa chỉ Email nhận mã QR *</label>
+                      <input 
+                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
+                        type="email" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Email nhận hóa đơn điện tử"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
+                      <label className="font-label-md text-xs font-semibold text-slate-700">Ghi chú đặc biệt (tùy chọn)</label>
+                      <input 
+                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 font-body-md text-sm text-slate-800 outline-none focus:border-cyan-500 focus:bg-white transition-colors" 
+                        type="text" 
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Yêu cầu áo phao trẻ em, hỗ trợ chụp ảnh..."
+                      />
                     </div>
                   </div>
-                  <span className="material-symbols-outlined text-secondary">qr_code_scanner</span>
-                </label>
-                <label className="p-space-md rounded-lg bg-surface-container-low hover:bg-surface-container cursor-pointer transition-all flex items-center justify-between">
-                  <div className="flex items-center gap-space-sm">
-                    <input className="w-5 h-5 accent-secondary cursor-pointer" name="payment_method" type="radio" value="MOMO"/>
-                    <div className="flex items-center gap-2">
-                      <span className="font-label-lg text-label-lg text-on-surface">Ví điện tử MoMo</span>
+                </div>
+
+                {/* Part 2: Payment Methods */}
+                <div className="flex flex-col gap-space-lg pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between border-b pb-space-xs border-slate-100">
+                    <div className="flex items-center gap-space-sm">
+                      <div className="w-7 h-7 rounded-full bg-cyan-600 text-white flex items-center justify-center font-bold text-xs">2</div>
+                      <h2 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Phương thức thanh toán</h2>
                     </div>
                   </div>
-                  <span className="material-symbols-outlined text-secondary">account_balance_wallet</span>
-                </label>
-              </div>
-            </section>
-
-            {/* Section 4: Ocean Safety & Marine Regulations Acknowledgment */}
-            <section className="w-full rounded-lg bg-surface-container-low p-space-xl shadow-sm flex flex-col gap-space-md">
-              <div className="flex items-center gap-space-sm">
-                <div className="w-9 h-9 rounded-full bg-secondary text-on-secondary flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <span className="material-symbols-outlined text-[22px]">assignment_turned_in</span>
-                </div>
-                <div>
-                  <h2 className="font-headline-sm text-headline-sm text-on-surface">Cam kết miễn trừ trách nhiệm (Waiver)</h2>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">Nội dung miễn trừ trách nhiệm theo từng dịch vụ biển bắt buộc xác nhận</p>
-                </div>
-              </div>
-              <div className="flex flex-col gap-space-md">
-                {items.map((item, i) => {
-                  const service = FEATURED_SERVICES.find(s => s.id === item.serviceId);
-                  if (!service) return null;
-                  return (
-                    <div key={item.id} className="p-space-md rounded-lg bg-surface-container-lowest border border-surface-container flex flex-col gap-space-xs">
-                      <div className="flex items-center gap-2 font-label-lg text-label-lg text-on-surface font-bold text-primary">
-                        <span className="material-symbols-outlined text-[18px]">verified_user</span> 
-                        {i+1}. Miễn trừ trách nhiệm: {service.name}
-                      </div>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant leading-relaxed bg-surface-container-low p-space-sm rounded-lg">
-                        Tôi xác nhận đã có đủ sức khỏe thể chất, đồng ý tuân thủ tuyệt đối mọi hướng dẫn an toàn của huấn luyện viên DANASEA tại điểm trải nghiệm {service.locationName}.
-                      </p>
-                      <label className="flex items-start gap-space-xs cursor-pointer pt-space-2xs">
-                        <input className="mt-1 w-4 h-4 accent-secondary cursor-pointer rounded" type="checkbox" defaultChecked/>
-                        <span className="font-label-md text-label-md text-on-surface">Tôi đã đọc, hiểu rõ và đồng ý với điều khoản miễn trừ trách nhiệm *</span>
-                      </label>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          </div>
-
-          {/* RIGHT COLUMN: Sticky Order Summary & Price Breakdown (5 Cols on Desktop) */}
-          <div className="lg:col-span-5 flex flex-col gap-space-lg sticky top-24">
-            {/* Booking Summary Card */}
-            <div className="w-full rounded-xl bg-surface-container-lowest p-space-xl shadow-md flex flex-col gap-space-lg">
-              <div className="flex items-center justify-between border-b pb-space-sm border-surface-container">
-                <h3 className="font-headline-sm text-headline-sm text-on-surface">Tóm tắt trải nghiệm biển</h3>
-                <span className="px-space-xs py-0.5 rounded-full bg-surface-container text-tertiary font-label-sm text-label-sm">{items.length} Dịch vụ</span>
-              </div>
-              <div className="flex flex-col gap-space-md">
-                {items.map(item => {
-                  const service = FEATURED_SERVICES.find(s => s.id === item.serviceId);
-                  const image = MOCK_IMAGES.find(i => i.serviceId === item.serviceId && i.isPrimary)?.imageUrl || "https://via.placeholder.com/400";
-                  if (!service) return null;
-                  return (
-                    <div key={item.id} className="flex gap-space-sm items-start border-b pb-space-md border-surface-container last:border-0 last:pb-0">
-                      <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-surface-container">
-                        <img className="w-full h-full object-cover" alt={service.name} src={image}/>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="px-2 py-0.5 rounded-full bg-secondary/10 text-secondary font-label-sm text-[10px] font-bold">{service.locationName}</span>
-                          <span className="font-label-lg text-label-lg text-on-surface font-bold">{(item.unitPrice * item.quantity).toLocaleString('vi-VN')}đ</span>
-                        </div>
-                        <h4 className="font-headline-sm text-[15px] text-on-surface font-bold leading-tight mt-1 truncate">{service.name}</h4>
-                        <p className="font-body-sm text-[12px] text-on-surface-variant">{item.selectedDate}</p>
-                        <div className="flex items-center justify-between mt-1 text-on-surface-variant font-body-sm text-[11px]">
-                          <span className="">{item.unitPrice.toLocaleString('vi-VN')}đ × {item.quantity} khách</span>
+                  <div className="flex flex-col gap-space-sm">
+                    <label 
+                      onClick={() => setPaymentProvider("VNPAY")}
+                      className={`p-space-md rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                        paymentProvider === "VNPAY" ? "border-cyan-500 bg-cyan-50/50 shadow-sm" : "border-slate-200 bg-slate-50 hover:bg-slate-100/70"
+                      }`}
+                    >
+                      <div className="flex items-center gap-space-sm">
+                        <input 
+                          checked={paymentProvider === "VNPAY"} 
+                          onChange={() => setPaymentProvider("VNPAY")}
+                          className="w-4 h-4 accent-cyan-600 cursor-pointer" 
+                          name="payment_method" 
+                          type="radio" 
+                          value="VNPAY"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-lg text-sm font-bold text-slate-800">Cổng VNPAY (QR Pay / Thẻ ATM &amp; Thẻ Quốc tế)</span>
+                          <span className="px-2 py-0.5 rounded-full bg-cyan-600 text-white font-label-sm text-[10px] font-bold">Khuyên dùng</span>
                         </div>
                       </div>
-                    </div>
-                  )
-                })}
+                      <span className="material-symbols-outlined text-cyan-600">qr_code_scanner</span>
+                    </label>
+
+                    <label 
+                      onClick={() => setPaymentProvider("PAYPAL")}
+                      className={`p-space-md rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                        paymentProvider === "PAYPAL" ? "border-cyan-500 bg-cyan-50/50 shadow-sm" : "border-slate-200 bg-slate-50 hover:bg-slate-100/70"
+                      }`}
+                    >
+                      <div className="flex items-center gap-space-sm">
+                        <input 
+                          checked={paymentProvider === "PAYPAL"} 
+                          onChange={() => setPaymentProvider("PAYPAL")}
+                          className="w-4 h-4 accent-cyan-600 cursor-pointer" 
+                          name="payment_method" 
+                          type="radio" 
+                          value="PAYPAL"
+                        />
+                        <div className="flex items-center gap-2">
+                          <span className="font-label-lg text-sm font-bold text-slate-800">Cổng PayPal (Thẻ quốc tế Visa, MasterCard & Ví PayPal)</span>
+                        </div>
+                      </div>
+                      <span className="material-symbols-outlined text-blue-600">credit_card</span>
+                    </label>
+
+                    
+                  </div>
+                </div>
               </div>
-              
-              {/* Promo Code Input */}
-              <div className="pt-2 border-t border-surface-container">
-                <label className="text-xs font-semibold text-slate-700 block mb-1.5">Mã ưu đãi / Khuyến mãi</label>
-                {appliedPromo ? (
-                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-emerald-600 text-sm">check_circle</span>
-                      <span className="font-bold text-emerald-800">{appliedPromo.code}</span>
-                      <span className="text-emerald-700">(-{appliedPromo.discount.toLocaleString('vi-VN')}đ)</span>
+            </div>
+
+            {/* RIGHT COLUMN: Sticky Order Summary & Price Breakdown (5 Cols on Desktop) */}
+            <div className="lg:col-span-5 flex flex-col h-full">
+              {/* Booking Summary Card */}
+              <div className="w-full h-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-md border border-slate-100 flex flex-col">
+                <div className="flex flex-col gap-space-md">
+                  <div className="flex items-center justify-between border-b pb-space-sm border-slate-100">
+                    <h3 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">Tóm tắt</h3>
+                    <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-800 font-label-sm text-xs font-bold border border-cyan-100">
+                      {items.length} Dịch vụ
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-space-md">
+                    {items.map((item) => {
+                      const title = item.serviceName || 'Trải nghiệm biển';
+                      const image = item.thumbnailUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800';
+                      const location = item.locationName || 'Đà Nẵng';
+                      const dateStr = item.selectedDate || item.date || 'Hôm nay';
+                      const timeStr = item.timeSlot || '08:00 - 10:00';
+
+                      return (
+                        <div key={item.id} className="flex gap-space-sm items-start border-b pb-space-md border-slate-100 last:border-0 last:pb-0">
+                          <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100">
+                            <img className="w-full h-full object-cover" alt={title} src={image} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700 text-[10px] font-bold">{location}</span>
+                              <span className="font-bold text-sm text-slate-900">{(item.unitPrice * item.quantity).toLocaleString('vi-VN')}₫</span>
+                            </div>
+                            <h4 className="font-bold text-xs sm:text-sm text-slate-900 leading-tight mt-1 truncate">{title}</h4>
+                            <p className="text-[11px] text-slate-500 mt-0.5">{timeStr} • {dateStr}</p>
+                            <div className="flex items-center justify-between mt-1 text-slate-500 text-[11px]">
+                              <span>{item.unitPrice.toLocaleString('vi-VN')}₫ × {item.quantity} khách</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Promo Code Input */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <label className="text-xs font-semibold text-slate-700 block mb-1.5">Mã ưu đãi / Khuyến mãi</label>
+                    {appliedPromoCode ? (
+                      <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-emerald-600 text-sm">check_circle</span>
+                          <span className="font-bold text-emerald-800">{appliedPromoCode}</span>
+                          <span className="text-emerald-700">(-{discountAmount.toLocaleString('vi-VN')}₫)</span>
+                        </div>
+                        <button
+                          onClick={handleRemovePromo}
+                          className="text-red-500 hover:text-red-700 font-medium cursor-pointer"
+                          type="button"
+                        >
+                          Gỡ bỏ
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={promoInput}
+                            onChange={(e) => setPromoInput(e.target.value)}
+                            placeholder="Nhập DANASEA10 hoặc HE2024"
+                            className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 uppercase focus:outline-none focus:ring-1 focus:ring-cyan-600"
+                          />
+                          <button
+                            onClick={handleApplyPromo}
+                            disabled={isApplyingPromo || !promoInput.trim()}
+                            type="button"
+                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                          >
+                            {isApplyingPromo ? 'Đang kiểm tra...' : 'Áp dụng'}
+                          </button>
+                        </div>
+                        {promoError && <p className="text-[11px] text-red-500">{promoError}</p>}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Subtotal & Promo breakdown directly below Promo Code */}
+                  <div className="flex flex-col gap-2 pt-3 border-t border-slate-100 text-xs text-slate-600">
+                    <div className="flex justify-between items-center text-sm">
+                      <span>Tạm tính</span>
+                      <span className="text-slate-900 font-semibold">{rawTotal.toLocaleString('vi-VN')}₫</span>
                     </div>
+                    {appliedPromoCode && (
+                      <div className="flex justify-between items-center text-sm text-emerald-600 font-bold">
+                        <span>Ưu đãi áp dụng ({appliedPromoCode})</span>
+                        <span>-{discountAmount.toLocaleString('vi-VN')}₫</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-xs text-slate-500">
+                      <span>Phí dịch vụ</span>
+                      <span className="text-emerald-600 font-medium">Miễn phí</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Balance empty space is absorbed above, Total Payment sits right above button */}
+                <div className="mt-auto pt-4 flex flex-col gap-4">
+                  <div className="flex justify-between items-baseline pt-3 border-t border-slate-100">
+                    <div>
+                      <span className="text-sm font-bold text-slate-900">Tổng thanh toán:</span>
+                      <p className="text-[11px] text-slate-400">Đã bao gồm thuế &amp; bảo hiểm</p>
+                    </div>
+                    <span className="text-2xl sm:text-3xl leading-tight text-cyan-700 font-black tracking-tight">
+                      {finalTotal.toLocaleString('vi-VN')}₫
+                    </span>
+                  </div>
+
+                  {isHoldExpired ? (
                     <button
-                      onClick={handleRemovePromo}
-                      className="text-red-500 hover:text-red-700 font-medium cursor-pointer"
+                      onClick={() => navigate('/cart')}
+                      type="button"
+                      className="w-full py-4 rounded-full font-bold text-sm bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/20 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer transition-all"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                      <span>Quay lại giỏ hàng</span>
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={handlePayment} 
+                      disabled={isProcessingPayment}
+                      className={`w-full py-4 rounded-full font-bold text-sm shadow-md transition-all flex items-center justify-center cursor-pointer ${
+                        !isProcessingPayment
+                          ? 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-cyan-600/25'
+                          : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
+                      }`} 
                       type="button"
                     >
-                      Gỡ bỏ
+                      {isProcessingPayment ? (
+                        <span className="flex items-center gap-2">
+                          <span className="material-symbols-outlined animate-spin text-[20px]">refresh</span>
+                          <span>Đang xử lý thanh toán...</span>
+                        </span>
+                      ) : (
+                        <span>Xác nhận &amp; Thanh toán</span>
+                      )}
                     </button>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={promoInput}
-                        onChange={(e) => setPromoInput(e.target.value)}
-                        placeholder="Nhập DANASEA10 hoặc HE2024"
-                        className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-800 uppercase focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                      <button
-                        onClick={handleApplyPromo}
-                        type="button"
-                        className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold cursor-pointer transition-colors"
-                      >
-                        Áp dụng
-                      </button>
-                    </div>
-                    {promoError && <p className="text-[11px] text-red-500">{promoError}</p>}
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex flex-col gap-space-xs pt-space-xs border-t border-surface-container font-body-md text-body-md text-on-surface-variant">
-                <div className="flex justify-between items-center text-sm">
-                  <span>Tạm tính</span>
-                  <span className="text-on-surface font-medium">{getTotalPrice().toLocaleString('vi-VN')}đ</span>
-                </div>
-                {appliedPromo && (
-                  <div className="flex justify-between items-center text-sm text-emerald-600 font-medium">
-                    <span>Khuyến mãi ({appliedPromo.code})</span>
-                    <span>-{appliedPromo.discount.toLocaleString('vi-VN')}đ</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-baseline pt-space-md border-t border-surface-container mt-space-xs">
-                  <div>
-                    <span className="font-headline-sm text-[18px] text-on-surface font-bold">Tổng thanh toán:</span>
-                  </div>
-                  <span className="font-display-hero text-[28px] leading-tight text-primary font-extrabold tracking-tight">{finalTotal.toLocaleString('vi-VN')}đ</span>
+                  )}
                 </div>
               </div>
-              <button onClick={handlePayment} className="w-full py-4 rounded-full bg-primary-container text-on-primary font-label-lg text-label-lg shadow-[0_8px_20px_rgba(255,115,92,0.35)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-space-sm font-bold tracking-wide cursor-pointer" type="button">
-                <span className="material-symbols-outlined text-[20px]">lock</span>
-                <span>Xác nhận &amp; Thanh toán {finalTotal.toLocaleString('vi-VN')}đ</span>
-              </button>
             </div>
           </div>
-        </div>
-      </main>
-    </div></main>
+        </main>
+      </div>
+    </main>
   );
 }
