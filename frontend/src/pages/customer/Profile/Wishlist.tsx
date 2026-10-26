@@ -326,12 +326,6 @@ export function Wishlist() {
                         alt={service.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                       />
-                      <div className="absolute top-3 left-3 flex flex-col gap-1 items-start">
-                        <span className="px-2.5 py-1 rounded-full bg-slate-900/70 backdrop-blur-md text-white text-xs font-medium flex items-center gap-1 shadow-sm border border-white/20">
-                          <span className="material-symbols-outlined text-[13px] text-cyan-400">verified</span>
-                          Bảo trợ An Toàn
-                        </span>
-                      </div>
                       <button 
                         aria-label="Bỏ lưu khỏi danh sách" 
                         title="Bỏ lưu khỏi danh sách yêu thích"
