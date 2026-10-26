@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { orderService } from "../../../services/orderService";
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
+import { useAuthStore } from "../../../store/useAuthStore";
+import { authService } from "../../../services/authService";
 import type {
   OrderResponse,
   SubOrderResponse,
@@ -16,6 +18,7 @@ type OrderFilter = "all" | "upcoming" | "pending" | "completed" | "cancelled";
 
 export function Orders() {
   const navigate = useNavigate();
+  const { user, isAuthenticated, accessToken, setAuth } = useAuthStore();
 
   // State management
   const [filter, setFilter] = useState<OrderFilter>("all");
@@ -57,6 +60,11 @@ export function Orders() {
 
   // Fetch orders from API
   const fetchOrders = useCallback(async (targetPage = 0) => {
+    if (!isAuthenticated || !accessToken) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -87,16 +95,61 @@ export function Orders() {
       });
     } catch (err: unknown) {
       console.error("[Orders] Lỗi khi tải danh sách đơn hàng:", err);
-      const msg = err instanceof Error ? err.message : "Không thể tải danh sách đơn hàng từ máy chủ.";
+      let msg = "Không thể tải danh sách đơn hàng từ máy chủ.";
+      if (err && typeof err === "object" && "response" in err) {
+        const resp = (err as { response?: { status?: number; data?: { message?: string } } }).response;
+        if (resp?.status === 401) {
+          msg = "Phiên đăng nhập đã hết hạn hoặc bạn chưa đăng nhập. Vui lòng đăng nhập lại.";
+        } else if (resp?.data?.message) {
+          msg = resp.data.message;
+        }
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
       setError(msg);
     } finally {
       setLoading(false);
     }
-  }, [serviceDetails]);
+  }, [isAuthenticated, accessToken, serviceDetails]);
 
   useEffect(() => {
-    fetchOrders(page);
-  }, [page, fetchOrders]);
+    if (isAuthenticated && accessToken) {
+      fetchOrders(page);
+    } else {
+      setLoading(false);
+    }
+  }, [page, isAuthenticated, accessToken, fetchOrders]);
+
+  // Quick Login helper for testing / unauthenticated state
+  const handleQuickLogin = async () => {
+    try {
+      setLoading(true);
+      const res = await authService.login({
+        email: "customer@danasea.vn",
+        password: "password123",
+      });
+      setAuth(
+        {
+          id: res.userId,
+          email: res.email,
+          fullName: "Nguyễn Văn Khách",
+          role: res.role,
+          avatarUrl: "",
+          isEmailVerified: true,
+          isLocked: false,
+          passwordHash: "",
+          phone: "0905000003",
+          locale: "vi",
+        },
+        res.accessToken
+      );
+    } catch (err) {
+      console.error("[Orders] Đăng nhập nhanh thất bại:", err);
+      navigate("/auth");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
@@ -318,6 +371,39 @@ export function Orders() {
     }
   };
 
+  // Unauthenticated Guard Screen
+  if (!isAuthenticated || !user) {
+    return (
+      <main className="w-full pt-28 pb-20 bg-slate-50/50 flex-1 min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white/90 backdrop-blur-md border border-cyan-100 rounded-3xl p-8 text-center space-y-5 shadow-sm">
+          <div className="w-16 h-16 rounded-full bg-cyan-50 border border-cyan-200 flex items-center justify-center mx-auto text-cyan-600">
+            <span className="material-symbols-outlined text-[32px]">lock</span>
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-xl font-bold text-slate-900">Vui lòng đăng nhập</h2>
+            <p className="text-xs text-slate-500 max-w-xs mx-auto">
+              Bạn cần đăng nhập tài khoản Khách hàng để xem vé điện tử và quản lý đơn đặt của mình.
+            </p>
+          </div>
+          <div className="space-y-2 pt-2">
+            <button
+              onClick={() => navigate("/auth")}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-xs font-bold hover:shadow-md cursor-pointer transition-all"
+            >
+              Đến trang Đăng nhập
+            </button>
+            <button
+              onClick={handleQuickLogin}
+              className="w-full py-2.5 rounded-xl border border-cyan-200 bg-cyan-50/60 hover:bg-cyan-50 text-cyan-700 text-xs font-bold cursor-pointer transition-colors"
+            >
+              Đăng nhập nhanh (customer@danasea.vn)
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="w-full pt-20 bg-slate-50/50 flex-1 min-h-screen">
       <div className="flex flex-col w-full">
@@ -326,13 +412,7 @@ export function Orders() {
           <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 lg:px-12 py-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-cyan-600 text-[26px]">confirmation_number</span>
-                  <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Trải nghiệm &amp; Vé của tôi</h1>
-                </div>
-                <p className="text-sm text-slate-500 mt-1">
-                  Quản lý các tour đã đặt, xuất mã vé điện tử QR xuất bến và tải hóa đơn E-Ticket.
-                </p>
+                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Vé của tôi</h1>
               </div>
 
               <div className="flex items-center gap-3">
@@ -431,21 +511,6 @@ export function Orders() {
 
         {/* Content Container */}
         <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 lg:px-12 py-8">
-          {/* Maritime Safety & Guarantee Banner */}
-          <div className="w-full bg-gradient-to-r from-cyan-50/90 via-sky-50/70 to-blue-50/80 border border-cyan-200/80 rounded-2xl p-4 flex items-center justify-between gap-4 mb-6 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-sm shadow-cyan-500/30">
-                <span className="material-symbols-outlined text-[22px]">verified_user</span>
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Bảo trợ an toàn biển &amp; Vé điện tử mã hóa</h3>
-                <p className="text-xs text-slate-600">
-                  Mọi dịch vụ đặt qua DANASEA đều được bảo hiểm du lịch biển, kiểm duyệt điều kiện an toàn và cấp mã QR xuất bến ký số HMAC-SHA256 chuẩn cảng vụ.
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Loading Skeleton */}
           {loading && (
             <div className="flex flex-col gap-6">
@@ -460,15 +525,28 @@ export function Orders() {
 
           {/* Error Alert */}
           {!loading && error && (
-            <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl text-center space-y-3">
-              <span className="material-symbols-outlined text-rose-500 text-[36px]">error</span>
-              <p className="text-sm font-bold text-rose-800">{error}</p>
-              <button
-                onClick={() => fetchOrders(page)}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
-              >
-                Thử lại
-              </button>
+            <div className="p-6 bg-white border border-rose-200 rounded-3xl text-center space-y-3 shadow-sm max-w-lg mx-auto">
+              <div className="w-12 h-12 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mx-auto">
+                <span className="material-symbols-outlined text-[26px]">info</span>
+              </div>
+              <p className="text-sm font-bold text-slate-800">{error}</p>
+              <div className="flex items-center justify-center gap-2 pt-2">
+                {error.includes("hết hạn") || error.includes("đăng nhập") ? (
+                  <button
+                    onClick={() => navigate("/auth")}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-xs font-bold cursor-pointer hover:shadow-md"
+                  >
+                    Đăng nhập lại
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => fetchOrders(page)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold cursor-pointer"
+                  >
+                    Thử lại
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
