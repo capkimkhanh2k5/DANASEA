@@ -678,12 +678,12 @@ export function Checkout() {
                 </div>
 
                 {/* QR Code Container */}
-                <div className="flex flex-col items-center justify-center p-4 bg-gradient-to-b from-slate-50 to-cyan-50/30 rounded-2xl border border-slate-200/80 shadow-inner">
-                  <div className="p-2 bg-white rounded-xl shadow-md border border-slate-100">
+                <div className="flex flex-col items-center justify-center p-3.5 bg-gradient-to-b from-slate-50 to-cyan-50/30 rounded-2xl border border-slate-200/80 shadow-inner">
+                  <div className="p-2.5 bg-white rounded-2xl shadow-md border border-slate-100">
                     <img
                       src={`https://img.vietqr.io/image/MB-0912345678-compact2.png?amount=${finalTotal}&addInfo=DNS${sessionCode || '89412'}&accountName=CONG%20TY%20DANASEA`}
                       alt="Mã QR thanh toán ngân hàng"
-                      className="w-56 h-56 object-contain rounded-lg"
+                      className="w-72 h-72 max-w-full object-contain rounded-xl"
                       onError={(e) => {
                         (e.target as HTMLElement).style.display = 'none';
                       }}
