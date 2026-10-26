@@ -32,6 +32,7 @@ class _BookingHoldScreenState extends State<BookingHoldScreen> {
   final _discount = TextEditingController();
   BookingHold? _hold;
   MasterOrderModel? _createdOrder;
+  DiscountPreviewResult? _discountPreview;
   Timer? _timer;
   bool _busy = false, _allowSplit = false, _cancelled = false;
   bool _uncertain = false, _orderUncertain = false, _allowExit = false;
@@ -121,13 +122,42 @@ class _BookingHoldScreenState extends State<BookingHoldScreen> {
     }, creating: true);
   }
 
+  Future<void> _previewDiscount() async {
+    if (!_active || _busy) return;
+    final code = _discount.text.trim();
+    if (code.isEmpty) {
+      setState(() {
+        _discountPreview = null;
+        _error = 'Vui lòng nhập mã giảm giá để kiểm tra.';
+      });
+      return;
+    }
+    await _run(() async {
+      final preview = await _orderRepository.previewDiscount(
+        bookingId: _hold!.id,
+        code: code,
+      );
+      if (!mounted) return;
+      setState(() {
+        _discountPreview = preview;
+        if (!preview.valid) {
+          _error =
+              preview.message ?? 'Mã giảm giá không hợp lệ hoặc đã hết hạn.';
+        }
+      });
+    });
+  }
+
   Future<void> _createOrder() async {
     if (!_active || _orderUncertain) return;
     await _run(() async {
+      final appliedCode = _discountPreview?.valid == true
+          ? _discountPreview!.code
+          : _discount.text.trim();
       final order = await _orderRepository.createOrder(
         bookingId: _hold!.id,
         idempotencyKey: _orderIdempotencyKey,
-        discountCode: _discount.text.trim(),
+        discountCode: appliedCode,
       );
       if (!mounted) return;
       _timer?.cancel();
@@ -298,9 +328,19 @@ class _BookingHoldScreenState extends State<BookingHoldScreen> {
             if (hold != null) ...[
               SelectableText(hold.id),
               Text(
-                '${NumberFormat.decimalPattern('vi').format(createdOrder?.totalAmount ?? hold.totalAmount)} ₫',
+                '${NumberFormat.decimalPattern('vi').format(createdOrder?.totalAmount ?? (_discountPreview?.valid == true ? _discountPreview!.finalPayableAmount : hold.totalAmount))} ₫',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
+              if (_discountPreview?.valid == true && createdOrder == null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '${tr(context, 'Giảm giá')} (${_discountPreview!.code}): -${NumberFormat.decimalPattern('vi').format(_discountPreview!.totalDiscountAmount)} ₫',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                if (_discountPreview!.message != null &&
+                    _discountPreview!.message!.isNotEmpty)
+                  LocalizedText(_discountPreview!.message!),
+              ],
               if (createdOrder != null) ...[
                 const SizedBox(height: 8),
                 LocalizedText('Đã tạo đơn hàng #${createdOrder.id}'),
@@ -328,13 +368,31 @@ class _BookingHoldScreenState extends State<BookingHoldScreen> {
                   'Thời gian còn lại: ${remaining ~/ 60}:${(remaining % 60).toString().padLeft(2, '0')}',
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: _discount,
-                  enabled: !_busy && !_orderUncertain,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: InputDecoration(
-                    labelText: tr(context, 'Mã giảm giá (không bắt buộc)'),
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _discount,
+                        enabled: !_busy && !_orderUncertain,
+                        textCapitalization: TextCapitalization.characters,
+                        onChanged: (_) {
+                          if (_discountPreview != null) {
+                            setState(() => _discountPreview = null);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          labelText: tr(context, 'Mã giảm giá (không bắt buộc)'),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: _busy || _orderUncertain
+                          ? null
+                          : _previewDiscount,
+                      child: const LocalizedText('Áp dụng'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 12),
                 FilledButton(

@@ -1488,4 +1488,11 @@ const englishTranslations = <String, String>{
   "Đang kiểm tra trạng thái...": "Checking status...",
   "Kiểm tra trạng thái thanh toán": "Check payment status",
   "Đang chờ xác nhận": "Awaiting confirmation",
+  "Vui lòng nhập mã giảm giá để kiểm tra.":
+      "Please enter a discount code to check.",
+  "Không tìm thấy mã giữ chỗ (bookingId) để xem trước mã giảm giá.":
+      "Booking hold ID not found to preview discount code.",
+  "Áp dụng mã {0} (-{1})!": "Applied code {0} (-{1})!",
+  "Không thể kiểm tra mã giảm giá. Vui lòng thử lại.":
+      "Unable to verify discount code. Please try again.",
 };

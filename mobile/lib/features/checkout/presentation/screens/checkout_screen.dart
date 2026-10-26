@@ -15,12 +15,14 @@ class CheckoutScreen extends StatefulWidget {
   final List<CartItemData> selectedItems;
   final MasterOrderModel? masterOrder;
   final String? orderId;
+  final String? bookingId;
 
   const CheckoutScreen({
     super.key,
     this.selectedItems = const [],
     this.masterOrder,
     this.orderId,
+    this.bookingId,
   });
 
   @override
@@ -36,8 +38,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final TextEditingController _discountController = TextEditingController();
 
   MasterOrderModel? _order;
+  DiscountPreviewResult? _discountPreview;
   List<OrderPaymentRecord> _existingPayments = const [];
   bool _loadingOrder = false;
+  bool _previewingDiscount = false;
   bool _submitting = false;
   final Set<PaymentProvider> _uncertainProviders = <PaymentProvider>{};
   final Map<PaymentProvider, String> _idempotencyKeys =
@@ -45,6 +49,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   String? _error;
 
   String? get _targetOrderId => widget.orderId ?? widget.masterOrder?.id;
+  String? get _targetBookingId => widget.bookingId ?? _order?.bookingId;
 
   @override
   void initState() {
@@ -106,6 +111,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   int get _subtotal {
+    if (_discountPreview?.valid == true) {
+      return _discountPreview!.originalTotalAmount.round();
+    }
     if (_order != null) {
       return _order!.subtotalAmount;
     }
@@ -113,6 +121,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   int get _discountAmount {
+    if (_discountPreview?.valid == true) {
+      return _discountPreview!.totalDiscountAmount.round();
+    }
     if (_order != null) {
       return _order!.discountAmount;
     }
@@ -120,6 +131,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   int get _finalTotal {
+    if (_discountPreview?.valid == true) {
+      return _discountPreview!.finalPayableAmount.round();
+    }
     if (_order != null) {
       return _order!.totalAmount;
     }
@@ -140,15 +154,84 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return '${buffer.toString().split('').reversed.join()} đ';
   }
 
-  void _applyDiscount() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: LocalizedText(
-          'Mã giảm giá được áp dụng khi tạo đơn hàng từ giữ chỗ. Chức năng xem trước mã giảm giá sẽ được nối ở bước tiếp theo.',
+  Future<void> _applyDiscount() async {
+    if (_previewingDiscount || _submitting) return;
+    final code = _discountController.text.trim();
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText('Vui lòng nhập mã giảm giá để kiểm tra.'),
+          backgroundColor: AppColors.error,
         ),
-        backgroundColor: AppColors.primary,
-      ),
-    );
+      );
+      return;
+    }
+    final bookingId = _targetBookingId;
+    if (bookingId == null || bookingId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText(
+            'Không tìm thấy mã giữ chỗ (bookingId) để xem trước mã giảm giá.',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _previewingDiscount = true;
+      _error = null;
+    });
+    try {
+      final preview = await _orderRepository.previewDiscount(
+        bookingId: bookingId,
+        code: code,
+      );
+      if (!mounted) return;
+      setState(() {
+        _discountPreview = preview;
+      });
+      if (preview.valid) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: LocalizedText(
+              preview.message ??
+                  'Áp dụng mã ${preview.code} (-${_formatPrice(preview.totalDiscountAmount)})!',
+            ),
+            backgroundColor: AppColors.secondary,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: LocalizedText(
+              preview.message ?? 'Mã giảm giá không hợp lệ hoặc đã hết hạn.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } on AuthFailure catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: LocalizedText(e.message),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText('Không thể kiểm tra mã giảm giá. Vui lòng thử lại.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _previewingDiscount = false);
+      }
+    }
   }
 
   Future<void> _processPayment() async {
@@ -725,7 +808,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         Expanded(
                           child: TextField(
                             controller: _discountController,
+                            enabled: !_previewingDiscount && !_submitting,
                             textCapitalization: TextCapitalization.characters,
+                            onChanged: (_) {
+                              if (_discountPreview != null) {
+                                setState(() => _discountPreview = null);
+                              }
+                            },
                             decoration: InputDecoration(
                               hintText: tr(
                                 context,
@@ -747,11 +836,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          onPressed: _applyDiscount,
-                          child: LocalizedText(
-                            'Áp dụng',
-                            style: AppTypography.labelSm(color: Colors.white),
-                          ),
+                          onPressed: (_previewingDiscount || _submitting)
+                              ? null
+                              : _applyDiscount,
+                          child: _previewingDiscount
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : LocalizedText(
+                                  'Áp dụng',
+                                  style: AppTypography.labelSm(
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
                       ],
                     ),
@@ -942,7 +1044,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               LocalizedText(
-                                'Giảm giá (${order?.discountCode ?? 'DISCOUNT'}):',
+                                'Giảm giá (${_discountPreview?.valid == true ? _discountPreview!.code : (order?.discountCode ?? 'DISCOUNT')}):',
                                 style: AppTypography.bodySm(
                                   color: AppColors.secondary,
                                 ),

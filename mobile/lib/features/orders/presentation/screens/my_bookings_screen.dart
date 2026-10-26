@@ -263,36 +263,130 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Future<void> _createOrder() async {
     if (_creatingOrder || _cancelling || _orderUncertain) return;
     String discountCode = '';
+    DiscountPreviewResult? previewResult;
+    bool previewing = false;
+    String? previewError;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const LocalizedText('Tạo đơn hàng'),
-        content: TextField(
-          onChanged: (value) => discountCode = value,
-          textCapitalization: TextCapitalization.characters,
-          decoration: InputDecoration(
-            labelText: tr(context, 'Mã giảm giá (không bắt buộc)'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const LocalizedText('Tạo đơn hàng'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      onChanged: (value) {
+                        discountCode = value;
+                        if (previewResult != null || previewError != null) {
+                          setDialogState(() {
+                            previewResult = null;
+                            previewError = null;
+                          });
+                        }
+                      },
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'Mã giảm giá (không bắt buộc)'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    onPressed: previewing
+                        ? null
+                        : () async {
+                            final code = discountCode.trim();
+                            if (code.isEmpty) {
+                              setDialogState(() {
+                                previewResult = null;
+                                previewError =
+                                    'Vui lòng nhập mã giảm giá để kiểm tra.';
+                              });
+                              return;
+                            }
+                            setDialogState(() {
+                              previewing = true;
+                              previewError = null;
+                            });
+                            try {
+                              final res = await _orderRepository
+                                  .previewDiscount(
+                                    bookingId: widget.bookingId,
+                                    code: code,
+                                  );
+                              setDialogState(() {
+                                previewResult = res;
+                                if (!res.valid) {
+                                  previewError =
+                                      res.message ??
+                                      'Mã giảm giá không hợp lệ hoặc đã hết hạn.';
+                                }
+                              });
+                            } catch (e) {
+                              setDialogState(() => previewError = _error(e));
+                            } finally {
+                              setDialogState(() => previewing = false);
+                            }
+                          },
+                    child: previewing
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const LocalizedText('Áp dụng'),
+                  ),
+                ],
+              ),
+              if (previewResult?.valid == true) ...[
+                const SizedBox(height: 10),
+                Text(
+                  '${tr(context, 'Giảm giá')}: -${_money(previewResult!.totalDiscountAmount)}',
+                  style: AppTypography.bodySm(color: AppColors.secondary),
+                ),
+                Text(
+                  '${tr(context, 'Tổng thanh toán')}: ${_money(previewResult!.finalPayableAmount)}',
+                  style: AppTypography.labelMd(color: AppColors.primary),
+                ),
+              ],
+              if (previewError != null) ...[
+                const SizedBox(height: 8),
+                LocalizedText(
+                  previewError!,
+                  style: AppTypography.bodySm(color: AppColors.error),
+                ),
+              ],
+            ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const LocalizedText('Quay lại'),
+            ),
+            TextButton(
+              onPressed: previewing
+                  ? null
+                  : () => Navigator.pop(dialogContext, true),
+              child: const LocalizedText('Tạo đơn hàng'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const LocalizedText('Quay lại'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const LocalizedText('Tạo đơn hàng'),
-          ),
-        ],
       ),
     );
     if (confirmed != true || !mounted) return;
     setState(() => _creatingOrder = true);
     try {
+      final appliedCode = previewResult?.valid == true
+          ? previewResult!.code
+          : discountCode;
       final order = await _orderRepository.createOrder(
         bookingId: widget.bookingId,
         idempotencyKey: _orderIdempotencyKey,
-        discountCode: discountCode,
+        discountCode: appliedCode,
       );
       if (!mounted) return;
       await _load();

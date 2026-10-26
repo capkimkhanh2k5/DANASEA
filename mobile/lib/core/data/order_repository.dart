@@ -649,4 +649,105 @@ class OrderRepository {
       headers: const {'Accept': 'application/pdf'},
     );
   }
+
+  Future<DiscountPreviewResult> previewDiscount({
+    required String bookingId,
+    required String code,
+  }) async {
+    final json = await session.request(
+      '/api/checkout/discount-preview',
+      method: 'POST',
+      data: {
+        'bookingId': bookingId,
+        'code': code.trim(),
+      },
+    );
+    return DiscountPreviewResult.fromJson(json);
+  }
+}
+
+class DiscountPreviewItem {
+  const DiscountPreviewItem({
+    required this.bookingItemId,
+    required this.vendorId,
+    required this.serviceId,
+    required this.originalSubtotal,
+    required this.eligible,
+    required this.vendorDiscountAmount,
+    required this.platformDiscountAmount,
+    required this.discountAmount,
+    required this.finalSubtotal,
+  });
+
+  final String bookingItemId;
+  final String vendorId;
+  final String serviceId;
+  final num originalSubtotal;
+  final bool eligible;
+  final num vendorDiscountAmount;
+  final num platformDiscountAmount;
+  final num discountAmount;
+  final num finalSubtotal;
+
+  factory DiscountPreviewItem.fromJson(Map<String, dynamic> json) {
+    return DiscountPreviewItem(
+      bookingItemId: json['bookingItemId']?.toString() ?? '',
+      vendorId: json['vendorId']?.toString() ?? '',
+      serviceId: json['serviceId']?.toString() ?? '',
+      originalSubtotal: (json['originalSubtotal'] as num?) ?? 0,
+      eligible: json['eligible'] == true,
+      vendorDiscountAmount: (json['vendorDiscountAmount'] as num?) ?? 0,
+      platformDiscountAmount: (json['platformDiscountAmount'] as num?) ?? 0,
+      discountAmount: (json['discountAmount'] as num?) ?? 0,
+      finalSubtotal: (json['finalSubtotal'] as num?) ?? 0,
+    );
+  }
+}
+
+class DiscountPreviewResult {
+  const DiscountPreviewResult({
+    required this.valid,
+    this.errorCode,
+    this.message,
+    required this.code,
+    this.scope,
+    this.sponsorType,
+    required this.originalTotalAmount,
+    required this.totalDiscountAmount,
+    required this.finalPayableAmount,
+    required this.itemBreakdown,
+  });
+
+  final bool valid;
+  final String? errorCode;
+  final String? message;
+  final String code;
+  final String? scope;
+  final String? sponsorType;
+  final num originalTotalAmount;
+  final num totalDiscountAmount;
+  final num finalPayableAmount;
+  final List<DiscountPreviewItem> itemBreakdown;
+
+  factory DiscountPreviewResult.fromJson(Map<String, dynamic> json) {
+    if (json['valid'] is! bool) {
+      throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+    }
+    final rawItems = json['itemBreakdown'] as List? ?? const [];
+    return DiscountPreviewResult(
+      valid: json['valid'] as bool,
+      errorCode: json['errorCode']?.toString(),
+      message: json['message']?.toString(),
+      code: json['code']?.toString() ?? '',
+      scope: json['scope']?.toString(),
+      sponsorType: json['sponsorType']?.toString(),
+      originalTotalAmount: (json['originalTotalAmount'] as num?) ?? 0,
+      totalDiscountAmount: (json['totalDiscountAmount'] as num?) ?? 0,
+      finalPayableAmount: (json['finalPayableAmount'] as num?) ?? 0,
+      itemBreakdown: rawItems
+          .whereType<Map<String, dynamic>>()
+          .map(DiscountPreviewItem.fromJson)
+          .toList(),
+    );
+  }
 }
