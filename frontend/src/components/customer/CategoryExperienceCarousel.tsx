@@ -31,8 +31,8 @@ export function CategoryExperienceCarousel({
   // Smooth page transition handler
   const handleNavigate = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
-      (document as any).startViewTransition(() => {
+    if (typeof document !== 'undefined' && document.startViewTransition) {
+      document.startViewTransition(() => {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
         navigate(linkHref);
       });

@@ -11,7 +11,7 @@ import { useState, useEffect, useRef } from "react";
 
 export function Checkout() {
   const navigate = useNavigate();
-  const { items, getTotalPrice, clearCart } = useCartStore();
+  const { items, getTotalPrice } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
   const { triggerDemoLoading } = useLoadingStore();
 
