@@ -47,6 +47,7 @@ export function Checkout() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
 
   const handleCopy = (text: string, field: string) => {
     if (navigator?.clipboard?.writeText) {
@@ -63,6 +64,43 @@ export function Checkout() {
       navigate('/cart');
     }
   }, [items, navigate, isProcessingPayment, showQrModal]);
+
+  // Auto-polling for payment status when QR Modal is active
+  useEffect(() => {
+    if (!showQrModal) return;
+
+    // 1. Timeout guard: when hold expires, close modal immediately
+    if (isHoldExpired) {
+      setShowQrModal(false);
+      setPaymentError("Thời gian giữ vé 15 phút đã kết thúc. Suất tour đã được giải phóng, vui lòng quay lại giỏ hàng.");
+      return;
+    }
+
+    // 2. Real Backend Polling
+    if (activeOrderId) {
+      const pollInterval = setInterval(async () => {
+        try {
+          const payments = await paymentService.getPaymentStatus(activeOrderId);
+          const latest = payments?.[0];
+          if (latest?.status === "SUCCESS") {
+            clearInterval(pollInterval);
+            setShowQrModal(false);
+            isNavigatingToResultRef.current = true;
+            navigate(`/checkout/result?orderId=${activeOrderId}&status=success`);
+          } else if (latest?.status === "FAILED") {
+            clearInterval(pollInterval);
+            setShowQrModal(false);
+            isNavigatingToResultRef.current = true;
+            navigate(`/checkout/result?orderId=${activeOrderId}&status=failed`);
+          }
+        } catch (err) {
+          console.debug("[Checkout Polling] Chờ nhận diện tiền về...", err);
+        }
+      }, 2500);
+
+      return () => clearInterval(pollInterval);
+    }
+  }, [showQrModal, activeOrderId, isHoldExpired, navigate]);
 
   // Sync user info if auth updates
   useEffect(() => {
@@ -225,6 +263,7 @@ export function Checkout() {
           bookingId: bookingHold.bookingId,
           discountCode: appliedPromoCode || undefined,
         });
+        setActiveOrderId(orderRes.id);
 
         // 2. Create Payment Intent
         const payRes = await paymentService.createPaymentIntent(orderRes.id, {
@@ -745,22 +784,14 @@ export function Checkout() {
               </div>
 
               {/* Modal Footer Actions */}
-              <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col gap-2">
-                <button
-                  onClick={() => {
-                    isNavigatingToResultRef.current = true;
-                    navigate('/checkout/result?status=success');
-                  }}
-                  className="w-full py-3 rounded-full font-bold text-sm bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white shadow-md shadow-cyan-600/25 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
-                >
-                  <span className="material-symbols-outlined text-[18px]">verified</span>
-                  <span>Tôi đã thanh toán xong</span>
-                </button>
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-center">
                 <button
                   onClick={() => setShowQrModal(false)}
-                  className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                  type="button"
+                  className="w-full py-3 rounded-full font-bold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-[0.99]"
                 >
-                  Đổi phương thức thanh toán
+                  <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
+                  <span>Đổi phương thức thanh toán</span>
                 </button>
               </div>
             </div>
