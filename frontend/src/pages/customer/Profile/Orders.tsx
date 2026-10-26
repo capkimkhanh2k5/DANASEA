@@ -991,6 +991,16 @@ export function Orders() {
                     </div>
                   </div>
 
+                  {/* Non-refundable notice when within 24 hours */}
+                  {cancellationPreview.refundAmount <= 0 && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-start gap-2">
+                      <span className="material-symbols-outlined text-amber-600 text-base shrink-0">info</span>
+                      <span>
+                        Đơn hàng có giờ khởi hành trong vòng 24 giờ tới nên không đủ điều kiện hoàn tiền theo chính sách dịch vụ.
+                      </span>
+                    </div>
+                  )}
+
                   {/* Reason selector */}
                   <div>
                     <label className="text-xs font-bold text-slate-800 block mb-2">Lý do hủy đơn</label>
@@ -1037,11 +1047,15 @@ export function Orders() {
                     </button>
                     <button
                       type="button"
-                      disabled={cancellationSubmitting}
+                      disabled={cancellationSubmitting || cancellationPreview.refundAmount <= 0}
                       onClick={handleConfirmCancellation}
-                      className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50"
+                      className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {cancellationSubmitting ? "Đang xử lý..." : "Xác nhận hủy & Hoàn tiền"}
+                      {cancellationSubmitting
+                        ? "Đang xử lý..."
+                        : cancellationPreview.refundAmount <= 0
+                        ? "Không đủ điều kiện hoàn tiền"
+                        : "Xác nhận hủy & Hoàn tiền"}
                     </button>
                   </div>
                 </div>
