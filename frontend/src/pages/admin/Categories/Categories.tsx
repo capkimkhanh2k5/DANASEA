@@ -16,7 +16,8 @@ export function Categories() {
   const [needsReload, setNeedsReload] = useState(false);
   const [reloadVersion, setReloadVersion] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const inFlight = useRef(false);
+  const inFlight = useRef<symbol | null>(null);
+  const pageActive = useRef(false);
   const generation = useRef(0);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const controlsDisabled = !canAccess || loading || !hasLoaded || saving || needsReload;
@@ -50,6 +51,7 @@ export function Categories() {
   }, []);
 
   useEffect(() => {
+    pageActive.current = true;
     const controller = new AbortController();
     const current = ++generation.current;
     const load = async () => {
@@ -59,8 +61,6 @@ export function Categories() {
       populateForm(null);
       setErrorMessage(null);
       setToastMessage(null);
-      setSaving(false);
-      inFlight.current = false;
       if (!canAccess) {
         setErrorMessage(!isAuthenticated || !accessToken
           ? 'Vui lòng đăng nhập bằng tài khoản Admin để quản lý danh mục.'
@@ -83,6 +83,7 @@ export function Categories() {
     };
     void load();
     return () => {
+      pageActive.current = false;
       controller.abort();
       generation.current = current + 1;
       if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -135,7 +136,8 @@ export function Categories() {
     updateEditor = true,
   ) => {
     if (controlsDisabled || inFlight.current) return;
-    inFlight.current = true;
+    const requestId = Symbol('categoryMutation');
+    inFlight.current = requestId;
     const current = generation.current;
     setSaving(true);
     setErrorMessage(null);
@@ -158,9 +160,10 @@ export function Categories() {
       setErrorMessage(failure.message);
       setNeedsReload(failure.outcomeUnknown);
     } finally {
-      if (generation.current === current) {
-        inFlight.current = false;
-        setSaving(false);
+      // Only the request that owns the lock may release it, even after a page reload.
+      if (inFlight.current === requestId) {
+        inFlight.current = null;
+        if (pageActive.current) setSaving(false);
       }
     }
   };
@@ -175,7 +178,8 @@ export function Categories() {
         .replace(/[đĐ]/g, "d")
         .replace(/[^a-z0-9\s-]/g, "")
         .trim()
-        .replace(/\s+/g, "-");
+        .replace(/[\s-]+/g, "-")
+        .replace(/^-+|-+$/g, "");
       setFormSlug(slug);
     }
   };
@@ -191,9 +195,11 @@ export function Categories() {
       setErrorMessage('Danh mục cha không hợp lệ hoặc gây vòng lặp phân cấp.');
       return;
     }
+    const nameEn = formNameEn.trim();
     const body = {
       name: formName.trim(),
-      nameEn: formNameEn.trim(),
+      // Omit absent English names; PATCH "" clears an existing English name.
+      ...(nameEn || editingCategory?.nameEn ? { nameEn } : {}),
       slug: formSlug.trim(),
       ...(!editingCategory || formIcon !== (editingCategory.iconUrl ?? '') ? { iconUrl: formIcon } : {}),
     };
@@ -376,7 +382,7 @@ export function Categories() {
                               </button>
                               <button 
                                 disabled
-                                className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors"
+                                className="p-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 disabled:cursor-not-allowed disabled:opacity-50"
                                 title="Backend chưa hỗ trợ xóa danh mục; dùng công tắc Hiển thị để tạm ẩn"
                                 aria-label="Xóa danh mục chưa được Backend hỗ trợ"
                               >

@@ -43,17 +43,16 @@ export const adminCategoryService = {
   async createCategory(body: CreateAdminCategoryRequest): Promise<AdminCategoryResponse> {
     const { data } = await apiClient.post<AdminCategoryResponse>('/admin/categories', body);
     requireCategory(data);
-    if (!data.isActive || Object.entries(body).some(([key, value]) => data[key as keyof CreateAdminCategoryRequest] !== value)) {
-      throw new Error('Backend chưa xác nhận dữ liệu tạo danh mục.');
-    }
+    if (!data.isActive) throw new Error('Backend chưa xác nhận trạng thái danh mục mới.');
     return data;
   },
 
   async updateCategory(id: string, body: UpdateAdminCategoryRequest): Promise<AdminCategoryResponse> {
     const { data } = await apiClient.patch<AdminCategoryResponse>(`/admin/categories/${encodeURIComponent(id)}`, body);
     requireCategory(data);
-    if (data.id !== id || Object.entries(body).some(([key, value]) => data[key as keyof UpdateAdminCategoryRequest] !== value)) {
-      throw new Error('Backend chưa xác nhận dữ liệu cập nhật danh mục.');
+    if (data.id !== id) throw new Error('Backend trả về danh mục khác với yêu cầu.');
+    if (body.isActive !== undefined && data.isActive !== body.isActive) {
+      throw new Error('Backend chưa xác nhận trạng thái danh mục.');
     }
     return data;
   },
