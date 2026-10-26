@@ -673,7 +673,7 @@ export function Checkout() {
                 <div className="flex items-center justify-between bg-amber-50 border border-amber-200/80 rounded-xl px-3.5 py-2 text-xs text-amber-800">
                   <span className="flex items-center gap-1.5 font-medium">
                     <span className="material-symbols-outlined text-[16px] text-amber-600 animate-pulse">timer</span>
-                    <span>Thời gian giữ vé còn lại:</span>
+                    <span>Thời gian giữ vé:</span>
                   </span>
                   <span className="font-mono font-bold text-amber-900 bg-amber-100/80 px-2 py-0.5 rounded">
                     {formatTime(countdown)}
