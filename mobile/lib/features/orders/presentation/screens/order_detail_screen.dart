@@ -969,6 +969,35 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               ),
             ],
           ),
+          if (sub.waiverRequired) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  sub.waiverAccepted
+                      ? Icons.verified_user
+                      : Icons.assignment_late_outlined,
+                  size: 14,
+                  color: sub.waiverAccepted
+                      ? AppColors.secondary
+                      : AppColors.primary,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: LocalizedText(
+                    sub.waiverAccepted
+                        ? 'Đã ký cam kết miễn trừ v${sub.waiverVersion ?? 1}'
+                        : 'Cần ký cam kết miễn trừ v${sub.waiverVersion ?? 1} trước khi thanh toán',
+                    style: AppTypography.bodySm(
+                      color: sub.waiverAccepted
+                          ? AppColors.secondary
+                          : AppColors.primary,
+                    ).copyWith(fontSize: 11),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const Divider(height: 16),
 
           // Sub-order Action Buttons Row
@@ -976,6 +1005,41 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
+              if (sub.waiverRequired)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: sub.waiverAccepted
+                          ? AppColors.secondary
+                          : AppColors.primary,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                  ),
+                  onPressed: () => _openSubOrderWaiverSheet(masterOrder, sub),
+                  icon: Icon(
+                    sub.waiverAccepted
+                        ? Icons.verified_user_outlined
+                        : Icons.fact_check_outlined,
+                    size: 14,
+                    color: sub.waiverAccepted
+                        ? AppColors.secondary
+                        : AppColors.primary,
+                  ),
+                  label: LocalizedText(
+                    sub.waiverAccepted ? 'Xem miễn trừ' : 'Ký miễn trừ',
+                    style: AppTypography.labelSm(
+                      color: sub.waiverAccepted
+                          ? AppColors.secondary
+                          : AppColors.primary,
+                    ),
+                  ),
+                ),
               if (isConfirmed)
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
@@ -1007,6 +1071,32 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   label: const LocalizedText(
                     'Xem vé QR',
                     style: TextStyle(color: Colors.white, fontSize: 11),
+                  ),
+                ),
+              if (sub.status == SubOrderStatus.confirmed &&
+                  (sub.rawStatus == null || sub.rawStatus == 'CONFIRMED'))
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.secondary),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                  ),
+                  onPressed: () => _openRescheduleSheet(sub),
+                  icon: const Icon(
+                    Icons.event_repeat,
+                    size: 14,
+                    color: AppColors.secondary,
+                  ),
+                  label: LocalizedText(
+                    'Đổi lịch / Gián đoạn',
+                    style: AppTypography.labelSm(
+                      color: AppColors.secondary,
+                    ),
                   ),
                 ),
               OutlinedButton.icon(
@@ -1105,6 +1195,182 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     );
   }
 
+  Future<void> _openSubOrderWaiverSheet(
+    MasterOrderModel masterOrder,
+    SubOrderModel sub,
+  ) async {
+    final canSign =
+        masterOrder.status == MasterOrderStatus.pendingPayment &&
+        sub.status == SubOrderStatus.pending &&
+        !sub.waiverAccepted;
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppShapes.gutterMobile),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: LocalizedText(
+                        'Cam kết miễn trừ trách nhiệm (v${sub.waiverVersion ?? 1})',
+                        style: AppTypography.headlineSm(
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(sheetContext, false),
+                    ),
+                  ],
+                ),
+                Text(
+                  sub.serviceName,
+                  style: AppTypography.labelMd(
+                    color: AppColors.secondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 260),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.borderSubtle),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      (sub.waiverContent != null &&
+                              sub.waiverContent!.trim().isNotEmpty)
+                          ? sub.waiverContent!
+                          : tr(
+                              context,
+                              'Tôi xác nhận đủ điều kiện sức khỏe và đồng ý với Cam kết miễn trừ trách nhiệm khi tham gia các hoạt động thể thao biển tại Đà Nẵng.',
+                            ),
+                      style: AppTypography.bodySm(color: AppColors.onSurface),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (sub.waiverAccepted)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: LocalizedText(
+                      'Đã ký cam kết miễn trừ trách nhiệm (${sub.waiverAcceptedLanguage ?? 'VI'}).',
+                      style: AppTypography.labelMd(
+                        color: AppColors.onSecondaryContainer,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                else if (canSign)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        minimumSize: const Size(double.infinity, 44),
+                      ),
+                      onPressed: () => Navigator.pop(sheetContext, true),
+                      icon: const Icon(
+                        Icons.verified_user,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                      label: const LocalizedText(
+                        'Đồng ý & Ký cam kết miễn trừ',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final langCode =
+          Localizations.localeOf(context).languageCode.toUpperCase() == 'EN'
+              ? 'EN'
+              : 'VI';
+      await _repository.acceptSubOrderWaiver(
+        subOrderId: sub.id,
+        version: sub.waiverVersion ?? 1,
+        language: langCode,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText('Đã xác nhận cam kết miễn trừ trách nhiệm!'),
+          backgroundColor: AppColors.secondary,
+        ),
+      );
+      _loadDetail();
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: LocalizedText(e.message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText(
+              'Không thể ghi nhận cam kết miễn trừ. Vui lòng thử lại.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openRescheduleSheet(SubOrderModel sub) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _SubOrderRescheduleSheet(
+        subOrder: sub,
+        repository: _repository,
+      ),
+    );
+    if (changed == true && mounted) {
+      _loadDetail();
+    }
+  }
+
   Widget _buildPriceRow(String label, String value, {Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1124,6 +1390,463 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SubOrderRescheduleSheet extends StatefulWidget {
+  final SubOrderModel subOrder;
+  final OrderRepository repository;
+
+  const _SubOrderRescheduleSheet({
+    required this.subOrder,
+    required this.repository,
+  });
+
+  @override
+  State<_SubOrderRescheduleSheet> createState() =>
+      _SubOrderRescheduleSheetState();
+}
+
+class _SubOrderRescheduleSheetState extends State<_SubOrderRescheduleSheet> {
+  RescheduleOptionsSummary? _summary;
+  RescheduleOptionItem? _selectedOption;
+  bool _loading = true;
+  bool _submitting = false;
+  bool _uncertainReschedule = false;
+  String? _idempotencyKey;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOptions();
+  }
+
+  Future<void> _loadOptions() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _uncertainReschedule = false;
+    });
+    try {
+      final summary = await widget.repository.getRescheduleOptions(
+        widget.subOrder.id,
+      );
+      if (!mounted) return;
+      RescheduleOptionItem? defaultSelected;
+      for (final opt in summary.options) {
+        if (opt.canAccommodate && opt.isProposedByVendor) {
+          defaultSelected = opt;
+          break;
+        }
+      }
+      if (defaultSelected == null) {
+        for (final opt in summary.options) {
+          if (opt.canAccommodate) {
+            defaultSelected = opt;
+            break;
+          }
+        }
+      }
+      setState(() {
+        _summary = summary;
+        _selectedOption = defaultSelected;
+      });
+    } on AuthFailure catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error = 'Không thể tải danh sách ca thay thế khả dụng.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _submitReschedule() async {
+    final summary = _summary;
+    final selected = _selectedOption;
+    if (_submitting || summary == null || selected == null) return;
+    if (_uncertainReschedule) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText(
+            'Chưa xác định được kết quả đổi lịch trước đó. Vui lòng bấm làm mới trước khi thử lại.',
+          ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    final key = _idempotencyKey ??= OrderRepository.generateIdempotencyKey(
+      'rsch',
+    );
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      final result = await widget.repository.confirmReschedule(
+        subOrderId: widget.subOrder.id,
+        targetSlotId: selected.slotId,
+        proposalId: selected.proposalId,
+        expectedVersion: summary.rescheduleVersion,
+        idempotencyKey: key,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: LocalizedText(
+            result.message.isNotEmpty
+                ? result.message
+                : 'Đã chuyển sang ca ${result.newBookingTime} ngày ${result.newBookingDate}!',
+          ),
+          backgroundColor: AppColors.secondary,
+        ),
+      );
+      Navigator.pop(context, true);
+    } on AuthFailure catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        if (e.status == 0 || e.status >= 500) {
+          _uncertainReschedule = true;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error =
+            'Chưa xác định được kết quả đổi lịch. Vui lòng làm mới trạng thái trước khi thử lại.';
+        _uncertainReschedule = true;
+      });
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _submitDisruptionRefund() async {
+    if (_submitting) return;
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      final res = await widget.repository.chooseDisruptionRefund(
+        widget.subOrder.id,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: LocalizedText(
+            'Đã ghi nhận hoàn tiền 100% do gián đoạn (${res.status}).',
+          ),
+          backgroundColor: AppColors.secondary,
+        ),
+      );
+      Navigator.pop(context, true);
+    } on AuthFailure catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Không thể gửi yêu cầu hoàn tiền gián đoạn. Vui lòng thử lại.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = _summary;
+    final deadline = summary?.decisionDeadline;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(AppShapes.gutterMobile),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: LocalizedText(
+                    'Đổi lịch & Xử lý gián đoạn',
+                    style: AppTypography.headlineSm(color: AppColors.onSurface),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: AppColors.secondary),
+                  onPressed: (_loading || _submitting) ? null : _loadOptions,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: _submitting
+                      ? null
+                      : () => Navigator.pop(context, false),
+                ),
+              ],
+            ),
+            Text(
+              widget.subOrder.serviceName,
+              style: AppTypography.labelMd(
+                color: AppColors.secondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else ...[
+              if (_error != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.errorContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: LocalizedText(
+                    _error!,
+                    style: AppTypography.bodySm(color: AppColors.error),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              if (summary != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.borderSubtle),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LocalizedText(
+                        'Ca hiện tại: ${summary.currentBookingTime} • ${summary.currentBookingDate}',
+                        style: AppTypography.labelMd(
+                          color: AppColors.onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      LocalizedText(
+                        summary.rescheduleAllowed
+                            ? 'Trạng thái: Đủ điều kiện đổi lịch (${summary.eligibilityReason ?? 'AVAILABLE'})'
+                            : 'Chưa có cảnh báo thời tiết hoặc đề xuất đổi lịch từ đối tác.',
+                        style: AppTypography.bodySm(
+                          color: summary.rescheduleAllowed
+                              ? AppColors.secondary
+                              : AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                      if (deadline != null) ...[
+                        const SizedBox(height: 4),
+                        LocalizedText(
+                          'Hạn xác nhận quyết định: ${deadline.day}/${deadline.month}/${deadline.year} ${deadline.hour.toString().padLeft(2, '0')}:${deadline.minute.toString().padLeft(2, '0')}',
+                          style: AppTypography.bodySm(
+                            color: AppColors.primary,
+                          ).copyWith(fontSize: 11),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                LocalizedText(
+                  'Ca thay thế khả dụng (${summary.options.length})',
+                  style: AppTypography.labelLg(color: AppColors.onSurface),
+                ),
+                const SizedBox(height: 8),
+                if (summary.options.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: LocalizedText(
+                        'Hiện chưa có ca thay thế khả dụng trong 14 ngày tới.',
+                        style: AppTypography.bodySm(
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 240),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: summary.options.length,
+                      itemBuilder: (context, index) {
+                        final opt = summary.options[index];
+                        final isSelected = _selectedOption?.slotId == opt.slotId;
+                        return InkWell(
+                          onTap: (!opt.canAccommodate || _submitting)
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _selectedOption = opt;
+                                    _idempotencyKey = null;
+                                  });
+                                },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.secondaryContainer.withValues(
+                                      alpha: 0.35,
+                                    )
+                                  : AppColors.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.secondary
+                                    : AppColors.borderSubtle,
+                                width: isSelected ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isSelected
+                                      ? Icons.radio_button_checked
+                                      : Icons.radio_button_off,
+                                  size: 18,
+                                  color: opt.canAccommodate
+                                      ? AppColors.secondary
+                                      : AppColors.outline,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              '${opt.bookingDate} • ${opt.startTime} - ${opt.endTime}',
+                                              style: AppTypography.labelMd(
+                                                color: opt.canAccommodate
+                                                    ? AppColors.onSurface
+                                                    : AppColors.outline,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                          if (opt.isProposedByVendor)
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 6,
+                                                    vertical: 2,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color:
+                                                    AppColors.secondaryContainer,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: LocalizedText(
+                                                'Đề xuất từ đối tác',
+                                                style: AppTypography.labelSm(
+                                                  color: AppColors
+                                                      .onSecondaryContainer,
+                                                ).copyWith(fontSize: 9),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${tr(context, 'Còn chỗ')}: ${opt.availableCapacity} • ${opt.accommodateNote}',
+                                        style: AppTypography.bodySm(
+                                          color: AppColors.onSurfaceVariant,
+                                        ).copyWith(fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                if (summary.rescheduleAllowed && _selectedOption != null)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        minimumSize: const Size(double.infinity, 44),
+                      ),
+                      onPressed: _submitting ? null : _submitReschedule,
+                      icon: const Icon(
+                        Icons.event_available,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                      label: LocalizedText(
+                        _submitting
+                            ? 'Đang xử lý...'
+                            : 'Xác nhận đổi sang ca đã chọn',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                if (summary.fullRefundAvailable) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.error),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        minimumSize: const Size(double.infinity, 44),
+                      ),
+                      onPressed: _submitting ? null : _submitDisruptionRefund,
+                      icon: const Icon(
+                        Icons.currency_exchange,
+                        size: 16,
+                        color: AppColors.error,
+                      ),
+                      label: LocalizedText(
+                        'Chọn hoàn tiền 100% do gián đoạn (${summary.disruptionReason ?? 'WEATHER'})',
+                        style: AppTypography.labelMd(color: AppColors.error),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

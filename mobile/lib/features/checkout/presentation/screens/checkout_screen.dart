@@ -42,6 +42,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<OrderPaymentRecord> _existingPayments = const [];
   bool _loadingOrder = false;
   bool _previewingDiscount = false;
+  bool _acceptingWaiver = false;
   bool _submitting = false;
   final Set<PaymentProvider> _uncertainProviders = <PaymentProvider>{};
   final Map<PaymentProvider, String> _idempotencyKeys =
@@ -303,6 +304,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
+      final langCode =
+          Localizations.localeOf(context).languageCode.toUpperCase() == 'EN'
+              ? 'EN'
+              : 'VI';
+      final pendingWaivers = order.subOrders
+          .where((s) => s.waiverRequired && !s.waiverAccepted)
+          .toList();
+      if (pendingWaivers.isNotEmpty) {
+        for (final sub in pendingWaivers) {
+          await _orderRepository.acceptSubOrderWaiver(
+            subOrderId: sub.id,
+            version: sub.waiverVersion ?? 1,
+            language: langCode,
+          );
+        }
+        final refreshed = await _orderRepository.detail(order.id);
+        if (mounted) {
+          setState(() => _order = refreshed);
+        }
+      }
+
       final intent = await _paymentRepository.createIntent(
         orderId: order.id,
         provider: _selectedProvider,
@@ -711,6 +733,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                             color: AppColors.onSurfaceVariant,
                                           ).copyWith(fontSize: 11),
                                         ),
+                                        if (sub.waiverRequired) ...[
+                                          const SizedBox(height: 4),
+                                          InkWell(
+                                            onTap: (_acceptingWaiver || _submitting)
+                                                ? null
+                                                : () => _openSubOrderWaiverSheet(sub),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  sub.waiverAccepted
+                                                      ? Icons.verified_user
+                                                      : Icons.assignment_late_outlined,
+                                                  size: 13,
+                                                  color: sub.waiverAccepted
+                                                      ? AppColors.secondary
+                                                      : AppColors.primary,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Flexible(
+                                                  child: LocalizedText(
+                                                    sub.waiverAccepted
+                                                        ? 'Đã ký miễn trừ v${sub.waiverVersion ?? 1}'
+                                                        : 'Xem & ký miễn trừ v${sub.waiverVersion ?? 1}',
+                                                    style: AppTypography.labelSm(
+                                                      color: sub.waiverAccepted
+                                                          ? AppColors.secondary
+                                                          : AppColors.primary,
+                                                      fontWeight: FontWeight.w700,
+                                                    ).copyWith(fontSize: 10),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
@@ -1096,6 +1154,145 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
     );
+  }
+
+  Future<void> _openSubOrderWaiverSheet(SubOrderModel sub) async {
+    if (_acceptingWaiver || _submitting) return;
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppShapes.gutterMobile),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: LocalizedText(
+                        'Cam kết miễn trừ trách nhiệm (v${sub.waiverVersion ?? 1})',
+                        style: AppTypography.headlineSm(
+                          color: AppColors.onSurface,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(sheetContext, false),
+                    ),
+                  ],
+                ),
+                Text(
+                  sub.serviceName,
+                  style: AppTypography.labelMd(
+                    color: AppColors.secondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 260),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.borderSubtle),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      (sub.waiverContent != null &&
+                              sub.waiverContent!.trim().isNotEmpty)
+                          ? sub.waiverContent!
+                          : tr(
+                              context,
+                              'Tôi xác nhận đủ điều kiện sức khỏe và đồng ý với Cam kết miễn trừ trách nhiệm khi tham gia các hoạt động thể thao biển tại Đà Nẵng.',
+                            ),
+                      style: AppTypography.bodySm(color: AppColors.onSurface),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (sub.waiverAccepted)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: LocalizedText(
+                      'Đã ký cam kết miễn trừ trách nhiệm (${sub.waiverAcceptedLanguage ?? 'VI'}).',
+                      style: AppTypography.labelMd(
+                        color: AppColors.onSecondaryContainer,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                else
+                  AppPillButton(
+                    label: 'Đồng ý & Ký cam kết miễn trừ',
+                    variant: AppButtonVariant.primary,
+                    width: double.infinity,
+                    onPressed: () => Navigator.pop(sheetContext, true),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _acceptingWaiver = true);
+    try {
+      final langCode =
+          Localizations.localeOf(context).languageCode.toUpperCase() == 'EN'
+              ? 'EN'
+              : 'VI';
+      await _orderRepository.acceptSubOrderWaiver(
+        subOrderId: sub.id,
+        version: sub.waiverVersion ?? 1,
+        language: langCode,
+      );
+      await _loadOrderAndPaymentStatus();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText('Đã xác nhận cam kết miễn trừ trách nhiệm!'),
+          backgroundColor: AppColors.secondary,
+        ),
+      );
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: LocalizedText(e.message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText(
+              'Không thể ghi nhận cam kết miễn trừ. Vui lòng thử lại.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _acceptingWaiver = false);
+    }
   }
 
   Widget _buildContactRow(IconData icon, String text) {

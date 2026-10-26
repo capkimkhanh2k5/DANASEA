@@ -1500,4 +1500,45 @@ const englishTranslations = <String, String>{
   "Đã sao chép mã token QR check-in!": "Copied check-in QR token!",
   "CHỜ MÃ QR": "AWAITING QR",
   "Hiệu lực đến: {0}": "Valid until: {0}",
+  "Đã ký miễn trừ v{0}": "Signed waiver v{0}",
+  "Xem & ký miễn trừ v{0}": "View & sign waiver v{0}",
+  "Cam kết miễn trừ trách nhiệm (v{0})": "Liability Waiver (v{0})",
+  "Đã ký cam kết miễn trừ trách nhiệm ({0}).":
+      "Liability waiver signed ({0}).",
+  "Đồng ý & Ký cam kết miễn trừ": "Agree & Sign Liability Waiver",
+  "Đã xác nhận cam kết miễn trừ trách nhiệm!":
+      "Liability waiver accepted!",
+  "Không thể ghi nhận cam kết miễn trừ. Vui lòng thử lại.":
+      "Unable to record liability waiver. Please try again.",
+  "Đã ký cam kết miễn trừ v{0}": "Signed liability waiver v{0}",
+  "Cần ký cam kết miễn trừ v{0} trước khi thanh toán":
+      "Liability waiver v{0} must be signed before payment",
+  "Xem miễn trừ": "View waiver",
+  "Ký miễn trừ": "Sign waiver",
+  "Đổi lịch / Gián đoạn": "Reschedule / Disruption",
+  "Đổi lịch & Xử lý gián đoạn": "Reschedule & Disruption Handling",
+  "Không thể tải danh sách ca thay thế khả dụng.":
+      "Unable to load available replacement slots.",
+  "Chưa xác định được kết quả đổi lịch trước đó. Vui lòng bấm làm mới trước khi thử lại.":
+      "Previous reschedule outcome is uncertain. Please refresh before trying again.",
+  "Đã chuyển sang ca {0} ngày {1}!": "Rescheduled to {0} on {1}!",
+  "Chưa xác định được kết quả đổi lịch. Vui lòng làm mới trạng thái trước khi thử lại.":
+      "Reschedule outcome is uncertain. Please refresh status before trying again.",
+  "Đã ghi nhận hoàn tiền 100% do gián đoạn ({0}).":
+      "Recorded 100% disruption refund ({0}).",
+  "Không thể gửi yêu cầu hoàn tiền gián đoạn. Vui lòng thử lại.":
+      "Unable to submit disruption refund request. Please try again.",
+  "Ca hiện tại: {0} • {1}": "Current slot: {0} • {1}",
+  "Trạng thái: Đủ điều kiện đổi lịch ({0})":
+      "Status: Eligible for rescheduling ({0})",
+  "Chưa có cảnh báo thời tiết hoặc đề xuất đổi lịch từ đối tác.":
+      "No active weather alert or vendor reschedule proposal.",
+  "Hạn xác nhận quyết định: {0}": "Decision deadline: {0}",
+  "Ca thay thế khả dụng ({0})": "Available replacement slots ({0})",
+  "Hiện chưa có ca thay thế khả dụng trong 14 ngày tới.":
+      "No replacement slots available in the next 14 days.",
+  "Đề xuất từ đối tác": "Proposed by vendor",
+  "Xác nhận đổi sang ca đã chọn": "Confirm reschedule to selected slot",
+  "Chọn hoàn tiền 100% do gián đoạn ({0})":
+      "Choose 100% disruption refund ({0})",
 };

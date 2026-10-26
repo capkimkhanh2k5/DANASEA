@@ -673,6 +673,323 @@ class OrderRepository {
     );
     return CheckinQrCode.fromJson(json);
   }
+
+  Future<SubOrderWaiverAcceptance> acceptSubOrderWaiver({
+    required String subOrderId,
+    required int version,
+    required String language,
+    bool accepted = true,
+  }) async {
+    if (subOrderId.trim().isEmpty) {
+      throw AuthFailure('Thiếu mã đơn con để xác nhận miễn trừ.');
+    }
+    final json = await session.request(
+      '/api/sub-orders/${Uri.encodeComponent(subOrderId.trim())}/waiver-acceptance',
+      method: 'POST',
+      retry: false,
+      data: {
+        'accepted': accepted,
+        'version': version,
+        'language': language.trim().toUpperCase(),
+      },
+    );
+    return SubOrderWaiverAcceptance.fromJson(json);
+  }
+
+  Future<RescheduleOptionsSummary> getRescheduleOptions(
+    String subOrderId,
+  ) async {
+    if (subOrderId.trim().isEmpty) {
+      throw AuthFailure('Thiếu mã đơn con để xem lịch thay thế.');
+    }
+    final json = await session.request(
+      '/api/sub-orders/${Uri.encodeComponent(subOrderId.trim())}/reschedule-options',
+    );
+    return RescheduleOptionsSummary.fromJson(json);
+  }
+
+  Future<SubOrderRescheduleResult> confirmReschedule({
+    required String subOrderId,
+    required String targetSlotId,
+    String? proposalId,
+    required int expectedVersion,
+    required String idempotencyKey,
+  }) async {
+    if (subOrderId.trim().isEmpty ||
+        targetSlotId.trim().isEmpty ||
+        idempotencyKey.trim().isEmpty) {
+      throw AuthFailure('Thiếu thông tin ca thay thế hoặc khóa chống trùng.');
+    }
+    final json = await session.request(
+      '/api/sub-orders/${Uri.encodeComponent(subOrderId.trim())}/reschedule',
+      method: 'POST',
+      retry: false,
+      headers: {'Idempotency-Key': idempotencyKey.trim()},
+      data: {
+        'targetSlotId': targetSlotId.trim(),
+        if (proposalId != null && proposalId.trim().isNotEmpty)
+          'proposalId': proposalId.trim(),
+        'expectedVersion': expectedVersion,
+      },
+    );
+    return SubOrderRescheduleResult.fromJson(json);
+  }
+
+  Future<SubOrderDisruptionResult> chooseDisruptionRefund(
+    String subOrderId,
+  ) async {
+    if (subOrderId.trim().isEmpty) {
+      throw AuthFailure('Thiếu mã đơn con để yêu cầu hoàn tiền do gián đoạn.');
+    }
+    final json = await session.request(
+      '/api/sub-orders/${Uri.encodeComponent(subOrderId.trim())}/disruption-refund',
+      method: 'POST',
+      retry: false,
+    );
+    return SubOrderDisruptionResult.fromJson(json);
+  }
+}
+
+class SubOrderWaiverAcceptance {
+  const SubOrderWaiverAcceptance({
+    required this.subOrderId,
+    required this.masterOrderId,
+    required this.accepted,
+    required this.waiverVersion,
+    required this.language,
+    this.acceptedAt,
+  });
+
+  final String subOrderId;
+  final String masterOrderId;
+  final bool accepted;
+  final int waiverVersion;
+  final String language;
+  final DateTime? acceptedAt;
+
+  factory SubOrderWaiverAcceptance.fromJson(Map<String, dynamic> json) {
+    if (json['subOrderId'] is! String || json['accepted'] is! bool) {
+      throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+    }
+    return SubOrderWaiverAcceptance(
+      subOrderId: json['subOrderId'] as String,
+      masterOrderId: json['masterOrderId']?.toString() ?? '',
+      accepted: json['accepted'] as bool,
+      waiverVersion: (json['waiverVersion'] as num?)?.toInt() ?? 1,
+      language: json['language']?.toString() ?? 'VI',
+      acceptedAt: DateTime.tryParse(
+        json['acceptedAt']?.toString() ?? '',
+      )?.toLocal(),
+    );
+  }
+}
+
+class RescheduleOptionItem {
+  const RescheduleOptionItem({
+    required this.slotId,
+    required this.bookingDate,
+    required this.startTime,
+    required this.endTime,
+    required this.availableCapacity,
+    required this.canAccommodate,
+    required this.accommodateNote,
+    required this.referencePrice,
+    required this.additionalFee,
+    required this.isProposedByVendor,
+    this.proposalId,
+    this.proposalExpiresAt,
+  });
+
+  final String slotId;
+  final String bookingDate;
+  final String startTime;
+  final String endTime;
+  final int availableCapacity;
+  final bool canAccommodate;
+  final String accommodateNote;
+  final num referencePrice;
+  final num additionalFee;
+  final bool isProposedByVendor;
+  final String? proposalId;
+  final DateTime? proposalExpiresAt;
+
+  factory RescheduleOptionItem.fromJson(Map<String, dynamic> json) {
+    return RescheduleOptionItem(
+      slotId: json['slotId']?.toString() ?? '',
+      bookingDate: json['bookingDate']?.toString() ?? '',
+      startTime: json['startTime']?.toString() ?? '',
+      endTime: json['endTime']?.toString() ?? '',
+      availableCapacity: (json['availableCapacity'] as num?)?.toInt() ?? 0,
+      canAccommodate: json['canAccommodate'] == true,
+      accommodateNote: json['accommodateNote']?.toString() ?? '',
+      referencePrice: (json['referencePrice'] as num?) ?? 0,
+      additionalFee: (json['additionalFee'] as num?) ?? 0,
+      isProposedByVendor: json['isProposedByVendor'] == true,
+      proposalId: json['proposalId']?.toString(),
+      proposalExpiresAt: DateTime.tryParse(
+        json['proposalExpiresAt']?.toString() ?? '',
+      )?.toLocal(),
+    );
+  }
+}
+
+class RescheduleOptionsSummary {
+  const RescheduleOptionsSummary({
+    required this.subOrderId,
+    required this.currentSlotId,
+    required this.currentBookingDate,
+    required this.currentBookingTime,
+    required this.serviceId,
+    required this.serviceName,
+    required this.quantity,
+    required this.pricingUnit,
+    required this.rescheduleVersion,
+    required this.rescheduleAllowed,
+    this.eligibilityReason,
+    required this.options,
+    this.decisionDeadline,
+    required this.fullRefundAvailable,
+    this.disruptionReason,
+  });
+
+  final String subOrderId;
+  final String currentSlotId;
+  final String currentBookingDate;
+  final String currentBookingTime;
+  final String serviceId;
+  final String serviceName;
+  final int quantity;
+  final String pricingUnit;
+  final int rescheduleVersion;
+  final bool rescheduleAllowed;
+  final String? eligibilityReason;
+  final List<RescheduleOptionItem> options;
+  final DateTime? decisionDeadline;
+  final bool fullRefundAvailable;
+  final String? disruptionReason;
+
+  factory RescheduleOptionsSummary.fromJson(Map<String, dynamic> json) {
+    if (json['subOrderId'] is! String) {
+      throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+    }
+    final rawOptions = json['options'] as List? ?? const [];
+    return RescheduleOptionsSummary(
+      subOrderId: json['subOrderId'] as String,
+      currentSlotId: json['currentSlotId']?.toString() ?? '',
+      currentBookingDate: json['currentBookingDate']?.toString() ?? '',
+      currentBookingTime: json['currentBookingTime']?.toString() ?? '',
+      serviceId: json['serviceId']?.toString() ?? '',
+      serviceName: json['serviceName']?.toString() ?? '',
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      pricingUnit: json['pricingUnit']?.toString() ?? '',
+      rescheduleVersion: (json['rescheduleVersion'] as num?)?.toInt() ?? 0,
+      rescheduleAllowed: json['rescheduleAllowed'] == true,
+      eligibilityReason: json['eligibilityReason']?.toString(),
+      options: rawOptions
+          .whereType<Map<String, dynamic>>()
+          .map(RescheduleOptionItem.fromJson)
+          .toList(),
+      decisionDeadline: DateTime.tryParse(
+        json['decisionDeadline']?.toString() ?? '',
+      )?.toLocal(),
+      fullRefundAvailable: json['fullRefundAvailable'] == true,
+      disruptionReason: json['disruptionReason']?.toString(),
+    );
+  }
+}
+
+class SubOrderRescheduleResult {
+  const SubOrderRescheduleResult({
+    required this.subOrderId,
+    required this.bookingItemId,
+    required this.fromSlotId,
+    required this.toSlotId,
+    required this.newBookingDate,
+    required this.newBookingTime,
+    required this.rescheduleVersion,
+    required this.additionalAmountCharged,
+    required this.status,
+    this.rescheduledAt,
+    required this.message,
+  });
+
+  final String subOrderId;
+  final String bookingItemId;
+  final String fromSlotId;
+  final String toSlotId;
+  final String newBookingDate;
+  final String newBookingTime;
+  final int rescheduleVersion;
+  final num additionalAmountCharged;
+  final String status;
+  final DateTime? rescheduledAt;
+  final String message;
+
+  factory SubOrderRescheduleResult.fromJson(Map<String, dynamic> json) {
+    if (json['subOrderId'] is! String || json['status'] is! String) {
+      throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+    }
+    return SubOrderRescheduleResult(
+      subOrderId: json['subOrderId'] as String,
+      bookingItemId: json['bookingItemId']?.toString() ?? '',
+      fromSlotId: json['fromSlotId']?.toString() ?? '',
+      toSlotId: json['toSlotId']?.toString() ?? '',
+      newBookingDate: json['newBookingDate']?.toString() ?? '',
+      newBookingTime: json['newBookingTime']?.toString() ?? '',
+      rescheduleVersion: (json['rescheduleVersion'] as num?)?.toInt() ?? 1,
+      additionalAmountCharged: (json['additionalAmountCharged'] as num?) ?? 0,
+      status: json['status'] as String,
+      rescheduledAt: DateTime.tryParse(
+        json['rescheduledAt']?.toString() ?? '',
+      )?.toLocal(),
+      message: json['message']?.toString() ?? '',
+    );
+  }
+}
+
+class SubOrderDisruptionResult {
+  const SubOrderDisruptionResult({
+    required this.id,
+    required this.subOrderId,
+    required this.reason,
+    required this.status,
+    required this.originalSlotId,
+    this.originalDepartureAt,
+    this.decisionDeadline,
+    this.refundId,
+    this.details,
+  });
+
+  final String id;
+  final String subOrderId;
+  final String reason;
+  final String status;
+  final String originalSlotId;
+  final DateTime? originalDepartureAt;
+  final DateTime? decisionDeadline;
+  final String? refundId;
+  final String? details;
+
+  factory SubOrderDisruptionResult.fromJson(Map<String, dynamic> json) {
+    if (json['id'] is! String || json['subOrderId'] is! String) {
+      throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+    }
+    return SubOrderDisruptionResult(
+      id: json['id'] as String,
+      subOrderId: json['subOrderId'] as String,
+      reason: json['reason']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      originalSlotId: json['originalSlotId']?.toString() ?? '',
+      originalDepartureAt: DateTime.tryParse(
+        json['originalDepartureAt']?.toString() ?? '',
+      )?.toLocal(),
+      decisionDeadline: DateTime.tryParse(
+        json['decisionDeadline']?.toString() ?? '',
+      )?.toLocal(),
+      refundId: json['refundId']?.toString(),
+      details: json['details']?.toString(),
+    );
+  }
 }
 
 class CheckinQrCode {
