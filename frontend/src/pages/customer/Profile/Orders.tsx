@@ -40,7 +40,7 @@ export function Orders() {
   const [cancellationPreview, setCancellationPreview] = useState<CancellationPreviewResponse | null>(null);
   const [cancellationLoading, setCancellationLoading] = useState<boolean>(false);
   const [cancellationSubmitting, setCancellationSubmitting] = useState<boolean>(false);
-  const [cancellationReason, setCancellationReason] = useState<RefundRequest["reason"]>("CUSTOMER_REQUEST");
+  const [cancellationReason, setCancellationReason] = useState<string>("PERSONAL");
   const [cancellationError, setCancellationError] = useState<string | null>(null);
   const [cancellationSuccess, setCancellationSuccess] = useState<string | null>(null);
 
@@ -280,7 +280,7 @@ export function Orders() {
     try {
       setCancellationSubmitting(true);
       setCancellationError(null);
-      await orderService.requestRefund(cancellationOrder.id, cancellationReason);
+      await orderService.requestRefund(cancellationOrder.id, "CUSTOMER_REQUEST");
       setCancellationSuccess("Yêu cầu hủy đơn và hoàn tiền đã được gửi thành công!");
       setTimeout(() => {
         setCancellationOrder(null);
@@ -999,8 +999,8 @@ export function Orders() {
                         <input
                           type="radio"
                           name="refundReason"
-                          checked={cancellationReason === "CUSTOMER_REQUEST"}
-                          onChange={() => setCancellationReason("CUSTOMER_REQUEST")}
+                          checked={cancellationReason === "PERSONAL"}
+                          onChange={() => setCancellationReason("PERSONAL")}
                         />
                         <span>Thay đổi lịch trình / Lý do cá nhân</span>
                       </label>
@@ -1009,8 +1009,8 @@ export function Orders() {
                         <input
                           type="radio"
                           name="refundReason"
-                          checked={cancellationReason === "WEATHER_DISRUPTION"}
-                          onChange={() => setCancellationReason("WEATHER_DISRUPTION")}
+                          checked={cancellationReason === "WEATHER"}
+                          onChange={() => setCancellationReason("WEATHER")}
                         />
                         <span>Thời tiết biển xấu / Sự cố bất khả kháng</span>
                       </label>
@@ -1019,8 +1019,8 @@ export function Orders() {
                         <input
                           type="radio"
                           name="refundReason"
-                          checked={cancellationReason === "VENDOR_CANCELLED"}
-                          onChange={() => setCancellationReason("VENDOR_CANCELLED")}
+                          checked={cancellationReason === "VENDOR"}
+                          onChange={() => setCancellationReason("VENDOR")}
                         />
                         <span>Nhà cung cấp yêu cầu dời/hủy ca</span>
                       </label>

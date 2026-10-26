@@ -162,8 +162,18 @@ export interface CancellationPreviewResponse {
   items: SubOrderCancellationPreview[];
 }
 
+export type RefundReason =
+  | 'CUSTOMER_REQUEST'
+  | 'CUSTOMER_CANCEL'
+  | 'WEATHER'
+  | 'VENDOR_FAULT'
+  | 'SYSTEM_FAULT'
+  | 'ADMIN_OVERRIDE'
+  | 'DISPUTE'
+  | 'COMPENSATION';
+
 export interface RefundRequest {
-  reason?: 'CUSTOMER_REQUEST' | 'WEATHER_DISRUPTION' | 'VENDOR_CANCELLED' | 'FORCE_MAJEURE';
+  reason?: RefundReason;
 }
 
 export interface RefundResponse {

@@ -89,9 +89,11 @@ export const orderService = {
    */
   async requestRefund(orderId: string, reason?: RefundRequest['reason'], idempotencyKey?: string): Promise<RefundResponse[]> {
     const key = idempotencyKey || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `refund-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
+    // Backend guardrail: customers may only submit CUSTOMER_REQUEST or CUSTOMER_CANCEL
+    const safeReason = reason === 'CUSTOMER_CANCEL' ? 'CUSTOMER_CANCEL' : 'CUSTOMER_REQUEST';
     const response = await apiClient.post<RefundResponse[]>(
       `/orders/${orderId}/refund-request`,
-      { reason: reason || 'CUSTOMER_REQUEST' },
+      { reason: safeReason },
       {
         headers: {
           'Idempotency-Key': key,
