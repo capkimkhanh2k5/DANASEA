@@ -1,8 +1,65 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { FEATURED_SERVICES, MOCK_IMAGES } from "../../../mockData";
+import {
+  FLASH_SALE_EXPERIENCES,
+  SUP_KAYAK_EXPERIENCES,
+  DIVING_EXPERIENCES,
+  THRILL_EXPERIENCES,
+  COMBO_SUNSET_EXPERIENCES,
+} from "../../../data/customerHomeData";
 import { useWishlistStore } from "../../../store/useWishlistStore";
-import type { Service } from "../../../types";
+
+interface WishlistItem {
+  id: string;
+  name: string;
+  categoryId?: string;
+  category?: string;
+  locationName: string;
+  price: number;
+  originalPrice: number;
+  imageUrl: string;
+  rating: number;
+}
+
+const CATEGORY_FILTERS = [
+  { id: 'all', name: 'Tất cả' },
+  { id: 'cheo-sup-kayak', name: 'Chèo SUP & Kayak' },
+  { id: 'lan-ngam-san-ho', name: 'Lặn ngắm san hô' },
+  { id: 'cano-du-bay', name: 'Cano & Dù bay' },
+  { id: 'mo-to-nuoc-jetski', name: 'Mô tô nước Jetski' },
+  { id: 'du-thuyen-ngam-hoang-hon', name: 'Du thuyền & Tour đảo' },
+  { id: 'cau-ca-muc', name: 'Câu cá & Câu mực' },
+  { id: 'hoc-luot-song', name: 'Lướt sóng' },
+  { id: 'truot-phao-chuoi', name: 'Trượt phao chuối' },
+];
+
+function matchesCategory(itemCategory: string | undefined, categoryId: string): boolean {
+  if (categoryId === 'all') return true;
+  if (!itemCategory) return false;
+  const val = itemCategory.toLowerCase();
+
+  switch (categoryId) {
+    case 'cheo-sup-kayak':
+      return val.includes('sup') || val.includes('kayak') || val === 'cat-1' || val === 'cat-4';
+    case 'lan-ngam-san-ho':
+      return val.includes('lặn') || val.includes('san hô') || val.includes('diving') || val.includes('snorkel') || val === 'cat-3';
+    case 'cano-du-bay':
+      return (val.includes('cano') && !val.includes('san hô')) || val.includes('dù bay') || val.includes('parasailing') || val === 'cat-2';
+    case 'mo-to-nuoc-jetski':
+      return val.includes('jetski') || val.includes('mô tô') || val.includes('moto');
+    case 'du-thuyen-ngam-hoang-hon':
+      return val.includes('du thuyền') || val.includes('yacht') || val.includes('tour đảo') || val.includes('hoàng hôn') || val === 'cat-5';
+    case 'cau-ca-muc':
+      return val.includes('câu cá') || val.includes('câu mực') || val.includes('fishing');
+    case 'hoc-luot-song':
+      return val.includes('lướt sóng') || val.includes('surf');
+    case 'truot-phao-chuoi':
+      return val.includes('phao chuối') || val.includes('banana');
+    default:
+      return val === categoryId.toLowerCase();
+  }
+}
 
 export function Wishlist() {
   const navigate = useNavigate();
@@ -11,14 +68,122 @@ export function Wishlist() {
   // State for active filter
   const [activeFilter, setActiveFilter] = useState("all");
 
-  // Dynamic wishlist synchronized with global store
-  const wishlist = useMemo(() => {
-    return FEATURED_SERVICES.filter(service => wishlistIds.includes(service.id));
-  }, [wishlistIds]);
+  // Compile all known experiences across mock data & home catalog
+  const allAvailableServices = useMemo<WishlistItem[]>(() => {
+    const items: WishlistItem[] = [];
+    const seenIds = new Set<string>();
 
-  const handleRemove = (e: React.MouseEvent, service: Service) => {
+    // 1. From FEATURED_SERVICES
+    FEATURED_SERVICES.forEach(s => {
+      if (!seenIds.has(s.id)) {
+        seenIds.add(s.id);
+        const img = MOCK_IMAGES.find(i => i.serviceId === s.id && i.isPrimary)?.imageUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80';
+        const p = s.basePrice || s.price || 0;
+        items.push({
+          id: s.id,
+          name: s.name,
+          categoryId: s.categoryId,
+          category: s.categoryId === 'cat-1' ? 'Chèo SUP' : s.categoryId === 'cat-2' ? 'Cano lướt sóng' : 'Lặn san hô',
+          locationName: s.locationName || 'Đà Nẵng',
+          price: p,
+          originalPrice: Math.round(p * 1.2),
+          imageUrl: img,
+          rating: 4.9,
+        });
+      }
+    });
+
+    // 2. From customer home data carousels
+    const homeSets = [
+      ...(FLASH_SALE_EXPERIENCES || []).map(f => ({
+        id: f.id,
+        name: f.title,
+        category: f.category,
+        locationName: f.location,
+        price: f.salePrice || f.originalPrice,
+        originalPrice: f.originalPrice,
+        imageUrl: f.imageUrl,
+        rating: f.rating || 4.9,
+      })),
+      ...(SUP_KAYAK_EXPERIENCES || []).map(a => ({
+        id: a.id,
+        name: a.title,
+        category: a.category,
+        locationName: a.location,
+        price: a.price,
+        originalPrice: Math.round(a.price * 1.2),
+        imageUrl: a.imageUrl,
+        rating: a.rating || 4.9,
+      })),
+      ...(DIVING_EXPERIENCES || []).map(a => ({
+        id: a.id,
+        name: a.title,
+        category: a.category,
+        locationName: a.location,
+        price: a.price,
+        originalPrice: Math.round(a.price * 1.2),
+        imageUrl: a.imageUrl,
+        rating: a.rating || 4.9,
+      })),
+      ...(THRILL_EXPERIENCES || []).map(a => ({
+        id: a.id,
+        name: a.title,
+        category: a.category,
+        locationName: a.location,
+        price: a.price,
+        originalPrice: Math.round(a.price * 1.2),
+        imageUrl: a.imageUrl,
+        rating: a.rating || 4.9,
+      })),
+      ...(COMBO_SUNSET_EXPERIENCES || []).map(a => ({
+        id: a.id,
+        name: a.title,
+        category: a.category,
+        locationName: a.location,
+        price: a.price,
+        originalPrice: Math.round(a.price * 1.2),
+        imageUrl: a.imageUrl,
+        rating: a.rating || 4.9,
+      })),
+    ];
+
+    homeSets.forEach(h => {
+      if (!seenIds.has(h.id)) {
+        seenIds.add(h.id);
+        items.push({
+          id: h.id,
+          name: h.name,
+          category: h.category,
+          locationName: h.locationName,
+          price: h.price,
+          originalPrice: h.originalPrice,
+          imageUrl: h.imageUrl,
+          rating: h.rating,
+        });
+      }
+    });
+
+    return items;
+  }, []);
+
+  // Synchronized wishlist matching saved IDs
+  const wishlist = useMemo(() => {
+    return allAvailableServices.filter(item => wishlistIds.includes(item.id));
+  }, [allAvailableServices, wishlistIds]);
+
+  // Compute item count per category
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: wishlist.length };
+    for (const cat of CATEGORY_FILTERS) {
+      if (cat.id === 'all') continue;
+      counts[cat.id] = wishlist.filter(item => matchesCategory(item.categoryId || item.category, cat.id)).length;
+    }
+    return counts;
+  }, [wishlist]);
+
+  const handleRemove = (e: React.MouseEvent, item: WishlistItem) => {
     e.stopPropagation();
-    removeFromWishlist(service.id, service.name);
+    removeFromWishlist(item.id, item.name);
   };
 
   const handleBook = (e: React.MouseEvent, id: string) => {
@@ -27,119 +192,121 @@ export function Wishlist() {
   };
 
   // Compute filtered wishlist
-  const filteredWishlist = wishlist.filter(service => {
-    if (activeFilter === "all") return true;
-    if (activeFilter === "sup") return service.categoryId === "cat-1";
-    if (activeFilter === "snorkel") return service.categoryId === "cat-3";
-    if (activeFilter === "cano") return service.categoryId === "cat-2" || service.categoryId === "cat-5";
-    return true;
-  });
+  const filteredWishlist = useMemo(() => {
+    if (activeFilter === "all") return wishlist;
+    return wishlist.filter(item => matchesCategory(item.categoryId || item.category, activeFilter));
+  }, [wishlist, activeFilter]);
 
   return (
-    <main className="w-full pt-20 bg-surface flex-1">
+    <main className="w-full pt-20 bg-slate-50/50 min-h-screen flex-1">
       <div className="flex flex-col w-full">
         {/* Main Content Container */}
-        <section className="max-w-[1440px] mx-auto w-full px-4 sm:px-8 lg:px-12 py-space-xl">
-          {/* Header Section */}
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-space-lg mb-space-2xl">
-            <div className="max-w-2xl flex flex-col gap-space-xs">
-              <div className="flex items-center gap-space-xs text-primary font-label-sm text-label-sm uppercase tracking-wider">
-                <span className="material-symbols-outlined text-[16px]">bookmark_heart</span>
-                DANASEA Wishlist Collection
-              </div>
-              <h1 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-                Trải nghiệm biển bạn đã lưu <span className="text-primary font-light text-headline-md font-headline-md">({wishlist.length} hoạt động)</span>
-              </h1>
-              <p className="font-body-md text-body-md text-on-surface-variant leading-relaxed">
-                Lưu lại những chuyến đi mơ ước tại Đà Nẵng để theo dõi khung giờ đẹp, mức giá ưu đãi và sẵn sàng đặt lịch khi thời tiết thuận lợi.
-              </p>
-            </div>
-            
-            {/* Quick Category Pills */}
-            <div className="flex items-center flex-wrap gap-space-xs">
-              <button 
-                onClick={() => setActiveFilter('all')}
-                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 cursor-pointer ${activeFilter === 'all' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
-              >
-                <span>Tất cả</span>
-                {activeFilter === 'all' && <span className="w-5 h-5 rounded-full bg-on-secondary/20 flex items-center justify-center font-label-sm text-label-sm">{wishlist.length}</span>}
-              </button>
-              <button 
-                onClick={() => setActiveFilter('sup')}
-                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 cursor-pointer ${activeFilter === 'sup' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
-              >
-                <span className="material-symbols-outlined text-[16px]">surfing</span>
-                <span>Chèo SUP</span>
-              </button>
-              <button 
-                onClick={() => setActiveFilter('snorkel')}
-                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 cursor-pointer ${activeFilter === 'snorkel' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
-              >
-                <span className="material-symbols-outlined text-[16px]">scuba_diving</span>
-                <span>Lặn san hô</span>
-              </button>
-              <button 
-                onClick={() => setActiveFilter('cano')}
-                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 cursor-pointer ${activeFilter === 'cano' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
-              >
-                <span className="material-symbols-outlined text-[16px]">sailing</span>
-                <span>Cano & Tour đảo</span>
-              </button>
+        <section className="max-w-[1440px] mx-auto w-full px-4 sm:px-8 lg:px-12 py-8">
+          {/* Header & Category Filter Section */}
+          <div className="flex flex-col gap-5 mb-8">
+            {/* Title only */}
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+              Hoạt động đã lưu
+            </h1>
+
+            {/* Quick Category Filter Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none flex-wrap">
+              {CATEGORY_FILTERS.map((cat) => {
+                const isActive = activeFilter === cat.id;
+                const count = categoryCounts[cat.id] ?? 0;
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setActiveFilter(cat.id)}
+                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                      isActive
+                        ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm shadow-cyan-500/25 ring-1 ring-cyan-500/30"
+                        : "bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200/80"
+                    }`}
+                  >
+                    <span>{cat.name}</span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-semibold transition-colors ${
+                        isActive
+                          ? "bg-white/20 text-white"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* Active Wishlist Grid */}
           {filteredWishlist.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-space-xl items-stretch">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
               {filteredWishlist.map(service => {
-                const image = MOCK_IMAGES.find(i => i.serviceId === service.id && i.isPrimary)?.imageUrl || 'https://via.placeholder.com/800x600';
                 const servicePrice = service.price || 0;
                 return (
-                  <article key={service.id} className="wishlist-card flex flex-col bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group cursor-pointer" onClick={() => navigate(`/tour/${service.id}`)}>
-                    <div className="relative w-full aspect-[4/3] overflow-hidden bg-surface-container">
-                      <img src={image} alt={service.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" />
-                      <div className="absolute top-space-sm left-space-sm flex flex-col gap-1 items-start">
-                        <span className="px-space-sm py-1 rounded-full bg-secondary/90 backdrop-blur-md text-on-secondary font-label-sm text-label-sm flex items-center gap-1 shadow-sm">
-                          <span className="material-symbols-outlined text-[14px]">verified</span>
+                  <article
+                    key={service.id}
+                    className="flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-lg transition-all duration-300 group cursor-pointer"
+                    onClick={() => navigate(`/tour/${service.id}`)}
+                  >
+                    <div className="relative w-full aspect-[4/3] overflow-hidden bg-slate-100">
+                      <img
+                        src={service.imageUrl}
+                        alt={service.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                      />
+                      <div className="absolute top-3 left-3 flex flex-col gap-1 items-start">
+                        <span className="px-2.5 py-1 rounded-full bg-slate-900/70 backdrop-blur-md text-white text-xs font-medium flex items-center gap-1 shadow-sm border border-white/20">
+                          <span className="material-symbols-outlined text-[13px] text-cyan-400">verified</span>
                           Bảo trợ An Toàn
                         </span>
                       </div>
                       <button 
                         aria-label="Bỏ lưu khỏi danh sách" 
                         title="Bỏ lưu khỏi danh sách yêu thích"
-                        className="absolute top-space-sm right-space-sm w-10 h-10 rounded-full bg-white text-red-500 ring-2 ring-red-100 flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer" 
+                        className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white text-red-500 ring-2 ring-red-100 flex items-center justify-center shadow-md hover:scale-110 active:scale-95 transition-all cursor-pointer" 
                         onClick={(e) => handleRemove(e, service)} 
                         type="button"
                       >
                         <span className="material-symbols-outlined text-[22px] text-red-500" style={{ fontVariationSettings: "'FILL' 1" }}>favorite</span>
                       </button>
                     </div>
-                    <div className="p-space-lg flex flex-col flex-1 justify-between gap-space-md">
-                      <div className="flex flex-col gap-space-xs">
-                        <div className="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+
+                    <div className="p-5 flex flex-col flex-1 justify-between gap-4">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between text-slate-500 text-xs">
                           <span className="flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[16px] text-secondary">location_on</span>
+                            <span className="material-symbols-outlined text-[16px] text-cyan-600">location_on</span>
                             {service.locationName}
                           </span>
-                          <span className="flex items-center gap-1 font-bold text-on-surface">
+                          <span className="flex items-center gap-1 font-semibold text-slate-700">
                             <span className="material-symbols-outlined text-[16px] text-amber-500" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                            4.9
+                            {service.rating}
                           </span>
                         </div>
-                        <h3 className="font-headline-sm text-headline-sm text-on-surface group-hover:text-primary transition-colors leading-snug">
+                        <h3 className="text-base font-semibold text-slate-900 group-hover:text-cyan-600 transition-colors leading-snug line-clamp-2">
                           {service.name}
                         </h3>
                       </div>
-                      <div className="flex items-center justify-between mt-auto">
+
+                      <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-auto">
                         <div className="flex flex-col">
-                          <span className="font-label-sm text-label-sm text-on-surface-variant line-through">{(servicePrice * 1.2).toLocaleString('vi-VN')} đ</span>
-                          <span className="font-headline-sm text-headline-sm text-secondary font-bold">{servicePrice.toLocaleString('vi-VN')} đ</span>
+                          <span className="text-xs text-slate-400 line-through">
+                            {service.originalPrice.toLocaleString('vi-VN')} đ
+                          </span>
+                          <span className="text-lg font-bold text-cyan-700">
+                            {servicePrice.toLocaleString('vi-VN')} đ
+                          </span>
                         </div>
                         <button 
                           onClick={(e) => handleBook(e, service.id)}
-                          className="px-space-md py-space-xs rounded-full bg-surface-container-low text-secondary font-label-md text-label-md hover:bg-secondary hover:text-on-secondary shadow-sm transition-all flex items-center gap-1.5 cursor-pointer" type="button"
+                          className="px-4 py-2 rounded-full bg-cyan-50 text-cyan-700 hover:bg-cyan-600 hover:text-white border border-cyan-200/80 font-medium text-xs shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                          type="button"
                         >
-                          <span className="material-symbols-outlined text-[18px]">calendar_month</span>
+                          <span className="material-symbols-outlined text-[16px]">calendar_month</span>
                           Đặt lịch
                         </button>
                       </div>
@@ -149,32 +316,24 @@ export function Wishlist() {
               })}
             </div>
           ) : (
-            <div className="bg-surface-container-low rounded-3xl p-space-2xl md:p-space-3xl flex flex-col items-center text-center justify-center shadow-sm w-full py-16">
-              <div className="relative w-32 h-32 mb-space-md flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full bg-secondary/5 animate-ping"></div>
-                <div className="w-24 h-24 rounded-full bg-surface-container-lowest flex items-center justify-center shadow-md text-secondary">
-                  <svg className="w-12 h-12" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 48 48">
-                    <path d="M4 20c4-3 8-3 12 0s8 3 12 0 8-3 12 0 4 1 4 1"></path>
-                    <path d="M4 28c4-3 8-3 12 0s8 3 12 0 8-3 12 0 4 1 4 1" opacity="0.6"></path>
-                    <path d="M4 36c4-3 8-3 12 0s8 3 12 0 8-3 12 0 4 1 4 1" opacity="0.3"></path>
-                    <circle cx="24" cy="14" fill="#ff735c" r="5" stroke="none"></circle>
-                  </svg>
-                </div>
+            <div className="bg-white/80 backdrop-blur-sm border border-slate-200/80 rounded-2xl p-8 md:p-12 flex flex-col items-center text-center justify-center shadow-sm w-full py-16">
+              <div className="w-16 h-16 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-3xl text-cyan-600">favorite_border</span>
               </div>
-              <p className="font-body-md text-body-md text-on-surface-variant max-w-md mb-space-lg leading-relaxed">
+              <p className="text-slate-500 text-sm md:text-base max-w-md mb-6 leading-relaxed">
                 Bạn chưa lưu hoạt động nào {activeFilter !== 'all' && "trong mục này"}
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-space-sm">
+              <div className="flex flex-wrap items-center justify-center gap-3">
                 <button 
                   onClick={() => navigate('/')}
-                  className="px-space-xl py-space-sm rounded-full bg-primary-container text-on-primary font-label-lg text-label-lg shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+                  className="px-6 py-2.5 rounded-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-medium text-sm shadow-sm hover:from-cyan-700 hover:to-blue-700 transition-all cursor-pointer"
                 >
                   Khám phá ngay
                 </button>
                 {activeFilter !== 'all' && (
                   <button 
                     onClick={() => setActiveFilter('all')}
-                    className="px-space-md py-space-sm rounded-full bg-surface-container-lowest text-secondary hover:bg-surface-container font-label-lg text-label-lg transition-colors cursor-pointer"
+                    className="px-5 py-2.5 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 font-medium text-sm transition-colors cursor-pointer"
                   >
                     Xem tất cả danh sách đã lưu
                   </button>
