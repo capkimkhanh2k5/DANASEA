@@ -399,7 +399,7 @@ export function Orders() {
       case "PENDING":
         return <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">CHỜ THANH TOÁN</span>;
       case "CONFIRMED":
-        return <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">ĐÃ XÁC NHẬN</span>;
+        return null;
       case "CHECKED_IN":
         return <span className="px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 text-xs font-bold">ĐÃ CHECK-IN</span>;
       case "COMPLETED":
