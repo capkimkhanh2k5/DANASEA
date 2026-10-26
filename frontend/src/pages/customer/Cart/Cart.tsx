@@ -74,10 +74,7 @@ export function Cart() {
                   <div className="w-16 h-16 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center mb-4">
                     <span className="material-symbols-outlined text-[36px]">shopping_cart</span>
                   </div>
-                  <h2 className="font-headline-sm text-xl font-bold text-slate-800 mb-2">Giỏ hàng của bạn đang trống</h2>
-                  <p className="text-on-surface-variant text-sm mb-6 max-w-md">
-                    Hãy khám phá ngay các hoạt động chèo SUP, lặn biển và lướt cano vịnh Đà Nẵng để bắt đầu hành trình.
-                  </p>
+                  <h2 className="font-headline-sm text-xl font-bold text-slate-800 mb-6">Giỏ hàng của bạn đang trống</h2>
                   <Link 
                     to="/search" 
                     className="px-6 py-3 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white rounded-full font-bold text-sm shadow-md transition-all hover:scale-105 active:scale-95"
