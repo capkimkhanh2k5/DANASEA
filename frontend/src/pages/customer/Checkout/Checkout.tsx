@@ -648,19 +648,16 @@ export function Checkout() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden flex flex-col max-h-[92vh]">
               {/* Modal Header */}
-              <div className="bg-gradient-to-r from-teal-700 via-cyan-700 to-sky-700 px-6 py-4 text-white flex items-center justify-between">
+              <div className="px-6 py-4 flex items-center justify-between border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[22px] text-white">qr_code_2</span>
+                  <div className="w-9 h-9 rounded-xl bg-cyan-50 border border-cyan-100 flex items-center justify-center text-cyan-700">
+                    <span className="material-symbols-outlined text-[20px]">qr_code_2</span>
                   </div>
-                  <div>
-                    <h3 className="font-bold text-base leading-tight">Mã QR Thanh toán</h3>
-                    <p className="text-[11px] text-cyan-100 font-medium">Quét bằng ứng dụng Ngân hàng hoặc Ví điện tử</p>
-                  </div>
+                  <h3 className="font-bold text-base text-slate-800 leading-tight">Mã QR Thanh toán</h3>
                 </div>
                 <button
                   onClick={() => setShowQrModal(false)}
-                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/90 transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
                   title="Đóng modal"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
