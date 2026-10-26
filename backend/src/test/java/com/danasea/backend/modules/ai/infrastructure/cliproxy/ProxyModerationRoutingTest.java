@@ -55,6 +55,7 @@ class ProxyModerationRoutingTest {
                         assertThat(authorization.get()).isEqualTo("Bearer gateway-key");
                         assertThat(body.get()).contains("gateway-model", "system", "BENIGN", "Xin chào");
                         try {
+                            assertThat(mapper.readTree(body.get()).path("reasoning_effort").asText()).isEqualTo("high");
                             assertThat(mapper.readTree(body.get()).path("messages").path(1).path("content").asText()).hasSize(2000);
                         } catch (java.io.IOException exception) {
                             throw new AssertionError(exception);

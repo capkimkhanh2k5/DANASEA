@@ -167,5 +167,5 @@ ai:
     enabled: ${AI_CLIPROXY_ENABLED:true}
     base-url: ${AI_CLIPROXY_BASE_URL:http://localhost:8318/v1}
     api-key: ${AI_CLIPROXY_API_KEY:sk-cliproxy-pbl6-local-key}
-    model: ${AI_CLIPROXY_MODEL:gemini-3.5-flash}
-    fallback-model: ${AI_CLIPROXY_FALLBACK_MODEL:openai/gpt-oss-120b}
+    model: ${AI_CLIPROXY_MODEL:gemini-3.5-flash-lite}
+    fallback-model: ${AI_CLIPROXY_FALLBACK_MODEL:gpt-oss-120b-medium}
