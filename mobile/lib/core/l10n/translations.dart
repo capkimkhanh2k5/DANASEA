@@ -1601,4 +1601,35 @@ const englishTranslations = <String, String>{
   "Mức hoàn tiền phê duyệt: {0}%": "Approved refund rate: {0}%",
   "Không thể tải chi tiết khiếu nại. Vui lòng thử lại.":
       "Unable to load dispute details. Please try again.",
+  "Phản hồi hội thoại không hợp lệ.": "Invalid conversation response.",
+  "Mã hội thoại không hợp lệ.": "Invalid conversation ID.",
+  "Nội dung tin nhắn không được để trống.": "Message content cannot be blank.",
+  "Phản hồi gửi tin nhắn không hợp lệ.": "Invalid send message response.",
+  "Bắt đầu cuộc trò chuyện với đối tác": "Start a conversation with the vendor",
+  "[Hình ảnh đính kèm]": "[Attached image]",
+  "Không thể tải danh sách hội thoại.": "Unable to load conversations.",
+  "Không thể tải danh sách đơn hàng để bắt đầu trò chuyện.":
+      "Unable to load orders to start a conversation.",
+  "Bạn cần có ít nhất 1 đơn hàng để bắt đầu nhắn tin với đối tác.":
+      "You need at least 1 order to start messaging a vendor.",
+  "Chọn đơn hàng để nhắn đối tác": "Select an order to message the vendor",
+  "Không thể khởi tạo cuộc trò chuyện với đối tác.":
+      "Unable to initialize conversation with the vendor.",
+  "Tạo cuộc trò chuyện từ đơn hàng": "Start conversation from order",
+  "Chưa có cuộc trò chuyện nào.": "No conversations yet.",
+  "Bắt đầu nhắn tin từ đơn hàng": "Start messaging from an order",
+  "Không thể tải nội dung cuộc trò chuyện.":
+      "Unable to load conversation messages.",
+  "Đính kèm đường dẫn hình ảnh": "Attach image URL",
+  "Nhập URL ảnh (https://...)": "Enter image URL (https://...)",
+  "Gỡ ảnh": "Remove image",
+  "Không thể gửi tin nhắn. Vui lòng kiểm tra kết nối và thử lại.":
+      "Unable to send message. Please check your connection and try again.",
+  "Làm mới tin nhắn": "Refresh messages",
+  "Trải nghiệm thể thao biển Đà Nẵng": "Da Nang ocean sports experience",
+  "Chưa có tin nhắn nào. Hãy gửi lời chào hoặc chọn câu hỏi gợi ý bên dưới!":
+      "No messages yet. Say hello or pick a suggested question below!",
+  "Nhắn đối tác": "Message vendor",
+  "Không thể mở hội thoại với đối tác. Vui lòng thử lại.":
+      "Unable to open conversation with vendor. Please try again.",
 };

@@ -569,8 +569,10 @@ class ConversationModel {
   final String vendorName;
   final String? vendorAvatar;
   final String? masterOrderId;
+  final String? serviceName;
   final String lastMessage;
   final DateTime lastMessageTime;
+  final DateTime? createdAt;
   final int unreadCount;
   final bool isOnline;
 
@@ -581,8 +583,10 @@ class ConversationModel {
     required this.vendorName,
     this.vendorAvatar,
     this.masterOrderId,
+    this.serviceName,
     required this.lastMessage,
     required this.lastMessageTime,
+    this.createdAt,
     this.unreadCount = 0,
     this.isOnline = true,
   });
@@ -597,6 +601,7 @@ class ChatMessageModel {
   final String? attachmentUrl;
   final bool isRead;
   final DateTime createdAt;
+  final int? sequence;
 
   const ChatMessageModel({
     required this.id,
@@ -607,6 +612,7 @@ class ChatMessageModel {
     this.attachmentUrl,
     this.isRead = true,
     required this.createdAt,
+    this.sequence,
   });
 }
 
