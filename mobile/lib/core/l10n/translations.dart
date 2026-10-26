@@ -1541,4 +1541,36 @@ const englishTranslations = <String, String>{
   "Xác nhận đổi sang ca đã chọn": "Confirm reschedule to selected slot",
   "Chọn hoàn tiền 100% do gián đoạn ({0})":
       "Choose 100% disruption refund ({0})",
+  "Tối đa 5 hình ảnh cho mỗi đánh giá.": "Maximum 5 photos per review.",
+  "Thêm liên kết ảnh chuyến đi": "Add trip photo URL",
+  "Liên kết ảnh phải bắt đầu bằng http:// hoặc https://.":
+      "Image URL must start with http:// or https://.",
+  "Đã cập nhật đánh giá trải nghiệm biển!":
+      "Updated your ocean experience review!",
+  "Không thể gửi đánh giá. Vui lòng thử lại.":
+      "Unable to submit review. Please try again.",
+  "Chỉnh sửa đánh giá": "Edit review",
+  "Đang gửi đánh giá...": "Submitting review...",
+  "Cập nhật đánh giá": "Update review",
+  "Không thể tải danh sách đánh giá. Vui lòng thử lại.":
+      "Unable to load reviews. Please try again.",
+  "Nội dung đánh giá...": "Review content...",
+  "Không thể cập nhật đánh giá. Vui lòng thử lại.":
+      "Unable to update review. Please try again.",
+  "Báo cáo đánh giá vi phạm": "Report inappropriate review",
+  "Nhập lý do báo cáo (ngôn từ không phù hợp, spam...)":
+      "Enter report reason (inappropriate language, spam...)",
+  "Gửi báo cáo": "Submit report",
+  "Vui lòng nhập lý do báo cáo đánh giá.":
+      "Please enter a reason to report this review.",
+  "Đã gửi báo cáo đánh giá cho bộ phận kiểm duyệt.":
+      "Review report submitted for moderation.",
+  "Không thể gửi báo cáo đánh giá. Vui lòng thử lại.":
+      "Unable to submit review report. Please try again.",
+  "Chưa có đánh giá nào cho dịch vụ này.":
+      "No reviews yet for this service.",
+  "Phản hồi từ đối tác": "Vendor reply",
+  "Đã báo cáo": "Reported",
+  "Báo cáo": "Report",
+  "Tải thêm đánh giá": "Load more reviews",
 };

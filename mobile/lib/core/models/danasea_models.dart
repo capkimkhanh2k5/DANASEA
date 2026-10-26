@@ -489,7 +489,12 @@ class ReviewModel {
   final List<String> images;
   final String? vendorReply;
   final DateTime? vendorRepliedAt;
+  final bool isFlagged;
+  final bool isVisible;
+  final String? flagReason;
+  final String? moderationNote;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   const ReviewModel({
     required this.id,
@@ -504,7 +509,12 @@ class ReviewModel {
     this.images = const [],
     this.vendorReply,
     this.vendorRepliedAt,
+    this.isFlagged = false,
+    this.isVisible = true,
+    this.flagReason,
+    this.moderationNote,
     required this.createdAt,
+    this.updatedAt,
   });
 }
 
