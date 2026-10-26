@@ -760,12 +760,6 @@ export function Orders() {
                                         <span className="font-mono font-bold text-xs text-cyan-700">
                                           #{subOrder.id.slice(0, 8).toUpperCase()}
                                         </span>
-                                        {subOrder.waiverRequired && (
-                                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-semibold">
-                                            <span className="material-symbols-outlined text-[12px]">verified</span>
-                                            {subOrder.waiverAccepted ? "Đã ký waiver" : "Cần ký waiver"}
-                                          </span>
-                                        )}
                                       </div>
 
                                       <h3
