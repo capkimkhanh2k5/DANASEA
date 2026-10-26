@@ -284,6 +284,36 @@ export function Checkout() {
         // 4. Backend returns paymentReference (which contains the gateway redirect URL)
         const gatewayUrl = payRes.paymentReference || payRes.paymentUrl;
         if (gatewayUrl && (gatewayUrl.startsWith("http://") || gatewayUrl.startsWith("https://"))) {
+          
+          // Save order snapshot for Step 3 (PaymentResult) when returning from VNPay gateway
+          const orderSnapshot = {
+            orderCode: `DNS-${sessionCode || Math.floor(10000 + Math.random() * 90000)}`,
+            customerName: fullName.trim() || "Khách Hàng DANASEA",
+            customerPhone: phone.trim() || "0912 345 678",
+            customerEmail: email.trim() || "khachhang@danasea.vn",
+            specialRequest: notes.trim(),
+            paymentProvider: paymentProvider,
+            items: items.map((item, idx) => ({
+              id: item.id || `item-${idx}`,
+              serviceId: item.serviceId,
+              slotId: item.slotId,
+              serviceName: item.serviceName || 'Trải nghiệm biển Đà Nẵng',
+              thumbnailUrl: item.thumbnailUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5',
+              unitPrice: item.unitPrice,
+              quantity: item.quantity,
+              date: item.selectedDate || item.date || 'Hôm nay',
+              timeSlot: item.timeSlot || '08:00 - 10:00',
+              locationName: item.locationName || 'Bán đảo Sơn Trà, Đà Nẵng',
+              vendorName: item.vendorName || 'DanaSea Marine Club',
+              ticketCode: `TKT-${sessionCode || '89412'}-0${idx + 1}`
+            })),
+            rawTotal: rawTotal,
+            discountAmount: discountAmount,
+            appliedPromoCode: appliedPromoCode,
+            finalTotal: finalTotal,
+            paidAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' • ' + new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          };
+          sessionStorage.setItem('danasea_last_order', JSON.stringify(orderSnapshot));
           window.location.href = gatewayUrl;
           return;
         } else {
@@ -297,44 +327,11 @@ export function Checkout() {
         setPaymentError(err.response?.data?.message || "Không thể khởi tạo giao dịch thanh toán. Vui lòng kiểm tra lại kết nối và thử lại.");
         return;
       }
+    } else {
+      setIsProcessingPayment(false);
+      setPaymentError("Vui lòng đăng nhập tài khoản Khách hàng để tiến hành thanh toán vé.");
+      return;
     }
-
-    // Save order snapshot for Step 3 (PaymentResult)
-    const orderSnapshot = {
-      orderCode: `DNS-${sessionCode || Math.floor(10000 + Math.random() * 90000)}`,
-      customerName: fullName.trim() || "Khách Hàng DANASEA",
-      customerPhone: phone.trim() || "0912 345 678",
-      customerEmail: email.trim() || "khachhang@danasea.vn",
-      specialRequest: notes.trim(),
-      paymentProvider: paymentProvider,
-      items: items.map((item, idx) => ({
-        id: item.id || `item-${idx}`,
-        serviceId: item.serviceId,
-        slotId: item.slotId,
-        serviceName: item.serviceName || 'Trải nghiệm biển Đà Nẵng',
-        thumbnailUrl: item.thumbnailUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5',
-        unitPrice: item.unitPrice,
-        quantity: item.quantity,
-        date: item.selectedDate || item.date || 'Hôm nay',
-        timeSlot: item.timeSlot || '08:00 - 10:00',
-        locationName: item.locationName || 'Bán đảo Sơn Trà, Đà Nẵng',
-        vendorName: item.vendorName || 'DanaSea Marine Club',
-        ticketCode: `TKT-${sessionCode || '89412'}-0${idx + 1}`
-      })),
-      rawTotal: rawTotal,
-      discountAmount: discountAmount,
-      appliedPromoCode: appliedPromoCode,
-      finalTotal: finalTotal,
-      paidAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' • ' + new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    };
-    sessionStorage.setItem('danasea_last_order', JSON.stringify(orderSnapshot));
-
-    // Graceful fallback for offline / demo mode
-    triggerDemoLoading(2000, "Đang xử lý giao dịch vé tour...", "Hệ thống đang bảo lưu mã vé và sinh mã vé QR");
-    setTimeout(() => {
-      isNavigatingToResultRef.current = true;
-      navigate('/checkout/result?status=success');
-    }, 1800);
   };
 
   if (items.length === 0 && !isNavigatingToResultRef.current) return null;
