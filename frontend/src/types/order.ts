@@ -177,13 +177,20 @@ export interface RefundRequest {
 }
 
 export interface RefundResponse {
-  refundId: string;
+  id?: string;
+  refundId?: string;
   subOrderId: string;
   amount: number;
-  refundPercentage: number;
+  percentage?: number;
+  refundPercentage?: number;
   reason: string;
   status: string;
+  provider?: string;
+  providerRefundId?: string;
+  providerTransactionId?: string;
+  processedAt?: string;
   createdAt?: string;
+  lastError?: string;
 }
 
 export interface OrderReceiptItemResponse {

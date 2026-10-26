@@ -49,6 +49,12 @@ export function Orders() {
   // PDF Receipt state
   const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null);
 
+  // Refund Details Modal state
+  const [viewingRefundOrder, setViewingRefundOrder] = useState<{
+    order: OrderResponse;
+    refunds: RefundResponse[];
+  } | null>(null);
+
   // Review Modal state
   const [reviewingSubOrder, setReviewingSubOrder] = useState<SubOrderResponse | null>(null);
   const [ratingStars, setRatingStars] = useState(5);
@@ -617,10 +623,20 @@ export function Orders() {
                             <span className="text-base font-bold text-slate-900 font-mono">{orderCode}</span>
                             {getStatusBadge(masterOrder.status || "PENDING")}
                             {hasRefund && (
-                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setViewingRefundOrder({ order: masterOrder, refunds })}
+                                className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Bấm để xem chi tiết kết quả hoàn tiền"
+                              >
                                 <span className="material-symbols-outlined text-[13px]">history</span>
-                                <span>{latestRefund?.status === "COMPLETED" ? "Đã hoàn tiền" : "Đang xử lý hoàn"}</span>
-                              </span>
+                                <span>
+                                  {latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
+                                    ? "Đã hoàn tiền"
+                                    : "Đang xử lý hoàn"}
+                                </span>
+                                <span className="material-symbols-outlined text-[12px] opacity-70">open_in_new</span>
+                              </button>
                             )}
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5">
@@ -1234,6 +1250,138 @@ export function Orders() {
                   className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
                 >
                   Gửi khiếu nại
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* ============================================================== */}
+      {/* Portaled Refund Details Modal                                  */}
+      {/* ============================================================== */}
+      {viewingRefundOrder &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-4 border border-slate-100">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900">Chi tiết hoàn tiền</h3>
+                    <p className="text-xs text-slate-500 font-mono">
+                      #ORD-{(viewingRefundOrder.order.id || "").slice(0, 8).toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setViewingRefundOrder(null)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+
+              {/* Refund Info Cards */}
+              <div className="space-y-3">
+                {viewingRefundOrder.refunds.map((ref, idx) => {
+                  const isProcessed = ref.status === "PROCESSED" || ref.status === "COMPLETED";
+                  const isFailed = ref.status === "FAILED";
+                  return (
+                    <div
+                      key={ref.id || ref.refundId || idx}
+                      className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2.5 text-xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Trạng thái hoàn:</span>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full font-bold text-[11px] ${
+                            isProcessed
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : isFailed
+                              ? "bg-rose-50 text-rose-700 border border-rose-200"
+                              : "bg-amber-50 text-amber-700 border border-amber-200"
+                          }`}
+                        >
+                          {isProcessed
+                            ? "Đã hoàn tất"
+                            : isFailed
+                            ? "Thất bại"
+                            : "Đang chờ đối soát (Pending)"}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Số tiền hoàn:</span>
+                        <span className="font-extrabold text-slate-900 text-sm">
+                          {formatVnd(ref.amount)}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Tỷ lệ hoàn:</span>
+                        <span className="font-bold text-blue-600">
+                          {ref.percentage ?? ref.refundPercentage ?? 100}%
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Cổng nhận hoàn:</span>
+                        <span className="font-semibold text-slate-800">
+                          {ref.provider || "VNPAY"} (về thẻ/tài khoản gốc)
+                        </span>
+                      </div>
+
+                      {ref.providerRefundId && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Mã giao dịch hoàn:</span>
+                          <span className="font-mono font-bold text-slate-700">
+                            #{ref.providerRefundId}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-500 font-medium">Ngày yêu cầu:</span>
+                        <span className="text-slate-700">
+                          {formatDateTime(ref.createdAt)}
+                        </span>
+                      </div>
+
+                      {ref.processedAt && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-500 font-medium">Ngày hoàn tất:</span>
+                          <span className="text-emerald-700 font-semibold">
+                            {formatDateTime(ref.processedAt)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Progress Notice */}
+              <div className="p-3 bg-blue-50/80 border border-blue-200/80 rounded-2xl text-[11px] text-blue-800 space-y-1">
+                <div className="flex items-center gap-1.5 font-bold text-blue-900">
+                  <span className="material-symbols-outlined text-[15px]">schedule</span>
+                  <span>Thời gian nhận tiền dự kiến</span>
+                </div>
+                <p className="leading-relaxed">
+                  Lệnh hoàn tiền đã được gửi sang cổng thanh toán. Tiền sẽ được chuyển về tài khoản/thẻ ngân hàng của quý khách trong vòng <strong>3 - 5 ngày làm việc</strong> tùy theo quy trình đối soát của ngân hàng phát hành thẻ.
+                </p>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setViewingRefundOrder(null)}
+                  className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Đóng
                 </button>
               </div>
             </div>
