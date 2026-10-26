@@ -147,17 +147,9 @@ export function FlashSaleSection({ experiences = FLASH_SALE_EXPERIENCES }: Flash
                     toggleWishlist(item.id, title);
                   }}
                   aria-label="Wishlist"
-                  className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-white/80 backdrop-blur-xs hover:bg-white text-slate-700 hover:text-rose-600 flex items-center justify-center transition-all shadow-xs active:scale-90"
+                  className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-black/20 backdrop-blur-md hover:bg-black/35 border border-white/30 shadow-sm flex items-center justify-center hover:scale-110 active:scale-90 transition-all cursor-pointer z-10 group/heart"
                 >
-                  <span
-                    className="material-symbols-outlined text-[16px]"
-                    style={{
-                      fontVariationSettings: isSaved ? "'FILL' 1" : "'FILL' 0",
-                      color: isSaved ? '#e11d48' : 'currentColor',
-                    }}
-                  >
-                    favorite
-                  </span>
+                  <svg className={`w-4.5 h-4.5 transition-all duration-200 drop-shadow-sm ${isSaved ? 'text-rose-500 fill-rose-500 scale-105' : 'text-white fill-none stroke-white stroke-[2.2] group-hover/heart:scale-110'}`} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill={isSaved ? 'currentColor' : 'none'} /></svg>
                 </button>
 
                 {/* Duration Tag */}
