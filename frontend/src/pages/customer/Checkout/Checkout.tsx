@@ -17,7 +17,7 @@ export function Checkout() {
 
   // Booking Hold State
   const [bookingHold, setBookingHold] = useState<BookingHoldResponse | null>(null);
-  const [isHolding, setIsHolding] = useState<boolean>(false);
+  const [_isHolding, setIsHolding] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(900); // 15 minutes default
   const [sessionCode] = useState(() => Math.floor(10000 + Math.random() * 90000));
 
@@ -46,10 +46,9 @@ export function Checkout() {
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  // Redirect if cart is empty (unless navigating to payment result)
-  const isNavigatingToResultRef = useRef<boolean>(false);
+  // Redirect if cart is empty
   useEffect(() => {
-    if (items.length === 0 && !isNavigatingToResultRef.current && !isProcessingPayment) {
+    if (items.length === 0 && !isProcessingPayment) {
       navigate('/cart');
     }
   }, [items, navigate, isProcessingPayment]);
@@ -150,7 +149,7 @@ export function Checkout() {
           setIsApplyingPromo(false);
           return;
         }
-      } catch (err: any) {
+      } catch (err) {
         console.warn('[Checkout] Lỗi xác thực voucher từ server, kiểm tra mã dự phòng:', err);
       }
     }
@@ -256,15 +255,27 @@ export function Checkout() {
           payRes = await paymentService.createPaymentIntent(orderRes.id, {
             provider: paymentProvider,
           });
-        } catch (paymentErr: any) {
+        } catch (paymentErr) {
+          const apiErr = paymentErr as {
+            response?: {
+              data?: {
+                errorCode?: string;
+                missingWaivers?: Array<{
+                  subOrderId: string;
+                  waiverVersion?: number;
+                  contentLanguage?: string;
+                }>;
+              };
+            };
+          };
           // Guardrail: If Backend returned WAIVER_ACCEPTANCE_REQUIRED with missingWaivers list, accept and retry
           if (
-            paymentErr.response?.data?.errorCode === 'WAIVER_ACCEPTANCE_REQUIRED' &&
-            Array.isArray(paymentErr.response?.data?.missingWaivers)
+            apiErr.response?.data?.errorCode === 'WAIVER_ACCEPTANCE_REQUIRED' &&
+            Array.isArray(apiErr.response?.data?.missingWaivers)
           ) {
-            const missing = paymentErr.response.data.missingWaivers;
+            const missing = apiErr.response.data.missingWaivers;
             await Promise.all(
-              missing.map((m: any) =>
+              missing.map((m: { subOrderId: string; waiverVersion?: number; contentLanguage?: string }) =>
                 orderService.acceptSubOrderWaiver(m.subOrderId, {
                   accepted: true,
                   version: m.waiverVersion || 1,
@@ -321,10 +332,11 @@ export function Checkout() {
           setPaymentError("Không nhận được liên kết thanh toán từ cổng VNPay. Vui lòng thử lại hoặc chọn phương thức khác.");
           return;
         }
-      } catch (err: any) {
+      } catch (err) {
+        const error = err as { response?: { data?: { message?: string } } };
         console.error('[Checkout] Lỗi khi tạo đơn hàng thật:', err);
         setIsProcessingPayment(false);
-        setPaymentError(err.response?.data?.message || "Không thể khởi tạo giao dịch thanh toán. Vui lòng kiểm tra lại kết nối và thử lại.");
+        setPaymentError(error.response?.data?.message || "Không thể khởi tạo giao dịch thanh toán. Vui lòng kiểm tra lại kết nối và thử lại.");
         return;
       }
     } else {
@@ -334,7 +346,7 @@ export function Checkout() {
     }
   };
 
-  if (items.length === 0 && !isNavigatingToResultRef.current) return null;
+  if (items.length === 0) return null;
 
   return (
     <main className="w-full pt-20 bg-surface flex-1">
