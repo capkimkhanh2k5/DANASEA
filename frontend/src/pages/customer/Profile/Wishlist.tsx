@@ -38,30 +38,6 @@ export function Wishlist() {
   return (
     <main className="w-full pt-20 bg-surface flex-1">
       <div className="flex flex-col w-full">
-        {/* Ocean Condition & Tide Tracker Bar */}
-        <section className="max-w-[1440px] mx-auto w-full px-4 sm:px-8 lg:px-12 pt-space-lg pb-space-xs">
-          <div className="bg-surface-container-low rounded-2xl p-space-sm md:p-space-md flex flex-wrap items-center justify-between gap-space-sm shadow-sm">
-            <div className="flex items-center gap-space-sm">
-              <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
-                <span className="material-symbols-outlined text-[22px]">waves</span>
-              </div>
-              <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-secondary uppercase tracking-widest">Thời tiết biển Đà Nẵng</span>
-                <span className="font-label-lg text-label-lg text-on-surface flex items-center gap-1.5">
-                  Sóng êm (0.4m) • Nắng nhẹ 29°C • Triều êm từ 05:00 - 09:30
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-space-sm">
-              <div className="hidden sm:flex items-center gap-1.5 px-space-sm py-1 rounded-full bg-surface-container-lowest text-tertiary font-label-md text-label-md">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Độ trong nước biển: 9.5/10 (Sơn Trà & Mỹ Khê)
-              </div>
-              <span className="px-space-sm py-1 rounded-full bg-primary-fixed text-on-primary-fixed font-label-sm text-label-sm font-bold">Lý tưởng ra khơi</span>
-            </div>
-          </div>
-        </section>
-
         {/* Main Content Container */}
         <section className="max-w-[1440px] mx-auto w-full px-4 sm:px-8 lg:px-12 py-space-xl">
           {/* Header Section */}
@@ -83,28 +59,28 @@ export function Wishlist() {
             <div className="flex items-center flex-wrap gap-space-xs">
               <button 
                 onClick={() => setActiveFilter('all')}
-                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 ${activeFilter === 'all' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
+                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 cursor-pointer ${activeFilter === 'all' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
               >
                 <span>Tất cả</span>
                 {activeFilter === 'all' && <span className="w-5 h-5 rounded-full bg-on-secondary/20 flex items-center justify-center font-label-sm text-label-sm">{wishlist.length}</span>}
               </button>
               <button 
                 onClick={() => setActiveFilter('sup')}
-                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 ${activeFilter === 'sup' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
+                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 cursor-pointer ${activeFilter === 'sup' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
               >
                 <span className="material-symbols-outlined text-[16px]">surfing</span>
                 <span>Chèo SUP</span>
               </button>
               <button 
                 onClick={() => setActiveFilter('snorkel')}
-                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 ${activeFilter === 'snorkel' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
+                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 cursor-pointer ${activeFilter === 'snorkel' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
               >
                 <span className="material-symbols-outlined text-[16px]">scuba_diving</span>
                 <span>Lặn san hô</span>
               </button>
               <button 
                 onClick={() => setActiveFilter('cano')}
-                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 ${activeFilter === 'cano' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
+                className={`filter-btn px-space-md py-space-xs rounded-full font-label-md text-label-md transition-all flex items-center gap-1.5 cursor-pointer ${activeFilter === 'cano' ? 'bg-secondary text-on-secondary shadow-sm' : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'}`}
               >
                 <span className="material-symbols-outlined text-[16px]">sailing</span>
                 <span>Cano & Tour đảo</span>
@@ -117,6 +93,7 @@ export function Wishlist() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-space-xl items-stretch">
               {filteredWishlist.map(service => {
                 const image = MOCK_IMAGES.find(i => i.serviceId === service.id && i.isPrimary)?.imageUrl || 'https://via.placeholder.com/800x600';
+                const servicePrice = service.price || 0;
                 return (
                   <article key={service.id} className="wishlist-card flex flex-col bg-surface-container-lowest rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group cursor-pointer" onClick={() => navigate(`/tour/${service.id}`)}>
                     <div className="relative w-full aspect-[4/3] overflow-hidden bg-surface-container">
@@ -155,12 +132,12 @@ export function Wishlist() {
                       </div>
                       <div className="flex items-center justify-between mt-auto">
                         <div className="flex flex-col">
-                          <span className="font-label-sm text-label-sm text-on-surface-variant line-through">{(((service as any).basePrice || service.price || 0) * 1.2).toLocaleString('vi-VN')} đ</span>
-                          <span className="font-headline-sm text-headline-sm text-secondary font-bold">{((service as any).basePrice || service.price || 0).toLocaleString('vi-VN')} đ</span>
+                          <span className="font-label-sm text-label-sm text-on-surface-variant line-through">{(servicePrice * 1.2).toLocaleString('vi-VN')} đ</span>
+                          <span className="font-headline-sm text-headline-sm text-secondary font-bold">{servicePrice.toLocaleString('vi-VN')} đ</span>
                         </div>
                         <button 
                           onClick={(e) => handleBook(e, service.id)}
-                          className="px-space-md py-space-xs rounded-full bg-surface-container-low text-secondary font-label-md text-label-md hover:bg-secondary hover:text-on-secondary shadow-sm transition-all flex items-center gap-1.5" type="button"
+                          className="px-space-md py-space-xs rounded-full bg-surface-container-low text-secondary font-label-md text-label-md hover:bg-secondary hover:text-on-secondary shadow-sm transition-all flex items-center gap-1.5 cursor-pointer" type="button"
                         >
                           <span className="material-symbols-outlined text-[18px]">calendar_month</span>
                           Đặt lịch
@@ -184,24 +161,20 @@ export function Wishlist() {
                   </svg>
                 </div>
               </div>
-              <h2 className="font-headline-md text-headline-md text-on-surface tracking-tight mb-space-xs">
-                Bạn chưa lưu trải nghiệm biển nào {activeFilter !== 'all' && "trong mục này"}
-              </h2>
               <p className="font-body-md text-body-md text-on-surface-variant max-w-md mb-space-lg leading-relaxed">
-                Khám phá các hoạt động chèo SUP đón bình minh, cano lướt vịnh hoặc lặn rạn san hô hoang sơ để bắt đầu bộ sưu tập kỳ nghỉ biển của bạn.
+                Bạn chưa lưu hoạt động nào {activeFilter !== 'all' && "trong mục này"}
               </p>
               <div className="flex flex-wrap items-center justify-center gap-space-sm">
                 <button 
                   onClick={() => navigate('/')}
-                  className="px-space-xl py-space-sm rounded-full bg-primary-container text-on-primary font-label-lg text-label-lg shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2"
+                  className="px-space-xl py-space-sm rounded-full bg-primary-container text-on-primary font-label-lg text-label-lg shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[20px]">explore</span>
-                  <span>Khám phá các hoạt động nổi bật hôm nay</span>
+                  Khám phá ngay
                 </button>
                 {activeFilter !== 'all' && (
                   <button 
                     onClick={() => setActiveFilter('all')}
-                    className="px-space-md py-space-sm rounded-full bg-surface-container-lowest text-secondary hover:bg-surface-container font-label-lg text-label-lg transition-colors"
+                    className="px-space-md py-space-sm rounded-full bg-surface-container-lowest text-secondary hover:bg-surface-container font-label-lg text-label-lg transition-colors cursor-pointer"
                   >
                     Xem tất cả danh sách đã lưu
                   </button>
