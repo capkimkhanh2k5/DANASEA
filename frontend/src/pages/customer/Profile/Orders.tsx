@@ -638,7 +638,7 @@ export function Orders() {
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                           <span className="material-symbols-outlined text-[18px] text-cyan-600">layers</span>
-                          Các dịch vụ trong đơn ({subOrders.length})
+                          Các dịch vụ ({subOrders.length})
                         </span>
                       </div>
 
