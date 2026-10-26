@@ -360,15 +360,20 @@ export function Checkout() {
               <div className="w-full h-full rounded-2xl bg-surface-container-lowest p-space-xl shadow-sm border border-slate-100 flex flex-col justify-between gap-space-xl">
                 {/* Hold Timer & ID Header Inside Card */}
                 <div className="flex items-center justify-between pb-4 border-b border-slate-100 flex-wrap gap-3">
-                  <div className="flex items-center gap-2 text-slate-900">
-                    <span className="material-symbols-outlined text-slate-900 text-[20px]">timer</span>
-                    <span className="text-sm font-medium text-slate-800">Thời gian giữ chỗ:</span>
-                    <span className={`font-bold font-mono text-base ${
-                      isHoldExpired ? "text-rose-600 animate-pulse font-extrabold" : "text-slate-900"
-                    }`} id="checkout-timer">
-                      {isHoldExpired ? "00:00 (Hết hạn giữ chỗ)" : formatTime(countdown)}
-                    </span>
-                  </div>
+                  {isHoldExpired ? (
+                    <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
+                      <span className="material-symbols-outlined text-rose-600 text-[20px]">timer_off</span>
+                      <span id="checkout-timer">Hết thời gian giữ chỗ</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-slate-900">
+                      <span className="material-symbols-outlined text-slate-900 text-[20px]">timer</span>
+                      <span className="text-sm font-medium text-slate-800">Thời gian giữ chỗ:</span>
+                      <span className="font-bold font-mono text-base text-slate-900" id="checkout-timer">
+                        {formatTime(countdown)}
+                      </span>
+                    </div>
+                  )}
                   <div className="text-sm font-mono text-slate-700">
                     ID: <span className="font-bold text-slate-900">DNS-{sessionCode}</span>
                   </div>
@@ -432,30 +437,6 @@ export function Checkout() {
                     </div>
                   </div>
                 </div>
-
-                {/* SCENARIO 4: EXPIRED HOLD NOTICE */}
-                {isHoldExpired && (
-                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs sm:text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in shadow-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center flex-shrink-0 text-rose-600">
-                        <span className="material-symbols-outlined text-[20px]">timer_off</span>
-                      </div>
-                      <div>
-                        <strong className="block font-bold text-rose-900">Thời gian giữ chỗ đã kết thúc (15 phút)</strong>
-                        <p className="text-rose-700 text-xs mt-0.5">
-                          Suất trải nghiệm đã được tự động mở lại cho du khách khác theo quy chuẩn an toàn.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => navigate('/cart')}
-                      type="button"
-                      className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors cursor-pointer flex-shrink-0 self-end sm:self-auto"
-                    >
-                      Quay lại giỏ hàng
-                    </button>
-                  </div>
-                )}
 
                 {/* SCENARIO 5: SAFETY WAIVER ACCEPTANCE GUARD */}
                 <div 
@@ -683,23 +664,14 @@ export function Checkout() {
                   </div>
 
                   {isHoldExpired ? (
-                    <div className="flex flex-col gap-2">
-                      <button 
-                        disabled
-                        className="w-full py-4 rounded-full font-bold text-sm bg-slate-200 text-slate-400 cursor-not-allowed flex items-center justify-center gap-2"
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">timer_off</span>
-                        <span>Đã hết hạn giữ chỗ</span>
-                      </button>
-                      <button
-                        onClick={() => navigate('/cart')}
-                        type="button"
-                        className="w-full py-3 rounded-full border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-colors cursor-pointer text-center"
-                      >
-                        Quay lại giỏ hàng để chọn lại suất
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => navigate('/cart')}
+                      type="button"
+                      className="w-full py-4 rounded-full font-bold text-sm bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/20 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer transition-all"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                      <span>Quay lại giỏ hàng</span>
+                    </button>
                   ) : (
                     <button 
                       onClick={handlePayment} 
