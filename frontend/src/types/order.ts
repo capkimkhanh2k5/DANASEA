@@ -4,26 +4,49 @@ export interface CreateOrderRequest {
 }
 
 export interface SubOrderResponse {
-  subOrderId: string;
-  vendorId: string;
-  serviceId: string;
-  slotId: string;
-  quantity: number;
-  unitPrice: number;
-  subtotalAmount: number;
-  status: string;
-  waiverAccepted: boolean;
+  id?: string;
+  subOrderId?: string;
+  vendorId?: string;
+  serviceId?: string;
+  slotId?: string;
+  quantity?: number;
+  unitPrice?: number;
+  subtotalAmount?: number;
+  status?: string;
+  waiverRequired?: boolean;
+  waiverVersion?: number;
+  waiverContent?: string;
+  waiverLanguage?: string;
+  waiverFallbackUsed?: boolean;
+  waiverAccepted?: boolean;
 }
 
 export interface OrderResponse {
   id: string;
-  customerId: string;
+  customerId?: string;
+  bookingId?: string;
   status: string;
   totalAmount: number;
-  discountAmount: number;
-  finalAmount: number;
-  createdAt: string;
-  subOrders: SubOrderResponse[];
+  discountAmount?: number;
+  finalAmount?: number;
+  createdAt?: string;
+  items?: SubOrderResponse[];
+  subOrders?: SubOrderResponse[];
+}
+
+export interface AcceptSubOrderWaiverRequest {
+  accepted: boolean;
+  version: number;
+  language: string;
+}
+
+export interface SubOrderWaiverAcceptanceResponse {
+  subOrderId: string;
+  masterOrderId: string;
+  accepted: boolean;
+  waiverVersion: number;
+  language: string;
+  acceptedAt: string;
 }
 
 export interface OrderPageResponse<T = OrderResponse> {

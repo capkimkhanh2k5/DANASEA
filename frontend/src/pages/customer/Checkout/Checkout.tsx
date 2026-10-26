@@ -216,12 +216,58 @@ export function Checkout() {
           discountCode: appliedPromoCode || undefined,
         });
 
-        // 2. Create Payment Intent
-        const payRes = await paymentService.createPaymentIntent(orderRes.id, {
-          provider: paymentProvider,
-        });
+        // 2. Synchronize safety waiver acceptance for all sub-orders requiring it
+        const orderSubOrders = orderRes.items || orderRes.subOrders || [];
+        const pendingWaivers = orderSubOrders.filter(
+          (sub) => sub.waiverRequired && !sub.waiverAccepted
+        );
 
-        // 3. Backend returns paymentReference (which contains the gateway redirect URL)
+        if (pendingWaivers.length > 0) {
+          await Promise.all(
+            pendingWaivers.map((sub) => {
+              const subId = sub.id || sub.subOrderId;
+              if (!subId) return Promise.resolve();
+              return orderService.acceptSubOrderWaiver(subId, {
+                accepted: true,
+                version: sub.waiverVersion || 1,
+                language: sub.waiverLanguage || 'VI',
+              });
+            })
+          );
+        }
+
+        // 3. Create Payment Intent
+        let payRes;
+        try {
+          payRes = await paymentService.createPaymentIntent(orderRes.id, {
+            provider: paymentProvider,
+          });
+        } catch (paymentErr: any) {
+          // Guardrail: If Backend returned WAIVER_ACCEPTANCE_REQUIRED with missingWaivers list, accept and retry
+          if (
+            paymentErr.response?.data?.errorCode === 'WAIVER_ACCEPTANCE_REQUIRED' &&
+            Array.isArray(paymentErr.response?.data?.missingWaivers)
+          ) {
+            const missing = paymentErr.response.data.missingWaivers;
+            await Promise.all(
+              missing.map((m: any) =>
+                orderService.acceptSubOrderWaiver(m.subOrderId, {
+                  accepted: true,
+                  version: m.waiverVersion || 1,
+                  language: m.contentLanguage || 'VI',
+                })
+              )
+            );
+            // Retry creating payment intent
+            payRes = await paymentService.createPaymentIntent(orderRes.id, {
+              provider: paymentProvider,
+            });
+          } else {
+            throw paymentErr;
+          }
+        }
+
+        // 4. Backend returns paymentReference (which contains the gateway redirect URL)
         const gatewayUrl = payRes.paymentReference || payRes.paymentUrl;
         if (gatewayUrl && (gatewayUrl.startsWith("http://") || gatewayUrl.startsWith("https://"))) {
           window.location.href = gatewayUrl;

@@ -5,6 +5,8 @@ import type {
   OrderPageResponse,
   DiscountPreviewRequest,
   DiscountPreviewResponse,
+  AcceptSubOrderWaiverRequest,
+  SubOrderWaiverAcceptanceResponse,
 } from '../types/order';
 
 export const orderService = {
@@ -48,6 +50,21 @@ export const orderService = {
    */
   async getOrderDetail(id: string): Promise<OrderResponse> {
     const response = await apiClient.get<OrderResponse>(`/orders/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Accept safety waiver for a sub-order
+   * POST /api/sub-orders/{subOrderId}/waiver-acceptance
+   */
+  async acceptSubOrderWaiver(
+    subOrderId: string,
+    request: AcceptSubOrderWaiverRequest
+  ): Promise<SubOrderWaiverAcceptanceResponse> {
+    const response = await apiClient.post<SubOrderWaiverAcceptanceResponse>(
+      `/sub-orders/${subOrderId}/waiver-acceptance`,
+      request
+    );
     return response.data;
   },
 };
