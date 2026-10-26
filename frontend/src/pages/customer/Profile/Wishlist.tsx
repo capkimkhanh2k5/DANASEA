@@ -365,27 +365,16 @@ export function Wishlist() {
             </div>
           ) : (
             <div className="bg-white/80 backdrop-blur-sm border border-slate-200/80 rounded-2xl p-8 md:p-12 flex flex-col items-center text-center justify-center shadow-sm w-full py-16">
-              <div className="w-16 h-16 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center mb-4">
-                <span className="material-symbols-outlined text-3xl text-cyan-600">favorite_border</span>
-              </div>
               <p className="text-slate-500 text-sm md:text-base max-w-md mb-6 leading-relaxed">
                 Bạn chưa lưu hoạt động nào {activeFilter !== 'all' && "trong mục này"}
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-3">
+              <div className="flex items-center justify-center">
                 <button 
                   onClick={() => navigate('/')}
                   className="px-6 py-2.5 rounded-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-medium text-sm shadow-sm hover:from-cyan-700 hover:to-blue-700 transition-all cursor-pointer"
                 >
                   Khám phá ngay
                 </button>
-                {activeFilter !== 'all' && (
-                  <button 
-                    onClick={() => setActiveFilter('all')}
-                    className="px-5 py-2.5 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 font-medium text-sm transition-colors cursor-pointer"
-                  >
-                    Xem tất cả danh sách đã lưu
-                  </button>
-                )}
               </div>
             </div>
           )}
