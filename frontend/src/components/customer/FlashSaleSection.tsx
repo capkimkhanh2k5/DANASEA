@@ -100,7 +100,7 @@ export function FlashSaleSection({ experiences = FLASH_SALE_EXPERIENCES }: Flash
           const category = language === 'en' ? item.categoryEn : item.category;
           const location = language === 'en' ? item.locationEn : item.location;
           const duration = language === 'en' ? item.durationEn : item.duration;
-          const badge = language === 'en' ? item.badgeEn : item.badge;
+          const _badge = language === 'en' ? item.badgeEn : item.badge;
 
           const isThisHovered = hoveredCardId === item.id;
 

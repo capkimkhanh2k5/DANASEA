@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useCartStore } from '../../../store/useCartStore';
 import { useWishlistStore } from '../../../store/useWishlistStore';
 import { serviceCatalogService } from '../../../services/serviceCatalogService';

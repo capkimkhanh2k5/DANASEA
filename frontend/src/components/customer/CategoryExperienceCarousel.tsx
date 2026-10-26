@@ -166,7 +166,7 @@ export function CategoryExperienceCarousel({
               const title = language === 'en' ? item.titleEn : item.title;
               const category = language === 'en' ? item.categoryEn : item.category;
               const duration = language === 'en' ? item.durationEn : item.duration;
-              const badge = language === 'en' ? item.badgeEn : item.badge;
+              const _badge = language === 'en' ? item.badgeEn : item.badge;
 
               const isThisHovered = hoveredCardId === item.id;
 

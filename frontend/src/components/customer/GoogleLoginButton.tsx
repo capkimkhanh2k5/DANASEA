@@ -98,7 +98,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           console.log('[Google One Tap] Skipped reason:', notification.getSkippedReason());
         }
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[GoogleLoginButton] Failed to initialize Google button:', err);
     }
   }, [isGsiLoaded, googleClientId, mode, onSuccess, onError]);
