@@ -205,6 +205,97 @@ class AuthSession {
     }
   }
 
+  Future<Map<String, dynamic>> requestMultipart(
+    String path, {
+    required String fieldName,
+    required Uint8List fileBytes,
+    required String filename,
+    required String contentType,
+    bool retry = true,
+    bool authenticated = true,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    if (kReleaseMode && uri.scheme != 'https')
+      throw AuthFailure('Backend phải dùng HTTPS.');
+    final boundary =
+        '----DanaseaFormBoundary${DateTime.now().microsecondsSinceEpoch}';
+    final safeFilename = filename.replaceAll('"', '_');
+    final headerStr =
+        '--$boundary\r\n'
+        'Content-Disposition: form-data; name="$fieldName"; filename="$safeFilename"\r\n'
+        'Content-Type: $contentType\r\n\r\n';
+    final footerStr = '\r\n--$boundary--\r\n';
+    final payloadBytes = BytesBuilder(copy: false)
+      ..add(utf8.encode(headerStr))
+      ..add(fileBytes)
+      ..add(utf8.encode(footerStr));
+    final rawPayload = payloadBytes.toBytes();
+
+    try {
+      final req = await client
+          .openUrl('POST', uri)
+          .timeout(const Duration(seconds: 20));
+      req.followRedirects = false;
+      req.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'multipart/form-data; boundary=$boundary',
+      );
+      req.headers.contentLength = rawPayload.length;
+      req.headers.set('Accept-Language', AppLanguage.instance.code);
+      if (authenticated && _access != null)
+        req.headers.set('Authorization', 'Bearer $_access');
+      req.add(rawPayload);
+      final response = await req.close().timeout(const Duration(seconds: 30));
+      final text = await utf8.decoder
+          .bind(response)
+          .join()
+          .timeout(const Duration(seconds: 20));
+      dynamic body;
+      try {
+        body = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
+      } catch (_) {
+        if (response.statusCode < 300) {
+          throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+        }
+      }
+      if (response.statusCode == 401 &&
+          authenticated &&
+          _access != null &&
+          retry &&
+          !pendingVerification &&
+          !path.startsWith('/api/auth/')) {
+        await refresh();
+        return requestMultipart(
+          path,
+          fieldName: fieldName,
+          fileBytes: fileBytes,
+          filename: filename,
+          contentType: contentType,
+          retry: false,
+          authenticated: authenticated,
+        );
+      }
+      if (response.statusCode >= 300) {
+        throw AuthFailure(
+          (body is Map ? body['message']?.toString() : null) ??
+              'Không thể tải tệp lên máy chủ. Vui lòng thử lại.',
+          response.statusCode,
+          body is Map<String, dynamic> ? body : null,
+        );
+      }
+      if (body is! Map<String, dynamic>) {
+        throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+      }
+      return body;
+    } on SocketException {
+      throw AuthFailure(
+        'Không kết nối được máy chủ. Kiểm tra mạng và địa chỉ backend.',
+      );
+    } on TimeoutException {
+      throw AuthFailure('Máy chủ phản hồi quá lâu. Vui lòng thử lại.');
+    }
+  }
+
   Future<void> _save() => !remember
       ? storage.delete(key: _key)
       : storage.write(

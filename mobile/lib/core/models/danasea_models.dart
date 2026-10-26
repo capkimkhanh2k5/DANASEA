@@ -442,33 +442,47 @@ enum DisputeStatus { open, inReview, resolved, rejected }
 
 class DisputeModel {
   final String id; // e.g. "DISP-1042"
+  final String? orderId;
   final String subOrderId;
   final String subOrderCode;
   final String serviceName;
   final String vendorName;
   final String raisedBy;
   final String category;
+  final String? rawReason;
   final String description;
   final DisputeStatus status;
+  final String? rawStatus;
+  final double? refundPercentage;
   final String? resolutionNote;
   final DateTime? resolvedAt;
   final DateTime createdAt;
   final List<String> attachmentUrls;
+  final String? vendorResponse;
+  final List<String> vendorEvidenceUrls;
+  final DateTime? vendorRespondedAt;
 
   const DisputeModel({
     required this.id,
+    this.orderId,
     required this.subOrderId,
     required this.subOrderCode,
     required this.serviceName,
     required this.vendorName,
     required this.raisedBy,
     required this.category,
+    this.rawReason,
     required this.description,
     required this.status,
+    this.rawStatus,
+    this.refundPercentage,
     this.resolutionNote,
     this.resolvedAt,
     required this.createdAt,
     this.attachmentUrls = const [],
+    this.vendorResponse,
+    this.vendorEvidenceUrls = const [],
+    this.vendorRespondedAt,
   });
 }
 

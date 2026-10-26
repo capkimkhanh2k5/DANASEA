@@ -1573,4 +1573,32 @@ const englishTranslations = <String, String>{
   "Đã báo cáo": "Reported",
   "Báo cáo": "Report",
   "Tải thêm đánh giá": "Load more reviews",
+  "Vấn đề thanh toán / phụ phí": "Payment / surcharge issue",
+  "Không tải được danh sách đơn hàng để khiếu nại.":
+      "Unable to load orders for dispute.",
+  "Tải bằng chứng khiếu nại": "Upload dispute evidence",
+  "Đường dẫn tệp trên máy hoặc URL (tùy chọn)...":
+      "Local file path or URL (optional)...",
+  "Tải tệp lên máy chủ (/api/disputes/evidence)":
+      "Upload file to server (/api/disputes/evidence)",
+  "Đính kèm từ liên kết URL": "Attach from URL link",
+  "Đã tải bằng chứng lên máy chủ thành công!":
+      "Evidence uploaded to server successfully!",
+  "Không thể tải bằng chứng lên máy chủ. Vui lòng thử lại.":
+      "Unable to upload evidence to server. Please try again.",
+  "Vui lòng chọn đơn hàng dịch vụ cần khiếu nại.":
+      "Please select a service booking to dispute.",
+  "Không thể gửi hồ sơ khiếu nại. Vui lòng thử lại.":
+      "Unable to submit dispute. Please try again.",
+  "Chưa tìm thấy đơn hàng nào để khiếu nại.":
+      "No orders found to raise a dispute.",
+  "Đang gửi khiếu nại...": "Submitting dispute...",
+  "Không thể tải danh sách khiếu nại. Vui lòng thử lại.":
+      "Unable to load disputes. Please try again.",
+  "Chi tiết khiếu nại #{0}": "Dispute detail #{0}",
+  "Minh chứng đính kèm ({0}):": "Attached evidence ({0}):",
+  "Giải trình từ đối tác:": "Vendor explanation:",
+  "Mức hoàn tiền phê duyệt: {0}%": "Approved refund rate: {0}%",
+  "Không thể tải chi tiết khiếu nại. Vui lòng thử lại.":
+      "Unable to load dispute details. Please try again.",
 };
