@@ -30,10 +30,6 @@ export function Checkout() {
   // Payment Method
   const [paymentProvider, setPaymentProvider] = useState<PaymentProviderType>("VNPAY");
 
-  // Safety Waiver State (Scenario 5 - Maritime Safety Guard)
-  const [waiverAccepted, setWaiverAccepted] = useState<boolean>(true);
-  const [waiverError, setWaiverError] = useState<string | null>(null);
-  const [showWaiverDetailModal, setShowWaiverDetailModal] = useState<boolean>(false);
   const [showDevSwitcher, setShowDevSwitcher] = useState<boolean>(true);
 
   // Slot Holding Status (Scenario 4 - 15-minute slot timeout)
@@ -207,18 +203,8 @@ export function Checkout() {
       return;
     }
 
-    if (!waiverAccepted) {
-      setWaiverError("Quý khách vui lòng xác nhận Cam kết an toàn hàng hải trước khi tiến hành thanh toán.");
-      const waiverEl = document.getElementById("waiver-acceptance-section");
-      if (waiverEl) {
-        waiverEl.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-      return;
-    }
-
     setIsProcessingPayment(true);
     setPaymentError(null);
-    setWaiverError(null);
 
     // If real backend booking is active and user is logged in
     if (bookingHold?.bookingId && isAuthenticated) {
@@ -438,58 +424,6 @@ export function Checkout() {
                   </div>
                 </div>
 
-                {/* SCENARIO 5: SAFETY WAIVER ACCEPTANCE GUARD */}
-                <div 
-                  id="waiver-acceptance-section"
-                  className={`p-space-lg rounded-2xl border transition-all duration-300 ${
-                    waiverError 
-                      ? "bg-rose-50/60 border-rose-300 ring-2 ring-rose-200" 
-                      : waiverAccepted
-                      ? "bg-cyan-50/40 border-cyan-100"
-                      : "bg-slate-50 border-slate-200"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-cyan-700 text-[20px]">verified_user</span>
-                      <h4 className="font-bold text-sm text-slate-900">Cam kết an toàn hàng hải &amp; Miễn trừ trách nhiệm</h4>
-                    </div>
-                    <button
-                      onClick={() => setShowWaiverDetailModal(true)}
-                      type="button"
-                      className="text-cyan-700 hover:text-cyan-800 text-xs font-semibold underline cursor-pointer"
-                    >
-                      Xem chi tiết điều khoản
-                    </button>
-                  </div>
-
-                  <p className="text-xs text-slate-600 leading-relaxed mb-3">
-                    Theo quy chuẩn an toàn biển Đà Nẵng, 100% du khách tham gia lặn biển, lướt sóng, cano cao tốc phải tuân thủ trang bị áo phao SOLAS, hướng dẫn viên và khai báo sức khỏe.
-                  </p>
-
-                  <label className="flex items-start gap-3 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={waiverAccepted}
-                      onChange={(e) => {
-                        setWaiverAccepted(e.target.checked);
-                        if (e.target.checked) setWaiverError(null);
-                      }}
-                      className="mt-0.5 w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500 border-slate-300 cursor-pointer"
-                    />
-                    <span className="text-xs font-medium text-slate-800 leading-snug">
-                      Tôi xác nhận đã đọc, hiểu rõ tình trạng thể lực và cam kết tuân thủ đầy đủ quy định an toàn biển của DANASEA và nhà cung cấp.
-                    </span>
-                  </label>
-
-                  {waiverError && (
-                    <div className="mt-2 text-rose-600 text-xs font-semibold flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[16px]">error</span>
-                      <span>{waiverError}</span>
-                    </div>
-                  )}
-                </div>
-
                 {/* Part 2: Payment Methods */}
                 <div className="flex flex-col gap-space-lg pt-2 border-t border-slate-100">
                   <div className="flex items-center justify-between border-b pb-space-xs border-slate-100">
@@ -699,56 +633,6 @@ export function Checkout() {
           </div>
         </main>
 
-        {/* Safety Waiver Detail Modal */}
-        {showWaiverDetailModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-fade-in">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 flex flex-col max-h-[85vh]">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2 text-cyan-800">
-                  <span className="material-symbols-outlined text-[22px]">gavel</span>
-                  <h3 className="font-bold text-base">Quy chuẩn An toàn Hàng hải DANASEA</h3>
-                </div>
-                <button
-                  onClick={() => setShowWaiverDetailModal(false)}
-                  className="text-slate-400 hover:text-slate-700 cursor-pointer"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
-                </button>
-              </div>
-
-              <div className="overflow-y-auto py-4 text-xs text-slate-600 space-y-3 leading-relaxed flex-1">
-                <p>
-                  <strong>1. Điều kiện thể lực:</strong> Du khách xác nhận không mắc các bệnh lý nghiêm trọng về tim mạch, huyết áp cấp, động kinh hoặc mang thai trên 28 tuần khi tham gia các bộ môn vận động mạnh dưới nước.
-                </p>
-                <p>
-                  <strong>2. Trang thiết bị bảo hộ:</strong> Bắt buộc 100% người tham gia mặc áo phao cứu sinh tiêu chuẩn SOLAS trong suốt hành trình cano và các hoạt động trên mặt nước.
-                </p>
-                <p>
-                  <strong>3. Tuân thủ hướng dẫn viên (HDV):</strong> Tuyệt đối chấp hành hiệu lệnh an toàn của HDV bản địa và thuyền trưởng điều hành. Không tự ý bơi tách đoàn ngoài ranh giới phao cảnh báo.
-                </p>
-                <p>
-                  <strong>4. Bảo tồn môi trường biển:</strong> Cam kết không dẫm đạp, bẻ gãy rạn san hô, không vứt rác thải nhựa xuống biển Đà Nẵng.
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2">
-                <button
-                  onClick={() => {
-                    setWaiverAccepted(true);
-                    setWaiverError(null);
-                    setShowWaiverDetailModal(false);
-                  }}
-                  type="button"
-                  className="px-5 py-2.5 rounded-xl bg-cyan-700 hover:bg-cyan-800 text-white font-bold text-xs transition-colors cursor-pointer"
-                >
-                  Đồng ý &amp; Xác nhận cam kết
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Floating Scenario Switcher for Step 2 testing */}
         {showDevSwitcher && (
           <aside 
@@ -771,7 +655,7 @@ export function Checkout() {
             </div>
 
             <p className="text-[10px] text-slate-400 leading-tight">
-              Công cụ test nhanh kịch bản kiểm soát giữ chỗ 15p &amp; Cam kết an toàn (Sẽ tự động xóa sau khi duyệt):
+              Công cụ test nhanh kịch bản kiểm soát giữ chỗ 15p (Sẽ tự động xóa sau khi duyệt):
             </p>
 
             <div className="grid grid-cols-1 gap-1.5 pt-1">
@@ -793,16 +677,6 @@ export function Checkout() {
               >
                 <span>Khôi phục thời gian 15 phút</span>
                 <span className="material-symbols-outlined text-[14px]">refresh</span>
-              </button>
-
-              <button
-                onClick={() => setWaiverAccepted(!waiverAccepted)}
-                className={`w-full text-left px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer flex items-center justify-between ${
-                  !waiverAccepted ? "bg-amber-600 text-white font-bold" : "bg-slate-800 hover:bg-slate-700 text-slate-200"
-                }`}
-                type="button"
-              >
-                <span>5. {waiverAccepted ? "Bỏ chọn Cam kết an toàn" : "Đã bỏ chọn (Thử bấm Thanh toán)"}</span>
               </button>
 
               <button
