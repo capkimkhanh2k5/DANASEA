@@ -1,335 +1,1001 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { FEATURED_SERVICES, MOCK_IMAGES, MOCK_SLOTS, MOCK_MASTER_ORDERS, MOCK_SUB_ORDERS } from "../../../mockData";
-import type { SubOrder } from "../../../types";
+import { orderService } from "../../../services/orderService";
+import { serviceCatalogService } from "../../../services/serviceCatalogService";
+import type {
+  OrderResponse,
+  SubOrderResponse,
+  CancellationPreviewResponse,
+  RefundRequest,
+  QrCodeResponse,
+} from "../../../types/order";
+import type { ServiceDetailDto } from "../../../types/service";
+
+type OrderFilter = "all" | "upcoming" | "pending" | "completed" | "cancelled";
 
 export function Orders() {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState("all");
-  const [selectedQrOrder, setSelectedQrOrder] = useState<SubOrder | null>(null);
 
-  // Review & Rating Modal state
-  const [reviewingOrder, setReviewingOrder] = useState<SubOrder | null>(null);
+  // State management
+  const [filter, setFilter] = useState<OrderFilter>("all");
+  const [orders, setOrders] = useState<OrderResponse[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [serviceDetails, setServiceDetails] = useState<Record<string, ServiceDetailDto>>({});
+
+  // QR Modal state
+  const [selectedSubOrder, setSelectedSubOrder] = useState<SubOrderResponse | null>(null);
+  const [qrData, setQrData] = useState<QrCodeResponse | null>(null);
+  const [qrLoading, setQrLoading] = useState<boolean>(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+
+  // Cancellation Preview Modal state
+  const [cancellationOrder, setCancellationOrder] = useState<OrderResponse | null>(null);
+  const [cancellationPreview, setCancellationPreview] = useState<CancellationPreviewResponse | null>(null);
+  const [cancellationLoading, setCancellationLoading] = useState<boolean>(false);
+  const [cancellationSubmitting, setCancellationSubmitting] = useState<boolean>(false);
+  const [cancellationReason, setCancellationReason] = useState<RefundRequest["reason"]>("CUSTOMER_REQUEST");
+  const [cancellationError, setCancellationError] = useState<string | null>(null);
+  const [cancellationSuccess, setCancellationSuccess] = useState<string | null>(null);
+
+  // PDF Receipt state
+  const [downloadingPdfId, setDownloadingPdfId] = useState<string | null>(null);
+
+  // Review Modal state
+  const [reviewingSubOrder, setReviewingSubOrder] = useState<SubOrderResponse | null>(null);
   const [ratingStars, setRatingStars] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [submittedReviews, setSubmittedReviews] = useState<Record<string, { rating: number; comment: string }>>({});
 
   // Dispute Modal state
-  const [disputingOrder, setDisputingOrder] = useState<SubOrder | null>(null);
+  const [disputingSubOrder, setDisputingSubOrder] = useState<SubOrderResponse | null>(null);
   const [disputeReason, setDisputeReason] = useState("");
   const [submittedDisputes, setSubmittedDisputes] = useState<Record<string, string>>({});
 
-  const filteredMasterOrders = useMemo(() => {
-    if (filter === "all") return MOCK_MASTER_ORDERS;
-    if (filter === "upcoming") return MOCK_MASTER_ORDERS.filter(o => o.status === 'CONFIRMED');
-    if (filter === "completed") return MOCK_MASTER_ORDERS.filter(o => o.status === 'CANCELLED' || o.status === 'COMPLETED');
-    return MOCK_MASTER_ORDERS;
-  }, [filter]);
+  // Fetch orders from API
+  const fetchOrders = useCallback(async (targetPage = 0) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await orderService.getMyOrders(targetPage, 20);
+      setOrders(res.content || []);
+      setPage(res.page || 0);
+      setTotalPages(res.totalPages || 1);
 
-  const handleOpenReview = (subOrder: SubOrder) => {
-    setReviewingOrder(subOrder);
+      // Extract unique service IDs to fetch service details
+      const serviceIds = new Set<string>();
+      (res.content || []).forEach((ord) => {
+        const items = ord.items || ord.subOrders || [];
+        items.forEach((item) => {
+          if (item.serviceId) serviceIds.add(item.serviceId);
+        });
+      });
+
+      // Lazy load service details for titles and images
+      serviceIds.forEach(async (sId) => {
+        if (!serviceDetails[sId]) {
+          try {
+            const detail = await serviceCatalogService.getServiceDetail(sId);
+            setServiceDetails((prev) => ({ ...prev, [sId]: detail }));
+          } catch {
+            // Non-critical, fallback will be used
+          }
+        }
+      });
+    } catch (err: unknown) {
+      console.error("[Orders] Lỗi khi tải danh sách đơn hàng:", err);
+      const msg = err instanceof Error ? err.message : "Không thể tải danh sách đơn hàng từ máy chủ.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [serviceDetails]);
+
+  useEffect(() => {
+    fetchOrders(page);
+  }, [page, fetchOrders]);
+
+  // Filtered orders
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const items = order.items || order.subOrders || [];
+      const masterStatus = (order.status || "").toUpperCase();
+
+      if (filter === "all") return true;
+
+      if (filter === "upcoming") {
+        return (
+          masterStatus === "PAID" ||
+          items.some((i) => i.status === "CONFIRMED")
+        );
+      }
+
+      if (filter === "pending") {
+        return masterStatus === "PENDING_PAYMENT";
+      }
+
+      if (filter === "completed") {
+        return (
+          masterStatus === "COMPLETED" ||
+          masterStatus === "PARTIALLY_COMPLETED" ||
+          items.some((i) => i.status === "COMPLETED" || i.status === "CHECKED_IN")
+        );
+      }
+
+      if (filter === "cancelled") {
+        return (
+          masterStatus === "CANCELLED" ||
+          items.some((i) => i.status === "CANCELLED" || i.status === "REFUNDED" || i.status === "PARTIALLY_REFUNDED")
+        );
+      }
+
+      return true;
+    });
+  }, [orders, filter]);
+
+  // Tab counts
+  const tabCounts = useMemo(() => {
+    let upcoming = 0;
+    let pending = 0;
+    let completed = 0;
+    let cancelled = 0;
+
+    orders.forEach((ord) => {
+      const st = (ord.status || "").toUpperCase();
+      const items = ord.items || ord.subOrders || [];
+      if (st === "PAID" || items.some((i) => i.status === "CONFIRMED")) upcoming++;
+      if (st === "PENDING_PAYMENT") pending++;
+      if (st === "COMPLETED" || st === "PARTIALLY_COMPLETED" || items.some((i) => i.status === "COMPLETED" || i.status === "CHECKED_IN")) completed++;
+      if (st === "CANCELLED" || items.some((i) => i.status === "CANCELLED" || i.status === "REFUNDED")) cancelled++;
+    });
+
+    return {
+      all: orders.length,
+      upcoming,
+      pending,
+      completed,
+      cancelled,
+    };
+  }, [orders]);
+
+  // Check-in QR Generation handler
+  const handleOpenQrModal = async (subOrder: SubOrderResponse) => {
+    setSelectedSubOrder(subOrder);
+    setQrLoading(true);
+    setQrError(null);
+    setQrData(null);
+
+    try {
+      const data = await orderService.getCheckinQrCode(subOrder.id);
+      setQrData(data);
+    } catch (err: unknown) {
+      console.error("[Orders] Lỗi khi tạo mã QR Check-in:", err);
+      const msg = err instanceof Error ? err.message : "Không thể tạo mã QR cho đơn hàng này.";
+      setQrError(msg);
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  // PDF Download handler
+  const handleDownloadReceiptPdf = async (orderId: string) => {
+    try {
+      setDownloadingPdfId(orderId);
+      const blob = await orderService.downloadOrderReceiptPdf(orderId);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `DANASEA-Receipt-${orderId.slice(0, 8).toUpperCase()}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      console.error("[Orders] Lỗi khi tải vé/hóa đơn PDF:", err);
+      alert("Không thể tải hóa đơn PDF. Vui lòng kiểm tra lại trạng thái đơn hàng.");
+    } finally {
+      setDownloadingPdfId(null);
+    }
+  };
+
+  // Cancellation Preview handler
+  const handleOpenCancellationModal = async (order: OrderResponse) => {
+    setCancellationOrder(order);
+    setCancellationLoading(true);
+    setCancellationError(null);
+    setCancellationSuccess(null);
+    setCancellationPreview(null);
+
+    try {
+      const preview = await orderService.getCancellationPreview(order.id);
+      setCancellationPreview(preview);
+    } catch (err: unknown) {
+      console.error("[Orders] Lỗi khi lấy chính sách hủy:", err);
+      const msg = err instanceof Error ? err.message : "Không thể lấy thông tin hủy đơn.";
+      setCancellationError(msg);
+    } finally {
+      setCancellationLoading(false);
+    }
+  };
+
+  // Confirm Cancellation handler
+  const handleConfirmCancellation = async () => {
+    if (!cancellationOrder) return;
+    try {
+      setCancellationSubmitting(true);
+      setCancellationError(null);
+      await orderService.requestRefund(cancellationOrder.id, cancellationReason);
+      setCancellationSuccess("Yêu cầu hủy đơn và hoàn tiền đã được gửi thành công!");
+      setTimeout(() => {
+        setCancellationOrder(null);
+        fetchOrders(page);
+      }, 1500);
+    } catch (err: unknown) {
+      console.error("[Orders] Lỗi khi xác nhận hủy đơn:", err);
+      const msg = err instanceof Error ? err.message : "Gửi yêu cầu hủy đơn thất bại.";
+      setCancellationError(msg);
+    } finally {
+      setCancellationSubmitting(false);
+    }
+  };
+
+  // Review handler
+  const handleOpenReview = (subOrder: SubOrderResponse) => {
+    setReviewingSubOrder(subOrder);
     setRatingStars(5);
     setReviewComment("");
   };
 
   const handleSubmitReview = () => {
-    if (!reviewingOrder) return;
-    setSubmittedReviews(prev => ({
+    if (!reviewingSubOrder) return;
+    setSubmittedReviews((prev) => ({
       ...prev,
-      [reviewingOrder.id]: { rating: ratingStars, comment: reviewComment }
+      [reviewingSubOrder.id]: { rating: ratingStars, comment: reviewComment },
     }));
-    setReviewingOrder(null);
+    setReviewingSubOrder(null);
   };
 
-  const handleOpenDispute = (subOrder: SubOrder) => {
-    setDisputingOrder(subOrder);
+  // Dispute handler
+  const handleOpenDispute = (subOrder: SubOrderResponse) => {
+    setDisputingSubOrder(subOrder);
     setDisputeReason("");
   };
 
   const handleSubmitDispute = () => {
-    if (!disputingOrder || !disputeReason.trim()) return;
-    setSubmittedDisputes(prev => ({
+    if (!disputingSubOrder || !disputeReason.trim()) return;
+    setSubmittedDisputes((prev) => ({
       ...prev,
-      [disputingOrder.id]: disputeReason
+      [disputingSubOrder.id]: disputeReason,
     }));
-    setDisputingOrder(null);
+    setDisputingSubOrder(null);
+  };
+
+  // Helper formatting functions
+  const formatVnd = (amount?: number) => {
+    return (amount ?? 0).toLocaleString("vi-VN") + "đ";
+  };
+
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return "N/A";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString("vi-VN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const s = status.toUpperCase();
+    switch (s) {
+      case "PAID":
+        return <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">ĐÃ THANH TOÁN</span>;
+      case "PENDING_PAYMENT":
+      case "PENDING":
+        return <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">CHỜ THANH TOÁN</span>;
+      case "CONFIRMED":
+        return <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">ĐÃ XÁC NHẬN</span>;
+      case "CHECKED_IN":
+        return <span className="px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200 text-xs font-bold">ĐÃ CHECK-IN</span>;
+      case "COMPLETED":
+        return <span className="px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-xs font-bold">HOÀN TẤT</span>;
+      case "CANCELLED":
+        return <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold">ĐÃ HỦY</span>;
+      case "REFUNDED":
+      case "PARTIALLY_REFUNDED":
+        return <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold">ĐÃ HOÀN TIỀN</span>;
+      default:
+        return <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold">{s}</span>;
+    }
   };
 
   return (
-    <main className="w-full pt-20 bg-surface flex-1">
+    <main className="w-full pt-20 bg-slate-50/50 flex-1 min-h-screen">
       <div className="flex flex-col w-full">
-        <div className="relative w-full overflow-hidden border-b border-slate-200 bg-white">
+        {/* Top Header Banner */}
+        <div className="relative w-full overflow-hidden border-b border-cyan-100/60 bg-white/80 backdrop-blur-md">
           <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 lg:px-12 py-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Trải nghiệm của tôi</h1>
-                <p className="text-sm text-slate-500 mt-1">Quản lý các tour đã đặt, mã vé điện tử QR xuất bến và gửi đánh giá dịch vụ.</p>
-              </div>
-              
-              <div className="flex items-center gap-3">
-                <div className="px-3.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
-                  <span className="block text-base font-bold text-primary">02</span>
-                  <span className="text-[11px] text-slate-500 font-medium">Sắp diễn ra</span>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-cyan-600 text-[26px]">confirmation_number</span>
+                  <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Trải nghiệm &amp; Vé của tôi</h1>
                 </div>
-                <div className="px-3.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
-                  <span className="block text-base font-bold text-slate-800">01</span>
-                  <span className="text-[11px] text-slate-500 font-medium">Đã đi</span>
+                <p className="text-sm text-slate-500 mt-1">
+                  Quản lý các tour đã đặt, xuất mã vé điện tử QR xuất bến và tải hóa đơn E-Ticket.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="px-4 py-2 rounded-xl bg-cyan-50/80 border border-cyan-200 text-center">
+                  <span className="block text-lg font-bold text-cyan-700">{tabCounts.upcoming}</span>
+                  <span className="text-[11px] text-cyan-600 font-medium">Sắp diễn ra</span>
+                </div>
+                <div className="px-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                  <span className="block text-lg font-bold text-slate-800">{tabCounts.completed}</span>
+                  <span className="text-[11px] text-slate-500 font-medium">Đã hoàn thành</span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 flex items-center gap-2">
-              <button onClick={() => setFilter("all")} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filter === 'all' ? 'bg-primary text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} type="button">
-                Tất cả ({MOCK_MASTER_ORDERS.length})
+            {/* Filter Tabs */}
+            <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+              <button
+                onClick={() => setFilter("all")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filter === "all"
+                    ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm shadow-cyan-500/20"
+                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                }`}
+                type="button"
+              >
+                <span>Tất cả</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${filter === "all" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"}`}>
+                  {tabCounts.all}
+                </span>
               </button>
-              <button onClick={() => setFilter("upcoming")} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filter === 'upcoming' ? 'bg-primary text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} type="button">
-                Sắp diễn ra ({MOCK_MASTER_ORDERS.filter(o => o.status === 'CONFIRMED').length})
+
+              <button
+                onClick={() => setFilter("upcoming")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filter === "upcoming"
+                    ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm shadow-cyan-500/20"
+                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                }`}
+                type="button"
+              >
+                <span>Sắp diễn ra</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${filter === "upcoming" ? "bg-white/20 text-white" : "bg-cyan-50 text-cyan-700"}`}>
+                  {tabCounts.upcoming}
+                </span>
               </button>
-              <button onClick={() => setFilter("completed")} className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${filter === 'completed' ? 'bg-primary text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} type="button">
-                Đã hoàn thành ({MOCK_MASTER_ORDERS.filter(o => o.status === 'CANCELLED' || o.status === 'COMPLETED').length})
+
+              <button
+                onClick={() => setFilter("pending")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filter === "pending"
+                    ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm shadow-cyan-500/20"
+                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                }`}
+                type="button"
+              >
+                <span>Chờ thanh toán</span>
+                {tabCounts.pending > 0 && (
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${filter === "pending" ? "bg-white/20 text-white" : "bg-amber-100 text-amber-800"}`}>
+                    {tabCounts.pending}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setFilter("completed")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filter === "completed"
+                    ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm shadow-cyan-500/20"
+                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                }`}
+                type="button"
+              >
+                <span>Đã hoàn thành</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${filter === "completed" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"}`}>
+                  {tabCounts.completed}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setFilter("cancelled")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  filter === "cancelled"
+                    ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-sm shadow-cyan-500/20"
+                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                }`}
+                type="button"
+              >
+                <span>Đã hủy / Hoàn tiền</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${filter === "cancelled" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"}`}>
+                  {tabCounts.cancelled}
+                </span>
               </button>
             </div>
           </div>
         </div>
 
+        {/* Content Container */}
         <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 lg:px-12 py-8">
-          {/* Full-width safety guarantee banner */}
-          <div className="w-full bg-cyan-50/80 border border-cyan-200/80 rounded-2xl p-4 flex items-center justify-between gap-4 mb-6">
+          {/* Maritime Safety & Guarantee Banner */}
+          <div className="w-full bg-gradient-to-r from-cyan-50/90 via-sky-50/70 to-blue-50/80 border border-cyan-200/80 rounded-2xl p-4 flex items-center justify-between gap-4 mb-6 shadow-sm">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
-                <span className="material-symbols-outlined text-[20px]">verified_user</span>
+              <div className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-sm shadow-cyan-500/30">
+                <span className="material-symbols-outlined text-[22px]">verified_user</span>
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Chính sách bảo trợ &amp; An toàn biển</h3>
-                <p className="text-xs text-slate-600">Tất cả các dịch vụ (Sub-orders) được xử lý qua hệ thống DANASEA đều được áp dụng bảo hiểm du lịch biển và chính sách bảo trợ an toàn tự động.</p>
+                <h3 className="text-sm font-bold text-slate-900">Bảo trợ an toàn biển &amp; Vé điện tử mã hóa</h3>
+                <p className="text-xs text-slate-600">
+                  Mọi dịch vụ đặt qua DANASEA đều được bảo hiểm du lịch biển, kiểm duyệt điều kiện an toàn và cấp mã QR xuất bến ký số HMAC-SHA256 chuẩn cảng vụ.
+                </p>
               </div>
             </div>
           </div>
 
-          <div key={filter} className="w-full flex flex-col gap-6 animate-fade-in-up">
-            {filteredMasterOrders.map(masterOrder => {
-              const subOrders = MOCK_SUB_ORDERS.filter(sub => sub.masterOrderId === masterOrder.id);
-              return (
-                <article key={masterOrder.id} className="order-card bg-surface-container-lowest rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col gap-6 transition-all duration-300 hover:shadow-md w-full">
-                  <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container flex-shrink-0">
-                        <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+          {/* Loading Skeleton */}
+          {loading && (
+            <div className="flex flex-col gap-6">
+              {[1, 2].map((i) => (
+                <div key={i} className="bg-white/80 rounded-2xl p-6 border border-slate-200 animate-pulse space-y-4">
+                  <div className="h-6 bg-slate-200 rounded w-1/3"></div>
+                  <div className="h-24 bg-slate-100 rounded-xl"></div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Error Alert */}
+          {!loading && error && (
+            <div className="p-6 bg-rose-50 border border-rose-200 rounded-2xl text-center space-y-3">
+              <span className="material-symbols-outlined text-rose-500 text-[36px]">error</span>
+              <p className="text-sm font-bold text-rose-800">{error}</p>
+              <button
+                onClick={() => fetchOrders(page)}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer"
+              >
+                Thử lại
+              </button>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loading && !error && filteredOrders.length === 0 && (
+            <div className="p-12 bg-white/70 backdrop-blur-md border border-cyan-100/60 rounded-3xl text-center space-y-4 shadow-sm">
+              <div className="w-16 h-16 rounded-full bg-cyan-50 border border-cyan-200 flex items-center justify-center mx-auto text-cyan-600">
+                <span className="material-symbols-outlined text-[32px]">sailing</span>
+              </div>
+              <h3 className="text-lg font-bold text-slate-900">Chưa có đơn đặt tour nào</h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                Bạn chưa có đơn đặt trong mục này. Hãy khám phá ngay các trải nghiệm lặn biển, cano, chèo SUP hấp dẫn tại Đà Nẵng!
+              </p>
+              <button
+                onClick={() => navigate("/")}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-xs font-bold hover:shadow-md cursor-pointer transition-all"
+              >
+                Khám phá tour biển ngay
+              </button>
+            </div>
+          )}
+
+          {/* Orders List */}
+          {!loading && !error && filteredOrders.length > 0 && (
+            <div className="w-full flex flex-col gap-6">
+              {filteredOrders.map((masterOrder) => {
+                const subOrders = masterOrder.items || masterOrder.subOrders || [];
+                const orderCode = `#ORD-${(masterOrder.id || "").slice(0, 8).toUpperCase()}`;
+                const masterStatus = (masterOrder.status || "").toUpperCase();
+                const canDownloadPdf = masterStatus === "PAID" || masterStatus === "COMPLETED";
+                const canCancelOrder = masterStatus === "PAID";
+
+                return (
+                  <article
+                    key={masterOrder.id}
+                    className="bg-white/80 backdrop-blur-md rounded-2xl p-6 shadow-sm border border-slate-200/80 flex flex-col gap-6 transition-all duration-300 hover:shadow-md hover:border-cyan-200"
+                  >
+                    {/* Master Order Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-cyan-50 border border-cyan-200 text-cyan-700 flex items-center justify-center flex-shrink-0">
+                          <span className="material-symbols-outlined text-[22px]">receipt_long</span>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Đơn hàng:</span>
+                            <span className="text-base font-bold text-slate-900 font-mono">{orderCode}</span>
+                            {getStatusBadge(masterOrder.status || "PENDING")}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Ngày tạo: {formatDateTime(masterOrder.createdAt)}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Master Order:</span>
-                          <span className="text-base font-bold text-slate-900">#{masterOrder.id.toUpperCase()}</span>
-                          <span className="px-2.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-xs font-bold">
-                            {masterOrder.status === 'CONFIRMED' ? 'PAID (Đã thanh toán)' : 'COMPLETED'}
+
+                      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
+                        <div className="text-right">
+                          <span className="text-xs text-slate-500 uppercase tracking-wider block font-medium">Tổng tiền</span>
+                          <span className="text-xl text-cyan-700 font-extrabold">
+                            {formatVnd(masterOrder.finalAmount ?? masterOrder.totalAmount)}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">Ngày tạo: {new Date(masterOrder.createdAt || '').toLocaleDateString('vi-VN')} · Phương thức thanh toán: QR Pay</p>
+
+                        {/* Master Order Action Buttons */}
+                        <div className="flex items-center gap-2">
+                          {canDownloadPdf && (
+                            <button
+                              onClick={() => handleDownloadReceiptPdf(masterOrder.id)}
+                              disabled={downloadingPdfId === masterOrder.id}
+                              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                              title="Tải hóa đơn & Vé điện tử PDF"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">
+                                {downloadingPdfId === masterOrder.id ? "sync" : "picture_as_pdf"}
+                              </span>
+                              <span>{downloadingPdfId === masterOrder.id ? "Đang xuất..." : "Tải vé PDF"}</span>
+                            </button>
+                          )}
+
+                          {canCancelOrder && (
+                            <button
+                              onClick={() => handleOpenCancellationModal(masterOrder)}
+                              className="px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
+                            >
+                              Yêu cầu hủy đơn
+                            </button>
+                          )}
+
+                          {masterStatus === "PENDING_PAYMENT" && (
+                            <button
+                              onClick={() => navigate(`/checkout`)}
+                              className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold shadow-sm cursor-pointer"
+                            >
+                              Thanh toán ngay
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-xs text-slate-500 uppercase tracking-wider block font-medium">Tổng thanh toán Master</span>
-                      <span className="text-xl text-primary font-bold">{masterOrder.totalAmount.toLocaleString('vi-VN')}đ</span>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[18px] text-secondary">layers</span>
-                      Danh sách đơn con (Sub Orders)
-                    </span>
-                    <span className="text-xs font-semibold text-slate-500">{subOrders.length} dịch vụ</span>
-                  </div>
+                    {/* Sub-Orders List */}
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-[18px] text-cyan-600">layers</span>
+                          Các dịch vụ trong đơn ({subOrders.length})
+                        </span>
+                      </div>
 
-                  {subOrders.length === 0 ? (
-                    <div className="p-4 rounded-xl bg-slate-50 text-center text-xs text-slate-500">
-                      Không có đơn con nào trong đơn hàng này.
-                    </div>
-                  ) : (
-                    subOrders.map(subOrder => {
-                      const service = FEATURED_SERVICES.find(s => s.id === subOrder.serviceId);
-                      const slot = MOCK_SLOTS.find(s => s.id === subOrder.slotId);
-                      const image = MOCK_IMAGES.find(i => i.serviceId === subOrder.serviceId && i.isPrimary)?.imageUrl;
-                      
-                      return (
-                        <div key={subOrder.id} className="bg-surface-container-low rounded-xl p-4 flex flex-col md:flex-row gap-4 w-full">
-                          <div className="relative w-full md:w-56 h-36 flex-shrink-0 rounded-xl overflow-hidden shadow-sm">
-                            <img src={image || 'https://via.placeholder.com/400x300'} className="w-full h-full object-cover" alt={service?.name} />
-                            <span className="absolute top-2 left-2 px-2.5 py-0.5 rounded-full bg-secondary text-on-secondary text-xs font-semibold flex items-center gap-1 shadow-sm">
-                              <span className="w-1.5 h-1.5 rounded-full bg-secondary-fixed animate-ping"></span>
-                              {slot?.startTime} {new Date(slot?.date || '').toLocaleDateString('vi-VN')}
-                            </span>
-                          </div>
-                          <div className="flex flex-col justify-between flex-1 min-w-0">
-                            <div>
-                              <div className="flex items-start justify-between gap-2">
+                      {subOrders.length === 0 ? (
+                        <div className="p-4 rounded-xl bg-slate-50 text-center text-xs text-slate-500">
+                          Không có dịch vụ con trong đơn hàng này.
+                        </div>
+                      ) : (
+                        subOrders.map((subOrder) => {
+                          const serviceDetail = serviceDetails[subOrder.serviceId];
+                          const serviceName = serviceDetail?.name || subOrder.serviceName || `Dịch vụ #${subOrder.serviceId.slice(0, 8)}`;
+                          const serviceImage = serviceDetail?.imageUrls?.[0] || subOrder.serviceThumbnail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80";
+                          const subOrderStatus = (subOrder.status || "").toUpperCase();
+                          const isConfirmed = subOrderStatus === "CONFIRMED";
+                          const isCheckedIn = subOrderStatus === "CHECKED_IN";
+                          const isCompleted = subOrderStatus === "COMPLETED";
+
+                          return (
+                            <div
+                              key={subOrder.id}
+                              className="bg-slate-50/80 rounded-xl p-4 flex flex-col md:flex-row gap-4 border border-slate-200/60 hover:bg-slate-50 transition-colors"
+                            >
+                              {/* Thumbnail */}
+                              <div className="relative w-full md:w-52 h-32 flex-shrink-0 rounded-xl overflow-hidden shadow-sm bg-slate-200">
+                                <img
+                                  src={serviceImage}
+                                  alt={serviceName}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80";
+                                  }}
+                                />
+                                {subOrder.slotTime && (
+                                  <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-slate-900/80 backdrop-blur-sm text-white text-[11px] font-semibold flex items-center gap-1 shadow-sm">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                                    {subOrder.slotTime}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Details */}
+                              <div className="flex flex-col justify-between flex-1 min-w-0">
                                 <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-mono font-bold text-xs text-secondary">#{subOrder.id.toUpperCase()}</span>
-                                    <span className="text-xs text-slate-500">· NCC: <strong>DANASEA Partner</strong></span>
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono font-bold text-xs text-cyan-700">
+                                          #{subOrder.id.slice(0, 8).toUpperCase()}
+                                        </span>
+                                        {subOrder.waiverRequired && (
+                                          <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-semibold">
+                                            <span className="material-symbols-outlined text-[12px]">verified</span>
+                                            {subOrder.waiverAccepted ? "Đã ký waiver" : "Cần ký waiver"}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <h3
+                                        className="text-base font-bold text-slate-900 mt-1 hover:text-cyan-600 cursor-pointer transition-colors"
+                                        onClick={() => navigate(`/tour/${subOrder.serviceId}`)}
+                                      >
+                                        {serviceName}
+                                      </h3>
+
+                                      {serviceDetail?.address && (
+                                        <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
+                                          <span className="material-symbols-outlined text-[14px] text-cyan-600">location_on</span>
+                                          <span>{serviceDetail.address}</span>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex flex-col items-end">
+                                      <span className="text-base text-cyan-700 font-bold">
+                                        {formatVnd(subOrder.finalAmount ?? subOrder.subtotalAmount)}
+                                      </span>
+                                      <span className="text-xs text-slate-500">
+                                        Số lượng: <strong>{subOrder.quantity} khách</strong>
+                                      </span>
+                                    </div>
                                   </div>
-                                  <h3 className="text-base font-bold text-slate-900 mt-1 hover:text-primary cursor-pointer transition-colors" onClick={() => navigate(`/tour/${service?.id}`)}>
-                                    {service?.name}
-                                  </h3>
                                 </div>
-                                <div className="flex flex-col items-end">
-                                  <span className="text-base text-primary font-bold">{subOrder.subtotalAmount.toLocaleString('vi-VN')}đ</span>
-                                  <span className="text-xs text-slate-500">SL: {subOrder.quantity} người</span>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 mt-2">
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary-container/30 text-on-secondary-container text-xs">
-                                  <span className="material-symbols-outlined text-[14px]">map</span>
-                                  {service?.locationName}
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 mt-3 border-t border-slate-200">
-                              <div className="flex items-center gap-2">
-                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                                  subOrder.status === 'CONFIRMED' 
-                                    ? 'bg-blue-50 text-blue-700 border border-blue-200' 
-                                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                }`}>
-                                  {subOrder.status === 'CONFIRMED' ? 'ĐÃ XÁC NHẬN' : 'HOÀN THÀNH'}
-                                </span>
-                                {submittedReviews[subOrder.id] && (
-                                  <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-medium">
-                                    ★ Đã đánh giá ({submittedReviews[subOrder.id].rating} sao)
-                                  </span>
-                                )}
-                                {submittedDisputes[subOrder.id] && (
-                                  <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-xs font-medium">
-                                    Đang xử lý khiếu nại
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {subOrder.status === 'CONFIRMED' ? (
-                                  <>
-                                    <button 
-                                      className="px-3.5 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold flex items-center gap-1 shadow-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer" 
-                                      type="button" 
-                                      onClick={() => setSelectedQrOrder(subOrder)}
-                                    >
-                                      <span className="material-symbols-outlined text-[15px]">qr_code_2</span>
-                                      <span>Mã QR Check-in</span>
-                                    </button>
-                                    <button 
-                                      onClick={() => handleOpenDispute(subOrder)}
-                                      className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition-colors cursor-pointer" 
-                                      type="button"
-                                    >
-                                      Hỗ trợ / Khiếu nại
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    {!submittedReviews[subOrder.id] && (
-                                      <button 
+
+                                {/* Sub-Order Footer & Actions */}
+                                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 mt-3 border-t border-slate-200">
+                                  <div className="flex items-center gap-2">
+                                    {getStatusBadge(subOrder.status)}
+                                    {submittedReviews[subOrder.id] && (
+                                      <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-medium">
+                                        ★ Đã đánh giá ({submittedReviews[subOrder.id].rating} sao)
+                                      </span>
+                                    )}
+                                    {submittedDisputes[subOrder.id] && (
+                                      <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium">
+                                        Đang khiếu nại
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    {/* Check-in QR button (P0 for CONFIRMED suborders) */}
+                                    {isConfirmed && (
+                                      <button
+                                        onClick={() => handleOpenQrModal(subOrder)}
+                                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-cyan-500/20 cursor-pointer transition-all active:scale-95"
+                                        type="button"
+                                      >
+                                        <span className="material-symbols-outlined text-[16px]">qr_code_2</span>
+                                        <span>Mã QR Check-in</span>
+                                      </button>
+                                    )}
+
+                                    {/* Checked-in status display */}
+                                    {isCheckedIn && (
+                                      <span className="px-3 py-1.5 rounded-xl bg-cyan-100/70 text-cyan-800 text-xs font-bold flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[16px] text-cyan-600">done_all</span>
+                                        <span>Đã quét vé lên tàu</span>
+                                      </span>
+                                    )}
+
+                                    {/* Review action for completed items */}
+                                    {isCompleted && !submittedReviews[subOrder.id] && (
+                                      <button
                                         onClick={() => handleOpenReview(subOrder)}
-                                        className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold flex items-center gap-1 shadow-sm transition-transform hover:scale-105 active:scale-95 cursor-pointer" 
+                                        className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold flex items-center gap-1 shadow-sm cursor-pointer"
                                         type="button"
                                       >
                                         <span className="material-symbols-outlined text-[15px]">rate_review</span>
-                                        <span>Đánh giá dịch vụ</span>
+                                        <span>Đánh giá</span>
                                       </button>
                                     )}
+
+                                    {/* Support / Dispute action */}
                                     {!submittedDisputes[subOrder.id] && (
-                                      <button 
+                                      <button
                                         onClick={() => handleOpenDispute(subOrder)}
-                                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-medium transition-colors cursor-pointer" 
+                                        className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
                                         type="button"
                                       >
-                                        Gửi khiếu nại
+                                        Hỗ trợ / Khiếu nại
                                       </button>
                                     )}
-                                  </>
-                                )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </article>
-              );
-            })}
-          </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-8">
+              <button
+                disabled={page <= 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold disabled:opacity-40 cursor-pointer"
+              >
+                Trang trước
+              </button>
+              <span className="text-xs text-slate-600 font-semibold">
+                Trang {page + 1} / {totalPages}
+              </span>
+              <button
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-xs font-bold disabled:opacity-40 cursor-pointer"
+              >
+                Trang sau
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Portaled QR Code Modal */}
-      {selectedQrOrder &&
+      {/* ============================================================== */}
+      {/* Portaled Check-in QR Code Modal (Real Backend HMAC Token)     */}
+      {/* ============================================================== */}
+      {selectedSubOrder &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-scale-in">
-            <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-3xl p-6 max-w-sm w-full shadow-2xl relative text-center">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl relative text-center border border-slate-100">
               <button
-                onClick={() => setSelectedQrOrder(null)}
-                className="absolute top-4 right-4 p-1.5 rounded-full text-on-surface-variant hover:bg-surface-container cursor-pointer transition-colors"
+                onClick={() => setSelectedSubOrder(null)}
+                className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer transition-colors"
               >
-                <span className="material-symbols-outlined">close</span>
+                <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
 
-              <div className="w-12 h-12 rounded-2xl bg-secondary-container text-on-secondary-container flex items-center justify-center mx-auto mb-3">
+              <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center mx-auto mb-3">
                 <span className="material-symbols-outlined text-[28px]">qr_code_scanner</span>
               </div>
 
-              <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">
-                Mã QR Check-in Vé Biển
+              <h3 className="text-lg font-bold text-slate-900">
+                Vé điện tử Check-in
               </h3>
-              <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
-                Đưa mã này cho HDV hoặc Quầy vé tại bến cảng để quét nhận ca
+              <p className="text-xs text-slate-500 mt-1">
+                Xuất trình mã này tại quầy vé hoặc cầu tàu trước giờ khởi hành
               </p>
 
-              <div className="my-5 p-4 rounded-2xl bg-white inline-block shadow-md border border-outline-variant/20">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
-                    selectedQrOrder.qrSecret || selectedQrOrder.id
-                  )}`}
-                  alt="QR Check-in"
-                  className="w-44 h-44 mx-auto rounded-lg"
-                />
+              {/* QR Content Body */}
+              <div className="my-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 inline-block">
+                {qrLoading && (
+                  <div className="w-48 h-48 flex flex-col items-center justify-center space-y-2">
+                    <span className="material-symbols-outlined text-cyan-600 text-[36px] animate-spin">
+                      progress_activity
+                    </span>
+                    <span className="text-xs text-slate-500 font-medium">Đang sinh mã QR ký số...</span>
+                  </div>
+                )}
+
+                {!qrLoading && qrError && (
+                  <div className="w-48 h-48 flex flex-col items-center justify-center p-3 text-center space-y-2">
+                    <span className="material-symbols-outlined text-rose-500 text-[32px]">warning</span>
+                    <span className="text-xs text-rose-700 font-semibold">{qrError}</span>
+                  </div>
+                )}
+
+                {!qrLoading && !qrError && qrData && (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                      qrData.qrToken
+                    )}`}
+                    alt="QR Check-in"
+                    className="w-48 h-48 mx-auto rounded-xl shadow-sm bg-white p-2"
+                  />
+                )}
               </div>
 
-              <div className="bg-surface-container-low rounded-xl p-3 text-left space-y-1 mb-4">
-                <div className="flex justify-between font-label-sm text-label-sm">
-                  <span className="text-on-surface-variant">Mã vé (Sub-order):</span>
-                  <span className="font-mono font-bold text-secondary">#{selectedQrOrder.id.toUpperCase()}</span>
+              {/* Ticket Details */}
+              <div className="bg-slate-50 rounded-xl p-3 text-left space-y-1.5 mb-5 border border-slate-200/60 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Mã vé (Sub-order):</span>
+                  <span className="font-mono font-bold text-cyan-700">
+                    #{selectedSubOrder.id.slice(0, 8).toUpperCase()}
+                  </span>
                 </div>
-                <div className="flex justify-between font-label-sm text-label-sm">
-                  <span className="text-on-surface-variant">Trạng thái:</span>
-                  <span className="text-green-600 font-bold">Hợp lệ / Sẵn sàng</span>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Số lượng khách:</span>
+                  <span className="font-bold text-slate-800">{selectedSubOrder.quantity} khách</span>
                 </div>
-                <div className="flex justify-between font-label-sm text-label-sm">
-                  <span className="text-on-surface-variant">Số lượng khách:</span>
-                  <span className="text-on-surface font-bold">{selectedQrOrder.quantity} người</span>
+                {qrData?.expiresAt && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Hiệu lực đến:</span>
+                    <span className="font-semibold text-slate-700">
+                      {formatDateTime(qrData.expiresAt)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Cơ chế an toàn:</span>
+                  <span className="text-emerald-700 font-bold">HMAC-SHA256 Token</span>
                 </div>
               </div>
 
-              <button
-                onClick={() => setSelectedQrOrder(null)}
-                className="w-full py-2.5 rounded-full bg-secondary text-on-secondary font-label-md font-semibold hover:opacity-90 transition-opacity cursor-pointer"
-              >
-                Đóng
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedSubOrder(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
             </div>
           </div>,
           document.body
         )}
 
-      {/* Portaled Review & Rating Modal */}
-      {reviewingOrder &&
+      {/* ============================================================== */}
+      {/* Portaled Cancellation & Refund Preview Modal                   */}
+      {/* ============================================================== */}
+      {cancellationOrder &&
         createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl relative space-y-4">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative border border-slate-100 space-y-4">
               <div className="flex items-center justify-between border-b pb-3">
-                <h3 className="text-lg font-bold text-slate-900">Đánh giá trải nghiệm</h3>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-rose-500 text-[24px]">cancel</span>
+                  <h3 className="text-lg font-bold text-slate-900">Yêu cầu hủy đơn &amp; Hoàn tiền</h3>
+                </div>
                 <button
-                  onClick={() => setReviewingOrder(null)}
+                  onClick={() => setCancellationOrder(null)}
+                  className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              {cancellationLoading && (
+                <div className="py-8 flex flex-col items-center justify-center space-y-2">
+                  <span className="material-symbols-outlined text-cyan-600 text-[32px] animate-spin">
+                    progress_activity
+                  </span>
+                  <p className="text-xs text-slate-500">Đang tra cứu chính sách hoàn tiền theo thời điểm...</p>
+                </div>
+              )}
+
+              {cancellationError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium">
+                  {cancellationError}
+                </div>
+              )}
+
+              {cancellationSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-semibold flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
+                  <span>{cancellationSuccess}</span>
+                </div>
+              )}
+
+              {!cancellationLoading && cancellationPreview && !cancellationSuccess && (
+                <div className="space-y-4">
+                  {/* Policy Preview Card */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Chính sách áp dụng:</span>
+                      <span className="font-bold text-cyan-700 font-mono">
+                        {cancellationPreview.policyApplied || "STANDARD_24H_V2"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Tổng thanh toán ban đầu:</span>
+                      <span className="font-bold text-slate-800">
+                        {formatVnd(cancellationPreview.originalAmount)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Tỷ lệ hoàn tiền:</span>
+                      <span className="font-extrabold text-blue-600">
+                        {cancellationPreview.refundPercentage}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm">
+                      <span className="font-bold text-slate-900">Dự kiến tiền hoàn về ví/tài khoản:</span>
+                      <span className="font-extrabold text-rose-600">
+                        {formatVnd(cancellationPreview.refundAmount)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Reason selector */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-800 block mb-2">Lý do hủy đơn</label>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs">
+                        <input
+                          type="radio"
+                          name="refundReason"
+                          checked={cancellationReason === "CUSTOMER_REQUEST"}
+                          onChange={() => setCancellationReason("CUSTOMER_REQUEST")}
+                        />
+                        <span>Thay đổi lịch trình / Lý do cá nhân</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs">
+                        <input
+                          type="radio"
+                          name="refundReason"
+                          checked={cancellationReason === "WEATHER_DISRUPTION"}
+                          onChange={() => setCancellationReason("WEATHER_DISRUPTION")}
+                        />
+                        <span>Thời tiết biển xấu / Sự cố bất khả kháng</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs">
+                        <input
+                          type="radio"
+                          name="refundReason"
+                          checked={cancellationReason === "VENDOR_CANCELLED"}
+                          onChange={() => setCancellationReason("VENDOR_CANCELLED")}
+                        />
+                        <span>Nhà cung cấp yêu cầu dời/hủy ca</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-slate-500">
+                    * Lưu ý: Khi xác nhận hủy, các mã vé QR tương ứng sẽ bị vô hiệu hóa ngay lập tức trên hệ thống cảng vụ.
+                  </p>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setCancellationOrder(null)}
+                      className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold cursor-pointer"
+                    >
+                      Hủy bỏ
+                    </button>
+                    <button
+                      type="button"
+                      disabled={cancellationSubmitting}
+                      onClick={handleConfirmCancellation}
+                      className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50"
+                    >
+                      {cancellationSubmitting ? "Đang xử lý..." : "Xác nhận hủy & Hoàn tiền"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* ============================================================== */}
+      {/* Portaled Review & Rating Modal                                 */}
+      {/* ============================================================== */}
+      {reviewingSubOrder &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-4 border border-slate-100">
+              <div className="flex items-center justify-between border-b pb-3">
+                <h3 className="text-base font-bold text-slate-900">Đánh giá trải nghiệm</h3>
+                <button
+                  onClick={() => setReviewingSubOrder(null)}
                   className="text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <span className="material-symbols-outlined">close</span>
@@ -337,14 +1003,16 @@ export function Orders() {
               </div>
 
               <div className="space-y-1">
-                <span className="text-xs text-slate-500 font-medium">Đơn hàng #{reviewingOrder.id.toUpperCase()}</span>
-                <p className="text-sm font-semibold text-slate-800">
-                  {FEATURED_SERVICES.find(s => s.id === reviewingOrder.serviceId)?.name}
+                <span className="text-xs text-slate-500 font-mono">
+                  Mã vé: #{reviewingSubOrder.id.slice(0, 8).toUpperCase()}
+                </span>
+                <p className="text-sm font-bold text-slate-800">
+                  {serviceDetails[reviewingSubOrder.serviceId]?.name || "Dịch vụ du lịch biển"}
                 </p>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1.5">Mức độ hài lòng</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">Mức độ hài lòng</label>
                 <div className="flex items-center gap-2">
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
@@ -359,26 +1027,32 @@ export function Orders() {
                     </button>
                   ))}
                   <span className="text-xs font-bold text-slate-600 ml-2">
-                    {ratingStars === 5 ? "Tuyệt vời" : ratingStars === 4 ? "Tốt" : ratingStars === 3 ? "Bình thường" : "Cần cải thiện"}
+                    {ratingStars === 5
+                      ? "Tuyệt vời"
+                      : ratingStars === 4
+                      ? "Tốt"
+                      : ratingStars === 3
+                      ? "Bình thường"
+                      : "Cần cải thiện"}
                   </span>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1.5">Nhận xét chi tiết</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">Nhận xét chi tiết</label>
                 <textarea
                   rows={4}
                   value={reviewComment}
                   onChange={(e) => setReviewComment(e.target.value)}
-                  placeholder="Chia sẻ cảm nhận của bạn về hướng dẫn viên, trang thiết bị, thời gian..."
-                  className="w-full p-3 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                  placeholder="Chia sẻ cảm nhận về hướng dẫn viên, trang thiết bị an toàn, trải nghiệm..."
+                  className="w-full p-3 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-cyan-600 resize-none"
                 />
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setReviewingOrder(null)}
+                  onClick={() => setReviewingSubOrder(null)}
                   className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                 >
                   Hủy
@@ -386,7 +1060,7 @@ export function Orders() {
                 <button
                   type="button"
                   onClick={handleSubmitReview}
-                  className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-dark cursor-pointer shadow-sm"
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-xs font-bold hover:shadow-sm cursor-pointer"
                 >
                   Gửi đánh giá
                 </button>
@@ -396,15 +1070,17 @@ export function Orders() {
           document.body
         )}
 
-      {/* Portaled Dispute Modal */}
-      {disputingOrder &&
+      {/* ============================================================== */}
+      {/* Portaled Dispute Modal                                         */}
+      {/* ============================================================== */}
+      {disputingSubOrder &&
         createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl relative space-y-4">
+            <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl relative space-y-4 border border-slate-100">
               <div className="flex items-center justify-between border-b pb-3">
-                <h3 className="text-lg font-bold text-slate-900">Gửi yêu cầu khiếu nại</h3>
+                <h3 className="text-base font-bold text-slate-900">Gửi khiếu nại &amp; Hỗ trợ dịch vụ</h3>
                 <button
-                  onClick={() => setDisputingOrder(null)}
+                  onClick={() => setDisputingSubOrder(null)}
                   className="text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <span className="material-symbols-outlined">close</span>
@@ -412,31 +1088,33 @@ export function Orders() {
               </div>
 
               <div className="space-y-1">
-                <span className="text-xs text-slate-500 font-medium">Mã đơn: #{disputingOrder.id.toUpperCase()}</span>
-                <p className="text-sm font-semibold text-slate-800">
-                  {FEATURED_SERVICES.find(s => s.id === disputingOrder.serviceId)?.name}
+                <span className="text-xs text-slate-500 font-mono">
+                  Mã vé: #{disputingSubOrder.id.slice(0, 8).toUpperCase()}
+                </span>
+                <p className="text-sm font-bold text-slate-800">
+                  {serviceDetails[disputingSubOrder.serviceId]?.name || "Dịch vụ du lịch biển"}
                 </p>
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1.5">Lý do khiếu nại / Hoàn tiền</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">Lý do khiếu nại</label>
                 <textarea
                   rows={4}
                   value={disputeReason}
                   onChange={(e) => setDisputeReason(e.target.value)}
-                  placeholder="Mô tả sự cố bạn gặp phải (ví dụ: đối tác hủy ca không báo trước, thời tiết xấu hoãn ca, chất lượng không đúng cam kết...)"
-                  className="w-full p-3 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                  placeholder="Mô tả sự cố bạn gặp phải (ví dụ: nhà cung cấp trễ ca không báo trước, trang thiết bị không đảm bảo an toàn...)"
+                  className="w-full p-3 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 resize-none"
                 />
               </div>
 
-              <p className="text-xs text-slate-500">
-                Đội ngũ hỗ trợ DANASEA sẽ liên hệ xác minh với đối tác và phản hồi trong vòng 24 giờ.
+              <p className="text-[11px] text-slate-500">
+                Đội ngũ điều phối và hỗ trợ khách hàng DANASEA sẽ tiếp nhận và phản hồi trong vòng 24 giờ.
               </p>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setDisputingOrder(null)}
+                  onClick={() => setDisputingSubOrder(null)}
                   className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
                 >
                   Hủy
@@ -445,9 +1123,9 @@ export function Orders() {
                   type="button"
                   disabled={!disputeReason.trim()}
                   onClick={handleSubmitDispute}
-                  className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700 cursor-pointer shadow-sm disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
                 >
-                  Xác nhận gửi khiếu nại
+                  Gửi khiếu nại
                 </button>
               </div>
             </div>
