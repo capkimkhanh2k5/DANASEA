@@ -407,15 +407,10 @@ export function Orders() {
   return (
     <main className="w-full pt-20 bg-slate-50/50 flex-1 min-h-screen">
       <div className="flex flex-col w-full">
-        {/* Top Header Banner */}
+        {/* Top Filter Tabs Bar */}
         <div className="relative w-full overflow-hidden border-b border-cyan-100/60 bg-white/80 backdrop-blur-md">
-          <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 lg:px-12 py-6">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Vé của tôi</h1>
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+          <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 lg:px-12 py-3.5">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={() => setFilter("all")}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -497,7 +492,7 @@ export function Orders() {
         </div>
 
         {/* Content Container */}
-        <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 lg:px-12 py-8">
+        <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-8 lg:px-12 py-5 sm:py-6">
           {/* Loading Skeleton */}
           {loading && (
             <div className="flex flex-col gap-6">
