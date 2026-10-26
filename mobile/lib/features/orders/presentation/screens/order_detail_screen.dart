@@ -2,12 +2,14 @@ import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/auth/auth_session.dart';
+import '../../../../core/data/conversation_repository.dart';
 import '../../../../core/data/order_repository.dart';
 import '../../../../core/data/payment_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../chat/presentation/screens/vendor_chat_screen.dart';
 import '../../../checkout/presentation/screens/checkout_screen.dart';
 import '../../../checkout/presentation/screens/e_ticket_qr_screen.dart';
 import '../../../checkout/presentation/screens/payment_result_screen.dart';
@@ -1142,6 +1144,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                     vertical: 6,
                   ),
                 ),
+                onPressed: () => _openVendorChat(masterOrder, sub),
+                icon: const Icon(
+                  Icons.chat_bubble_outline,
+                  size: 14,
+                  color: AppColors.secondary,
+                ),
+                label: LocalizedText(
+                  'Nhắn đối tác',
+                  style: AppTypography.labelSm(
+                    color: AppColors.secondary,
+                  ),
+                ),
+              ),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.borderSubtle),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                ),
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -1193,6 +1219,48 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _openVendorChat(
+    MasterOrderModel masterOrder,
+    SubOrderModel sub,
+  ) async {
+    try {
+      final conv = await ConversationRepository.instance
+          .createOrGetConversation(
+            masterOrderId: masterOrder.id,
+            vendorId: sub.vendorId.isNotEmpty ? sub.vendorId : null,
+            fallbackVendorName: sub.vendorName,
+            fallbackServiceName: sub.serviceName,
+          );
+      if (!mounted) return;
+      await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VendorChatScreen(conversation: conv),
+        ),
+      );
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: LocalizedText(e.message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText(
+              'Không thể mở hội thoại với đối tác. Vui lòng thử lại.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _openSubOrderWaiverSheet(

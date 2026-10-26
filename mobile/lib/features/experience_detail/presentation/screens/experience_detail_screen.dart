@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/mock_database_data.dart';
 import '../../../../core/data/review_repository.dart';
+import '../../../../core/data/weather_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
@@ -37,6 +38,7 @@ class ExperienceDetailScreen extends StatefulWidget {
 
 class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
   final ReviewRepository _reviewRepository = ReviewRepository();
+  final WeatherRepository _weatherRepository = WeatherRepository.instance;
   late bool _isFavorite;
   int _currentImageIndex = 0;
   bool _isDescriptionExpanded = false;
@@ -48,6 +50,10 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
   bool _loadingMoreReviews = false;
   bool _reviewActionBusy = false;
   String? _reviewsError;
+  WeatherSnapshotModel? _weatherSnapshot;
+  AdvanceBookingSafetyModel? _safetyEvaluation;
+  bool _loadingWeather = true;
+  String? _weatherError;
 
   @override
   void initState() {
@@ -55,6 +61,51 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
     _isFavorite = widget.service.isFavorite;
     _reviewTotalElements = widget.service.ratingCount;
     _loadReviews();
+    _loadServiceWeather();
+  }
+
+  Future<void> _loadServiceWeather() async {
+    setState(() {
+      _loadingWeather = true;
+      _weatherError = null;
+    });
+    final lat =
+        widget.service.latitude != 0 ? widget.service.latitude : 16.0598;
+    final lng =
+        widget.service.longitude != 0 ? widget.service.longitude : 108.2469;
+    final firstSlotId =
+        widget.service.catalogSlots.isNotEmpty
+            ? widget.service.catalogSlots.first.id
+            : null;
+    try {
+      final results = await Future.wait([
+        _weatherRepository.getCurrentWeather(latitude: lat, longitude: lng),
+        _weatherRepository.checkAdvanceSafety(
+          slotId: firstSlotId,
+          categoryId: widget.service.categoryId,
+          latitude: lat,
+          longitude: lng,
+        ),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _weatherSnapshot = results[0] as WeatherSnapshotModel;
+        _safetyEvaluation = results[1] as AdvanceBookingSafetyModel;
+        _loadingWeather = false;
+      });
+    } on AuthFailure catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _weatherError = e.message;
+        _loadingWeather = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _weatherError = 'Không thể tải dữ liệu an toàn biển.';
+        _loadingWeather = false;
+      });
+    }
   }
 
   Future<void> _loadReviews({bool loadMore = false}) async {
@@ -633,24 +684,63 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  LocalizedText(
-                                    'Điều kiện biển hôm nay: Rất tốt',
-                                    style: AppTypography.labelMd(
-                                      color: AppColors.onSecondaryContainer,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  LocalizedText(
-                                    'Sóng 0.4m • Gió 8 km/h • Đủ điều kiện an toàn xuất bến',
-                                    style: AppTypography.bodySm(
-                                      color: AppColors.onSurfaceVariant,
-                                    ).copyWith(fontSize: 12),
-                                  ),
-                                ],
-                              ),
+                              child:
+                                  _loadingWeather
+                                      ? LocalizedText(
+                                        'Đang kiểm tra điều kiện thời tiết & an toàn biển...',
+                                        style: AppTypography.bodySm(
+                                          color: AppColors.onSurfaceVariant,
+                                        ),
+                                      )
+                                      : _weatherError != null
+                                      ? Row(
+                                        children: [
+                                          Expanded(
+                                            child: LocalizedText(
+                                              _weatherError!,
+                                              style: AppTypography.bodySm(
+                                                color: AppColors.error,
+                                              ),
+                                            ),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.refresh,
+                                              size: 18,
+                                              color: AppColors.secondary,
+                                            ),
+                                            onPressed: _loadServiceWeather,
+                                          ),
+                                        ],
+                                      )
+                                      : Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          LocalizedText(
+                                            _safetyEvaluation?.alertLevel ==
+                                                    'RED'
+                                                ? 'Cảnh báo thời tiết: Hạn chế xuất bến'
+                                                : _safetyEvaluation
+                                                        ?.alertLevel ==
+                                                    'YELLOW'
+                                                ? 'Điều kiện biển hôm nay: Cần lưu ý'
+                                                : 'Điều kiện biển hôm nay: Rất tốt',
+                                            style: AppTypography.labelMd(
+                                              color:
+                                                  AppColors
+                                                      .onSecondaryContainer,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${tr(context, 'Sóng')} ${(_weatherSnapshot?.waveHeight ?? _safetyEvaluation?.peakWaveHeightM ?? 0).toStringAsFixed(1)}m • ${tr(context, 'Gió')} ${(_weatherSnapshot?.windSpeed ?? _safetyEvaluation?.peakWindSpeedKmh ?? 0).toStringAsFixed(0)} km/h • ${_safetyEvaluation?.summaryMessage ?? tr(context, 'Đủ điều kiện an toàn xuất bến')}',
+                                            style: AppTypography.bodySm(
+                                              color: AppColors.onSurfaceVariant,
+                                            ).copyWith(fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
                             ),
                           ],
                         ),

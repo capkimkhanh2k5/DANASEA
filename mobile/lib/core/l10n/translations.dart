@@ -1601,4 +1601,89 @@ const englishTranslations = <String, String>{
   "Mức hoàn tiền phê duyệt: {0}%": "Approved refund rate: {0}%",
   "Không thể tải chi tiết khiếu nại. Vui lòng thử lại.":
       "Unable to load dispute details. Please try again.",
+  "Phản hồi hội thoại không hợp lệ.": "Invalid conversation response.",
+  "Mã hội thoại không hợp lệ.": "Invalid conversation ID.",
+  "Nội dung tin nhắn không được để trống.": "Message content cannot be blank.",
+  "Phản hồi gửi tin nhắn không hợp lệ.": "Invalid send message response.",
+  "Bắt đầu cuộc trò chuyện với đối tác": "Start a conversation with the vendor",
+  "[Hình ảnh đính kèm]": "[Attached image]",
+  "Không thể tải danh sách hội thoại.": "Unable to load conversations.",
+  "Không thể tải danh sách đơn hàng để bắt đầu trò chuyện.":
+      "Unable to load orders to start a conversation.",
+  "Bạn cần có ít nhất 1 đơn hàng để bắt đầu nhắn tin với đối tác.":
+      "You need at least 1 order to start messaging a vendor.",
+  "Chọn đơn hàng để nhắn đối tác": "Select an order to message the vendor",
+  "Không thể khởi tạo cuộc trò chuyện với đối tác.":
+      "Unable to initialize conversation with the vendor.",
+  "Tạo cuộc trò chuyện từ đơn hàng": "Start conversation from order",
+  "Chưa có cuộc trò chuyện nào.": "No conversations yet.",
+  "Bắt đầu nhắn tin từ đơn hàng": "Start messaging from an order",
+  "Không thể tải nội dung cuộc trò chuyện.":
+      "Unable to load conversation messages.",
+  "Đính kèm đường dẫn hình ảnh": "Attach image URL",
+  "Nhập URL ảnh (https://...)": "Enter image URL (https://...)",
+  "Gỡ ảnh": "Remove image",
+  "Không thể gửi tin nhắn. Vui lòng kiểm tra kết nối và thử lại.":
+      "Unable to send message. Please check your connection and try again.",
+  "Làm mới tin nhắn": "Refresh messages",
+  "Trải nghiệm thể thao biển Đà Nẵng": "Da Nang ocean sports experience",
+  "Chưa có tin nhắn nào. Hãy gửi lời chào hoặc chọn câu hỏi gợi ý bên dưới!":
+      "No messages yet. Say hello or pick a suggested question below!",
+  "Nhắn đối tác": "Message vendor",
+  "Không thể mở hội thoại với đối tác. Vui lòng thử lại.":
+      "Unable to open conversation with vendor. Please try again.",
+  "Mã thông báo không hợp lệ.": "Invalid notification ID.",
+  "Phản hồi đánh dấu đã đọc không hợp lệ.":
+      "Invalid mark-as-read response.",
+  "Thông báo hệ thống": "System notification",
+  "Không thể tải danh sách thông báo.": "Unable to load notifications.",
+  "Không thể cập nhật trạng thái thông báo.":
+      "Unable to update notification status.",
+  "Đã đánh dấu đọc tất cả thông báo": "Marked all notifications as read",
+  "Không thể đánh dấu đọc tất cả thông báo.":
+      "Unable to mark all notifications as read.",
+  "Đánh dấu đã đọc tất cả": "Mark all as read",
+  "Bạn chưa có thông báo nào.": "You have no notifications yet.",
+  "Xem đơn hàng": "View order",
+  "Phản hồi dữ liệu thời tiết không hợp lệ.": "Invalid weather data response.",
+  "Phản hồi kiểm tra an toàn biển không hợp lệ.":
+      "Invalid marine safety check response.",
+  "Không thể tải dữ liệu thời tiết & hải văn.":
+      "Unable to load weather & marine data.",
+  "Chưa rõ": "Unknown",
+  "Gió vừa": "Moderate wind",
+  "Gió mạnh": "Strong wind",
+  "Sóng gợn": "Choppy waves",
+  "Sóng lớn": "High waves",
+  "Mưa nhỏ": "Light rain",
+  "Có mưa": "Rainy",
+  "Chèo SUP & Kayak": "SUP & Kayak",
+  "Lặn biển ngắm san hô": "Coral snorkeling",
+  "Mô tô nước Jetski": "Jetski",
+  "Dù lượn & Ca nô kéo": "Parasailing & Speedboat",
+  "Không thể kiểm tra an toàn cho ngày đã chọn.":
+      "Unable to check safety for the selected date.",
+  "Kiểm tra an toàn đặt trước": "Advance booking safety check",
+  "Loại hình hoạt động biển": "Ocean activity type",
+  "Ngày dự kiến": "Planned date",
+  "Phân tích điều kiện an toàn": "Analyze safety conditions",
+  "Mức cảnh báo": "Alert level",
+  "Hạn chế": "Restricted",
+  "Sóng tối đa": "Max wave",
+  "Gió tối đa": "Max wind",
+  "Cảnh báo biển động": "Rough sea warning",
+  "Lưu ý sóng gió": "Wave & wind caution",
+  "Đang cập nhật": "Updating",
+  "Điều kiện mặt biển ổn định cho các hoạt động thể thao biển.":
+      "Sea conditions are stable for ocean sports activities.",
+  "Cập nhật lúc": "Updated at",
+  "Dữ liệu khí tượng hải văn trực tiếp": "Live meteorological & marine data",
+  "Tra cứu theo ngày ›": "Check by date ›",
+  "Không thể tải dữ liệu an toàn biển.": "Unable to load marine safety data.",
+  "Đang kiểm tra điều kiện thời tiết & an toàn biển...":
+      "Checking weather & marine safety conditions...",
+  "Cảnh báo thời tiết: Hạn chế xuất bến":
+      "Weather warning: Departure restricted",
+  "Điều kiện biển hôm nay: Cần lưu ý": "Sea conditions today: Caution advised",
+  "Đủ điều kiện an toàn xuất bến": "Safe conditions for departure",
 };

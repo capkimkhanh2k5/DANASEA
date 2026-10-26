@@ -33,8 +33,12 @@ public final class CliProxyDto {
     public record ChatRequest(
             String model,
             List<Message> messages,
-            List<Map<String, Object>> tools
+            List<Map<String, Object>> tools,
+            String reasoning_effort
     ) {
+        public ChatRequest(String model, List<Message> messages, List<Map<String, Object>> tools) {
+            this(model, messages, tools, "high");
+        }
     }
 
     public record ChatResponse(List<Choice> choices) {

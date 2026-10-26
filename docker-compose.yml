@@ -78,8 +78,8 @@ services:
       AI_CLIPROXY_ENABLED: ${AI_CLIPROXY_ENABLED:-true}
       AI_CLIPROXY_BASE_URL: ${AI_CLIPROXY_BASE_URL:-http://host.docker.internal:8318/v1}
       AI_CLIPROXY_API_KEY: ${AI_CLIPROXY_API_KEY:-sk-cliproxy-pbl6-local-key}
-      AI_CLIPROXY_MODEL: ${AI_CLIPROXY_MODEL:-gemini-3.5-flash}
-      AI_CLIPROXY_FALLBACK_MODEL: ${AI_CLIPROXY_FALLBACK_MODEL:-openai/gpt-oss-120b}
+      AI_CLIPROXY_MODEL: ${AI_CLIPROXY_MODEL:-gemini-3.5-flash-lite}
+      AI_CLIPROXY_FALLBACK_MODEL: ${AI_CLIPROXY_FALLBACK_MODEL:-gpt-oss-120b-medium}
       AI_QUYET_ENABLED: ${AI_QUYET_ENABLED:-false}
       AI_QUYET_BASE_URL: ${AI_QUYET_BASE_URL:-http://quyet:8091}
       AI_QUYET_API_KEY: ${AI_QUYET_API_KEY:-}
