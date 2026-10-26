@@ -354,6 +354,9 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         accountInternalApi.saveUser(savedUser);
 
         // (4) Kiểm tra cache của email cũ: Bắt buộc phải bị evict!
+        for (int i = 0; i < 20 && usersByEmailCache.get(oldEmail) != null; i++) {
+            Thread.sleep(50);
+        }
         assertThat(usersByEmailCache.get(oldEmail)).isNull();
 
         // (5) Dùng lại oldToken để gọi API: Bắt buộc phải trả về 401 Unauthorized

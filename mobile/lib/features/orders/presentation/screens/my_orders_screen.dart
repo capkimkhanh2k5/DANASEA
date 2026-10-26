@@ -1,13 +1,16 @@
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../../core/data/mock_database_data.dart';
+import '../../../../core/auth/auth_session.dart';
+import '../../../../core/data/order_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../shared/widgets/app_pill_button.dart';
 import '../../../checkout/presentation/screens/e_ticket_qr_screen.dart';
 import 'order_detail_screen.dart';
+import 'my_bookings_screen.dart';
 
 class MyOrdersScreen extends StatefulWidget {
   final VoidCallback? onExplore;
@@ -19,7 +22,14 @@ class MyOrdersScreen extends StatefulWidget {
 }
 
 class _MyOrdersScreenState extends State<MyOrdersScreen> {
+  final OrderRepository _repository = OrderRepository();
   int _selectedFilterIndex = 0;
+  List<MasterOrderModel> _orders = [];
+  bool _loading = false;
+  bool _hasMore = false;
+  int _page = -1;
+  int _generation = 0;
+  String? _error;
 
   final List<String> _filters = [
     'Tất cả',
@@ -30,8 +40,62 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     'Đã hủy',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    AuthSession.instance.accountVersion.addListener(_onAccountChanged);
+    _loadOrders();
+  }
+
+  void _onAccountChanged() {
+    _loadOrders();
+  }
+
+  @override
+  void dispose() {
+    AuthSession.instance.accountVersion.removeListener(_onAccountChanged);
+    super.dispose();
+  }
+
+  Future<void> _loadOrders({bool loadMore = false}) async {
+    if (loadMore && _loading) return;
+    final generation = ++_generation;
+    setState(() {
+      _loading = true;
+      _error = null;
+      if (!loadMore) {
+        _orders = [];
+        _page = -1;
+        _hasMore = false;
+      }
+    });
+    try {
+      final result = await _repository.list(page: _page + 1, size: 20);
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _orders = [..._orders, ...result.content];
+        _page = result.page;
+        _hasMore = _page + 1 < result.totalPages;
+      });
+    } on AuthFailure catch (e) {
+      if (mounted && generation == _generation) {
+        setState(() => _error = e.message);
+      }
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(
+          () => _error = 'Không thể tải danh sách đơn hàng. Vui lòng thử lại.',
+        );
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
   List<MasterOrderModel> get _filteredOrders {
-    final all = MockDatabaseData.allOrders;
+    final all = _orders;
     if (_selectedFilterIndex == 0) return all;
     if (_selectedFilterIndex == 1) {
       return all
@@ -127,6 +191,20 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       ),
       body: Column(
         children: [
+          ListTile(
+            leading: const Icon(Icons.event_note, color: AppColors.secondary),
+            title: const LocalizedText('Booking của tôi'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              await Navigator.push<void>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MyBookingsScreen(),
+                ),
+              );
+              if (mounted) _loadOrders();
+            },
+          ),
           // STATUS FILTER TABS
           Container(
             height: 48,
@@ -169,23 +247,113 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
           // ORDERS LIST
           Expanded(
-            child: orders.isEmpty
-                ? _buildEmptyState()
-                : ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppShapes.gutterMobile,
-                      vertical: 10,
-                    ),
-                    itemCount: orders.length,
-                    separatorBuilder: (_, unused) =>
-                        const SizedBox(height: AppShapes.spaceMd),
-                    itemBuilder: (context, index) {
-                      return _buildOrderCard(orders[index]);
-                    },
-                  ),
+            child: RefreshIndicator(
+              onRefresh: _loadOrders,
+              child: _loading && _orders.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null && _orders.isEmpty
+                      ? _buildErrorState()
+                      : orders.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                SizedBox(
+                                  height:
+                                      MediaQuery.of(context).size.height * 0.55,
+                                  child: _buildEmptyState(),
+                                ),
+                              ],
+                            )
+                          : ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppShapes.gutterMobile,
+                                vertical: 10,
+                              ),
+                              itemCount: orders.length +
+                                  ((_loading || _error != null || _hasMore)
+                                      ? 1
+                                      : 0),
+                              separatorBuilder: (_, unused) =>
+                                  const SizedBox(height: AppShapes.spaceMd),
+                              itemBuilder: (context, index) {
+                                if (index == orders.length) {
+                                  if (_loading) {
+                                    return const Padding(
+                                      padding: EdgeInsets.all(16),
+                                      child: Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    );
+                                  }
+                                  if (_error != null) {
+                                    return Column(
+                                      children: [
+                                        LocalizedText(
+                                          _error!,
+                                          style: AppTypography.bodySm(
+                                            color: AppColors.error,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              _loadOrders(loadMore: true),
+                                          child: const LocalizedText('Thử lại'),
+                                        ),
+                                      ],
+                                    );
+                                  }
+                                  if (_hasMore) {
+                                    return AppPillButton(
+                                      label: 'Xem thêm',
+                                      onPressed: () =>
+                                          _loadOrders(loadMore: true),
+                                    );
+                                  }
+                                }
+                                return _buildOrderCard(orders[index]);
+                              },
+                            ),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(AppShapes.gutterMobile),
+      children: [
+        const SizedBox(height: 80),
+        const Icon(Icons.error_outline, size: 48, color: AppColors.error),
+        const SizedBox(height: 12),
+        Center(
+          child: LocalizedText(
+            _error!,
+            textAlign: TextAlign.center,
+            style: AppTypography.bodyMd(color: AppColors.onSurface),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.secondary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            onPressed: _loadOrders,
+            child: const LocalizedText(
+              'Thử lại',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -334,12 +502,27 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                     child: SizedBox(
                       width: 50,
                       height: 50,
-                      child: Image.network(
-                        sub.serviceImageUrl.isNotEmpty
-                            ? sub.serviceImageUrl
-                            : '',
-                        fit: BoxFit.cover,
-                      ),
+                      child: sub.serviceImageUrl.isNotEmpty
+                          ? Image.network(
+                              sub.serviceImageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: AppColors.surfaceContainerHigh,
+                                child: const Icon(
+                                  Icons.waves,
+                                  size: 20,
+                                  color: AppColors.secondary,
+                                ),
+                              ),
+                            )
+                          : Container(
+                              color: AppColors.surfaceContainerHigh,
+                              child: const Icon(
+                                Icons.waves,
+                                size: 20,
+                                color: AppColors.secondary,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -462,14 +645,15 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 8),
                   ),
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    await Navigator.push<void>(
                       context,
                       MaterialPageRoute(
                         builder: (_) =>
                             OrderDetailScreen(masterOrder: order),
                       ),
                     );
+                    if (mounted) _loadOrders();
                   },
                   child: LocalizedText(
                     'Chi tiết đơn',

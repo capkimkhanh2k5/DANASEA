@@ -29,7 +29,13 @@ jobs:
       packages: write
     strategy:
       matrix:
-        service: [backend, frontend]
+        include:
+          - service: backend
+            context: ./backend
+          - service: frontend
+            context: ./frontend
+          - service: quyet
+            context: ./ai-decision
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -45,7 +51,7 @@ jobs:
 
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          context: ./${{ matrix.service }}
+          context: ${{ matrix.context }}
           build-args: |
             ${{ matrix.service == 'frontend' && format('VITE_GOOGLE_CLIENT_ID={0}', vars.VITE_GOOGLE_CLIENT_ID) || '' }}
             ${{ matrix.service == 'frontend' && 'REQUIRE_GOOGLE_CLIENT_ID=true' || '' }}

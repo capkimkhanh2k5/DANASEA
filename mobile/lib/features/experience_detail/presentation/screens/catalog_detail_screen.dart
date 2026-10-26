@@ -6,6 +6,7 @@ import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../vendor/presentation/screens/vendor_profile_screen.dart';
 import 'experience_detail_screen.dart';
+import '../widgets/service_availability_sheet.dart';
 
 /// Public catalog details. Booking is connected separately from catalog reads.
 class CatalogDetailScreen extends StatefulWidget {
@@ -103,8 +104,10 @@ class _CatalogDetailScreenState extends State<CatalogDetailScreen> {
             builder: (_) => VendorProfileScreen(vendorId: service.vendorId),
           ));
         },
-        onOpenBooking: () => ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: LocalizedText('Đặt chỗ hiện chưa khả dụng.')),
+        onOpenBooking: () => showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => ServiceAvailabilitySheet(service: service),
         ),
       );
     }

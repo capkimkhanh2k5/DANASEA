@@ -3,8 +3,10 @@ package com.danasea.backend.modules.order.presentation.controllers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort;
 import com.danasea.backend.modules.order.application.OrderPaymentService;
 import com.danasea.backend.modules.order.application.services.DisruptionDecisionService;
+import com.danasea.backend.modules.order.domain.ports.CommissionPolicyPort;
 import com.danasea.backend.modules.order.domain.ports.ServiceWaiverLookupPort;
 import com.danasea.backend.shared.i18n.LocalizedContentSelector;
 
@@ -23,6 +25,12 @@ class InternalPaymentWebhookProfileTest {
                             ServiceWaiverLookupPort.class,
                             () -> mock(ServiceWaiverLookupPort.class))
                     .withBean(LocalizedContentSelector.class, LocalizedContentSelector::new)
+                    .withBean(
+                            CommissionPolicyPort.class,
+                            () -> mock(CommissionPolicyPort.class))
+                    .withBean(
+                            FlashSaleBookingPort.class,
+                            () -> mock(FlashSaleBookingPort.class))
                     .withBean(OrderPaymentService.class, () -> mock(OrderPaymentService.class))
                     .withUserConfiguration(InternalPaymentWebhookController.class);
 

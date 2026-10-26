@@ -5,11 +5,9 @@ import java.util.UUID;
 
 /**
  * Domain Port xác định tỷ lệ hoa hồng cho vendor.
- * Mặc định fallback là 10% (0.10).
+ * Missing configuration must fail explicitly; there is no default rate.
  */
 public interface CommissionPolicyPort {
-
-    BigDecimal DEFAULT_COMMISSION_RATE = new BigDecimal("0.10");
 
     BigDecimal getCommissionRate(UUID vendorId);
 }

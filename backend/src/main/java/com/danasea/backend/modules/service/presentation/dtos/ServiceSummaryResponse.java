@@ -8,6 +8,7 @@ import lombok.Data;
 @Data
 @Builder
 public class ServiceSummaryResponse {
+    private java.util.List<com.danasea.backend.modules.flashsale.application.FlashSaleService.PublicOffer> flashSales;
     private UUID id;
     private String name;
     private String shortDescription;

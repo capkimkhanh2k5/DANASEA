@@ -6,20 +6,20 @@ import hashlib
 import ipaddress
 import json
 import os
-from pathlib import Path
 import re
 import secrets
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 EDGE = ipaddress.ip_network('172.30.10.0/28')
 SECRETS = ['APP_JWT_SECRET', 'APP_CHECKIN_QR_SECRET', 'APP_PAYMENT_WEBHOOK_SECRET',
            'POSTGRES_APP_PASSWORD', 'SPRING_REDIS_PASSWORD', 'SPRING_RABBITMQ_PASSWORD',
-           'RABBITMQ_ADMIN_PASSWORD', 'AI_CLIPROXY_API_KEY', 'CLIPROXY_MANAGEMENT_KEY']
+           'RABBITMQ_ADMIN_PASSWORD', 'AI_QUYET_API_KEY', 'AI_CLIPROXY_API_KEY', 'CLIPROXY_MANAGEMENT_KEY']
 DEFAULTS = {'POSTGRES_APP_USER': 'danasea_app', 'SPRING_RABBITMQ_USERNAME': 'danasea_app',
             'SPRING_RABBITMQ_VIRTUAL_HOST': '/danasea', 'RABBITMQ_ADMIN_USER': 'danasea_admin'}
-KEYS = SECRETS + list(DEFAULTS) + ['POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'CLIPROXY_UID', 'CLIPROXY_GID']
+KEYS = SECRETS + list(DEFAULTS) + ['POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'CLIPROXY_UID', 'CLIPROXY_GID', 'QUYET_MODEL_DIR']
 
 
 def command(args, **kwargs):
@@ -164,6 +164,46 @@ def validate_frontend_config(path):
         raise ValueError('Public Nginx config must be readable by its container user and not group/other writable (use chmod 644).')
 
 
+QUYET_MANIFEST_SHA256 = '9ef88d40e9fe14003195b15d181e3bd7bb2802ba5100998c198338b7a640a457'
+
+
+def validate_quyet_model(directory):
+    path = Path(directory)
+    if not directory or not path.is_absolute() or not path.is_dir():
+        raise ValueError('QUYET_MODEL_DIR must be an existing absolute model directory.')
+    manifest = path / 'MANIFEST.sha256'
+    if hashlib.sha256(manifest.read_bytes()).hexdigest() != QUYET_MANIFEST_SHA256:
+        raise ValueError('Quyet manifest differs from the pinned Small release.')
+    covered = set()
+    for line in manifest.read_text().splitlines():
+        if not line.strip():
+            continue
+        expected, name = line.split(maxsplit=1)
+        name = name.strip().lstrip('*')
+        candidate = (path / name).resolve()
+        if not candidate.is_relative_to(path.resolve()) or not candidate.is_file():
+            raise ValueError('Invalid Quyet model file path.')
+        # The image runs UID 10001. Require public read/traverse bits within the mount;
+        # parent host directories are traversed by Docker, not by the container user.
+        if not candidate.stat().st_mode & 0o004:
+            raise ValueError('Quyet model files must be readable by container UID 10001.')
+        for parent in [path.resolve(), *candidate.relative_to(path.resolve()).parents]:
+            parent = parent if parent.is_absolute() else path.resolve() / parent
+            if not parent.stat().st_mode & 0o001:
+                raise ValueError('Quyet model directories require container traversal permission.')
+        digest = hashlib.sha256()
+        with candidate.open('rb') as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b''):
+                digest.update(chunk)
+        if digest.hexdigest() != expected:
+            raise ValueError('Quyet model checksum mismatch.')
+        covered.add(name)
+    if 'model.safetensors' not in covered:
+        raise ValueError('Quyet manifest must cover model.safetensors.')
+    if not manifest.stat().st_mode & 0o004:
+        raise ValueError('Quyet manifest must be readable by container UID 10001.')
+
+
 def check(root, values):
     for key in SECRETS:
         if placeholder(values[key]) or len(values[key]) < 32:
@@ -213,6 +253,7 @@ def check(root, values):
     auth = root / 'cli-proxy/auths'
     if not auth.is_dir() or auth.stat().st_uid != uid or any(p.stat().st_uid != uid for p in auth.glob('*')):
         raise ValueError('OAuth directory/files must belong to the configured proxy UID. Preserve tokens when fixing ownership.')
+    validate_quyet_model(values['QUYET_MODEL_DIR'])
     command(['docker', 'compose', '--env-file', str(root / '.env'), '-f', str(root / 'docker-compose.prod.yml'), 'config', '--quiet'])
     ids = command(['docker', 'network', 'ls', '-q']).split()
     networks = json.loads(command(['docker', 'network', 'inspect', *ids])) if ids else []

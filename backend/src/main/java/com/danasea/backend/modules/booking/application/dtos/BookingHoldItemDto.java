@@ -7,8 +7,12 @@ public record BookingHoldItemDto(
         Integer quantity,
         UUID optionId,
         Integer participantsCount,
-        boolean allowSplit
+        boolean allowSplit,
+        UUID flashSaleId
 ) {
+    public BookingHoldItemDto(UUID slotId,Integer quantity,UUID optionId,Integer participantsCount,boolean allowSplit) {
+        this(slotId,quantity,optionId,participantsCount,allowSplit,null);
+    }
     public BookingHoldItemDto(UUID slotId, Integer quantity, UUID optionId, Integer participantsCount) {
         this(slotId, quantity, optionId, participantsCount, false);
     }

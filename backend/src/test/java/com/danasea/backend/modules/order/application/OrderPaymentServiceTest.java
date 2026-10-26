@@ -64,6 +64,7 @@ class OrderPaymentServiceTest {
     @Mock private VendorInternalApi vendorInternalApi;
     @Mock private ConfirmBookingUseCase confirmBookingUseCase;
     @Mock private CreatePaymentIntentUseCase createPaymentIntentUseCase;
+    @Mock private com.danasea.backend.modules.order.domain.ports.CommissionPolicyPort commissionPolicy;
 
     private PaymentWebhookSigner signer;
     private OrderPaymentService service;
@@ -85,6 +86,8 @@ class OrderPaymentServiceTest {
                 confirmBookingUseCase,
                 new ObjectMapper(),
                 createPaymentIntentUseCase);
+        service.setConfiguredCommission(commissionPolicy);
+        org.mockito.Mockito.lenient().when(commissionPolicy.getCommissionRate(any())).thenReturn(new BigDecimal("0.10"));
     }
 
     @Test

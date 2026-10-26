@@ -30,9 +30,29 @@ final class ReportFinancialLedger {
             BigDecimal cash,
             BigDecimal refunds,
             BigDecimal commission,
-            boolean payment) {
-        BigDecimal payout() {
-            return cash.subtract(refunds).subtract(commission);
+            boolean payment,
+            BigDecimal payout) {
+        public Entry(
+                UUID subOrderId,
+                UUID vendorId,
+                OffsetDateTime occurredAt,
+                BigDecimal gmv,
+                BigDecimal discount,
+                BigDecimal cash,
+                BigDecimal refunds,
+                BigDecimal commission,
+                boolean payment) {
+            this(
+                    subOrderId,
+                    vendorId,
+                    occurredAt,
+                    gmv,
+                    discount,
+                    cash,
+                    refunds,
+                    commission,
+                    payment,
+                    payment ? cash.subtract(commission) : commission.subtract(refunds));
         }
     }
 
@@ -71,6 +91,9 @@ final class ReportFinancialLedger {
                 if (vendorId != null && !vendorId.equals(order.vendorId())) continue;
                 BigDecimal gross = safe(order.subtotalAmount());
                 BigDecimal cash = cashShares.getOrDefault(order.id(), BigDecimal.ZERO);
+                BigDecimal comm = commission(order, BigDecimal.ZERO);
+                BigDecimal basis = effectiveCommissionBasis(order);
+                BigDecimal payout = basis.subtract(comm);
                 result.add(
                         new Entry(
                                 order.id(),
@@ -80,8 +103,9 @@ final class ReportFinancialLedger {
                                 gross.subtract(cash),
                                 cash,
                                 BigDecimal.ZERO,
-                                commission(order, BigDecimal.ZERO),
-                                true));
+                                comm,
+                                true,
+                                payout));
             }
         }
         // Read the full refund history for each affected line to reverse rounded commission once.
@@ -95,25 +119,41 @@ final class ReportFinancialLedger {
                                         r.status() == RefundStatus.PROCESSED
                                                 && r.processedAt() != null)
                         .collect(Collectors.groupingBy(RefundRecord::subOrderId));
-        Map<UUID, BigDecimal> reversals = new HashMap<>();
+        Map<UUID, BigDecimal> commissionReversals = new HashMap<>();
+        Map<UUID, BigDecimal> payoutReversals = new HashMap<>();
         for (Map.Entry<UUID, List<RefundRecord>> group : history.entrySet()) {
             SubOrderRecord order = orders.get(group.getKey());
             if (order == null) continue;
+            BigDecimal basis = effectiveCommissionBasis(order);
+            BigDecimal cash = effectiveCashPayable(order);
             BigDecimal cumulative = BigDecimal.ZERO;
             for (RefundRecord refund :
                     group.getValue().stream()
                             .sorted(
                                     Comparator.comparing(RefundRecord::processedAt)
                                             .thenComparing(r -> r.id().toString()))
-                            .toList()) {
-                BigDecimal before = commission(order, cumulative);
+                                    .toList()) {
+                BigDecimal beforeBasis = basis.subtract(cash.signum() > 0 ? basis.multiply(cumulative).divide(cash, 2, RoundingMode.HALF_UP) : cumulative).max(BigDecimal.ZERO);
+                BigDecimal beforeComm = commission(order, cumulative);
+
                 cumulative = cumulative.add(safe(refund.amount()));
-                reversals.put(refund.id(), before.subtract(commission(order, cumulative)));
+
+                BigDecimal afterBasis = basis.subtract(cash.signum() > 0 ? basis.multiply(cumulative).divide(cash, 2, RoundingMode.HALF_UP) : cumulative).max(BigDecimal.ZERO);
+                BigDecimal afterComm = commission(order, cumulative);
+
+                BigDecimal commReversal = beforeComm.subtract(afterComm);
+                BigDecimal basisReversal = beforeBasis.subtract(afterBasis);
+                BigDecimal payoutReversal = basisReversal.subtract(commReversal);
+
+                commissionReversals.put(refund.id(), commReversal);
+                payoutReversals.put(refund.id(), payoutReversal);
             }
         }
         for (RefundRecord refund : refunds) {
             SubOrderRecord order = orders.get(refund.subOrderId());
             if (order == null || (vendorId != null && !vendorId.equals(order.vendorId()))) continue;
+            BigDecimal commReversal = commissionReversals.getOrDefault(refund.id(), BigDecimal.ZERO);
+            BigDecimal payoutReversal = payoutReversals.getOrDefault(refund.id(), BigDecimal.ZERO);
             result.add(
                     new Entry(
                             order.id(),
@@ -123,8 +163,9 @@ final class ReportFinancialLedger {
                             BigDecimal.ZERO,
                             BigDecimal.ZERO,
                             safe(refund.amount()),
-                            reversals.getOrDefault(refund.id(), BigDecimal.ZERO).negate(),
-                            false));
+                            commReversal.negate(),
+                            false,
+                            payoutReversal.negate()));
         }
         return result;
     }
@@ -137,12 +178,27 @@ final class ReportFinancialLedger {
         return value == null ? BigDecimal.ZERO : value;
     }
 
-    private static BigDecimal commission(SubOrderRecord order, BigDecimal refunded) {
-        BigDecimal remaining = safe(order.subtotalAmount()).subtract(refunded).max(BigDecimal.ZERO);
+    private static BigDecimal effectiveCashPayable(SubOrderRecord o) {
+        if (o.finalAmount() != null) return safe(o.finalAmount());
+        return safe(o.subtotalAmount());
+    }
+
+    private static BigDecimal effectiveCommissionBasis(SubOrderRecord o) {
+        if (o.commissionBasisAmount() != null) return safe(o.commissionBasisAmount());
+        return safe(o.subtotalAmount());
+    }
+
+    private static BigDecimal commission(SubOrderRecord order, BigDecimal refundedCash) {
+        BigDecimal basis = effectiveCommissionBasis(order);
+        BigDecimal cash = effectiveCashPayable(order);
+        BigDecimal reversedBasis = cash.signum() > 0
+                ? basis.multiply(safe(refundedCash)).divide(cash, 2, RoundingMode.HALF_UP)
+                : safe(refundedCash);
+        BigDecimal remaining = basis.subtract(reversedBasis).max(BigDecimal.ZERO);
         if (order.commissionRate() != null) {
             return remaining.multiply(order.commissionRate()).setScale(2, RoundingMode.HALF_UP);
         }
-        BigDecimal gross = safe(order.subtotalAmount());
+        BigDecimal gross = effectiveCommissionBasis(order);
         return gross.signum() == 0
                 ? BigDecimal.ZERO
                 : safe(order.commissionAmount())
@@ -154,7 +210,7 @@ final class ReportFinancialLedger {
     private static Map<UUID, BigDecimal> allocate(BigDecimal total, List<SubOrderRecord> orders) {
         BigDecimal weight =
                 orders.stream()
-                        .map(o -> safe(o.subtotalAmount()))
+                        .map(ReportFinancialLedger::effectiveCashPayable)
                         .reduce(BigDecimal.ZERO, BigDecimal::add);
         if (weight.signum() <= 0) return Map.of();
         Map<UUID, BigDecimal> amounts = new HashMap<>();
@@ -162,7 +218,7 @@ final class ReportFinancialLedger {
         BigDecimal allocated = BigDecimal.ZERO;
         for (SubOrderRecord order : orders) {
             BigDecimal exact =
-                    total.multiply(safe(order.subtotalAmount()))
+                    total.multiply(effectiveCashPayable(order))
                             .divide(weight, 12, RoundingMode.HALF_UP);
             BigDecimal rounded = exact.setScale(2, RoundingMode.DOWN);
             amounts.put(order.id(), rounded);

@@ -99,18 +99,27 @@ class CategoryModel {
 
 enum ServiceStatus { draft, pendingReview, published, rejected, paused }
 
+class CatalogOption {
+  final String id, name;
+  const CatalogOption({required this.id, required this.name});
+}
+
 class CatalogSlot {
   final String id, date, startTime, endTime;
+  final String? optionId;
   final int? availableCapacity;
+  final int? maxPaxPerPackage;
   final num? price;
   final String? pricingUnit;
   final bool bookable;
   const CatalogSlot({
     required this.id,
+    this.optionId,
     required this.date,
     required this.startTime,
     required this.endTime,
     this.availableCapacity,
+    this.maxPaxPerPackage,
     this.price,
     this.pricingUnit,
     required this.bookable,
@@ -151,6 +160,7 @@ class ServiceModel {
       safetyRules;
   final bool? waiverRequired;
   final List<CatalogSlot> catalogSlots;
+  final List<CatalogOption> options;
   final List<String> availableSlots;
 
   const ServiceModel({
@@ -187,10 +197,11 @@ class ServiceModel {
     this.safetyRules = '',
     this.waiverRequired,
     this.catalogSlots = const [],
+    this.options = const [],
     this.availableSlots = const [],
   });
 
-  ServiceModel copyWith({bool? isFavorite}) {
+  ServiceModel copyWith({bool? isFavorite, List<CatalogSlot>? catalogSlots}) {
     return ServiceModel(
       id: id,
       vendorId: vendorId,
@@ -224,7 +235,8 @@ class ServiceModel {
       cancellationPolicy: cancellationPolicy,
       safetyRules: safetyRules,
       waiverRequired: waiverRequired,
-      catalogSlots: catalogSlots,
+      catalogSlots: catalogSlots ?? this.catalogSlots,
+      options: options,
       availableSlots: availableSlots,
     );
   }
@@ -278,12 +290,13 @@ enum SubOrderStatus {
   refunded,
 }
 
-enum PaymentProvider { vnpay, momo, sepay }
+enum PaymentProvider { vnpay, momo, sepay, paypal }
 
 enum PaymentStatus { pending, success, failed, refunded }
 
 class MasterOrderModel {
   final String id; // Code, e.g. "DNS-8924"
+  final String? bookingId;
   final String customerId;
   final MasterOrderStatus status;
   final int totalAmount;
@@ -291,10 +304,12 @@ class MasterOrderModel {
   final String? discountCodeId;
   final String? discountCode;
   final DateTime createdAt;
+  final DateTime? updatedAt;
   final List<SubOrderModel> subOrders;
 
   const MasterOrderModel({
     required this.id,
+    this.bookingId,
     required this.customerId,
     required this.status,
     required this.totalAmount,
@@ -302,6 +317,7 @@ class MasterOrderModel {
     this.discountCodeId,
     this.discountCode,
     required this.createdAt,
+    this.updatedAt,
     required this.subOrders,
   });
 
@@ -324,9 +340,20 @@ class SubOrderModel {
   final int quantity;
   final int unitPrice;
   final int subtotalAmount;
+  final int discountAmount;
+  final int finalAmount;
   final SubOrderStatus status;
+  final String? rawStatus;
+  final bool waiverRequired;
+  final int? waiverVersion;
+  final String? waiverContent;
+  final String? waiverLanguage;
+  final bool waiverFallbackUsed;
   final bool waiverAccepted;
   final DateTime? waiverAcceptedAt;
+  final String? waiverAcceptedBy;
+  final String? waiverAcceptedLanguage;
+  final String? cancellationPolicyVersion;
   final String qrSecret; // UUID for verification
   final DateTime? checkedInAt;
 
@@ -345,12 +372,24 @@ class SubOrderModel {
     required this.quantity,
     required this.unitPrice,
     required this.subtotalAmount,
+    int? discountAmount,
+    int? finalAmount,
     required this.status,
+    this.rawStatus,
+    this.waiverRequired = false,
+    this.waiverVersion,
+    this.waiverContent,
+    this.waiverLanguage,
+    this.waiverFallbackUsed = false,
     this.waiverAccepted = true,
     this.waiverAcceptedAt,
+    this.waiverAcceptedBy,
+    this.waiverAcceptedLanguage,
+    this.cancellationPolicyVersion,
     required this.qrSecret,
     this.checkedInAt,
-  });
+  }) : discountAmount = discountAmount ?? 0,
+       finalAmount = finalAmount ?? subtotalAmount;
 }
 
 // ==========================================
@@ -365,12 +404,17 @@ class RefundModel {
   final String id;
   final String subOrderId;
   final String subOrderCode;
+  final String? masterOrderId;
   final String serviceName;
   final int amount;
   final double refundPercentage;
   final RefundReason reason;
+  final String? rawReason;
   final RefundStatus status;
   final String originalPaymentMethod;
+  final String? providerTransactionId;
+  final String? providerRefundId;
+  final String? lastError;
   final DateTime? processedAt;
   final DateTime createdAt;
 
@@ -378,12 +422,17 @@ class RefundModel {
     required this.id,
     required this.subOrderId,
     required this.subOrderCode,
+    this.masterOrderId,
     required this.serviceName,
     required this.amount,
     required this.refundPercentage,
     required this.reason,
+    this.rawReason,
     required this.status,
     required this.originalPaymentMethod,
+    this.providerTransactionId,
+    this.providerRefundId,
+    this.lastError,
     this.processedAt,
     required this.createdAt,
   });
@@ -393,33 +442,47 @@ enum DisputeStatus { open, inReview, resolved, rejected }
 
 class DisputeModel {
   final String id; // e.g. "DISP-1042"
+  final String? orderId;
   final String subOrderId;
   final String subOrderCode;
   final String serviceName;
   final String vendorName;
   final String raisedBy;
   final String category;
+  final String? rawReason;
   final String description;
   final DisputeStatus status;
+  final String? rawStatus;
+  final double? refundPercentage;
   final String? resolutionNote;
   final DateTime? resolvedAt;
   final DateTime createdAt;
   final List<String> attachmentUrls;
+  final String? vendorResponse;
+  final List<String> vendorEvidenceUrls;
+  final DateTime? vendorRespondedAt;
 
   const DisputeModel({
     required this.id,
+    this.orderId,
     required this.subOrderId,
     required this.subOrderCode,
     required this.serviceName,
     required this.vendorName,
     required this.raisedBy,
     required this.category,
+    this.rawReason,
     required this.description,
     required this.status,
+    this.rawStatus,
+    this.refundPercentage,
     this.resolutionNote,
     this.resolvedAt,
     required this.createdAt,
     this.attachmentUrls = const [],
+    this.vendorResponse,
+    this.vendorEvidenceUrls = const [],
+    this.vendorRespondedAt,
   });
 }
 
@@ -440,7 +503,12 @@ class ReviewModel {
   final List<String> images;
   final String? vendorReply;
   final DateTime? vendorRepliedAt;
+  final bool isFlagged;
+  final bool isVisible;
+  final String? flagReason;
+  final String? moderationNote;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   const ReviewModel({
     required this.id,
@@ -455,7 +523,12 @@ class ReviewModel {
     this.images = const [],
     this.vendorReply,
     this.vendorRepliedAt,
+    this.isFlagged = false,
+    this.isVisible = true,
+    this.flagReason,
+    this.moderationNote,
     required this.createdAt,
+    this.updatedAt,
   });
 }
 

@@ -25,6 +25,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping({"/api/services", "/api/v1/catalog"})
 @RequiredArgsConstructor
 public class CatalogController {
+    private com.danasea.backend.modules.flashsale.application.FlashSaleService flashSale;
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setFlashSale(com.danasea.backend.modules.flashsale.application.FlashSaleService flashSale) { this.flashSale=flashSale; }
 
     private final SearchServicesUseCase searchServicesUseCase;
     private final GetPublicServiceDetailUseCase getServiceDetailUseCase;
@@ -83,7 +86,9 @@ public class CatalogController {
         List<ServiceSummaryResult> results = searchServicesUseCase.execute(criteria);
         long total = searchServicesUseCase.count(criteria);
 
+        var offers=flashSale!=null?flashSale.active():java.util.List.<com.danasea.backend.modules.flashsale.application.FlashSaleService.PublicOffer>of();
         List<ServiceSummaryResponse> responses = results.stream().map(r -> ServiceSummaryResponse.builder()
+                .flashSales(offers.stream().filter(o->o.serviceId().equals(r.getId())).toList())
                 .id(r.getId())
                 .name(r.getName())
                 .shortDescription(r.getShortDescription())
@@ -109,6 +114,7 @@ public class CatalogController {
         ServiceDetailResult result = getServiceDetailUseCase.execute(id, userId, sessionId);
 
         ServiceDetailResponse response = ServiceDetailResponse.builder()
+                .flashSales(flashSale!=null?flashSale.active().stream().filter(o->o.serviceId().equals(id)).toList():java.util.List.of())
                 .id(result.getId())
                 .name(result.getName())
                 .description(result.getDescription())

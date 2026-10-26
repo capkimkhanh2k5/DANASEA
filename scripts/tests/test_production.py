@@ -1,13 +1,15 @@
+import hashlib
 import importlib.util
 import json
 import os
-from pathlib import Path
 import secrets
 import shlex
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location('production', ROOT / 'scripts/production.py')
@@ -115,6 +117,39 @@ class ProductionPreparationTest(unittest.TestCase):
             config.chmod(0o644)
             self.module.validate_frontend_config(config)
 
+    def test_quyet_model_rejects_missing_tampered_unreadable_and_escaping_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o755)
+            weights = root / 'model.safetensors'
+            weights.write_bytes(b'fixture weights')
+            weights.chmod(0o644)
+            manifest = root / 'MANIFEST.sha256'
+            manifest.write_text(hashlib.sha256(weights.read_bytes()).hexdigest() + '  model.safetensors\n')
+            manifest.chmod(0o644)
+            with patch.object(self.module, 'QUYET_MANIFEST_SHA256', hashlib.sha256(manifest.read_bytes()).hexdigest()):
+                self.module.validate_quyet_model(str(root))
+                weights.chmod(0o600)
+                with self.assertRaisesRegex(ValueError, 'readable'):
+                    self.module.validate_quyet_model(str(root))
+                weights.chmod(0o644)
+                weights.write_bytes(b'tampered')
+                with self.assertRaisesRegex(ValueError, 'checksum'):
+                    self.module.validate_quyet_model(str(root))
+                weights.unlink()
+                with self.assertRaisesRegex(ValueError, 'file path'):
+                    self.module.validate_quyet_model(str(root))
+            manifest.write_text('0' * 64 + '  ../outside\n')
+            with (
+                patch.object(self.module, 'QUYET_MANIFEST_SHA256', hashlib.sha256(manifest.read_bytes()).hexdigest()),
+                self.assertRaisesRegex(ValueError, 'file path'),
+            ):
+                self.module.validate_quyet_model(str(root))
+            with self.assertRaisesRegex(ValueError, 'pinned'):
+                self.module.validate_quyet_model(str(root))
+        with self.assertRaisesRegex(ValueError, 'absolute'):
+            self.module.validate_quyet_model('')
+
     def test_database_role_cannot_be_the_migration_owner(self):
         with self.assertRaises(ValueError):
             self.module.runtime_role_sql({'POSTGRES_APP_USER': 'owner', 'POSTGRES_USER': 'owner', 'POSTGRES_DB': 'app', 'POSTGRES_APP_PASSWORD': secrets.token_hex(32)})
@@ -125,7 +160,7 @@ class ProductionPreparationTest(unittest.TestCase):
 
 
 class DeploymentGuardTest(unittest.TestCase):
-    def simulate_failed_deploy(self, infrastructure_changed):
+    def simulate_failed_deploy(self, infrastructure_changed, previous_worker=True):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             binary = root / 'bin'
@@ -160,9 +195,13 @@ if name == 'docker':
     if 'config' in args:
         previous = any('rollback-source.yml' in arg for arg in args)
         redis = 'redis:7.0-alpine' if previous and os.environ['DANASEA_TEST_INFRA_CHANGED'] == '1' else 'redis:7.4-alpine'
-        print(json.dumps({'services': {'postgres': {'image': 'postgres:17-alpine'},
-              'redis': {'image': redis}, 'rabbitmq': {'image': 'rabbitmq:4.3-alpine'}},
-              'networks': {}, 'volumes': {}}))
+        payload = {'services': {'postgres': {'image': 'postgres:17-alpine'},
+              'redis': {'image': redis}, 'rabbitmq': {'image': 'rabbitmq:4.3-alpine'},
+              'quyet': {'image': 'quyet:old' if previous else 'quyet:new', 'read_only': True}},
+              'networks': {}, 'volumes': {}}
+        if previous and os.environ['DANASEA_TEST_PREVIOUS_WORKER'] == '0':
+            payload['services'].pop('quyet')
+        print(json.dumps(payload))
     if 'up' in args:
         calls = [json.loads(line) for line in log.read_text().splitlines()]
         count = sum(row[0] == 'docker' and 'up' in row for row in calls)
@@ -182,6 +221,7 @@ if name == 'docker':
                 'SSH_ORIGINAL_COMMAND': 'deploy ' + 'a' * 40,
                 'DANASEA_TEST_CALLS': str(log),
                 'DANASEA_TEST_INFRA_CHANGED': '1' if infrastructure_changed else '0',
+                'DANASEA_TEST_PREVIOUS_WORKER': '1' if previous_worker else '0',
             }
             result = subprocess.run(['bash', str(ROOT / 'scripts/deploy.sh')],
                                     env=environment, capture_output=True, text=True)
@@ -206,18 +246,53 @@ if name == 'docker':
         self.assertEqual(result.returncode, 1)
         self.assertEqual(len(updates), 2)
         self.assertIn('--no-deps', updates[1])
-        self.assertEqual(updates[1][-2:], ['backend', 'frontend'])
+        self.assertEqual(updates[1][-3:], ['quyet', 'backend', 'frontend'])
         self.assertNotIn('fake-diagnostic-password', result.stdout)
+
+    def test_first_quyet_release_blocks_rollback_to_backend_without_worker(self):
+        result, calls = self.simulate_failed_deploy(False, previous_worker=False)
+        updates = [call for call in calls if call[0] == 'docker' and 'up' in call]
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(len(updates), 1)
+        self.assertIn('Rollback blocked', result.stdout)
 
     def test_private_proxy_addresses_match_compose_and_backend(self):
         with tempfile.TemporaryDirectory() as directory:
             envfile = Path(directory) / '.env'
             text = (ROOT / '.env.example').read_text()
-            for key in ['POSTGRES_APP_PASSWORD', 'APP_CHECKIN_QR_SECRET', 'APP_PAYMENT_WEBHOOK_SECRET', 'SPRING_REDIS_PASSWORD', 'SPRING_RABBITMQ_PASSWORD', 'AI_CLIPROXY_API_KEY']:
+            for key in ['POSTGRES_APP_PASSWORD', 'APP_CHECKIN_QR_SECRET', 'APP_PAYMENT_WEBHOOK_SECRET', 'SPRING_REDIS_PASSWORD', 'SPRING_RABBITMQ_PASSWORD', 'AI_CLIPROXY_API_KEY', 'AI_QUYET_API_KEY']:
                 text = text.replace(key + '=\n', key + '=' + secrets.token_hex(32) + '\n')
+            text = text.replace('QUYET_MODEL_DIR=\n', 'QUYET_MODEL_DIR=/tmp/quyet-test-model\n')
+            # The example targets a backend on the host; this fixture targets Docker production.
+            text = text.replace('AI_QUYET_ENABLED=false\n', 'AI_QUYET_ENABLED=true\n')
+            text = text.replace('AI_QUYET_BASE_URL=http://127.0.0.1:8091\n',
+                                'AI_QUYET_BASE_URL=http://quyet:8091\n')
             envfile.write_text(text)
-            result = subprocess.run(['docker', 'compose', '--env-file', str(envfile), '-f', str(ROOT / 'docker-compose.prod.yml'), 'config', '--format', 'json'], capture_output=True, text=True, check=True)
+            environment = {key: value for key, value in os.environ.items()
+                           if key not in ['AI_QUYET_ENABLED', 'AI_QUYET_BASE_URL']}
+            command = ['docker', 'compose', '--env-file', str(envfile), '-f', str(ROOT / 'docker-compose.prod.yml'), 'config', '--format', 'json']
+            result = subprocess.run(command, env=environment, capture_output=True, text=True, check=True)
             config = json.loads(result.stdout)
+            # Explicit .env values must remain configurable, including disabling backend calls.
+            envfile.write_text(text.replace('AI_QUYET_ENABLED=true\n', 'AI_QUYET_ENABLED=false\n')
+                              .replace('AI_QUYET_BASE_URL=http://quyet:8091\n',
+                                       'AI_QUYET_BASE_URL=http://external-worker:8091\n'))
+            override = subprocess.run(command, env=environment, capture_output=True, text=True, check=True)
+            overridden = json.loads(override.stdout)['services']['backend']['environment']
+            self.assertEqual(overridden['AI_QUYET_ENABLED'], 'false')
+            self.assertEqual(overridden['AI_QUYET_BASE_URL'], 'http://external-worker:8091')
+        worker = config['services']['quyet']
+        backend = config['services']['backend']
+        self.assertEqual(backend['environment']['AI_QUYET_ENABLED'], 'true')
+        self.assertEqual(backend['environment']['AI_QUYET_BASE_URL'], 'http://quyet:8091')
+        self.assertEqual(backend['environment']['AI_QUYET_API_KEY'], worker['environment']['AI_QUYET_API_KEY'])
+        self.assertEqual(backend['depends_on']['quyet']['condition'], 'service_healthy')
+        self.assertNotIn('ports', worker)
+        self.assertTrue(worker['volumes'][0]['read_only'])
+        source = (ROOT / 'docker-compose.prod.yml').read_text()
+        worker_source = source.split('\n  quyet:\n', 1)[1].split('\n  cli-proxy-api:\n', 1)[0]
+        self.assertIn('        bind:\n          create_host_path: false\n', worker_source)
+        self.assertIs(worker['volumes'][0].get('bind', {}).get('create_host_path', False), False)
         network = config['networks']['app']['ipam']['config'][0]
         self.assertEqual(network, {'subnet': '172.30.10.0/28', 'gateway': '172.30.10.1'})
         frontend = config['services']['frontend']['networks']['app']['ipv4_address']

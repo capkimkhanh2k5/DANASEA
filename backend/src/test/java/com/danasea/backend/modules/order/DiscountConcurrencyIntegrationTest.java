@@ -41,6 +41,7 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.presentation.dtos.UpdateDiscountCodeRequest;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -85,6 +86,11 @@ class DiscountConcurrencyIntegrationTest extends BaseSecurityIntegrationTest {
 
     @MockitoBean(name = "payPalPaymentAdapter")
     private PaymentGatewayPort gateway;
+
+    @BeforeEach
+    void setupCommissions() {
+        org.mockito.Mockito.lenient().when(commissions.getCommissionRate(any())).thenReturn(new BigDecimal("0.10"));
+    }
 
     @Test
     void simultaneousOrdersRespectPerCustomerLimit() throws Exception {

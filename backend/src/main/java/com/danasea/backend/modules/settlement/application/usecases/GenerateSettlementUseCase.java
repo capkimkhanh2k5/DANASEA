@@ -184,7 +184,9 @@ public class GenerateSettlementUseCase {
             boolean hasActiveDispute = activeDisputeSubOrderIds.contains(so.getId());
 
             BigDecimal subtotal = so.getSubtotalAmount() != null ? so.getSubtotalAmount() : BigDecimal.ZERO;
-            BigDecimal rate = so.getCommissionRate() != null ? so.getCommissionRate() : SettlementCalculationEngine.DEFAULT_COMMISSION_RATE;
+            BigDecimal rate = so.getCommissionRate();
+            if(rate==null) throw new com.danasea.backend.modules.settlement.domain.exceptions.InvalidCommissionRateException(
+                    "Commission snapshot missing for sub-order " + so.getId());
 
             SubOrderCalculationContext context = SubOrderCalculationContext.builder()
                     .subOrderId(so.getId())

@@ -48,6 +48,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class CreateOrderUseCase {
+    private com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale;
+    @Autowired
+    public void setFlashSale(com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
 
     private final MasterOrderRepositoryPort masterOrderRepository;
     private final SubOrderRepositoryPort subOrderRepository;
@@ -187,6 +190,9 @@ public class CreateOrderUseCase {
             throw new BookingNotEligibleForOrderException(command.bookingId(), "Booking contains no items.");
         }
 
+        if(flashSale!=null && command.discountCode()!=null && !command.discountCode().isBlank() && flashSale.hasAllocation(command.bookingId()))
+            throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("FLASH_SALE_VOUCHER_STACKING_NOT_ALLOWED");
+
         // 8. Đánh giá Voucher / Discount Code (nếu có yêu cầu áp dụng)
         DiscountCodeJpaEntity appliedCodeEntity = null;
         AllocationResult allocationResult = null;
@@ -211,7 +217,7 @@ public class CreateOrderUseCase {
             for (BookingOrderView.BookingItemOrderView item : booking.items()) {
                 BigDecimal rate = commissionPolicyPort != null ? commissionPolicyPort.getCommissionRate(item.vendorId()) : null;
                 if (rate == null) {
-                    rate = CommissionPolicyPort.DEFAULT_COMMISSION_RATE;
+                    throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("COMMISSION_POLICY_MISSING");
                 }
                 BigDecimal subtotal = item.price().multiply(BigDecimal.valueOf(item.quantity()));
                 candidateItems.add(new CandidateItem(
@@ -268,9 +274,10 @@ public class CreateOrderUseCase {
 
         List<SubOrder> subOrders = new ArrayList<>();
         for (BookingOrderView.BookingItemOrderView item : booking.items()) {
-            BigDecimal rate = commissionPolicyPort != null ? commissionPolicyPort.getCommissionRate(item.vendorId()) : null;
+            var promotion=flashSale!=null?flashSale.snapshot(item.bookingItemId()).orElse(null):null;
+            BigDecimal rate = promotion!=null?promotion.commissionRate():commissionPolicyPort != null ? commissionPolicyPort.getCommissionRate(item.vendorId()) : null;
             if (rate == null) {
-                rate = CommissionPolicyPort.DEFAULT_COMMISSION_RATE;
+                throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("COMMISSION_POLICY_MISSING");
             }
             BigDecimal subtotal = item.price().multiply(BigDecimal.valueOf(item.quantity()));
 
@@ -301,6 +308,18 @@ public class CreateOrderUseCase {
                 subOrder.setFinalAmount(subtotal);
             }
 
+            if(promotion!=null) {
+                subOrder.setUnitPrice(promotion.originalUnitPrice());
+                subOrder.setSubtotalAmount(promotion.originalAmount());
+                subOrder.setCommissionBasisAmount(promotion.originalAmount());
+                subOrder.setCommissionRate(promotion.commissionRate());
+                subOrder.setCommissionAmount(promotion.commissionAmount());
+                subOrder.setVendorPayoutAmount(promotion.vendorReceivable());
+                subOrder.setVendorDiscountAmount(BigDecimal.ZERO);
+                subOrder.setPlatformDiscountAmount(promotion.subsidyAmount());
+                subOrder.setDiscountAmount(promotion.subsidyAmount());
+                subOrder.setFinalAmount(promotion.customerPayable());
+            }
             subOrder.setStatus(SubOrderStatus.PENDING);
             subOrder.setWaiverAccepted(false);
 
@@ -317,6 +336,10 @@ public class CreateOrderUseCase {
         }
         subOrders = subOrderRepository.saveAll(subOrders);
         order.setSubOrders(subOrders);
+        if(flashSale!=null && flashSale.hasAllocation(command.bookingId())) {
+            order.setDiscountAmount(subOrders.stream().map(SubOrder::getPlatformDiscountAmount).reduce(BigDecimal.ZERO,BigDecimal::add));
+            order=masterOrderRepository.save(order);
+        }
 
         // 11. Ghi nhận Discount Redemption
         if (allocationResult != null && appliedCodeEntity != null && discountRedemptionRepository != null) {

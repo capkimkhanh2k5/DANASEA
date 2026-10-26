@@ -53,10 +53,10 @@ prepare_public_config() {
 
 diagnostics() {
   compose "$1" ps --all || true
-  compose "$1" logs --tail 50 frontend redis rabbitmq backend 2>&1 \
+  compose "$1" logs --tail 50 frontend redis rabbitmq backend quyet 2>&1 \
     | sed -E 's/(Using generated security password: )[[:alnum:]-]+/\1[REDACTED]/g' || true
   docker inspect --format '{{.Name}} {{json .State.Health}}' \
-    danasea-frontend danasea-backend danasea-redis danasea-rabbitmq cli-proxy-api 2>/dev/null || true
+    danasea-frontend danasea-backend danasea-redis danasea-rabbitmq danasea-quyet cli-proxy-api 2>/dev/null || true
 }
 
 rollback_ready=false
@@ -73,7 +73,7 @@ rollback() {
   git checkout --quiet --force --detach "$prev_tag"
   prepare_public_config
   # Never downgrade or recreate databases/brokers during application rollback.
-  if ! compose "$prev_tag" up -d --no-deps --wait --wait-timeout "$WAIT_TIMEOUT" backend frontend; then
+  if ! compose "$prev_tag" up -d --no-deps --wait --wait-timeout "$WAIT_TIMEOUT" quyet backend frontend; then
     log "Application rollback failed, manual action required"
     diagnostics "$prev_tag"
   fi
@@ -110,6 +110,12 @@ try:
     services = ('postgres', 'redis', 'rabbitmq')
     compatible = all(previous['services'].get(name) == current['services'].get(name)
                      for name in services)
+    # Roll back the worker image with the backend only when its mount/runtime contract is unchanged.
+    old_worker = dict(previous['services'].get('quyet') or {})
+    new_worker = dict(current['services'].get('quyet') or {})
+    old_worker.pop('image', None)
+    new_worker.pop('image', None)
+    compatible = compatible and bool(old_worker) and old_worker == new_worker
     compatible = compatible and all(previous.get(key) == current.get(key)
                                     for key in ('networks', 'volumes'))
 except (OSError, ValueError, KeyError, TypeError):

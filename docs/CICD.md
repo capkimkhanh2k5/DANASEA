@@ -1,14 +1,14 @@
 # CI/CD — DANASEA
 
-CI chạy cho PR/push main; CD build image gắn commit SHA sau khi CI push main thành công. **Deploy chỉ chạy khi repository variable `PRODUCTION_DEPLOY_ENABLED=true`.** Mặc định biến chưa đặt thì chỉ build/push image, không SSH vào server. Giữ biến tắt trong lần chuyển đổi cấu hình production đầu tiên.
+CI chạy cho PR/push main. Sau khi CI của push main thành công, CD luôn build/push ba image `backend`, `frontend`, `quyet` theo commit SHA. Chỉ job SSH deploy lên server yêu cầu repository variable `PRODUCTION_DEPLOY_ENABLED=true`; khi biến là `false` hoặc chưa đặt, job deploy bị skipped nhưng image vẫn được xuất bản. Đổi biến không tự kích hoạt CD, và giữ `true` sẽ tự deploy các lần merge tiếp theo khi CI và cả ba image build thành công.
 
 ## Thứ tự đưa bản bảo mật lên server
 
 1. Review diff và chạy kiểm tra local. Commit/push nhánh đang làm, tạo PR và đợi CI đạt. Push nhánh tính năng không deploy production.
 2. Bật bảo vệ main: bắt buộc PR và required checks `Backend (Java 21)`, `Frontend (Node 22)`; giới hạn quyền bypass. Production environment chỉ cho main. Bật MFA GitHub/Tailscale. Giữ `PRODUCTION_DEPLOY_ENABLED` tắt.
-3. Merge PR sau review/CI; đợi CI trên main và CD build image theo SHA hoàn tất. Server vẫn chạy release cũ vì deploy gate đang tắt.
+3. Merge PR sau review/CI; đợi CI trên main và CD build/push đủ ba image theo SHA hoàn tất. Khi gate tắt, server vẫn chạy release cũ.
 4. Trong cửa sổ bảo trì, SSH bằng key, giữ phiên quản trị mở. Fetch và checkout đúng SHA đã được CI kiểm tra. Đây chỉ đổi source/config trên host; chưa chạy `compose up`.
-5. Chuẩn bị `.env`/private config/runtime DB role theo phần dưới, xử lý message đang chờ ở broker cũ. Cài lại script deploy root-owned của release mới. Deploy thủ công và nghiệm thu.
+5. Chuẩn bị `.env`/private config/runtime DB role theo phần dưới, xử lý message đang chờ ở broker cũ. Cài lại script deploy root-owned của release mới. Dùng ba image đúng SHA do CD vừa build/push để deploy thủ công và nghiệm thu.
 6. Chỉ sau khi release mới đạt nghiệm thu mới bật `PRODUCTION_DEPLOY_ENABLED=true` để những lần merge sau tự deploy.
 
 Không merge rồi để workflow cũ tự deploy trước khi chuẩn bị config. Trong lần chuyển đổi này, xác nhận gate ở workflow trên main thực sự có mặt trước khi coi merge là an toàn cho server.
@@ -100,6 +100,65 @@ Deploy thủ công qua phiên quản trị sau khi chuẩn bị xong:
 
 Script giữ backup database trước deploy và 7 bản gần nhất; image pull chỉ lấy nội dung đã cấu hình. Không tự sinh secret hoặc thay OS/firewall trong pipeline. Sau checkout, script chỉ đặt file cấu hình Nginx công khai thành mode 644 để UID của frontend đọc được; secret/private config vẫn được giữ quyền hạn chế.
 
-Khi healthcheck thất bại, script in trạng thái, log frontend/backend/Redis/RabbitMQ và chi tiết healthcheck. Manifest so sánh rollback được render vào thư mục tạm mode 700 rồi xoá khi kết thúc; không in các manifest chứa secret. Chỉ cho phép rollback tự động khi cấu hình PostgreSQL, Redis, RabbitMQ, mạng và volume giữa hai release không đổi. Rollback chỉ khởi động lại backend/frontend bằng `--no-deps`, không recreate hay hạ phiên bản các dịch vụ dữ liệu. Nếu cấu hình hạ tầng khác hoặc chưa xác minh được, script giữ bản hiện tại và yêu cầu phục hồi có kiểm soát. Không dùng Compose cũ để hạ Redis sau khi bản mới đã ghi RDB mới. Rollback cũng không hoàn tác Flyway; migration phải tương thích phiên bản ứng dụng trước.
+Khi healthcheck thất bại, script in trạng thái, log frontend/backend/Redis/RabbitMQ và chi tiết healthcheck. Manifest so sánh rollback được render vào thư mục tạm mode 700 rồi xoá khi kết thúc; không in các manifest chứa secret. Chỉ cho phép rollback tự động khi cấu hình PostgreSQL, Redis, RabbitMQ, mạng và volume giữa hai release không đổi. Rollback chỉ khởi động lại Quyet/backend/frontend bằng `--no-deps`, không recreate hay hạ phiên bản các dịch vụ dữ liệu. Nếu cấu hình hạ tầng khác hoặc chưa xác minh được, script giữ bản hiện tại và yêu cầu phục hồi có kiểm soát. Không dùng Compose cũ để hạ Redis sau khi bản mới đã ghi RDB mới. Rollback cũng không hoàn tác Flyway; migration phải tương thích phiên bản ứng dụng trước.
 
 Sau deploy: xác nhận prod profile, DB role không đặc quyền, Redis/RabbitMQ authentication, OAuth AI thật, IP/HTTPS từ hai mạng khách, customer/vendor ownership, cổng public, SMTP/payment sandbox và giám sát. Chỉ sau nghiệm thu mới bật auto deploy. Backup ngoài máy tiếp tục là phạm vi vận hành riêng.
+
+
+## Quyet trong production
+
+Production mặc định bật Quyet và dùng `http://quyet:8091`; có thể ghi đè bằng `AI_QUYET_ENABLED` và `AI_QUYET_BASE_URL` trong `.env`. Khi dùng worker cùng Compose, đặt URL theo tên service `quyet`, không dùng `127.0.0.1` của backend container. Cờ `false` chỉ tắt lời gọi từ backend; Compose vẫn khởi động worker và chờ worker healthy trước backend. Toàn bộ dịch vụ production được quản lý thống nhất trong `docker-compose.prod.yml`. Worker dùng image `danasea-quyet:<SHA>`, CPU, UID 10001, mạng `ai`, không publish cổng; model mount read-only tại `/models`. `production.py prepare` sinh khóa `AI_QUYET_API_KEY` riêng nếu thiếu/placeholder và giữ khóa đã có.
+
+Trước lần phát hành đầu tiên, trên server:
+
+1. Chuẩn bị thư mục model tuyệt đối ngoài checkout (ví dụ `/srv/danasea-models/quyet-small/233167bba5df61b5375a522bf8a042d8d2189379`). Tải đúng `chinhnc/Quyet-1.0-Small` revision này hoặc chuyển bản đã xác minh từ máy phát triển; không tải model mỗi lần container khởi động.
+2. Đặt `QUYET_MODEL_DIR` vào `.env` server. Model là dữ liệu công khai: file cần quyền đọc cho UID 10001 (644), thư mục bên trong mount cần quyền traverse (755). Không áp dụng các quyền này cho `.env`, service key hay OAuth token.
+3. Chạy `python3 scripts/production.py prepare`, rồi `python3 scripts/production.py check`. Preflight đối chiếu manifest cố định, checksum từng file, phạm vi đường dẫn và quyền đọc trước khi pull/start container. Worker xác minh lại checksum khi nạp model.
+4. Đảm bảo đủ RAM cho cả backend, database, broker và model. Ghi chú server 4 GB trong script deploy chưa phải bằng chứng đủ tài nguyên; đo RAM đỉnh và OOM trên server trước nghiệm thu. Worker CPU threads mặc định 4, tùy chỉnh `QUYET_CPU_THREADS` theo máy.
+5. Bật gate trước lần merge phát hành khi server đã sẵn sàng. Đợi ba image build thành công và CD hoàn tất. Kiểm tra `quyet` healthy, sau đó thử các API backend cần Quyet và xác nhận không còn `QUYET_DISABLED`, `QUYET_UNAVAILABLE`, `REQUEST_DECISION_BUDGET_EXHAUSTED` trong kết quả.
+
+`AI_QUYET_CONNECT_TIMEOUT`/`AI_QUYET_READ_TIMEOUT` được truyền vào backend (mặc định 1s/3s). Chỉ điều chỉnh theo số đo trên server và tổng execution budget; tăng timeout quá lớn có thể khiến backend bỏ qua suy luận vì không đủ budget. Worker chỉ xử lý một request tại một thời điểm và trả 429 khi bận, nên cần nghiệm thu cả đồng thời và fallback.
+
+Kiểm thử local (từ `ai-decision`, dùng Python environment đã cài dependencies):
+
+```bash
+python -m unittest discover -s tests -p test_service.py -v
+PYTHONPATH=. python tests/smoke_production_worker.py
+```
+
+Smoke nạp model thật, gọi HTTP handler cho 7 loại tác vụ và báo startup/latency. Đây không phải test mạng container, kiểm thử backend end-to-end hay đánh giá độ chính xác nghiệp vụ. Không gọi provider trả phí.
+
+Rollback tự động khôi phục cả image Quyet, backend và frontend khi cấu hình worker, data services, networks và volumes tương thích. Lần đầu thêm Quyet hoặc đổi mount/runtime config sẽ chặn rollback tự động để tránh ghép worker khác hợp đồng với backend cũ; cần xử lý thủ công nếu phát hành đó thất bại.
+
+
+## Lần đầu deploy bản có Quyet khi đã bật gate
+
+Push code lên GitHub chưa phải deploy lên server. Push nhánh tính năng không kích hoạt CD; push/merge vào `main` mới chạy chuỗi CI → build/push ba image → SSH deploy (khi gate là `true`). Workflow chưa có nút `workflow_dispatch` cho CD.
+
+Nếu server đã có model, `.env` và script deploy mới, có thể giữ `true` rồi merge. Nếu chưa chuẩn bị, đặt gate về `false` trước khi merge lần đầu: vẫn có image từ CD để chuẩn bị và deploy thủ công, tránh tự deploy khi thiếu model. Một job đã bắt đầu không bị huỷ chỉ vì đổi biến; kiểm tra Actions trước khi chuyển đổi.
+
+Sau khi CI và ba image build/push thành công, thực hiện trên server bằng tài khoản quản trị/deploy (thay SHA bằng đủ 40 ký tự của commit trên main đã qua CI):
+
+```bash
+cd ~/danasea
+git status --short
+git fetch origin main
+# Chỉ checkout khi các thay đổi local cần giữ đã được xử lý; không dùng --force.
+git checkout --detach <SHA>
+```
+
+Chuyển model đã xác minh vào thư mục ngoài checkout, đặt `QUYET_MODEL_DIR` trong `.env` như phần Quyet phía trên; không chép đè `.env` hoặc OAuth. Sau đó:
+
+```bash
+python3 scripts/production.py prepare
+# Chỉ dùng init-db nếu runtime role chưa được tạo/cập nhật theo hướng dẫn ở trên.
+python3 scripts/production.py check
+sudo install -m 755 scripts/deploy.sh /usr/local/bin/danasea-deploy
+/usr/local/bin/danasea-deploy deploy <SHA>
+IMAGE_TAG=<SHA> docker compose -f docker-compose.prod.yml ps
+docker stats --no-stream
+```
+
+Các bước này giả định server đã có Docker Compose, Git/SSH tới repository, quyền pull các image GHCR, PostgreSQL/runtime role và cấu hình Tailscale/SSH đã thiết lập. Nếu `check` thất bại, sửa nguyên nhân trước khi deploy; không bỏ qua preflight. Với PostgreSQL mới hoàn toàn, làm quy trình bootstrap database phía trên trước.
+
+Xác nhận frontend/backend/Quyet healthy và gọi thử chức năng AI qua backend. Sau nghiệm thu, bật `PRODUCTION_DEPLOY_ENABLED=true` để các lần merge tiếp theo tự deploy. Lần đầu thêm Quyet không có rollback tự động về release chưa có worker; giữ phiên quản trị để xử lý nếu healthcheck thất bại.

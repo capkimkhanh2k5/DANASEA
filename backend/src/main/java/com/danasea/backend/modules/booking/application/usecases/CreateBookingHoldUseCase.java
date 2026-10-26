@@ -13,10 +13,15 @@ import com.danasea.backend.modules.booking.domain.models.SlotValidationDetails;
 import com.danasea.backend.modules.booking.domain.ports.BookingRepositoryPort;
 import com.danasea.backend.modules.booking.domain.ports.InventoryLockPort;
 import com.danasea.backend.modules.booking.domain.ports.ServiceSlotPort;
+import com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort;
+import com.danasea.backend.modules.flashsale.domain.FlashSaleException;
 import com.danasea.backend.modules.service.domain.models.InventoryType;
 import com.danasea.backend.modules.service.domain.models.OptionType;
 import com.danasea.backend.modules.service.domain.models.PricingUnit;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -42,8 +47,11 @@ public class CreateBookingHoldUseCase {
     private final BookingRepositoryPort bookingRepository;
     private final InventoryLockPort inventoryLockPort;
     private final ServiceSlotPort serviceSlotPort;
+    private FlashSaleBookingPort flashSale;
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setFlashSale(FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
 
-    private record AggregationKey(UUID slotId, UUID optionId, Integer participantsCount, boolean allowSplit, int groupIndex) {}
+    private record AggregationKey(UUID slotId, UUID optionId, Integer participantsCount, boolean allowSplit, UUID flashSaleId, int groupIndex) {}
 
     @Transactional
     public BookingHoldResult execute(CreateBookingHoldCommand command) {
@@ -59,6 +67,16 @@ public class CreateBookingHoldUseCase {
         }
         if (command.items().size() > MAX_REQUEST_ITEMS) {
             throw new IllegalArgumentException("Booking must contain at most " + MAX_REQUEST_ITEMS + " items");
+        }
+        boolean promotional=command.items().stream().anyMatch(i->i!=null && i.flashSaleId()!=null);
+        String fingerprint=null;
+        if(promotional) {
+            if(flashSale==null) throw new FlashSaleException("FLASH_SALE_NOT_CONFIGURED");
+            try { fingerprint=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(command.items().toString().getBytes(StandardCharsets.UTF_8))); }
+            catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+            UUID replay=flashSale.replay(command.customerId(),command.idempotencyKey(),fingerprint);
+            if(replay!=null) return mapToResult(bookingRepository.findByIdWithItems(replay).orElseThrow());
         }
 
         // 2. Aggregate quantities by (slotId, optionId, participantsCount)
@@ -80,7 +98,7 @@ public class CreateBookingHoldUseCase {
             }
             try {
                 totalQuantity = Math.addExact(totalQuantity, item.quantity());
-                AggregationKey key = new AggregationKey(item.slotId(), item.optionId(), item.participantsCount(), item.allowSplit(),
+                AggregationKey key = new AggregationKey(item.slotId(), item.optionId(), item.participantsCount(), item.allowSplit(),item.flashSaleId(),
                         item.optionId() != null ? ++groupIndex : 0);
                 aggregatedQuantities.merge(key, item.quantity(), Math::addExact);
             } catch (ArithmeticException exception) {
@@ -98,6 +116,7 @@ public class CreateBookingHoldUseCase {
                 .distinct()
                 .toList();
 
+        if(promotional) flashSale.lockOffers(orderedOfferIds(command));
         serviceSlotPort.lockSlotsForUpdate(slotIds);
         List<SlotValidationDetails> slotDetailsList = serviceSlotPort.findSlotDetailsBatch(slotIds);
         Map<UUID, SlotValidationDetails> slotDetailsMap = slotDetailsList.stream()
@@ -178,19 +197,6 @@ public class CreateBookingHoldUseCase {
 
         UUID bookingId = UUID.randomUUID();
 
-        // 5. Atomic Redis inventory lock (All-or-Nothing)
-        inventoryLockPort.acquireHolds(bookingId, lockItems, HOLD_DURATION);
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCompletion(int status) {
-                    if (status != STATUS_COMMITTED) {
-                        inventoryLockPort.releaseHolds(bookingId, lockItems);
-                    }
-                }
-            });
-        }
-
         // 6. Build Booking & BookingItems and persist to DB with compensating rollback on failure
         try {
             List<BookingItem> bookingItems = new ArrayList<>();
@@ -206,6 +212,11 @@ public class CreateBookingHoldUseCase {
                 UUID optId = option != null ? option.getId() : null;
 
                 UUID bookingItemId = UUID.randomUUID();
+                if(key.flashSaleId()!=null) {
+                    var snapshot=flashSale.reserve(key.flashSaleId(),details.getServiceId(),optId,itemPrice,
+                            pricingUnit.name(),qty,bookingId,bookingItemId);
+                    itemPrice=snapshot.originalUnitPrice().subtract(snapshot.unitSubsidy());
+                }
                 List<BookingItemAllocation> itemAllocations = new ArrayList<>();
                 if (lockItem.getAllocations() != null) {
                     for (BookingItemAllocation alloc : lockItem.getAllocations()) {
@@ -233,9 +244,31 @@ public class CreateBookingHoldUseCase {
                         .build());
             }
 
+            // 5. Atomic Redis inventory lock (All-or-Nothing)
+            inventoryLockPort.acquireHolds(bookingId, lockItems, HOLD_DURATION);
+            for(int i=0;i<bookingItems.size();i++) {
+                var item=bookingItems.get(i);
+                var allocations=lockItems.get(i).getAllocations();
+                if(allocations!=null) {
+                    allocations.forEach(a->a.setBookingItemId(item.getId()));
+                    item.setAllocations(new ArrayList<>(allocations));
+                }
+            }
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status != STATUS_COMMITTED) {
+                            inventoryLockPort.releaseHolds(bookingId, lockItems);
+                        }
+                    }
+                });
+            }
+
             OffsetDateTime now = OffsetDateTime.now();
             Booking booking = Booking.createHold(bookingId, command.customerId(), bookingItems, HOLD_DURATION, now);
             Booking savedBooking = bookingRepository.save(booking);
+            if(promotional) flashSale.remember(command.customerId(),command.idempotencyKey(),fingerprint,bookingId);
 
             return mapToResult(savedBooking);
         } catch (Exception ex) {
@@ -245,6 +278,9 @@ public class CreateBookingHoldUseCase {
         }
     }
 
+    private List<UUID> orderedOfferIds(CreateBookingHoldCommand command) {
+        return command.items().stream().map(BookingHoldItemDto::flashSaleId).filter(java.util.Objects::nonNull).distinct().sorted().toList();
+    }
     private SlotValidationDetails.ServiceOptionValidationDetails resolveOption(SlotValidationDetails details, UUID optionId) {
         if (optionId != null) {
             var option = details.getOptions().get(optionId);

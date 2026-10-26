@@ -81,6 +81,7 @@ public class SecurityConfig {
 								"/api/services", "/api/services/**",
 								"/api/v1/catalog", "/api/v1/catalog/**").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/vendors", "/api/vendors/**").permitAll()
+						.requestMatchers(HttpMethod.GET, "/api/flash-sales/active", "/api/flash-sales/*").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/recently-viewed").permitAll()
 						.requestMatchers("/api/admin/**").hasRole("ADMIN")
 						.anyRequest()

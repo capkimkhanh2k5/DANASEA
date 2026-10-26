@@ -18,8 +18,12 @@ public record BookingHoldItemRequest(
         @Min(value = 1, message = "{validation.booking.participants.min}")
         Integer participantsCount,
 
-        Boolean allowSplit
+        Boolean allowSplit,
+        UUID flashSaleId
 ) {
+    public BookingHoldItemRequest(UUID slotId,Integer quantity,UUID optionId,Integer participantsCount,Boolean allowSplit) {
+        this(slotId,quantity,optionId,participantsCount,allowSplit,null);
+    }
     public BookingHoldItemRequest {
         allowSplit = Boolean.TRUE.equals(allowSplit);
     }

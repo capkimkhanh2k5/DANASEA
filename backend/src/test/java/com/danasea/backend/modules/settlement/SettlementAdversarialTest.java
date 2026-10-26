@@ -226,6 +226,7 @@ public class SettlementAdversarialTest {
             o1.setVendorId(vendorAId);
             o1.setStatus(SubOrderStatus.COMPLETED);
             o1.setSubtotalAmount(new BigDecimal("2000000.00"));
+            o1.setCommissionRate(new BigDecimal("0.100000"));
             o1.setCreatedAt(periodStart.atTime(12, 0).atOffset(OffsetDateTime.now().getOffset()));
 
             SubOrderJpaEntity o2 = new SubOrderJpaEntity();
@@ -233,6 +234,7 @@ public class SettlementAdversarialTest {
             o2.setVendorId(vendorAId);
             o2.setStatus(SubOrderStatus.COMPLETED);
             o2.setSubtotalAmount(new BigDecimal("1000000.00"));
+            o2.setCommissionRate(new BigDecimal("0.100000"));
             o2.setCreatedAt(periodStart.atTime(12, 0).atOffset(OffsetDateTime.now().getOffset()));
 
             when(subOrderRepository.findByVendorIdAndStatusIn(eq(vendorAId), anyCollection()))
@@ -393,6 +395,7 @@ public class SettlementAdversarialTest {
             onStart.setVendorId(vendorAId);
             onStart.setStatus(SubOrderStatus.COMPLETED);
             onStart.setSubtotalAmount(new BigDecimal("100000.00"));
+            onStart.setCommissionRate(new BigDecimal("0.100000"));
             onStart.setCreatedAt(start.atStartOfDay().atOffset(OffsetDateTime.now().getOffset()));
 
             // SubOrder on periodEnd (included)
@@ -401,6 +404,7 @@ public class SettlementAdversarialTest {
             onEnd.setVendorId(vendorAId);
             onEnd.setStatus(SubOrderStatus.COMPLETED);
             onEnd.setSubtotalAmount(new BigDecimal("200000.00"));
+            onEnd.setCommissionRate(new BigDecimal("0.100000"));
             onEnd.setCreatedAt(end.atStartOfDay().atOffset(OffsetDateTime.now().getOffset()));
 
             // SubOrder 1 day before start (excluded)
@@ -409,6 +413,7 @@ public class SettlementAdversarialTest {
             beforeStart.setVendorId(vendorAId);
             beforeStart.setStatus(SubOrderStatus.COMPLETED);
             beforeStart.setSubtotalAmount(new BigDecimal("300000.00"));
+            beforeStart.setCommissionRate(new BigDecimal("0.100000"));
             beforeStart.setCreatedAt(start.minusDays(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset()));
 
             // SubOrder 1 day after end (excluded)
@@ -417,6 +422,7 @@ public class SettlementAdversarialTest {
             afterEnd.setVendorId(vendorAId);
             afterEnd.setStatus(SubOrderStatus.COMPLETED);
             afterEnd.setSubtotalAmount(new BigDecimal("400000.00"));
+            afterEnd.setCommissionRate(new BigDecimal("0.100000"));
             afterEnd.setCreatedAt(end.plusDays(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset()));
 
             when(settlementRepository.findByVendorIdAndPeriodStartAndPeriodEnd(vendorAId, start, end))
@@ -447,6 +453,7 @@ public class SettlementAdversarialTest {
             matchOrder.setVendorId(vendorAId);
             matchOrder.setStatus(SubOrderStatus.COMPLETED);
             matchOrder.setSubtotalAmount(new BigDecimal("500000.00"));
+            matchOrder.setCommissionRate(new BigDecimal("0.100000"));
             matchOrder.setCreatedAt(singleDay.atStartOfDay().atOffset(OffsetDateTime.now().getOffset()));
 
             SubOrderJpaEntity otherDayOrder = new SubOrderJpaEntity();
@@ -454,6 +461,7 @@ public class SettlementAdversarialTest {
             otherDayOrder.setVendorId(vendorAId);
             otherDayOrder.setStatus(SubOrderStatus.COMPLETED);
             otherDayOrder.setSubtotalAmount(new BigDecimal("500000.00"));
+            otherDayOrder.setCommissionRate(new BigDecimal("0.100000"));
             otherDayOrder.setCreatedAt(singleDay.plusDays(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset()));
 
             when(settlementRepository.findByVendorIdAndPeriodStartAndPeriodEnd(vendorAId, singleDay, singleDay))

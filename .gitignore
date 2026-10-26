@@ -27,3 +27,4 @@ cli-proxy/auths/
 cli-proxy/logs/
 .deploy-state
 .deploy.lock
+.product.env

@@ -28,7 +28,6 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class SettlementCalculationEngine {
 
-    public static final BigDecimal DEFAULT_COMMISSION_RATE = new BigDecimal("0.1000");
     public static final int SCALE = 2;
     public static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
@@ -50,7 +49,8 @@ public class SettlementCalculationEngine {
             throw new IllegalArgumentException("SubOrderCalculationContext cannot be null");
         }
 
-        BigDecimal rate = context.getCommissionRate() != null ? context.getCommissionRate() : DEFAULT_COMMISSION_RATE;
+        BigDecimal rate = context.getCommissionRate();
+        if(rate==null) throw new InvalidCommissionRateException("Commission policy or snapshot is required");
         if (rate.compareTo(BigDecimal.ZERO) < 0 || rate.compareTo(BigDecimal.ONE) > 0) {
             throw new InvalidCommissionRateException("Commission rate must be between 0 and 1");
         }
@@ -200,7 +200,7 @@ public class SettlementCalculationEngine {
                     .build();
         }
 
-        BigDecimal rate = defaultCommissionRate != null ? defaultCommissionRate : DEFAULT_COMMISSION_RATE;
+        BigDecimal rate = defaultCommissionRate;
         List<SettlementLineItem> lineItems = new ArrayList<>();
         BigDecimal totalGross = BigDecimal.ZERO.setScale(SCALE, ROUNDING);
         BigDecimal totalRefund = BigDecimal.ZERO.setScale(SCALE, ROUNDING);
@@ -209,6 +209,7 @@ public class SettlementCalculationEngine {
 
         for (SubOrderCalculationContext order : orders) {
             if (order.getCommissionRate() == null) {
+                if(rate==null) throw new InvalidCommissionRateException("Commission policy or snapshot is required");
                 order.setCommissionRate(rate);
             }
             SettlementLineItem item = calculateLineItem(order);
@@ -306,6 +307,6 @@ public class SettlementCalculationEngine {
                         .build())
                 .toList() : Collections.emptyList();
 
-        return calculateDomainSettlement(settlementId, vendorId, periodStart, periodEnd, contexts, DEFAULT_COMMISSION_RATE);
+        return calculateDomainSettlement(settlementId, vendorId, periodStart, periodEnd, contexts, null);
     }
 }

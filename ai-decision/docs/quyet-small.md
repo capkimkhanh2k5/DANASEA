@@ -21,19 +21,19 @@ Không cần kích hoạt venv. `run.sh` tự sử dụng Python đã cài và b
 Phân loại một câu tiếng Việt:
 
 ```sh
-sh /Users/capkimkhanh/Documents/DUT4_1/PBL6/backend/ai-decision/scripts/diagnose.sh --message "Tôi muốn đặt dịch vụ chèo SUP Mân Thái này cho 3 người vào sáng mai."
+sh /Users/capkimkhanh/Documents/DUT4_1/PBL6/ai-decision/scripts/diagnose.sh --message "Tôi muốn đặt dịch vụ chèo SUP Mân Thái này cho 3 người vào sáng mai."
 ```
 
 Thử cả Choice, Noul và Score bằng request mẫu:
 
 ```sh
-sh /Users/capkimkhanh/Documents/DUT4_1/PBL6/backend/ai-decision/scripts/diagnose.sh --request /Users/capkimkhanh/Documents/DUT4_1/PBL6/backend/ai-decision/tests/fixtures/quyet-small/example-request.json
+sh /Users/capkimkhanh/Documents/DUT4_1/PBL6/ai-decision/scripts/diagnose.sh --request /Users/capkimkhanh/Documents/DUT4_1/PBL6/ai-decision/tests/fixtures/quyet-small/example-request.json
 ```
 
 Chạy lại 40 tình huống, ghi vào file mới để giữ kết quả ban đầu:
 
 ```sh
-sh /Users/capkimkhanh/Documents/DUT4_1/PBL6/backend/ai-decision/scripts/diagnose.sh --device cpu --output /Users/capkimkhanh/Documents/DUT4_1/PBL6/backend/ai-decision/reports/quyet-small/results-cpu-rerun.json
+sh /Users/capkimkhanh/Documents/DUT4_1/PBL6/ai-decision/scripts/diagnose.sh --device cpu --output /Users/capkimkhanh/Documents/DUT4_1/PBL6/ai-decision/reports/quyet-small/results-cpu-rerun.json
 ```
 
 GPU Apple dùng `--device mps`; CPU là mặc định vì lượt đo hiện tại có độ trễ đuôi ổn định hơn. `--request` cho phép bạn thay `state/questions`; mỗi Choice tối đa 10 nhãn theo hợp đồng của runtime. Script bật `strict=True` để không âm thầm cắt input dài.
@@ -95,8 +95,8 @@ Vì vậy output gần giống schema Jev nhưng ý nghĩa confidence không đ�
 
 ```sh
 uv venv /Users/capkimkhanh/.cache/danasea/quyet-small/.venv --python /opt/homebrew/opt/python@3.11/bin/python3.11
-uv pip install --python /Users/capkimkhanh/.cache/danasea/quyet-small/.venv/bin/python -r /Users/capkimkhanh/Documents/DUT4_1/PBL6/backend/ai-decision/config/quyet-small.lock.txt
-/Users/capkimkhanh/.cache/danasea/quyet-small/.venv/bin/python /Users/capkimkhanh/Documents/DUT4_1/PBL6/backend/ai-decision/scripts/prepare_model.py
+uv pip install --python /Users/capkimkhanh/.cache/danasea/quyet-small/.venv/bin/python -r /Users/capkimkhanh/Documents/DUT4_1/PBL6/ai-decision/config/quyet-small.lock.txt
+/Users/capkimkhanh/.cache/danasea/quyet-small/.venv/bin/python /Users/capkimkhanh/Documents/DUT4_1/PBL6/ai-decision/scripts/prepare_model.py
 ```
 
 Chỉ bước cài package và tải model cần mạng. Giữ LICENSE/NOTICE đã tải cùng model khi phân phối lại weights. `QUYET_PYTHON` và `--model-dir` có thể chọn đường dẫn khác cho runtime; kết quả đo trong báo cáo này thuộc đúng revision mặc định nêu trên.

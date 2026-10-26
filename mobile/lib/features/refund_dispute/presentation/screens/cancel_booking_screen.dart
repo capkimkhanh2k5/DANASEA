@@ -1,5 +1,7 @@
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/auth/auth_session.dart';
+import '../../../../core/data/order_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
@@ -20,8 +22,23 @@ class CancelBookingScreen extends StatefulWidget {
 }
 
 class _CancelBookingScreenState extends State<CancelBookingScreen> {
+  final OrderRepository _repository = OrderRepository();
   RefundReason _selectedReason = RefundReason.customerCancel;
   final TextEditingController _noteController = TextEditingController();
+  OrderCancellationPreview? _preview;
+  bool _loadingPreview = true;
+  String? _previewError;
+  bool _submitting = false;
+  bool _uncertain = false;
+  String? _submitError;
+  late final String _idempotencyKey =
+      OrderRepository.generateIdempotencyKey('ref');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreview();
+  }
 
   @override
   void dispose() {
@@ -29,8 +46,31 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
     super.dispose();
   }
 
-  String _formatPrice(int price) {
-    final str = price.toString();
+  Future<void> _loadPreview() async {
+    setState(() {
+      _loadingPreview = true;
+      _previewError = null;
+    });
+    try {
+      final preview = await _repository.cancellationPreview(widget.subOrder.id);
+      if (!mounted) return;
+      setState(() => _preview = preview);
+    } on AuthFailure catch (e) {
+      if (mounted) setState(() => _previewError = e.message);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _previewError =
+              'Không thể tải xem trước hoàn tiền. Vui lòng thử lại.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingPreview = false);
+    }
+  }
+
+  String _formatPrice(num price) {
+    final str = price.round().toString();
     final buffer = StringBuffer();
     int count = 0;
     for (int i = str.length - 1; i >= 0; i--) {
@@ -43,24 +83,64 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
     return '${buffer.toString().split('').reversed.join()} đ';
   }
 
-  void _submitCancelRequest() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: LocalizedText('Đã gửi yêu cầu hủy dịch vụ thành công! Hệ thống đang xử lý đối soát.'),
-        backgroundColor: AppColors.secondary,
-      ),
-    );
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const RefundTrackingScreen(),
-      ),
-    );
+  Future<void> _submitCancelRequest() async {
+    if (_submitting || _uncertain) return;
+    setState(() {
+      _submitting = true;
+      _submitError = null;
+    });
+    final reasonCode = _selectedReason == RefundReason.customerCancel
+        ? 'CUSTOMER_CANCEL'
+        : 'CUSTOMER_REQUEST';
+    try {
+      final refunds = await _repository.requestRefund(
+        widget.subOrder.id,
+        idempotencyKey: _idempotencyKey,
+        reason: reasonCode,
+        masterOrderId: widget.subOrder.masterOrderId,
+        subOrderServiceNames: {widget.subOrder.id: widget.subOrder.serviceName},
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText(
+            'Đã gửi yêu cầu hủy dịch vụ thành công! Hệ thống đang xử lý đối soát.',
+          ),
+          backgroundColor: AppColors.secondary,
+        ),
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => RefundTrackingScreen(
+            orderId: widget.subOrder.masterOrderId,
+            initialRefunds: refunds,
+          ),
+        ),
+      );
+    } on AuthFailure catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitError = e.message;
+        if (e.status == 0 || e.status >= 500) {
+          _uncertain = true;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _submitError = 'Không thể gửi yêu cầu hoàn tiền. Vui lòng kiểm tra lại.';
+        _uncertain = true;
+      });
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final sub = widget.subOrder;
+    final preview = _preview;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -69,7 +149,7 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.onSurface),
-          onPressed: () => Navigator.pop(context),
+          onPressed: _submitting ? null : () => Navigator.pop(context),
         ),
         title: LocalizedText(
           'Yêu cầu hủy dịch vụ',
@@ -151,7 +231,7 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
                         ),
                       ),
                       LocalizedText(
-                        _formatPrice(sub.subtotalAmount),
+                        _formatPrice(sub.finalAmount),
                         style: AppTypography.headlineSm(color: AppColors.primary),
                       ),
                     ],
@@ -177,8 +257,12 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
               child: Column(
                 children: [
                   InkWell(
-                    onTap: () => setState(() =>
-                        _selectedReason = RefundReason.customerCancel),
+                    onTap: _submitting || _uncertain
+                        ? null
+                        : () => setState(
+                              () => _selectedReason =
+                                  RefundReason.customerCancel,
+                            ),
                     borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(AppShapes.radiusDefaultValue)),
                     child: Padding(
@@ -239,8 +323,11 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
                   ),
                   const Divider(height: 1),
                   InkWell(
-                    onTap: () =>
-                        setState(() => _selectedReason = RefundReason.weather),
+                    onTap: _submitting || _uncertain
+                        ? null
+                        : () => setState(
+                              () => _selectedReason = RefundReason.weather,
+                            ),
                     borderRadius: const BorderRadius.vertical(
                         bottom: Radius.circular(AppShapes.radiusDefaultValue)),
                     child: Padding(
@@ -316,6 +403,7 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
               ),
               child: TextField(
                 controller: _noteController,
+                enabled: !_submitting && !_uncertain,
                 maxLines: 3,
                 decoration: InputDecoration(
                   hintText: tr(context, 'Nhập lý do cụ thể hoặc yêu cầu hỗ trợ đặc biệt...'),
@@ -364,7 +452,7 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
             ),
             const SizedBox(height: 16),
 
-            // ESTIMATE REFUND POLICY NOTICE
+            // ESTIMATE REFUND POLICY NOTICE (FROM CANCELLATION PREVIEW API)
             Container(
               padding: const EdgeInsets.all(AppShapes.spaceSm),
               decoration: BoxDecoration(
@@ -378,24 +466,96 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
                       size: 18, color: AppColors.secondary),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: LocalizedText(
-                      'Yêu cầu hoàn tiền sẽ được hệ thống tiếp nhận và xử lý căn cứ theo bảng hoàn tiền (refunds) và quy định dịch vụ.',
-                      style: AppTypography.bodySm(
-                        color: AppColors.onSurface,
-                      ).copyWith(fontSize: 11),
-                    ),
+                    child: _loadingPreview
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: LinearProgressIndicator(),
+                          )
+                        : _previewError != null
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  LocalizedText(
+                                    _previewError!,
+                                    style: AppTypography.bodySm(
+                                      color: AppColors.error,
+                                    ).copyWith(fontSize: 11),
+                                  ),
+                                  TextButton(
+                                    onPressed: _loadPreview,
+                                    child: const LocalizedText('Thử lại'),
+                                  ),
+                                ],
+                              )
+                            : preview != null
+                                ? Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      LocalizedText(
+                                        'Dự kiến hoàn tiền: ${_formatPrice(preview.refundAmount)} (${preview.refundPercentage.toStringAsFixed(0)}% / gốc ${_formatPrice(preview.originalAmount)})',
+                                        style: AppTypography.labelMd(
+                                          color: AppColors.secondary,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        preview.policyApplied,
+                                        style: AppTypography.bodySm(
+                                          color: AppColors.onSurface,
+                                        ).copyWith(fontSize: 11),
+                                      ),
+                                    ],
+                                  )
+                                : LocalizedText(
+                                    'Yêu cầu hoàn tiền sẽ được hệ thống tiếp nhận và xử lý căn cứ theo bảng hoàn tiền (refunds) và quy định dịch vụ.',
+                                    style: AppTypography.bodySm(
+                                      color: AppColors.onSurface,
+                                    ).copyWith(fontSize: 11),
+                                  ),
                   ),
                 ],
               ),
             ),
+            if (_submitError != null) ...[
+              const SizedBox(height: 12),
+              LocalizedText(
+                _submitError!,
+                style: AppTypography.bodySm(color: AppColors.error),
+              ),
+            ],
+            if (_uncertain) ...[
+              const SizedBox(height: 8),
+              LocalizedText(
+                'Chưa xác định được kết quả yêu cầu hoàn tiền trước đó. Đã khóa tự động gửi lại để tránh trùng lặp, vui lòng kiểm tra mục Theo dõi hoàn tiền.',
+                style: AppTypography.bodySm(color: AppColors.onSurfaceVariant),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RefundTrackingScreen(
+                        orderId: sub.masterOrderId,
+                      ),
+                    ),
+                  );
+                },
+                child: const LocalizedText('Mở Theo dõi hoàn tiền'),
+              ),
+            ],
             const SizedBox(height: 24),
 
             // SUBMIT BUTTON
             AppPillButton(
-              label: 'Xác nhận gửi yêu cầu hủy',
+              label: _submitting
+                  ? 'Đang gửi yêu cầu...'
+                  : 'Xác nhận gửi yêu cầu hủy',
               variant: AppButtonVariant.primary,
               width: double.infinity,
-              onPressed: _submitCancelRequest,
+              onPressed:
+                  _submitting || _uncertain ? null : _submitCancelRequest,
             ),
           ],
         ),

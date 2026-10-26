@@ -1,6 +1,7 @@
 package com.danasea.backend.modules.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -20,6 +21,7 @@ import com.danasea.backend.modules.order.domain.models.DiscountScope;
 import com.danasea.backend.modules.order.domain.models.DiscountType;
 import com.danasea.backend.modules.order.domain.ports.BookingLookupPort;
 import com.danasea.backend.modules.order.domain.ports.BookingOrderView;
+import com.danasea.backend.modules.order.domain.ports.CommissionPolicyPort;
 import com.danasea.backend.modules.order.domain.services.DiscountAllocationEngine;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.DiscountCodeJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.mappers.DiscountCodeMapper;
@@ -30,8 +32,14 @@ import com.danasea.backend.modules.order.presentation.dtos.DiscountPreviewReques
 class DiscountLocalizationTest {
     private final BookingLookupPort bookings = mock(BookingLookupPort.class);
     private final JpaDiscountCodeRepository codes = mock(JpaDiscountCodeRepository.class);
-    private final DiscountPreviewUseCase preview = new DiscountPreviewUseCase(bookings, codes,
-            mock(JpaDiscountRedemptionRepository.class), null, new DiscountAllocationEngine(), new DiscountCodeMapper());
+    private final CommissionPolicyPort commissions = mock(CommissionPolicyPort.class);
+    private final DiscountPreviewUseCase preview;
+
+    DiscountLocalizationTest() {
+        when(commissions.getCommissionRate(any())).thenReturn(new BigDecimal("0.10"));
+        this.preview = new DiscountPreviewUseCase(bookings, codes,
+                mock(JpaDiscountRedemptionRepository.class), commissions, new DiscountAllocationEngine(), new DiscountCodeMapper());
+    }
 
     @AfterEach
     void resetLocale() {

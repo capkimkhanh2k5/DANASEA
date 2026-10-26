@@ -96,7 +96,12 @@ import java.util.stream.Collectors;
 public class OrderPaymentService {
 
     private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[A-Za-z0-9._:-]{8,100}");
-    private static final BigDecimal DEFAULT_COMMISSION_RATE = CommissionPolicyPort.DEFAULT_COMMISSION_RATE;
+    private CommissionPolicyPort configuredCommission;
+    private com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale;
+    @Autowired
+    public void setConfiguredCommission(CommissionPolicyPort configuredCommission) { this.configuredCommission=configuredCommission; }
+    @Autowired
+    public void setFlashSale(com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
 
     private DisruptionDecisionService disruptionDecisions;
 
@@ -298,8 +303,11 @@ public class OrderPaymentService {
 
         List<SubOrderJpaEntity> subOrders = new ArrayList<>();
         for (BookingItemJpaEntity item : booking.getItems()) {
+            var promotion=flashSale!=null?flashSale.snapshot(item.getId()).orElse(null):null;
+            BigDecimal rate=promotion!=null?promotion.commissionRate():configuredCommission!=null?configuredCommission.getCommissionRate(item.getVendorId()):null;
+            if(rate==null) throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("COMMISSION_POLICY_MISSING");
             BigDecimal subtotal = item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
-            BigDecimal commission = subtotal.multiply(DEFAULT_COMMISSION_RATE).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal commission = subtotal.multiply(rate).setScale(2, RoundingMode.HALF_UP);
 
             SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
             subOrder.setBookingItemId(item.getId());
@@ -310,9 +318,20 @@ public class OrderPaymentService {
             subOrder.setQuantity(item.getQuantity());
             subOrder.setUnitPrice(item.getPrice());
             subOrder.setSubtotalAmount(subtotal);
-            subOrder.setCommissionRate(DEFAULT_COMMISSION_RATE);
+            subOrder.setCommissionRate(rate);
             subOrder.setCommissionAmount(commission);
             subOrder.setVendorPayoutAmount(subtotal.subtract(commission));
+            if(promotion!=null) {
+                subOrder.setUnitPrice(promotion.originalUnitPrice());
+                subOrder.setSubtotalAmount(promotion.originalAmount());
+                subOrder.setCommissionBasisAmount(promotion.originalAmount());
+                subOrder.setCommissionAmount(promotion.commissionAmount());
+                subOrder.setVendorPayoutAmount(promotion.vendorReceivable());
+                subOrder.setDiscountAmount(promotion.subsidyAmount());
+                subOrder.setPlatformDiscountAmount(promotion.subsidyAmount());
+                subOrder.setVendorDiscountAmount(BigDecimal.ZERO);
+                subOrder.setFinalAmount(promotion.customerPayable());
+            }
             subOrder.setStatus(SubOrderStatus.PENDING);
             subOrder.setWaiverAccepted(false);
 
@@ -328,6 +347,10 @@ public class OrderPaymentService {
             subOrders.add(subOrder);
         }
         subOrderRepository.saveAll(subOrders);
+        if(flashSale!=null && flashSale.hasAllocation(bookingId)) {
+            order.setDiscountAmount(subOrders.stream().map(SubOrderJpaEntity::getPlatformDiscountAmount).reduce(BigDecimal.ZERO,BigDecimal::add));
+            masterOrderRepository.save(order);
+        }
         booking.setStatus(BookingStatus.PENDING_PAYMENT);
         bookingRepository.save(booking);
         return toOrderResponse(order, subOrders);

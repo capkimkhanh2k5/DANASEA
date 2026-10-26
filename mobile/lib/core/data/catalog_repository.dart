@@ -67,9 +67,50 @@ class CatalogRepository {
     );
   }
 
-  Future<ServiceModel> detail(String id) async => serviceFromJson(
-    await session.request('/api/services/${Uri.encodeComponent(id)}'),
-  );
+  Future<ServiceModel> detail(String id) async {
+    final service = serviceFromJson(
+      await session.request('/api/services/${Uri.encodeComponent(id)}'),
+    );
+    // Multiple active options require explicit option IDs on the slots API.
+    final available = service.options.isEmpty
+        ? await slots(id)
+        : (await Future.wait(
+            service.options.map((option) => slots(id, optionId: option.id)),
+          )).expand((items) => items).toList();
+    return service.copyWith(catalogSlots: available);
+  }
+
+  Future<List<CatalogSlot>> slots(String id, {String? optionId}) async {
+    final path = '/api/services/${Uri.encodeComponent(id)}/slots';
+    final query = optionId == null
+        ? ''
+        : '?${Uri(queryParameters: {'optionId': optionId}).query}';
+    final json = await session.requestJson('$path$query', authenticated: false);
+    if (json is! List) throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+    return json.map((item) {
+      if (item is! Map<String, dynamic> ||
+          item['slotId'] is! String ||
+          item['date'] is! String ||
+          item['startTime'] is! String ||
+          item['endTime'] is! String ||
+          item['availablePaxOrPackages'] is! num ||
+          item['bookable'] is! bool) {
+        throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+      }
+      return CatalogSlot(
+        id: item['slotId'] as String,
+        optionId: item['optionId'] as String? ?? optionId,
+        date: item['date'] as String,
+        startTime: item['startTime'] as String,
+        endTime: item['endTime'] as String,
+        availableCapacity: (item['availablePaxOrPackages'] as num).toInt(),
+        maxPaxPerPackage: (item['maxPaxPerPackage'] as num?)?.toInt(),
+        price: item['price'] as num?,
+        pricingUnit: item['pricingUnit'] as String?,
+        bookable: item['bookable'] as bool,
+      );
+    }).toList();
+  }
 
   static ServiceModel serviceFromJson(Map<String, dynamic> json) {
     num number(String key) => json[key] is num ? json[key] as num : 0;
@@ -77,6 +118,16 @@ class CatalogRepository {
     final primary = json['primaryImageUrl'] as String?;
     return ServiceModel(
       id: json['id'] as String,
+      options: (json['options'] as List? ?? [])
+          .cast<Map<String, dynamic>>()
+          .where((option) => option['status'] == 'ACTIVE')
+          .map(
+            (option) => CatalogOption(
+              id: option['id'] as String,
+              name: option['name'] as String,
+            ),
+          )
+          .toList(),
       name: json['name'] as String,
       vendorId: json['vendorId'] as String? ?? '',
       vendorName: json['businessName'] as String? ?? '',

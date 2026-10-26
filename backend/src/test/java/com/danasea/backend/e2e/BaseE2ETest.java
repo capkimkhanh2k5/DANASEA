@@ -210,6 +210,9 @@ public abstract class BaseE2ETest extends BaseSecurityIntegrationTest {
     }
 
     protected void seedTestData() {
+        jdbc.update("DELETE FROM system_configs WHERE \"key\" = 'PLATFORM_COMMISSION_RATE'");
+        jdbc.update("INSERT INTO system_configs(id, \"key\", \"value\", description, created_at, updated_at) VALUES (gen_random_uuid(), 'PLATFORM_COMMISSION_RATE', '10.0', 'Platform Commission Rate', now(), now())");
+
         // 1. Users
         customerUser = createUser("customer.e2e@danasea.vn", "Customer One", Role.CUSTOMER);
         attackerUser = createUser("attacker.e2e@danasea.vn", "Attacker User", Role.CUSTOMER);

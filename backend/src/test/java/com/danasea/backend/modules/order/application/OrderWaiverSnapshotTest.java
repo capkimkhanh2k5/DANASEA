@@ -101,6 +101,8 @@ class OrderWaiverSnapshotTest {
                         null,
                         null);
         orderPaymentService.setServiceWaiverLookupPort(serviceWaiverLookupPort);
+        orderPaymentService.setConfiguredCommission(commissionPolicyPort);
+        when(commissionPolicyPort.getCommissionRate(any())).thenReturn(new BigDecimal("0.10"));
     }
 
     @Test

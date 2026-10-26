@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,19 +40,22 @@ public class BookingHoldController {
     private final ConfirmBookingUseCase confirmBookingUseCase;
     private final CancelBookingHoldUseCase cancelBookingHoldUseCase;
 
+    public ResponseEntity<BookingHoldResponse> holdBooking(BookingHoldRequest request) { return holdBooking(request,null); }
+
     @PostMapping("/hold")
     @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     public ResponseEntity<BookingHoldResponse> holdBooking(
-            @Valid @RequestBody BookingHoldRequest request) {
+            @Valid @RequestBody BookingHoldRequest request,
+            @RequestHeader(value="Idempotency-Key",required=false) String idempotencyKey) {
 
         UUID customerId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new AccessDeniedException("User is not authenticated"));
 
         List<BookingHoldItemDto> itemDtos = request.items().stream()
-                .map(item -> new BookingHoldItemDto(item.slotId(), item.quantity(), item.optionId(), item.participantsCount(), item.allowSplit()))
+                .map(item -> new BookingHoldItemDto(item.slotId(), item.quantity(), item.optionId(), item.participantsCount(), item.allowSplit(),item.flashSaleId()))
                 .toList();
 
-        CreateBookingHoldCommand command = new CreateBookingHoldCommand(customerId, itemDtos);
+        CreateBookingHoldCommand command = new CreateBookingHoldCommand(customerId, itemDtos,idempotencyKey);
         BookingHoldResult result = createBookingHoldUseCase.execute(command);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(result));

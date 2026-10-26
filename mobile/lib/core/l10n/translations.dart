@@ -1,6 +1,30 @@
 // English UI catalog. Vietnamese source phrases are stable lookup keys.
 // Numbered placeholders retain values from the existing presentation layer.
 const englishTranslations = <String, String>{
+  "Giữ chỗ": "Hold reservation",
+  "Bỏ giữ chỗ": "Release hold",
+  "Số gói": "Number of packages",
+  "Số người": "Number of people",
+  "Số người mỗi gói": "People per package",
+  "Cho phép chia nhóm": "Allow splitting the group",
+  "Số lượng không hợp lệ.": "Invalid quantity.",
+  "Vui lòng kiểm tra số lượng và khung giờ.": "Please check the quantity and time slot.",
+  "Đặt chỗ chưa được xác nhận.": "The reservation has not been confirmed.",
+  "Đặt chỗ đã được xác nhận.": "The reservation is confirmed.",
+  "Đã bỏ giữ chỗ.": "The hold has been released.",
+  "Thời gian giữ chỗ đã hết.": "The hold has expired.",
+  "Thời gian còn lại: {0}": "Time remaining: {0}",
+  "Xác nhận đặt chỗ": "Confirm reservation",
+  "Chỉ xác nhận được sau khi thanh toán thành công. Thanh toán trong app chưa khả dụng.": "Confirmation requires successful payment. In-app payment is not available yet.",
+  "Chưa xác định được kết quả giữ chỗ. Không gửi lại để tránh tạo giữ chỗ trùng.": "The hold result is unknown. Do not submit again to avoid duplicate holds.",
+  "Chỗ vẫn đang được giữ": "Your reservation is still on hold",
+  "Đóng màn hình không bỏ giữ chỗ. Chỗ sẽ được giữ đến khi hết hạn. Bạn có thể ở lại để bỏ giữ chỗ.": "Closing does not release the hold. It remains until it expires. Stay on this screen to release it.",
+  "Ở lại": "Stay",
+  "Chọn khung giờ để giữ chỗ.": "Choose a time slot to hold a reservation.",
+  "Khung giờ trong 30 ngày tới": "Time slots for the next 30 days",
+  "Chưa có khung giờ trong khoảng thời gian này.": "No time slots in this period.",
+  "Còn lại: {0}": "Remaining: {0}",
+  "Xem nhà cung cấp": "View provider",
   "Chưa có dịch vụ.": "No services yet.",
   "Không tải được danh sách yêu thích.": "Unable to load favorites.",
   "Chưa có trải nghiệm yêu thích.": "No favorite experiences yet.",
@@ -1364,4 +1388,217 @@ const englishTranslations = <String, String>{
       "Enter the 6-digit code sent to your email.",
   "Tạo mật khẩu an toàn để dùng cho lần đăng nhập tiếp theo.":
       "Create a secure password for the next time you log in.",
+  "Mã giảm giá (tùy chọn)": "Discount code (optional)",
+  "Nhập mã giảm giá nếu có": "Enter discount code if any",
+  "Đang tạo đơn hàng...": "Creating order...",
+  "Tạo đơn hàng từ giữ chỗ": "Create order from hold",
+  "Tạo đơn hàng": "Create order",
+  "Chưa xác định được kết quả tạo đơn hàng. Vui lòng kiểm tra mục Đơn hàng của tôi trước khi thử lại.":
+      "Order creation result is uncertain. Please check My Orders before trying again.",
+  "Đã tạo đơn hàng thành công.": "Order created successfully.",
+  "Không thể tạo đơn hàng.": "Unable to create order.",
+  "Bạn có thể nhập mã giảm giá (nếu có) trước khi tạo đơn hàng từ giữ chỗ này.":
+      "You can enter a discount code (if any) before creating an order from this hold.",
+  "Vui lòng đăng nhập để xem đơn hàng.": "Please sign in to view your orders.",
+  "Không tải được danh sách đơn hàng.": "Unable to load orders.",
+  "Tải thêm đơn hàng": "Load more orders",
+  "Chưa xác định được kết quả gửi yêu cầu hoàn tiền. Vui lòng kiểm tra mục Theo dõi hoàn tiền trước khi thử lại.":
+      "Refund request result is uncertain. Please check Refund Tracking before trying again.",
+  "Không thể tải thông tin xem trước hủy đơn.":
+      "Unable to load cancellation preview.",
+  "Không thể gửi yêu cầu hoàn tiền.": "Unable to submit refund request.",
+  "Tải lại chính sách hoàn tiền từ máy chủ":
+      "Reload refund policy from server",
+  "Đang xử lý yêu cầu...": "Processing request...",
+  "Không tải được chi tiết đơn hàng.": "Unable to load order details.",
+  "Không tải được biên nhận.": "Unable to load receipt.",
+  "Biên nhận PDF chưa khả dụng cho đơn hàng này.":
+      "PDF receipt is not available for this order.",
+  "Không tải được biên nhận PDF.": "Unable to load PDF receipt.",
+  "Tải biên nhận PDF": "Download PDF receipt",
+  "Đã tải biên nhận PDF ({0} KB) cho biên nhận #{1}.":
+      "Downloaded PDF receipt ({0} KB) for receipt #{1}.",
+  "Biên nhận điện tử": "Electronic receipt",
+  "Mã biên nhận": "Receipt number",
+  "Mã đơn hàng": "Order ID",
+  "Trạng thái đơn": "Order status",
+  "Trạng thái thanh toán": "Payment status",
+  "Mã giao dịch": "Transaction ID",
+  "Thời gian phát hành": "Issued at",
+  "Chi tiết hạng mục": "Line items",
+  "Tạm tính": "Subtotal",
+  "Giảm giá": "Discount",
+  "Tổng thanh toán": "Total paid",
+  "Hỗ trợ": "Support",
+  "Lịch sử giao dịch thanh toán": "Payment transaction history",
+  "Yêu cầu hoàn tiền": "Refund requests",
+  "Vui lòng đăng nhập để theo dõi hoàn tiền.":
+      "Please sign in to track refunds.",
+  "Không tải được dữ liệu hoàn tiền.": "Unable to load refund data.",
+  "Chưa có yêu cầu hoàn tiền nào trên hệ thống.":
+      "No refund requests found.",
+  "Danh sách yêu cầu hoàn tiền ({0})": "Refund requests ({0})",
+  "PayPal Quốc tế": "PayPal International",
+  "Thanh toán quốc tế an toàn qua tài khoản PayPal":
+      "Secure international payment via PayPal account",
+  "Đang khởi tạo thanh toán...": "Initializing payment...",
+  "Không tải được thông tin đơn hàng để thanh toán.":
+      "Unable to load order details for payment.",
+  "Chưa xác định được kết quả tạo thanh toán trước đó. Vui lòng bấm làm mới trạng thái thanh toán trước khi thử lại.":
+      "Previous payment creation result is uncertain. Please refresh payment status before trying again.",
+  "Cần có đơn hàng thực tế từ giữ chỗ để khởi tạo thanh toán trên máy chủ.":
+      "A server order created from a reservation hold is required to initiate payment.",
+  "Chưa xác định được kết quả khởi tạo thanh toán. Vui lòng kiểm tra trạng thái đơn hàng trước khi thử lại.":
+      "Payment initialization result is uncertain. Please check order status before trying again.",
+  "Đơn hàng #{0} đang chờ thanh toán": "Order #{0} is awaiting payment",
+  "Giao dịch gần nhất: {0} • {1}": "Latest transaction: {0} • {1}",
+  "Xem trạng thái": "View status",
+  "Thanh toán đơn hàng": "Pay for order",
+  "Không thể tải chi tiết giao dịch thanh toán.":
+      "Unable to load payment transaction details.",
+  "Đang chờ xác nhận thanh toán": "Awaiting payment confirmation",
+  "Yêu cầu thanh toán đã được khởi tạo trên máy chủ. Vui lòng hoàn tất trên cổng thanh toán và kiểm tra lại trạng thái.":
+      "Payment intent has been created on the server. Please complete it on the payment gateway and refresh status.",
+  "Không tải được trạng thái thanh toán. Vui lòng thử lại.":
+      "Unable to load payment status. Please try again.",
+  "Mã thanh toán:": "Payment ID:",
+  "Trạng thái thanh toán:": "Payment status:",
+  "Hạn thanh toán:": "Payment deadline:",
+  "Số lần giao dịch:": "Transaction count:",
+  "Ghi chú hệ thống:": "System note:",
+  "Tổng tiền cần thanh toán:": "Total amount due:",
+  "Liên kết thanh toán từ cổng {0}": "Payment link from {0}",
+  "Sao chép liên kết thanh toán": "Copy payment link",
+  "Đã sao chép liên kết thanh toán!": "Payment link copied!",
+  "Xác nhận đơn PayPal (Capture)": "Confirm PayPal Order (Capture)",
+  "Sau khi chấp thuận thanh toán trên PayPal, nhập hoặc xác nhận mã PayPal Order ID để hoàn tất thu tiền.":
+      "After approving payment on PayPal, enter or confirm the PayPal Order ID to capture payment.",
+  "Mã đơn PayPal (PayPal Order ID)": "PayPal Order ID",
+  "Vui lòng nhập mã đơn PayPal (PayPal Order ID).":
+      "Please enter the PayPal Order ID.",
+  "Không tìm thấy mã giao dịch thanh toán.": "Payment ID not found.",
+  "Xác nhận thanh toán PayPal thành công!":
+      "PayPal payment captured successfully!",
+  "Chưa xác định được kết quả capture PayPal. Vui lòng kiểm tra trạng thái thanh toán trước khi thử lại.":
+      "PayPal capture result is uncertain. Please check payment status before trying again.",
+  "Chưa xác định được kết quả capture PayPal. Vui lòng bấm Kiểm tra trạng thái thanh toán trước khi gửi lại.":
+      "PayPal capture result is uncertain. Please tap Check payment status before submitting again.",
+  "Đang xác nhận PayPal...": "Confirming PayPal...",
+  "Xác nhận thanh toán PayPal": "Confirm PayPal payment",
+  "Đang kiểm tra trạng thái...": "Checking status...",
+  "Kiểm tra trạng thái thanh toán": "Check payment status",
+  "Đang chờ xác nhận": "Awaiting confirmation",
+  "Vui lòng nhập mã giảm giá để kiểm tra.":
+      "Please enter a discount code to check.",
+  "Không tìm thấy mã giữ chỗ (bookingId) để xem trước mã giảm giá.":
+      "Booking hold ID not found to preview discount code.",
+  "Áp dụng mã {0} (-{1})!": "Applied code {0} (-{1})!",
+  "Không thể kiểm tra mã giảm giá. Vui lòng thử lại.":
+      "Unable to verify discount code. Please try again.",
+  "Không thể tạo mã QR check-in. Vui lòng thử lại.":
+      "Unable to generate check-in QR code. Please try again.",
+  "Đã sao chép mã token QR check-in!": "Copied check-in QR token!",
+  "CHỜ MÃ QR": "AWAITING QR",
+  "Hiệu lực đến: {0}": "Valid until: {0}",
+  "Đã ký miễn trừ v{0}": "Signed waiver v{0}",
+  "Xem & ký miễn trừ v{0}": "View & sign waiver v{0}",
+  "Cam kết miễn trừ trách nhiệm (v{0})": "Liability Waiver (v{0})",
+  "Đã ký cam kết miễn trừ trách nhiệm ({0}).":
+      "Liability waiver signed ({0}).",
+  "Đồng ý & Ký cam kết miễn trừ": "Agree & Sign Liability Waiver",
+  "Đã xác nhận cam kết miễn trừ trách nhiệm!":
+      "Liability waiver accepted!",
+  "Không thể ghi nhận cam kết miễn trừ. Vui lòng thử lại.":
+      "Unable to record liability waiver. Please try again.",
+  "Đã ký cam kết miễn trừ v{0}": "Signed liability waiver v{0}",
+  "Cần ký cam kết miễn trừ v{0} trước khi thanh toán":
+      "Liability waiver v{0} must be signed before payment",
+  "Xem miễn trừ": "View waiver",
+  "Ký miễn trừ": "Sign waiver",
+  "Đổi lịch / Gián đoạn": "Reschedule / Disruption",
+  "Đổi lịch & Xử lý gián đoạn": "Reschedule & Disruption Handling",
+  "Không thể tải danh sách ca thay thế khả dụng.":
+      "Unable to load available replacement slots.",
+  "Chưa xác định được kết quả đổi lịch trước đó. Vui lòng bấm làm mới trước khi thử lại.":
+      "Previous reschedule outcome is uncertain. Please refresh before trying again.",
+  "Đã chuyển sang ca {0} ngày {1}!": "Rescheduled to {0} on {1}!",
+  "Chưa xác định được kết quả đổi lịch. Vui lòng làm mới trạng thái trước khi thử lại.":
+      "Reschedule outcome is uncertain. Please refresh status before trying again.",
+  "Đã ghi nhận hoàn tiền 100% do gián đoạn ({0}).":
+      "Recorded 100% disruption refund ({0}).",
+  "Không thể gửi yêu cầu hoàn tiền gián đoạn. Vui lòng thử lại.":
+      "Unable to submit disruption refund request. Please try again.",
+  "Ca hiện tại: {0} • {1}": "Current slot: {0} • {1}",
+  "Trạng thái: Đủ điều kiện đổi lịch ({0})":
+      "Status: Eligible for rescheduling ({0})",
+  "Chưa có cảnh báo thời tiết hoặc đề xuất đổi lịch từ đối tác.":
+      "No active weather alert or vendor reschedule proposal.",
+  "Hạn xác nhận quyết định: {0}": "Decision deadline: {0}",
+  "Ca thay thế khả dụng ({0})": "Available replacement slots ({0})",
+  "Hiện chưa có ca thay thế khả dụng trong 14 ngày tới.":
+      "No replacement slots available in the next 14 days.",
+  "Đề xuất từ đối tác": "Proposed by vendor",
+  "Xác nhận đổi sang ca đã chọn": "Confirm reschedule to selected slot",
+  "Chọn hoàn tiền 100% do gián đoạn ({0})":
+      "Choose 100% disruption refund ({0})",
+  "Tối đa 5 hình ảnh cho mỗi đánh giá.": "Maximum 5 photos per review.",
+  "Thêm liên kết ảnh chuyến đi": "Add trip photo URL",
+  "Liên kết ảnh phải bắt đầu bằng http:// hoặc https://.":
+      "Image URL must start with http:// or https://.",
+  "Đã cập nhật đánh giá trải nghiệm biển!":
+      "Updated your ocean experience review!",
+  "Không thể gửi đánh giá. Vui lòng thử lại.":
+      "Unable to submit review. Please try again.",
+  "Chỉnh sửa đánh giá": "Edit review",
+  "Đang gửi đánh giá...": "Submitting review...",
+  "Cập nhật đánh giá": "Update review",
+  "Không thể tải danh sách đánh giá. Vui lòng thử lại.":
+      "Unable to load reviews. Please try again.",
+  "Nội dung đánh giá...": "Review content...",
+  "Không thể cập nhật đánh giá. Vui lòng thử lại.":
+      "Unable to update review. Please try again.",
+  "Báo cáo đánh giá vi phạm": "Report inappropriate review",
+  "Nhập lý do báo cáo (ngôn từ không phù hợp, spam...)":
+      "Enter report reason (inappropriate language, spam...)",
+  "Gửi báo cáo": "Submit report",
+  "Vui lòng nhập lý do báo cáo đánh giá.":
+      "Please enter a reason to report this review.",
+  "Đã gửi báo cáo đánh giá cho bộ phận kiểm duyệt.":
+      "Review report submitted for moderation.",
+  "Không thể gửi báo cáo đánh giá. Vui lòng thử lại.":
+      "Unable to submit review report. Please try again.",
+  "Chưa có đánh giá nào cho dịch vụ này.":
+      "No reviews yet for this service.",
+  "Phản hồi từ đối tác": "Vendor reply",
+  "Đã báo cáo": "Reported",
+  "Báo cáo": "Report",
+  "Tải thêm đánh giá": "Load more reviews",
+  "Vấn đề thanh toán / phụ phí": "Payment / surcharge issue",
+  "Không tải được danh sách đơn hàng để khiếu nại.":
+      "Unable to load orders for dispute.",
+  "Tải bằng chứng khiếu nại": "Upload dispute evidence",
+  "Đường dẫn tệp trên máy hoặc URL (tùy chọn)...":
+      "Local file path or URL (optional)...",
+  "Tải tệp lên máy chủ (/api/disputes/evidence)":
+      "Upload file to server (/api/disputes/evidence)",
+  "Đính kèm từ liên kết URL": "Attach from URL link",
+  "Đã tải bằng chứng lên máy chủ thành công!":
+      "Evidence uploaded to server successfully!",
+  "Không thể tải bằng chứng lên máy chủ. Vui lòng thử lại.":
+      "Unable to upload evidence to server. Please try again.",
+  "Vui lòng chọn đơn hàng dịch vụ cần khiếu nại.":
+      "Please select a service booking to dispute.",
+  "Không thể gửi hồ sơ khiếu nại. Vui lòng thử lại.":
+      "Unable to submit dispute. Please try again.",
+  "Chưa tìm thấy đơn hàng nào để khiếu nại.":
+      "No orders found to raise a dispute.",
+  "Đang gửi khiếu nại...": "Submitting dispute...",
+  "Không thể tải danh sách khiếu nại. Vui lòng thử lại.":
+      "Unable to load disputes. Please try again.",
+  "Chi tiết khiếu nại #{0}": "Dispute detail #{0}",
+  "Minh chứng đính kèm ({0}):": "Attached evidence ({0}):",
+  "Giải trình từ đối tác:": "Vendor explanation:",
+  "Mức hoàn tiền phê duyệt: {0}%": "Approved refund rate: {0}%",
+  "Không thể tải chi tiết khiếu nại. Vui lòng thử lại.":
+      "Unable to load dispute details. Please try again.",
 };

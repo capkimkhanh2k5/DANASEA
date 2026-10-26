@@ -599,6 +599,29 @@ Chính sách hiện tại: khách sửa review trong 7 ngày; chưa cung cấp A
 - [x] GET /api/vendor/settlements/{id}
 - [x] SettlementCalculationTest, SettlementUseCaseTest, SettlementAdversarialTest và AdversarialSettlementStressTest (71 ca: tính tiền/hoa hồng, refund, cam kết kỳ và chống tạo/chốt trùng; báo cáo ngày 10/10/2026 không có failure/error/skip). Không nghiệm thu payout hoặc cấu hình hoa hồng chưa triển khai.
 
+### Flash Sale & Platform Promotions — API
+- [x] GET /api/flash-sales/active
+- [x] GET /api/flash-sales/{id}
+- [x] POST /api/admin/flash-sales
+- [x] GET /api/admin/flash-sales
+- [x] GET /api/admin/flash-sales/eligible-services
+- [x] GET /api/admin/flash-sales/commission-policies
+- [x] POST /api/admin/flash-sales/commission-policies
+- [x] POST /api/admin/flash-sales/preview
+- [x] GET /api/admin/flash-sales/{id}
+- [x] PATCH /api/admin/flash-sales/{id}
+- [x] POST /api/admin/flash-sales/{id}/activate
+- [x] POST /api/admin/flash-sales/{id}/cancel
+- [x] DELETE /api/admin/flash-sales/{id}
+
+### System Configs & Settings — API
+- [x] GET /api/admin/system-configs
+- [x] GET /api/admin/system-configs/{key}
+- [x] PUT /api/admin/system-configs/{key}
+- [x] GET /api/admin/settings
+- [x] GET /api/admin/settings/{key}
+- [x] PUT /api/admin/settings/{key}
+
 ### Thông báo — API
 - [x] GET /api/notifications (danh sách thông báo của user hiện tại, có phân trang, `isRead`/`readAt`)
 - [x] GET /api/notifications/unread-count (số thông báo chưa đọc của user hiện tại)

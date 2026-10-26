@@ -1,13 +1,97 @@
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/data/mock_database_data.dart';
+import '../../../../core/auth/auth_session.dart';
+import '../../../../core/data/order_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../orders/presentation/screens/order_detail_screen.dart';
 
-class RefundTrackingScreen extends StatelessWidget {
-  const RefundTrackingScreen({super.key});
+class RefundTrackingScreen extends StatefulWidget {
+  final String? orderId;
+  final List<RefundModel>? initialRefunds;
+
+  const RefundTrackingScreen({
+    super.key,
+    this.orderId,
+    this.initialRefunds,
+  });
+
+  @override
+  State<RefundTrackingScreen> createState() => _RefundTrackingScreenState();
+}
+
+class _RefundTrackingScreenState extends State<RefundTrackingScreen> {
+  final OrderRepository _repository = OrderRepository();
+  List<RefundModel> _refunds = [];
+  bool _loading = true;
+  String? _error;
+  int _generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialRefunds != null && widget.initialRefunds!.isNotEmpty) {
+      _refunds = widget.initialRefunds!;
+    }
+    _loadRefunds();
+  }
+
+  Future<void> _loadRefunds() async {
+    final generation = ++_generation;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      List<RefundModel> loaded = [];
+      if (widget.orderId != null && widget.orderId!.isNotEmpty) {
+        final order = await _repository.detail(widget.orderId!);
+        final names = <String, String>{
+          for (final sub in order.subOrders) sub.id: sub.serviceName,
+        };
+        loaded = await _repository.refunds(
+          order.id,
+          subOrderServiceNames: names,
+        );
+      } else {
+        final page = await _repository.list(page: 0, size: 20);
+        final allLists = await Future.wait(
+          page.content.map((order) {
+            final names = <String, String>{
+              for (final sub in order.subOrders) sub.id: sub.serviceName,
+            };
+            return _repository.refunds(
+              order.id,
+              subOrderServiceNames: names,
+            );
+          }),
+        );
+        loaded = allLists.expand((e) => e).toList();
+      }
+      if (!mounted || generation != _generation) return;
+      setState(() => _refunds = loaded);
+    } on AuthFailure catch (e) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _refunds = [];
+          _error = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _refunds = [];
+          _error = 'Không thể tải danh sách hoàn tiền. Vui lòng thử lại.';
+        });
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _loading = false);
+      }
+    }
+  }
 
   String _formatPrice(int price) {
     final str = price.toString();
@@ -23,7 +107,24 @@ class RefundTrackingScreen extends StatelessWidget {
     return '${buffer.toString().split('').reversed.join()} đ';
   }
 
-  String _getReasonText(RefundReason reason) {
+  String _getReasonText(RefundReason reason, String? rawReason) {
+    switch (rawReason) {
+      case 'CUSTOMER_CANCEL':
+      case 'CUSTOMER_REQUEST':
+        return 'Khách yêu cầu hủy';
+      case 'WEATHER':
+        return 'Thời tiết biển bất lợi';
+      case 'DISPUTE':
+        return 'Bồi thường khiếu nại';
+      case 'VENDOR_FAULT':
+        return 'Đối tác hủy dịch vụ';
+      case 'SYSTEM_FAULT':
+        return 'Sự cố hệ thống';
+      case 'ADMIN_OVERRIDE':
+        return 'Quản trị viên phê duyệt';
+      case 'COMPENSATION':
+        return 'Bù trừ tách đơn';
+    }
     switch (reason) {
       case RefundReason.customerCancel:
         return 'Khách yêu cầu hủy';
@@ -38,7 +139,7 @@ class RefundTrackingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final refunds = MockDatabaseData.refunds;
+    final refunds = _refunds;
     final totalAmount =
         refunds.fold(0, (sum, item) => sum + item.amount);
 
@@ -57,104 +158,135 @@ class RefundTrackingScreen extends StatelessWidget {
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppShapes.gutterMobile),
-        child: Column(
-          children: [
-            // METRIC CARDS ROW
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(AppShapes.spaceSm),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLowest,
-                      borderRadius: AppShapes.radiusDefault,
-                      boxShadow: AppShapes.shadowLevel1,
-                      border: Border.all(color: AppColors.borderSubtle),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        LocalizedText(
-                          'Tổng yêu cầu',
-                          style: AppTypography.bodySm(
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        LocalizedText(
-                          '${refunds.length} dịch vụ',
-                          style: AppTypography.headlineSm(
-                            color: AppColors.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(AppShapes.spaceSm),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLowest,
-                      borderRadius: AppShapes.radiusDefault,
-                      boxShadow: AppShapes.shadowLevel1,
-                      border: Border.all(color: AppColors.borderSubtle),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        LocalizedText(
-                          'Tổng tiền yêu cầu',
-                          style: AppTypography.bodySm(
-                            color: AppColors.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        LocalizedText(
-                          _formatPrice(totalAmount),
-                          style: AppTypography.headlineSm(
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // TRANSPARENCY NOTICE
-            Container(
-              padding: const EdgeInsets.all(AppShapes.spaceSm),
-              decoration: BoxDecoration(
-                color: AppColors.secondaryFixed.withValues(alpha: 0.35),
-                borderRadius: AppShapes.radiusDefault,
-              ),
-              child: Row(
+      body: RefreshIndicator(
+        onRefresh: _loadRefunds,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(AppShapes.gutterMobile),
+          child: Column(
+            children: [
+              // METRIC CARDS ROW
+              Row(
                 children: [
-                  const Icon(Icons.shield_outlined,
-                      size: 20, color: AppColors.secondary),
-                  const SizedBox(width: 8),
                   Expanded(
-                    child: LocalizedText(
-                      'Hoàn trả minh bạch kết nối trực tiếp cổng thanh toán gốc, theo đúng lịch đối soát của ngân hàng.',
-                      style: AppTypography.bodySm(
-                        color: AppColors.onSecondaryFixedVariant,
-                      ).copyWith(fontSize: 11),
+                    child: Container(
+                      padding: const EdgeInsets.all(AppShapes.spaceSm),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLowest,
+                        borderRadius: AppShapes.radiusDefault,
+                        boxShadow: AppShapes.shadowLevel1,
+                        border: Border.all(color: AppColors.borderSubtle),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          LocalizedText(
+                            'Tổng yêu cầu',
+                            style: AppTypography.bodySm(
+                              color: AppColors.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          LocalizedText(
+                            '${refunds.length} dịch vụ',
+                            style: AppTypography.headlineSm(
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(AppShapes.spaceSm),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLowest,
+                        borderRadius: AppShapes.radiusDefault,
+                        boxShadow: AppShapes.shadowLevel1,
+                        border: Border.all(color: AppColors.borderSubtle),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          LocalizedText(
+                            'Tổng tiền yêu cầu',
+                            style: AppTypography.bodySm(
+                              color: AppColors.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          LocalizedText(
+                            _formatPrice(totalAmount),
+                            style: AppTypography.headlineSm(
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // REFUND CARDS LIST
-            ...refunds.map((ref) => _buildRefundCard(context, ref)),
-          ],
+              // TRANSPARENCY NOTICE
+              Container(
+                padding: const EdgeInsets.all(AppShapes.spaceSm),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryFixed.withValues(alpha: 0.35),
+                  borderRadius: AppShapes.radiusDefault,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shield_outlined,
+                        size: 20, color: AppColors.secondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: LocalizedText(
+                        'Hoàn trả minh bạch kết nối trực tiếp cổng thanh toán gốc, theo đúng lịch đối soát của ngân hàng.',
+                        style: AppTypography.bodySm(
+                          color: AppColors.onSecondaryFixedVariant,
+                        ).copyWith(fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_error != null) ...[
+                LocalizedText(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: AppTypography.bodyMd(color: AppColors.error),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _loadRefunds,
+                  child: const LocalizedText('Thử lại'),
+                ),
+              ] else if (refunds.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32),
+                  child: LocalizedText(
+                    'Chưa có yêu cầu hoàn tiền nào.',
+                    style: AppTypography.bodyMd(
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                // REFUND CARDS LIST
+                ...refunds.map((ref) => _buildRefundCard(context, ref)),
+            ],
+          ),
         ),
       ),
     );
@@ -162,6 +294,7 @@ class RefundTrackingScreen extends StatelessWidget {
 
   Widget _buildRefundCard(BuildContext context, RefundModel ref) {
     final isProcessed = ref.status == RefundStatus.processed;
+    final isFailed = ref.status == RefundStatus.failed;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -224,19 +357,31 @@ class RefundTrackingScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      isProcessed ? Icons.check_circle : Icons.sync,
+                      isProcessed
+                          ? Icons.check_circle
+                          : isFailed
+                              ? Icons.error_outline
+                              : Icons.sync,
                       size: 12,
                       color: isProcessed
                           ? AppColors.onSecondaryContainer
-                          : AppColors.onSurfaceVariant,
+                          : isFailed
+                              ? AppColors.error
+                              : AppColors.onSurfaceVariant,
                     ),
                     const SizedBox(width: 4),
                     LocalizedText(
-                      isProcessed ? 'Đã hoàn tất' : 'Đang xử lý',
+                      isProcessed
+                          ? 'Đã hoàn tất'
+                          : isFailed
+                              ? 'Thất bại'
+                              : 'Đang xử lý',
                       style: AppTypography.labelSm(
                         color: isProcessed
                             ? AppColors.onSecondaryContainer
-                            : AppColors.onSurfaceVariant,
+                            : isFailed
+                                ? AppColors.error
+                                : AppColors.onSurfaceVariant,
                         fontWeight: FontWeight.w700,
                       ).copyWith(fontSize: 10),
                     ),
@@ -303,7 +448,7 @@ class RefundTrackingScreen extends StatelessWidget {
           ),
           const SizedBox(height: 10),
 
-          _buildRow('Lý do hoàn:', _getReasonText(ref.reason)),
+          _buildRow('Lý do hoàn:', _getReasonText(ref.reason, ref.rawReason)),
           const SizedBox(height: 4),
           _buildRow('Phương thức nhận:', ref.originalPaymentMethod),
           const Divider(height: 16),
@@ -317,12 +462,24 @@ class RefundTrackingScreen extends StatelessWidget {
               minimumSize: const Size(double.infinity, 38),
             ),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: LocalizedText('Xem chi tiết đơn ${ref.subOrderCode}'),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
+              final targetOrder = ref.masterOrderId ?? widget.orderId;
+              if (targetOrder != null && targetOrder.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => OrderDetailScreen(orderId: targetOrder),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: LocalizedText(
+                      'Xem chi tiết đơn ${ref.subOrderCode}',
+                    ),
+                    duration: const Duration(seconds: 1),
+                  ),
+                );
+              }
             },
             icon: const Icon(Icons.receipt_long,
                 size: 16, color: AppColors.secondary),

@@ -23,7 +23,17 @@ public record SubOrderRecord(
         SubOrderStatus status,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
-        RefundReason cancellationReason) {
+        RefundReason cancellationReason,
+        BigDecimal finalAmount,
+        BigDecimal platformDiscountAmount,
+        BigDecimal commissionBasisAmount) {
+    public SubOrderRecord(UUID id,UUID masterOrderId,UUID vendorId,UUID serviceId,UUID slotId,Integer quantity,
+            BigDecimal unitPrice,BigDecimal subtotalAmount,BigDecimal commissionRate,BigDecimal commissionAmount,
+            BigDecimal vendorPayoutAmount,SubOrderStatus status,OffsetDateTime createdAt,OffsetDateTime updatedAt,
+            RefundReason cancellationReason) {
+        this(id,masterOrderId,vendorId,serviceId,slotId,quantity,unitPrice,subtotalAmount,commissionRate,commissionAmount,
+                vendorPayoutAmount,status,createdAt,updatedAt,cancellationReason,null,null,null);
+    }
     public SubOrderRecord(
             UUID id,
             UUID masterOrderId,

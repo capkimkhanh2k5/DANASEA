@@ -14,10 +14,10 @@ python3 scripts/production.py prepare
 
 Script sinh các khóa còn thiếu và config riêng `private/cli-proxy/config.yaml`. Không ghi giá trị khóa vào Git, không ghi đè cấu hình proxy đã tồn tại, không xoá token OAuth. File `cli-proxy/config.yaml` trong Git chỉ là mẫu với management tắt và danh sách client key rỗng.
 
-Production đã có service `cli-proxy-api` trong `docker-compose.prod.yml`; không chạy thêm Compose độc lập cùng lúc vì trùng tên container và cổng. Compose độc lập dành cho backend chạy trực tiếp trên host:
+Production đã có service `cli-proxy-api` trong `docker-compose.prod.yml`; không chạy thêm Compose độc lập cùng lúc vì trùng tên container và cổng. Trong môi trường local development, khi cần bật proxy cùng hệ thống hoặc cho backend chạy trực tiếp trên host:
 
 ```bash
-docker compose -f docker-compose.cli-proxy.yml up -d
+docker compose --profile ai up -d cli-proxy-api
 ```
 
 ## Quản trị qua SSH

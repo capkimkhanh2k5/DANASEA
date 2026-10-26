@@ -107,10 +107,6 @@ The platform is designed around a **Modular Clean Monolith** adhering to Hexagon
    - Backend API: `http://localhost:8080/api`
    - RabbitMQ Management: `http://localhost:15672` (default: `guest` / `guest`)
 
-### Automated Demo Data Loading
-
-The [Demo data workflow](.github/workflows/demo-data.yml) automatically loads and verifies [the demo package](dataBase_demo/README.md) in a disposable PostgreSQL 17 database when the package or migrations change on a push or pull request to `main`. You can also run it from **Actions → Demo data → Run workflow**. It validates checksums, migrates to V37, backs up the database, verifies a dry-run rollback, loads 228 fixture rows, and confirms a second load inserts no duplicates. No secrets are required. The database is removed after the run; server deployment data is not changed.
-
 ---
 
 ## Authors

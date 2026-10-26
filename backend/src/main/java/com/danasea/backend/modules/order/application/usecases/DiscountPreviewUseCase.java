@@ -32,6 +32,9 @@ import java.util.UUID;
 
 @Service
 public class DiscountPreviewUseCase {
+    private com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale;
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setFlashSale(com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
 
     private final BookingLookupPort bookingLookupPort;
     private LocalizedMessageService messages = LocalizedMessageService.standalone();
@@ -92,6 +95,9 @@ public class DiscountPreviewUseCase {
             return DiscountPreviewResponse.invalid("EMPTY_ITEMS", messages.get("error.empty_items"), request.code());
         }
 
+        if(flashSale!=null && flashSale.hasAllocation(request.bookingId()))
+            throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("FLASH_SALE_VOUCHER_STACKING_NOT_ALLOWED");
+
         // 2. Tìm Discount Code
         String cleanCode = request.code().trim().toUpperCase(Locale.ROOT);
         Optional<DiscountCodeJpaEntity> codeOpt = discountCodeRepository.findByCodeIgnoreCase(cleanCode);
@@ -110,7 +116,7 @@ public class DiscountPreviewUseCase {
         for (BookingOrderView.BookingItemOrderView item : booking.items()) {
             BigDecimal rate = commissionPolicyPort != null ? commissionPolicyPort.getCommissionRate(item.vendorId()) : null;
             if (rate == null) {
-                rate = CommissionPolicyPort.DEFAULT_COMMISSION_RATE;
+                throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("COMMISSION_POLICY_MISSING");
             }
             BigDecimal subtotal = item.price().multiply(BigDecimal.valueOf(item.quantity()));
             candidateItems.add(new CandidateItem(

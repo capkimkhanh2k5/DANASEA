@@ -5,5 +5,8 @@ import java.util.UUID;
 
 public record CreateBookingHoldCommand(
         UUID customerId,
-        List<BookingHoldItemDto> items
-) {}
+        List<BookingHoldItemDto> items,
+        String idempotencyKey
+) {
+    public CreateBookingHoldCommand(UUID customerId,List<BookingHoldItemDto> items) { this(customerId,items,null); }
+}

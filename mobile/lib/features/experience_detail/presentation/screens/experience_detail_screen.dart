@@ -1,6 +1,8 @@
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/mock_database_data.dart';
+import '../../../../core/data/review_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
@@ -34,14 +36,298 @@ class ExperienceDetailScreen extends StatefulWidget {
 }
 
 class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
+  final ReviewRepository _reviewRepository = ReviewRepository();
   late bool _isFavorite;
   int _currentImageIndex = 0;
   bool _isDescriptionExpanded = false;
+  List<ReviewModel> _reviews = [];
+  int _reviewPage = 0;
+  int _reviewTotalPages = 1;
+  int _reviewTotalElements = 0;
+  bool _loadingReviews = true;
+  bool _loadingMoreReviews = false;
+  bool _reviewActionBusy = false;
+  String? _reviewsError;
 
   @override
   void initState() {
     super.initState();
     _isFavorite = widget.service.isFavorite;
+    _reviewTotalElements = widget.service.ratingCount;
+    _loadReviews();
+  }
+
+  Future<void> _loadReviews({bool loadMore = false}) async {
+    if (loadMore) {
+      if (_loadingMoreReviews || _reviewPage + 1 >= _reviewTotalPages) return;
+      setState(() => _loadingMoreReviews = true);
+    } else {
+      setState(() {
+        _loadingReviews = true;
+        _reviewsError = null;
+      });
+    }
+    try {
+      final targetPage = loadMore ? _reviewPage + 1 : 0;
+      final page = await _reviewRepository.getServiceReviews(
+        widget.service.id,
+        page: targetPage,
+        size: 10,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (loadMore) {
+          _reviews = [..._reviews, ...page.content];
+        } else {
+          _reviews = page.content;
+        }
+        _reviewPage = page.page;
+        _reviewTotalPages = page.totalPages;
+        _reviewTotalElements = page.totalElements;
+      });
+    } on AuthFailure catch (e) {
+      if (mounted && !loadMore) {
+        setState(() => _reviewsError = e.message);
+      }
+    } catch (_) {
+      if (mounted && !loadMore) {
+        setState(
+          () => _reviewsError =
+              'Không thể tải danh sách đánh giá. Vui lòng thử lại.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingReviews = false;
+          _loadingMoreReviews = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openEditReviewDialog(ReviewModel rev) async {
+    if (_reviewActionBusy) return;
+    int selectedRating = rev.rating;
+    final commentCtrl = TextEditingController(text: rev.comment);
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: AppShapes.gutterMobile,
+                right: AppShapes.gutterMobile,
+                top: AppShapes.gutterMobile,
+                bottom:
+                    MediaQuery.of(sheetContext).viewInsets.bottom +
+                    AppShapes.gutterMobile,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: LocalizedText(
+                          'Chỉnh sửa đánh giá',
+                          style: AppTypography.headlineSm(
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(sheetContext, false),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (idx) {
+                      final star = idx + 1;
+                      return IconButton(
+                        icon: Icon(
+                          star <= selectedRating
+                              ? Icons.star
+                              : Icons.star_border,
+                          color: AppColors.starRating,
+                          size: 28,
+                        ),
+                        onPressed: () =>
+                            setSheetState(() => selectedRating = star),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.borderSubtle),
+                    ),
+                    child: TextField(
+                      controller: commentCtrl,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: tr(sheetContext, 'Nội dung đánh giá...'),
+                        contentPadding: const EdgeInsets.all(10),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  AppPillButton(
+                    label: 'Lưu thay đổi',
+                    variant: AppButtonVariant.primary,
+                    width: double.infinity,
+                    onPressed: () => Navigator.pop(sheetContext, true),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (updated != true || !mounted) return;
+    final newComment = commentCtrl.text.trim();
+    if (newComment.isEmpty) return;
+
+    setState(() => _reviewActionBusy = true);
+    try {
+      await _reviewRepository.updateReview(
+        reviewId: rev.id,
+        rating: selectedRating,
+        comment: newComment,
+        images: rev.images,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText('Đã cập nhật đánh giá trải nghiệm biển!'),
+          backgroundColor: AppColors.secondary,
+        ),
+      );
+      _loadReviews();
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: LocalizedText(e.message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText(
+              'Không thể cập nhật đánh giá. Vui lòng thử lại.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _reviewActionBusy = false);
+    }
+  }
+
+  Future<void> _openFlagReviewDialog(ReviewModel rev) async {
+    if (_reviewActionBusy) return;
+    final reasonCtrl = TextEditingController();
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const LocalizedText('Báo cáo đánh giá vi phạm'),
+          content: TextField(
+            controller: reasonCtrl,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: tr(
+                dialogContext,
+                'Nhập lý do báo cáo (ngôn từ không phù hợp, spam...)',
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const LocalizedText('Hủy'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const LocalizedText(
+                'Gửi báo cáo',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (submitted != true || !mounted) return;
+    final reason = reasonCtrl.text.trim();
+    if (reason.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText('Vui lòng nhập lý do báo cáo đánh giá.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _reviewActionBusy = true);
+    try {
+      await _reviewRepository.flagReview(reviewId: rev.id, reason: reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText(
+            'Đã gửi báo cáo đánh giá cho bộ phận kiểm duyệt.',
+          ),
+          backgroundColor: AppColors.secondary,
+        ),
+      );
+      _loadReviews();
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: LocalizedText(e.message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText(
+              'Không thể gửi báo cáo đánh giá. Vui lòng thử lại.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _reviewActionBusy = false);
+    }
   }
 
   String _formatPrice(int price) {
@@ -205,27 +491,27 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                           GestureDetector(
                             onTap: widget.onOpenVendor,
                             child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.secondary,
-                              borderRadius: AppShapes.radiusFull,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.verified,
-                                    size: 13, color: AppColors.onSecondary),
-                                const SizedBox(width: 4),
-                                LocalizedText(
-                                  service.vendorName,
-                                  style: AppTypography.labelSm(
-                                    color: AppColors.onSecondary,
-                                    fontWeight: FontWeight.w700,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.secondary,
+                                borderRadius: AppShapes.radiusFull,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.verified,
+                                      size: 13, color: AppColors.onSecondary),
+                                  const SizedBox(width: 4),
+                                  LocalizedText(
+                                    service.vendorName,
+                                    style: AppTypography.labelSm(
+                                      color: AppColors.onSecondary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
                             ),
                           ),
                           Container(
@@ -261,7 +547,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                         children: [
                           const Icon(
                             Icons.star,
-                            color: AppColors.starRating, // Coral, NOT YELLOW
+                            color: AppColors.starRating,
                             size: 18,
                           ),
                           const SizedBox(width: 4),
@@ -274,7 +560,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                           const SizedBox(width: 4),
                           Expanded(
                             child: LocalizedText(
-                              '(${service.ratingCount} đánh giá)',
+                              '($_reviewTotalElements đánh giá)',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: AppTypography.bodySm(
@@ -325,8 +611,8 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                       Container(
                         padding: const EdgeInsets.all(AppShapes.spaceSm),
                         decoration: BoxDecoration(
-                          color:
-                              AppColors.secondaryContainer.withValues(alpha: 0.35),
+                          color: AppColors.secondaryContainer
+                              .withValues(alpha: 0.35),
                           borderRadius: AppShapes.radiusDefault,
                           border: Border.all(
                             color: AppColors.secondaryContainer,
@@ -477,7 +763,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                         children: [
                           Expanded(
                             child: LocalizedText(
-                              'Đánh giá từ khách hàng (${MockDatabaseData.reviews.length})',
+                              'Đánh giá từ khách hàng ($_reviewTotalElements)',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: AppTypography.headlineSm(
@@ -505,9 +791,14 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      ...MockDatabaseData.reviews.map((rev) {
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
+                      if (_loadingReviews)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (_reviewsError != null)
+                        Container(
+                          width: double.infinity,
                           padding: const EdgeInsets.all(AppShapes.spaceSm),
                           decoration: BoxDecoration(
                             color: AppColors.surfaceContainerLowest,
@@ -515,66 +806,247 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                             border: Border.all(color: AppColors.borderSubtle),
                           ),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 16,
-                                    backgroundColor:
-                                        AppColors.secondaryContainer,
-                                    child: LocalizedText(
-                                      rev.customerName[0],
-                                      style: AppTypography.labelSm(
-                                        color: AppColors.onSecondaryContainer,
+                              LocalizedText(
+                                _reviewsError!,
+                                textAlign: TextAlign.center,
+                                style: AppTypography.bodySm(
+                                  color: AppColors.error,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextButton.icon(
+                                onPressed: _loadReviews,
+                                icon: const Icon(Icons.refresh, size: 16),
+                                label: const LocalizedText('Thử lại'),
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (_reviews.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(AppShapes.spaceSm),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLowest,
+                            borderRadius: AppShapes.radiusDefault,
+                            border: Border.all(color: AppColors.borderSubtle),
+                          ),
+                          child: LocalizedText(
+                            'Chưa có đánh giá nào cho dịch vụ này.',
+                            style: AppTypography.bodySm(
+                              color: AppColors.onSurfaceVariant,
+                            ),
+                          ),
+                        )
+                      else ...[
+                        ..._reviews.map((rev) {
+                          final currentUserId =
+                              AuthSession.instance.profile?['id']?.toString() ??
+                              '';
+                          final isOwnReview =
+                              currentUserId.isNotEmpty &&
+                              rev.customerId == currentUserId;
+                          final initialChar = rev.customerName.trim().isNotEmpty
+                              ? rev.customerName.trim()[0].toUpperCase()
+                              : 'K';
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(AppShapes.spaceSm),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceContainerLowest,
+                              borderRadius: AppShapes.radiusDefault,
+                              border: Border.all(color: AppColors.borderSubtle),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 16,
+                                      backgroundColor:
+                                          AppColors.secondaryContainer,
+                                      child: Text(
+                                        initialChar,
+                                        style: AppTypography.labelSm(
+                                          color: AppColors.onSecondaryContainer,
+                                        ),
                                       ),
                                     ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            rev.customerName,
+                                            style: AppTypography.labelMd(
+                                              color: AppColors.onSurface,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${rev.createdAt.day.toString().padLeft(2, '0')}/${rev.createdAt.month.toString().padLeft(2, '0')}/${rev.createdAt.year}',
+                                            style: AppTypography.bodySm(
+                                              color: AppColors.outline,
+                                            ).copyWith(fontSize: 11),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Row(
+                                      children: List.generate(
+                                        rev.rating,
+                                        (_) => const Icon(
+                                          Icons.star,
+                                          size: 14,
+                                          color: AppColors.starRating,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  rev.comment,
+                                  style: AppTypography.bodySm(
+                                    color: AppColors.onSurface,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
+                                ),
+                                if (rev.images.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: rev.images.map((imgUrl) {
+                                      return ClipRRect(
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Image.network(
+                                          imgUrl,
+                                          width: 56,
+                                          height: 56,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, _, _) => Container(
+                                            width: 56,
+                                            height: 56,
+                                            color:
+                                                AppColors.surfaceContainerHigh,
+                                            child: const Icon(
+                                              Icons.image_outlined,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                                if (rev.vendorReply != null &&
+                                    rev.vendorReply!.trim().isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surfaceContainerLow,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
                                         LocalizedText(
-                                          rev.customerName,
-                                          style: AppTypography.labelMd(
-                                            color: AppColors.onSurface,
+                                          'Phản hồi từ đối tác',
+                                          style: AppTypography.labelSm(
+                                            color: AppColors.secondary,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
-                                        LocalizedText(
-                                          'Tháng 10/2024',
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          rev.vendorReply!,
                                           style: AppTypography.bodySm(
-                                            color: AppColors.outline,
-                                          ).copyWith(fontSize: 11),
+                                            color: AppColors.onSurfaceVariant,
+                                          ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  Row(
-                                    children: List.generate(
-                                      rev.rating,
-                                      (_) => const Icon(
-                                        Icons.star,
+                                ],
+                                const SizedBox(height: 6),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    if (isOwnReview)
+                                      TextButton.icon(
+                                        style: TextButton.styleFrom(
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                        onPressed: _reviewActionBusy
+                                            ? null
+                                            : () => _openEditReviewDialog(rev),
+                                        icon: const Icon(
+                                          Icons.edit_outlined,
+                                          size: 14,
+                                          color: AppColors.secondary,
+                                        ),
+                                        label: LocalizedText(
+                                          'Chỉnh sửa',
+                                          style: AppTypography.labelSm(
+                                            color: AppColors.secondary,
+                                          ),
+                                        ),
+                                      ),
+                                    TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      onPressed:
+                                          (_reviewActionBusy || rev.isFlagged)
+                                          ? null
+                                          : () => _openFlagReviewDialog(rev),
+                                      icon: Icon(
+                                        rev.isFlagged
+                                            ? Icons.flag
+                                            : Icons.flag_outlined,
                                         size: 14,
-                                        color: AppColors.starRating,
+                                        color: rev.isFlagged
+                                            ? AppColors.error
+                                            : AppColors.onSurfaceVariant,
+                                      ),
+                                      label: LocalizedText(
+                                        rev.isFlagged
+                                            ? 'Đã báo cáo'
+                                            : 'Báo cáo',
+                                        style: AppTypography.labelSm(
+                                          color: rev.isFlagged
+                                              ? AppColors.error
+                                              : AppColors.onSurfaceVariant,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              LocalizedText(
-                                rev.comment,
-                                style: AppTypography.bodySm(
-                                  color: AppColors.onSurface,
+                                  ],
                                 ),
+                              ],
+                            ),
+                          );
+                        }),
+                        if (_reviewPage + 1 < _reviewTotalPages)
+                          Center(
+                            child: OutlinedButton(
+                              onPressed: _loadingMoreReviews
+                                  ? null
+                                  : () => _loadReviews(loadMore: true),
+                              child: LocalizedText(
+                                _loadingMoreReviews
+                                    ? 'Đang tải...'
+                                    : 'Tải thêm đánh giá',
                               ),
-                            ],
+                            ),
                           ),
-                        );
-                      }),
+                      ],
                     ],
                   ),
                 ),
@@ -614,7 +1086,8 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                             onPressed: () {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content: LocalizedText('Đã sao chép liên kết chia sẻ!')),
+                                    content: LocalizedText(
+                                        'Đã sao chép liên kết chia sẻ!')),
                               );
                             },
                           ),
@@ -625,20 +1098,27 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen> {
                               AppColors.surface.withValues(alpha: 0.85),
                           child: IconButton(
                             icon: Icon(
-                              (widget.onToggleFavorite != null ? widget.service.isFavorite : _isFavorite)
+                              (widget.onToggleFavorite != null
+                                      ? widget.service.isFavorite
+                                      : _isFavorite)
                                   ? Icons.favorite
                                   : Icons.favorite_border,
-                              color: (widget.onToggleFavorite != null ? widget.service.isFavorite : _isFavorite)
+                              color: (widget.onToggleFavorite != null
+                                      ? widget.service.isFavorite
+                                      : _isFavorite)
                                   ? AppColors.primary
                                   : AppColors.onSurface,
                             ),
-                            onPressed: widget.favoriteBusy ? null : () async {
-                              if (widget.onToggleFavorite != null) {
-                                await widget.onToggleFavorite!();
-                              } else {
-                                setState(() => _isFavorite = !_isFavorite);
-                              }
-                            },
+                            onPressed: widget.favoriteBusy
+                                ? null
+                                : () async {
+                                    if (widget.onToggleFavorite != null) {
+                                      await widget.onToggleFavorite!();
+                                    } else {
+                                      setState(
+                                          () => _isFavorite = !_isFavorite);
+                                    }
+                                  },
                           ),
                         ),
                       ],
