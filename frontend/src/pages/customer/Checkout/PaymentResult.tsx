@@ -559,12 +559,9 @@ export function PaymentResult() {
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight max-w-2xl">
                   Giao dịch thanh toán đã bị hủy
                 </h1>
-                <p className="text-slate-600 text-sm mt-2 max-w-md">
-                  Quý khách đã hủy phiên thanh toán trên cổng VNPay. Suất trải nghiệm vẫn đang được bảo lưu trong thời gian giữ chỗ.
-                </p>
                 <div className="mt-3 p-2 px-4 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-800 inline-flex items-center gap-2 text-xs">
                   <span className="material-symbols-outlined text-amber-600 text-[18px]">info</span>
-                  <span>Đơn hàng chưa hoàn tất thanh toán. Vui lòng thử lại để nhận vé.</span>
+                  <span>Vui lòng thử lại</span>
                 </div>
               </div>
 
