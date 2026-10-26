@@ -10,6 +10,7 @@ import type {
   SubOrderResponse,
   CancellationPreviewResponse,
   RefundRequest,
+  RefundResponse,
   QrCodeResponse,
 } from "../../../types/order";
 import type { ServiceDetailDto } from "../../../types/service";
@@ -23,6 +24,7 @@ export function Orders() {
   // State management
   const [filter, setFilter] = useState<OrderFilter>("all");
   const [orders, setOrders] = useState<OrderResponse[]>([]);
+  const [orderRefunds, setOrderRefunds] = useState<Record<string, RefundResponse[]>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<number>(0);
@@ -73,12 +75,21 @@ export function Orders() {
       setPage(res.page || 0);
       setTotalPages(res.totalPages || 1);
 
-      // Extract unique service IDs to fetch service details
+      // Extract unique service IDs to fetch service details and fetch refund history
       const serviceIds = new Set<string>();
       (res.content || []).forEach((ord) => {
         const items = ord.items || ord.subOrders || [];
         items.forEach((item) => {
           if (item.serviceId) serviceIds.add(item.serviceId);
+        });
+
+        // Query refund history for each order
+        orderService.getOrderRefunds(ord.id).then((refunds) => {
+          if (refunds && refunds.length > 0) {
+            setOrderRefunds((prev) => ({ ...prev, [ord.id]: refunds }));
+          }
+        }).catch(() => {
+          // Non-critical, ignore
         });
       });
 
@@ -282,6 +293,14 @@ export function Orders() {
       setCancellationError(null);
       await orderService.requestRefund(cancellationOrder.id, "CUSTOMER_REQUEST");
       setCancellationSuccess("Yêu cầu hủy đơn và hoàn tiền đã được gửi thành công!");
+      try {
+        const refunds = await orderService.getOrderRefunds(cancellationOrder.id);
+        if (refunds && refunds.length > 0) {
+          setOrderRefunds((prev) => ({ ...prev, [cancellationOrder.id]: refunds }));
+        }
+      } catch {
+        // ignore
+      }
       setTimeout(() => {
         setCancellationOrder(null);
         fetchOrders(page);
@@ -576,7 +595,10 @@ export function Orders() {
                 const orderCode = `#ORD-${(masterOrder.id || "").slice(0, 8).toUpperCase()}`;
                 const masterStatus = (masterOrder.status || "").toUpperCase();
                 const canDownloadPdf = masterStatus === "PAID" || masterStatus === "COMPLETED";
-                const canCancelOrder = masterStatus === "PAID";
+                const refunds = orderRefunds[masterOrder.id] || [];
+                const hasRefund = refunds.length > 0;
+                const latestRefund = hasRefund ? refunds[0] : null;
+                const canCancelOrder = masterStatus === "PAID" && !hasRefund;
 
                 return (
                   <article
@@ -594,6 +616,12 @@ export function Orders() {
                             <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Đơn hàng:</span>
                             <span className="text-base font-bold text-slate-900 font-mono">{orderCode}</span>
                             {getStatusBadge(masterOrder.status || "PENDING")}
+                            {hasRefund && (
+                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[13px]">history</span>
+                                <span>{latestRefund?.status === "COMPLETED" ? "Đã hoàn tiền" : "Đang xử lý hoàn"}</span>
+                              </span>
+                            )}
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5">
                             Ngày tạo: {formatDateTime(masterOrder.createdAt)}
@@ -632,6 +660,13 @@ export function Orders() {
                             >
                               Yêu cầu hủy đơn
                             </button>
+                          )}
+
+                          {hasRefund && (
+                            <span className="px-3 py-2 rounded-xl bg-amber-50/80 border border-amber-200/80 text-amber-700 text-xs font-bold flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-[16px]">hourglass_top</span>
+                              <span>{latestRefund?.status === "COMPLETED" ? "Đã hoàn tiền" : "Đang xử lý hoàn"}</span>
+                            </span>
                           )}
 
                           {masterStatus === "PENDING_PAYMENT" && (

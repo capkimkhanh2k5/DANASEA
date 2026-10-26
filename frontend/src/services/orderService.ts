@@ -104,6 +104,15 @@ export const orderService = {
   },
 
   /**
+   * Get refunds for an order
+   * GET /api/orders/{id}/refunds
+   */
+  async getOrderRefunds(orderId: string): Promise<RefundResponse[]> {
+    const response = await apiClient.get<RefundResponse[]>(`/orders/${orderId}/refunds`);
+    return response.data;
+  },
+
+  /**
    * Get payment transactions for an order
    * GET /api/orders/{id}/payments
    */
