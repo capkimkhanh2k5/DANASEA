@@ -113,7 +113,7 @@ def main():
         row_str = f"({escape_sql(r['id'])}, {escape_sql(r['vendor_id'])}, {escape_sql(r['category_id'])}, {escape_sql(r['name'])}, {escape_sql(r.get('name_en'))}, {escape_sql(slug)}, {escape_sql(r.get('description'))}, {escape_sql(r.get('description_en'))}, {escape_sql(r.get('price', 0))}, {escape_sql(r.get('duration_minutes', 60))}, {escape_sql(r.get('capacity_per_slot', 10))}, {escape_sql(r.get('location_name', 'Đà Nẵng'))}, {escape_sql(r.get('address'))}, {escape_sql(r.get('latitude', 16.068))}, {escape_sql(r.get('longitude', 108.243))}, {escape_sql(r.get('weather_sensitive', False))}, {escape_sql(r.get('min_wind_kmh'))}, {escape_sql(r.get('max_wavem'))}, {escape_sql(r.get('avg_rating', 5.0))}, {escape_sql(r.get('rating_count', 12))}, {escape_sql(r.get('view_count', 150))}, 'PUBLISHED', NULL, {escape_sql(r.get('waiver_content'))}, {escape_sql(r.get('waiver_content_en'))}, {escape_sql(waiver_req)}, 1, NOW(), NOW())"
         s_vals.append(row_str)
     lines.append(",\n".join(s_vals))
-    lines.append("ON CONFLICT (id) DO UPDATE SET status = 'PUBLISHED', price = EXCLUDED.price, name = EXCLUDED.name, description = EXCLUDED.description, location_name = EXCLUDED.location_name, address = EXCLUDED.address, updated_at = NOW();\n")
+    lines.append("ON CONFLICT (id) DO UPDATE SET status = 'PUBLISHED', price = EXCLUDED.price, name = EXCLUDED.name, description = EXCLUDED.description, location_name = EXCLUDED.location_name, address = EXCLUDED.address, waiver_content = EXCLUDED.waiver_content, waiver_content_en = EXCLUDED.waiver_content_en, waiver_required = EXCLUDED.waiver_required, updated_at = NOW();\n")
 
     # 6. SERVICE OPTIONS
     print("Processing service options...")
