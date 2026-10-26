@@ -1,4 +1,4 @@
--- V39__fill_missing_safety_waivers.sql
+-- V41__fill_missing_safety_waivers.sql
 -- Ensure services requiring safety waiver have standard waiver content populated
 
 -- 1. Populate default Vietnamese & English waiver content for services with waiver_required = TRUE but null content
