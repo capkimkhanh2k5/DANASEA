@@ -1632,4 +1632,17 @@ const englishTranslations = <String, String>{
   "Nhắn đối tác": "Message vendor",
   "Không thể mở hội thoại với đối tác. Vui lòng thử lại.":
       "Unable to open conversation with vendor. Please try again.",
+  "Mã thông báo không hợp lệ.": "Invalid notification ID.",
+  "Phản hồi đánh dấu đã đọc không hợp lệ.":
+      "Invalid mark-as-read response.",
+  "Thông báo hệ thống": "System notification",
+  "Không thể tải danh sách thông báo.": "Unable to load notifications.",
+  "Không thể cập nhật trạng thái thông báo.":
+      "Unable to update notification status.",
+  "Đã đánh dấu đọc tất cả thông báo": "Marked all notifications as read",
+  "Không thể đánh dấu đọc tất cả thông báo.":
+      "Unable to mark all notifications as read.",
+  "Đánh dấu đã đọc tất cả": "Mark all as read",
+  "Bạn chưa có thông báo nào.": "You have no notifications yet.",
+  "Xem đơn hàng": "View order",
 };
