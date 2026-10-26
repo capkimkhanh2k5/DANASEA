@@ -689,10 +689,6 @@ export function Checkout() {
                       }}
                     />
                   </div>
-                  <div className="flex items-center gap-2 mt-2.5 text-[11px] font-semibold text-slate-500">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                    <span>VietQR Napas 247 • Tự động nhận diện thanh toán</span>
-                  </div>
                 </div>
 
                 {/* Transfer Details Card */}
