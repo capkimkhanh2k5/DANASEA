@@ -80,6 +80,11 @@ services:
       AI_CLIPROXY_API_KEY: ${AI_CLIPROXY_API_KEY:-sk-cliproxy-pbl6-local-key}
       AI_CLIPROXY_MODEL: ${AI_CLIPROXY_MODEL:-gemini-3.5-flash}
       AI_CLIPROXY_FALLBACK_MODEL: ${AI_CLIPROXY_FALLBACK_MODEL:-openai/gpt-oss-120b}
+      AI_QUYET_ENABLED: ${AI_QUYET_ENABLED:-false}
+      AI_QUYET_BASE_URL: ${AI_QUYET_BASE_URL:-http://quyet:8091}
+      AI_QUYET_API_KEY: ${AI_QUYET_API_KEY:-}
+      AI_QUYET_CONNECT_TIMEOUT: ${AI_QUYET_CONNECT_TIMEOUT:-1s}
+      AI_QUYET_READ_TIMEOUT: ${AI_QUYET_READ_TIMEOUT:-3s}
       APP_JWT_ACCESS_TOKEN_MINUTES: ${APP_JWT_ACCESS_TOKEN_MINUTES}
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080}
       SPRING_REDIS_HOST: redis
@@ -147,6 +152,69 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  cli-proxy-api:
+    profiles: ["ai"]
+    image: eceasy/cli-proxy-api:v8.0.40@sha256:0a0ed62b20fa48ad9a5321cef1fbe98a6c02237827b04ee30ecceb8fb39b36e0
+    container_name: cli-proxy-api
+    user: "${CLIPROXY_UID:-1000}:${CLIPROXY_GID:-1000}"
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CLIPROXYAPI_PORT:-8318}:8317"
+      - "127.0.0.1:8085:8085"
+      - "127.0.0.1:1455:1455"
+      - "127.0.0.1:54545:54545"
+      - "127.0.0.1:${CLIPROXYAPI_AG_PORT:-51122}:51121"
+    volumes:
+      - ./private/cli-proxy/config.yaml:/CLIProxyAPI/config.yaml
+      - ./cli-proxy/auths:/auths
+      - ./private/cli-proxy/static:/CLIProxyAPI/static
+    networks:
+      - app
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/8317' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  quyet:
+    profiles: ["ai"]
+    build:
+      context: ./ai-decision
+    restart: unless-stopped
+    environment:
+      AI_QUYET_API_KEY: ${AI_QUYET_API_KEY:-}
+      QUYET_MODEL_DIR: /models
+      QUYET_HOST: 0.0.0.0
+      QUYET_CPU_THREADS: ${QUYET_CPU_THREADS:-4}
+    volumes:
+      - type: bind
+        source: ${QUYET_MODEL_DIR:-./ai-decision}
+        target: /models
+        read_only: true
+    networks:
+      - app
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=2).read()"]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
 
 volumes:
   postgres_data:

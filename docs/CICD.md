@@ -107,7 +107,7 @@ Sau deploy: xác nhận prod profile, DB role không đặc quyền, Redis/Rabbi
 
 ## Quyet trong production
 
-Production mặc định bật Quyet và dùng `http://quyet:8091`; có thể ghi đè bằng `AI_QUYET_ENABLED` và `AI_QUYET_BASE_URL` trong `.env`. Khi dùng worker cùng Compose, đặt URL theo tên service `quyet`, không dùng `127.0.0.1` của backend container. Cờ `false` chỉ tắt lời gọi từ backend; Compose vẫn khởi động worker và chờ worker healthy trước backend. Không nạp thêm `docker-compose.ai.yml` khi chạy production. Worker dùng image `danasea-quyet:<SHA>`, CPU, UID 10001, mạng `ai`, không publish cổng; model mount read-only tại `/models`. `production.py prepare` sinh khóa `AI_QUYET_API_KEY` riêng nếu thiếu/placeholder và giữ khóa đã có.
+Production mặc định bật Quyet và dùng `http://quyet:8091`; có thể ghi đè bằng `AI_QUYET_ENABLED` và `AI_QUYET_BASE_URL` trong `.env`. Khi dùng worker cùng Compose, đặt URL theo tên service `quyet`, không dùng `127.0.0.1` của backend container. Cờ `false` chỉ tắt lời gọi từ backend; Compose vẫn khởi động worker và chờ worker healthy trước backend. Toàn bộ dịch vụ production được quản lý thống nhất trong `docker-compose.prod.yml`. Worker dùng image `danasea-quyet:<SHA>`, CPU, UID 10001, mạng `ai`, không publish cổng; model mount read-only tại `/models`. `production.py prepare` sinh khóa `AI_QUYET_API_KEY` riêng nếu thiếu/placeholder và giữ khóa đã có.
 
 Trước lần phát hành đầu tiên, trên server:
 
