@@ -623,20 +623,24 @@ export function Orders() {
                             <span className="text-base font-bold text-slate-900 font-mono">{orderCode}</span>
                             {getStatusBadge(masterOrder.status || "PENDING")}
                             {hasRefund && (
-                              <button
-                                type="button"
-                                onClick={() => setViewingRefundOrder({ order: masterOrder, refunds })}
-                                className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 flex items-center gap-1 transition-colors cursor-pointer"
-                                title="Bấm để xem chi tiết kết quả hoàn tiền"
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 border ${
+                                  latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : "bg-amber-50 text-amber-700 border-amber-200"
+                                }`}
                               >
-                                <span className="material-symbols-outlined text-[13px]">history</span>
+                                <span className="material-symbols-outlined text-[13px]">
+                                  {latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
+                                    ? "check_circle"
+                                    : "history"}
+                                </span>
                                 <span>
                                   {latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
                                     ? "Đã hoàn tiền"
                                     : "Đang xử lý hoàn"}
                                 </span>
-                                <span className="material-symbols-outlined text-[12px] opacity-70">open_in_new</span>
-                              </button>
+                              </span>
                             )}
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5">
@@ -675,6 +679,18 @@ export function Orders() {
                               className="px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
                             >
                               Yêu cầu hủy đơn
+                            </button>
+                          )}
+
+                          {hasRefund && (latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED") && (
+                            <button
+                              type="button"
+                              onClick={() => setViewingRefundOrder({ order: masterOrder, refunds })}
+                              className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+                              title="Xem chi tiết biên nhận hoàn tiền"
+                            >
+                              <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                              <span>Chi tiết hoàn tiền</span>
                             </button>
                           )}
 
@@ -806,6 +822,14 @@ export function Orders() {
                                         <span className="material-symbols-outlined text-[16px]">qr_code_2</span>
                                         <span>Mã QR Check-in</span>
                                       </button>
+                                    )}
+
+                                    {/* Refunded status display */}
+                                    {subOrder.status === "REFUNDED" && (
+                                      <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-500 text-xs font-semibold flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[15px]">block</span>
+                                        <span>Vé đã hủy</span>
+                                      </span>
                                     )}
 
                                     {/* Checked-in status display */}
