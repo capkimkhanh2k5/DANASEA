@@ -1,6 +1,8 @@
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/data/mock_database_data.dart';
+import 'package:flutter/services.dart';
+import '../../../../core/auth/auth_session.dart';
+import '../../../../core/data/order_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
@@ -21,18 +23,70 @@ class ETicketQrScreen extends StatefulWidget {
 }
 
 class _ETicketQrScreenState extends State<ETicketQrScreen> {
+  final OrderRepository _orderRepository = OrderRepository();
   late SubOrderModel _currentSubOrder;
+  final Map<String, CheckinQrCode> _qrCache = <String, CheckinQrCode>{};
+  bool _loadingQr = false;
+  String? _qrError;
+  int _generation = 0;
+
+  CheckinQrCode? get _activeQr => _qrCache[_currentSubOrder.id];
 
   @override
   void initState() {
     super.initState();
     _currentSubOrder = widget.subOrder;
+    _loadQrForCurrentTicket();
+  }
+
+  Future<void> _loadQrForCurrentTicket({bool forceRefresh = false}) async {
+    final targetId = _currentSubOrder.id;
+    if (!forceRefresh && _qrCache.containsKey(targetId)) {
+      setState(() => _qrError = null);
+      return;
+    }
+    if (_loadingQr && !forceRefresh) return;
+    final generation = ++_generation;
+    setState(() {
+      _loadingQr = true;
+      _qrError = null;
+    });
+    try {
+      final qr = await _orderRepository.generateQrCode(targetId);
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _qrCache[targetId] = qr;
+      });
+    } on AuthFailure catch (e) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _qrError = e.message;
+        });
+      }
+    } catch (_) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _qrError = 'Không thể tạo mã QR check-in. Vui lòng thử lại.';
+        });
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _loadingQr = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final tickets = widget.allSubOrders ?? [_currentSubOrder];
-    final user = MockDatabaseData.currentUser;
+    final profile = AuthSession.instance.profile;
+    final fullName = (profile?['fullName']?.toString() ?? '').trim();
+    final email = (profile?['email']?.toString() ?? '').trim();
+    final attendeeName = fullName.isNotEmpty
+        ? fullName
+        : (email.isNotEmpty ? email : '#${_currentSubOrder.masterOrderId}');
+    final qrData = _activeQr;
+    final expiresAt = qrData?.expiresAt.toLocal();
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -50,15 +104,31 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
         centerTitle: true,
         actions: [
           IconButton(
+            tooltip: tr(context, 'Làm mới'),
+            icon: _loadingQr
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh, color: AppColors.onSurface),
+            onPressed: _loadingQr
+                ? null
+                : () => _loadQrForCurrentTicket(forceRefresh: true),
+          ),
+          IconButton(
             icon: const Icon(Icons.share, color: AppColors.onSurface),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: LocalizedText('Đã tạo liên kết chia sẻ vé điện tử!'),
-                  backgroundColor: AppColors.secondary,
-                ),
-              );
-            },
+            onPressed: qrData == null
+                ? null
+                : () {
+                    Clipboard.setData(ClipboardData(text: qrData.qrToken));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: LocalizedText('Đã sao chép mã token QR check-in!'),
+                        backgroundColor: AppColors.secondary,
+                      ),
+                    );
+                  },
           ),
         ],
       ),
@@ -82,6 +152,7 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                     return InkWell(
                       onTap: () {
                         setState(() => _currentSubOrder = item);
+                        _loadQrForCurrentTicket();
                       },
                       child: Container(
                         margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -131,6 +202,9 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                               ? _currentSubOrder.serviceImageUrl
                               : 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&auto=format&fit=crop&q=80',
                           fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            color: AppColors.surfaceContainerHigh,
+                          ),
                         ),
                         Container(
                           decoration: BoxDecoration(
@@ -185,19 +259,31 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: AppColors.secondaryContainer,
+                              color: qrData != null
+                                  ? AppColors.secondaryContainer
+                                  : AppColors.surfaceContainerHigh,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.verified,
-                                    size: 12,
-                                    color: AppColors.onSecondaryContainer),
+                                Icon(
+                                  qrData != null
+                                      ? Icons.verified
+                                      : Icons.hourglass_top,
+                                  size: 12,
+                                  color: qrData != null
+                                      ? AppColors.onSecondaryContainer
+                                      : AppColors.onSurfaceVariant,
+                                ),
                                 const SizedBox(width: 4),
                                 LocalizedText(
-                                  'HỢP LỆ CHECK-IN',
+                                  qrData != null
+                                      ? 'HỢP LỆ CHECK-IN'
+                                      : 'CHỜ MÃ QR',
                                   style: AppTypography.labelSm(
-                                    color: AppColors.onSecondaryContainer,
+                                    color: qrData != null
+                                        ? AppColors.onSecondaryContainer
+                                        : AppColors.onSurfaceVariant,
                                     fontWeight: FontWeight.w800,
                                   ).copyWith(fontSize: 10),
                                 ),
@@ -303,7 +389,7 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                                     const SizedBox(width: 6),
                                     Flexible(
                                       child: LocalizedText(
-                                        user.fullName,
+                                        attendeeName,
                                         overflow: TextOverflow.ellipsis,
                                         style: AppTypography.labelMd(
                                           color: AppColors.onSurface,
@@ -390,133 +476,188 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                     padding: const EdgeInsets.all(AppShapes.spaceMd),
                     child: Column(
                       children: [
-                        // Outdoor High-Contrast QR Frame
-                        Container(
-                          width: 200,
-                          height: 200,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
-                                blurRadius: 16,
-                              ),
-                            ],
-                            border: Border.all(
-                              color: AppColors.borderOcean,
-                              width: 1.5,
+                        if (_loadingQr && qrData == null)
+                          const SizedBox(
+                            width: 200,
+                            height: 200,
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (_qrError != null && qrData == null)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.errorContainer,
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          ),
-                          child: Stack(
-                            children: [
-                              // Reticle Corners
-                              Positioned(
-                                top: 0,
-                                left: 0,
-                                child: Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: const BoxDecoration(
-                                    border: Border(
-                                      top: BorderSide(
-                                          color: AppColors.primary, width: 3),
-                                      left: BorderSide(
-                                          color: AppColors.primary, width: 3),
-                                    ),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.error_outline,
+                                  color: AppColors.error,
+                                  size: 36,
+                                ),
+                                const SizedBox(height: 8),
+                                LocalizedText(
+                                  _qrError!,
+                                  textAlign: TextAlign.center,
+                                  style: AppTypography.bodySm(
+                                    color: AppColors.error,
                                   ),
                                 ),
-                              ),
-                              Positioned(
-                                top: 0,
-                                right: 0,
-                                child: Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: const BoxDecoration(
-                                    border: Border(
-                                      top: BorderSide(
-                                          color: AppColors.primary, width: 3),
-                                      right: BorderSide(
-                                          color: AppColors.primary, width: 3),
-                                    ),
-                                  ),
+                                const SizedBox(height: 10),
+                                OutlinedButton.icon(
+                                  onPressed: _loadingQr
+                                      ? null
+                                      : () => _loadQrForCurrentTicket(
+                                          forceRefresh: true,
+                                        ),
+                                  icon: const Icon(Icons.refresh, size: 16),
+                                  label: const LocalizedText('Thử lại'),
                                 ),
-                              ),
-                              Positioned(
-                                bottom: 0,
-                                left: 0,
-                                child: Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: const BoxDecoration(
-                                    border: Border(
-                                      bottom: BorderSide(
-                                          color: AppColors.primary, width: 3),
-                                      left: BorderSide(
-                                          color: AppColors.primary, width: 3),
-                                    ),
-                                  ),
+                              ],
+                            ),
+                          )
+                        else ...[
+                          // Outdoor High-Contrast QR Frame
+                          Container(
+                            width: 200,
+                            height: 200,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.08),
+                                  blurRadius: 16,
                                 ),
+                              ],
+                              border: Border.all(
+                                color: AppColors.borderOcean,
+                                width: 1.5,
                               ),
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: const BoxDecoration(
-                                    border: Border(
-                                      bottom: BorderSide(
-                                          color: AppColors.primary, width: 3),
-                                      right: BorderSide(
-                                          color: AppColors.primary, width: 3),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // QR Pattern Representation
-                              Center(
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(
-                                      Icons.qr_code_2,
-                                      size: 140,
-                                      color: Color(0xFF1A1C1A),
-                                    ),
-                                    LocalizedText(
-                                      _currentSubOrder.id,
-                                      style: const TextStyle(
-                                        fontFamily: 'monospace',
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.secondary,
+                            ),
+                            child: Stack(
+                              children: [
+                                // Reticle Corners
+                                Positioned(
+                                  top: 0,
+                                  left: 0,
+                                  child: Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: const BoxDecoration(
+                                      border: Border(
+                                        top: BorderSide(
+                                            color: AppColors.primary, width: 3),
+                                        left: BorderSide(
+                                            color: AppColors.primary, width: 3),
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                                Positioned(
+                                  top: 0,
+                                  right: 0,
+                                  child: Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: const BoxDecoration(
+                                      border: Border(
+                                        top: BorderSide(
+                                            color: AppColors.primary, width: 3),
+                                        right: BorderSide(
+                                            color: AppColors.primary, width: 3),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: 0,
+                                  left: 0,
+                                  child: Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: const BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide(
+                                            color: AppColors.primary, width: 3),
+                                        left: BorderSide(
+                                            color: AppColors.primary, width: 3),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: 0,
+                                  right: 0,
+                                  child: Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: const BoxDecoration(
+                                      border: Border(
+                                        bottom: BorderSide(
+                                            color: AppColors.primary, width: 3),
+                                        right: BorderSide(
+                                            color: AppColors.primary, width: 3),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // QR Pattern Representation
+                                Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.qr_code_2,
+                                        size: 132,
+                                        color: Color(0xFF1A1C1A),
+                                      ),
+                                      LocalizedText(
+                                        qrData!.subOrderId,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.secondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 14),
-                        LocalizedText(
-                          'Đưa mã QR cho đối tác quét xác nhận check-in',
-                          style: AppTypography.labelMd(
-                            color: AppColors.onSurface,
-                            fontWeight: FontWeight.w700,
+                          const SizedBox(height: 14),
+                          LocalizedText(
+                            'Đưa mã QR cho đối tác quét xác nhận check-in',
+                            style: AppTypography.labelMd(
+                              color: AppColors.onSurface,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        LocalizedText(
-                          'Mã bảo mật: ${_currentSubOrder.qrSecret}',
-                          style: AppTypography.bodySm(
-                            color: AppColors.outline,
-                          ).copyWith(fontSize: 10),
-                          textAlign: TextAlign.center,
-                        ),
+                          const SizedBox(height: 4),
+                          SelectableText(
+                            'Mã bảo mật: ${qrData.qrToken}',
+                            style: AppTypography.bodySm(
+                              color: AppColors.outline,
+                            ).copyWith(fontSize: 10),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (expiresAt != null) ...[
+                            const SizedBox(height: 4),
+                            LocalizedText(
+                              'Hiệu lực đến: ${expiresAt.hour.toString().padLeft(2, '0')}:${expiresAt.minute.toString().padLeft(2, '0')} • ${expiresAt.day}/${expiresAt.month}/${expiresAt.year}',
+                              style: AppTypography.bodySm(
+                                color: AppColors.secondary,
+                              ).copyWith(fontSize: 11),
+                            ),
+                          ],
+                        ],
                       ],
                     ),
                   ),

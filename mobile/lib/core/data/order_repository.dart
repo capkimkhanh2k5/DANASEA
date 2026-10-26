@@ -664,6 +664,42 @@ class OrderRepository {
     );
     return DiscountPreviewResult.fromJson(json);
   }
+
+  Future<CheckinQrCode> generateQrCode(String subOrderOrOrderId) async {
+    final json = await session.request(
+      '/api/bookings/${Uri.encodeComponent(subOrderOrOrderId)}/qr-code',
+      method: 'POST',
+      retry: false,
+    );
+    return CheckinQrCode.fromJson(json);
+  }
+}
+
+class CheckinQrCode {
+  const CheckinQrCode({
+    required this.subOrderId,
+    required this.qrToken,
+    required this.expiresAt,
+  });
+
+  final String subOrderId;
+  final String qrToken;
+  final DateTime expiresAt;
+
+  factory CheckinQrCode.fromJson(Map<String, dynamic> json) {
+    if (json['subOrderId'] is! String ||
+        json['qrToken'] is! String ||
+        (json['qrToken'] as String).isEmpty) {
+      throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+    }
+    return CheckinQrCode(
+      subOrderId: json['subOrderId'] as String,
+      qrToken: json['qrToken'] as String,
+      expiresAt:
+          DateTime.tryParse(json['expiresAt']?.toString() ?? '') ??
+          DateTime.now().add(const Duration(days: 1)),
+    );
+  }
 }
 
 class DiscountPreviewItem {

@@ -1495,4 +1495,9 @@ const englishTranslations = <String, String>{
   "Áp dụng mã {0} (-{1})!": "Applied code {0} (-{1})!",
   "Không thể kiểm tra mã giảm giá. Vui lòng thử lại.":
       "Unable to verify discount code. Please try again.",
+  "Không thể tạo mã QR check-in. Vui lòng thử lại.":
+      "Unable to generate check-in QR code. Please try again.",
+  "Đã sao chép mã token QR check-in!": "Copied check-in QR token!",
+  "CHỜ MÃ QR": "AWAITING QR",
+  "Hiệu lực đến: {0}": "Valid until: {0}",
 };
