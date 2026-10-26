@@ -829,12 +829,8 @@ export function Orders() {
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
 
-              <div className="w-12 h-12 rounded-2xl bg-cyan-50 border border-cyan-200 text-cyan-600 flex items-center justify-center mx-auto mb-3">
-                <span className="material-symbols-outlined text-[28px]">qr_code_scanner</span>
-              </div>
-
               <h3 className="text-lg font-bold text-slate-900">
-                Vé điện tử Check-in
+                Vé check-in
               </h3>
               <p className="text-xs text-slate-500 mt-1">
                 Xuất trình mã này tại quầy vé hoặc cầu tàu trước giờ khởi hành
