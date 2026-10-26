@@ -331,6 +331,24 @@ export function Orders() {
     return (amount ?? 0).toLocaleString("vi-VN") + "đ";
   };
 
+  const formatPolicyDescription = (rawPolicy?: string | null, percentage?: number) => {
+    if (!rawPolicy) return "Chính sách tiêu chuẩn 24 giờ";
+    const lower = rawPolicy.toLowerCase();
+    if (lower.includes("within 24 hours") || lower.includes("no refund") || percentage === 0) {
+      return "Không hoàn tiền do hủy trong vòng 24h trước giờ khởi hành";
+    }
+    if (lower.includes("more than 24 hours") || lower.includes("100% refund") || percentage === 100) {
+      return "Hoàn tiền 100% khi hủy trước giờ khởi hành trên 24 giờ";
+    }
+    if (lower.includes("weather") || lower.includes("disruption")) {
+      return "Hoàn tiền 100% do thời tiết biển bất khả kháng";
+    }
+    if (lower.includes("vendor") || lower.includes("operator")) {
+      return "Hoàn tiền 100% do đối tác hủy ca hoạt động";
+    }
+    return rawPolicy;
+  };
+
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return "N/A";
     try {
@@ -909,10 +927,7 @@ export function Orders() {
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
             <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl relative border border-slate-100 space-y-4">
               <div className="flex items-center justify-between border-b pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-rose-500 text-[24px]">cancel</span>
-                  <h3 className="text-lg font-bold text-slate-900">Yêu cầu hủy đơn &amp; Hoàn tiền</h3>
-                </div>
+                <h3 className="text-lg font-bold text-slate-900">Yêu cầu hủy đơn &amp; Hoàn tiền</h3>
                 <button
                   onClick={() => setCancellationOrder(null)}
                   className="text-slate-400 hover:text-slate-600 cursor-pointer"
@@ -947,10 +962,13 @@ export function Orders() {
                 <div className="space-y-4">
                   {/* Policy Preview Card */}
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500">Chính sách áp dụng:</span>
-                      <span className="font-bold text-cyan-700 font-mono">
-                        {cancellationPreview.policyApplied || "STANDARD_24H_V2"}
+                    <div className="flex justify-between items-start gap-4">
+                      <span className="text-slate-500 shrink-0">Chính sách áp dụng:</span>
+                      <span className="font-semibold text-slate-800 text-right leading-relaxed">
+                        {formatPolicyDescription(
+                          cancellationPreview.policyApplied,
+                          cancellationPreview.refundPercentage
+                        )}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
@@ -966,7 +984,7 @@ export function Orders() {
                       </span>
                     </div>
                     <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-sm">
-                      <span className="font-bold text-slate-900">Dự kiến tiền hoàn về ví/tài khoản:</span>
+                      <span className="font-bold text-slate-900">Tiền hoàn dự kiến:</span>
                       <span className="font-extrabold text-rose-600">
                         {formatVnd(cancellationPreview.refundAmount)}
                       </span>
@@ -1008,10 +1026,6 @@ export function Orders() {
                       </label>
                     </div>
                   </div>
-
-                  <p className="text-[11px] text-slate-500">
-                    * Lưu ý: Khi xác nhận hủy, các mã vé QR tương ứng sẽ bị vô hiệu hóa ngay lập tức trên hệ thống cảng vụ.
-                  </p>
 
                   <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
                     <button
