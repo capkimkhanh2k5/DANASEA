@@ -624,22 +624,15 @@ export function Orders() {
                             {!hasRefund && getStatusBadge(masterOrder.status || "PENDING")}
                             {hasRefund && (
                               <span
-                                className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-1 border ${
+                                className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${
                                   latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
                                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                     : "bg-amber-50 text-amber-700 border-amber-200"
                                 }`}
                               >
-                                <span className="material-symbols-outlined text-[13px]">
-                                  {latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
-                                    ? "check_circle"
-                                    : "history"}
-                                </span>
-                                <span>
-                                  {latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
-                                    ? "Đã hoàn tiền"
-                                    : "Đang xử lý hoàn"}
-                                </span>
+                                {latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
+                                  ? "Đã hoàn tiền"
+                                  : "Đang xử lý hoàn"}
                               </span>
                             )}
                           </div>
