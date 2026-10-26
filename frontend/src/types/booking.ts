@@ -37,6 +37,36 @@ export interface BookingDetailResponse {
   customerId: string;
   status: string;
   totalAmount: number;
-  expiresAt: string;
+  expiresAt?: string;
+  holdExpiresAt?: string;
   items: BookingHoldItemResponse[];
+  createdAt?: string;
+  updatedAt?: string;
 }
+
+export interface BookingSummaryResponse {
+  bookingId: string;
+  customerId: string;
+  status: string;
+  totalAmount: number;
+  totalItems: number;
+  holdExpiresAt?: string;
+  createdAt?: string;
+}
+
+export interface CancelBookingRequest {
+  reason?: string;
+}
+
+export interface BookingCancelResponse {
+  bookingId: string;
+  status: string;
+  cancelledAt: string;
+  earliestServiceTime?: string;
+  refundEligible: boolean;
+  refundPercentage: number;
+  refundAmount: number;
+  cancellationReason?: string;
+  message?: string;
+}
+
