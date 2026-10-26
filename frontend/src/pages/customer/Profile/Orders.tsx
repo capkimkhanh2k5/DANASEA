@@ -821,7 +821,7 @@ export function Orders() {
       {selectedSubOrder &&
         createPortal(
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl relative text-center border border-slate-100">
+            <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative text-center border border-slate-100">
               <button
                 onClick={() => setSelectedSubOrder(null)}
                 className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer transition-colors"
@@ -829,7 +829,7 @@ export function Orders() {
                 <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
 
-              <h3 className="text-lg font-bold text-slate-900">
+              <h3 className="text-xl font-bold text-slate-900">
                 Vé check-in
               </h3>
               <p className="text-xs text-slate-500 mt-1">
@@ -837,9 +837,9 @@ export function Orders() {
               </p>
 
               {/* QR Content Body */}
-              <div className="my-5 p-4 rounded-2xl bg-slate-50 border border-slate-200 inline-block">
+              <div className="my-4 p-3 sm:p-4 rounded-2xl bg-slate-50 border border-slate-200 inline-block shadow-inner">
                 {qrLoading && (
-                  <div className="w-48 h-48 flex flex-col items-center justify-center space-y-2">
+                  <div className="w-64 h-64 sm:w-72 sm:h-72 flex flex-col items-center justify-center space-y-2">
                     <span className="material-symbols-outlined text-cyan-600 text-[36px] animate-spin">
                       progress_activity
                     </span>
@@ -848,7 +848,7 @@ export function Orders() {
                 )}
 
                 {!qrLoading && qrError && (
-                  <div className="w-48 h-48 flex flex-col items-center justify-center p-3 text-center space-y-2">
+                  <div className="w-64 h-64 sm:w-72 sm:h-72 flex flex-col items-center justify-center p-3 text-center space-y-2">
                     <span className="material-symbols-outlined text-rose-500 text-[32px]">warning</span>
                     <span className="text-xs text-rose-700 font-semibold">{qrError}</span>
                   </div>
@@ -856,11 +856,11 @@ export function Orders() {
 
                 {!qrLoading && !qrError && qrData && (
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(
                       qrData.qrToken
                     )}`}
                     alt="QR Check-in"
-                    className="w-48 h-48 mx-auto rounded-xl shadow-sm bg-white p-2"
+                    className="w-64 h-64 sm:w-72 sm:h-72 mx-auto rounded-xl shadow-sm bg-white p-2.5"
                   />
                 )}
               </div>
