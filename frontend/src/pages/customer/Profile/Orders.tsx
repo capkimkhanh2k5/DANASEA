@@ -885,10 +885,7 @@ export function Orders() {
                     </span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Cơ chế an toàn:</span>
-                  <span className="text-emerald-700 font-bold">HMAC-SHA256 Token</span>
-                </div>
+
               </div>
 
               <div className="flex items-center gap-2">
