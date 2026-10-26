@@ -309,7 +309,7 @@ export function Wishlist() {
                       <button 
                         aria-label="Bỏ lưu khỏi danh sách" 
                         title="Bỏ lưu khỏi danh sách yêu thích"
-                        className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/50 backdrop-blur-md hover:bg-white/75 border border-white/50 shadow-sm flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer group/heart" 
+                        className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/20 backdrop-blur-md hover:bg-black/35 border border-white/30 shadow-sm flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer group/heart" 
                         onClick={(e) => handleRemove(e, service)} 
                         type="button"
                       >
