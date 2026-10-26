@@ -708,18 +708,11 @@ export function Checkout() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
                   {/* Left Column: QR Code (Single Card, tightly wrapping the image) */}
                   <div className="flex flex-col items-center justify-center">
-                    <div 
-                      onClick={() => {
-                        isNavigatingToResultRef.current = true;
-                        navigate(`/checkout/result?orderId=${activeOrderId || 'demo'}&status=success`);
-                      }}
-                      title="Mẹo kiểm thử: Click vào mã QR để mô phỏng hoàn tất thanh toán nhanh"
-                      className="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden w-full max-w-[270px] cursor-pointer hover:border-cyan-400 hover:shadow-md transition-all group"
-                    >
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden w-full max-w-[270px]">
                       <img
                         src={`https://img.vietqr.io/image/MB-0912345678-compact2.png?amount=${finalTotal}&addInfo=DNS${sessionCode || '89412'}&accountName=CONG%20TY%20DANASEA`}
                         alt="Mã QR thanh toán ngân hàng"
-                        className="w-full h-auto block group-hover:scale-[1.01] transition-transform"
+                        className="w-full h-auto block"
                         onError={(e) => {
                           (e.target as HTMLElement).style.display = 'none';
                         }}
