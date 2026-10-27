@@ -82,6 +82,8 @@ function App() {
           <Route path="profile" element={<VendorProfile />} />
           <Route path="services" element={<Services />} />
           <Route path="services/new" element={<ServiceForm />} />
+          <Route path="services/:serviceId/edit" element={<ServiceForm />} />
+          <Route path="services/:serviceId" element={<ServiceForm />} />
           <Route path="schedule" element={<Schedule />} />
           <Route path="orders" element={<VendorOrders />} />
           <Route path="promotions" element={<Promotions />} />
