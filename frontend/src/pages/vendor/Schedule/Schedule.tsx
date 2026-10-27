@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { vendorService } from "../../../services/vendorService";
+import { toast } from "../../../store/useToastStore";
+import { extractErrorMessage } from "../../../utils/errorHandler";
 import type {
   VendorServiceDto,
   VendorServiceSlotDto,
@@ -15,10 +17,9 @@ export function Schedule() {
   const [searchParams] = useSearchParams();
   const queryServiceId = searchParams.get("serviceId");
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    toast.success(msg);
   };
 
   // Services State
@@ -117,9 +118,9 @@ export function Schedule() {
           : "Đã mở lại ca vận hành đón khách!"
       );
     } catch (err: unknown) {
-      console.error("[Schedule] Lỗi đổi trạng thái ca:", err);
-      const msg = err instanceof Error ? err.message : "Đổi trạng thái ca thất bại";
-      alert(`Không thể đổi trạng thái ca: ${msg}`);
+      console.error('[Schedule] Lỗi đổi trạng thái ca:', err);
+      const msg = extractErrorMessage(err, 'Đổi trạng thái ca thất bại');
+      toast.error(msg);
     }
   };
 
@@ -166,12 +167,12 @@ export function Schedule() {
   const handleCreateSlot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedServiceId) {
-      alert("Vui lòng chọn dịch vụ trước khi tạo ca.");
+      toast.warning("Vui lòng chọn dịch vụ trước khi tạo ca.");
       return;
     }
 
     if (newEndTime <= newStartTime) {
-      alert("Giờ kết thúc ca biển phải sau giờ bắt đầu!");
+      toast.warning("Giờ kết thúc ca biển phải sau giờ bắt đầu!");
       return;
     }
 
@@ -194,9 +195,9 @@ export function Schedule() {
       showToast(`Đã tạo ca khởi hành mới (${newStartTime} - ${newEndTime}) thành công!`);
       setIsCreateModalOpen(false);
     } catch (err: unknown) {
-      console.error("[Schedule] Lỗi tạo ca:", err);
-      const msg = err instanceof Error ? err.message : "Tạo ca thất bại";
-      alert(`Không thể tạo ca: ${msg}`);
+      console.error('[Schedule] Lỗi tạo ca:', err);
+      const msg = extractErrorMessage(err, 'Không thể tạo ca khởi hành');
+      toast.error(msg);
     } finally {
       setIsSubmittingSlot(false);
     }
@@ -688,14 +689,7 @@ export function Schedule() {
           document.body
         )}
 
-        {/* Toast Notification */}
-        {toastMessage && createPortal(
-          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2 animate-fade-in">
-            <span className="material-symbols-outlined text-[16px] text-emerald-400">check_circle</span>
-            <span>{toastMessage}</span>
-          </div>,
-          document.body
-        )}
+        
       </div>
     </div>
   );

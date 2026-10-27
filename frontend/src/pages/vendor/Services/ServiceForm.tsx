@@ -14,6 +14,8 @@ import type {
   PricingUnit,
 } from '../../../types/vendorService';
 import type { CategoryDto } from '../../../types/category';
+import { toast } from '../../../store/useToastStore';
+import { extractErrorMessage } from '../../../utils/errorHandler';
 
 type FormTab = 'CONTENT_SAFETY' | 'IMAGES' | 'OPTIONS' | 'SAFETY_DOCS';
 
@@ -25,7 +27,7 @@ export function ServiceForm() {
   const [activeTab, setActiveTab] = useState<FormTab>('CONTENT_SAFETY');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  
 
   // Categories
   const [categories, setCategories] = useState<CategoryDto[]>([]);
@@ -79,8 +81,7 @@ export function ServiceForm() {
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    toast.success(msg);
   };
 
   // Load initial data
@@ -116,8 +117,8 @@ export function ServiceForm() {
       setOptions(opts || []);
     } catch (err: unknown) {
       console.error('[ServiceForm] Lỗi nạp thông tin dịch vụ:', err);
-      const msg = err instanceof Error ? err.message : 'Không thể tải thông tin dịch vụ';
-      alert(msg);
+      const msg = extractErrorMessage(err, 'Không thể tải thông tin chi tiết dịch vụ');
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
@@ -141,27 +142,27 @@ export function ServiceForm() {
   // Save Service (Create or Update)
   const handleSaveService = async (andSubmit = false): Promise<VendorServiceDto | null> => {
     if (!nameVi.trim()) {
-      alert('Vui lòng nhập tên dịch vụ (Tiếng Việt).');
+      toast.warning('Vui lòng nhập tên dịch vụ (Tiếng Việt).');
       return null;
     }
     if (!categoryId) {
-      alert('Vui lòng chọn danh mục dịch vụ.');
+      toast.warning('Vui lòng chọn danh mục dịch vụ.');
       return null;
     }
     if (price <= 0) {
-      alert('Đơn giá niêm yết phải lớn hơn 0 đ.');
+      toast.warning('Đơn giá niêm yết phải lớn hơn 0 đ.');
       return null;
     }
     if (durationMinutes <= 0) {
-      alert('Thời lượng dịch vụ phải lớn hơn 0 phút.');
+      toast.warning('Thời lượng dịch vụ phải lớn hơn 0 phút.');
       return null;
     }
     if (waiverRequired && !waiverContent.trim() && !waiverContentEn.trim()) {
-      alert('Khi yêu cầu miễn trừ trách nhiệm, vui lòng nhập nội dung cam kết an toàn (Waiver).');
+      toast.warning('Khi yêu cầu miễn trừ trách nhiệm, vui lòng nhập nội dung cam kết an toàn (Waiver).');
       return null;
     }
     if (weatherSensitive && (minWindKmh == null || maxWaveM == null)) {
-      alert('Dịch vụ nhạy cảm thời tiết biển bắt buộc phải cấu hình cả Giới hạn gió (km/h) và Độ cao sóng (m).');
+      toast.warning('Dịch vụ nhạy cảm thời tiết biển bắt buộc phải cấu hình cả Giới hạn gió (km/h) và Độ cao sóng (m).');
       return null;
     }
 
@@ -223,22 +224,31 @@ export function ServiceForm() {
       }
 
       if (andSubmit) {
+        if (savedService.status !== 'DRAFT' && savedService.status !== 'REJECTED') {
+          toast.info(
+            savedService.status === 'PENDING_REVIEW'
+              ? 'Dịch vụ đang ở trạng thái Chờ duyệt bởi Quản trị viên. Không cần gửi duyệt lại.'
+              : `Dịch vụ đang ở trạng thái ${savedService.status}.`,
+            'Thông báo'
+          );
+          return savedService;
+        }
         if (!images || images.length === 0) {
-          alert('Dịch vụ cần ít nhất 1 ảnh để gửi duyệt. Vui lòng chuyển sang tab "Ảnh dịch vụ" để tải ảnh lên.');
+          toast.warning('Dịch vụ cần ít nhất 1 ảnh để gửi duyệt. Vui lòng chuyển sang tab "Ảnh dịch vụ" để tải ảnh lên.');
           setActiveTab('IMAGES');
           return savedService;
         }
         const submitted = await vendorService.submitForReview(savedService.id);
         setServiceStatus(submitted.status);
-        showToast('Đã gửi duyệt dịch vụ thành công tới Quản trị viên!');
+        toast.success('Đã gửi duyệt dịch vụ thành công tới Quản trị viên!');
         setTimeout(() => navigate('/vendor/services'), 1500);
       }
 
       return savedService;
     } catch (err: unknown) {
       console.error('[ServiceForm] Lỗi lưu dịch vụ:', err);
-      const msg = err instanceof Error ? err.message : 'Lưu dịch vụ thất bại';
-      alert(`Lỗi: ${msg}`);
+      const msg = extractErrorMessage(err, 'Lưu thông tin dịch vụ thất bại');
+      toast.error(msg);
       return null;
     } finally {
       setIsSaving(false);
@@ -251,12 +261,12 @@ export function ServiceForm() {
     if (!file) return;
 
     if (!currentServiceId) {
-      alert('Vui lòng lưu thông tin dịch vụ (Lưu nháp) trước khi tải ảnh lên.');
+      toast.warning('Vui lòng lưu thông tin dịch vụ (Lưu nháp) trước khi tải ảnh lên.');
       return;
     }
 
     if (images.length >= 10) {
-      alert('Mỗi dịch vụ chỉ được tải tối đa 10 hình ảnh.');
+      toast.warning('Mỗi dịch vụ chỉ được tải tối đa 10 hình ảnh.');
       return;
     }
 
@@ -270,7 +280,7 @@ export function ServiceForm() {
     } catch (err: unknown) {
       console.error('[ServiceForm] Lỗi tải ảnh:', err);
       const msg = err instanceof Error ? err.message : 'Tải ảnh thất bại';
-      alert(`Không thể tải ảnh: ${msg}`);
+      toast.error(extractErrorMessage(err, "Tải ảnh lên thất bại"));
     } finally {
       setIsUploadingImage(false);
     }
@@ -286,8 +296,8 @@ export function ServiceForm() {
       showToast('Đã xóa ảnh thành công.');
     } catch (err: unknown) {
       console.error('[ServiceForm] Lỗi xóa ảnh:', err);
-      const msg = err instanceof Error ? err.message : 'Xóa ảnh thất bại';
-      alert(`Không thể xóa ảnh: ${msg}`);
+      const msg = extractErrorMessage(err, 'Không thể xóa ảnh');
+      toast.error(msg);
     }
   };
 
@@ -320,19 +330,19 @@ export function ServiceForm() {
   // Tab 3: Create Option
   const handleCreateOption = async () => {
     if (!currentServiceId) {
-      alert('Vui lòng lưu dịch vụ trước khi tạo lựa chọn bán.');
+      toast.warning('Vui lòng lưu dịch vụ trước khi tạo lựa chọn bán.');
       return;
     }
     if (!optName.trim()) {
-      alert('Vui lòng nhập tên gói/lựa chọn.');
+      toast.warning('Vui lòng nhập tên gói/lựa chọn.');
       return;
     }
     if (optPrice <= 0) {
-      alert('Đơn giá phải lớn hơn 0 đ.');
+      toast.warning('Đơn giá phải lớn hơn 0 đ.');
       return;
     }
     if (optType === 'PRIVATE' && (!optMaxPax || optMaxPax <= 0)) {
-      alert('Gói riêng tư (PRIVATE) bắt buộc phải cấu hình số khách tối đa (maxPaxPerPackage > 0).');
+      toast.warning('Gói riêng tư (PRIVATE) bắt buộc phải cấu hình số khách tối đa (maxPaxPerPackage > 0).');
       return;
     }
 
@@ -355,8 +365,8 @@ export function ServiceForm() {
       setOptBenefits('');
     } catch (err: unknown) {
       console.error('[ServiceForm] Lỗi tạo option:', err);
-      const msg = err instanceof Error ? err.message : 'Tạo lựa chọn thất bại';
-      alert(`Không thể tạo lựa chọn: ${msg}`);
+      const msg = extractErrorMessage(err, 'Không thể tạo lựa chọn');
+      toast.error(msg);
     }
   };
 
@@ -366,7 +376,7 @@ export function ServiceForm() {
     if (!file) return;
 
     if (!currentServiceId) {
-      alert('Vui lòng lưu thông tin dịch vụ trước khi tải chứng từ an toàn.');
+      toast.warning('Vui lòng lưu thông tin dịch vụ trước khi tải chứng từ an toàn.');
       return;
     }
 
@@ -379,7 +389,7 @@ export function ServiceForm() {
     } catch (err: unknown) {
       console.error('[ServiceForm] Lỗi tải chứng từ an toàn:', err);
       const msg = err instanceof Error ? err.message : 'Tải chứng từ thất bại';
-      alert(`Không thể tải chứng từ: ${msg}`);
+      toast.error(extractErrorMessage(err, "Tải chứng từ an toàn thất bại"));
     } finally {
       setIsUploadingDoc(false);
     }
@@ -461,15 +471,32 @@ export function ServiceForm() {
               <span>Xem trước</span>
             </button>
 
-            <button 
-              onClick={() => handleSaveService(true)}
-              disabled={isSaving}
-              className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50" 
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[16px]">send</span>
-              <span>Gửi duyệt</span>
-            </button>
+            {serviceStatus === 'PENDING_REVIEW' ? (
+              <div className="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-xs font-semibold flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-amber-600">hourglass_top</span>
+                <span>Đang chờ duyệt</span>
+              </div>
+            ) : serviceStatus === 'PUBLISHED' ? (
+              <button 
+                onClick={() => handleSaveService(false)}
+                disabled={isSaving}
+                className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50" 
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">save</span>
+                <span>{isSaving ? 'Đang lưu...' : 'Lưu cập nhật'}</span>
+              </button>
+            ) : (
+              <button 
+                onClick={() => handleSaveService(true)}
+                disabled={isSaving}
+                className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50" 
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[16px]">send</span>
+                <span>Gửi duyệt</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1241,14 +1268,7 @@ export function ServiceForm() {
           document.body
         )}
 
-        {/* Toast */}
-        {toastMessage && createPortal(
-          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2 animate-fade-in">
-            <span className="material-symbols-outlined text-[16px] text-emerald-400">check_circle</span>
-            <span>{toastMessage}</span>
-          </div>,
-          document.body
-        )}
+        
       </div>
     </div>
   );

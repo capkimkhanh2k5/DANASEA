@@ -46,12 +46,14 @@ import { Logs } from "./pages/admin/Logs/Logs";
 import { DevRoleSwitcher } from "./components/common/DevRoleSwitcher";
 import { PageLoader } from "./components/common/PageLoader";
 import { ScrollToTop } from "./components/common/ScrollToTop";
+import { ToastContainer } from "./components/common/ToastContainer";
 
 function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
       <PageLoader />
+      <ToastContainer />
       <DevRoleSwitcher />
       <Routes>
         {/* KHÁCH HÀNG */}

@@ -5,6 +5,8 @@ import { vendorService } from '../../../services/vendorService';
 import { categoryService } from '../../../services/categoryService';
 import type { VendorServiceDto, ServiceStatus } from '../../../types/vendorService';
 import type { CategoryDto } from '../../../types/category';
+import { toast } from '../../../store/useToastStore';
+import { extractErrorMessage } from '../../../utils/errorHandler';
 
 export function Services() {
   const navigate = useNavigate();
@@ -17,7 +19,7 @@ export function Services() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'newest' | 'price_asc' | 'price_desc' | 'rating'>('newest');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  
   const [actionInProgressId, setActionInProgressId] = useState<string | null>(null);
 
   // Edit price modal state
@@ -25,8 +27,7 @@ export function Services() {
   const [editPriceInput, setEditPriceInput] = useState('');
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    toast.success(msg);
   };
 
   const loadData = useCallback(async () => {
@@ -55,7 +56,7 @@ export function Services() {
   // Handle Submit for Review (DRAFT or REJECTED)
   const handleSubmitForReview = async (service: VendorServiceDto) => {
     if (!service.images || service.images.length === 0) {
-      alert('Dịch vụ cần ít nhất 1 ảnh để gửi duyệt. Vui lòng mở chỉnh sửa dịch vụ và tải ảnh lên.');
+      toast.warning('Dịch vụ cần ít nhất 1 ảnh để gửi duyệt. Vui lòng mở chỉnh sửa dịch vụ và tải ảnh lên.');
       return;
     }
     if (!window.confirm(`Bạn có chắc muốn gửi duyệt dịch vụ "${service.name}" tới Quản trị viên?`)) {
@@ -68,8 +69,8 @@ export function Services() {
       showToast(`Đã gửi duyệt thành công dịch vụ "${service.name}". Trạng thái chuyển thành Chờ duyệt.`);
     } catch (err: unknown) {
       console.error('[Services] Lỗi submit duyệt:', err);
-      const msg = err instanceof Error ? err.message : 'Gửi duyệt thất bại';
-      alert(`Không thể gửi duyệt: ${msg}`);
+      const msg = extractErrorMessage(err, 'Không thể gửi duyệt dịch vụ');
+      toast.error(msg);
     } finally {
       setActionInProgressId(null);
     }
@@ -87,8 +88,8 @@ export function Services() {
       showToast(`Đã tạm ngưng dịch vụ "${service.name}".`);
     } catch (err: unknown) {
       console.error('[Services] Lỗi tạm ngưng:', err);
-      const msg = err instanceof Error ? err.message : 'Tạm ngưng thất bại';
-      alert(`Không thể tạm ngưng: ${msg}`);
+      const msg = extractErrorMessage(err, 'Không thể tạm ngưng dịch vụ');
+      toast.error(msg);
     } finally {
       setActionInProgressId(null);
     }
@@ -106,8 +107,8 @@ export function Services() {
       showToast(`Đã mở bán lại thành công dịch vụ "${service.name}".`);
     } catch (err: unknown) {
       console.error('[Services] Lỗi mở bán lại:', err);
-      const msg = err instanceof Error ? err.message : 'Mở bán lại thất bại';
-      alert(`Không thể mở bán lại: ${msg}`);
+      const msg = extractErrorMessage(err, 'Không thể mở bán lại dịch vụ');
+      toast.error(msg);
     } finally {
       setActionInProgressId(null);
     }
@@ -125,8 +126,8 @@ export function Services() {
       showToast(`Đã xóa vĩnh viễn dịch vụ "${name}".`);
     } catch (err: unknown) {
       console.error('[Services] Lỗi xóa dịch vụ:', err);
-      const msg = err instanceof Error ? err.message : 'Xóa thất bại';
-      alert(`Không thể xóa dịch vụ: ${msg}`);
+      const msg = extractErrorMessage(err, 'Không thể xóa dịch vụ');
+      toast.error(msg);
     } finally {
       setActionInProgressId(null);
     }
@@ -137,7 +138,7 @@ export function Services() {
     if (!editingService) return;
     const newPrice = parseInt(editPriceInput.replace(/\D/g, ''), 10);
     if (isNaN(newPrice) || newPrice <= 0) {
-      alert('Vui lòng nhập đơn giá hợp lệ lớn hơn 0 đ.');
+      toast.warning('Vui lòng nhập đơn giá hợp lệ lớn hơn 0 đ.');
       return;
     }
 
@@ -156,8 +157,8 @@ export function Services() {
       setEditingService(null);
     } catch (err: unknown) {
       console.error('[Services] Lỗi sửa giá nhanh:', err);
-      const msg = err instanceof Error ? err.message : 'Cập nhật giá thất bại';
-      alert(`Không thể sửa giá: ${msg}`);
+      const msg = extractErrorMessage(err, 'Cập nhật giá thất bại');
+      toast.error(msg);
     } finally {
       setActionInProgressId(null);
     }
@@ -802,14 +803,7 @@ export function Services() {
           document.body
         )}
 
-        {/* Toast Notification */}
-        {toastMessage && createPortal(
-          <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg text-xs font-medium flex items-center gap-2 animate-fade-in">
-            <span className="material-symbols-outlined text-[16px] text-emerald-400">check_circle</span>
-            <span>{toastMessage}</span>
-          </div>,
-          document.body
-        )}
+        
       </div>
     </div>
   );
