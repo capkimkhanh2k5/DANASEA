@@ -146,7 +146,7 @@ export function Home() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [language]);
 
   // Map live services to carousel formats
   const flashSaleList: FlashSaleExperience[] = liveServices.length > 0
