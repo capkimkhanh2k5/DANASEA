@@ -29,12 +29,7 @@ final class CliProxyTokenCounter {
     }
 
     Count count(CliProxyDto.ChatRequest request, long limit) {
-        String serialized;
-        try {
-            serialized = MAPPER.writeValueAsString(request);
-        } catch (JsonProcessingException exception) {
-            throw new CliProxyException("Cannot serialize model input for preflight", exception);
-        }
+        String serialized = serialize(request);
         long bytes = serialized.getBytes(StandardCharsets.UTF_8).length;
         if (bytes <= limit || !request.model().toLowerCase(Locale.ROOT).startsWith("gemini-")) {
             return new Count(bytes, "UTF8_BYTE_BOUND");
@@ -59,5 +54,32 @@ final class CliProxyTokenCounter {
             log.warn("Proxy token count unavailable for model {} ({})", request.model(), exception.getClass().getSimpleName());
         }
         return new Count(bytes, "UTF8_BYTE_BOUND_FALLBACK");
+    }
+
+    Count estimateWithCalibration(CliProxyDto.ChatRequest request, long limit, long refTokens, long refBytes, boolean remoteFailed) {
+        long bytes = utf8Bytes(request);
+        if (bytes <= limit || !request.model().toLowerCase(Locale.ROOT).startsWith("gemini-")) {
+            return new Count(bytes, "UTF8_BYTE_BOUND");
+        }
+        if (remoteFailed) {
+            return new Count(bytes, "UTF8_BYTE_BOUND_FALLBACK");
+        }
+        if (refTokens > 0 && refBytes > 0) {
+            long estimated = Math.max(1L, (bytes * refTokens + refBytes - 1L) / refBytes);
+            return new Count(estimated, "CALIBRATED_RATIO_ESTIMATE");
+        }
+        return count(request, limit);
+    }
+
+    long utf8Bytes(CliProxyDto.ChatRequest request) {
+        return serialize(request).getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    private String serialize(CliProxyDto.ChatRequest request) {
+        try {
+            return MAPPER.writeValueAsString(request);
+        } catch (JsonProcessingException exception) {
+            throw new CliProxyException("Cannot serialize model input for preflight", exception);
+        }
     }
 }

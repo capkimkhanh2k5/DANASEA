@@ -177,7 +177,12 @@ public class CliProxyLlmClient implements LlmClientPort {
 
         List<Map<String, Object>> tools = (aiToolRegistry != null && aiToolRegistry.getToolDefinitions() != null)
                 ? aiToolRegistry.getToolDefinitions().stream()
-                        .map(t -> Map.of("type", "function", "function", t))
+                        .map(t -> {
+                            Map<String, Object> toolMap = new java.util.LinkedHashMap<>();
+                            toolMap.put("type", "function");
+                            toolMap.put("function", t);
+                            return java.util.Collections.unmodifiableMap(toolMap);
+                        })
                         .toList()
                 : List.of();
 

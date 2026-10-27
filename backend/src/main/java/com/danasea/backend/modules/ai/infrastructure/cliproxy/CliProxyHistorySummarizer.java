@@ -2,6 +2,7 @@ package com.danasea.backend.modules.ai.infrastructure.cliproxy;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -38,6 +39,11 @@ final class CliProxyHistorySummarizer {
     }
 
     List<Map<String, String>> summarize(String model, List<CliProxyDto.Message> omitted, String current, long inputLimit) {
+        return summarize(model, omitted, current, inputLimit, 0L, 0L, false);
+    }
+
+    List<Map<String, String>> summarize(String model, List<CliProxyDto.Message> omitted, String current, long inputLimit,
+            long refTokens, long refBytes, boolean remoteFailed) {
         Map<String, String> sources = new LinkedHashMap<>();
         for (int i = 0; i < omitted.size(); i++) {
             var message = omitted.get(i);
@@ -100,39 +106,53 @@ final class CliProxyHistorySummarizer {
                 if (chosen.contains(id)) selected.add(id);
             }
         }
-        try {
-            var prompt = new CliProxyDto.ChatRequest(model, List.of(new CliProxyDto.Message("system", INSTRUCTION),
-                    new CliProxyDto.Message("user", MAPPER.writeValueAsString(Map.of("currentRequest",
-                            CliProxyToolContextCompactor.prefix(current, 1800), "sources", sources)))), null,
-                    "high", Math.min(8192, properties.maxOutputTokens()));
-            if (counter.count(prompt, inputLimit).tokens() <= inputLimit
-                    && AiExecutionBudget.permitCompaction(Duration.ofSeconds(30))) {
-                var response = HttpRequestDeadline.execute(Duration.ofSeconds(10), () -> client.post()
-                        .uri("/chat/completions").header("Authorization", "Bearer " + apiKey)
-                        .body(prompt).retrieve().body(CliProxyDto.ChatResponse.class));
-                if (response != null && response.choices() != null && !response.choices().isEmpty()) {
-                    var choice = response.choices().getFirst();
-                    if ("stop".equals(choice.finish_reason()) && choice.message() != null
-                            && (choice.message().tool_calls() == null || choice.message().tool_calls().isEmpty())) {
-                        var keep = MAPPER.readTree(choice.message().content()).path("keep");
-                        List<String> validated = new ArrayList<>();
-                        boolean valid = keep.isArray() && keep.size() > 0 && keep.size() <= 4;
-                        for (var id : keep) {
-                            if (!id.isTextual() || !sources.containsKey(id.asText())) valid = false;
-                            validated.add(id.asText());
-                        }
-                        if (valid) {
-                            Set<String> validSet = Set.copyOf(validated);
-                            selected = sources.keySet().stream().filter(validSet::contains).toList();
+        List<String> cachedSelection = AiExecutionBudget.getCompactionSelection().stream()
+                .filter(sources::containsKey).toList();
+        if (!cachedSelection.isEmpty()) {
+            selected = cachedSelection;
+        } else if (AiExecutionBudget.canAttemptCompaction(Duration.ofSeconds(30))) {
+            try {
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("currentRequest", CliProxyToolContextCompactor.prefix(current, 1800));
+                payload.put("sources", sources);
+                var prompt = new CliProxyDto.ChatRequest(model, List.of(new CliProxyDto.Message("system", INSTRUCTION),
+                        new CliProxyDto.Message("user", MAPPER.writeValueAsString(payload))), null,
+                        "high", Math.min(8192, properties.maxOutputTokens()));
+                if (counter.estimateWithCalibration(prompt, inputLimit, refTokens, refBytes, remoteFailed).tokens() <= inputLimit
+                        && AiExecutionBudget.permitCompaction(Duration.ofSeconds(30))) {
+                    var response = HttpRequestDeadline.execute(Duration.ofSeconds(10), () -> client.post()
+                            .uri("/chat/completions").header("Authorization", "Bearer " + apiKey)
+                            .body(prompt).retrieve().body(CliProxyDto.ChatResponse.class));
+                    if (response != null && response.choices() != null && !response.choices().isEmpty()) {
+                        var choice = response.choices().getFirst();
+                        if ("stop".equals(choice.finish_reason()) && choice.message() != null
+                                && (choice.message().tool_calls() == null || choice.message().tool_calls().isEmpty())) {
+                            var keep = MAPPER.readTree(choice.message().content()).path("keep");
+                            List<String> validated = new ArrayList<>();
+                            boolean valid = keep.isArray() && keep.size() > 0 && keep.size() <= 4;
+                            for (var id : keep) {
+                                if (!id.isTextual() || !sources.containsKey(id.asText())) valid = false;
+                                validated.add(id.asText());
+                            }
+                            if (valid) {
+                                Set<String> validSet = Set.copyOf(validated);
+                                selected = sources.keySet().stream().filter(validSet::contains).toList();
+                                AiExecutionBudget.recordCompactionSelection(selected);
+                            }
                         }
                     }
                 }
+            } catch (Exception exception) {
+                log.debug("AI extractive memory selection unavailable ({})", exception.getClass().getSimpleName());
             }
-        } catch (Exception exception) {
-            log.debug("AI extractive memory selection unavailable ({})", exception.getClass().getSimpleName());
         }
         Set<String> kept = Set.copyOf(selected);
         return sources.entrySet().stream().filter(entry -> kept.contains(entry.getKey()))
-                .map(entry -> Map.of("sourceMessage", entry.getKey(), "quote", entry.getValue())).toList();
+                .map(entry -> {
+                    Map<String, String> quoteMap = new LinkedHashMap<>();
+                    quoteMap.put("sourceMessage", entry.getKey());
+                    quoteMap.put("quote", entry.getValue());
+                    return Collections.unmodifiableMap(quoteMap);
+                }).toList();
     }
 }

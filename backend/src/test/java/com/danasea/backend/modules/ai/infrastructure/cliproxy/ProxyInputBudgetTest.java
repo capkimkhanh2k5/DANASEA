@@ -284,6 +284,47 @@ class ProxyInputBudgetTest {
         assertThat((sent.length() + 1) / 2).isLessThanOrEqualTo(1100 - 32);
     }
 
+    @Test void binarySearchUsesCalibratedTokenRatioToMinimizeRemoteCountCallsAndCircuitBreaksFailedCounter() throws Exception {
+        counterFails = true;
+        assertThat(client(false).generateResponse(history()).getContent()).isEqualTo("OK");
+        assertThat(counted).as("failed counter should be circuit-broken within the same preflight").hasSize(1);
+
+        stop();
+        counted.clear();
+        generations.clear();
+        summaries.clear();
+        counterFails = false;
+        inputLimit = 6000;
+        assertThat(client(false).generateResponse(memoryHistory()).getContent()).isEqualTo("OK");
+        assertThat(counted.size()).as("healthy counter should only verify boundary and final candidates").isLessThanOrEqualTo(4);
+    }
+
+    @Test void preservesLlmSelectedQuotesAndDeterministicPrefixAcrossToolIterations() throws Exception {
+        inputLimit = 6000;
+        var history = new ArrayList<AiMessage>();
+        history.add(message(AiMessageRole.USER, "Subtle note without regex keywords: prefers sunset departure."));
+        history.add(message(AiMessageRole.ASSISTANT, "Noted."));
+        history.add(message(AiMessageRole.USER, "Secondary constraint: budget is flexible."));
+        history.add(message(AiMessageRole.ASSISTANT, "Noted."));
+        for (int i = 0; i < 6; i++) {
+            history.add(message(AiMessageRole.USER, "discussion " + "x".repeat(2500)));
+            history.add(message(AiMessageRole.ASSISTANT, "y".repeat(2500)));
+        }
+        history.add(message(AiMessageRole.USER, "LATEST_QUESTION: suggest a trip"));
+        var client = client(true);
+        try (var budget = AiExecutionBudget.open(Duration.ofMinutes(2), 6)) {
+            assertThat(client.generateResponse(history).getContent()).isEqualTo("OK");
+            assertThat(client.generateResponse(history).getContent()).isEqualTo("OK");
+        }
+        assertThat(summaries).hasSize(1);
+        assertThat(generations).hasSize(2);
+        assertThat(generations.get(0).toString()).contains("prefers sunset departure");
+        assertThat(generations.get(1).toString()).contains("prefers sunset departure");
+        assertThat(generations.get(0).path("tools").toString()).isEqualTo(generations.get(1).path("tools").toString());
+        assertThat(generations.get(0).path("messages").path(2).toString())
+                .isEqualTo(generations.get(1).path("messages").path(2).toString());
+    }
+
     private List<AiMessage> memoryHistory() {
         var history = new ArrayList<AiMessage>();
         history.add(message(AiMessageRole.USER, "I cannot swim. We are travelling with two children."));

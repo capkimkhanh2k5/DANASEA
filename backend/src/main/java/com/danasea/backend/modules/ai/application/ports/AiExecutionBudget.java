@@ -1,6 +1,7 @@
 package com.danasea.backend.modules.ai.application.ports;
 
 import java.time.Duration;
+import java.util.List;
 import com.danasea.backend.shared.infrastructure.http.HttpRequestDeadline;
 
 public final class AiExecutionBudget implements AutoCloseable {
@@ -10,6 +11,7 @@ public final class AiExecutionBudget implements AutoCloseable {
     private final long deadline;
     private int modelCalls;
     private boolean compactionUsed;
+    private List<String> compactionSelection = List.of();
     private final int maximumModelCalls;
     private final HttpRequestDeadline httpDeadline;
 
@@ -43,14 +45,38 @@ public final class AiExecutionBudget implements AutoCloseable {
         return true;
     }
 
+    public static boolean canAttemptCompaction(Duration minimumRemaining) {
+        if (!hasTimeFor(minimumRemaining)) return false;
+        AiExecutionBudget root = rootBudget();
+        return root == null || !root.compactionUsed;
+    }
+
     public static boolean permitCompaction(Duration minimumRemaining) {
         if (!hasTimeFor(minimumRemaining)) return false;
-        AiExecutionBudget budget = CURRENT.get();
-        if (budget == null) return true;
-        while (budget.previous != null) budget = budget.previous;
-        if (budget.compactionUsed) return false;
-        budget.compactionUsed = true;
+        AiExecutionBudget root = rootBudget();
+        if (root == null) return true;
+        if (root.compactionUsed) return false;
+        root.compactionUsed = true;
         return true;
+    }
+
+    public static void recordCompactionSelection(List<String> selectedIds) {
+        AiExecutionBudget root = rootBudget();
+        if (root != null && selectedIds != null) {
+            root.compactionSelection = List.copyOf(selectedIds);
+        }
+    }
+
+    public static List<String> getCompactionSelection() {
+        AiExecutionBudget root = rootBudget();
+        return root == null ? List.of() : root.compactionSelection;
+    }
+
+    private static AiExecutionBudget rootBudget() {
+        AiExecutionBudget budget = CURRENT.get();
+        if (budget == null) return null;
+        while (budget.previous != null) budget = budget.previous;
+        return budget;
     }
 
     @Override 

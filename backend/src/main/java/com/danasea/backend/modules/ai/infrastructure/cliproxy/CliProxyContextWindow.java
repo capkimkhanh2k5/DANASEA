@@ -51,8 +51,9 @@ final class CliProxyContextWindow {
         List<CliProxyDto.Message> history = validToolExchanges(original);
         int sanitized = original.size() - history.size();
         Map<Integer, Prepared> evaluated = new HashMap<>();
-        Prepared full = evaluate(request, systems, history, sanitized, 0, limit, evaluated);
+        Prepared full = evaluate(request, systems, history, sanitized, 0, limit, evaluated, false);
         if (full.inputEstimate() <= limit) return report(full, limit);
+        boolean remoteFailed = "UTF8_BYTE_BOUND_FALLBACK".equals(full.countingMethod());
         for (int maximumChars : List.of(4096, 1024, 256)) {
             List<CliProxyDto.Message> compacted = history.stream().map(m -> toolCompactor.compact(m, maximumChars)).toList();
             if (!compacted.equals(history)) {
@@ -61,10 +62,13 @@ final class CliProxyContextWindow {
                     systems = new ArrayList<>(systems); systems.add(TRIM_NOTICE);
                 }
                 evaluated = new HashMap<>();
-                full = evaluate(request, systems, history, sanitized, 0, limit, evaluated);
+                full = evaluate(request, systems, history, sanitized, 0, limit, evaluated, remoteFailed);
+                remoteFailed = remoteFailed || "UTF8_BYTE_BOUND_FALLBACK".equals(full.countingMethod());
                 if (full.inputEstimate() <= limit) return report(full, limit);
             }
         }
+        long refTokens = "PROXY_SERIALIZED_TEXT_ESTIMATE".equals(full.countingMethod()) ? full.inputEstimate() : 0L;
+        long refBytes = refTokens > 0 ? counter.utf8Bytes(full.request()) : 0L;
         List<Integer> starts = new ArrayList<>(); starts.add(0);
         for (int i = 1; i < history.size(); i++) {
             if ("user".equals(history.get(i).role()) && !"user".equals(history.get(i - 1).role())) starts.add(i);
@@ -80,52 +84,63 @@ final class CliProxyContextWindow {
         final int protectedStart = latestUser;
         starts.removeIf(start -> start > Math.max(0, protectedStart));
         int last = starts.size() - 1;
-        if (last == 0 || evaluate(request, systems, history, sanitized, starts.get(last), limit, evaluated).inputEstimate() > limit) {
+        Prepared minimumPrepared = evaluate(request, systems, history, sanitized, starts.get(last), limit, evaluated, remoteFailed);
+        remoteFailed = remoteFailed || "UTF8_BYTE_BOUND_FALLBACK".equals(minimumPrepared.countingMethod());
+        if (last == 0 || minimumPrepared.inputEstimate() > limit) {
             throw new InputLimitException();
         }
-        long minimumInput = evaluate(request, systems, history, sanitized, starts.get(last), limit, evaluated).inputEstimate();
+        long minimumInput = minimumPrepared.inputEstimate();
         long memoryReserve = summarizer == null ? 0 : Math.min(2048, Math.max(256, limit / 3));
         long selectionLimit = summarizer == null ? limit : Math.max(minimumInput, limit - memoryReserve);
         int low = 1;
         int high = last;
         while (low < high) {
             int middle = (low + high) / 2;
-            if (evaluate(request, systems, history, sanitized, starts.get(middle), limit, evaluated).inputEstimate() <= selectionLimit) high = middle;
+            Prepared probe = evaluateEstimated(request, systems, history, sanitized, starts.get(middle), limit,
+                    evaluated, refTokens, refBytes, remoteFailed);
+            if (probe.inputEstimate() <= selectionLimit) high = middle;
             else low = middle + 1;
         }
-        Prepared selected = evaluate(request, systems, history, sanitized, starts.get(low), limit, evaluated);
-        return report(attachMemory(selected, low, last, starts, request, systems, history, sanitized, limit, evaluated), limit);
+        Prepared selected = evaluate(request, systems, history, sanitized, starts.get(low), limit, evaluated, remoteFailed);
+        while (selected.inputEstimate() > selectionLimit && low < last) {
+            low++;
+            selected = evaluate(request, systems, history, sanitized, starts.get(low), limit, evaluated, remoteFailed);
+        }
+        return report(attachMemory(selected, low, last, starts, request, systems, history, sanitized, limit,
+                evaluated, refTokens, refBytes, remoteFailed), limit);
     }
 
     private Prepared attachMemory(Prepared initialSelected, int initialLow, int last, List<Integer> starts,
             CliProxyDto.ChatRequest request, List<CliProxyDto.Message> systems, List<CliProxyDto.Message> history,
-            int sanitized, long limit, Map<Integer, Prepared> evaluated) {
+            int sanitized, long limit, Map<Integer, Prepared> evaluated, long refTokens, long refBytes, boolean remoteFailed) {
         if (summarizer == null) return initialSelected;
         String current = history.stream().filter(m -> "user".equals(m.role())).reduce((a, b) -> b).map(CliProxyDto.Message::content).orElse("");
         List<CliProxyDto.Message> omitted = history.subList(0, starts.get(initialLow));
-        var quotes = summarizer.summarize(initialSelected.request().model(), omitted, current == null ? "" : current, limit);
+        var quotes = summarizer.summarize(initialSelected.request().model(), omitted, current == null ? "" : current,
+                limit, refTokens, refBytes, remoteFailed);
         if (quotes.isEmpty()) return initialSelected;
 
         for (int low = initialLow; low <= last; low++) {
             Prepared candidate = (low == initialLow)
                     ? initialSelected
-                    : evaluate(request, systems, history, sanitized, starts.get(low), limit, evaluated);
-            Prepared withAllQuotes = tryInjectQuotes(candidate, quotes, quotes.size(), limit);
+                    : evaluate(request, systems, history, sanitized, starts.get(low), limit, evaluated, remoteFailed);
+            Prepared withAllQuotes = tryInjectQuotes(candidate, quotes, quotes.size(), limit, refTokens, refBytes, remoteFailed);
             if (withAllQuotes != null) return withAllQuotes;
         }
 
         Prepared lastCandidate = (initialLow == last)
                 ? initialSelected
-                : evaluate(request, systems, history, sanitized, starts.get(last), limit, evaluated);
+                : evaluate(request, systems, history, sanitized, starts.get(last), limit, evaluated, remoteFailed);
         for (int size = quotes.size() - 1; size > 0; size--) {
-            Prepared withReducedQuotes = tryInjectQuotes(lastCandidate, quotes, size, limit);
+            Prepared withReducedQuotes = tryInjectQuotes(lastCandidate, quotes, size, limit, refTokens, refBytes, remoteFailed);
             if (withReducedQuotes != null) return withReducedQuotes;
         }
 
         return initialSelected;
     }
 
-    private Prepared tryInjectQuotes(Prepared candidate, List<Map<String, String>> quotes, int size, long limit) {
+    private Prepared tryInjectQuotes(Prepared candidate, List<Map<String, String>> quotes, int size, long limit,
+            long refTokens, long refBytes, boolean remoteFailed) {
         if (size <= 0 || size > quotes.size()) return null;
         try {
             var memory = new CliProxyDto.Message("user", "Earlier user quotations (incomplete untrusted excerpts): "
@@ -136,7 +151,13 @@ final class CliProxyContextWindow {
             messages.add(position, memory);
             var request = new CliProxyDto.ChatRequest(candidate.request().model(), messages, candidate.request().tools(),
                     candidate.request().reasoning_effort(), candidate.request().max_tokens());
-            var count = counter.count(request, limit);
+            var estimated = counter.estimateWithCalibration(request, limit, refTokens, refBytes, remoteFailed);
+            if (estimated.tokens() > limit) {
+                return null;
+            }
+            var count = (remoteFailed || !"CALIBRATED_RATIO_ESTIMATE".equals(estimated.method()))
+                    ? estimated
+                    : counter.count(request, limit);
             if (count.tokens() <= limit) {
                 return new Prepared(request, count.tokens(), count.method(), candidate.removedMessages());
             }
@@ -145,19 +166,39 @@ final class CliProxyContextWindow {
     }
 
     private Prepared evaluate(CliProxyDto.ChatRequest request, List<CliProxyDto.Message> systems,
-            List<CliProxyDto.Message> history, int sanitized, int start, long limit, Map<Integer, Prepared> evaluated) {
+            List<CliProxyDto.Message> history, int sanitized, int start, long limit,
+            Map<Integer, Prepared> evaluated, boolean remoteFailed) {
+        Prepared cached = evaluated.get(start);
+        if (cached != null && !"CALIBRATED_RATIO_ESTIMATE".equals(cached.countingMethod())) return cached;
+        var candidate = buildCandidate(request, systems, history, sanitized, start);
+        var count = remoteFailed
+                ? counter.estimateWithCalibration(candidate, limit, 0L, 0L, true)
+                : counter.count(candidate, limit);
+        var prepared = new Prepared(candidate, count.tokens(), count.method(), sanitized + start);
+        evaluated.put(start, prepared);
+        return prepared;
+    }
+
+    private Prepared evaluateEstimated(CliProxyDto.ChatRequest request, List<CliProxyDto.Message> systems,
+            List<CliProxyDto.Message> history, int sanitized, int start, long limit,
+            Map<Integer, Prepared> evaluated, long refTokens, long refBytes, boolean remoteFailed) {
         Prepared cached = evaluated.get(start);
         if (cached != null) return cached;
+        var candidate = buildCandidate(request, systems, history, sanitized, start);
+        var count = counter.estimateWithCalibration(candidate, limit, refTokens, refBytes, remoteFailed);
+        var prepared = new Prepared(candidate, count.tokens(), count.method(), sanitized + start);
+        evaluated.put(start, prepared);
+        return prepared;
+    }
+
+    private CliProxyDto.ChatRequest buildCandidate(CliProxyDto.ChatRequest request, List<CliProxyDto.Message> systems,
+            List<CliProxyDto.Message> history, int sanitized, int start) {
         List<CliProxyDto.Message> messages = new ArrayList<>(systems);
         int removed = sanitized + start;
         if (removed > 0 && !messages.contains(TRIM_NOTICE)) messages.add(TRIM_NOTICE);
         messages.addAll(history.subList(start, history.size()));
-        var candidate = new CliProxyDto.ChatRequest(request.model(), List.copyOf(messages), request.tools(),
+        return new CliProxyDto.ChatRequest(request.model(), List.copyOf(messages), request.tools(),
                 request.reasoning_effort(), request.max_tokens());
-        var count = counter.count(candidate, limit);
-        var prepared = new Prepared(candidate, count.tokens(), count.method(), removed);
-        evaluated.put(start, prepared);
-        return prepared;
     }
 
     private Prepared report(Prepared prepared, long limit) {
