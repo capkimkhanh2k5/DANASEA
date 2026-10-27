@@ -107,6 +107,9 @@ apiClient.interceptors.response.use(
     if (status === 401 && !url?.includes('/auth/')) {
       console.warn('[API Auth] Session expired or unauthorized (401). Clearing credentials...');
       useAuthStore.getState().logout();
+      if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/vendor') || window.location.pathname.startsWith('/admin'))) {
+        window.location.href = '/auth';
+      }
     }
 
 
