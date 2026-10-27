@@ -145,13 +145,13 @@ class WeatherRepository {
     ).query;
 
     final body = await _session.requestJson(
-      'GET',
       '/api/weather/current?$query',
+      method: 'GET',
       authenticated: false,
     );
 
     if (body is! Map) {
-      throw const AuthFailure('Phản hồi dữ liệu thời tiết không hợp lệ.');
+      throw AuthFailure('Phản hồi dữ liệu thời tiết không hợp lệ.');
     }
 
     return _mapSnapshot(Map<String, dynamic>.from(body));
@@ -202,13 +202,13 @@ class WeatherRepository {
 
     final query = Uri(queryParameters: params).query;
     final body = await _session.requestJson(
-      'GET',
       '/api/weather/advance-safety-check?$query',
+      method: 'GET',
       authenticated: false,
     );
 
     if (body is! Map) {
-      throw const AuthFailure('Phản hồi kiểm tra an toàn biển không hợp lệ.');
+      throw AuthFailure('Phản hồi kiểm tra an toàn biển không hợp lệ.');
     }
 
     return _mapSafety(Map<String, dynamic>.from(body));

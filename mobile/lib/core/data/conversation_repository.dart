@@ -17,7 +17,7 @@ class ConversationRepository {
   }) async {
     final trimmedOrderId = masterOrderId.trim();
     if (trimmedOrderId.isEmpty) {
-      throw const AuthFailure('Mã đơn hàng không hợp lệ.');
+      throw AuthFailure('Mã đơn hàng không hợp lệ.');
     }
 
     final payload = <String, dynamic>{
@@ -27,14 +27,14 @@ class ConversationRepository {
     };
 
     final body = await _session.requestJson(
-      'POST',
       '/api/conversations',
-      body: payload,
+      method: 'POST',
+      data: payload,
       authenticated: true,
     );
 
     if (body is! Map) {
-      throw const AuthFailure('Phản hồi hội thoại không hợp lệ.');
+      throw AuthFailure('Phản hồi hội thoại không hợp lệ.');
     }
 
     return _mapConversation(
@@ -52,8 +52,8 @@ class ConversationRepository {
     final safePage = page < 0 ? 0 : page;
     final safeSize = size.clamp(1, 100);
     final body = await _session.requestJson(
-      'GET',
       '/api/conversations?page=$safePage&size=$safeSize',
+      method: 'GET',
       authenticated: true,
     );
 
@@ -63,11 +63,10 @@ class ConversationRepository {
     final orderVendorNames = <String, String>{};
     final orderServiceNames = <String, String>{};
     try {
-      final orders = await OrderRepository.instance.listMyOrders(
-        page: 0,
-        size: 50,
-      );
-      for (final order in orders) {
+      final orderPage = await OrderRepository(
+        session: _session,
+      ).list(page: 0, size: 50);
+      for (final order in orderPage.content) {
         for (final sub in order.subOrders) {
           final key = '${order.id}:${sub.vendorId}';
           if (sub.vendorName.trim().isNotEmpty) {
@@ -110,7 +109,7 @@ class ConversationRepository {
   }) async {
     final trimmedId = conversationId.trim();
     if (trimmedId.isEmpty) {
-      throw const AuthFailure('Mã hội thoại không hợp lệ.');
+      throw AuthFailure('Mã hội thoại không hợp lệ.');
     }
 
     final safePage = page < 0 ? 0 : page;
@@ -127,12 +126,12 @@ class ConversationRepository {
 
     final queryString = Uri(queryParameters: queryParams).query;
     final body = await _session.requestJson(
-      'GET',
-      '/api/conversations/$trimmedId/messages?$queryString',
+      '/api/conversations/${Uri.encodeComponent(trimmedId)}/messages?$queryString',
+      method: 'GET',
       authenticated: true,
     );
 
-    final currentUserId = _session.currentUser?.id;
+    final currentUserId = _session.profile?['id']?.toString();
     final rawList = _extractContentList(body);
     return rawList
         .map(
@@ -153,11 +152,11 @@ class ConversationRepository {
   }) async {
     final trimmedId = conversationId.trim();
     if (trimmedId.isEmpty) {
-      throw const AuthFailure('Mã hội thoại không hợp lệ.');
+      throw AuthFailure('Mã hội thoại không hợp lệ.');
     }
     final trimmedContent = content.trim();
     if (trimmedContent.isEmpty) {
-      throw const AuthFailure('Nội dung tin nhắn không được để trống.');
+      throw AuthFailure('Nội dung tin nhắn không được để trống.');
     }
 
     final payload = <String, dynamic>{
@@ -167,19 +166,20 @@ class ConversationRepository {
     };
 
     final body = await _session.requestJson(
-      'POST',
-      '/api/conversations/$trimmedId/messages',
-      body: payload,
+      '/api/conversations/${Uri.encodeComponent(trimmedId)}/messages',
+      method: 'POST',
+      data: payload,
+      retry: false,
       authenticated: true,
     );
 
     if (body is! Map) {
-      throw const AuthFailure('Phản hồi gửi tin nhắn không hợp lệ.');
+      throw AuthFailure('Phản hồi gửi tin nhắn không hợp lệ.');
     }
 
     return _mapMessage(
       Map<String, dynamic>.from(body),
-      currentUserId: _session.currentUser?.id,
+      currentUserId: _session.profile?['id']?.toString(),
       fallbackConversationId: trimmedId,
       forceIsMe: true,
     );

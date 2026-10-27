@@ -19,19 +19,18 @@ class NotificationRepository extends ChangeNotifier {
     final safePage = page < 0 ? 0 : page;
     final safeSize = size.clamp(1, 100);
     final body = await _session.requestJson(
-      'GET',
       '/api/notifications?page=$safePage&size=$safeSize',
+      method: 'GET',
       authenticated: true,
     );
 
     final rawList = _extractContentList(body);
-    final items = rawList.map(_mapNotification).toList();
-    return items;
+    return rawList.map(_mapNotification).toList();
   }
 
   /// GET /api/notifications/unread-count
   Future<int> fetchUnreadCount() async {
-    if (!_session.isAuthenticated) {
+    if (_session.profile == null) {
       if (_unreadCount != 0) {
         _unreadCount = 0;
         notifyListeners();
@@ -40,8 +39,8 @@ class NotificationRepository extends ChangeNotifier {
     }
 
     final body = await _session.requestJson(
-      'GET',
       '/api/notifications/unread-count',
+      method: 'GET',
       authenticated: true,
     );
 
@@ -60,17 +59,18 @@ class NotificationRepository extends ChangeNotifier {
   Future<NotificationModel> markAsRead(String notificationId) async {
     final trimmed = notificationId.trim();
     if (trimmed.isEmpty) {
-      throw const AuthFailure('Mã thông báo không hợp lệ.');
+      throw AuthFailure('Mã thông báo không hợp lệ.');
     }
 
     final body = await _session.requestJson(
-      'PATCH',
-      '/api/notifications/$trimmed/read',
+      '/api/notifications/${Uri.encodeComponent(trimmed)}/read',
+      method: 'PATCH',
+      retry: false,
       authenticated: true,
     );
 
     if (body is! Map) {
-      throw const AuthFailure('Phản hồi đánh dấu đã đọc không hợp lệ.');
+      throw AuthFailure('Phản hồi đánh dấu đã đọc không hợp lệ.');
     }
 
     final updated = _mapNotification(Map<String, dynamic>.from(body));
@@ -84,8 +84,9 @@ class NotificationRepository extends ChangeNotifier {
   /// PATCH /api/notifications/read-all
   Future<int> markAllAsRead() async {
     final body = await _session.requestJson(
-      'PATCH',
       '/api/notifications/read-all',
+      method: 'PATCH',
+      retry: false,
       authenticated: true,
     );
 
