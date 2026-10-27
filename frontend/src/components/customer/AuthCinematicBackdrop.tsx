@@ -8,7 +8,7 @@ export interface ImageScene {
   subtitle: string;
 }
 
-export const AUTH_SCENES: ImageScene[] = [
+const AUTH_SCENES: ImageScene[] = [
   {
     id: 'hero',
     url: '/images/scenes/sean-oulashin-KMn4VEeEPR8-unsplash.jpg',

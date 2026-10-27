@@ -1,14 +1,23 @@
 package com.danasea.backend.modules.ai.domain.services;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.springframework.stereotype.Service;
 
 @Service
 public class AIToolRegistry {
 
+    private static final List<Map<String, Object>> CANONICAL_DEFINITIONS = buildCanonicalDefinitions();
+
     public List<Map<String, Object>> getToolDefinitions() {
+        return CANONICAL_DEFINITIONS;
+    }
+
+    private static List<Map<String, Object>> buildCanonicalDefinitions() {
         List<Map<String, Object>> legacy = List.of(
             Map.of(
                 "name", "search_services",
@@ -93,6 +102,36 @@ public class AIToolRegistry {
                 )
             )
         );
-        return java.util.stream.Stream.concat(legacy.stream(), CustomerFeatureToolDefinitions.definitions().stream()).toList();
+        return java.util.stream.Stream.concat(legacy.stream(), CustomerFeatureToolDefinitions.definitions().stream())
+                .map(AIToolRegistry::canonicalizeMap)
+                .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> canonicalizeMap(Map<String, Object> raw) {
+        Map<String, Object> ordered = new LinkedHashMap<>();
+        for (String priorityKey : List.of("name", "description", "type", "format", "enum", "properties", "items", "required", "parameters")) {
+            if (raw.containsKey(priorityKey)) {
+                ordered.put(priorityKey, canonicalizeValue(raw.get(priorityKey)));
+            }
+        }
+        Map<String, Object> remaining = new TreeMap<>(raw);
+        for (var entry : remaining.entrySet()) {
+            if (!ordered.containsKey(entry.getKey())) {
+                ordered.put(entry.getKey(), canonicalizeValue(entry.getValue()));
+            }
+        }
+        return Collections.unmodifiableMap(ordered);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object canonicalizeValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            return canonicalizeMap((Map<String, Object>) map);
+        }
+        if (value instanceof List<?> list) {
+            return list.stream().map(AIToolRegistry::canonicalizeValue).toList();
+        }
+        return value;
     }
 }

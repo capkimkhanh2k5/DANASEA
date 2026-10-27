@@ -1,5 +1,12 @@
 import { apiClient } from './apiClient';
-import type { BookingHoldRequest, BookingHoldResponse, BookingDetailResponse } from '../types/booking';
+import type {
+  BookingHoldRequest,
+  BookingHoldResponse,
+  BookingDetailResponse,
+  BookingSummaryResponse,
+  CancelBookingRequest,
+  BookingCancelResponse,
+} from '../types/booking';
 
 export const bookingService = {
   /**
@@ -36,4 +43,42 @@ export const bookingService = {
     const response = await apiClient.get<BookingDetailResponse>(`/bookings/${id}`);
     return response.data;
   },
+
+  /**
+   * Get customer bookings
+   * GET /api/bookings
+   */
+  async getMyBookings(params?: {
+    status?: string;
+    page?: number;
+    size?: number;
+    sortBy?: string;
+    sortDir?: string;
+  }): Promise<{ content: BookingSummaryResponse[]; totalElements: number; totalPages: number }> {
+    const response = await apiClient.get('/api/bookings', { params });
+    return response.data;
+  },
+
+  /**
+   * Cancel confirmed booking
+   * PATCH /api/bookings/{id}/cancel
+   */
+  async cancelBooking(
+    bookingId: string,
+    request?: CancelBookingRequest,
+    idempotencyKey?: string
+  ): Promise<BookingCancelResponse> {
+    const key = idempotencyKey || `cancel-${bookingId}`;
+    const response = await apiClient.patch<BookingCancelResponse>(
+      `/bookings/${bookingId}/cancel`,
+      request || {},
+      {
+        headers: {
+          'Idempotency-Key': key,
+        },
+      }
+    );
+    return response.data;
+  },
 };
+

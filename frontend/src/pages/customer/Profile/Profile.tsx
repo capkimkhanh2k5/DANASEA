@@ -1,12 +1,12 @@
 import { useAuthStore } from "../../../store/useAuthStore";
-import { useWishlistStore } from "../../../store/useWishlistStore";
+
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 
 export function Profile() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
-  const wishlistCount = useWishlistStore((state) => state.wishlistIds.length);
+
   const [showToast, setShowToast] = useState(false);
   
   if (!user) {
@@ -83,7 +83,7 @@ export function Profile() {
                         <span className="material-symbols-outlined text-[20px] text-slate-500">receipt_long</span>
                         <span>Đơn hàng của tôi</span>
                       </span>
-                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">3 đơn</span>
+                      <span className="material-symbols-outlined text-[18px] text-slate-400">chevron_right</span>
                     </button>
 
                     <button
@@ -95,7 +95,7 @@ export function Profile() {
                         <span className="material-symbols-outlined text-[20px] text-slate-500">favorite</span>
                         <span>Danh sách yêu thích</span>
                       </span>
-                      <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 text-xs font-semibold">{wishlistCount} tour</span>
+                      <span className="material-symbols-outlined text-[18px] text-slate-400">chevron_right</span>
                     </button>
 
                     <button

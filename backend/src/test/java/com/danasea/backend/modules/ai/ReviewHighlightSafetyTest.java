@@ -17,6 +17,16 @@ import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 class ReviewHighlightSafetyTest {
+    @Test void partialModelOutputCannotSelectReviewEvidenceEvenIfJsonParses() {
+        var llm = mock(LlmClientPort.class);
+        var adapter = new CliProxyReviewHighlightAdapter(llm, new ObjectMapper().findAndRegisterModules());
+        var source = new ReviewEvidence(UUID.randomUUID(), UUID.randomUUID(), 5, "Good", OffsetDateTime.now());
+        var response = new LlmResponse();
+        response.setContent("{\"reviewIds\":[\"" + source.id() + "\"]}");
+        response.setResponseStatus("PARTIAL");
+        when(llm.generateResponse(anyList(), eq(SupportedLanguage.VI))).thenReturn(response);
+        assertThat(adapter.select(List.of(source), SupportedLanguage.VI)).isEmpty();
+    }
     @Test void inventedSourceIdsAreRejectedWhileVerifiedIdsAreDeduplicated() {
         var llm = mock(LlmClientPort.class);
         var adapter = new CliProxyReviewHighlightAdapter(llm, new ObjectMapper().findAndRegisterModules());

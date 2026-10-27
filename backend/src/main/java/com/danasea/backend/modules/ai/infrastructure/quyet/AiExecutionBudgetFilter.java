@@ -46,7 +46,9 @@ public class AiExecutionBudgetFilter extends OncePerRequestFilter {
         MeterRegistry registry = metrics.getIfAvailable();
         Timer.Sample timer = registry == null ? null : Timer.start(registry);
         String route = request.getRequestURI().equals("/api/assistant/chat") ? "assistant" : "customer_features";
-        try (var budget = AiExecutionBudget.open(Duration.ofSeconds("assistant".equals(route) ? 40 : 12), 6)) {
+        Duration timeout = "assistant".equals(route) || request.getRequestURI().startsWith("/api/ai/review-summaries/")
+                ? AiExecutionBudget.LLM_REQUEST_TIMEOUT : Duration.ofSeconds(12);
+        try (var budget = AiExecutionBudget.open(timeout, 6)) {
             chain.doFilter(request, response);
         } finally {
             concurrentRequests.release();

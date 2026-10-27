@@ -23,7 +23,7 @@ export const useWishlistStore = create<WishlistState>()(
         return get().wishlistIds.includes(serviceId);
       },
 
-      toggleWishlist: (serviceId: string, serviceName?: string) => {
+      toggleWishlist: (serviceId: string, _serviceName?: string) => {
         const current = get().wishlistIds;
         const exists = current.includes(serviceId);
         if (exists) {
@@ -43,7 +43,7 @@ export const useWishlistStore = create<WishlistState>()(
         }
       },
 
-      removeFromWishlist: (serviceId: string, serviceName?: string) => {
+      removeFromWishlist: (serviceId: string, _serviceName?: string) => {
         set({
           wishlistIds: get().wishlistIds.filter((id) => id !== serviceId),
           toastMessage: "Đã bỏ lưu khỏi yêu thích!",

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useCartStore } from '../../../store/useCartStore';
 import { useWishlistStore } from '../../../store/useWishlistStore';
 import { useLanguageStore } from '../../../store/useLanguageStore';
@@ -270,6 +270,13 @@ export function ExperienceDetail() {
       const wave = raw.match(/max wave:\s*([\d.]+m)/i)?.[1] || '0.80m';
       const wind = raw.match(/max wind:\s*([\d.]+\s*km\/h)/i)?.[1] || '5.00km/h';
       return `Sóng biển ≤ ${wave}, gió ≤ ${wind}`;
+    }
+    if (
+      raw.toLowerCase().includes('standard marine safety') ||
+      raw.toLowerCase().includes('life jackets') ||
+      raw.toLowerCase().includes('worn at all times')
+    ) {
+      return 'Phù hợp điều kiện thời tiết thông thường (Biển êm, bắt buộc mặc áo phao)';
     }
     if (raw.includes('Bắt buộc') || raw.includes('áo phao')) {
       return raw.split('.')[0].trim();

@@ -1686,4 +1686,57 @@ const englishTranslations = <String, String>{
       "Weather warning: Departure restricted",
   "Điều kiện biển hôm nay: Cần lưu ý": "Sea conditions today: Caution advised",
   "Đủ điều kiện an toàn xuất bến": "Safe conditions for departure",
+  "Vui lòng nhập nội dung câu hỏi.": "Please enter your question.",
+  "Phản hồi từ trợ lý AI không hợp lệ.": "Invalid AI assistant response.",
+  "Không thể tạo lịch trình AI.": "Unable to create AI itinerary.",
+  "Không tìm thấy lịch trình AI.": "AI itinerary not found.",
+  "Không thể lưu bản xem trước lịch trình.": "Unable to save itinerary preview.",
+  "Không thể xác nhận lịch trình.": "Unable to accept itinerary.",
+  "Không thể lưu trữ lịch trình.": "Unable to archive itinerary.",
+  "Không thể chấp nhận đề xuất điều chỉnh lịch trình.":
+      "Unable to accept itinerary proposal.",
+  "Không thể tải sở thích cá nhân AI.": "Unable to load AI preferences.",
+  "Không thể lưu sở thích cá nhân AI.": "Unable to save AI preferences.",
+  "Không thể gửi yêu cầu hỗ trợ AI.": "Unable to submit AI support request.",
+  "Không tìm thấy yêu cầu hỗ trợ.": "Support request not found.",
+  "Không thể hủy yêu cầu hỗ trợ.": "Unable to cancel support request.",
+  "Gợi ý trải nghiệm DanaSea": "DanaSea experience suggestion",
+  "Xin chào! Tôi là trợ lý du lịch biển DANASEA AI. Bạn muốn tìm hoạt động biển, lập lịch trình hay hỗ trợ đơn hàng hôm nay?":
+      "Hello! I am the DANASEA AI ocean travel assistant. Would you like to find sea activities, plan an itinerary, or get order support today?",
+  "Đã phân tích yêu cầu của bạn. Xem gợi ý chi tiết bên dưới.":
+      "Analyzed your request. See detailed suggestions below.",
+  "Không thể kết nối trợ lý AI lúc này. Vui lòng thử lại.":
+      "Unable to connect to AI assistant right now. Please try again.",
+  "Lịch trình AI": "AI Itineraries",
+  "Sở thích AI": "AI Preferences",
+  "Hỗ trợ đơn hàng AI": "AI Order Support",
+  "Lịch trình biển Đà Nẵng 1 ngày cho 2 người ngân sách 1 triệu":
+      "1-day Da Nang beach itinerary for 2 people under 1M VND",
+  "Không thể tải danh sách lịch trình AI.": "Unable to load AI itineraries.",
+  "Không thể tạo lịch trình AI lúc này.":
+      "Unable to create AI itinerary right now.",
+  "Lịch trình du lịch biển AI": "AI Ocean Travel Itineraries",
+  "Nhập yêu cầu lập lịch trình...": "Enter itinerary request...",
+  "Tạo mới": "Create new",
+  "Chưa có lịch trình AI nào được lưu.": "No saved AI itineraries yet.",
+  "Chốt lịch": "Accept plan",
+  "Lập lại lịch": "Replan",
+  "Lưu trữ": "Archive",
+  "Đã lưu sở thích cá nhân hoá AI!": "AI personalization preferences saved!",
+  "Sở thích cá nhân hoá AI": "AI Personalization Preferences",
+  "Bật gợi ý theo sở thích đã lưu": "Enable saved preference recommendations",
+  "Sở thích (phân cách bằng dấu phẩy)": "Interests (comma-separated)",
+  "Hoạt động muốn tránh (phân cách bằng dấu phẩy)":
+      "Excluded activities (comma-separated)",
+  "Lưu thiết lập": "Save settings",
+  "Không thể tải dữ liệu hỗ trợ đơn hàng.":
+      "Unable to load order support data.",
+  "Không thể tra cứu hỗ trợ AI.": "Unable to query AI support.",
+  "Không thể gửi phiếu hỗ trợ.": "Unable to submit support ticket.",
+  "Hỗ trợ đơn hàng AI & CSKH": "AI Order Support & Customer Care",
+  "Đơn hàng cần hỗ trợ": "Order needing support",
+  "Nhập nội dung cần tư vấn chính sách hoặc chuyển nhân viên...":
+      "Enter policy question or handoff message...",
+  "Hỏi AI về đơn": "Ask AI about order",
+  "Gửi phiếu CSKH": "Submit support ticket",
 };

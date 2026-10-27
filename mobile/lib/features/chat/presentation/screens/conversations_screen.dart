@@ -102,7 +102,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     setState(() => _isCreatingConversation = true);
     List<MasterOrderModel> orders = const [];
     try {
-      orders = await OrderRepository.instance.listMyOrders(page: 0, size: 30);
+      final page = await OrderRepository().list(page: 0, size: 30);
+      orders = page.content;
     } on AuthFailure catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

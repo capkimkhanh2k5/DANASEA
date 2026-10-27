@@ -104,4 +104,53 @@ class AssistantStructuredContractTest {
         assertThat(result.getResponseStatus()).isEqualTo("NEEDS_INPUT");
         assertThat(result.getRequiredInputs()).containsExactly("PARTY_SIZE_REQUIRED");
     }
+
+    @Test void switchingActivityAndNaturalLanguageConstraintsOverridesStaleSavedCriteria() throws Exception {
+        var chat = chat("ai_smart_search");
+        when(history.getStructuredContext(conversation)).thenReturn(Optional.of(
+                "{\"criteria\":{\"query\":\"chèo SUP\",\"partySize\":2,\"totalBudget\":2000000,"
+                + "\"categoryId\":\"" + UUID.randomUUID() + "\",\"interests\":[\"sup\"]}}"));
+        when(llm.generateResponse(any(), eq(SupportedLanguage.VI))).thenReturn(
+                toolResponse("ai_smart_search", "{\"criteria\":{\"query\":\"du thuyền\"}}"),
+                answer("Đã tìm thấy du thuyền phù hợp."));
+        when(tool.execute(any(), any(ToolExecutionContext.class))).thenReturn(
+                "{\"status\":\"OK\",\"candidates\":[{\"service\":{\"id\":\"" + UUID.randomUUID() + "\"}}]}");
+
+        chat.processMessage(conversation,
+                "Đổi sang tìm du thuyền cho 6 người ngân sách dưới 12 triệu ngày 2026-11-20",
+                SupportedLanguage.VI, actor);
+
+        var argument = ArgumentCaptor.forClass(String.class);
+        verify(tool).execute(argument.capture(), any(ToolExecutionContext.class));
+        var criteria = mapper.readTree(argument.getValue()).path("criteria");
+        assertThat(criteria.path("query").asText()).isEqualTo("du thuyền");
+        assertThat(criteria.path("partySize").asInt()).isEqualTo(6);
+        assertThat(criteria.path("totalBudget").asLong()).isEqualTo(12_000_000L);
+        assertThat(criteria.path("from").asText()).isEqualTo("2026-11-20");
+        assertThat(criteria.has("categoryId")).isFalse();
+        assertThat(criteria.has("interests")).isFalse();
+    }
+
+    @Test void explicitResetPhraseClearsAllStaleSavedCriteria() throws Exception {
+        var chat = chat("ai_smart_search");
+        when(history.getStructuredContext(conversation)).thenReturn(Optional.of(
+                "{\"criteria\":{\"query\":\"kayak\",\"partySize\":4,\"totalBudget\":5000000,\"weatherSafeOnly\":true}}"));
+        when(llm.generateResponse(any(), eq(SupportedLanguage.VI))).thenReturn(
+                toolResponse("ai_smart_search", "{\"criteria\":{\"query\":\"lặn ngắm san hô\"}}"),
+                answer("Kết quả tìm kiếm mới."));
+        when(tool.execute(any(), any(ToolExecutionContext.class))).thenReturn(
+                "{\"status\":\"OK\",\"candidates\":[]}");
+
+        chat.processMessage(conversation,
+                "Xóa bộ lọc cũ, tìm mới hoàn toàn tour lặn ngắm san hô",
+                SupportedLanguage.VI, actor);
+
+        var argument = ArgumentCaptor.forClass(String.class);
+        verify(tool).execute(argument.capture(), any(ToolExecutionContext.class));
+        var criteria = mapper.readTree(argument.getValue()).path("criteria");
+        assertThat(criteria.path("query").asText()).isEqualTo("lặn ngắm san hô");
+        assertThat(criteria.has("partySize")).isFalse();
+        assertThat(criteria.has("totalBudget")).isFalse();
+        assertThat(criteria.has("weatherSafeOnly")).isFalse();
+    }
 }

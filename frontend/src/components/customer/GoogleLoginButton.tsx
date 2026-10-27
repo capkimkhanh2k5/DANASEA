@@ -91,9 +91,10 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       }
 
       // Trigger One Tap if appropriate
+      // Trigger One Tap if appropriate
       // Google One Tap prompt is disabled in local dev to avoid unregistered_origin 403 network errors
       // The standard Google Sign-In button renders and works cleanly
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[GoogleLoginButton] Failed to initialize Google button:', err);
     }
   }, [isGsiLoaded, googleClientId, mode, onSuccess, onError]);

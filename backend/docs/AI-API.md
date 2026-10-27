@@ -115,3 +115,34 @@ Yêu cầu đổi lịch được chuyển cho người có thẩm quyền xử 
 | `POST /api/admin/support/requests/{id}/handle` | Cập nhật tiến độ xử lý yêu cầu và phản hồi cho khách. |
 
 Kết quả kiểm duyệt và đánh giá rủi ro là thông tin hỗ trợ admin xem xét; quyết định xuất bản hoặc xử lý giao dịch vẫn theo nghiệp vụ có thẩm quyền.
+
+## 5. Giới hạn model và thời gian chờ
+
+Chat và review summary dùng chung budget **120 giây cho mỗi request**. Kiểm duyệt, model chính,
+model dự phòng và các lượt gọi tiếp đều trừ vào cùng deadline; fallback không được cấp lại 120 giây.
+Backend hủy HTTP đang chờ khi hết budget, kể cả khi response body vẫn đang gửi nhỏ giọt.
+Chat trả `PARTIAL` nếu hết thời gian; kiểm duyệt không hoàn tất vẫn từ chối xử lý.
+Review summary tiếp tục dùng nguồn trích xuất đã kiểm chứng khi model không hoàn tất.
+Đây là deadline cho công việc AI; truy vấn/lưu dữ liệu và truyền response có thể thêm độ trễ.
+Nginx chờ đọc tối đa 125 giây để chuyển response tại deadline. Client gọi AI cần timeout lớn hơn 120 giây;
+API client web dùng chung hiện vẫn có mặc định 15 giây và chưa có luồng gọi AI.
+
+Theo [Google](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite),
+`gemini-3.5-flash-lite` hỗ trợ tối đa **1.048.576 token đầu vào / 65.536 token đầu ra**.
+Backend gửi `reasoning_effort=high`, `max_tokens=65536`; có thể giảm trần bằng
+`AI_CLIPROXY_MAX_OUTPUT_TOKENS` (1–65536). Đây là mức trần được phép sinh, không yêu cầu model dùng hết.
+Proxy trên server đã trả HTTP 200 cho cả Gemini và `gpt-oss-120b-medium` với hai tham số này;
+kiểm tra ngắn đó không chứng minh proxy cho phép sinh đủ 65.536 token hoặc sử dụng toàn bộ context.
+Response có `finish_reason=length` được đánh dấu `PARTIAL` và không thực thi tool call bị cắt.
+
+Giới hạn lịch sử 20 tin nhắn, nguồn review và số lượt/tool vẫn bảo vệ luồng nghiệp vụ;
+không tự mở rộng đến một triệu token. Quota theo tài khoản, lỗi 429 và độ trễ provider vẫn có thể xảy ra.
+
+### 5.1. Quản lý ngữ cảnh và bộ nhớ trích dẫn (Context Window & Extractive Memory)
+
+Nhằm tuân thủ nguyên tắc xử lý ngữ cảnh dài tự động ở backend mà không bắt người dùng đổi câu hỏi hay mở chat mới:
+- **Nén kết quả tool**: Rút gọn payload tool lớn thành bản ghi tham chiếu (`references`), đánh dấu `evidenceComplete=false`, `fullResultInBackendCard=true` và trích xuất một phần nội dung (`excerpt`).
+- **Chọn lịch sử theo budget**: Giữ nguyên yêu cầu hiện tại, các chỉ dẫn hệ thống và chuỗi gọi tool hợp lệ liền kề; lược bỏ các lượt hội thoại cũ nhất khi chạm trần budget token.
+- **Bộ nhớ trích dẫn (Extractive Memory)**: Khi có lượt hội thoại bị lược bỏ, trích xuất các ràng buộc an toàn (không biết bơi, dị ứng, số lượng khách, ngân sách) và các điều chỉnh mới nhất của người dùng (`sửa lại`, `đổi thành`, `cập nhật`, `thay vì`...). Ưu tiên gọi LLM chọn tối đa 4 ID phát biểu trong 10 giây (với deadline còn lại >= 30 giây); nếu lỗi hoặc chậm, tự động fallback sang trích xuất trực tiếp bằng biểu thức chính quy. Phát biểu sau luôn được sắp xếp theo trình tự thời gian tăng dần và ưu tiên ghi đè phát biểu trước.
+- **Dự phòng budget động cho bộ nhớ**: Hệ thống luôn dành một khoản dự phòng budget cho bộ nhớ ngắn; nếu sau khi ghép trích dẫn bộ nhớ mà tổng kích thước vượt trần, hệ thống tiếp tục loại bỏ thêm lượt hội thoại cũ đang giữ lại để nhường không gian cho các ràng buộc cốt lõi trước khi buộc phải giảm bớt số lượng trích dẫn.
+
