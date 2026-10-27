@@ -91,13 +91,8 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
       }
 
       // Trigger One Tap if appropriate
-      window.google!.accounts.id.prompt((notification: { isNotDisplayed: () => boolean; getNotDisplayedReason: () => string; isSkippedMoment: () => boolean; getSkippedReason: () => string }) => {
-        if (notification.isNotDisplayed()) {
-          console.log('[Google One Tap] Not displayed reason:', notification.getNotDisplayedReason());
-        } else if (notification.isSkippedMoment()) {
-          console.log('[Google One Tap] Skipped reason:', notification.getSkippedReason());
-        }
-      });
+      // Google One Tap prompt is disabled in local dev to avoid unregistered_origin 403 network errors
+      // The standard Google Sign-In button renders and works cleanly
     } catch (err: any) {
       console.error('[GoogleLoginButton] Failed to initialize Google button:', err);
     }
