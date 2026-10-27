@@ -19,8 +19,10 @@ public class AiMessageJpaEntity extends BaseJpaEntity {
     @Enumerated(EnumType.STRING)
     private AiMessageRole role;
 
+    @Column(columnDefinition = "TEXT")
     private String content;
 
+    @Column(columnDefinition = "TEXT")
     private String toolCalls;
 
     @Column(columnDefinition = "TEXT")

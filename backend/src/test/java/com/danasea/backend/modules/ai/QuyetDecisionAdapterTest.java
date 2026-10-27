@@ -85,8 +85,9 @@ class QuyetDecisionAdapterTest {
     }
     @Test @EnabledIfSystemProperty(named = "ai.local.smoke", matches = "true")
     void actualPinnedLocalWorkerExecutesAllSevenTasksThroughJavaAdapter() throws Exception {
-        String key = Files.readString(Path.of(System.getProperty("user.home"), ".cache/danasea/quyet-small/service.key")).trim();
-        var actual = adapter(true, "http://127.0.0.1:8091", key);
+        Path defaultKey = Path.of(System.getProperty("user.home"), ".cache/danasea/quyet-small/service.key");
+        String key = Files.readString(Path.of(System.getProperty("ai.local.key-file", defaultKey.toString()))).trim();
+        var actual = adapter(true, System.getProperty("ai.local.base-url", "http://127.0.0.1:8091"), key);
         for (DecisionTask task : DecisionTask.values()) {
             var result = actual.decide(task, Map.of("message", "Tìm kayak cho 3 người", "content", "Tour kayak có hướng dẫn viên",
                     "review", "Hướng dẫn tốt", "complaint", "Tour đổi giờ", "context", "Du lịch Đà Nẵng", "service", "Kayak", "risk_signals", List.of("FAILED_PAYMENTS")));

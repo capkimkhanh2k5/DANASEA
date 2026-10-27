@@ -2,6 +2,7 @@ package com.danasea.backend.modules.ai;
 
 import com.danasea.backend.modules.ai.application.ports.LlmClientPort;
 import com.danasea.backend.modules.ai.application.ports.ModerationPort;
+import com.danasea.backend.modules.ai.application.ports.AiExecutionBudget;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutor;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutionContext;
 import com.danasea.backend.modules.ai.application.usecases.ChatUseCase;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -93,6 +95,22 @@ public class AssistantChatUseCaseTest {
     // =========================================================================
     // TIER 1: FEATURE COVERAGE (>=5 test cases across R2 & R6 core tools)
     // =========================================================================
+
+    @Test
+    void moderationAndChatShareTwoMinuteBudgetEvenWithoutHttpFilter() {
+        when(moderationPort.isSafe(any())).thenAnswer(invocation -> {
+            assertFalse(AiExecutionBudget.hasTimeFor(Duration.ofSeconds(121)));
+            return true;
+        });
+        when(chatHistoryService.getRecentMessages(conversationId, 20)).thenReturn(List.of());
+        when(llmClientPort.generateResponse(any())).thenAnswer(invocation -> {
+            assertTrue(AiExecutionBudget.hasTimeFor(Duration.ofSeconds(119)));
+            assertFalse(AiExecutionBudget.hasTimeFor(Duration.ofSeconds(121)));
+            var response = new LlmResponse(); response.setContent("OK"); return response;
+        });
+        assertEquals("OK", chatUseCase.processMessage(conversationId, "Xin chào").getContent());
+        assertTrue(AiExecutionBudget.hasTimeFor(Duration.ofSeconds(121)));
+    }
 
     @Test
     void sendsRecentConversationChronologicallyWithSavedTravelContext() {

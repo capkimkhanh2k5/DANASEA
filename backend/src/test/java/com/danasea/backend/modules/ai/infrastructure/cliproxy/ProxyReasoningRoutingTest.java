@@ -48,6 +48,7 @@ class ProxyReasoningRoutingTest {
             assertThat(requests.get(1).path("model").asText()).isEqualTo("gpt-oss-120b-medium");
             for (JsonNode request : requests) {
                 assertThat(request.path("reasoning_effort").asText()).isEqualTo("high");
+                assertThat(request.path("max_tokens").asInt()).isEqualTo(65536);
                 JsonNode messages = request.path("messages");
                 assertThat(messages.size()).isEqualTo(4);
                 assertThat(messages.path(0).path("role").asText()).isEqualTo("system");

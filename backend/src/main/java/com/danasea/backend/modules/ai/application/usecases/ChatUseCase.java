@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -14,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.danasea.backend.modules.ai.application.ports.LlmClientPort;
+import com.danasea.backend.modules.ai.application.ports.AiExecutionBudget;
 import com.danasea.backend.modules.ai.application.ports.ModerationPort;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutionContext;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutor;
@@ -25,6 +25,7 @@ import com.danasea.backend.modules.ai.domain.models.LlmResponse;
 import com.danasea.backend.modules.ai.domain.models.ToolCall;
 import com.danasea.backend.modules.ai.domain.services.AssistantAuditLogService;
 import com.danasea.backend.modules.ai.domain.services.ChatHistoryService;
+import com.danasea.backend.modules.ai.domain.services.TravelQueryParser;
 import com.danasea.backend.modules.ai.infrastructure.persistence.entities.AiMessageJpaEntity;
 import com.danasea.backend.shared.i18n.LocalizedException;
 import com.danasea.backend.shared.i18n.LocalizedMessageService;
@@ -53,6 +54,8 @@ public class ChatUseCase {
     private static final int MAX_USER_MESSAGE_CHARS = 1800;
     private static final int MAX_CHAT_ITERATIONS = 5;
     private static final int DEFAULT_HISTORY_LIMIT = 20;
+    private static final String RESET_CRITERIA_REGEX =
+            ".*\\b(xoa bo loc|bo dieu kien cu|bo tieu chi cu|tim moi hoan toan|bat dau lai|reset|clear filter|clear criteria|new search|start over)\\b.*";
 
     private final LlmClientPort llmClientPort;
     private final ModerationPort moderationPort;
@@ -106,6 +109,13 @@ public class ChatUseCase {
 
     private LlmResponse processMessageInternal(
             UUID conversationId, String userMessageContent, SupportedLanguage language, UUID userId) {
+        try (var budget = AiExecutionBudget.open(AiExecutionBudget.LLM_REQUEST_TIMEOUT, 6)) {
+            return processWithinBudget(conversationId, userMessageContent, language, userId);
+        }
+    }
+
+    private LlmResponse processWithinBudget(
+            UUID conversationId, String userMessageContent, SupportedLanguage language, UUID userId) {
         String effectiveContent = userMessageContent;
         if (effectiveContent != null && effectiveContent.length() > MAX_USER_MESSAGE_CHARS) {
             int maxChars = MAX_USER_MESSAGE_CHARS;
@@ -143,7 +153,10 @@ public class ChatUseCase {
         List<AssistantArtifact> cards = new ArrayList<>();
         AssistantArtifactMapper artifactMapper = new AssistantArtifactMapper(objectMapper);
         ObjectNode state = readContext(conversationId);
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        if (message != null && TravelQueryParser.normalize(message).matches(RESET_CRITERIA_REGEX)) {
+            state.remove("criteria");
+        }
+        long deadline = System.nanoTime() + AiExecutionBudget.remaining(AiExecutionBudget.LLM_REQUEST_TIMEOUT).toNanos();
         int toolCount = 0;
 
         for (int i = 0; i < MAX_CHAT_ITERATIONS && System.nanoTime() < deadline; i++) {
@@ -238,13 +251,75 @@ public class ChatUseCase {
         try {
             if (call.getArguments() == null || call.getArguments().length() > 8000) return call.getArguments();
             if (!(objectMapper.readTree(call.getArguments()) instanceof ObjectNode arguments)) return call.getArguments();
-            ObjectNode criteria = state.path("criteria") instanceof ObjectNode saved ? saved.deepCopy() : objectMapper.createObjectNode();
-            if (arguments.get("criteria") instanceof ObjectNode supplied) {
+            String normalizedMessage = TravelQueryParser.normalize(message);
+            boolean explicitReset = !normalizedMessage.isBlank() && normalizedMessage.matches(RESET_CRITERIA_REGEX);
+            if (explicitReset) {
+                state.remove("criteria");
+            }
+            ObjectNode saved = (!explicitReset && state.path("criteria") instanceof ObjectNode s) ? s : null;
+            ObjectNode criteria = saved != null ? saved.deepCopy() : objectMapper.createObjectNode();
+            ObjectNode supplied = arguments.get("criteria") instanceof ObjectNode sup ? sup : null;
+
+            if (saved != null && message != null && !message.isBlank()) {
+                List<String> savedActivities = TravelQueryParser.includedActivities(saved.path("query").asText(""));
+                String currentQueryCandidate = (supplied != null && supplied.hasNonNull("query"))
+                        ? supplied.get("query").asText() : message;
+                List<String> currentActivities = TravelQueryParser.includedActivities(currentQueryCandidate);
+                boolean switchedActivity = !currentActivities.isEmpty() && !savedActivities.isEmpty()
+                        && Collections.disjoint(savedActivities, currentActivities);
+                if (switchedActivity) {
+                    if (supplied == null || !supplied.hasNonNull("query")) {
+                        criteria.put("query", message);
+                    }
+                    if (supplied == null || !supplied.has("categoryId")) {
+                        criteria.remove("categoryId");
+                    }
+                    if (supplied == null || !supplied.has("interests")) {
+                        criteria.remove("interests");
+                    }
+                }
+            }
+
+            if (supplied != null) {
                 supplied.fields().forEachRemaining(field -> {
                     if (!field.getValue().isNull()) criteria.set(field.getKey(), field.getValue());
                     else criteria.remove(field.getKey());
                 });
             }
+
+            if (saved != null && message != null && !message.isBlank()) {
+                if (supplied == null || !supplied.has("partySize")) {
+                    Integer parsedParty = TravelQueryParser.partySize(message);
+                    if (parsedParty != null) criteria.put("partySize", parsedParty);
+                }
+                if (supplied == null || !supplied.has("totalBudget")) {
+                    java.math.BigDecimal parsedBudget = TravelQueryParser.budget(message);
+                    if (parsedBudget != null) {
+                        if (TravelQueryParser.perPersonBudget(message)) {
+                            int party = Math.max(1, criteria.path("partySize").asInt(1));
+                            parsedBudget = parsedBudget.multiply(java.math.BigDecimal.valueOf(party));
+                        }
+                        criteria.put("totalBudget", parsedBudget);
+                    }
+                }
+                if (supplied == null || (!supplied.has("from") && !supplied.has("to"))) {
+                    try {
+                        java.time.LocalDate[] dates = TravelQueryParser.dates(message);
+                        if (dates[0] != null) {
+                            criteria.put("from", dates[0].toString());
+                            criteria.put("to", (dates[1] != null ? dates[1] : dates[0]).toString());
+                        }
+                    } catch (Exception ignored) { }
+                }
+                if (supplied == null || (!supplied.has("dayStart") && !supplied.has("dayEnd"))) {
+                    try {
+                        java.time.LocalTime[] times = TravelQueryParser.times(message);
+                        if (times[0] != null) criteria.put("dayStart", times[0].toString());
+                        if (times[1] != null) criteria.put("dayEnd", times[1].toString());
+                    } catch (Exception ignored) { }
+                }
+            }
+
             if ("search_services".equals(call.getName()) && arguments.hasNonNull("query")) criteria.set("query", arguments.get("query"));
             if (!criteria.hasNonNull("query")) criteria.put("query", message);
             if (criteria.path("limit").asInt(15) > 15 || !criteria.hasNonNull("limit")) criteria.put("limit", 15);
