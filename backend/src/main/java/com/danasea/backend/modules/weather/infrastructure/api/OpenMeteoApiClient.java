@@ -7,7 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
@@ -17,6 +17,8 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Duration;
+import java.net.http.HttpClient;
+import com.danasea.backend.shared.infrastructure.http.HttpRequestDeadline;
 
 @Slf4j
 @Component
@@ -40,8 +42,8 @@ public class OpenMeteoApiClient {
             String marineBaseUrl,
             boolean applyTimeouts) {
         if (applyTimeouts) {
-            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-            requestFactory.setConnectTimeout(Duration.ofSeconds(5));
+            var requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(5)).build());
             requestFactory.setReadTimeout(Duration.ofSeconds(10));
             this.restClient = restClientBuilder.requestFactory(requestFactory).build();
         } else {
@@ -74,7 +76,7 @@ public class OpenMeteoApiClient {
                 .toUriString();
 
         try {
-            return restClient.get()
+            return HttpRequestDeadline.execute(Duration.ofSeconds(15), () -> restClient.get()
                     .uri(url)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, resp) -> {
@@ -89,7 +91,7 @@ public class OpenMeteoApiClient {
                         log.error("Open-Meteo Weather API server error: {}", resp.getStatusCode());
                         throw new HttpServerErrorException(resp.getStatusCode(), resp.getStatusText());
                     })
-                    .body(OpenMeteoWeatherResponse.class);
+                    .body(OpenMeteoWeatherResponse.class));
         } catch (RestClientResponseException e) {
             log.error("Open-Meteo Weather API error response [{}]: {}", e.getStatusCode(), e.getResponseBodyAsString());
             return null;
@@ -118,7 +120,7 @@ public class OpenMeteoApiClient {
                 .toUriString();
 
         try {
-            return restClient.get()
+            return HttpRequestDeadline.execute(Duration.ofSeconds(15), () -> restClient.get()
                     .uri(url)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, resp) -> {
@@ -133,7 +135,7 @@ public class OpenMeteoApiClient {
                         log.error("Open-Meteo Marine API server error: {}", resp.getStatusCode());
                         throw new HttpServerErrorException(resp.getStatusCode(), resp.getStatusText());
                     })
-                    .body(OpenMeteoMarineResponse.class);
+                    .body(OpenMeteoMarineResponse.class));
         } catch (RestClientResponseException e) {
             log.error("Open-Meteo Marine API error response [{}]: {}", e.getStatusCode(), e.getResponseBodyAsString());
             return null;

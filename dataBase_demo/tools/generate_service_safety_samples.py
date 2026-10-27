@@ -7,7 +7,6 @@ from pathlib import Path
 import hashlib
 import io
 import json
-import textwrap
 import uuid
 from PIL import Image, ImageDraw, ImageFont
 
@@ -24,14 +23,31 @@ def main():
     previous_path=ROOT/'data/service_safety_documents.json'
     previous={r['sqlRow']['id']:r for r in load('service_safety_documents.json')['records']} if previous_path.exists() else {}
     folder=ROOT/'media/service_safety_documents'; folder.mkdir(parents=True,exist_ok=True)
-    font_path=Path('C:/Windows/Fonts/arial.ttf')
-    font=lambda size: ImageFont.truetype(str(font_path),size)
+    font_paths=[Path('C:/Windows/Fonts/arial.ttf'),
+                Path('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),
+                Path('/System/Library/Fonts/Supplemental/Arial.ttf')]
+    def font(size):
+        path=next((p for p in font_paths if p.is_file()),None)
+        if path is None:raise ValueError('Install an Arial or DejaVu Sans font to generate new samples')
+        return ImageFont.truetype(str(path),size)
     records=[]; media=load('media_index.json')['records']
+    accepted_media={m['path']:m for m in media if m['kind']=='service_safety_documents'}
     media=[m for m in media if m['kind']!='service_safety_documents']
     for item in services:
         s=item['sqlRow']; c=categories[s['category_id']]
         if not (s.get('weather_sensitive') is True or c.get('requires_safety_cert') is True):continue
         sid=s['id']; doc_id=str(uuid.uuid5(uuid.NAMESPACE_URL,'danasea:development:service-safety:checklist-v1:'+sid))
+        old=previous.get(doc_id)
+        path=folder/(sid+'.png')
+        if old:
+            assert old['sqlRow']['service_id']==sid, 'Accepted sample service mapping changed'
+            assert old['sqlRow']['status']=='PENDING' and old['sqlRow']['reviewed_at'] is None, 'Do not reset reviewed documents'
+            digest=hashlib.sha256(path.read_bytes()).hexdigest()
+            entry=accepted_media.get(path.relative_to(ROOT).as_posix())
+            assert old['mediaSha256']==digest and entry and entry['sha256']==digest, 'Accepted sample content changed'
+            records.append(old)
+            media.append(entry)
+            continue
         slug=c['slug']
         if any(k in slug for k in ('sup','kayak','luot-song','surf')):
             prompts=['Equipment inspection reference','Route / activity area reference','Guide briefing reference','Participant readiness review entry']

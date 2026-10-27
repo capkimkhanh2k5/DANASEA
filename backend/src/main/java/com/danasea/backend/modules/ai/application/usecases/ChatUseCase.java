@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -14,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.danasea.backend.modules.ai.application.ports.LlmClientPort;
+import com.danasea.backend.modules.ai.application.ports.AiExecutionBudget;
 import com.danasea.backend.modules.ai.application.ports.ModerationPort;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutionContext;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutor;
@@ -106,6 +106,13 @@ public class ChatUseCase {
 
     private LlmResponse processMessageInternal(
             UUID conversationId, String userMessageContent, SupportedLanguage language, UUID userId) {
+        try (var budget = AiExecutionBudget.open(AiExecutionBudget.LLM_REQUEST_TIMEOUT, 6)) {
+            return processWithinBudget(conversationId, userMessageContent, language, userId);
+        }
+    }
+
+    private LlmResponse processWithinBudget(
+            UUID conversationId, String userMessageContent, SupportedLanguage language, UUID userId) {
         String effectiveContent = userMessageContent;
         if (effectiveContent != null && effectiveContent.length() > MAX_USER_MESSAGE_CHARS) {
             int maxChars = MAX_USER_MESSAGE_CHARS;
@@ -143,7 +150,7 @@ public class ChatUseCase {
         List<AssistantArtifact> cards = new ArrayList<>();
         AssistantArtifactMapper artifactMapper = new AssistantArtifactMapper(objectMapper);
         ObjectNode state = readContext(conversationId);
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        long deadline = System.nanoTime() + AiExecutionBudget.remaining(AiExecutionBudget.LLM_REQUEST_TIMEOUT).toNanos();
         int toolCount = 0;
 
         for (int i = 0; i < MAX_CHAT_ITERATIONS && System.nanoTime() < deadline; i++) {

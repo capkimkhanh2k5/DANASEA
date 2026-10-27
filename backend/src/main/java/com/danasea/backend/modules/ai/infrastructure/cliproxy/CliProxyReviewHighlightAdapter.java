@@ -36,7 +36,7 @@ public class CliProxyReviewHighlightAdapter implements ReviewHighlightPort {
             sources.setRole(AiMessageRole.USER);
             sources.setContent(mapper.writeValueAsString(Map.of("reviews", reviews)));
             var response = llm.generateResponse(List.of(instruction, sources), language);
-            if (response == null || response.getContent() == null || response.getToolCalls() != null && !response.getToolCalls().isEmpty()) return List.of();
+            if (response == null || "PARTIAL".equals(response.getResponseStatus()) || response.getContent() == null || response.getToolCalls() != null && !response.getToolCalls().isEmpty()) return List.of();
             var ids = mapper.readTree(response.getContent()).path("reviewIds");
             if (!ids.isArray() || ids.size() > 6) return List.of();
             Set<UUID> allowed = reviews.stream().map(ReviewEvidence::id).collect(Collectors.toSet());

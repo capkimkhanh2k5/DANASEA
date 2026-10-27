@@ -14,6 +14,31 @@ INSTALLER = runpy.run_path(str(ROOT / 'installer/install_demo_data.py'))
 
 
 class PackageContract(unittest.TestCase):
+    def test_current_schema_identity_is_accepted(self):
+        for version in ('41', '42'):
+            with self.subTest(version=version):
+                INSTALLER['validate_identity']({'database': 'danasea_demo_audit', 'schema': 'public',
+                                                'failed': 0, 'flyway': version}, 'danasea_demo_audit')
+
+    def test_unknown_schema_or_foreign_database_is_rejected(self):
+        baseline = {'database': 'danasea_demo_audit', 'schema': 'public', 'failed': 0, 'flyway': '41'}
+        for change in ({'database': 'danasea'}, {'schema': 'private'}, {'failed': 1}, {'flyway': '43'}):
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, 'Database/schema/Flyway mismatch'):
+                INSTALLER['validate_identity'](dict(baseline, **change), 'danasea_demo_audit')
+
+    def test_reviewed_package_matches_manifest(self):
+        INSTALLER['manifest']()
+
+    def test_manifest_rejects_changed_service_data(self):
+        with tempfile.TemporaryDirectory(prefix='danasea_manifest_contract_') as temp:
+            target = Path(temp) / 'dataBase_demo'
+            shutil.copytree(ROOT, target, ignore=shutil.ignore_patterns('runtime', '__pycache__'))
+            service_file = target / 'data/services.json'
+            service_file.write_bytes(service_file.read_bytes() + b' ')
+            installer = runpy.run_path(str(target / 'installer/install_demo_data.py'))
+            with self.assertRaisesRegex(ValueError, 'Manifest mismatch: data/services.json'):
+                installer['manifest']()
+
     def rows(self):
         return {p.stem: [r['sqlRow'] for r in json.loads(p.read_text(encoding='utf8'))['records']]
                 for p in (ROOT / 'data').glob('*.json')

@@ -10,18 +10,20 @@ import com.danasea.backend.modules.ai.domain.services.SystemPromptBuilder;
 import com.danasea.backend.modules.ai.infrastructure.cliproxy.configs.CliProxyProperties;
 import com.danasea.backend.shared.i18n.LocalizedMessageService;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
+import com.danasea.backend.shared.infrastructure.http.HttpRequestDeadline;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
+import java.net.http.HttpClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,13 +34,14 @@ public class CliProxyLlmClient implements LlmClientPort {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final Duration DEFAULT_CONNECT_TIMEOUT = Duration.ofSeconds(5);
-    private static final Duration DEFAULT_READ_TIMEOUT = Duration.ofSeconds(15);
 
     private final RestClient restClient;
     private final AIToolRegistry aiToolRegistry;
     private final String apiKey;
     private final String defaultModel;
     private final String fallbackModel;
+    private final int maxOutputTokens;
+    private final CliProxyContextWindow contextWindow;
 
     private SystemPromptBuilder systemPromptBuilder = new SystemPromptBuilder();
     private LocalizedMessageService localizedMessages = LocalizedMessageService.standalone();
@@ -55,9 +58,9 @@ public class CliProxyLlmClient implements LlmClientPort {
             AIToolRegistry aiToolRegistry,
             CliProxyProperties properties
     ) {
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
-        requestFactory.setReadTimeout(DEFAULT_READ_TIMEOUT);
+        var requestFactory = new JdkClientHttpRequestFactory(HttpClient.newBuilder()
+                .connectTimeout(DEFAULT_CONNECT_TIMEOUT).build());
+        requestFactory.setReadTimeout(AiExecutionBudget.LLM_REQUEST_TIMEOUT);
 
         String baseUrl = properties != null ? properties.sanitizedBaseUrl() : "";
         this.restClient = restClientBuilder
@@ -68,6 +71,12 @@ public class CliProxyLlmClient implements LlmClientPort {
         this.apiKey = properties != null ? properties.apiKey() : null;
         this.defaultModel = properties != null ? properties.model() : null;
         this.fallbackModel = properties != null ? properties.fallbackModel() : null;
+        this.maxOutputTokens = properties != null ? properties.maxOutputTokens() : 65536;
+        var effectiveProperties = properties != null ? properties
+                : new CliProxyProperties(true, baseUrl, apiKey, defaultModel, fallbackModel);
+        var counter = new CliProxyTokenCounter(restClient, apiKey);
+        this.contextWindow = new CliProxyContextWindow(effectiveProperties, counter,
+                new CliProxyHistorySummarizer(restClient, apiKey, effectiveProperties, counter));
     }
 
     public CliProxyLlmClient(
@@ -82,6 +91,11 @@ public class CliProxyLlmClient implements LlmClientPort {
         this.apiKey = apiKey;
         this.defaultModel = defaultModel;
         this.fallbackModel = fallbackModel;
+        this.maxOutputTokens = 65536;
+        var properties = new CliProxyProperties(true, "", apiKey, defaultModel, fallbackModel);
+        var counter = new CliProxyTokenCounter(restClient, apiKey);
+        this.contextWindow = new CliProxyContextWindow(properties, counter,
+                new CliProxyHistorySummarizer(restClient, apiKey, properties, counter));
     }
 
     public String getDefaultModel() {
@@ -100,15 +114,23 @@ public class CliProxyLlmClient implements LlmClientPort {
     @Override
     public LlmResponse generateResponse(List<AiMessage> messages, SupportedLanguage language) {
         SupportedLanguage promptLanguage = language == null ? SupportedLanguage.VI : language;
+        try (var budget = AiExecutionBudget.open(AiExecutionBudget.LLM_REQUEST_TIMEOUT, 6)) {
+            return generateWithinBudget(messages, promptLanguage);
+        }
+    }
+
+    private LlmResponse generateWithinBudget(List<AiMessage> messages, SupportedLanguage promptLanguage) {
         try {
             log.info("Attempting primary CLI Proxy model: {}", defaultModel);
             return callModel(messages, defaultModel, promptLanguage);
         } catch (Exception ex) {
+            if (!AiExecutionBudget.hasTimeFor(Duration.ofMillis(10))) return partial(promptLanguage);
             log.warn("CLI Proxy primary model {} failed ({}). Attempting secondary model {}",
                     defaultModel, ex.getClass().getSimpleName(), fallbackModel);
             try {
                 return callModel(messages, fallbackModel, promptLanguage);
             } catch (Exception fallbackEx) {
+                if (!AiExecutionBudget.hasTimeFor(Duration.ofMillis(10))) return partial(promptLanguage);
                 log.error("CLI Proxy secondary model {} also failed: {}", fallbackModel, fallbackEx.getClass().getSimpleName());
                 throw new CliProxyException(
                         "Both models on CLI Proxy failed. Primary [" + defaultModel
@@ -119,12 +141,7 @@ public class CliProxyLlmClient implements LlmClientPort {
     }
 
     private LlmResponse callModel(List<AiMessage> messages, String model, SupportedLanguage language) {
-        if (!AiExecutionBudget.hasTimeFor(DEFAULT_CONNECT_TIMEOUT.plus(DEFAULT_READ_TIMEOUT))) {
-            LlmResponse timeout = new LlmResponse();
-            timeout.setContent(localizedMessages.get("ai.timeout", language));
-            timeout.setResponseStatus("PARTIAL");
-            return timeout;
-        }
+        if (!AiExecutionBudget.hasTimeFor(Duration.ofMillis(10))) return partial(language);
         if (model == null || model.isBlank()) {
             throw new CliProxyException("CLI Proxy model is not configured");
         }
@@ -167,22 +184,42 @@ public class CliProxyLlmClient implements LlmClientPort {
         CliProxyDto.ChatRequest request = new CliProxyDto.ChatRequest(
                 model,
                 chatMessages,
-                tools.isEmpty() ? null : tools
+                tools.isEmpty() ? null : tools,
+                "high", maxOutputTokens
         );
 
+        final CliProxyContextWindow.Prepared prepared;
         try {
-            CliProxyDto.ChatResponse response = restClient.post()
+            prepared = contextWindow.prepare(request);
+        } catch (CliProxyContextWindow.InputLimitException exception) {
+            int recoveryOutput = Math.min(8192, Math.max(64, request.max_tokens() / 4));
+            if (!model.toLowerCase(java.util.Locale.ROOT).startsWith("gemini-") && recoveryOutput < request.max_tokens()) {
+                var recovery = new CliProxyDto.ChatRequest(model, request.messages(), request.tools(), "high", recoveryOutput);
+                return callPreparedModel(contextWindow.prepare(recovery), model, language);
+            }
+            throw exception;
+        }
+        return callPreparedModel(prepared, model, language);
+    }
+
+    private LlmResponse callPreparedModel(CliProxyContextWindow.Prepared prepared, String model, SupportedLanguage language) {
+        if (!AiExecutionBudget.hasTimeFor(Duration.ofMillis(10))) return partial(language);
+
+        try {
+            CliProxyDto.ChatResponse response = HttpRequestDeadline.execute(AiExecutionBudget.LLM_REQUEST_TIMEOUT, () -> restClient.post()
                     .uri("/chat/completions")
                     .header("Authorization", "Bearer " + apiKey)
-                    .body(request)
+                    .body(prepared.request())
                     .retrieve()
-                    .body(CliProxyDto.ChatResponse.class);
+                    .body(CliProxyDto.ChatResponse.class));
 
             if (response == null || response.choices() == null || response.choices().isEmpty()) {
                 throw new CliProxyException("CLI Proxy returned empty choices for model " + model);
             }
 
-            CliProxyDto.Message msg = response.choices().get(0).message();
+            var choice = response.choices().get(0);
+            if ("length".equals(choice.finish_reason())) return partial(language);
+            CliProxyDto.Message msg = choice.message();
             LlmResponse llmResponse = new LlmResponse();
             llmResponse.setContent(msg.content());
             if (apiKey != null && apiKey.length() >= 4) {
@@ -200,11 +237,18 @@ public class CliProxyLlmClient implements LlmClientPort {
 
             return llmResponse;
         } catch (ResourceAccessException ex) {
-            log.warn("CLI Proxy request timed out (15s) for model {}", model);
+            log.warn("CLI Proxy request timed out within shared request budget for model {}", model);
             throw new CliProxyException("CLI Proxy timeout for model " + model);
         } catch (RestClientResponseException ex) {
             log.warn("CLI Proxy API returned HTTP {} for model {}", ex.getStatusCode().value(), model);
             throw new CliProxyException("CLI Proxy HTTP " + ex.getStatusCode().value() + " for model " + model);
         }
+    }
+
+    private LlmResponse partial(SupportedLanguage language) {
+        LlmResponse response = new LlmResponse();
+        response.setContent(localizedMessages.get("ai.timeout", language));
+        response.setResponseStatus("PARTIAL");
+        return response;
     }
 }
