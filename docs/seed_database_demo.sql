@@ -25,20 +25,20 @@ INSERT INTO categories (id, name, name_en, slug, icon_url, is_active, requires_s
 ('fe49b1a1-6c7f-4eb0-a08f-0d65c02c36d5', 'Thuê kayak', NULL, 'thue-kayak', NULL, TRUE, TRUE, NOW(), NOW())
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, name_en = EXCLUDED.name_en, slug = EXCLUDED.slug, is_active = TRUE, requires_safety_cert = EXCLUDED.requires_safety_cert, updated_at = NOW();
 
--- 2. BẢNG USERS (12 Tài khoản demo: 1 Admin, 9 Vendor, 2 Customer - Mật khẩu: password123)
+-- 2. BẢNG USERS (12 Tài khoản demo: 1 Admin, 9 Vendor, 2 Customer - Mật khẩu: Password123!)
 INSERT INTO users (id, email, password_hash, full_name, phone, role, is_locked, is_email_verified, session_version, locale, created_at, updated_at) VALUES
-('06223bd1-3fae-525c-afc3-4f42943be6e3', 'vender_8@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'Go N Chill SUP Club', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
-('1066fe9e-e4d4-5aa9-9178-84f1d006f75b', 'vender_7@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'DaNaFi – Tour Câu Cá Đà Nẵng', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
-('322173c1-c330-54d9-9d1b-b69c7e480920', 'vender_2@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'Công ty TNHH Kajin Vina', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
-('32797f00-04d0-53fc-b55d-6672984aba55', 'vender_9@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'Surf Shack Da Nang', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
-('3ad7d9af-4d4c-59b7-9897-288fcce5be79', 'vender_3@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'Da Nang Outdoor Adventures (DNOA)', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
-('44d76fc6-fc8b-5031-87ce-2ee2191bd900', 'vender_4@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'Loca Travel Đà Nẵng', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
-('4e428199-0ca1-5e4c-98dd-35d20a52692e', 'vender_6@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'Khuê Nguyễn – Dịch Vụ Câu Mực Đà Nẵng', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
-('5777bfcf-0c5a-5957-a83f-83a3253668e4', 'vender_5@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'Công ty Cổ phần D BLUE', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
-('865a115c-d7f9-5ebd-a36b-1834a590177a', 'vender_1@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'Danabeach Club (Điểm dịch vụ thể thao biển)', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
-('3e3005a7-001a-5d9f-b4ee-993b52a01d61', 'admin_demo@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'DANASEA DEMO Admin', '0905123456', 'ADMIN', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
-('46c8f2ea-2be5-5365-be80-31fd57d9e260', 'customer_1@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'Customer Number 1', '0900000001', 'CUSTOMER', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
-('1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0', 'customer_2@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a', 'Customer Number 2', '0900000002', 'CUSTOMER', FALSE, TRUE, 1, 'vi', NOW(), NOW())
+('06223bd1-3fae-525c-afc3-4f42943be6e3', 'vender_8@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'Go N Chill SUP Club', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
+('1066fe9e-e4d4-5aa9-9178-84f1d006f75b', 'vender_7@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'DaNaFi – Tour Câu Cá Đà Nẵng', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
+('322173c1-c330-54d9-9d1b-b69c7e480920', 'vender_2@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'Công ty TNHH Kajin Vina', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
+('32797f00-04d0-53fc-b55d-6672984aba55', 'vender_9@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'Surf Shack Da Nang', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
+('3ad7d9af-4d4c-59b7-9897-288fcce5be79', 'vender_3@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'Da Nang Outdoor Adventures (DNOA)', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
+('44d76fc6-fc8b-5031-87ce-2ee2191bd900', 'vender_4@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'Loca Travel Đà Nẵng', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
+('4e428199-0ca1-5e4c-98dd-35d20a52692e', 'vender_6@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'Khuê Nguyễn – Dịch Vụ Câu Mực Đà Nẵng', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
+('5777bfcf-0c5a-5957-a83f-83a3253668e4', 'vender_5@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'Công ty Cổ phần D BLUE', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
+('865a115c-d7f9-5ebd-a36b-1834a590177a', 'vender_1@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'Danabeach Club (Điểm dịch vụ thể thao biển)', '0905123456', 'VENDOR', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
+('3e3005a7-001a-5d9f-b4ee-993b52a01d61', 'admin_demo@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'DANASEA DEMO Admin', '0905123456', 'ADMIN', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
+('46c8f2ea-2be5-5365-be80-31fd57d9e260', 'customer_1@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'Customer Number 1', '0900000001', 'CUSTOMER', FALSE, TRUE, 1, 'vi', NOW(), NOW()),
+('1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0', 'customer_2@danasea.test', '$2b$10$3fCoF56b5jsG8q3bUupZg.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB.', 'Customer Number 2', '0900000002', 'CUSTOMER', FALSE, TRUE, 1, 'vi', NOW(), NOW())
 ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role, password_hash = EXCLUDED.password_hash, is_locked = FALSE, is_email_verified = TRUE, updated_at = NOW();
 
 -- 3. BẢNG VENDORS (9 Nhà cung cấp - Kích hoạt APPROVED 100%)
