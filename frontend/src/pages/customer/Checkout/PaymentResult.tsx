@@ -36,7 +36,7 @@ interface OrderSnapshot {
 
 export function PaymentResult() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const { items: cartItems, addItem, clearCart } = useCartStore();
   const [order, setOrder] = useState<OrderSnapshot | null>(null);
   const [savedTicketId, setSavedTicketId] = useState<string | null>(null);

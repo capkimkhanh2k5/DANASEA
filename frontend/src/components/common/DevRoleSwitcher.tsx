@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useLoadingStore } from '../../store/useLoadingStore';
+import { authService } from '../../services/authService';
 import type { Role } from '../../types';
 
 export function DevRoleSwitcher() {
@@ -71,10 +72,38 @@ export function DevRoleSwitcher() {
     },
   };
 
-  const handleSelectRole = (key: 'customer' | 'vendor' | 'admin', path: string) => {
+  const handleSelectRole = async (key: 'customer' | 'vendor' | 'admin', path: string) => {
     const targetName = key === 'admin' ? 'Cổng Quản Trị Viên' : key === 'vendor' ? 'Cổng Đối Tác Vendor' : 'Cổng Trải Nghiệm Du Khách';
     triggerDemoLoading(850, `Đang kết nối ${targetName}...`, 'Tải dữ liệu phân hệ và cấu hình quyền hạn');
-    switchRole(key);
+
+    const creds = {
+      customer: { email: 'customer@danasea.vn', password: 'password123' },
+      vendor: { email: 'vendor@danasea.vn', password: 'password123' },
+      admin: { email: 'admin@danasea.vn', password: 'password123' },
+    }[key];
+
+    try {
+      const res = await authService.login(creds);
+      useAuthStore.getState().setAuth(
+        {
+          id: res.userId,
+          email: res.email,
+          fullName: res.role === 'ADMIN' ? 'Quản Trị Viên Danasea' : res.role === 'VENDOR' ? 'Công Ty Biển Xanh Danasea' : 'Nguyễn Văn Khách',
+          role: res.role,
+          avatarUrl: '',
+          isEmailVerified: true,
+          isLocked: false,
+          passwordHash: '',
+          phone: '',
+          locale: 'vi',
+        },
+        res.accessToken
+      );
+    } catch (err) {
+      console.warn('[DevRoleSwitcher] Không thể đăng nhập API thật, fallback mock:', err);
+      switchRole(key);
+    }
+
     setIsOpen(false);
     navigate(path);
   };
@@ -130,7 +159,7 @@ export function DevRoleSwitcher() {
                   Chuyển nhanh phân hệ
                 </h4>
                 <p className="font-label-sm text-[10px] text-outline">
-                  Mật khẩu mặc định: <span className="font-mono font-bold text-on-surface">123456</span>
+                  Mật khẩu mặc định: <span className="font-mono font-bold text-on-surface">password123</span>
                 </p>
               </div>
             </div>

@@ -1,36 +1,68 @@
+export type MasterOrderStatus =
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'PARTIALLY_COMPLETED'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type SubOrderStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'REJECTED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'REFUNDED'
+  | 'PARTIALLY_REFUNDED'
+  | 'CHECKED_IN'
+  | 'IN_PROGRESS';
+
 export interface CreateOrderRequest {
   bookingId: string;
   discountCode?: string;
 }
 
 export interface SubOrderResponse {
-  id?: string;
+  id: string;
   subOrderId?: string;
   vendorId?: string;
-  serviceId?: string;
+  serviceId: string;
   slotId?: string;
-  quantity?: number;
-  unitPrice?: number;
-  subtotalAmount?: number;
-  status?: string;
+  quantity: number;
+  unitPrice: number;
+  subtotalAmount: number;
+  status: SubOrderStatus | string;
+  discountAmount?: number;
+  finalAmount?: number;
   waiverRequired?: boolean;
   waiverVersion?: number;
   waiverContent?: string;
   waiverLanguage?: string;
   waiverFallbackUsed?: boolean;
   waiverAccepted?: boolean;
+  waiverAcceptedAt?: string;
+  waiverAcceptedBy?: string;
+  waiverAcceptedLanguage?: string;
+  cancellationPolicyVersion?: string;
+  // UI enrichment fields (joined from service catalog/slots if needed)
+  serviceName?: string;
+  serviceThumbnail?: string;
+  serviceLocation?: string;
+  vendorName?: string;
+  slotDate?: string;
+  slotTime?: string;
 }
 
 export interface OrderResponse {
   id: string;
   customerId?: string;
   bookingId?: string;
-  status: string;
+  status: MasterOrderStatus | string;
   totalAmount: number;
   discountAmount?: number;
   finalAmount?: number;
-  createdAt?: string;
-  items?: SubOrderResponse[];
+  createdAt: string;
+  updatedAt?: string;
+  items: SubOrderResponse[];
   subOrders?: SubOrderResponse[];
 }
 
@@ -108,4 +140,88 @@ export interface PaymentResponse {
   amount: number;
   status: string;
   createdAt: string;
+}
+
+export interface SubOrderCancellationPreview {
+  subOrderId: string;
+  serviceId: string;
+  slotId: string;
+  departureTime?: string;
+  originalAmount: number;
+  refundPercentage: number;
+  refundAmount: number;
+  policyApplied: string;
+}
+
+export interface CancellationPreviewResponse {
+  orderId: string;
+  originalAmount: number;
+  refundPercentage: number;
+  refundAmount: number;
+  policyApplied: string;
+  items: SubOrderCancellationPreview[];
+}
+
+export type RefundReason =
+  | 'CUSTOMER_REQUEST'
+  | 'CUSTOMER_CANCEL'
+  | 'WEATHER'
+  | 'VENDOR_FAULT'
+  | 'SYSTEM_FAULT'
+  | 'ADMIN_OVERRIDE'
+  | 'DISPUTE'
+  | 'COMPENSATION';
+
+export interface RefundRequest {
+  reason?: RefundReason;
+}
+
+export interface RefundResponse {
+  id?: string;
+  refundId?: string;
+  subOrderId: string;
+  amount: number;
+  percentage?: number;
+  refundPercentage?: number;
+  reason: string;
+  status: string;
+  provider?: string;
+  providerRefundId?: string;
+  providerTransactionId?: string;
+  processedAt?: string;
+  createdAt?: string;
+  lastError?: string;
+}
+
+export interface OrderReceiptItemResponse {
+  subOrderId: string;
+  serviceName: string;
+  serviceNameEn?: string;
+  quantity: number;
+  unitPrice: number;
+  subtotalAmount: number;
+  discountAmount: number;
+  finalAmount: number;
+  departureTime?: string;
+  vendorName?: string;
+  locationName?: string;
+}
+
+export interface OrderReceiptResponse {
+  orderId: string;
+  orderCode: string;
+  receiptCode: string;
+  customerId: string;
+  totalAmount: number;
+  discountAmount: number;
+  status: string;
+  paidAt?: string;
+  paymentProvider?: string;
+  items: OrderReceiptItemResponse[];
+}
+
+export interface QrCodeResponse {
+  subOrderId: string;
+  qrToken: string;
+  expiresAt: string;
 }

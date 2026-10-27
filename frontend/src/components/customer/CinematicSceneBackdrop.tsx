@@ -162,7 +162,7 @@ export const CinematicSceneBackdrop: React.FC = () => {
     };
   }, []);
 
-  const activeScene = IMAGE_SCENES.find((s) => s.id === activeSceneId) || IMAGE_SCENES[0];
+  const _activeScene = IMAGE_SCENES.find((s) => s.id === activeSceneId) || IMAGE_SCENES[0];
 
   return (
     <>
