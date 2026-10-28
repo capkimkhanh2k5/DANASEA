@@ -35,6 +35,7 @@ export function Orders() {
   const [qrData, setQrData] = useState<QrCodeResponse | null>(null);
   const [qrLoading, setQrLoading] = useState<boolean>(false);
   const [qrError, setQrError] = useState<string | null>(null);
+  const [copiedToken, setCopiedToken] = useState<boolean>(false);
 
   // Cancellation Preview Modal state
   const [cancellationOrder, setCancellationOrder] = useState<OrderResponse | null>(null);
@@ -965,13 +966,41 @@ export function Orders() {
                 )}
 
                 {!qrLoading && !qrError && qrData && (
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(
-                      qrData.qrToken
-                    )}`}
-                    alt="QR Check-in"
-                    className="w-64 h-64 sm:w-72 sm:h-72 mx-auto rounded-xl shadow-sm bg-white p-2.5"
-                  />
+                  <div className="flex flex-col items-center gap-3">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(
+                        qrData.qrToken
+                      )}`}
+                      alt="QR Check-in"
+                      className="w-64 h-64 sm:w-72 sm:h-72 mx-auto rounded-xl shadow-sm bg-white p-2.5"
+                    />
+                    <div className="w-full max-w-sm bg-cyan-50/90 border border-cyan-200 rounded-xl p-2.5 text-left flex items-center justify-between gap-2 shadow-xs">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-[10px] font-bold text-cyan-800 uppercase tracking-wider block">Mã Token Check-in:</span>
+                        <span className="text-[11px] font-mono text-cyan-950 truncate block select-all" title={qrData.qrToken}>
+                          {qrData.qrToken}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(qrData.qrToken);
+                          setCopiedToken(true);
+                          setTimeout(() => setCopiedToken(false), 2000);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer flex-shrink-0 ${
+                          copiedToken
+                            ? "bg-emerald-600 text-white"
+                            : "bg-cyan-600 hover:bg-cyan-700 text-white shadow-xs"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">
+                          {copiedToken ? "check" : "content_copy"}
+                        </span>
+                        <span>{copiedToken ? "Đã copy!" : "Copy mã"}</span>
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
 
