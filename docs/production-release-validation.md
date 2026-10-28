@@ -1,10 +1,10 @@
 # Production CI/CD validation — 2026-10-28
 
-> **Current scope after FE handoff:** the owner requested removing all hardening changes under `frontend/`. That directory now matches main `d0bda178ec4624aa2d5167a18c240258bdf9cfcd`. Fresh checks on the restored FE report **16 ESLint errors, 35 warnings** (strict lint exit 1), a passing TypeScript/Vite build, npm audit with 0 vulnerabilities, and **3 HIGH image findings across 2 CVEs** (image scan exit 1). See [the FE handoff](FE_CICD_HANDOFF.md) for every location and acceptance criteria. CI remains blocking. The earlier FE/browser/image/rehearsal successes below are historical evidence for the pre-withdrawal implementation, not current release acceptance. No production-ready or full-green claim applies to the current branch.
+> **Current scope:** the owner has now authorized fixing frontend issues directly and removing the former FE handoff. FE source/image fixes are restored. Fresh strict lint reports zero errors/warnings, TypeScript/Vite build and npm audit pass, and the rebuilt FE image has zero HIGH/CRITICAL findings. Earlier withdrawal/failure results below are historical checkpoints. The complete PR gate and host activation still require their own evidence.
 
 Scope: local implementation on `codex/production-cicd-hardening`, started from main `870a1264609a70c86212772917e5fe203d003571` and integrated main `d0bda178ec4624aa2d5167a18c240258bdf9cfcd` locally. Frontend lint/build/image/rehearsal and release-tooling checks were repeated after integration; backend/worker code and tests were unchanged by it. This is measured local evidence, not an assertion that the new controls are active on production.
 
-## Historical checks before FE withdrawal
+## Earlier implementation checks
 
 - Backend: `./mvnw -B clean verify` passed; 2,647 cases, 0 failures, 0 errors, 138 allowlisted skips, 2,509 executed. The report gate confirmed all 6 required classes. Flash Sale HTTP cases exercise all 33 owned service-option fixtures on disposable PostgreSQL 17/Redis, including hold/cancel behavior.
 - Deployment tooling: 43 unittests passed. These use real SSH signatures and the real deployment shell, with simulated external deployment commands. Cases cover tampering, immutable SHA bindings, stale history, migration rollback rejection, backup/acceptance/outage failures, policy app directory and isolated rehearsal resources.
@@ -13,7 +13,7 @@ Scope: local implementation on `codex/production-cicd-hardening`, started from m
 - Worker: 7 boundary tests passed inside the new runtime image. All 7 pinned CPU HTTP inference tasks returned 200 without warnings. This validates execution and contracts, not semantic quality.
 - Workflow/shell/source: actionlint, Bash syntax, isolated Ruff and `git diff --check` passed. Trivy source vulnerability/secret and worker lock dependency checks passed.
 
-## Historical images before FE withdrawal
+## Earlier built images
 
 All three images were built locally on Docker Desktop Linux arm64. Trivy 0.76.1 reported 0 HIGH/CRITICAL vulnerabilities across the detected OS and application package inventories. No vulnerability ignore list was added. CycloneDX SBOMs were generated for each actual image. Build-time packages outside runtime images are outside these runtime findings.
 
@@ -23,7 +23,7 @@ All three images were built locally on Docker Desktop Linux arm64. Trivy 0.76.1 
 
 Scanner database snapshot: vulnerability DB updated 2026-10-28 01:21 UTC; Java DB updated 2026-10-28 01:07 UTC. Findings can change as databases and dependencies change.
 
-## Historical Compose rehearsal before FE withdrawal
+## Earlier Compose rehearsal
 
 The final three local images completed the release rehearsal in **59.51 seconds**. The rehearsal restored a custom PostgreSQL archive into a random temporary database, preserved an existing marker across migration, started the real backend/frontend/worker/proxy stack, verified public catalog and unauthenticated rejection, invoked actual model inference, and registered/authenticated a synthetic user to hold a booking and create/read an order. All five signed-promotion evidence flags were true. Cleanup removed only the randomized project resources. Baseline SHA was empty (fresh database); this does not establish an actual historical production upgrade or production downtime.
 
@@ -31,7 +31,7 @@ The final three local images completed the release rehearsal in **59.51 seconds*
 
 One fresh review identified four material issues. All were corrected: production named volumes/environment leakage in rehearsal, Python application import on worker startup, candidate configuration not extracted from the exact SHA, and installer app directory ignored by the forced-command wrapper. Isolation and custom-directory regressions pass; the rebuilt worker starts and executes native inference; actionlint validates the exact-SHA extraction workflow.
 
-Before FE withdrawal, latest-main integration exposed 4 additional ESLint errors and 6 warnings and they were corrected without rule exceptions. These FE corrections were subsequently removed at the owner's request. The service-edit form also no longer refetches and overwrites editable fields whenever its category changes, and the detail page retains its locale subscription after the keyed-route refactor.
+Before FE withdrawal, latest-main integration exposed 4 additional ESLint errors and 6 warnings and they were corrected without rule exceptions. They were temporarily removed at the owner's request and have now been restored under the latest instruction. The service-edit form also no longer refetches and overwrites editable fields whenever its category changes, and the detail page retains its locale subscription after the keyed-route refactor.
 
 ## Production activation still required
 
@@ -47,7 +47,7 @@ No remote push was performed: `docs/GIT_PUSH_PRINCIPLES.md` requires an explicit
 
 The owner requires one backup before each deployment attempt and at most seven retained archives. The draft periodic backup service/timer and installer schedule have been removed. The latest archive is always retained, older archives rotate only after successful verification, and a legacy retention setting above seven is capped. No server schedule or production backup was modified during this local change.
 
-Verification of the backup correction: all 48 release-tooling unittests passed; isolated Ruff, actionlint, Bash syntax and diff whitespace checks passed. The real deploy-shell harness confirms exactly one backup call before image pull/service update. Retention tests exercise real archive/metadata files, with only Docker dump/restore boundaries simulated. Existing frontend lint/image blockers remain assigned to Role FE.
+Verification of the backup correction: all 48 release-tooling unittests passed; isolated Ruff, actionlint, Bash syntax and diff whitespace checks passed. The real deploy-shell harness confirms exactly one backup call before image pull/service update. Retention tests exercise real archive/metadata files, with only Docker dump/restore boundaries simulated. Frontend lint/image blockers were delegated at that checkpoint; that temporary delegation is superseded.
 
 ## Local production server recheck
 
@@ -63,8 +63,22 @@ The production database is approximately 11.1 MiB. `PLATFORM_COMMISSION_RATE` ha
 
 The installer was corrected to validate configuration before updating helpers and to adopt the healthy legacy release before atomically replacing the forced command. A failed validation/adoption preserves the existing deploy entrypoint. The deploy account must be non-root. Four new Linux-container installer regressions cover these transitions without changing the author's machine or production server.
 
-Pre-push verification after the local-server recheck: 52/52 release-tooling tests passed, including four Linux-container installer regressions; Ruff, actionlint, Bash syntax and source vulnerability/secret checks passed. Fresh frontend production build and npm audit passed; the built authentication page rendered with zero captured console errors. Frontend sources still exactly match main and their separately documented lint/image blockers remain unresolved. Operator authorized pushing the hardening branch; production deployment/host installation remains unperformed. The last actual successful home-server deployment matching the running release is CD run `40446270790`; do not adopt the newer build-only run as deployment evidence.
+Pre-push verification after the local-server recheck: 52/52 release-tooling tests passed, including four Linux-container installer regressions; Ruff, actionlint, Bash syntax and source vulnerability/secret checks passed. Fresh frontend production build and npm audit passed; the built authentication page rendered with zero captured console errors. Frontend still matched main at that checkpoint; the latest instruction now permits source fixes. Operator authorized pushing the hardening branch; production deployment/host installation remains unperformed. The last actual successful home-server deployment matching the running release is CD run `40446270790`; do not adopt the newer build-only run as deployment evidence.
 
 The live PostgreSQL server reports version 17.11, compatible with the pinned PostgreSQL 17 image family. The existing backup directory contains seven legacy gzip archives. A first-transition retention regression now ensures legacy application archives and new verified dumps share the same seven-snapshot limit when that directory is reused. Unrelated files remain untouched.
 
-The first GitHub PR run passed all 52 deployment-tooling tests and the seven-task CPU worker job. Source scanning stopped at Maven Central HTTP 429 rather than treating unavailable evidence as a pass. The quality job now waits for backend verification and restores its Maven cache before resolving POMs for Trivy. Frontend lint/image gates remain assigned to Role FE.
+The first GitHub PR run passed all 52 deployment-tooling tests and the seven-task CPU worker job. Source scanning stopped at Maven Central HTTP 429 rather than treating unavailable evidence as a pass. The quality job now waits for backend verification and restores its Maven cache before resolving POMs for Trivy. Frontend failures in that run belonged to the temporary unmodified-FE state; FE is now being fixed directly.
+
+## Frontend correction restored under the latest instruction
+
+The owner authorized fixing FE directly and deleting its former handoff report. The source corrections fix the original 16 ESLint errors and 35 warnings without rule suppression. They preserve route/locale updates, explicitly initialize derived state, retain request loading/retry behavior, type HTTP errors and Google callbacks, and avoid service-detail fetch dependencies that caused refetch loops. The service-edit form loads categories separately from the service so changing category does not overwrite unsaved fields.
+
+Fresh strict lint has zero errors/warnings; TypeScript/Vite build and npm audit pass. The rebuilt pinned frontend runtime was scanned again with Trivy: zero HIGH/CRITICAL findings, with no vulnerability ignore list. The source still builds non-root Nginx and retains configurable Google client ID handling. The removed FE handoff has no remaining links in current documentation.
+
+Browser smoke used an owned disposable Compose project and synthetic customer/vendor accounts. Customer login and the real created order rendered, service detail rendered with availability, changing language refetched the detail view, the vendor service form retained an unsaved edited name after selecting a different category, and the vendor schedule displayed the seeded slot. No payment or production write was performed. The HTTP loopback browser setup needed a temporary proxy adaptation because the production backend correctly rejects an HTTP CORS origin; production CORS policy/source files were not weakened. A missing external weather result returned a handled 404 in the synthetic environment and was logged by the existing weather widget; these checks are not a zero-console-error assertion for every page or proof of external weather-provider availability.
+
+Fresh FE image: `sha256:328ca4da64c7c4c868c051880d107f19786e805de7cf0e5090c814b38d172e58`, scanned `2026-10-28T16:05:58.17171+07:00`.
+
+The preceding GitHub run passed the complete backend Maven/report gate, the native seven-task worker job, backend/worker image scans and deployment/source quality checks. Its only remaining failures were the then-unmodified frontend lint/image jobs, which this correction now addresses.
+
+After browser inspection, the unmodified release-rehearsal entrypoint was run again against the final images and passed in 52.72 seconds. Restore verification, existing-data preservation, booking/order and native worker flags were all true; only owned temporary resources were removed. This clean run did not use the browser-only loopback proxy adaptation. The local deployment-tooling suite also passed all 53 tests after restoring FE.

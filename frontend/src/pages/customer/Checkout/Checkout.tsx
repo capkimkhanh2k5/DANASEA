@@ -17,7 +17,6 @@ export function Checkout() {
 
   // Booking Hold State
   const [bookingHold, setBookingHold] = useState<BookingHoldResponse | null>(null);
-  const [_isHolding, setIsHolding] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(900); // 15 minutes default
   const [sessionCode] = useState(() => Math.floor(10000 + Math.random() * 90000));
 
@@ -53,14 +52,14 @@ export function Checkout() {
     }
   }, [items, navigate, isProcessingPayment]);
 
-  // Sync user info if auth updates
-  useEffect(() => {
-    if (user) {
-      if (user.fullName) setFullName(user.fullName);
-      if (user.phone) setPhone(user.phone);
-      if (user.email) setEmail(user.email);
-    }
-  }, [user]);
+  // Update editable defaults only when the authenticated user object changes.
+  const [previousUser, setPreviousUser] = useState(user);
+  if (user !== previousUser) {
+    setPreviousUser(user);
+    if (user?.fullName) setFullName(user.fullName);
+    if (user?.phone) setPhone(user.phone);
+    if (user?.email) setEmail(user.email);
+  }
 
   // Request backend slot hold on mount
   const holdRequestedRef = useRef<boolean>(false);
@@ -81,7 +80,6 @@ export function Checkout() {
     const allUuids = holdItems.every((item) => validUuidRegex.test(item.slotId));
 
     if (allUuids && isAuthenticated) {
-      setIsHolding(true);
       bookingService
         .holdBooking({ items: holdItems })
         .then((res) => {
@@ -96,9 +94,6 @@ export function Checkout() {
         })
         .catch((err) => {
           console.warn('[Checkout] Không thể giữ chỗ qua API, dùng chế độ giữ chỗ cục bộ:', err);
-        })
-        .finally(() => {
-          setIsHolding(false);
         });
     }
   }, [items, isAuthenticated]);
@@ -298,7 +293,7 @@ export function Checkout() {
           
           // Save order snapshot for Step 3 (PaymentResult) when returning from VNPay gateway
           const orderSnapshot = {
-            orderCode: `DNS-${sessionCode || Math.floor(10000 + Math.random() * 90000)}`,
+            orderCode: `DNS-${sessionCode}`,
             customerName: fullName.trim() || "Khách Hàng DANASEA",
             customerPhone: phone.trim() || "0912 345 678",
             customerEmail: email.trim() || "khachhang@danasea.vn",
@@ -325,7 +320,7 @@ export function Checkout() {
             paidAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' • ' + new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
           };
           sessionStorage.setItem('danasea_last_order', JSON.stringify(orderSnapshot));
-          window.location.href = gatewayUrl;
+          window.location.assign(gatewayUrl);
           return;
         } else {
           setIsProcessingPayment(false);

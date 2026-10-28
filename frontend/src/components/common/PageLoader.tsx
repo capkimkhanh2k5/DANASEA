@@ -20,20 +20,21 @@ export function PageLoader() {
   // 2. Liquid Wave Progress Animation
   useEffect(() => {
     if (!isLoading) {
-      setProgress(0);
-      setIsExiting(false);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       return;
     }
 
-    setProgress(0);
-    setIsExiting(false);
     startTimeRef.current = null;
 
+    let holdTimer: ReturnType<typeof setTimeout>;
+    let exitTimer: ReturnType<typeof setTimeout>;
     const targetDuration = Math.max(durationMs || 2200, 1400);
 
     const step = (timestamp: number) => {
-      if (!startTimeRef.current) startTimeRef.current = timestamp;
+      if (!startTimeRef.current) {
+        startTimeRef.current = timestamp;
+        setIsExiting(false);
+      }
       const elapsed = timestamp - startTimeRef.current;
       const currentProgress = Math.min(100, (elapsed / targetDuration) * 100);
 
@@ -43,9 +44,9 @@ export function PageLoader() {
         rafRef.current = requestAnimationFrame(step);
       } else {
         // Hold at 100% for 250ms so user admires the fully filled logo, then smoothly fade out
-        setTimeout(() => {
+        holdTimer = setTimeout(() => {
           setIsExiting(true);
-          setTimeout(() => {
+          exitTimer = setTimeout(() => {
             hideLoader();
             setIsExiting(false);
             setProgress(0);
@@ -58,6 +59,8 @@ export function PageLoader() {
 
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      clearTimeout(holdTimer);
+      clearTimeout(exitTimer);
     };
   }, [isLoading, durationMs, hideLoader]);
 

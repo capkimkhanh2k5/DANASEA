@@ -1,6 +1,6 @@
 # Production releases and recovery
 
-Current implementation status: frontend corrections were delegated to Role FE and removed from this branch. Its CI lint and frontend image gates are currently blocking; use [the FE handoff](FE_CICD_HANDOFF.md) before promoting a release.
+Current implementation status: the owner authorized fixing frontend issues directly. Source corrections and the hardened frontend image have been restored; the former FE handoff file was removed. Lint/build/image gates remain mandatory.
 
 ## Release contract
 
@@ -98,6 +98,6 @@ CI/CD use signed, namespace-validated digest manifests instead of local image na
 3. Use **Settings → Environments → production**, with **Protected branches only**. Configure `SERVER_TAILSCALE_IP`, `SERVER_USER`, `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` as environment secrets. Preserve existing operator access and use the same CI keypair for SSH and release signing. Do not paste credentials into chat or issue/PR comments.
 4. Private repositories require a supported GitHub plan for branch/environment restrictions. If GitHub shows an upgrade requirement, the account owner must resolve the plan; this change does not upgrade billing or publish the repository. Environment approval/reviewer features have separate plan restrictions.
 5. Keep accepted GHCR image digests available and verify that the existing deployment user can pull them. The local server's current operator/wrapper configuration and existing backup directory can be reused; the one-time signed-protocol update above remains required. No public SSH port or additional hosted server is required: the GitHub runner connects through Tailscale OAuth and strict-host-key SSH.
-6. Role FE must resolve the lint/image findings in `FE_CICD_HANDOFF.md`; the owner must configure the actual commission policy. After CI is green, repository/environment checks pass and the forced command supports the signed protocol, enable `PRODUCTION_DEPLOY_ENABLED=true` for the deliberately prepared release. On the first transition, re-run CI for the reviewed main commit if it was merged while deployment was disabled. Normal deployment is triggered by a successful main push CI run; manual dispatch is reserved for an explicit rollback.
+6. All frontend lint/build/image checks must pass; the owner must configure the actual commission policy. After CI is green, repository/environment checks pass and the forced command supports the signed protocol, enable `PRODUCTION_DEPLOY_ENABLED=true` for the deliberately prepared release. On the first transition, re-run CI for the reviewed main commit if it was merged while deployment was disabled. Normal deployment is triggered by a successful main push CI run; manual dispatch is reserved for an explicit rollback.
 
 Official references: [branch protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/managing-a-branch-protection-rule), [deployment environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).

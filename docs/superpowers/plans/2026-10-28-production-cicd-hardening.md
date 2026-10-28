@@ -1,6 +1,6 @@
 # Production CI/CD Hardening Implementation Plan
 
-> Scope update, 2026-10-28: the owner delegated all `frontend/` changes to Role FE. They have been restored to main; the current frontend has 16 ESLint errors, 35 warnings and 3 HIGH image findings (2 CVEs). CI is intentionally still blocking. Historical frontend/rehearsal success below does not apply after that withdrawal. See `docs/FE_CICD_HANDOFF.md`.
+> Scope update, 2026-10-28: the owner authorized fixing frontend issues directly and deleting the former FE handoff. Strict lint/build/image checks remain required; the earlier temporary withdrawal is superseded.
 
 > **For agentic workers:** Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
@@ -50,7 +50,7 @@ Files: backend/src/test/.../flashsale/*, scripts/check_test_reports.py, scripts/
 - [x] Capture current lint and Flash Sale failures; add report-gate failure tests.
 - [x] Give Flash Sale suites PostgreSQL 17/Redis Testcontainers, remove stale schema-version assumptions, enforce critical-suite execution and worker tests.
 - [x] Run Maven verify and worker tests.
-- [ ] Role FE: fix source lint and frontend image findings, validate build/runtime, then rerun integration. Former FE fixes have been removed at the owner's request.
+- [x] Restore and verify frontend source/image fixes, exercise affected UI flows, remove the former FE handoff and submit the correction to PR CI.
 
 ### Task 4: Immutable builds and security gates
 
@@ -96,4 +96,6 @@ Current frontend verification after withdrawal: strict lint exits 1 (16 errors, 
 
 Backup scope correction (2026-10-28): one restore-verified backup before each deploy attempt; maximum seven retained archives, no periodic schedule. Removed draft systemd service/timer and their installer setup. Added retention regression coverage, including latest-archive preservation and failed-verification preservation.
 
-Backup correction verified: 48/48 scripts tests, Ruff, actionlint and Bash syntax pass. The deployment harness checks exactly one backup before service mutation; frontend remains unchanged and delegated.
+Backup correction verified: 48/48 scripts tests, Ruff, actionlint and Bash syntax pass. The deployment harness checks exactly one backup before service mutation; frontend was still delegated at that checkpoint; the latest scope update supersedes it.
+
+Final FE correction: strict lint has zero errors/warnings, build/npm audit and actual image scan pass; browser smoke confirms customer/vendor login, order/detail views, locale refresh, unsaved service fields surviving category changes and schedule loading. The clean final Compose rehearsal passed in 52.72 seconds. Full PR CI is rerun for the updated head before claiming overall success.
