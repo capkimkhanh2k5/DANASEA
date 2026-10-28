@@ -1,0 +1,185 @@
+{
+  "classification": "DEVELOPMENT_SYNTHETIC",
+  "records": [
+    {
+      "sqlRow": {
+        "id": "10f8ffc5-e987-592f-9d38-426ad7f97066",
+        "address": "83 Nguyễn Xuân Khoát, Phường An Hải, Thành phố Đà Nẵng, Việt Nam",
+        "user_id": "44d76fc6-fc8b-5031-87ce-2ee2191bd900",
+        "tax_code": "TEST-DS-006",
+        "bank_name": "BIDV",
+        "badge_tier": "NONE",
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "rating_avg": "0.00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "verified_at": null,
+        "verified_by": null,
+        "rating_count": 0,
+        "business_name": "Loca Travel Đà Nẵng",
+        "bank_account_holder": "DANASEA DEMO VENDOR 04",
+        "bank_account_number": "621140119996",
+        "verification_status": "PENDING"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "128672c5-94e7-5560-896c-158794913b8c",
+        "address": "179 Nguyễn Sắc Kim, Cẩm Lệ, Đà Nẵng",
+        "user_id": "5777bfcf-0c5a-5957-a83f-83a3253668e4",
+        "tax_code": "0401802233",
+        "bank_name": "BIDV",
+        "badge_tier": "NONE",
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "rating_avg": "0.00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "verified_at": null,
+        "verified_by": null,
+        "rating_count": 0,
+        "business_name": "Công ty Cổ phần D BLUE",
+        "bank_account_holder": "DANASEA DEMO VENDOR 05",
+        "bank_account_number": "622440868686",
+        "verification_status": "PENDING"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "2680f19f-8b5a-5aa8-8474-cb13e2ff1c22",
+        "address": "Cảng cá Thọ Quang, Phường Thọ Quang, Quận Sơn Trà, TP. Đà Nẵng",
+        "user_id": "4e428199-0ca1-5e4c-98dd-35d20a52692e",
+        "tax_code": "TEST-DS-009",
+        "bank_name": "ACB",
+        "badge_tier": "NONE",
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "rating_avg": "0.00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "verified_at": null,
+        "verified_by": null,
+        "rating_count": 0,
+        "business_name": "Khuê Nguyễn – Dịch Vụ Câu Mực Đà Nẵng",
+        "bank_account_holder": "DANASEA DEMO VENDOR 06",
+        "bank_account_number": "1974197426",
+        "verification_status": "PENDING"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "27afde91-58fd-5daa-b9fa-7f93f00135f0",
+        "address": "51 Võ Nguyên Giáp, Phường Mỹ An, Quận Ngũ Hành Sơn, TP. Đà Nẵng",
+        "user_id": "865a115c-d7f9-5ebd-a36b-1834a590177a",
+        "tax_code": "TEST-DS-001",
+        "bank_name": "VPBank",
+        "badge_tier": "NONE",
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "rating_avg": "0.00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "verified_at": null,
+        "verified_by": null,
+        "rating_count": 0,
+        "business_name": "Danabeach Club (Điểm dịch vụ thể thao biển)",
+        "bank_account_holder": "DANASEA DEMO VENDOR 01",
+        "bank_account_number": "6969696163",
+        "verification_status": "PENDING"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "5a53c8e5-3a76-5383-b104-17b22d4af50f",
+        "address": "33 An Thượng 4, Phường Mỹ An, Quận Ngũ Hành Sơn, TP. Đà Nẵng",
+        "user_id": "32797f00-04d0-53fc-b55d-6672984aba55",
+        "tax_code": "TEST-DS-034",
+        "bank_name": "VPBank",
+        "badge_tier": "NONE",
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "rating_avg": "0.00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "verified_at": null,
+        "verified_by": null,
+        "rating_count": 0,
+        "business_name": "Surf Shack Da Nang",
+        "bank_account_holder": "DANASEA DEMO VENDOR 09",
+        "bank_account_number": "797979683863",
+        "verification_status": "PENDING"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "5fb18fee-16fd-5b9f-bcbd-759b47768d9b",
+        "address": "Vùng biển bán đảo Sơn Trà, Quận Sơn Trà, TP. Đà Nẵng",
+        "user_id": "1066fe9e-e4d4-5aa9-9178-84f1d006f75b",
+        "tax_code": "TEST-DS-013",
+        "bank_name": "Vietcombank",
+        "badge_tier": "NONE",
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "rating_avg": "0.00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "verified_at": null,
+        "verified_by": null,
+        "rating_count": 0,
+        "business_name": "DaNaFi – Tour Câu Cá Đà Nẵng",
+        "bank_account_holder": "DANASEA DEMO VENDOR 07",
+        "bank_account_number": "00700797976",
+        "verification_status": "PENDING"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "631db4cf-1ec4-5b06-8f98-56abcf3406d0",
+        "address": "35 An Thượng 5, Phường Mỹ An, Quận Ngũ Hành Sơn, TP. Đà Nẵng",
+        "user_id": "3ad7d9af-4d4c-59b7-9897-288fcce5be79",
+        "tax_code": "TEST-DS-004",
+        "bank_name": "ACB",
+        "badge_tier": "NONE",
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "rating_avg": "0.00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "verified_at": null,
+        "verified_by": null,
+        "rating_count": 0,
+        "business_name": "Da Nang Outdoor Adventures (DNOA)",
+        "bank_account_holder": "DANASEA DEMO VENDOR 03",
+        "bank_account_number": "127273899",
+        "verification_status": "PENDING"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "baea9605-392b-5003-93f1-60f2c0582f65",
+        "address": "53 Chính Hữu, P. An Hải, TP. Đà Nẵng",
+        "user_id": "322173c1-c330-54d9-9d1b-b69c7e480920",
+        "tax_code": "0402177261",
+        "bank_name": "Techcombank",
+        "badge_tier": "NONE",
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "rating_avg": "0.00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "verified_at": null,
+        "verified_by": null,
+        "rating_count": 0,
+        "business_name": "Công ty TNHH Kajin Vina",
+        "bank_account_holder": "DANASEA DEMO VENDOR 02",
+        "bank_account_number": "69986999999999",
+        "verification_status": "PENDING"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c7dcff25-f5dc-5fee-a719-5c23b6a899cb",
+        "address": "Đường Hoàng Sa, Phường Mân Thái, Quận Sơn Trà, TP. Đà Nẵng",
+        "user_id": "06223bd1-3fae-525c-afc3-4f42943be6e3",
+        "tax_code": "TEST-DS-025",
+        "bank_name": "Vietcombank",
+        "badge_tier": "NONE",
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "rating_avg": "0.00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "verified_at": null,
+        "verified_by": null,
+        "rating_count": 0,
+        "business_name": "Go N Chill SUP Club",
+        "bank_account_holder": "DANASEA DEMO VENDOR 08",
+        "bank_account_number": "00700648686",
+        "verification_status": "PENDING"
+      }
+    }
+  ]
+}

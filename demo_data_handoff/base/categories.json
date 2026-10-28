@@ -1,0 +1,173 @@
+{
+  "classification": "DEVELOPMENT_SYNTHETIC",
+  "records": [
+    {
+      "sqlRow": {
+        "id": "a0000001-0000-0000-0000-000000000001",
+        "name": "Chèo SUP & Kayak",
+        "slug": "cheo-sup-kayak",
+        "name_en": "Stand-Up Paddleboarding & Kayak",
+        "icon_url": "surfing",
+        "is_active": true,
+        "parent_id": null,
+        "created_at": "2026-10-02T11:16:37.440183+00:00",
+        "updated_at": "2026-10-02T11:16:37.440183+00:00",
+        "requires_safety_cert": true
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "a0000001-0000-0000-0000-000000000002",
+        "name": "Lặn ngắm san hô & Đi bộ dưới biển",
+        "slug": "lan-ngam-san-ho",
+        "name_en": "Scuba Diving & Seawalker",
+        "icon_url": "scuba_diving",
+        "is_active": true,
+        "parent_id": null,
+        "created_at": "2026-10-02T11:16:37.440183+00:00",
+        "updated_at": "2026-10-02T11:16:37.440183+00:00",
+        "requires_safety_cert": true
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "a0000001-0000-0000-0000-000000000003",
+        "name": "Cano lướt sóng & Dù bay biển",
+        "slug": "cano-du-bay",
+        "name_en": "Speedboat & Parasailing",
+        "icon_url": "speed",
+        "is_active": true,
+        "parent_id": null,
+        "created_at": "2026-10-02T11:16:37.440183+00:00",
+        "updated_at": "2026-10-02T11:16:37.440183+00:00",
+        "requires_safety_cert": true
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "a0000001-0000-0000-0000-000000000004",
+        "name": "Mô tô nước (Jetski)",
+        "slug": "mo-to-nuoc-jetski",
+        "name_en": "Jetski Rental",
+        "icon_url": "waves",
+        "is_active": true,
+        "parent_id": null,
+        "created_at": "2026-10-02T11:16:37.440183+00:00",
+        "updated_at": "2026-10-02T11:16:37.440183+00:00",
+        "requires_safety_cert": true
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "a0000001-0000-0000-0000-000000000005",
+        "name": "Trượt phao chuối cảm giác mạnh",
+        "slug": "truot-phao-chuoi",
+        "name_en": "Banana Boat Ride",
+        "icon_url": "sports_kabaddi",
+        "is_active": true,
+        "parent_id": null,
+        "created_at": "2026-10-02T11:16:37.440183+00:00",
+        "updated_at": "2026-10-02T11:16:37.440183+00:00",
+        "requires_safety_cert": true
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "0647f498-72e0-46ba-9192-a833e238e41e",
+        "name": "Câu cá biển",
+        "slug": "cau-ca-bien",
+        "name_en": null,
+        "icon_url": null,
+        "is_active": false,
+        "parent_id": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "requires_safety_cert": true
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "52ced236-bce3-4044-9a4f-ca3559e24cfb",
+        "name": "Câu mực đêm",
+        "slug": "cau-muc-dem",
+        "name_en": null,
+        "icon_url": null,
+        "is_active": false,
+        "parent_id": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "requires_safety_cert": true
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "762dff4f-cdd4-49fd-8e19-a9c99c2752de",
+        "name": "Thuê SUP",
+        "slug": "thue-sup",
+        "name_en": null,
+        "icon_url": null,
+        "is_active": false,
+        "parent_id": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "requires_safety_cert": true
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "b6d82a0f-ebbd-4d26-8363-17599c90e058",
+        "name": "Học lướt sóng",
+        "slug": "hoc-luot-song",
+        "name_en": null,
+        "icon_url": null,
+        "is_active": false,
+        "parent_id": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "requires_safety_cert": true
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "bab1c632-d82a-452a-8230-2028a67fac31",
+        "name": "Surf tour có hướng dẫn",
+        "slug": "surf-tour-co-huong-dan",
+        "name_en": null,
+        "icon_url": null,
+        "is_active": false,
+        "parent_id": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "requires_safety_cert": true
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c00581cc-26dd-4dc2-a87d-2590f76943f3",
+        "name": "Thuê ván lướt sóng",
+        "slug": "thue-van-luot-song",
+        "name_en": null,
+        "icon_url": null,
+        "is_active": false,
+        "parent_id": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "requires_safety_cert": true
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "fe49b1a1-6c7f-4eb0-a08f-0d65c02c36d5",
+        "name": "Thuê kayak",
+        "slug": "thue-kayak",
+        "name_en": null,
+        "icon_url": null,
+        "is_active": false,
+        "parent_id": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "requires_safety_cert": true
+      }
+    }
+  ]
+}

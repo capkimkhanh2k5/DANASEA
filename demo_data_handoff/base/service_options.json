@@ -1,0 +1,500 @@
+{
+  "classification": "DEVELOPMENT_SYNTHETIC",
+  "records": [
+    {
+      "sqlRow": {
+        "id": "08af741d-d70b-57bd-a24f-5112c98f8dce",
+        "name": "Bay đơn",
+        "price": "650000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "3758c297-54ff-5887-89bd-62220227570b",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": 1
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "094124bc-010a-5f99-aa01-3029650c953b",
+        "name": "Giá mỗi người khi nhóm 2",
+        "price": "500000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "9f4eb04d-9ec6-5295-8de6-475b728e5cfc",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "16c5d241-bd1c-51cc-963b-9a57dcb29608",
+        "name": "Giá mỗi người khi nhóm 3–4",
+        "price": "400000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "9f4eb04d-9ec6-5295-8de6-475b728e5cfc",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "1f9ba83b-e8e3-5a45-bc2f-83bd0021f804",
+        "name": "Bay đôi",
+        "price": "900000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "c4c56ae2-5f9b-555c-81f1-f0d4c8dd7c1b",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": 2
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "1fe768ef-2dd7-5c9a-90d3-4379ca7f91ea",
+        "name": "Theo khách",
+        "price": "800000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "5943ecd7-6480-5b4a-b42b-43abc0988776",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "28a24ce4-5a63-5656-b736-fe9946a853f5",
+        "name": "Kayak đơn – kỳ thuê cần xác nhận",
+        "price": "150000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "bf8626cd-2271-59ab-9273-4fdd10eb451e",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "2942f332-cac2-5e68-be94-a3d013ffb760",
+        "name": "Một xe – tối đa 2 khách",
+        "price": "650000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "2cdfabcf-13a2-550a-8f9e-283aad7053c9",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": 2
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "2f870294-6c15-5ca8-a77f-8b1113da8680",
+        "name": "Bay đôi",
+        "price": "950000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "3758c297-54ff-5887-89bd-62220227570b",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": 2
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "3b3501db-38bc-5fa8-8d8d-2d7a6378ebea",
+        "name": "Phao chuối – nhóm tối đa 5 khách",
+        "price": "1000000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "fd6fced2-812e-56ce-817f-80bb3d0841e9",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": 5
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "5333de67-ab14-55f5-8ef3-2fec7fceffcf",
+        "name": "Vé một người có bữa tối – chờ xác nhận",
+        "price": "550000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "dab42f5f-e61d-5ebf-811d-34ab8d293143",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "6473d417-abbf-5402-bb54-be6b76992d0d",
+        "name": "Giá mỗi người khi nhóm 1",
+        "price": "600000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "9f4eb04d-9ec6-5295-8de6-475b728e5cfc",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "6843099a-4900-5299-8755-d30ee0812569",
+        "name": "Theo khách",
+        "price": "650000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "a6f4ab9c-4794-542b-a443-e3013e6bbe47",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "68b6ba94-dbd7-578c-91d1-cae0a17b536d",
+        "name": "Bay đơn",
+        "price": "650000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "c4c56ae2-5f9b-555c-81f1-f0d4c8dd7c1b",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": 1
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "734547ef-1427-5ffd-95c9-36be5611af21",
+        "name": "Bay đôi",
+        "price": "950000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "4190046d-112a-5b93-beb2-bcc8b1cd16d4",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": 2
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "7e3cafbc-eefb-5999-8bad-3f05ead10f3c",
+        "name": "Nguyên cano – tối đa 8 khách",
+        "price": "8000000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": 8
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "8581ae13-d5c4-502b-a70b-4c7a801a17e7",
+        "name": "Theo khách",
+        "price": "450000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "57c22a43-22fd-57da-894c-257ade02450d",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "87d24e66-ef2e-556c-be51-d430855a8c17",
+        "name": "Theo khách",
+        "price": "350000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "9b3444ce-b7c7-5f40-9f14-2c1ca4258dea",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "8c1234ea-4a66-5297-9162-0ac9c8241e0a",
+        "name": "Bay đơn",
+        "price": "650000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "4190046d-112a-5b93-beb2-bcc8b1cd16d4",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": 1
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "8c9b3d13-76f5-51e5-a640-48104413d399",
+        "name": "Một xe – tối đa 2 khách",
+        "price": "650000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "088d874c-a61e-5b58-a7a9-497f32a56901",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": 2
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "9fa50461-6a11-5553-82e9-72bec31d153a",
+        "name": "Mold & Epoxy – 1 giờ",
+        "price": "130000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "4b79c4cd-a138-59ca-83c3-d396c1208ac4",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "a692c601-4e70-50b7-97fc-329302505875",
+        "name": "SUP – 1 giờ",
+        "price": "140000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "160e67fc-f236-5871-9971-5555cf855d02",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "ac6642a8-3fe5-58be-a12b-92396f5fa0db",
+        "name": "Theo khách",
+        "price": "350000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "d51355fc-bf7e-5366-b199-6272efe7f52b",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "ae3c385b-c09e-51f8-aca3-70ac78154a40",
+        "name": "Special – 1 giờ",
+        "price": "170000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "4b79c4cd-a138-59ca-83c3-d396c1208ac4",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "cf0532f4-2a70-5a8f-ae98-ad1ca966ee31",
+        "name": "Một người lớn – giá tham chiếu đơn",
+        "price": "1100000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "1dd26db5-f863-5b03-b562-ac46f43df9d2",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "d037d098-2916-5fe1-99e2-12c10cadad3d",
+        "name": "Phao chuối – nhóm tối đa 5 khách",
+        "price": "1000000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "83ee83c5-c08b-5f6e-924e-db3ceaacd364",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": 5
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "dc4d38e8-60ed-5c95-bb8d-3b656b6e6b2a",
+        "name": "Theo khách",
+        "price": "850000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "6d4249fe-a82b-5537-a712-818b23c177d2",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "df00d944-166d-5c36-b842-2b04782f8c04",
+        "name": "Thuê ván – kỳ thuê cần xác nhận",
+        "price": "120000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "508d4dad-4227-527b-9df3-8416dd870c04",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "e2803a6c-76ea-5d4e-96d5-ba230ef97808",
+        "name": "Kayak đôi – kỳ thuê cần xác nhận",
+        "price": "250000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "bf8626cd-2271-59ab-9273-4fdd10eb451e",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "ecc12b01-fecb-5a1c-936d-521937f55233",
+        "name": "Theo khách",
+        "price": "150000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "cd0c7a8d-b0b8-579a-968c-a1783174a0fc",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "ecede796-0160-5454-82e0-62fa6e432cf9",
+        "name": "Một người lớn",
+        "price": "720000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "9b575c51-196b-56eb-940e-aaf2f61c966f",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "ef1020ae-0120-52ec-8e71-5830729dcfab",
+        "name": "Vé một người",
+        "price": "750000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "5536f743-3b6d-518e-af2b-05634a218195",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "f5f3da2f-2f4c-5cb0-b9ac-b31d83eabac8",
+        "name": "Soft board – 1 giờ",
+        "price": "110000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "4b79c4cd-a138-59ca-83c3-d396c1208ac4",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "PRIVATE",
+        "pricing_unit": "PER_PACKAGE",
+        "max_pax_per_package": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "fba453f8-0ed6-5d11-bcd4-36830f1d1150",
+        "name": "Một trẻ từ 7 tuổi – cần xác nhận độ tuổi",
+        "price": "550000.00",
+        "status": "INACTIVE",
+        "benefits": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "service_id": "9b575c51-196b-56eb-940e-aaf2f61c966f",
+        "updated_at": "2026-10-15T09:06:26.816505+00:00",
+        "option_type": "SHARED",
+        "pricing_unit": "PER_PERSON",
+        "max_pax_per_package": null
+      }
+    }
+  ]
+}
