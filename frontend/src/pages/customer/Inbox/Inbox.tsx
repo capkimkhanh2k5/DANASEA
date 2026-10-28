@@ -1,9 +1,38 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { notificationService } from "../../../services/notificationService";
+import type { NotificationResponse } from "../../../types/notification";
 
 export function Inbox() {
   const [activeTab, setActiveTab] = useState("messages");
-  const [activeChat, setActiveChat] = useState<number | null>(1);
+  const [_activeChat, setActiveChat] = useState<number | null>(1);
   const [showOrder, setShowOrder] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    const run = async () => {
+      await Promise.resolve();
+      if (ignore) return;
+      if (activeTab === "notifications") {
+        setLoadingNotifs(true);
+        try {
+          const res = await notificationService.getMyNotifications(0, 50);
+          if (!ignore) setNotifications(res.content || []);
+        } catch {
+          // ignore
+        } finally {
+          if (!ignore) setLoadingNotifs(false);
+        }
+      }
+    };
+    run();
+    return () => {
+      ignore = true;
+    };
+  }, [activeTab]);
+
 
   return (
     <main className="w-full pt-20 bg-surface min-h-screen">
@@ -556,235 +585,101 @@ export function Inbox() {
               className="w-full flex flex-col gap-space-2xl"
               id="view-notifications"
             >
-              {/* Section: Hôm nay */}
               <div className="flex flex-col gap-space-md">
-                <div className="flex items-center gap-space-sm">
-                  <span className="w-2 h-6 rounded-full bg-primary"></span>
-                  <h2 className="font-headline-md text-headline-md text-on-surface">
-                    Hôm nay
-                  </h2>
-                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm">
-                    2 thông báo
-                  </span>
-                </div>
-                <div className="flex flex-col gap-space-sm">
-                  {/* Notif 1: Cập nhật lịch khởi hành (Sea Schedule / Weather) */}
-                  <div className="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-space-lg">
-                    <div className="flex items-start gap-space-lg">
-                      <div className="w-12 h-12 rounded-xl bg-primary text-on-primary flex items-center justify-center shrink-0 shadow-sm">
-                        <span className="material-symbols-outlined text-[26px]">
-                          sailing
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-space-xs">
-                        <div className="flex items-center gap-space-sm flex-wrap">
-                          <span className="px-2 py-0.5 rounded-md bg-primary-fixed-dim text-on-primary-fixed-variant font-label-sm text-label-sm font-bold">
-                            LỊCH KHỞI HÀNH &amp; SÓNG BIỂN
-                          </span>
-                          <span className="font-label-sm text-label-sm text-on-surface-variant">
-                            Vừa xong (10:15)
-                          </span>
-                        </div>
-                        <h3 className="font-headline-sm text-headline-sm text-on-surface">
-                          Điều kiện hải văn thuận lợi cho chuyến Lặn Biển Bán
-                          Đảo Sơn Trà ngày mai
-                        </h3>
-                        <p className="font-body-md text-body-md text-on-surface-variant max-w-3xl">
-                          Dự báo độ cao sóng tại Bãi Bụt dao động 0.4m - 0.6m,
-                          tầm nhìn dưới nước đạt 12 mét, độ mặn tối ưu. Huấn
-                          luyện viên trưởng câu lạc bộ đã xác nhận tour
-                          #DNS-89412 khởi hành đúng 08:00 sáng mai.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="shrink-0 flex items-center self-start md:self-center">
-                      <a
-                        className="px-space-lg py-space-sm rounded-xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg transition-colors flex items-center gap-1 shadow-sm"
-                        href="/"
-                      >
-                        <span>Xem chi tiết lịch đón</span>
-                        <span className="material-symbols-outlined text-[18px]">
-                          arrow_forward
-                        </span>
-                      </a>
-                    </div>
-                  </div>
-                  {/* Notif 2: Xác nhận thanh toán & Vé điện tử (Order Success) */}
-                  <div className="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-space-lg">
-                    <div className="flex items-start gap-space-lg">
-                      <div className="w-12 h-12 rounded-xl bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0 shadow-sm">
-                        <span className="material-symbols-outlined text-[26px]">
-                          confirmation_number
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-space-xs">
-                        <div className="flex items-center gap-space-sm flex-wrap">
-                          <span className="px-2 py-0.5 rounded-md bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm font-bold">
-                            ĐƠN HÀNG THÀNH CÔNG
-                          </span>
-                          <span className="font-label-sm text-label-sm text-on-surface-variant">
-                            08:20 Sáng
-                          </span>
-                        </div>
-                        <h3 className="font-headline-sm text-headline-sm text-on-surface">
-                          Đã xuất E-ticket dịch vụ thể thao biển #SUB-89412-01
-                        </h3>
-                        <p className="font-body-md text-body-md text-on-surface-variant max-w-3xl">
-                          Thanh toán qua VNPAY-QR thành công số tiền 1.780.000 đ
-                          cho trải nghiệm Lặn biển ngắm rạn san hô Sơn Trà. Mã
-                          QR Check-in điện tử đã sẵn sàng để quét tại cầu cảng.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="shrink-0 flex items-center self-start md:self-center">
-                      <a
-                        className="px-space-lg py-space-sm rounded-xl bg-surface-container-low hover:bg-surface-container text-primary font-label-lg text-label-lg transition-colors flex items-center gap-1 shadow-sm"
-                        href="/"
-                      >
-                        <span>Xem chi tiết đơn #SUB-89412-01</span>
-                        <span className="material-symbols-outlined text-[18px]">
-                          open_in_new
-                        </span>
-                      </a>
-                    </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-space-sm">
+                    <span className="w-2 h-6 rounded-full bg-primary"></span>
+                    <h2 className="font-headline-md text-headline-md text-on-surface">
+                      Thông báo từ hệ thống & Nhà cung cấp
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm font-bold">
+                      {notifications.length} thông báo
+                    </span>
                   </div>
                 </div>
-              </div>
-              {/* Section: Tuần này */}
-              <div className="flex flex-col gap-space-md">
-                <div className="flex items-center gap-space-sm">
-                  <span className="w-2 h-6 rounded-full bg-tertiary"></span>
-                  <h2 className="font-headline-md text-headline-md text-on-surface">
-                    Tuần này
-                  </h2>
-                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm">
-                    3 thông báo
-                  </span>
-                </div>
-                <div className="flex flex-col gap-space-sm">
-                  {/* Notif 3: Khuyến mãi đặc quyền (Promotion) */}
-                  <div className="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-space-lg">
-                    <div className="flex items-start gap-space-lg">
-                      <div className="w-12 h-12 rounded-xl bg-primary-container text-on-primary-container flex items-center justify-center shrink-0 shadow-sm">
-                        <span className="material-symbols-outlined text-[26px]">
-                          local_activity
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-space-xs">
-                        <div className="flex items-center gap-space-sm flex-wrap">
-                          <span className="px-2 py-0.5 rounded-md bg-tertiary-fixed text-on-tertiary-fixed font-label-sm text-label-sm font-bold">
-                            ƯU ĐÃI ĐỘC QUYỀN MÙA THU
-                          </span>
-                          <span className="font-label-sm text-label-sm text-on-surface-variant">
-                            15/10/2025
-                          </span>
-                        </div>
-                        <h3 className="font-headline-sm text-headline-sm text-on-surface">
-                          Tặng Voucher 150.000 đ trải nghiệm Chèo SUP đón bình
-                          minh Mân Thái
-                        </h3>
-                        <p className="font-body-md text-body-md text-on-surface-variant max-w-3xl">
-                          Dành riêng cho Thành viên Vàng Nguyễn Văn An. Áp dụng
-                          ngay khi đặt tour chèo SUP ngắm bình minh và thưởng
-                          thức cafe biển cùng các câu lạc bộ tại bãi biển Mân
-                          Thái, Sơn Trà.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="shrink-0 flex items-center self-start md:self-center">
-                      <a
-                        className="px-space-lg py-space-sm rounded-xl bg-surface-container-low hover:bg-surface-container text-primary font-label-lg text-label-lg transition-colors flex items-center gap-1 shadow-sm"
-                        href="/"
-                      >
-                        <span>Xem chi tiết trải nghiệm</span>
-                        <span className="material-symbols-outlined text-[18px]">
-                          arrow_forward
-                        </span>
-                      </a>
-                    </div>
+
+                {loadingNotifs && (
+                  <div className="p-12 text-center bg-white rounded-2xl border border-slate-200">
+                    <span className="material-symbols-outlined text-primary text-[36px] animate-spin">progress_activity</span>
+                    <p className="text-xs text-slate-500 mt-2 font-medium">Đang tải thông báo từ hệ thống...</p>
                   </div>
-                  {/* Notif 4: Thay đổi giờ hoạt động / Cập nhật an toàn hàng hải */}
-                  <div className="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-space-lg">
-                    <div className="flex items-start gap-space-lg">
-                      <div className="w-12 h-12 rounded-xl bg-surface-container-highest text-on-surface-variant flex items-center justify-center shrink-0 shadow-sm">
-                        <span className="material-symbols-outlined text-[26px]">
-                          security_update_good
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-space-xs">
-                        <div className="flex items-center gap-space-sm flex-wrap">
-                          <span className="px-2 py-0.5 rounded-md bg-surface-container-high text-on-surface font-label-sm text-label-sm font-bold">
-                            QUY ĐỊNH AN TOÀN BÃI BIỂN
-                          </span>
-                          <span className="font-label-sm text-label-sm text-on-surface-variant">
-                            14/10/2025
-                          </span>
-                        </div>
-                        <h3 className="font-headline-sm text-headline-sm text-on-surface">
-                          Quy chuẩn phao cứu sinh tự động và flycam ghi hình năm
-                          2025
-                        </h3>
-                        <p className="font-body-md text-body-md text-on-surface-variant max-w-3xl">
-                          Ban Quản lý Bán đảo Sơn Trà và các Bãi biển du lịch Đà
-                          Nẵng chính thức đưa vào áp dụng thiết bị định vị GPS
-                          cá nhân gắn trên áo phao cho tất cả du khách tham gia
-                          lặn biển và lướt sóng.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="shrink-0 flex items-center self-start md:self-center">
-                      <a
-                        className="px-space-lg py-space-sm rounded-xl bg-surface-container-low hover:bg-surface-container text-primary font-label-lg text-label-lg transition-colors flex items-center gap-1 shadow-sm"
-                        href="/"
-                      >
-                        <span>Xem hướng dẫn an toàn</span>
-                        <span className="material-symbols-outlined text-[18px]">
-                          verified_user
-                        </span>
-                      </a>
-                    </div>
+                )}
+
+                {!loadingNotifs && notifications.length === 0 && (
+                  <div className="p-12 text-center bg-white rounded-2xl border border-slate-200">
+                    <span className="material-symbols-outlined text-slate-400 text-[40px]">notifications_off</span>
+                    <p className="text-sm text-slate-600 mt-2 font-semibold">Hiện bạn chưa có thông báo mới.</p>
                   </div>
-                  {/* Notif 5: Hoàn tất trải nghiệm & Đánh giá dịch vụ */}
-                  <div className="bg-surface-container-lowest p-space-lg rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-space-lg">
-                    <div className="flex items-start gap-space-lg">
-                      <div className="w-12 h-12 rounded-xl bg-secondary-fixed text-secondary flex items-center justify-center shrink-0 shadow-sm">
-                        <span className="material-symbols-outlined text-[26px]">
-                          hotel_class
-                        </span>
-                      </div>
-                      <div className="flex flex-col gap-space-xs">
-                        <div className="flex items-center gap-space-sm flex-wrap">
-                          <span className="px-2 py-0.5 rounded-md bg-secondary-fixed-dim text-on-secondary-fixed-variant font-label-sm text-label-sm font-bold">
-                            ĐÁNH GIÁ TRẢI NGHIỆM
-                          </span>
-                          <span className="font-label-sm text-label-sm text-on-surface-variant">
-                            12/10/2025
-                          </span>
+                )}
+
+                {!loadingNotifs && notifications.length > 0 && (
+                  <div className="flex flex-col gap-space-sm">
+                    {notifications.map((notif) => {
+                      const isProposal = notif.type === "RESCHEDULE_PROPOSAL" || notif.type === "DISRUPTION_DECISION";
+                      return (
+                        <div
+                          key={notif.id}
+                          className={`p-space-lg rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-space-lg border ${
+                            isProposal
+                              ? "bg-amber-50/70 border-amber-300"
+                              : "bg-surface-container-lowest border-slate-200"
+                          }`}
+                        >
+                          <div className="flex items-start gap-space-lg">
+                            <div
+                              className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${
+                                isProposal
+                                  ? "bg-amber-500 text-white"
+                                  : "bg-primary text-on-primary"
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[26px]">
+                                {isProposal ? "edit_calendar" : "notifications"}
+                              </span>
+                            </div>
+                            <div className="flex flex-col gap-space-xs">
+                              <div className="flex items-center gap-space-sm flex-wrap">
+                                <span
+                                  className={`px-2 py-0.5 rounded-md font-label-sm text-label-sm font-bold ${
+                                    isProposal
+                                      ? "bg-amber-200 text-amber-900"
+                                      : "bg-primary-fixed-dim text-on-primary-fixed-variant"
+                                  }`}
+                                >
+                                  {isProposal ? "ĐỀ XUẤT ĐỔI CA" : "THÔNG BÁO"}
+                                </span>
+                                <span className="font-label-sm text-label-sm text-on-surface-variant font-mono">
+                                  {new Date(notif.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} • {new Date(notif.createdAt).toLocaleDateString("vi-VN")}
+                                </span>
+                              </div>
+                              <h3 className="font-headline-sm text-headline-sm text-on-surface font-bold">
+                                {notif.title}
+                              </h3>
+                              <p className="font-body-md text-body-md text-on-surface-variant max-w-3xl">
+                                {notif.body}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="shrink-0 flex items-center self-start md:self-center">
+                            <Link
+                              to="/profile/orders"
+                              className={`px-space-lg py-space-sm rounded-xl font-label-lg text-label-lg transition-colors flex items-center gap-1 shadow-sm ${
+                                isProposal
+                                  ? "bg-amber-600 hover:bg-amber-700 text-white"
+                                  : "bg-primary hover:bg-primary-container text-on-primary"
+                              }`}
+                            >
+                              <span>Xem đơn & Phản hồi</span>
+                              <span className="material-symbols-outlined text-[18px]">
+                                arrow_forward
+                              </span>
+                            </Link>
+                          </div>
                         </div>
-                        <h3 className="font-headline-sm text-headline-sm text-on-surface">
-                          Trải nghiệm Dù lượn ngắm toàn cảnh biển Mỹ Khê của bạn
-                          như thế nào?
-                        </h3>
-                        <p className="font-body-md text-body-md text-on-surface-variant max-w-3xl">
-                          Đơn hàng #DNS-77109 cùng đơn vị SkyFly đã hoàn tất.
-                          Chia sẻ hình ảnh và nhận xét chuyến bay để tích lũy
-                          500 điểm thưởng Thể Thao Biển DANASEA.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="shrink-0 flex items-center self-start md:self-center">
-                      <a
-                        className="px-space-lg py-space-sm rounded-xl bg-secondary-container hover:bg-secondary text-on-secondary-container hover:text-on-secondary font-label-lg text-label-lg transition-colors flex items-center gap-1 shadow-sm"
-                        href="/"
-                      >
-                        <span>Đánh giá &amp; Nhận 500 điểm</span>
-                        <span className="material-symbols-outlined text-[18px]">
-                          rate_review
-                        </span>
-                      </a>
-                    </div>
+                      );
+                    })}
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}

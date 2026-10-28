@@ -1,8 +1,10 @@
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useCartStore } from "../../store/useCartStore";
 import { useWishlistStore } from "../../store/useWishlistStore";
 import { useLanguageStore } from "../../store/useLanguageStore";
+import { notificationService } from "../../services/notificationService";
 
 export function Header() {
   const location = useLocation();
@@ -12,6 +14,29 @@ export function Header() {
   const cartItemCount = useCartStore((state) => state.getTotalItems());
   const wishlistCount = useWishlistStore((state) => state.wishlistIds.length);
   const { language, setLanguage, t } = useLanguageStore();
+
+  
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  useEffect(() => {
+    let ignore = false;
+    const fetchUnread = async () => {
+      await Promise.resolve();
+      if (ignore) return;
+      if (!isAuthenticated) {
+        setUnreadNotifs(0);
+        return;
+      }
+      const count = await notificationService.getUnreadCount();
+      if (!ignore) setUnreadNotifs(count);
+    };
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000);
+    return () => {
+      ignore = true;
+      clearInterval(interval);
+    };
+  }, [isAuthenticated]);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -116,6 +141,22 @@ export function Header() {
                 <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-secondary text-on-secondary font-label-sm text-[10px] flex items-center justify-center leading-none">{cartItemCount}</span>
               )}
             </Link>
+
+            {isAuthenticated && (
+              <Link
+                to="/inbox"
+                aria-label="Thông báo"
+                title="Thông báo và Đề xuất đổi ca"
+                className="relative w-10 h-10 rounded-full flex items-center justify-center bg-surface-container-low text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">notifications</span>
+                {unreadNotifs > 0 && (
+                  <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white font-label-sm text-[10px] font-bold flex items-center justify-center leading-none shadow-sm animate-pulse">
+                    {unreadNotifs > 9 ? "9+" : unreadNotifs}
+                  </span>
+                )}
+              </Link>
+            )}
           </div>
           
           <div className="hidden md:flex items-center gap-space-xs">

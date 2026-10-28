@@ -5,12 +5,15 @@ import { orderService } from "../../../services/orderService";
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { authService } from "../../../services/authService";
+import { toast } from "../../../store/useToastStore";
 import type {
   OrderResponse,
   SubOrderResponse,
   CancellationPreviewResponse,
   RefundResponse,
   QrCodeResponse,
+  RescheduleOptionsSummaryResponse,
+  RescheduleOptionItem,
 } from "../../../types/order";
 import type { ServiceDetailDto } from "../../../types/service";
 
@@ -29,6 +32,10 @@ export function Orders() {
   const [page, setPage] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [serviceDetails, setServiceDetails] = useState<Record<string, ServiceDetailDto>>({});
+
+  // Reschedule state
+  const [rescheduleMap, setRescheduleMap] = useState<Record<string, RescheduleOptionsSummaryResponse>>({});
+  const [confirmingRescheduleId, setConfirmingRescheduleId] = useState<string | null>(null);
 
   // QR Modal state
   const [selectedSubOrder, setSelectedSubOrder] = useState<SubOrderResponse | null>(null);
@@ -87,6 +94,18 @@ export function Orders() {
         const items = ord.items || ord.subOrders || [];
         items.forEach((item) => {
           if (item.serviceId) serviceIds.add(item.serviceId);
+          if (item.status === "CONFIRMED") {
+            orderService
+              .getRescheduleOptions(item.id)
+              .then((opts) => {
+                if (opts && opts.options && opts.options.some((o: RescheduleOptionItem) => o.isProposedByVendor)) {
+                  setRescheduleMap((prev) => ({ ...prev, [item.id]: opts }));
+                }
+              })
+              .catch(() => {
+                // Non-critical, ignore
+              });
+          }
         });
 
         // Query refund history for each order
@@ -239,6 +258,35 @@ export function Orders() {
       cancelled,
     };
   }, [orders]);
+
+  // Confirm reschedule proposal handler
+  const handleConfirmReschedule = async (
+    subOrderId: string,
+    vendorOption: RescheduleOptionItem,
+    version: number
+  ) => {
+    setConfirmingRescheduleId(subOrderId);
+    try {
+      await orderService.confirmReschedule(subOrderId, {
+        targetSlotId: vendorOption.slotId,
+        proposalId: vendorOption.proposalId,
+        expectedVersion: version,
+      });
+      toast.success("Đã đồng ý chuyển sang ca khởi hành mới thành công!");
+      fetchOrders(page);
+    } catch (err: unknown) {
+      let msg = "Không thể xác nhận đổi ca.";
+      if (err && typeof err === "object" && "response" in err) {
+        const resp = (err as { response?: { data?: { message?: string } } }).response;
+        if (resp?.data?.message) msg = resp.data.message;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      toast.error("Lỗi: " + msg);
+    } finally {
+      setConfirmingRescheduleId(null);
+    }
+  };
 
   // Check-in QR Generation handler
   const handleOpenQrModal = async (subOrder: SubOrderResponse) => {
@@ -889,6 +937,54 @@ export function Orders() {
                                     )}
                                   </div>
                                 </div>
+
+                                {/* Pending Vendor Reschedule Proposal Banner */}
+                                {rescheduleMap[subOrder.id] && (() => {
+                                  const summary = rescheduleMap[subOrder.id];
+                                  const vendorOption = summary.options?.find((o) => o.isProposedByVendor);
+                                  if (!vendorOption) return null;
+
+                                  return (
+                                    <div className="mt-3 p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border border-amber-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs animate-fade-in">
+                                      <div className="flex items-start gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                                          <span className="material-symbols-outlined text-[20px]">edit_calendar</span>
+                                        </div>
+                                        <div className="flex flex-col gap-1 text-left">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="px-2 py-0.5 rounded-md bg-amber-200 text-amber-900 text-[10px] font-bold uppercase tracking-wider">
+                                              Đối tác đề xuất đổi ca
+                                            </span>
+                                            <span className="text-xs font-bold text-slate-900">
+                                              Ca mới: {vendorOption.bookingDate} ({vendorOption.startTime.slice(0, 5)} - {vendorOption.endTime.slice(0, 5)})
+                                            </span>
+                                          </div>
+                                          <p className="text-xs text-slate-700">
+                                            <strong>Lý do từ đối tác:</strong> {summary.disruptionReason || "Điều kiện vận hành / an toàn thời tiết"}
+                                          </p>
+                                          {vendorOption.proposalExpiresAt && (
+                                            <p className="text-[11px] text-amber-800 font-medium flex items-center gap-1">
+                                              <span className="material-symbols-outlined text-[13px]">schedule</span>
+                                              Xác nhận trước: {formatDateTime(vendorOption.proposalExpiresAt)}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-2 self-end md:self-center flex-shrink-0">
+                                        <button
+                                          type="button"
+                                          disabled={confirmingRescheduleId === subOrder.id}
+                                          onClick={() => handleConfirmReschedule(subOrder.id, vendorOption, summary.rescheduleVersion)}
+                                          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-emerald-500/20 cursor-pointer disabled:opacity-50 transition-all active:scale-95"
+                                        >
+                                          <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                                          <span>{confirmingRescheduleId === subOrder.id ? "Đang xử lý..." : "Đồng ý chuyển ca"}</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </div>
                           );
