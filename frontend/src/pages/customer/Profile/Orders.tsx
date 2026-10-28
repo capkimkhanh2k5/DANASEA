@@ -100,11 +100,25 @@ export function Orders() {
               .then((opts) => {
                 if (opts && opts.options && opts.options.some((o: RescheduleOptionItem) => o.isProposedByVendor)) {
                   setRescheduleMap((prev) => ({ ...prev, [item.id]: opts }));
+                } else {
+                  setRescheduleMap((prev) => {
+                    if (!prev[item.id]) return prev;
+                    const next = { ...prev };
+                    delete next[item.id];
+                    return next;
+                  });
                 }
               })
               .catch(() => {
                 // Non-critical, ignore
               });
+          } else {
+            setRescheduleMap((prev) => {
+              if (!prev[item.id]) return prev;
+              const next = { ...prev };
+              delete next[item.id];
+              return next;
+            });
           }
         });
 
@@ -273,6 +287,11 @@ export function Orders() {
         expectedVersion: version,
       });
       toast.success("Đã đồng ý chuyển sang ca khởi hành mới thành công!");
+      setRescheduleMap((prev) => {
+        const next = { ...prev };
+        delete next[subOrderId];
+        return next;
+      });
       fetchOrders(page);
     } catch (err: unknown) {
       let msg = "Không thể xác nhận đổi ca.";
