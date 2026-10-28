@@ -19,6 +19,10 @@ public record VendorDocumentResponse(
         OffsetDateTime updatedAt
 ) {
     public static VendorDocumentResponse fromDomain(VendorDocument doc) {
+        return fromDomain(doc, doc != null ? doc.getFileUrl() : null);
+    }
+
+    public static VendorDocumentResponse fromDomain(VendorDocument doc, String deliveryUrl) {
         if (doc == null) {
             return null;
         }
@@ -26,7 +30,7 @@ public record VendorDocumentResponse(
                 doc.getId(),
                 doc.getVendorId(),
                 doc.getDocType(),
-                doc.getFileUrl(),
+                deliveryUrl != null ? deliveryUrl : doc.getFileUrl(),
                 doc.getStatus(),
                 doc.getReviewedBy(),
                 doc.getReviewedAt(),
