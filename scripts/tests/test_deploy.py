@@ -4,6 +4,30 @@ from deploy_fixture import simulate
 
 
 class ReleaseDeploymentTest(unittest.TestCase):
+    def test_dependencies_are_ready_before_replacing_public_applications(self):
+        result, calls, _state = simulate(deploy_fails=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        updates = [c for c in calls if c[0] == 'docker' and 'up' in c]
+        self.assertEqual([c[-1] for c in updates], ['cli-proxy-api', 'quyet', 'backend', 'frontend'])
+        self.assertTrue(all('--wait' in c for c in updates))
+        self.assertTrue(all('--no-deps' in c for c in updates[1:]))
+        migration = next(i for i, c in enumerate(calls) if c[0] == 'docker' and 'run' in c and c[-1] == 'migrate')
+        backend = next(i for i, c in enumerate(calls) if c[0] == 'docker' and 'up' in c and c[-1] == 'backend')
+        self.assertLess(migration, backend)
+
+    def test_failed_rollout_retains_availability_evidence(self):
+        result, _calls, _state = simulate(deploy_fails=False, availability_fails=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('Availability evidence retained:', result.stdout)
+
+    def test_monitor_crash_still_attempts_compatible_rollback(self):
+        result, calls, state = simulate(deploy_fails=False, availability_missing=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(state, 'b' * 40)
+        updates = [c for c in calls if c[0] == 'docker' and 'up' in c]
+        self.assertIn('Rolling back applications', result.stdout)
+        self.assertEqual(updates[-1][-3:], ['quyet', 'backend', 'frontend'])
+
     def test_successful_acceptance_advances_state(self):
         result, calls, state = simulate(deploy_fails=False)
         self.assertEqual(result.returncode, 0, result.stderr)

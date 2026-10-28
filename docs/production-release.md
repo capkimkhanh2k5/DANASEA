@@ -67,6 +67,26 @@ If health, acceptance or the outage budget fails, release state remains on the l
 
 This remains a single-host, single-instance Compose deployment. Public API samples and measured outage budgets are retained in `.release-events/<sha>.json`. They quantify this rollout's observed interruption; they do not create zero downtime, host failover, load capacity or an availability SLA. Rehearsal elapsed time similarly does not measure production downtime. Blue/green traffic switching, another host and recovery from host loss require additional infrastructure and an explicit availability requirement.
 
+The rollout starts infrastructure, runs the migration to completion, waits for Quyet, then replaces backend and frontend individually with `--no-deps`. This keeps the old public applications available while the model loads. It still measures the entire rollout against the same 60-second outage budget; a backend replacement can interrupt requests. Every completed monitor writes a timestamped attempt report, including failed attempts, before cleanup or rollback. The accepted SHA report is written only on success. Backend health is probed every five seconds so traffic does not wait for a 30-second probe interval after startup.
+
+### Dependency maintenance
+
+Keep `Required CI gate`, strict up-to-date branches and protected `main`. `.github/dependabot.yml` groups supported ecosystems into one `weekly-maintenance` PR each Monday at 08:00 Asia/Ho_Chi_Minh. Validate the complete combined lockfiles/images in that PR, then merge once; this avoids invalidating 26 independently tested branches one by one. Security alerts remain enabled; grouped version updates are not a replacement for urgent vulnerability fixes. See [GitHub multi-ecosystem groups](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configuring-multi-ecosystem-updates).
+
+The 2026-10-29 consolidation incorporates PRs #120, #121, #123, #126, #127, #128, #129, #130, #132, #133, #135, #138, #139, #140, #141, #142 and #144. React and React DOM must resolve to the same release; Pydantic 2.14.1 requires pydantic-core 2.50.1. Regenerate and verify their lockfiles together. PR #143 (lucide-react) was already merged before consolidation.
+
+The following proposed versions are deliberately deferred, rather than reported as installed:
+
+- #118 / #122: Maven build image changes JDK to 26 and runtime image changes JRE to 22. Retain Java 21 in build, CI and runtime. Maven Docker tags encode two versions, so that image is maintained manually; Maven Wrapper updates remain automated.
+- #119: Node 26 image changes the tested Node 22 build baseline.
+- #124 / #125: RabbitMQ 4.4 and Redis 8 require a separate persisted-data upgrade and rollback rehearsal. Retain RabbitMQ 4.3 and Redis 7; RabbitMQ updates >=4.4 and runtime major version updates are excluded from routine version PRs.
+- #134: TypeScript 7 is outside the installed typescript-eslint supported peer range (<6.1).
+- #136: huggingface-hub 2.3 conflicts with the installed Transformers constraint (<2).
+- #137: mpmath 1.4.1 conflicts with SymPy 1.14's constraint (<1.4).
+- #131: NetworkX 3.7 requires Python >=3.12; worker runtime and CI use Python 3.11.
+
+Remove the corresponding version exclusions only when the owning runtime/library migration is implemented and tested. Closing superseded or incompatible PRs is housekeeping; it must never be represented as successfully applying those upgrades.
+
 Provider acceptance performs one small completion through each configured primary/fallback route and suppresses response content. It proves connectivity/authentication/response contracts at that moment; it does not grade AI quality, payment-provider settlement, authorization isolation for every role or business load capacity. The database/booking/order rehearsal uses synthetic data; provider-specific payment acceptance remains a separate controlled validation.
 
 ## Local validation

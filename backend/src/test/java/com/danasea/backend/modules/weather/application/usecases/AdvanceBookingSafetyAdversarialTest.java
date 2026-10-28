@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.danasea.backend.modules.booking.domain.models.Booking;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaCategoryRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
@@ -18,9 +19,11 @@ import com.danasea.backend.modules.weather.infrastructure.adapters.WeatherForeca
 import com.danasea.backend.modules.weather.infrastructure.adapters.WeatherProviderAdapter;
 import com.danasea.backend.modules.weather.infrastructure.api.OpenMeteoApiClient;
 import com.danasea.backend.modules.weather.infrastructure.api.dtos.OpenMeteoWeatherResponse;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -61,7 +64,9 @@ public class AdvanceBookingSafetyAdversarialTest {
     private WeatherRuleEngine weatherRuleEngine;
     private CheckAdvanceBookingSafetyUseCase useCase;
 
-    private final LocalDate today = LocalDate.now();
+    // UTC and Vietnam have different dates at this instant.
+    private final Clock clock = Clock.fixed(Instant.parse("2026-10-28T17:30:00Z"), ZoneOffset.UTC);
+    private final LocalDate today = LocalDate.now(clock.withZone(Booking.VIETNAM_ZONE));
     private CategorySafetyRule supRule;
     private CategorySafetyRule parasailingRule;
 
@@ -74,7 +79,8 @@ public class AdvanceBookingSafetyAdversarialTest {
                 weatherRuleEngine,
                 slotRepository,
                 serviceRepository,
-                categoryRepository
+                categoryRepository,
+                clock
         );
 
         supRule = CategorySafetyRule.getBySlug("cheo-sup-kayak");
