@@ -16,14 +16,14 @@ interface PageResponse<T> {
 export const notificationService = {
   getMyNotifications: async (page = 0, size = 20): Promise<PageResponse<NotificationResponse>> => {
     const res = await apiClient.get<PageResponse<NotificationResponse>>(
-      `/api/notifications?page=${page}&size=${size}`
+      `/notifications?page=${page}&size=${size}`
     );
     return res.data;
   },
 
   getUnreadCount: async (): Promise<number> => {
     try {
-      const res = await apiClient.get<UnreadCountResponse>("/api/notifications/unread-count");
+      const res = await apiClient.get<UnreadCountResponse>("/notifications/unread-count");
       return res.data?.unreadCount ?? 0;
     } catch {
       return 0;
@@ -31,12 +31,12 @@ export const notificationService = {
   },
 
   markAsRead: async (id: string): Promise<NotificationResponse> => {
-    const res = await apiClient.patch<NotificationResponse>(`/api/notifications/${id}/read`);
+    const res = await apiClient.patch<NotificationResponse>(`/notifications/${id}/read`);
     return res.data;
   },
 
   markAllAsRead: async (): Promise<MarkAllNotificationsReadResponse> => {
-    const res = await apiClient.patch<MarkAllNotificationsReadResponse>("/api/notifications/read-all");
+    const res = await apiClient.patch<MarkAllNotificationsReadResponse>("/notifications/read-all");
     return res.data;
   },
 };
