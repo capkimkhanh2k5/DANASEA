@@ -681,7 +681,21 @@ export function VendorOrders() {
       });
       toast.success(`Check-in thành công đơn #${(verifyRes.subOrderId || rawInput).slice(0, 8)}...!`);
     } catch (err: unknown) {
-      const errMsg = extractErrorMessage(err);
+      let errMsg = extractErrorMessage(err);
+      const targetSubOrderId = rawInput.includes(":") ? rawInput.split(":")[0] : rawInput;
+      const matchedOrder = orders.find(
+        (o) => o.id.toUpperCase() === targetSubOrderId.toUpperCase() || o.orderNumber.toUpperCase() === targetSubOrderId.toUpperCase()
+      );
+
+      // Clarify premature check-in error vs concluded slot
+      if (errMsg.includes("đã kết thúc") || errMsg.includes("SLOT_ALREADY_CONCLUDED")) {
+        if (matchedOrder && matchedOrder.dateStr) {
+          errMsg = `Chưa đến thời gian soát vé. Cổng soát vé chỉ mở trước giờ khởi hành 2 tiếng (Ca: ${matchedOrder.timeSlot} ngày ${matchedOrder.dateStr}).`;
+        } else {
+          errMsg = "Khung giờ dịch vụ chưa mở cổng soát vé hoặc đã kết thúc (Cổng soát vé mở từ trước ca 2 tiếng đến sau ca 30 phút).";
+        }
+      }
+
       if (errMsg.includes("đã được sử dụng") || errMsg.includes("ALREADY_USED") || errMsg.includes("used at")) {
         setScannerResult({
           type: "USED",
