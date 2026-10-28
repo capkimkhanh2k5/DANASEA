@@ -29,7 +29,7 @@ jobs:
         run: ./mvnw -B clean verify
       - name: Reject unexpected skips and missing critical suites
         run: python3 ../scripts/check_test_reports.py target/surefire-reports --policy ../.ci/test-policy.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: backend-test-reports
@@ -110,7 +110,7 @@ jobs:
           cp ai-decision/config/requirements.lock.txt "$RUNNER_TEMP/worker-dependencies/requirements.txt"
           trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output security-reports/worker-dependencies.json "$RUNNER_TEMP/worker-dependencies"
           trivy fs --scanners vuln,secret --severity HIGH,CRITICAL --exit-code 1 --format json --output security-reports/source.json --skip-dirs .git,.superpowers,frontend/node_modules,frontend/dist,backend/target .
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: source-security-reports
@@ -148,7 +148,7 @@ jobs:
           mkdir -p security-reports
           trivy image --image-src docker --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output security-reports/image.json "$IMAGE"
           trivy image --image-src docker --format cyclonedx --output security-reports/sbom.cdx.json "$IMAGE"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: image-security-${{ matrix.service }}
