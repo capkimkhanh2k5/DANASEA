@@ -21,6 +21,8 @@ import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -70,6 +72,14 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
     @Autowired
     private UserMapper userMapper;
 
+    private final Set<UUID> ownedUsers = new HashSet<>();
+
+    private User saveTestUser(User user) {
+        User saved = accountInternalApi.saveUser(user);
+        ownedUsers.add(saved.getId());
+        return saved;
+    }
+
     @BeforeEach
     void setUp() {
         tearDown();
@@ -77,7 +87,8 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
 
     @AfterEach
     void tearDown() {
-        jpaUserRepository.deleteAll();
+        jpaUserRepository.deleteAllById(ownedUsers);
+        ownedUsers.clear();
         Cache usersByEmailCache = cacheManager.getCache("usersByEmail");
         if (usersByEmailCache != null) {
             usersByEmailCache.clear();
@@ -114,7 +125,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         user.setIsEmailVerified(true);
         user.setFullName("Active Admin Lock Test");
 
-        User savedUser = accountInternalApi.saveUser(user);
+        User savedUser = saveTestUser(user);
         assertThat(savedUser.getId()).isNotNull();
 
         Authentication auth = new Authentication(
@@ -151,7 +162,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         assertThat(fetchedUserOpt).isPresent();
         User userToLock = fetchedUserOpt.get();
         userToLock.setIsLocked(true);
-        accountInternalApi.saveUser(userToLock);
+        saveTestUser(userToLock);
 
         // Xác minh cả hai Cache usersByEmail và usersById đều đã bị Evict thành công
         assertThat(usersByEmailCache.get(email)).isNull();
@@ -193,7 +204,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         user.setIsEmailVerified(true);
         user.setFullName("Demoted Admin Cache Test");
 
-        User savedUser = accountInternalApi.saveUser(user);
+        User savedUser = saveTestUser(user);
         assertThat(savedUser.getId()).isNotNull();
 
         Authentication auth = new Authentication(
@@ -230,7 +241,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         assertThat(fetchedUserOpt).isPresent();
         User userToDowngrade = fetchedUserOpt.get();
         userToDowngrade.setRole(Role.CUSTOMER);
-        accountInternalApi.saveUser(userToDowngrade);
+        saveTestUser(userToDowngrade);
 
         // Xác minh cả hai Cache đã bị Evict thành công
         assertThat(usersByEmailCache.get(email)).isNull();
@@ -263,7 +274,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         user.setIsEmailVerified(true);
         user.setFullName("Contrast Admin Test");
 
-        User savedUser = accountInternalApi.saveUser(user);
+        User savedUser = saveTestUser(user);
         Authentication auth = new Authentication(
                 savedUser.getId(),
                 savedUser.getEmail(),
@@ -300,7 +311,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         User domainUser = accountInternalApi.findUserByEmail(email).orElseThrow();
         // Domain user này lúc này được lấy từ cache cũ, nhưng khi ta gọi saveUser để áp dụng thay đổi chuẩn:
         domainUser.setIsLocked(true);
-        accountInternalApi.saveUser(domainUser);
+        saveTestUser(domainUser);
 
         // Cache lập tức bị Evict hoàn toàn!
         assertThat(usersByEmailCache.get(email)).isNull();
@@ -327,7 +338,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         user.setIsEmailVerified(true);
         user.setFullName("Email Change Test Admin");
 
-        User savedUser = accountInternalApi.saveUser(user);
+        User savedUser = saveTestUser(user);
         assertThat(savedUser.getId()).isNotNull();
 
         Authentication auth = new Authentication(
@@ -351,12 +362,9 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
 
         // (3) Đổi email sang newEmail thông qua saveUser()
         savedUser.setEmail(newEmail);
-        accountInternalApi.saveUser(savedUser);
+        saveTestUser(savedUser);
 
         // (4) Kiểm tra cache của email cũ: Bắt buộc phải bị evict!
-        for (int i = 0; i < 20 && usersByEmailCache.get(oldEmail) != null; i++) {
-            Thread.sleep(50);
-        }
         assertThat(usersByEmailCache.get(oldEmail)).isNull();
 
         // (5) Dùng lại oldToken để gọi API: Bắt buộc phải trả về 401 Unauthorized
@@ -377,7 +385,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         user.setIsEmailVerified(true);
         user.setFullName("User ID Cache Test");
 
-        User savedUser = accountInternalApi.saveUser(user);
+        User savedUser = saveTestUser(user);
         UUID userId = savedUser.getId();
 
         // Nạp usersById vào cache
@@ -388,7 +396,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         User toUpdate = byId.get();
         toUpdate.setIsLocked(true);
         toUpdate.setFullName("Updated User Name");
-        accountInternalApi.saveUser(toUpdate);
+        saveTestUser(toUpdate);
 
         // Đọc lại từ DB: xác nhận trả về dữ liệu mới đã được cập nhật
         Optional<User> reloaded = accountInternalApi.findUserById(userId);
@@ -451,7 +459,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         user.setIsEmailVerified(true);
         user.setFullName("TX Admin Commit Test");
 
-        User savedUser = accountInternalApi.saveUser(user);
+        User savedUser = saveTestUser(user);
         Authentication auth = new Authentication(
                 savedUser.getId(),
                 savedUser.getEmail(),
@@ -476,7 +484,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         txTemplate.executeWithoutResult(status -> {
             User userInTx = accountInternalApi.findUserByEmail(email).orElseThrow();
             userInTx.setIsLocked(true);
-            accountInternalApi.saveUser(userInTx);
+            saveTestUser(userInTx);
         });
 
         // Sau khi Transaction commit: Cache bắt buộc phải bị evict
@@ -501,7 +509,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         user.setIsEmailVerified(true);
         user.setFullName("TX Admin Rollback Test");
 
-        User savedUser = accountInternalApi.saveUser(user);
+        User savedUser = saveTestUser(user);
         Authentication auth = new Authentication(
                 savedUser.getId(),
                 savedUser.getEmail(),
@@ -523,7 +531,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
             txTemplate.executeWithoutResult(status -> {
                 User userInTx = accountInternalApi.findUserByEmail(email).orElseThrow();
                 userInTx.setIsLocked(true);
-                accountInternalApi.saveUser(userInTx);
+                saveTestUser(userInTx);
                 throw new RuntimeException("Business simulation error causing rollback");
             });
         } catch (RuntimeException ignored) {}
@@ -551,7 +559,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         user.setIsEmailVerified(true);
         user.setFullName("Cache Hit Audit User");
 
-        User savedUser = accountInternalApi.saveUser(user);
+        User savedUser = saveTestUser(user);
         Authentication auth = new Authentication(
                 savedUser.getId(),
                 savedUser.getEmail(),
@@ -602,7 +610,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         user.setIsEmailVerified(true);
         user.setFullName("Mixed Case Admin");
 
-        User savedUser = accountInternalApi.saveUser(user);
+        User savedUser = saveTestUser(user);
         // Xác nhận email trong entity đã được chuẩn hóa về lowercase
         assertThat(savedUser.getEmail()).isEqualTo(baseEmail);
 
@@ -630,7 +638,7 @@ public class RbacCacheInvalidationIntegrationTest extends BaseSecurityIntegratio
         assertThat(fetchedUserOpt).isPresent();
         User userToLock = fetchedUserOpt.get();
         userToLock.setIsLocked(true);
-        accountInternalApi.saveUser(userToLock);
+        saveTestUser(userToLock);
 
         // Xác nhận dữ liệu mới đã được cập nhật và cache cũ không còn giá trị stale
         Optional<User> reloaded = accountInternalApi.findUserByEmail(baseEmail);

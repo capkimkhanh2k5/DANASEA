@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLanguageStore } from "../../../store/useLanguageStore";
 
@@ -26,8 +26,28 @@ import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import type { ServiceSummaryDto } from "../../../types/service";
 import type { FlashSaleExperience, ActivityCardData } from "../../../data/customerHomeData";
 
+interface ChatMessage {
+  chatPrompt: string;
+  chatPromptEn?: string;
+  chatReply: string | null;
+  chatReplyEn?: string;
+  chatTourName?: string;
+  chatTourNameEn?: string;
+}
+interface MarineMetric { val: string; desc: string; descEn: string }
+interface BeachInfo extends ChatMessage {
+  temp: MarineMetric;
+  wave: MarineMetric;
+  visibility: MarineMetric;
+  wind: MarineMetric;
+  recommendationTitle: string;
+  recommendationTitleEn: string;
+  recommendationDesc: string;
+  recommendationDescEn: string;
+}
+
 // AI Beach Data for Maritime Concierge
-const AI_BEACH_DATA: Record<string, any> = {
+const AI_BEACH_DATA: Record<string, BeachInfo> = {
   'Mỹ Khê': {
     chatPrompt: 'Nhóm mình 4 người muốn chèo SUP sáng mai ở Mỹ Khê, giờ nào biển êm và ánh sáng chụp ảnh đẹp nhất vậy bạn?',
     chatPromptEn: 'Our group of 4 wants to paddle SUP tomorrow morning at My Khe. What time has the calmest waves and best photoshoot light?',
@@ -78,7 +98,7 @@ const AI_BEACH_DATA: Record<string, any> = {
   }
 };
 
-const CUSTOM_PROMPT_DATA: Record<string, any> = {
+const CUSTOM_PROMPT_DATA: Record<string, ChatMessage> = {
   'group': {
     chatPrompt: 'Nhóm mình 6 người muốn đi biển nửa ngày, có hoạt động nào vui mà gắn kết không AI?',
     chatPromptEn: 'Our group of 6 wants a half-day marine outing. What activities are fun and bonding?',
@@ -110,11 +130,11 @@ export function Home() {
   const navigate = useNavigate();
 
   // AI Concierge State
-  const [activeAIBeach, setActiveAIBeach] = useState<string>('Mỹ Khê');
+  const activeAIBeach = 'Mỹ Khê';
   const [activeCustomPrompt, setActiveCustomPrompt] = useState<string | null>(null);
   const [chatInputValue, setChatInputValue] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [chatHistory, setChatHistory] = useState<any[]>([]);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Search Capsule State
@@ -263,7 +283,7 @@ export function Home() {
     : THRILL_EXPERIENCES;
 
   const baseMessage = activeCustomPrompt ? CUSTOM_PROMPT_DATA[activeCustomPrompt] : AI_BEACH_DATA[activeAIBeach];
-  const displayMessages = [baseMessage, ...chatHistory];
+  const displayMessages = useMemo(() => [baseMessage, ...chatHistory], [baseMessage, chatHistory]);
   const currentBeachData = AI_BEACH_DATA[activeAIBeach] || AI_BEACH_DATA['Mỹ Khê'];
 
   useEffect(() => {
@@ -338,16 +358,6 @@ export function Home() {
       }
     } else {
       setSelectedRegions([...selectedRegions, region]);
-    }
-  };
-
-  const scrollToSection = (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    const element = document.querySelector(id);
-    if (element) {
-      const headerHeight = 80;
-      const targetPosition = element.getBoundingClientRect().top + window.scrollY - headerHeight;
-      window.scrollTo({ top: targetPosition, behavior: 'smooth' });
     }
   };
 

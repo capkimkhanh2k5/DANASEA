@@ -6,7 +6,7 @@ x-logging: &logging
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
     container_name: danasea-postgres
     restart: unless-stopped
     logging: *logging
@@ -67,7 +67,7 @@ services:
       retries: 5
 
   migrate:
-    image: ${IMAGE_PREFIX:-ghcr.io/capkimkhanh2k5/danasea}-backend:${IMAGE_TAG:-latest}
+    image: ${BACKEND_IMAGE:-${IMAGE_PREFIX:-ghcr.io/capkimkhanh2k5/danasea}-backend:${IMAGE_TAG:-latest}}
     restart: "no"
     logging: *logging
     environment:
@@ -92,7 +92,7 @@ services:
         condition: service_healthy
 
   backend:
-    image: ${IMAGE_PREFIX:-ghcr.io/capkimkhanh2k5/danasea}-backend:${IMAGE_TAG:-latest}
+    image: ${BACKEND_IMAGE:-${IMAGE_PREFIX:-ghcr.io/capkimkhanh2k5/danasea}-backend:${IMAGE_TAG:-latest}}
     container_name: danasea-backend
     restart: unless-stopped
     logging: *logging
@@ -148,8 +148,8 @@ services:
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME}
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD}
-      OPEN_METEO_BASE_URL: ${OPEN_METEO_BASE_URL}
-      OPEN_METEO_MARINE_BASE_URL: ${OPEN_METEO_MARINE_BASE_URL}
+      OPEN_METEO_BASE_URL: ${OPEN_METEO_BASE_URL:-https://api.open-meteo.com}
+      OPEN_METEO_MARINE_BASE_URL: ${OPEN_METEO_MARINE_BASE_URL:-https://marine-api.open-meteo.com}
     depends_on:
       postgres:
         condition: service_healthy
@@ -183,7 +183,7 @@ services:
       start_period: 30s
 
   quyet:
-    image: ${IMAGE_PREFIX:-ghcr.io/capkimkhanh2k5/danasea}-quyet:${IMAGE_TAG:-latest}
+    image: ${QUYET_IMAGE:-${IMAGE_PREFIX:-ghcr.io/capkimkhanh2k5/danasea}-quyet:${IMAGE_TAG:-latest}}
     container_name: danasea-quyet
     restart: unless-stopped
     logging: *logging
@@ -245,7 +245,7 @@ services:
       start_period: 15s
 
   frontend:
-    image: ${IMAGE_PREFIX:-ghcr.io/capkimkhanh2k5/danasea}-frontend:${IMAGE_TAG:-latest}
+    image: ${FRONTEND_IMAGE:-${IMAGE_PREFIX:-ghcr.io/capkimkhanh2k5/danasea}-frontend:${IMAGE_TAG:-latest}}
     container_name: danasea-frontend
     restart: unless-stopped
     logging: *logging

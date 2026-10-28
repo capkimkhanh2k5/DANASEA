@@ -3,9 +3,7 @@ import importlib.util
 import json
 import os
 import secrets
-import shlex
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -161,72 +159,9 @@ class ProductionPreparationTest(unittest.TestCase):
 
 class DeploymentGuardTest(unittest.TestCase):
     def simulate_failed_deploy(self, infrastructure_changed, previous_worker=True):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            binary = root / 'bin'
-            binary.mkdir()
-            (root / 'frontend').mkdir()
-            (root / '.deploy-state').write_text('b' * 40)
-            (root / '.env').write_text('fixture')
-            (root / '.env').chmod(0o600)
-            log = root / 'calls.jsonl'
-            mock = '''import json, os, pathlib, sys
-name = pathlib.Path(sys.argv[0]).name
-args = sys.argv[1:]
-root = pathlib.Path(os.environ['APP_DIR'])
-log = pathlib.Path(os.environ['DANASEA_TEST_CALLS'])
-def record(value):
-    with log.open('a') as output:
-        output.write(json.dumps(value) + '\\n')
-record([name, *args])
-if name == 'git' and args[0] == 'checkout':
-    path = root / 'frontend/nginx.prod.conf'
-    path.write_text('fixture')
-    path.chmod(0o600)
-if name == 'git' and args[0] == 'show':
-    print('fixture compose')
-if name == 'python3':
-    if args[0] == 'scripts/production.py':
-        record(['preflight-modes', (root / 'frontend/nginx.prod.conf').stat().st_mode & 0o777,
-                (root / '.env').stat().st_mode & 0o777])
-    else:
-        os.execv(sys.executable, [sys.executable, *args])
-if name == 'docker':
-    if 'config' in args:
-        previous = any('rollback-source.yml' in arg for arg in args)
-        redis = 'redis:7.0-alpine' if previous and os.environ['DANASEA_TEST_INFRA_CHANGED'] == '1' else 'redis:7.4-alpine'
-        payload = {'services': {'postgres': {'image': 'postgres:17-alpine'},
-              'redis': {'image': redis}, 'rabbitmq': {'image': 'rabbitmq:4.3-alpine'},
-              'quyet': {'image': 'quyet:old' if previous else 'quyet:new', 'read_only': True}},
-              'networks': {}, 'volumes': {}}
-        if previous and os.environ['DANASEA_TEST_PREVIOUS_WORKER'] == '0':
-            payload['services'].pop('quyet')
-        print(json.dumps(payload))
-    if 'up' in args:
-        calls = [json.loads(line) for line in log.read_text().splitlines()]
-        count = sum(row[0] == 'docker' and 'up' in row for row in calls)
-        sys.exit(1 if count == 1 else 0)
-    if 'logs' in args:
-        print('Using generated security password: fake-diagnostic-password')
-    if 'inspect' in args:
-        print('[]')
-'''
-            for name in ['git', 'flock', 'python3', 'docker']:
-                path = binary / name
-                path.write_text('#!' + sys.executable + '\n' + mock)
-                path.chmod(0o700)
-            environment = {
-                **os.environ, 'APP_DIR': str(root),
-                'PATH': str(binary) + ':' + os.environ['PATH'],
-                'SSH_ORIGINAL_COMMAND': 'deploy ' + 'a' * 40,
-                'DANASEA_TEST_CALLS': str(log),
-                'DANASEA_TEST_INFRA_CHANGED': '1' if infrastructure_changed else '0',
-                'DANASEA_TEST_PREVIOUS_WORKER': '1' if previous_worker else '0',
-            }
-            result = subprocess.run(['bash', str(ROOT / 'scripts/deploy.sh')],
-                                    env=environment, capture_output=True, text=True)
-            calls = [json.loads(line) for line in log.read_text().splitlines()]
-            return result, calls
+        from deploy_fixture import simulate
+        result, calls, _ = simulate(infrastructure_changed, previous_worker)
+        return result, calls
 
     def test_nginx_config_is_readable_without_relaxing_secret_permissions(self):
         _, calls = self.simulate_failed_deploy(False)
@@ -306,24 +241,14 @@ if name == 'docker':
         self.assertIn('PRODUCTION_DEPLOY_ENABLED', (ROOT / '.github/workflows/cd.yml').read_text())
 
     def test_preflight_failure_never_starts_or_pulls_containers(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            binary = root / 'bin'
-            binary.mkdir()
-            log = root / 'calls'
-            for name in ['git', 'flock', 'python3', 'docker']:
-                path = binary / name
-                path.write_text('#!/bin/sh\nprintf "%s\\n" "' + name + ' $*" >> ' + shlex.quote(str(log)) + '\n' + ('exit 17\n' if name == 'python3' else 'exit 0\n'))
-                path.chmod(0o700)
-            environment = {**os.environ, 'APP_DIR': str(root), 'PATH': str(binary) + ':' + os.environ['PATH'], 'SSH_ORIGINAL_COMMAND': 'deploy ' + 'a' * 40}
-            result = subprocess.run(['bash', str(ROOT / 'scripts/deploy.sh')], env=environment, capture_output=True, text=True)
-            self.assertNotEqual(result.returncode, 0)
-            calls = log.read_text()
-            self.assertIn('python3 scripts/production.py check', calls)
-            self.assertNotIn('docker ', calls)
+        from deploy_fixture import simulate
+        result, calls, _ = simulate(preflight_fails=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(any(c[:2] == ['python3', 'scripts/production.py'] for c in calls))
+        self.assertFalse(any(c[0] == 'docker' for c in calls))
 
     def test_forced_command_rejects_extra_arguments_before_git(self):
-        result = subprocess.run(['bash', str(ROOT / 'scripts/deploy.sh')], env={**os.environ, 'SSH_ORIGINAL_COMMAND': 'deploy ' + 'a' * 40 + ' extra'}, capture_output=True, text=True)
+        result = subprocess.run(['bash', str(ROOT / 'scripts/deploy.sh')], env={**os.environ, 'SSH_ORIGINAL_COMMAND': 'deploy ' + 'a' * 40 + ' extra'}, capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 2)
         self.assertIn('Usage:', result.stderr)
 

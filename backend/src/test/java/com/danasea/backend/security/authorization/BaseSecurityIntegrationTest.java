@@ -33,8 +33,6 @@ public abstract class BaseSecurityIntegrationTest {
         registry.add("spring.datasource.url", () -> dbUrl);
         registry.add("spring.datasource.username", () -> "test");
         registry.add("spring.datasource.password", () -> "test");
-        registry.add("spring.datasource.hikari.maximum-pool-size", () -> "3");
-        registry.add("spring.datasource.hikari.minimum-idle", () -> "1");
         registry.add("app.scheduler.enabled", () -> "false");
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.datasource.hikari.maximum-pool-size", () -> "5");
@@ -45,6 +43,9 @@ public abstract class BaseSecurityIntegrationTest {
         registry.add("spring.flyway.url", () -> dbUrl);
         registry.add("spring.flyway.user", () -> "test");
         registry.add("spring.flyway.password", () -> "test");
+        // Every context shares this database: a test profile must never recreate its schema.
+        registry.add("spring.flyway.enabled", () -> "true");
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         
         registry.add("spring.data.redis.host", () -> redis.getHost());
         registry.add("spring.data.redis.port", () -> redis.getFirstMappedPort());
