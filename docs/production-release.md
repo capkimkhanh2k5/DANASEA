@@ -18,7 +18,7 @@ The server requires root-owned policy/signer files, verifies the envelope signat
 2. **Production environment:** restrict deployments to protected branches. Store production SSH/Tailscale credentials in this environment. Add reviewers if the team's release policy requires a human gate. `environment: production` by itself does not establish those restrictions.
 3. **Registry:** the deploy account needs read access to private GHCR packages. Keep accepted digests available beyond the recovery window. Candidate artifacts are retained for 90 days; GHCR retention must preserve accepted images independently of artifact retention.
 4. **Host:** Linux, Python >=3.11, Docker Compose supporting `--wait`, OpenSSH signing support, `flock`, a separate unprivileged deployment user with Docker access, and the existing forced-command authorized key. Install `python3-yaml` if the proxy management panel writes YAML. Keep the current MacBook/operator access unchanged.
-5. **Business configuration:** configure the platform commission through the existing admin workflow before release acceptance. CI never invents or overwrites production financial policy.
+5. **Business configuration:** the owner approved a 10% initial platform commission. Migration V43 inserts `PLATFORM_COMMISSION_RATE=10` only when absent and preserves any existing Admin policy. Confirm the effective value after deployment; Admin API updates still override it.
 6. **Local backups:** per the owner's explicit choice, backups stay on this server in `~/BackUp/danasea` unless an absolute alternative is supplied. No rclone, age key, off-host bucket or additional service is required. Each deploy attempt creates one restore-verified backup before service changes. Keep at most seven archives; no periodic backup schedule is installed. Directory mode is 700 and archives are 600.
 
 `scripts/check_repository_controls.py` checks branch/gate/environment restrictions at release time. A missing setting, insufficient API permission or unsupported account plan blocks CD rather than treating the check as successful. The integration available in the authoring session cannot administer branch/environment protections; local `gh` also has no authenticated session. Those settings require an account administrator.
@@ -121,11 +121,19 @@ Hai biến này phải ở **Repository variables**. Không chỉ đặt trong e
 6. Bật **Require branches to be up to date before merging**.
 7. Bật **Require conversation resolution before merging**.
 8. Bật **Do not allow bypassing the above settings** nếu giao diện có mục này. Giữ **Allow force pushes** và **Allow deletions** tắt.
-9. Nếu có thành viên khác đủ quyền review, bật **Require approvals**, chọn ít nhất **1**, và có thể bật **Dismiss stale pull request approvals when new commits are pushed**.
-10. Chỉ bật **Require review from Code Owners** khi có CODEOWNER hợp lệ khác tác giả PR. File `.github/CODEOWNERS` hiện chỉ định `@capkimkhanh2k5`; nếu chính tài khoản này tạo PR thì cần bổ sung người/nhóm có quyền ghi vào các dòng tương ứng trước khi bắt buộc code-owner approval. Tác giả không thể tự duyệt PR của mình. Nếu đang làm một mình, giữ bắt buộc PR và CI; ghi nhận review độc lập chưa được thiết lập.
-11. Chọn **Create** hoặc **Save changes**.
+9. Với cấu hình team lead hiện tại, giữ **Require approvals** và **Require review from Code Owners** tắt trong classic rule. Approval được thực thi bằng ruleset riêng bên dưới; bật lại ở classic sẽ chặn cả admin tự merge.
+10. Chọn **Save changes**. Giữ **Do not allow bypassing the above settings** bật để cả admin vẫn phải qua PR và CI xanh.
 
-Repository đang private: branch protection cần gói hỗ trợ private repository, ví dụ GitHub Pro cho tài khoản cá nhân hoặc Team cho tổ chức. Nếu GitHub yêu cầu nâng cấp, chủ tài khoản phải xử lý gói trước; không coi việc lưu một rule không được thực thi là đã bảo vệ. Không cần chuyển repository sang public. [Tài liệu GitHub về branch protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/managing-a-branch-protection-rule).
+Cấu hình review đã chọn cho repository public:
+
+- **Settings → Rules → Rulesets → main-review-team-lead**: trạng thái **Active**, target **Default branch** (`main`).
+- Bật **Require a pull request before merging**, chọn **Required approvals = 1** và **Require review from Code Owners**.
+- Bypass chỉ cho **Repository admin**, chế độ **For pull requests only**. Không cấp bypass cho Write/Maintain hay ứng dụng.
+- `.github/CODEOWNERS` có dòng mặc định `* @capkimkhanh2k5`, yêu cầu lead review thay đổi của thành viên trên mọi đường dẫn.
+- Thành viên nên có quyền Write; ai được cấp Admin cũng nhận ngoại lệ approval này. Bypass dựa trên **người bấm merge**, không phải tác giả PR: admin có thể merge cả PR của thành viên mà chưa có approval. Việc lead thực sự review trước khi tự bấm merge vẫn là trách nhiệm của lead.
+- Ruleset này chỉ tách yêu cầu review. Classic rule tiếp tục bắt buộc PR, `Required CI gate`, cập nhật nhánh, giải quyết conversation và cấm force push/xoá nhánh; ngoại lệ review không bỏ qua các yêu cầu CI đó.
+
+Nếu repository chuyển lại private: branch protection cần gói hỗ trợ private repository, ví dụ GitHub Pro cho tài khoản cá nhân hoặc Team cho tổ chức. Nếu GitHub yêu cầu nâng cấp, chủ tài khoản phải xử lý gói trước; không coi việc lưu một rule không được thực thi là đã bảo vệ. Không cần chuyển repository sang public. [Tài liệu GitHub về branch protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/managing-a-branch-protection-rule).
 
 ### Bước 4 — Tạo environment `production`
 
@@ -157,7 +165,7 @@ CD cũ đã dùng SSH/Tailscale thành công, nên ưu tiên tái sử dụng c�
 1. Cập nhật một lần forced-command script/policy theo phần **One-time host transition** bên trên. Wrapper cũ chưa hiểu lệnh `status` và signed release manifest của workflow mới.
 2. Tái sử dụng thư mục backup `/home/capkimkhanh/backups/danasea` bằng tham số thứ sáu của installer. Mỗi lần deploy chỉ tạo một backup trước thay đổi dịch vụ, giữ tối đa **7 bản tổng cộng**, gồm backup cũ nhận diện được. Không cài timer/service backup định kỳ.
 3. Giữ quyền đọc private GHCR packages của user deploy; không xoá image digest đang được chấp nhận hoặc còn cần rollback.
-4. Cấu hình `PLATFORM_COMMISSION_RATE` thật bằng API Admin: `PUT /api/admin/settings/PLATFORM_COMMISSION_RATE`, dùng bearer token ADMIN và JSON có trường `value` là chuỗi phần trăm từ `0` đến `100`. Ví dụ `"10"` có nghĩa 10%, chỉ là minh hoạ; chủ hệ thống quyết định tỷ lệ thật. Đọc lại bằng `GET` cùng endpoint để xác nhận đã lưu. Trang FE Admin Settings hiện dùng mock/state cục bộ, nên nút lưu tại trang đó chưa chứng minh database đã nhận giá trị.
+4. Chủ hệ thống đã xác nhận mức mặc định **10%**. Migration `V43__default_platform_commission.sql` tự thêm `PLATFORM_COMMISSION_RATE=10` khi chưa có, và giữ nguyên giá trị Admin đã cấu hình. Không cần gọi PUT chỉ để khởi tạo 10%. Sau deploy, đọc lại `GET /api/admin/settings/PLATFORM_COMMISSION_RATE` bằng token ADMIN để xác nhận. Khi muốn đổi tỷ lệ, dùng `PUT` cùng endpoint với trường `value` là chuỗi phần trăm từ `0` đến `100`. Trang FE Admin Settings hiện vẫn dùng mock/state cục bộ; nút lưu tại đó chưa ghi database.
 5. Xác minh restricted SSH `status` trả về release đang được chấp nhận, và policy checker đọc được branch/environment. Khi có `gh` đã đăng nhập bằng tài khoản đủ quyền, có thể kiểm tra từ máy local:
 
 ```bash
