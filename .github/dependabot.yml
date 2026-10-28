@@ -1,34 +1,114 @@
+# Weekly consolidated updates retain the same required CI and up-to-date checks.
+# Runtime major changes require a separately tested migration. Security alerts remain enabled.
+# Maven Docker tags also encode the JDK: update this image manually within Java 21.
 version: 2
 updates:
-  - package-ecosystem: github-actions
-    directory: /
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+  multi-ecosystem-group: weekly-maintenance
+  patterns:
+  - '*'
+  open-pull-requests-limit: 1
+- package-ecosystem: docker
+  directory: /backend
+  schedule:
+    interval: weekly
+  multi-ecosystem-group: weekly-maintenance
+  patterns:
+  - '*'
+  open-pull-requests-limit: 1
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  - dependency-name: maven
+- package-ecosystem: docker
+  directory: /frontend
+  schedule:
+    interval: weekly
+  multi-ecosystem-group: weekly-maintenance
+  patterns:
+  - '*'
+  open-pull-requests-limit: 1
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+- package-ecosystem: docker
+  directory: /ai-decision
+  schedule:
+    interval: weekly
+  multi-ecosystem-group: weekly-maintenance
+  patterns:
+  - '*'
+  open-pull-requests-limit: 1
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+- package-ecosystem: docker-compose
+  directory: /
+  schedule:
+    interval: weekly
+  multi-ecosystem-group: weekly-maintenance
+  patterns:
+  - '*'
+  open-pull-requests-limit: 1
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  - dependency-name: rabbitmq
+    versions:
+    - '>=4.4'
+- package-ecosystem: maven
+  directory: /backend
+  schedule:
+    interval: weekly
+  multi-ecosystem-group: weekly-maintenance
+  patterns:
+  - '*'
+  open-pull-requests-limit: 1
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+- package-ecosystem: npm
+  directory: /frontend
+  schedule:
+    interval: weekly
+  multi-ecosystem-group: weekly-maintenance
+  patterns:
+  - '*'
+  open-pull-requests-limit: 1
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+- package-ecosystem: pip
+  directory: /ai-decision/config
+  schedule:
+    interval: weekly
+  multi-ecosystem-group: weekly-maintenance
+  patterns:
+  - '*'
+  open-pull-requests-limit: 1
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  - dependency-name: mpmath
+    versions:
+    - '>=1.4'
+  - dependency-name: networkx
+    versions:
+    - '>=3.7'
+multi-ecosystem-groups:
+  weekly-maintenance:
     schedule:
       interval: weekly
-  - package-ecosystem: docker
-    directory: /backend
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker
-    directory: /frontend
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker
-    directory: /ai-decision
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker-compose
-    directory: /
-    schedule:
-      interval: weekly
-  - package-ecosystem: maven
-    directory: /backend
-    schedule:
-      interval: weekly
-  - package-ecosystem: npm
-    directory: /frontend
-    schedule:
-      interval: weekly
-  - package-ecosystem: pip
-    directory: /ai-decision/config
-    schedule:
-      interval: weekly
+      day: monday
+      time: 08:00
+      timezone: Asia/Ho_Chi_Minh
