@@ -95,6 +95,26 @@ class BackupTest(unittest.TestCase):
                     module.backup({'directory': str(root)})
             self.assertEqual(set(root.glob('verified-*.dump')), old)
 
+    def test_first_hardened_backup_rotates_legacy_predeploy_archives_within_the_same_limit(self):
+        module = self.module()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            legacy = []
+            for number in range(7):
+                archive = root / f'pre-deadbee-200001010000{number:02}.sql.gz'
+                archive.write_bytes(b'legacy snapshot')
+                os.utime(archive, (100 + number, 100 + number))
+                legacy.append(archive)
+            unrelated = root / 'pre-operator-notes.sql.gz'
+            unrelated.write_bytes(b'preserve unrelated file')
+            os.utime(unrelated, (1, 1))
+            with patch.object(module, 'run', side_effect=self.dump), patch.object(module, 'verify_restore'):
+                module.backup({'directory': str(root)})
+            retained = [path for path in legacy if path.exists()]
+            self.assertEqual(len(retained) + len(list(root.glob('verified-*.dump'))), 7)
+            self.assertEqual(retained, legacy[1:])
+            self.assertEqual(unrelated.read_bytes(), b'preserve unrelated file')
+
     def test_restore_rejects_live_or_invalid_database_before_any_docker_call(self):
         module = self.module()
         with patch.object(module, 'run') as run:

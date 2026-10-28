@@ -81,7 +81,11 @@ def backup(config):
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
-    previous = sorted((path for path in directory.glob('verified-*.dump') if path != final),
+    archives = [path for path in directory.glob('verified-*.dump') if path != final]
+    # Reuse the existing predeploy directory without retaining a second set of seven.
+    archives.extend(path for path in directory.glob('pre-*.sql.gz')
+                    if re.fullmatch(r'pre-[0-9a-f]{7}-[0-9]{14}\.sql\.gz', path.name))
+    previous = sorted(archives,
                       key=lambda path: (path.stat().st_mtime_ns, path.name), reverse=True)
     for old in previous[keep - 1:]:
         old.unlink()
