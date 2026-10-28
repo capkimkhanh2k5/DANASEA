@@ -606,6 +606,13 @@ export function VendorOrders() {
   const countCancelled = orders.filter((o) => o.status === "CANCELLED").length;
   const countRefunded = orders.filter((o) => o.status === "REFUNDED").length;
 
+  // Total Net Payout
+  const totalNetRevenue = useMemo(() => {
+    return orders
+      .filter((o) => o.status === "CONFIRMED" || o.status === "COMPLETED")
+      .reduce((acc, curr) => acc + curr.payoutAmount, 0);
+  }, [orders]);
+
   // Pagination calculation
   const totalItems = filteredOrders.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -799,7 +806,7 @@ export function VendorOrders() {
               </span>
               <select
                 value={selectedShift}
-                onChange={(e) => { setSelectedShift(e.target.value as typeof selectedShift); setCurrentPage(1); }}
+                onChange={(e) => { setSelectedShift(e.target.value as any); setCurrentPage(1); }}
                 className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-black font-semibold cursor-pointer focus:outline-none"
               >
                 <option value="ALL">Tất cả các ca</option>

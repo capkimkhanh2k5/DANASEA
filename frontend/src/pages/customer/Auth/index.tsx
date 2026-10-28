@@ -1,4 +1,3 @@
-import type { HttpRequestError } from "../../../types/http";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../store/useAuthStore";
@@ -138,8 +137,7 @@ export function Auth() {
       setTimeout(() => {
         navigate(destination);
       }, 1100);
-    } catch (caught: unknown) {
-      const err = caught as HttpRequestError;
+    } catch (err: any) {
       console.groupEnd();
       console.error('[Auth Flow] Lỗi đăng nhập thất bại:', err);
 
@@ -237,8 +235,7 @@ export function Auth() {
       setTimeout(() => {
         navigate(destination);
       }, 1200);
-    } catch (caught: unknown) {
-      const err = caught as HttpRequestError;
+    } catch (err: any) {
       console.groupEnd();
       console.error('[Google Auth] Lỗi đăng nhập Google thất bại:', err);
       const status = err.response?.status;
@@ -335,8 +332,7 @@ export function Auth() {
       setRegStep('otp');
       console.log('[Bước 4/4] Chuyển giao diện sang bước nhập mã OTP 6 chữ số.');
       console.groupEnd();
-    } catch (caught: unknown) {
-      const err = caught as HttpRequestError;
+    } catch (err: any) {
       console.groupEnd();
       console.error('[Auth Register] Đăng ký thất bại:', err);
 
@@ -373,8 +369,7 @@ export function Auth() {
       await authService.sendVerificationOtp();
       console.log('[Gửi lại OTP] Thành công (202 Accepted)! Bắt đầu đếm ngược 60s.');
       setOtpCooldown(60);
-    } catch (caught: unknown) {
-      const err = caught as HttpRequestError;
+    } catch (err: any) {
       console.error('[Gửi lại OTP] Thất bại:', err);
       const status = err.response?.status;
       if (status === 401) {
@@ -433,8 +428,7 @@ export function Auth() {
       setTimeout(() => {
         navigate('/');
       }, 1200);
-    } catch (caught: unknown) {
-      const err = caught as HttpRequestError;
+    } catch (err: any) {
       console.groupEnd();
       console.error('[Auth OTP] Xác thực OTP thất bại:', err);
       const status = err.response?.status;

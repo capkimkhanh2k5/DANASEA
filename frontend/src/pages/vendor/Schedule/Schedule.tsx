@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { vendorService } from "../../../services/vendorService";
 import { toast } from "../../../store/useToastStore";
 import { extractErrorMessage } from "../../../utils/errorHandler";
@@ -13,6 +13,7 @@ import type {
 } from "../../../types/vendorService";
 
 export function Schedule() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryServiceId = searchParams.get("serviceId");
 
@@ -55,21 +56,9 @@ export function Schedule() {
   const [capacityError, setCapacityError] = useState<string | null>(null);
   const [isUpdatingSlot, setIsUpdatingSlot] = useState(false);
 
-  const [previousQueryService, setPreviousQueryService] = useState(queryServiceId);
-  if (previousQueryService !== queryServiceId) {
-    setPreviousQueryService(queryServiceId);
-    setIsLoadingServices(true);
-  }
-  const [previousService, setPreviousService] = useState(selectedServiceId);
-  if (previousService !== selectedServiceId) {
-    setPreviousService(selectedServiceId);
-    setSlots([]);
-    setSlotsErrorMessage(null);
-    setIsLoadingSlots(Boolean(selectedServiceId));
-  }
-
   // 1. Fetch vendor services
   useEffect(() => {
+    setIsLoadingServices(true);
     vendorService.getMyServices()
       .then((data) => {
         const list = data || [];
@@ -89,18 +78,23 @@ export function Schedule() {
   }, [queryServiceId]);
 
   // 2. Fetch slots for selected service
-  const loadSlots = useCallback((serviceId: string) => {
-    if (!serviceId) return;
-    return vendorService.getSlots(serviceId).then((data) => {
-      setSlotsErrorMessage(null);
+  const loadSlots = useCallback(async (serviceId: string) => {
+    if (!serviceId) {
+      setSlots([]);
+      return;
+    }
+    setIsLoadingSlots(true);
+    setSlotsErrorMessage(null);
+    try {
+      const data = await vendorService.getSlots(serviceId);
       setSlots(data || []);
-    }).catch((err: unknown) => {
+    } catch (err: unknown) {
       console.error("[Schedule] Lỗi nạp danh sách ca:", err);
       const msg = err instanceof Error ? err.message : "Không thể nạp lịch ca";
       setSlotsErrorMessage(msg);
-    }).finally(() => {
+    } finally {
       setIsLoadingSlots(false);
-    });
+    }
   }, []);
 
   useEffect(() => {
@@ -292,7 +286,7 @@ export function Schedule() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => { if (selectedServiceId) { setIsLoadingSlots(true); loadSlots(selectedServiceId); } }}
+              onClick={() => selectedServiceId && loadSlots(selectedServiceId)}
               className="p-1.5 rounded-lg bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200 transition-colors"
               title="Làm mới lịch ca"
               type="button"
@@ -307,7 +301,7 @@ export function Schedule() {
           <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between text-rose-800 text-xs">
             <span>Lỗi tải danh sách ca: {slotsErrorMessage}</span>
             <button
-              onClick={() => { if (selectedServiceId) { setIsLoadingSlots(true); loadSlots(selectedServiceId); } }}
+              onClick={() => selectedServiceId && loadSlots(selectedServiceId)}
               className="px-2.5 py-1 bg-rose-600 text-white rounded font-bold hover:bg-rose-700"
               type="button"
             >

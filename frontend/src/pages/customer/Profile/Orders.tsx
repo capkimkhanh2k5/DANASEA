@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { orderService } from "../../../services/orderService";
@@ -9,6 +9,7 @@ import type {
   OrderResponse,
   SubOrderResponse,
   CancellationPreviewResponse,
+  RefundRequest,
   RefundResponse,
   QrCodeResponse,
 } from "../../../types/order";
@@ -24,17 +25,10 @@ export function Orders() {
   const [filter, setFilter] = useState<OrderFilter>("all");
   const [orders, setOrders] = useState<OrderResponse[]>([]);
   const [orderRefunds, setOrderRefunds] = useState<Record<string, RefundResponse[]>>({});
-  const [loadingState, setLoading] = useState<boolean>(true);
-  const loading = isAuthenticated && Boolean(accessToken) && loadingState;
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
-  const [previousRequest, setPreviousRequest] = useState({ page, accessToken });
-  if (previousRequest.page !== page || previousRequest.accessToken !== accessToken) {
-    setPreviousRequest({ page, accessToken });
-    setLoading(true);
-  }
-
   const [serviceDetails, setServiceDetails] = useState<Record<string, ServiceDetailDto>>({});
 
   // QR Modal state
@@ -72,14 +66,17 @@ export function Orders() {
   const [disputeReason, setDisputeReason] = useState("");
   const [submittedDisputes, setSubmittedDisputes] = useState<Record<string, string>>({});
 
-  const serviceDetailsCache = useRef<Record<string, ServiceDetailDto>>({});
-
   // Fetch orders from API
-  const fetchOrders = useCallback((targetPage = 0) => {
-    if (!isAuthenticated || !accessToken) return;
+  const fetchOrders = useCallback(async (targetPage = 0) => {
+    if (!isAuthenticated || !accessToken) {
+      setLoading(false);
+      return;
+    }
 
-    return orderService.getMyOrders(targetPage, 20).then((res) => {
+    try {
+      setLoading(true);
       setError(null);
+      const res = await orderService.getMyOrders(targetPage, 20);
       setOrders(res.content || []);
       setPage(res.page || 0);
       setTotalPages(res.totalPages || 1);
@@ -104,17 +101,16 @@ export function Orders() {
 
       // Lazy load service details for titles and images
       serviceIds.forEach(async (sId) => {
-        if (!serviceDetailsCache.current[sId]) {
+        if (!serviceDetails[sId]) {
           try {
             const detail = await serviceCatalogService.getServiceDetail(sId);
-            serviceDetailsCache.current[sId] = detail;
             setServiceDetails((prev) => ({ ...prev, [sId]: detail }));
           } catch {
             // Non-critical, fallback will be used
           }
         }
       });
-    }).catch((err: unknown) => {
+    } catch (err: unknown) {
       console.error("[Orders] Lỗi khi tải danh sách đơn hàng:", err);
       let msg = "Không thể tải danh sách đơn hàng từ máy chủ.";
       if (err && typeof err === "object" && "response" in err) {
@@ -128,14 +124,16 @@ export function Orders() {
         msg = err.message;
       }
       setError(msg);
-    }).finally(() => {
+    } finally {
       setLoading(false);
-    });
-  }, [isAuthenticated, accessToken]);
+    }
+  }, [isAuthenticated, accessToken, serviceDetails]);
 
   useEffect(() => {
     if (isAuthenticated && accessToken) {
       fetchOrders(page);
+    } else {
+      setLoading(false);
     }
   }, [page, isAuthenticated, accessToken, fetchOrders]);
 
@@ -311,7 +309,6 @@ export function Orders() {
       }
       setTimeout(() => {
         setCancellationOrder(null);
-        setLoading(true);
         fetchOrders(page);
       }, 1500);
     } catch (err: unknown) {
@@ -568,7 +565,7 @@ export function Orders() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => { setLoading(true); fetchOrders(page); }}
+                    onClick={() => fetchOrders(page)}
                     className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold cursor-pointer"
                   >
                     Thử lại

@@ -30,21 +30,23 @@ export function Services() {
     toast.success(msg);
   };
 
-  const loadData = useCallback(() => {
-    return Promise.all([
-      vendorService.getMyServices(),
-      categoryService.getCategories(),
-    ]).then(([servicesData, categoriesData]) => {
-      setErrorMessage(null);
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const [servicesData, categoriesData] = await Promise.all([
+        vendorService.getMyServices(),
+        categoryService.getCategories(),
+      ]);
       setServices(servicesData || []);
       setCategories(categoriesData || []);
-    }).catch((err: unknown) => {
+    } catch (err: unknown) {
       console.error('[Services] Lỗi khi nạp danh sách dịch vụ:', err);
       const msg = err instanceof Error ? err.message : 'Không thể kết nối máy chủ';
       setErrorMessage(msg);
-    }).finally(() => {
+    } finally {
       setIsLoading(false);
-    });
+    }
   }, []);
 
   useEffect(() => {
@@ -394,7 +396,7 @@ export function Services() {
                 </select>
               </div>
               <button 
-                onClick={() => { setSearchQuery(''); setCategoryFilter('all'); setSortBy('newest'); setActiveTab('ALL'); setCurrentPage(1); setIsLoading(true); loadData(); }}
+                onClick={() => { setSearchQuery(''); setCategoryFilter('all'); setSortBy('newest'); setActiveTab('ALL'); setCurrentPage(1); loadData(); }}
                 className="p-1.5 rounded-lg bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200 transition-colors" 
                 title="Làm mới dữ liệu" 
                 type="button"
@@ -413,7 +415,7 @@ export function Services() {
               <span>Không thể tải danh sách dịch vụ: {errorMessage}</span>
             </div>
             <button
-              onClick={() => { setIsLoading(true); loadData(); }}
+              onClick={loadData}
               className="px-3 py-1 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 transition-colors shrink-0"
               type="button"
             >

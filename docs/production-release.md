@@ -1,5 +1,7 @@
 # Production releases and recovery
 
+Current implementation status: frontend corrections were delegated to Role FE and removed from this branch. Its CI lint and frontend image gates are currently blocking; use [the FE handoff](FE_CICD_HANDOFF.md) before promoting a release.
+
 ## Release contract
 
 CI runs Java 21 verification, mandatory Flash Sale tests with owned PostgreSQL 17/Redis, Quyet boundary and pinned CPU inference tests, blocking frontend lint (zero errors and zero warnings)/build, dependency/secret checks, workflow/deployment guards, and production image builds/scans. `Required CI gate` must pass; absent suites and unexpected skips fail it. The allowlist in `.ci/test-policy.json` contains only historical superseded ServiceTier tests and live AI probes whose runtime acceptance runs elsewhere.

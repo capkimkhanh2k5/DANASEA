@@ -38,6 +38,7 @@ export function PaymentResult() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { items: cartItems, addItem, clearCart } = useCartStore();
+  const [order, setOrder] = useState<OrderSnapshot | null>(null);
   const [savedTicketId, setSavedTicketId] = useState<string | null>(null);
 
   // Status detection from URL params (e.g. from VNPay or simulation)
@@ -65,13 +66,14 @@ export function PaymentResult() {
     }
   };
 
-  const [order] = useState<OrderSnapshot>(() => {
+  useEffect(() => {
     // 1. Try to load recent order snapshot from sessionStorage
     const saved = sessionStorage.getItem("danasea_last_order");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return parsed;
+        setOrder(parsed);
+        return;
       } catch (e) {
         console.error("Failed to parse saved order snapshot:", e);
       }
@@ -105,8 +107,8 @@ export function PaymentResult() {
       finalTotal: 900000,
       paidAt: "08:35 • Hôm nay",
     };
-    return fallbackOrder;
-  });
+    setOrder(fallbackOrder);
+  }, [searchParams]);
 
   // Only clear cart when payment is confirmed SUCCESSFUL
   useEffect(() => {

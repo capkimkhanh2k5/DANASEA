@@ -1,5 +1,7 @@
 # Production CI/CD Hardening Implementation Plan
 
+> Scope update, 2026-10-28: the owner delegated all `frontend/` changes to Role FE. They have been restored to main; the current frontend has 16 ESLint errors, 35 warnings and 3 HIGH image findings (2 CVEs). CI is intentionally still blocking. Historical frontend/rehearsal success below does not apply after that withdrawal. See `docs/FE_CICD_HANDOFF.md`.
+
 > **For agentic workers:** Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
 **Goal:** Close the audited repository-level release gaps with executable controls and measured validation.
@@ -47,7 +49,8 @@ Files: backend/src/test/.../flashsale/*, scripts/check_test_reports.py, scripts/
 
 - [x] Capture current lint and Flash Sale failures; add report-gate failure tests.
 - [x] Give Flash Sale suites PostgreSQL 17/Redis Testcontainers, remove stale schema-version assumptions, enforce critical-suite execution and worker tests.
-- [x] Fix ESLint errors at source; run frontend lint/build, Maven verify and worker tests.
+- [x] Run Maven verify and worker tests.
+- [ ] Role FE: fix source lint and frontend image findings, validate build/runtime, then rerun integration. Former FE fixes have been removed at the owner's request.
 
 ### Task 4: Immutable builds and security gates
 
@@ -88,3 +91,5 @@ User clarification (2026-10-28): local server BackUp storage is sufficient; off-
 - Fresh Linux amd64 GitHub Actions execution and actual older-production-image upgrade rehearsal have not run in this local session.
 
 Latest main d0bda178ec4624aa2d5167a18c240258bdf9cfcd was integrated locally. Its additional 4 ESLint errors and 6 warnings were fixed; the merged frontend passes strict lint/build, image scan and the disposable rehearsal. No push: the new repository push principles require explicit written user authorization.
+
+Current frontend verification after withdrawal: strict lint exits 1 (16 errors, 35 warnings); build exits 0; npm audit reports 0 vulnerabilities; actual original-Dockerfile image scan exits 1 (3 HIGH package findings, 2 CVEs). No release gate was weakened.

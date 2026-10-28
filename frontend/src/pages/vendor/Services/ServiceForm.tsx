@@ -20,16 +20,12 @@ import { extractErrorMessage } from '../../../utils/errorHandler';
 type FormTab = 'CONTENT_SAFETY' | 'IMAGES' | 'OPTIONS' | 'SAFETY_DOCS';
 
 export function ServiceForm() {
-  const { serviceId } = useParams<{ serviceId?: string }>();
-  return <ServiceFormPage key={serviceId || 'new'} serviceId={serviceId} />;
-}
-
-function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
   const navigate = useNavigate();
+  const { serviceId } = useParams<{ serviceId?: string }>();
   const isEditMode = Boolean(serviceId);
 
   const [activeTab, setActiveTab] = useState<FormTab>('CONTENT_SAFETY');
-  const [isLoading, setIsLoading] = useState<boolean>(Boolean(serviceId));
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   
 
@@ -89,11 +85,13 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
   };
 
   // Load initial data
-  const loadServiceData = useCallback((id: string) => {
-    return Promise.all([
-      vendorService.getServiceDetail(id),
-      vendorService.getOptions(id).catch(() => []),
-    ]).then(([svc, opts]) => {
+  const loadServiceData = useCallback(async (id: string) => {
+    setIsLoading(true);
+    try {
+      const [svc, opts] = await Promise.all([
+        vendorService.getServiceDetail(id),
+        vendorService.getOptions(id).catch(() => []),
+      ]);
       setCurrentServiceId(svc.id);
       setServiceStatus(svc.status);
       setRejectionReason(svc.rejectionReason);
@@ -117,31 +115,29 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
       setMaxWaveM(svc.maxWaveM);
       setImages(svc.images || []);
       setOptions(opts || []);
-    }).catch((err: unknown) => {
+    } catch (err: unknown) {
       console.error('[ServiceForm] Lỗi nạp thông tin dịch vụ:', err);
       const msg = extractErrorMessage(err, 'Không thể tải thông tin chi tiết dịch vụ');
       toast.error(msg);
-    }).finally(() => {
+    } finally {
       setIsLoading(false);
-    });
+    }
   }, []);
 
   useEffect(() => {
     // 1. Fetch categories
     categoryService.getCategories().then(cats => {
       setCategories(cats || []);
-      if (cats && cats.length > 0) {
-        setCategoryId(current => current || cats[0].id);
+      if (!categoryId && cats && cats.length > 0) {
+        setCategoryId(cats[0].id);
       }
-    }).catch(err => toast.error(extractErrorMessage(err, 'Không thể tải danh mục')));
-  }, []);
+    });
 
-  useEffect(() => {
     // 2. Fetch service if in edit mode
     if (serviceId) {
       loadServiceData(serviceId);
     }
-  }, [serviceId, loadServiceData]);
+  }, [serviceId, loadServiceData, categoryId]);
 
   // Save Service (Create or Update)
   const handleSaveService = async (andSubmit = false): Promise<VendorServiceDto | null> => {
@@ -283,6 +279,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
       e.target.value = '';
     } catch (err: unknown) {
       console.error('[ServiceForm] Lỗi tải ảnh:', err);
+      const msg = err instanceof Error ? err.message : 'Tải ảnh thất bại';
       toast.error(extractErrorMessage(err, "Tải ảnh lên thất bại"));
     } finally {
       setIsUploadingImage(false);
@@ -391,6 +388,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
       e.target.value = '';
     } catch (err: unknown) {
       console.error('[ServiceForm] Lỗi tải chứng từ an toàn:', err);
+      const msg = err instanceof Error ? err.message : 'Tải chứng từ thất bại';
       toast.error(extractErrorMessage(err, "Tải chứng từ an toàn thất bại"));
     } finally {
       setIsUploadingDoc(false);

@@ -227,6 +227,7 @@ export function Promotions() {
   });
 
   const activeCount = promotions.filter((p) => p.isActive).length;
+  const totalUsed = promotions.reduce((sum, p) => sum + p.usedCount, 0);
 
   return (
     <div className="w-full pt-4 pb-20 bg-background min-h-screen">
@@ -520,7 +521,7 @@ export function Promotions() {
                   </label>
                   <select
                     value={type}
-                    onChange={(e) => setType(e.target.value as typeof type)}
+                    onChange={(e) => setType(e.target.value as any)}
                     className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/30 font-body-md"
                   >
                     <option value="PERCENTAGE">Theo Phần trăm (%)</option>

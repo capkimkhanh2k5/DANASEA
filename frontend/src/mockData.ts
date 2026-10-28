@@ -1,4 +1,4 @@
-import type { Service, User, ServiceSlot, ServiceImage, MasterOrder, SubOrder, Dispute } from './types';
+import type { Service, User, ServiceSlot, ServiceImage, MasterOrder, SubOrder } from './types';
 
 export const CATEGORIES = [
   { id: 'cat-1', name: 'Chèo SUP', icon: 'surfing' },
@@ -205,7 +205,7 @@ export const MOCK_SUB_ORDERS: SubOrder[] = [
   }
 ];
 
-export const MOCK_DISPUTES: Array<Omit<Dispute, 'resolvedBy' | 'resolvedAt' | 'createdAt'> & { createdAt: string; resolvedBy: string | null; resolvedAt: string | null }> = [
+export const MOCK_DISPUTES: any[] = [
   {
     id: "DSP-01",
     subOrderId: "SUB-89412-01",

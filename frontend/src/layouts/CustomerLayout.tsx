@@ -17,18 +17,14 @@ export function CustomerLayout() {
   const [prevPath, setPrevPath] = useState(location.pathname);
   const [animationClass, setAnimationClass] = useState("animate-fade-in-up");
   const { toastMessage, toastTimestamp, clearToast } = useWishlistStore();
-  const [currentToast, setCurrentToast] = useState<{ text: string; id: number } | null>(() => toastMessage && toastTimestamp ? { text: toastMessage, id: toastTimestamp } : null);
+  const [currentToast, setCurrentToast] = useState<{ text: string; id: number } | null>(null);
   const [isExiting, setIsExiting] = useState(false);
-
-  const [seenToast, setSeenToast] = useState(toastTimestamp);
-  if (toastTimestamp !== seenToast) {
-    setSeenToast(toastTimestamp);
-    setIsExiting(false);
-    setCurrentToast(toastMessage ? { text: toastMessage, id: toastTimestamp } : null);
-  }
 
   useEffect(() => {
     if (toastMessage && toastTimestamp) {
+      setIsExiting(false);
+      setCurrentToast({ text: toastMessage, id: toastTimestamp });
+
       // After 2.5s, trigger exit slide-out animation to the right
       const exitTimer = setTimeout(() => {
         setIsExiting(true);

@@ -29,13 +29,6 @@ export interface GsiButtonConfiguration {
   locale?: string;
 }
 
-export interface GooglePromptMomentNotification {
-  isNotDisplayed: () => boolean;
-  getNotDisplayedReason: () => string;
-  isSkippedMoment: () => boolean;
-  getSkippedReason: () => string;
-}
-
 declare global {
   interface Window {
     google?: {
@@ -43,7 +36,7 @@ declare global {
         id: {
           initialize: (config: GoogleIdConfiguration) => void;
           renderButton: (parent: HTMLElement, options: GsiButtonConfiguration) => void;
-          prompt: (momentListener?: (moment: GooglePromptMomentNotification) => void) => void;
+          prompt: (momentListener?: (moment: any) => void) => void;
           cancel: () => void;
           disableAutoSelect: () => void;
         };
