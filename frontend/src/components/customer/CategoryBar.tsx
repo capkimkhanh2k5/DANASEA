@@ -48,7 +48,7 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({ className = '' }) => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [language]);
 
   const handleCategoryClick = (slug: string) => {
     navigate(`/search?category=${encodeURIComponent(slug)}`);

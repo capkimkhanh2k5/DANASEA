@@ -119,7 +119,7 @@ export function Search() {
     }
     loadCategories();
     return () => { isMounted = false; };
-  }, []);
+  }, [language]);
 
   const [previousCategory, setPreviousCategory] = useState(categoryParam);
   if (categoryParam !== previousCategory) {
@@ -244,7 +244,7 @@ export function Search() {
 
     fetchServices();
     return () => { isMounted = false; };
-  }, [matchedCategory, selectedCategorySlug, keyword, sortBy]);
+  }, [matchedCategory, selectedCategorySlug, keyword, sortBy, language]);
 
   // Client-side filtering by max price & sorting if needed
   const displayServices = useMemo(() => {

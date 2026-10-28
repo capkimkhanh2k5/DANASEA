@@ -1,197 +1,201 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-
-interface VendorServiceItem {
-  id: string;
-  code: string;
-  name: string;
-  nameEn: string;
-  category: string;
-  categoryKey: 'sup' | 'diving' | 'boat' | 'extreme';
-  price: number;
-  duration: number; // minutes
-  capacityPerSlot: number;
-  rating: number;
-  reviewCount: number;
-  status: 'ACTIVE' | 'PENDING_APPROVAL' | 'DRAFT' | 'PAUSED';
-  location: string;
-  image: string;
-}
-
-const INITIAL_SERVICES: VendorServiceItem[] = [
-  {
-    id: 'SRV-001',
-    code: 'SUP-MK-01',
-    name: 'Chèo SUP đón bình minh biển Mỹ Khê',
-    nameEn: 'Sunrise Stand-up Paddleboarding at My Khe Beach',
-    category: 'Chèo SUP & Kayak',
-    categoryKey: 'sup',
-    price: 280000,
-    duration: 120,
-    capacityPerSlot: 12,
-    rating: 4.9,
-    reviewCount: 86,
-    status: 'ACTIVE',
-    location: 'Bãi tắm Sao Biển, Hoàng Sa, Sơn Trà',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC7CA5tOzJev3TShmxMJ4QbD1KAtw2Nt4zcS-OGJysAF35iVA3yiq1cn7LzS5avIoYwSZtPPYOK8Uy4sAiKi81ovlXynWiu-ABcA7jMJ4VLmNNaKQnR9XjELpnzI_DKus9UZnuzQy55BJ1ZQa3wNf8-in9TALBABjR7nBMIJYRSaUKp1dthyttkxPw5Z6gKOQz6AO3zsLYbigGjjmP7NTtVdChlPTxTxv31Xsc_IzrAeN1uHkN-vqkS_Q'
-  },
-  {
-    id: 'SRV-002',
-    code: 'DIV-BB-02',
-    name: 'Lặn biển bình khí ngắm rạn san hô Bãi Bụt',
-    nameEn: 'Scuba Diving at Bai But Coral Reef',
-    category: 'Lặn biển & San hô',
-    categoryKey: 'diving',
-    price: 650000,
-    duration: 180,
-    capacityPerSlot: 8,
-    rating: 4.8,
-    reviewCount: 42,
-    status: 'ACTIVE',
-    location: 'Bến tàu Bãi Bụt, Bán đảo Sơn Trà',
-    image: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80'
-  },
-  {
-    id: 'SRV-003',
-    code: 'JET-ST-03',
-    name: 'Lướt ván phản lực Jetsurf Sơn Trà',
-    nameEn: 'Electric Hydrofoil & JetSurf Adventure',
-    category: 'Thể thao cảm giác mạnh',
-    categoryKey: 'extreme',
-    price: 1200000,
-    duration: 45,
-    capacityPerSlot: 4,
-    rating: 5.0,
-    reviewCount: 15,
-    status: 'ACTIVE',
-    location: 'Bãi Tiên Sa, Sơn Trà, Đà Nẵng',
-    image: 'https://images.unsplash.com/photo-1559827291-72ee739d0d9a?auto=format&fit=crop&w=600&q=80'
-  },
-  {
-    id: 'SRV-004',
-    code: 'PAR-MK-04',
-    name: 'Dù bay cano kéo Parasailing Mỹ Khê',
-    nameEn: 'Tandem Parasailing Over Da Nang Coast',
-    category: 'Thể thao cảm giác mạnh',
-    categoryKey: 'extreme',
-    price: 950000,
-    duration: 30,
-    capacityPerSlot: 6,
-    rating: 4.7,
-    reviewCount: 38,
-    status: 'ACTIVE',
-    location: 'Bãi tắm Phạm Văn Đồng, Sơn Trà',
-    image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80'
-  },
-  {
-    id: 'SRV-005',
-    code: 'PAD-OW-05',
-    name: 'Khóa học lặn biển chuẩn quốc tế PADI Open Water',
-    nameEn: 'PADI Open Water Diver Certification Course',
-    category: 'Lặn biển & San hô',
-    categoryKey: 'diving',
-    price: 4500000,
-    duration: 1440,
-    capacityPerSlot: 6,
-    rating: 0,
-    reviewCount: 0,
-    status: 'PENDING_APPROVAL',
-    location: 'Trạm kiểm định Hòn Chảo, Sơn Trà',
-    image: 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?auto=format&fit=crop&w=600&q=80'
-  },
-  {
-    id: 'SRV-006',
-    code: 'KAY-TS-06',
-    name: 'Sunset Kayak ngắm hoàng hôn Tiên Sa',
-    nameEn: 'Tiên Sa Bay Sunset Kayaking',
-    category: 'Chèo SUP & Kayak',
-    categoryKey: 'sup',
-    price: 350000,
-    duration: 90,
-    capacityPerSlot: 10,
-    rating: 0,
-    reviewCount: 0,
-    status: 'DRAFT',
-    location: 'Vịnh Tiên Sa, Sơn Trà, Đà Nẵng',
-    image: 'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?auto=format&fit=crop&w=600&q=80'
-  }
-];
+import { vendorService } from '../../../services/vendorService';
+import { categoryService } from '../../../services/categoryService';
+import type { VendorServiceDto, ServiceStatus } from '../../../types/vendorService';
+import type { CategoryDto } from '../../../types/category';
+import { toast } from '../../../store/useToastStore';
+import { extractErrorMessage } from '../../../utils/errorHandler';
 
 export function Services() {
   const navigate = useNavigate();
-  const [services, setServices] = useState<VendorServiceItem[]>(INITIAL_SERVICES);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'ACTIVE' | 'PENDING_APPROVAL' | 'DRAFT' | 'PAUSED'>('ALL');
+  const [services, setServices] = useState<VendorServiceDto[]>([]);
+  const [categories, setCategories] = useState<CategoryDto[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<'ALL' | ServiceStatus>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('newest');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'newest' | 'price_asc' | 'price_desc' | 'rating'>('newest');
+  
+  const [actionInProgressId, setActionInProgressId] = useState<string | null>(null);
 
   // Edit price modal state
-  const [editingService, setEditingService] = useState<VendorServiceItem | null>(null);
+  const [editingService, setEditingService] = useState<VendorServiceDto | null>(null);
   const [editPriceInput, setEditPriceInput] = useState('');
 
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    toast.success(msg);
   };
 
-  // Toggle status between ACTIVE and PAUSED
-  const handleToggleStatus = (id: string) => {
-    setServices(prev => prev.map(s => {
-      if (s.id === id) {
-        const nextStatus = s.status === 'ACTIVE' ? 'PAUSED' : 'ACTIVE';
-        showToast(nextStatus === 'ACTIVE' ? `Đã mở bán lại dịch vụ "${s.name}"` : `Đã tạm ngưng dịch vụ "${s.name}"`);
-        return { ...s, status: nextStatus };
-      }
-      return s;
-    }));
-  };
+  const loadData = useCallback(() => {
+    return Promise.all([
+      vendorService.getMyServices(),
+      categoryService.getCategories(),
+    ]).then(([servicesData, categoriesData]) => {
+      setErrorMessage(null);
+      setServices(servicesData || []);
+      setCategories(categoriesData || []);
+    }).catch((err: unknown) => {
+      console.error('[Services] Lỗi khi nạp danh sách dịch vụ:', err);
+      const msg = err instanceof Error ? err.message : 'Không thể kết nối máy chủ';
+      setErrorMessage(msg);
+    }).finally(() => {
+      setIsLoading(false);
+    });
+  }, []);
 
-  // Delete service
-  const handleDeleteService = (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc muốn xóa dịch vụ "${name}" khỏi danh sách?`)) {
-      setServices(prev => prev.filter(s => s.id !== id));
-      showToast(`Đã xóa dịch vụ "${name}"`);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Handle Submit for Review (DRAFT or REJECTED)
+  const handleSubmitForReview = async (service: VendorServiceDto) => {
+    if (!service.images || service.images.length === 0) {
+      toast.warning('Dịch vụ cần ít nhất 1 ảnh để gửi duyệt. Vui lòng mở chỉnh sửa dịch vụ và tải ảnh lên.');
+      return;
+    }
+    if (!window.confirm(`Bạn có chắc muốn gửi duyệt dịch vụ "${service.name}" tới Quản trị viên?`)) {
+      return;
+    }
+    setActionInProgressId(service.id);
+    try {
+      const updated = await vendorService.submitForReview(service.id);
+      setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
+      showToast(`Đã gửi duyệt thành công dịch vụ "${service.name}". Trạng thái chuyển thành Chờ duyệt.`);
+    } catch (err: unknown) {
+      console.error('[Services] Lỗi submit duyệt:', err);
+      const msg = extractErrorMessage(err, 'Không thể gửi duyệt dịch vụ');
+      toast.error(msg);
+    } finally {
+      setActionInProgressId(null);
     }
   };
 
-  // Save quick price edit
-  const handleSavePrice = () => {
+  // Handle Pause (PUBLISHED -> PAUSED)
+  const handlePauseService = async (service: VendorServiceDto) => {
+    if (!window.confirm(`Bạn có chắc muốn tạm ngưng nhận khách cho dịch vụ "${service.name}"?`)) {
+      return;
+    }
+    setActionInProgressId(service.id);
+    try {
+      const updated = await vendorService.pauseService(service.id);
+      setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
+      showToast(`Đã tạm ngưng dịch vụ "${service.name}".`);
+    } catch (err: unknown) {
+      console.error('[Services] Lỗi tạm ngưng:', err);
+      const msg = extractErrorMessage(err, 'Không thể tạm ngưng dịch vụ');
+      toast.error(msg);
+    } finally {
+      setActionInProgressId(null);
+    }
+  };
+
+  // Handle Resume (PAUSED -> PUBLISHED)
+  const handleResumeService = async (service: VendorServiceDto) => {
+    if (!window.confirm(`Bạn có chắc muốn mở bán lại dịch vụ "${service.name}"?`)) {
+      return;
+    }
+    setActionInProgressId(service.id);
+    try {
+      const updated = await vendorService.resumeService(service.id);
+      setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
+      showToast(`Đã mở bán lại thành công dịch vụ "${service.name}".`);
+    } catch (err: unknown) {
+      console.error('[Services] Lỗi mở bán lại:', err);
+      const msg = extractErrorMessage(err, 'Không thể mở bán lại dịch vụ');
+      toast.error(msg);
+    } finally {
+      setActionInProgressId(null);
+    }
+  };
+
+  // Handle Delete (Only DRAFT or REJECTED)
+  const handleDeleteService = async (id: string, name: string) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa vĩnh viễn dịch vụ "${name}"? Thao tác này không thể hoàn tác.`)) {
+      return;
+    }
+    setActionInProgressId(id);
+    try {
+      await vendorService.deleteService(id);
+      setServices(prev => prev.filter(s => s.id !== id));
+      showToast(`Đã xóa vĩnh viễn dịch vụ "${name}".`);
+    } catch (err: unknown) {
+      console.error('[Services] Lỗi xóa dịch vụ:', err);
+      const msg = extractErrorMessage(err, 'Không thể xóa dịch vụ');
+      toast.error(msg);
+    } finally {
+      setActionInProgressId(null);
+    }
+  };
+
+  // Quick Price Edit
+  const handleSavePrice = async () => {
     if (!editingService) return;
     const newPrice = parseInt(editPriceInput.replace(/\D/g, ''), 10);
     if (isNaN(newPrice) || newPrice <= 0) {
-      alert('Vui lòng nhập đơn giá hợp lệ lớn hơn 0đ.');
+      toast.warning('Vui lòng nhập đơn giá hợp lệ lớn hơn 0 đ.');
       return;
     }
-    setServices(prev => prev.map(s => s.id === editingService.id ? { ...s, price: newPrice } : s));
-    showToast(`Đã cập nhật giá mới: ${newPrice.toLocaleString('vi-VN')} đ cho ${editingService.name}`);
-    setEditingService(null);
+
+    if (editingService.status === 'PUBLISHED') {
+      const confirmWarning = window.confirm(
+        'LƯU Ý: Dịch vụ đang mở bán (PUBLISHED). Khi chỉnh sửa giá, Backend sẽ tự động chuyển trạng thái về "Chờ duyệt" (PENDING_REVIEW) để Admin kiểm duyệt lại.\n\nBạn có chắc muốn tiếp tục?'
+      );
+      if (!confirmWarning) return;
+    }
+
+    setActionInProgressId(editingService.id);
+    try {
+      const updated = await vendorService.updateService(editingService.id, { price: newPrice });
+      setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
+      showToast(`Đã cập nhật giá mới: ${newPrice.toLocaleString('vi-VN')} đ cho "${editingService.name}"`);
+      setEditingService(null);
+    } catch (err: unknown) {
+      console.error('[Services] Lỗi sửa giá nhanh:', err);
+      const msg = extractErrorMessage(err, 'Cập nhật giá thất bại');
+      toast.error(msg);
+    } finally {
+      setActionInProgressId(null);
+    }
   };
+
+  // Category map helper for defensive display
+  const categoryMap = new Map<string, string>();
+  categories.forEach(cat => {
+    categoryMap.set(cat.id, cat.name);
+    if (cat.children && cat.children.length > 0) {
+      cat.children.forEach(sub => categoryMap.set(sub.id, sub.name));
+    }
+  });
 
   // Filter and sort
   const filteredServices = services.filter(service => {
     if (activeTab !== 'ALL' && service.status !== activeTab) return false;
-    if (categoryFilter !== 'all' && service.categoryKey !== categoryFilter) return false;
+    if (categoryFilter !== 'all' && service.categoryId !== categoryFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      const matchName = service.name.toLowerCase().includes(q);
-      const matchEn = service.nameEn.toLowerCase().includes(q);
-      const matchLoc = service.location.toLowerCase().includes(q);
-      const matchCode = service.code.toLowerCase().includes(q);
-      if (!matchName && !matchEn && !matchLoc && !matchCode) return false;
+      const matchName = (service.name || '').toLowerCase().includes(q);
+      const matchEn = (service.nameEn || '').toLowerCase().includes(q);
+      const matchLoc = (service.locationName || service.address || '').toLowerCase().includes(q);
+      if (!matchName && !matchEn && !matchLoc) return false;
     }
     return true;
   }).sort((a, b) => {
-    if (sortBy === 'price_asc') return a.price - b.price;
-    if (sortBy === 'price_desc') return b.price - a.price;
-    if (sortBy === 'rating') return b.rating - a.rating;
-    return 0; // newest default
+    if (sortBy === 'price_asc') return (a.price || 0) - (b.price || 0);
+    if (sortBy === 'price_desc') return (b.price || 0) - (a.price || 0);
+    if (sortBy === 'rating') return (b.avgRating || 0) - (a.avgRating || 0);
+    // newest default: compare updatedAt or createdAt
+    const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return timeB - timeA;
   });
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize] = useState(6);
 
   const totalItems = filteredServices.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -201,8 +205,11 @@ export function Services() {
     validCurrentPage * pageSize
   );
 
-  const activeCount = services.filter(s => s.status === 'ACTIVE').length;
-  const pendingCount = services.filter(s => s.status === 'PENDING_APPROVAL').length;
+  // Tab counters (Defensive counts)
+  const publishedCount = services.filter(s => s.status === 'PUBLISHED').length;
+  const pendingCount = services.filter(s => s.status === 'PENDING_REVIEW').length;
+  const approvedCount = services.filter(s => s.status === 'APPROVED').length;
+  const rejectedCount = services.filter(s => s.status === 'REJECTED').length;
   const draftCount = services.filter(s => s.status === 'DRAFT').length;
   const pausedCount = services.filter(s => s.status === 'PAUSED').length;
 
@@ -213,13 +220,16 @@ export function Services() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-300">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-black tracking-tight">
-              Dịch vụ
+              Quản lý Dịch vụ
             </h1>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Quản lý danh sách dịch vụ, nộp duyệt, cấu hình giá, lịch ca và theo dõi trạng thái kiểm duyệt
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button 
               onClick={() => navigate('/vendor/services/new')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-on-primary text-sm font-medium hover:bg-primary-container transition-colors shadow-xs" 
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-on-primary text-sm font-medium hover:bg-primary/90 transition-colors shadow-xs" 
               type="button"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
@@ -233,80 +243,112 @@ export function Services() {
           {/* Status Pill Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-nowrap scrollbar-none">
             <button 
-              onClick={() => setActiveTab('ALL')}
-              className={`px-4 py-2 rounded-xl font-label-md text-label-md transition-all flex items-center gap-1.5 ${
+              onClick={() => { setActiveTab('ALL'); setCurrentPage(1); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs transition-all flex items-center gap-1.5 ${
                 activeTab === 'ALL' 
-                  ? 'bg-primary text-on-primary font-semibold shadow-sm' 
-                  : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+                  ? 'bg-primary text-on-primary font-bold shadow-xs' 
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
               }`} 
               type="button"
             >
               <span>Tất cả</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold ${activeTab === 'ALL' ? 'bg-on-primary/20 text-on-primary' : 'bg-surface-container text-on-surface-variant'}`}>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeTab === 'ALL' ? 'bg-on-primary/20 text-on-primary' : 'bg-slate-100 text-slate-700'}`}>
                 {services.length}
               </span>
             </button>
 
             <button 
-              onClick={() => setActiveTab('ACTIVE')}
-              className={`px-4 py-2 rounded-xl font-label-md text-label-md transition-all flex items-center gap-1.5 ${
-                activeTab === 'ACTIVE' 
-                  ? 'bg-primary text-on-primary font-semibold shadow-sm' 
-                  : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+              onClick={() => { setActiveTab('PUBLISHED'); setCurrentPage(1); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs transition-all flex items-center gap-1.5 ${
+                activeTab === 'PUBLISHED' 
+                  ? 'bg-primary text-on-primary font-bold shadow-xs' 
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
               }`} 
               type="button"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span>Đang hoạt động</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${activeTab === 'ACTIVE' ? 'bg-on-primary/20 text-on-primary' : 'bg-surface-container text-on-surface-variant'}`}>
-                {activeCount}
+              <span>Đang mở bán</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${activeTab === 'PUBLISHED' ? 'bg-on-primary/20 text-on-primary' : 'bg-slate-100 text-slate-700'}`}>
+                {publishedCount}
               </span>
             </button>
 
             <button 
-              onClick={() => setActiveTab('PENDING_APPROVAL')}
-              className={`px-4 py-2 rounded-xl font-label-md text-label-md transition-all flex items-center gap-1.5 ${
-                activeTab === 'PENDING_APPROVAL' 
-                  ? 'bg-primary text-on-primary font-semibold shadow-sm' 
-                  : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+              onClick={() => { setActiveTab('PENDING_REVIEW'); setCurrentPage(1); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs transition-all flex items-center gap-1.5 ${
+                activeTab === 'PENDING_REVIEW' 
+                  ? 'bg-primary text-on-primary font-bold shadow-xs' 
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
               }`} 
               type="button"
             >
               <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-              <span>Đang chờ duyệt</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${activeTab === 'PENDING_APPROVAL' ? 'bg-on-primary/20 text-on-primary' : 'bg-surface-container text-on-surface-variant'}`}>
+              <span>Chờ duyệt</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${activeTab === 'PENDING_REVIEW' ? 'bg-on-primary/20 text-on-primary' : 'bg-slate-100 text-slate-700'}`}>
                 {pendingCount}
               </span>
             </button>
 
             <button 
-              onClick={() => setActiveTab('DRAFT')}
-              className={`px-4 py-2 rounded-xl font-label-md text-label-md transition-all flex items-center gap-1.5 ${
-                activeTab === 'DRAFT' 
-                  ? 'bg-primary text-on-primary font-semibold shadow-sm' 
-                  : 'bg-surface-container-lowest text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low'
+              onClick={() => { setActiveTab('APPROVED'); setCurrentPage(1); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs transition-all flex items-center gap-1.5 ${
+                activeTab === 'APPROVED' 
+                  ? 'bg-primary text-on-primary font-bold shadow-xs' 
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
               }`} 
               type="button"
             >
-              <span className="w-2 h-2 rounded-full bg-outline"></span>
+              <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+              <span>Đã duyệt (Sẵn sàng)</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${activeTab === 'APPROVED' ? 'bg-on-primary/20 text-on-primary' : 'bg-slate-100 text-slate-700'}`}>
+                {approvedCount}
+              </span>
+            </button>
+
+            <button 
+              onClick={() => { setActiveTab('REJECTED'); setCurrentPage(1); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs transition-all flex items-center gap-1.5 ${
+                activeTab === 'REJECTED' 
+                  ? 'bg-primary text-on-primary font-bold shadow-xs' 
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`} 
+              type="button"
+            >
+              <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+              <span>Bị từ chối</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${activeTab === 'REJECTED' ? 'bg-on-primary/20 text-on-primary' : 'bg-slate-100 text-slate-700'}`}>
+                {rejectedCount}
+              </span>
+            </button>
+
+            <button 
+              onClick={() => { setActiveTab('DRAFT'); setCurrentPage(1); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs transition-all flex items-center gap-1.5 ${
+                activeTab === 'DRAFT' 
+                  ? 'bg-primary text-on-primary font-bold shadow-xs' 
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`} 
+              type="button"
+            >
+              <span className="w-2 h-2 rounded-full bg-slate-400"></span>
               <span>Bản nháp</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${activeTab === 'DRAFT' ? 'bg-on-primary/20 text-on-primary' : 'bg-surface-container text-on-surface-variant'}`}>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${activeTab === 'DRAFT' ? 'bg-on-primary/20 text-on-primary' : 'bg-slate-100 text-slate-700'}`}>
                 {draftCount}
               </span>
             </button>
 
             <button 
-              onClick={() => setActiveTab('PAUSED')}
-              className={`px-4 py-2 rounded-xl font-label-md text-label-md transition-all flex items-center gap-1.5 ${
+              onClick={() => { setActiveTab('PAUSED'); setCurrentPage(1); }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs transition-all flex items-center gap-1.5 ${
                 activeTab === 'PAUSED' 
-                  ? 'bg-primary text-on-primary font-semibold shadow-sm' 
-                  : 'bg-surface-container-lowest text-outline hover:text-on-surface-variant'
+                  ? 'bg-primary text-on-primary font-bold shadow-xs' 
+                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
               }`} 
               type="button"
             >
-              <span className="w-2 h-2 rounded-full bg-red-400"></span>
+              <span className="w-2 h-2 rounded-full bg-amber-600"></span>
               <span>Tạm ngưng</span>
-              <span className={`px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${activeTab === 'PAUSED' ? 'bg-on-primary/20 text-on-primary' : 'bg-surface-container text-outline'}`}>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${activeTab === 'PAUSED' ? 'bg-on-primary/20 text-on-primary' : 'bg-slate-100 text-slate-700'}`}>
                 {pausedCount}
               </span>
             </button>
@@ -315,36 +357,35 @@ export function Services() {
           {/* Search & Filter Controls Panel */}
           <div className="p-3 rounded-xl bg-white border border-slate-300 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
             <div className="relative w-full md:max-w-md">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-black text-body-lg">search</span>
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-[18px]">search</span>
               <input 
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                className="w-full pl-10 pr-3 py-2 rounded-lg bg-slate-50 border border-slate-300 text-black placeholder:text-slate-500 text-sm focus:outline-none focus:ring-1 focus:ring-black" 
-                placeholder="Tìm theo tên dịch vụ, mã tour, bến xuất phát..." 
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-black placeholder:text-slate-500 text-xs focus:outline-none focus:ring-1 focus:ring-primary" 
+                placeholder="Tìm theo tên dịch vụ, bến xuất phát, địa chỉ..." 
                 type="text"
               />
             </div>
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-lg">
-                <span className="material-symbols-outlined text-black text-[18px]">category</span>
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-300 px-2.5 py-1 rounded-lg">
+                <span className="material-symbols-outlined text-slate-600 text-[16px]">category</span>
                 <select 
                   value={categoryFilter}
                   onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1); }}
-                  className="bg-transparent text-black text-xs font-semibold focus:outline-none cursor-pointer"
+                  className="bg-transparent text-black text-xs font-medium focus:outline-none cursor-pointer"
                 >
                   <option value="all">Tất cả danh mục</option>
-                  <option value="sup">Chèo SUP &amp; Kayak</option>
-                  <option value="diving">Lặn biển &amp; San hô</option>
-                  <option value="boat">Cano &amp; Du thuyền</option>
-                  <option value="extreme">Thể thao cảm giác mạnh</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
                 </select>
               </div>
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-lg">
-                <span className="material-symbols-outlined text-black text-[18px]">swap_vert</span>
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-300 px-2.5 py-1 rounded-lg">
+                <span className="material-symbols-outlined text-slate-600 text-[16px]">swap_vert</span>
                 <select 
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="bg-transparent text-black text-xs font-semibold focus:outline-none cursor-pointer"
+                  onChange={(e) => setSortBy(e.target.value as 'newest' | 'price_asc' | 'price_desc' | 'rating')}
+                  className="bg-transparent text-black text-xs font-medium focus:outline-none cursor-pointer"
                 >
                   <option value="newest">Mới cập nhật</option>
                   <option value="price_asc">Giá tăng dần</option>
@@ -353,323 +394,415 @@ export function Services() {
                 </select>
               </div>
               <button 
-                onClick={() => { setSearchQuery(''); setCategoryFilter('all'); setSortBy('newest'); setActiveTab('ALL'); setCurrentPage(1); }}
-                className="p-2 rounded-lg bg-slate-100 border border-slate-300 text-black hover:bg-slate-200 transition-colors" 
-                title="Làm mới bộ lọc" 
+                onClick={() => { setSearchQuery(''); setCategoryFilter('all'); setSortBy('newest'); setActiveTab('ALL'); setCurrentPage(1); setIsLoading(true); loadData(); }}
+                className="p-1.5 rounded-lg bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200 transition-colors" 
+                title="Làm mới dữ liệu" 
                 type="button"
               >
-                <span className="material-symbols-outlined text-[18px]">refresh</span>
+                <span className="material-symbols-outlined text-[16px]">refresh</span>
               </button>
             </div>
           </div>
         </div>
 
+        {/* Error Fallback Banner */}
+        {errorMessage && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start justify-between gap-3 text-rose-800 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-rose-600">error</span>
+              <span>Không thể tải danh sách dịch vụ: {errorMessage}</span>
+            </div>
+            <button
+              onClick={() => { setIsLoading(true); loadData(); }}
+              className="px-3 py-1 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 transition-colors shrink-0"
+              type="button"
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {/* Loading Skeleton */}
+        {isLoading && (
+          <div className="w-full bg-white rounded-xl border border-slate-200 p-6 space-y-4 animate-pulse">
+            <div className="h-6 bg-slate-200 rounded w-1/4"></div>
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-14 bg-slate-100 rounded-lg w-full"></div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Main Service Management Table */}
-        <div
-          key={`${activeTab}-${categoryFilter}-${sortBy}`}
-          className="w-full bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col"
-        >
-          <div className="overflow-x-auto scrollbar-thin">
-            <table className="w-full text-left border-collapse min-w-[960px]">
-              <thead>
-                <tr className="bg-slate-50 text-black text-xs font-bold border-b border-slate-200">
-                  <th className="py-3 px-4 font-bold text-black border-r border-slate-200">Tên dịch vụ &amp; Trải nghiệm</th>
-                  <th className="py-3 px-3 font-bold text-black border-r border-slate-200">Danh mục</th>
-                  <th className="py-3 px-3 font-bold text-black text-right border-r border-slate-200">Đơn giá niêm yết</th>
-                  <th className="py-3 px-3 font-bold text-black border-r border-slate-200">Thời lượng &amp; Ca</th>
-                  <th className="py-3 px-3 font-bold text-black border-r border-slate-200">Đánh giá</th>
-                  <th className="py-3 px-3 font-bold text-black border-r border-slate-200">Trạng thái</th>
-                  <th className="py-3 px-3 text-center font-bold text-black sticky right-0 bg-slate-50 z-10 w-[130px]">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 text-sm text-black">
-                {paginatedServices.length > 0 ? (
-                  paginatedServices.map(service => (
-                    <tr key={service.id} className="hover:bg-slate-50 transition-colors group">
-                      <td className="py-3 px-4 border-r border-slate-200">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
-                            <img className="w-full h-full object-cover" alt={service.name} src={service.image} />
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span 
-                              onClick={() => navigate('/vendor/services/new')}
-                              className="font-bold text-sm text-black hover:underline truncate cursor-pointer"
-                            >
-                              {service.name}
+        {!isLoading && !errorMessage && (
+          <div className="w-full bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+            <div className="overflow-x-auto scrollbar-thin">
+              <table className="w-full text-left border-collapse min-w-[960px]">
+                <thead>
+                  <tr className="bg-slate-50 text-slate-800 text-xs font-bold border-b border-slate-200">
+                    <th className="py-3 px-4 border-r border-slate-200">Tên dịch vụ &amp; Trải nghiệm</th>
+                    <th className="py-3 px-3 border-r border-slate-200">Danh mục</th>
+                    <th className="py-3 px-3 text-right border-r border-slate-200">Đơn giá niêm yết</th>
+                    <th className="py-3 px-3 border-r border-slate-200">Thời lượng &amp; Ca</th>
+                    <th className="py-3 px-3 border-r border-slate-200">Đánh giá</th>
+                    <th className="py-3 px-3 border-r border-slate-200">Trạng thái</th>
+                    <th className="py-3 px-3 text-center sticky right-0 bg-slate-50 z-10 w-[160px]">
+                      Thao tác
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-sm text-black">
+                  {paginatedServices.length > 0 ? (
+                    paginatedServices.map(service => {
+                      // Defensive fallbacks for images and names
+                      const primaryImageUrl = (service.images && service.images.length > 0 && service.images[0]?.url)
+                        ? service.images[0].url
+                        : 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=300&q=80';
+                      const displayName = service.name || 'Dịch vụ chưa đặt tên';
+                      const displayLocation = service.locationName || service.address || 'Đà Nẵng';
+                      const categoryName = categoryMap.get(service.categoryId) || 'Thể thao biển';
+                      const isActionBusy = actionInProgressId === service.id;
+
+                      return (
+                        <tr key={service.id} className="hover:bg-slate-50/80 transition-colors group">
+                          {/* Name & Image */}
+                          <td className="py-3 px-4 border-r border-slate-200">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-slate-100 border border-slate-200">
+                                <img 
+                                  className="w-full h-full object-cover" 
+                                  alt={displayName} 
+                                  src={primaryImageUrl}
+                                  onError={(e) => {
+                                    // Fallback to placeholder if image fails to load
+                                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=300&q=80';
+                                  }}
+                                />
+                              </div>
+                              <div className="flex flex-col min-w-0 max-w-xs">
+                                <span 
+                                  onClick={() => navigate(`/vendor/services/${service.id}/edit`)}
+                                  className="font-bold text-sm text-black hover:text-primary hover:underline truncate cursor-pointer"
+                                  title={displayName}
+                                >
+                                  {displayName}
+                                </span>
+                                {service.nameEn && (
+                                  <span className="text-[11px] text-slate-500 truncate" title={service.nameEn}>
+                                    {service.nameEn}
+                                  </span>
+                                )}
+                                <span className="text-xs text-slate-600 flex items-center gap-1 mt-0.5 truncate">
+                                  <span className="material-symbols-outlined text-[13px] text-slate-500">location_on</span>
+                                  <span>{displayLocation}</span>
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Category */}
+                          <td className="py-3 px-3 border-r border-slate-200">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-xs font-medium border border-slate-200 whitespace-nowrap">
+                              {categoryName}
                             </span>
-                            <span className="text-xs text-black flex items-center gap-1 mt-0.5">
-                              <span className="material-symbols-outlined text-[13px] text-black">location_on</span>
-                              <span>{service.location}</span>
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200">
-                        <span className="px-2 py-0.5 rounded bg-slate-100 text-black text-xs font-medium border border-slate-200 whitespace-nowrap">
-                          {service.category}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right border-r border-slate-200">
-                        <div className="flex flex-col items-end">
-                          <div className="flex items-center gap-1">
-                            <span className="font-mono font-bold text-sm text-black">
-                              {service.price.toLocaleString('vi-VN')} đ
-                            </span>
-                            <button 
-                              onClick={() => { setEditingService(service); setEditPriceInput(service.price.toString()); }}
-                              className="text-black hover:text-slate-700 transition-colors cursor-pointer"
-                              title="Sửa giá nhanh"
-                              type="button"
-                            >
-                              <span className="material-symbols-outlined text-[15px]">edit</span>
-                            </button>
-                          </div>
-                          <span className="text-[11px] text-black">/ người</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200">
-                        <div className="flex flex-col text-xs space-y-0.5 text-black">
-                          <span className="font-medium text-black flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px] text-black">schedule</span>
-                            <span>{service.duration >= 60 ? `${Math.floor(service.duration / 60)} giờ` : `${service.duration} phút`}</span>
-                          </span>
-                          <span className="text-[11px] text-black flex items-center gap-1">
-                            <span className="material-symbols-outlined text-[14px] text-black">group</span>
-                            <span>{service.capacityPerSlot} người / ca</span>
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200">
-                        {service.rating > 0 ? (
-                          <div className="flex items-center gap-1 text-xs">
-                            <span className="material-symbols-outlined text-amber-500 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                            <span className="font-bold text-black">{service.rating}</span>
-                            <span className="text-black">({service.reviewCount})</span>
-                          </div>
-                        ) : (
-                          <span className="text-black text-xs italic">Chưa có đánh giá</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 border-r border-slate-200">
-                        {service.status === 'ACTIVE' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                            <span>Đang hoạt động</span>
-                          </span>
-                        )}
-                        {service.status === 'PENDING_APPROVAL' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300">
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
-                            <span>Chờ duyệt</span>
-                          </span>
-                        )}
-                        {service.status === 'DRAFT' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-                            <span>Bản nháp</span>
-                          </span>
-                        )}
-                        {service.status === 'PAUSED' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-800 border border-red-300">
-                            <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
-                            <span>Đã tạm ngưng</span>
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-3 text-center sticky right-0 bg-white group-hover:bg-slate-50 z-10 transition-colors w-[130px]">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button 
+                          </td>
+
+                          {/* Price */}
+                          <td className="py-3 px-3 text-right border-r border-slate-200">
+                            <div className="flex flex-col items-end">
+                              <div className="flex items-center gap-1">
+                                <span className="font-mono font-bold text-sm text-black">
+                                  {(service.price || 0).toLocaleString('vi-VN')} đ
+                                </span>
+                                <button 
+                                  onClick={() => { setEditingService(service); setEditPriceInput(service.price.toString()); }}
+                                  className="text-slate-500 hover:text-primary transition-colors cursor-pointer"
+                                  title="Sửa giá nhanh"
+                                  type="button"
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">edit</span>
+                                </button>
+                              </div>
+                              <span className="text-[11px] text-slate-500">/ người</span>
+                            </div>
+                          </td>
+
+                          {/* Duration & Capacity */}
+                          <td className="py-3 px-3 border-r border-slate-200">
+                            <div className="flex flex-col text-xs space-y-0.5 text-slate-700">
+                              <span className="font-medium text-black flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px] text-slate-500">schedule</span>
+                                <span>{service.durationMinutes ? `${service.durationMinutes} phút` : 'Chưa đặt'}</span>
+                              </span>
+                              <span className="text-[11px] text-slate-600 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px] text-slate-500">group</span>
+                                <span>{service.capacityPerSlot ? `${service.capacityPerSlot} người/ca` : 'Tùy chỉnh'}</span>
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Rating */}
+                          <td className="py-3 px-3 border-r border-slate-200">
+                            {service.avgRating != null && service.avgRating > 0 ? (
+                              <div className="flex items-center gap-1 text-xs">
+                                <span className="material-symbols-outlined text-amber-500 text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                                <span className="font-bold text-black">{Number(service.avgRating).toFixed(1)}</span>
+                                <span className="text-slate-500">({service.ratingCount || 0})</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-500 text-xs italic">Chưa có</span>
+                            )}
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-3 px-3 border-r border-slate-200">
+                            {service.status === 'PUBLISHED' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                                <span>Đang mở bán</span>
+                              </span>
+                            )}
+                            {service.status === 'PENDING_REVIEW' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                                <span>Chờ duyệt</span>
+                              </span>
+                            )}
+                            {service.status === 'APPROVED' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-sky-600"></span>
+                                <span>Đã duyệt</span>
+                              </span>
+                            )}
+                            {service.status === 'REJECTED' && (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-300">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-600"></span>
+                                  <span>Bị từ chối</span>
+                                </span>
+                                {service.rejectionReason && (
+                                  <span className="text-[10px] text-rose-600 max-w-[130px] truncate" title={service.rejectionReason}>
+                                    Lý do: {service.rejectionReason}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {service.status === 'DRAFT' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+                                <span>Bản nháp</span>
+                              </span>
+                            )}
+                            {service.status === 'PAUSED' && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-800 border border-amber-300">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                                <span>Tạm ngưng</span>
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3 px-3 text-center sticky right-0 bg-white group-hover:bg-slate-50/80 z-10 transition-colors w-[160px]">
+                            <div className="flex items-center justify-center gap-1">
+                              {/* Edit Button */}
+                              <button 
+                                onClick={() => navigate(`/vendor/services/${service.id}/edit`)}
+                                className="p-1 rounded text-slate-700 hover:text-primary hover:bg-slate-100 transition-colors" 
+                                title="Chỉnh sửa dịch vụ" 
+                                type="button"
+                                disabled={isActionBusy}
+                              >
+                                <span className="material-symbols-outlined text-[17px]">edit</span>
+                              </button>
+
+                              {/* Submit for review: DRAFT or REJECTED */}
+                              {(service.status === 'DRAFT' || service.status === 'REJECTED') && (
+                                <button 
+                                  onClick={() => handleSubmitForReview(service)}
+                                  className="p-1 rounded text-emerald-600 hover:bg-emerald-50 transition-colors" 
+                                  title="Gửi duyệt dịch vụ tới Admin" 
+                                  type="button"
+                                  disabled={isActionBusy}
+                                >
+                                  <span className="material-symbols-outlined text-[17px]">send</span>
+                                </button>
+                              )}
+
+                              {/* Pause: PUBLISHED */}
+                              {service.status === 'PUBLISHED' && (
+                                <button 
+                                  onClick={() => handlePauseService(service)}
+                                  className="p-1 rounded text-amber-600 hover:bg-amber-50 transition-colors" 
+                                  title="Tạm ngưng nhận khách" 
+                                  type="button"
+                                  disabled={isActionBusy}
+                                >
+                                  <span className="material-symbols-outlined text-[17px]">pause_circle</span>
+                                </button>
+                              )}
+
+                              {/* Resume: PAUSED */}
+                              {service.status === 'PAUSED' && (
+                                <button 
+                                  onClick={() => handleResumeService(service)}
+                                  className="p-1 rounded text-emerald-600 hover:bg-emerald-50 transition-colors" 
+                                  title="Mở bán lại" 
+                                  type="button"
+                                  disabled={isActionBusy}
+                                >
+                                  <span className="material-symbols-outlined text-[17px]">play_circle</span>
+                                </button>
+                              )}
+
+                              {/* Schedule / Slots Button */}
+                              <button 
+                                onClick={() => navigate(`/vendor/schedule?serviceId=${service.id}`)}
+                                className="p-1 rounded text-sky-600 hover:bg-sky-50 transition-colors" 
+                                title="Lịch ca & Sức chứa"
+                                type="button"
+                                disabled={isActionBusy}
+                              >
+                                <span className="material-symbols-outlined text-[17px]">calendar_month</span>
+                              </button>
+
+                              {/* Delete Button: DRAFT or REJECTED */}
+                              {(service.status === 'DRAFT' || service.status === 'REJECTED') && (
+                                <button 
+                                  onClick={() => handleDeleteService(service.id, displayName)}
+                                  className="p-1 rounded text-rose-600 hover:bg-rose-50 transition-colors" 
+                                  title="Xóa dịch vụ" 
+                                  type="button"
+                                  disabled={isActionBusy}
+                                >
+                                  <span className="material-symbols-outlined text-[17px]">delete</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    /* Defensive Empty State */
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center">
+                        <div className="flex flex-col items-center justify-center space-y-2 text-slate-500">
+                          <span className="material-symbols-outlined text-4xl text-slate-400">inventory_2</span>
+                          <p className="font-semibold text-slate-700">Chưa tìm thấy dịch vụ nào</p>
+                          <p className="text-xs text-slate-500 max-w-sm">
+                            {searchQuery || categoryFilter !== 'all' || activeTab !== 'ALL'
+                              ? 'Không có kết quả khớp với tiêu chí tìm kiếm. Hãy thử đổi bộ lọc.'
+                              : 'Bạn chưa tạo dịch vụ trải nghiệm biển nào. Hãy nhấn nút bên dưới để tạo ngay!'}
+                          </p>
+                          <button
                             onClick={() => navigate('/vendor/services/new')}
-                            className="p-1.5 rounded text-black hover:bg-slate-200 transition-colors" 
-                            title="Chỉnh sửa dịch vụ" 
+                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-medium hover:bg-primary/90 transition-colors"
                             type="button"
                           >
-                            <span className="material-symbols-outlined text-[18px]">edit</span>
-                          </button>
-                          
-                          <button 
-                            onClick={() => handleToggleStatus(service.id)}
-                            className="p-1.5 rounded text-black hover:bg-slate-200 transition-colors" 
-                            title={service.status === 'ACTIVE' ? 'Tạm ngưng nhận khách' : 'Mở bán lại'} 
-                            type="button"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">
-                              {service.status === 'ACTIVE' ? 'pause_circle' : 'play_circle'}
-                            </span>
-                          </button>
-
-                          <button 
-                            onClick={() => navigate('/vendor/schedule')}
-                            className="p-1.5 rounded text-black hover:bg-slate-200 transition-colors" 
-                            title="Lịch ca & Sức chứa"
-                            type="button"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">calendar_month</span>
-                          </button>
-
-                          <button 
-                            onClick={() => handleDeleteService(service.id, service.name)}
-                            className="p-1.5 rounded text-black hover:text-red-600 hover:bg-red-50 transition-colors" 
-                            title="Xóa dịch vụ" 
-                            type="button"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                            <span className="material-symbols-outlined text-[16px]">add</span>
+                            <span>Tạo dịch vụ mới</span>
                           </button>
                         </div>
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-black">
-                      <span className="material-symbols-outlined text-4xl mb-2 text-slate-400">search_off</span>
-                      <p className="font-body-md text-black">Không tìm thấy dịch vụ nào phù hợp với bộ lọc hiện tại.</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Minimal Clean Pagination Bar */}
-          <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs select-none">
-            {/* Page Size Selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-black font-semibold">Số dòng:</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="px-2 py-1 rounded bg-white border border-slate-200 text-xs font-semibold text-black cursor-pointer focus:outline-none"
-              >
-                <option value={5}>5</option>
-                <option value={10}>10</option>
-                <option value={20}>20</option>
-              </select>
+                  )}
+                </tbody>
+              </table>
             </div>
 
-            {/* Pagination Navigation */}
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={validCurrentPage === 1}
-                className="p-1 rounded border border-slate-200 text-black hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                title="Trang đầu"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[16px]">first_page</span>
-              </button>
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={validCurrentPage === 1}
-                className="p-1 rounded border border-slate-200 text-black hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                title="Trang trước"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[16px]">chevron_left</span>
-              </button>
-
-              <div className="flex items-center gap-1 px-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            {/* Pagination Controls */}
+            {totalItems > 0 && (
+              <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600">
+                <span>
+                  Hiển thị <span className="font-semibold text-black">{(validCurrentPage - 1) * pageSize + 1}</span> - <span className="font-semibold text-black">{Math.min(validCurrentPage * pageSize, totalItems)}</span> trong <span className="font-semibold text-black">{totalItems}</span> dịch vụ
+                </span>
+                <div className="flex items-center gap-1">
                   <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`min-w-[28px] h-7 px-2 rounded text-xs font-bold transition-colors ${
-                      page === validCurrentPage
-                        ? "bg-primary text-white"
-                        : "border border-slate-200 text-black hover:bg-slate-100"
-                    }`}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={validCurrentPage === 1}
+                    className="p-1 rounded border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+                    title="Trang trước"
                     type="button"
                   >
-                    {page}
+                    <span className="material-symbols-outlined text-[16px]">chevron_left</span>
                   </button>
-                ))}
+                  <span className="px-2 font-medium">Trang {validCurrentPage} / {totalPages}</span>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={validCurrentPage >= totalPages}
+                    className="p-1 rounded border border-slate-300 bg-white disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100 transition-colors"
+                    title="Trang sau"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Quick Price Edit Modal */}
+        {editingService && createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-xl shadow-lg border border-slate-200 w-full max-w-sm p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="font-bold text-sm text-black">Chỉnh sửa đơn giá nhanh</h3>
+                <button
+                  onClick={() => setEditingService(null)}
+                  className="text-slate-400 hover:text-black"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
               </div>
 
-              <button
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={validCurrentPage === totalPages}
-                className="p-1 rounded border border-slate-300 text-black hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                title="Trang sau"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={validCurrentPage === totalPages}
-                className="p-1 rounded border border-slate-300 text-black hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                title="Trang cuối"
-                type="button"
-              >
-                <span className="material-symbols-outlined text-[16px]">last_page</span>
-              </button>
+              <div>
+                <p className="text-xs text-slate-600 font-medium truncate mb-1">
+                  Dịch vụ: <span className="font-bold text-black">{editingService.name}</span>
+                </p>
+                {editingService.status === 'PUBLISHED' && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 mb-2">
+                    Cảnh báo: Sửa giá dịch vụ đang mở bán sẽ chuyển trạng thái về "Chờ duyệt" theo quy tắc an toàn của sàn.
+                  </p>
+                )}
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Đơn giá mới (VNĐ):</label>
+                <input
+                  type="number"
+                  min={1000}
+                  step={1000}
+                  value={editPriceInput}
+                  onChange={(e) => setEditPriceInput(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono font-bold focus:outline-none focus:ring-1 focus:ring-primary"
+                  placeholder="Nhập giá mới..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  onClick={() => setEditingService(null)}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  type="button"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSavePrice}
+                  disabled={actionInProgressId === editingService.id}
+                  className="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  type="button"
+                >
+                  {actionInProgressId === editingService.id ? 'Đang lưu...' : 'Lưu đơn giá'}
+                </button>
+              </div>
             </div>
-          </div>
-        </div>
+          </div>,
+          document.body
+        )}
+
+        
       </div>
-
-      {/* Edit Price Modal (Portaled to body) */}
-      {editingService && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-          <div className="bg-surface rounded-2xl max-w-md w-full p-space-lg shadow-2xl flex flex-col gap-space-md border border-outline-variant/30">
-            <div className="flex items-center justify-between border-b border-outline-variant/30 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">payments</span>
-                </span>
-                <h3 className="font-headline-sm text-headline-sm font-bold text-on-surface">Cập nhật đơn giá niêm yết</h3>
-              </div>
-              <button onClick={() => setEditingService(null)} className="text-on-surface-variant hover:text-on-surface">
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-            <div>
-              <p className="font-label-md font-semibold text-on-surface">{editingService.name}</p>
-              <p className="font-body-sm text-on-surface-variant mt-0.5">Giá hiện tại: <strong className="text-primary">{editingService.price.toLocaleString('vi-VN')} đ</strong> / người</p>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="font-label-md text-label-md font-semibold text-on-surface">Đơn giá trọn gói mới (VNĐ)</label>
-              <input 
-                type="number"
-                value={editPriceInput}
-                onChange={(e) => setEditPriceInput(e.target.value)}
-                className="w-full px-space-md py-2.5 rounded-xl bg-surface-container-low text-on-surface font-headline-sm font-bold text-primary focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
-                placeholder="Ví dụ: 300000"
-              />
-              <span className="text-[11px] text-on-surface-variant italic">* Giá trọn gói đã bao gồm bảo hiểm cứu hộ biển và áo phao.</span>
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-outline-variant/30">
-              <button 
-                onClick={() => setEditingService(null)}
-                className="px-4 py-2 rounded-xl bg-surface-container-high text-on-surface font-label-md"
-              >
-                Hủy
-              </button>
-              <button 
-                onClick={handleSavePrice}
-                className="px-5 py-2 rounded-xl bg-primary text-on-primary font-label-md font-bold shadow hover:bg-primary-container"
-              >
-                Lưu giá mới
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 p-space-md rounded-xl bg-on-surface text-surface shadow-xl flex items-center gap-space-sm animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <span className="material-symbols-outlined text-emerald-400 text-[20px]">task_alt</span>
-          <span className="font-label-md text-label-md">{toastMessage}</span>
-        </div>
-      )}
     </div>
   );
 }

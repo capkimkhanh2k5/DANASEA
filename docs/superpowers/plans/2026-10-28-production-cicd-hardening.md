@@ -86,3 +86,5 @@ User clarification (2026-10-28): local server BackUp storage is sufficient; off-
 - No production deployment, data replacement, account-plan changes or repository-visibility changes performed.
 - External controls remain pending: GitHub account administrator protection/environment setup; reviewed Linux host installation and real backup/timer/SSH/provider acceptance. The implementation blocks deployment until controls are available.
 - Fresh Linux amd64 GitHub Actions execution and actual older-production-image upgrade rehearsal have not run in this local session.
+
+Latest main d0bda178ec4624aa2d5167a18c240258bdf9cfcd was integrated locally. Its additional 4 ESLint errors and 6 warnings were fixed; the merged frontend passes strict lint/build, image scan and the disposable rehearsal. No push: the new repository push principles require explicit written user authorization.

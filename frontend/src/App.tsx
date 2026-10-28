@@ -46,12 +46,14 @@ import { Logs } from "./pages/admin/Logs/Logs";
 import { DevRoleSwitcher } from "./components/common/DevRoleSwitcher";
 import { PageLoader } from "./components/common/PageLoader";
 import { ScrollToTop } from "./components/common/ScrollToTop";
+import { ToastContainer } from "./components/common/ToastContainer";
 
 function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
       <PageLoader />
+      <ToastContainer />
       <DevRoleSwitcher />
       <Routes>
         {/* KHÁCH HÀNG */}
@@ -82,6 +84,8 @@ function App() {
           <Route path="profile" element={<VendorProfile />} />
           <Route path="services" element={<Services />} />
           <Route path="services/new" element={<ServiceForm />} />
+          <Route path="services/:serviceId/edit" element={<ServiceForm />} />
+          <Route path="services/:serviceId" element={<ServiceForm />} />
           <Route path="schedule" element={<Schedule />} />
           <Route path="orders" element={<VendorOrders />} />
           <Route path="promotions" element={<Promotions />} />

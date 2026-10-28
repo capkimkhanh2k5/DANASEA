@@ -14,12 +14,15 @@ export function Auth() {
   // Login Form States
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   
   // Register Form States
   const [regFullName, setRegFullName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regConfirmPassword, setRegConfirmPassword] = useState("");
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
   
   // Register Sub-step: 'form' (enter info) -> 'otp' (verify 6-digit OTP)
   const [regStep, setRegStep] = useState<"form" | "otp">("form");
@@ -163,13 +166,6 @@ export function Auth() {
     }
   };
 
-  const handleQuickLogin = (roleKey: 'customer' | 'vendor' | 'admin') => {
-    const quickEmail = `${roleKey}@danasea.vn`;
-    const quickPass = '123456';
-    setEmail(quickEmail);
-    setPassword(quickPass);
-    executeLogin(quickEmail, quickPass);
-  };
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -465,7 +461,7 @@ export function Auth() {
   };
 
   return (
-    <main className="w-full flex-1 flex flex-col justify-center items-center relative overflow-hidden px-4 py-3 sm:py-6">
+    <main className="w-full min-h-screen flex flex-col justify-center items-center relative overflow-hidden px-4 pt-24 pb-10 sm:pt-28 sm:pb-14">
       {/* Dynamic Auto-Rotating Coastal Scene Backdrop */}
       <AuthCinematicBackdrop autoRotateInterval={5500} />
 
@@ -486,7 +482,7 @@ export function Auth() {
         </aside>
       )}
 
-      <div className="w-full max-w-[1180px] grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center relative z-10 -translate-y-6 sm:-translate-y-9 translate-x-3 sm:translate-x-8 lg:translate-x-14 my-auto">
+      <div className="w-full max-w-[1180px] grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center relative z-10 my-auto">
         {/* Left Column: Coastal Brand Messaging */}
         <div className="lg:col-span-5 hidden lg:flex flex-col space-y-3">
           <h1 className="text-3xl xl:text-4xl font-extrabold text-white leading-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.8)]">
@@ -574,57 +570,6 @@ export function Auth() {
             {/* TAB 1: LOGIN */}
             {activeTab === "login" && (
               <div className="space-y-3 block">
-                {/* Quick Demo Role Selector */}
-                <div className="p-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-on-surface uppercase tracking-wider flex items-center gap-1 text-[11px]">
-                      <span className="material-symbols-outlined text-[14px] text-secondary">flash_on</span>
-                      1-Click Login
-                    </span>
-                    <span className="text-[11px] font-mono text-outline">Pass: 123456</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      type="button"
-                      disabled={isLoading}
-                      onClick={() => handleQuickLogin('customer')}
-                      className="p-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant/30 hover:border-primary text-left transition-all hover:shadow-sm cursor-pointer group disabled:opacity-50"
-                    >
-                      <div className="flex items-center gap-1 text-primary font-bold text-xs">
-                        <span className="material-symbols-outlined text-[14px]">person</span>
-                        <span>Khách</span>
-                      </div>
-                      <p className="text-[10px] text-on-surface-variant truncate mt-0.5">customer</p>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isLoading}
-                      onClick={() => handleQuickLogin('vendor')}
-                      className="p-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant/30 hover:border-secondary text-left transition-all hover:shadow-sm cursor-pointer group disabled:opacity-50"
-                    >
-                      <div className="flex items-center gap-1 text-secondary font-bold text-xs">
-                        <span className="material-symbols-outlined text-[14px]">sailing</span>
-                        <span>Vendor</span>
-                      </div>
-                      <p className="text-[10px] text-on-surface-variant truncate mt-0.5">vendor</p>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isLoading}
-                      onClick={() => handleQuickLogin('admin')}
-                      className="p-1.5 rounded-lg bg-surface-container-lowest border border-outline-variant/30 hover:border-primary-container text-left transition-all hover:shadow-sm cursor-pointer group disabled:opacity-50"
-                    >
-                      <div className="flex items-center gap-1 text-primary-container font-bold text-xs">
-                        <span className="material-symbols-outlined text-[14px]">admin_panel_settings</span>
-                        <span>Admin</span>
-                      </div>
-                      <p className="text-[10px] text-on-surface-variant truncate mt-0.5">admin</p>
-                    </button>
-                  </div>
-                </div>
-                
                 <form className="space-y-2.5" onSubmit={handleLoginSubmit}>
                   <div className="space-y-1">
                     <label className="text-xs font-medium text-on-surface">
@@ -657,11 +602,22 @@ export function Auth() {
                         value={password} 
                         onChange={e => setPassword(e.target.value)} 
                         disabled={isLoading}
-                        className="w-full h-[42px] pl-10 pr-10 rounded-xl bg-surface-container-lowest text-on-surface text-sm shadow-sm outline-none border border-outline-variant/30 focus:border-primary focus:shadow-md transition-all placeholder:text-outline-variant disabled:opacity-60" 
+                        className="w-full h-[42px] pl-10 pr-11 rounded-xl bg-surface-container-lowest text-on-surface text-sm shadow-sm outline-none border border-outline-variant/30 focus:border-primary focus:shadow-md transition-all placeholder:text-outline-variant disabled:opacity-60" 
                         placeholder="Nhập mật khẩu" 
                         required 
-                        type="password" 
+                        type={showPassword ? "text" : "password"} 
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(prev => !prev)}
+                        className="absolute right-3 p-1 text-outline hover:text-on-surface transition-colors flex items-center justify-center cursor-pointer focus:outline-none"
+                        tabIndex={-1}
+                        title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                      >
+                        <span className="material-symbols-outlined text-[20px]">
+                          {showPassword ? "visibility_off" : "visibility"}
+                        </span>
+                      </button>
                     </div>
                   </div>
                   
@@ -757,30 +713,56 @@ export function Auth() {
                           <label className="text-xs font-medium text-on-surface">
                             Mật khẩu
                           </label>
-                          <input 
-                            value={regPassword}
-                            onChange={e => setRegPassword(e.target.value)}
-                            disabled={isLoading}
-                            className="w-full h-[40px] px-3 rounded-xl bg-surface-container-lowest text-on-surface text-xs sm:text-sm shadow-sm outline-none border border-outline-variant/30 focus:border-primary focus:shadow-md transition-all placeholder:text-outline-variant disabled:opacity-60" 
-                            placeholder="Tối thiểu 8 ký tự" 
-                            required 
-                            type="password" 
-                          />
+                          <div className="relative flex items-center">
+                            <input 
+                              value={regPassword}
+                              onChange={e => setRegPassword(e.target.value)}
+                              disabled={isLoading}
+                              className="w-full h-[40px] pl-3 pr-9 rounded-xl bg-surface-container-lowest text-on-surface text-xs sm:text-sm shadow-sm outline-none border border-outline-variant/30 focus:border-primary focus:shadow-md transition-all placeholder:text-outline-variant disabled:opacity-60" 
+                              placeholder="Tối thiểu 8 ký tự" 
+                              required 
+                              type={showRegPassword ? "text" : "password"} 
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowRegPassword(prev => !prev)}
+                              className="absolute right-2 p-1 text-outline hover:text-on-surface transition-colors flex items-center justify-center cursor-pointer focus:outline-none"
+                              tabIndex={-1}
+                              title={showRegPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                            >
+                              <span className="material-symbols-outlined text-[18px]">
+                                {showRegPassword ? "visibility_off" : "visibility"}
+                              </span>
+                            </button>
+                          </div>
                         </div>
 
                         <div className="space-y-1">
                           <label className="text-xs font-medium text-on-surface">
                             Nhập lại
                           </label>
-                          <input 
-                            value={regConfirmPassword}
-                            onChange={e => setRegConfirmPassword(e.target.value)}
-                            disabled={isLoading}
-                            className="w-full h-[40px] px-3 rounded-xl bg-surface-container-lowest text-on-surface text-xs sm:text-sm shadow-sm outline-none border border-outline-variant/30 focus:border-primary focus:shadow-md transition-all placeholder:text-outline-variant disabled:opacity-60" 
-                            placeholder="Xác nhận lại" 
-                            required 
-                            type="password" 
-                          />
+                          <div className="relative flex items-center">
+                            <input 
+                              value={regConfirmPassword}
+                              onChange={e => setRegConfirmPassword(e.target.value)}
+                              disabled={isLoading}
+                              className="w-full h-[40px] pl-3 pr-9 rounded-xl bg-surface-container-lowest text-on-surface text-xs sm:text-sm shadow-sm outline-none border border-outline-variant/30 focus:border-primary focus:shadow-md transition-all placeholder:text-outline-variant disabled:opacity-60" 
+                              placeholder="Xác nhận lại" 
+                              required 
+                              type={showRegConfirmPassword ? "text" : "password"} 
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowRegConfirmPassword(prev => !prev)}
+                              className="absolute right-2 p-1 text-outline hover:text-on-surface transition-colors flex items-center justify-center cursor-pointer focus:outline-none"
+                              tabIndex={-1}
+                              title={showRegConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                            >
+                              <span className="material-symbols-outlined text-[18px]">
+                                {showRegConfirmPassword ? "visibility_off" : "visibility"}
+                              </span>
+                            </button>
+                          </div>
                         </div>
                       </div>
 

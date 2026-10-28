@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuthStore } from "../store/useAuthStore";
 import { createPortal } from "react-dom";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { MOCK_NOTIFICATIONS, type VendorNotificationItem } from "../services/vendorMockService";
@@ -20,6 +21,14 @@ const VENDOR_PAGE_ORDER: Record<string, number> = {
 export function VendorLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, isAuthenticated, accessToken } = useAuthStore();
+
+  useEffect(() => {
+    if (!accessToken || !isAuthenticated) {
+      console.warn('[VendorLayout] Chưa đăng nhập hoặc phiên hết hạn. Đang chuyển hướng về /auth...');
+      navigate("/auth", { replace: true });
+    }
+  }, [accessToken, isAuthenticated, navigate]);
   const [prevPath, setPrevPath] = useState(location.pathname);
   const [animationClass, setAnimationClass] = useState("animate-fade-in-up");
 
@@ -314,10 +323,16 @@ export function VendorLayout() {
               onClick={() => navigate("/vendor/profile")}
               className="flex items-center gap-2 pl-2 border-l border-outline-variant/30 cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center font-bold text-label-sm">
-                DOC
+              <div className="w-8 h-8 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center font-bold text-label-sm overflow-hidden shadow-xs">
+                {user?.avatarUrl ? (
+                  <img src={user.avatarUrl} alt={user.fullName || 'Vendor'} className="w-full h-full object-cover" />
+                ) : (
+                  (user?.fullName || user?.email || 'V').charAt(0).toUpperCase()
+                )}
               </div>
-              <span className="font-label-md text-label-md text-on-surface font-semibold hidden sm:inline">Quản lý bến</span>
+              <span className="font-label-md text-label-md text-on-surface font-semibold hidden sm:inline max-w-[160px] truncate">
+                {user?.fullName || user?.email || 'Kênh đối tác'}
+              </span>
             </div>
           </div>
         </header>

@@ -1,641 +1,702 @@
-import { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-
-interface SlotData {
-  id: string;
-  name: string;
-  timeRange: string;
-  subTitle: string;
-  location: string;
-  capacity: number;
-  booked: number;
-  holds: number;
-  status: "OPEN" | "FULL" | "BLOCKED";
-  note: string;
-}
+import { useSearchParams } from "react-router-dom";
+import { vendorService } from "../../../services/vendorService";
+import { toast } from "../../../store/useToastStore";
+import { extractErrorMessage } from "../../../utils/errorHandler";
+import type {
+  VendorServiceDto,
+  VendorServiceSlotDto,
+  InventoryType,
+  SlotStatus,
+  CreateSlotUnitRequest,
+} from "../../../types/vendorService";
 
 export function Schedule() {
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const queryServiceId = searchParams.get("serviceId");
+
+  
   const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
+    toast.success(msg);
   };
 
-  // Selected Service & Mode
-  const [selectedService, setSelectedService] = useState("sup-sunrise");
-  const [viewMode, setViewMode] = useState<"WEEK" | "MONTH">("WEEK");
-  const [selectedDate, setSelectedDate] = useState("2024-10-24");
+  // Services State
+  const [services, setServices] = useState<VendorServiceDto[]>([]);
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  const [isLoadingServices, setIsLoadingServices] = useState<boolean>(true);
 
   // Slots State
-  const [slots, setSlots] = useState<SlotData[]>([
-    {
-      id: "slot-1",
-      name: "Ca 1",
-      timeRange: "05:00 - 07:00",
-      subTitle: "(Sáng sớm - Đón bình minh)",
-      location: "Bãi tắm Sao Biển • Trưởng đoàn: Huỳnh Văn Long",
-      capacity: 12,
-      booked: 10,
-      holds: 2,
-      status: "OPEN",
-      note: "10 áo phao size M-XL đã gán vào QR Code đoàn",
-    },
-    {
-      id: "slot-2",
-      name: "Ca 2",
-      timeRange: "07:30 - 09:30",
-      subTitle: "(Sáng)",
-      location: "Bãi tắm Phạm Văn Đồng • Đã kiểm định mỏ neo định vị",
-      capacity: 12,
-      booked: 4,
-      holds: 0,
-      status: "OPEN",
-      note: "Khung giờ nước biển êm, thuận lợi cho khách mới tập chèo",
-    },
-    {
-      id: "slot-3",
-      name: "Ca 3",
-      timeRange: "14:30 - 16:30",
-      subTitle: "(Chiều)",
-      location: "Bãi tắm Mỹ Khê Bến 02",
-      capacity: 10,
-      booked: 6,
-      holds: 1,
-      status: "OPEN",
-      note: "Có gió nhẹ hướng Đông Nam, kiểm soát phao tiêu an toàn",
-    },
-  ]);
+  const [slots, setSlots] = useState<VendorServiceSlotDto[]>([]);
+  const [isLoadingSlots, setIsLoadingSlots] = useState<boolean>(false);
+  const [slotsErrorMessage, setSlotsErrorMessage] = useState<string | null>(null);
+
+  // Date Filter State
+  const todayStr = new Date().toISOString().split("T")[0];
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
   // Modal State: Create Slot
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newServiceId, setNewServiceId] = useState("tour-1");
-  const [newDate, setNewDate] = useState("2024-10-24");
-  const [newStartTime, setNewStartTime] = useState("16:30");
-  const [newEndTime, setNewEndTime] = useState("18:30");
-  const [newCapacity, setNewCapacity] = useState(12);
-  const [newLocation, setNewLocation] = useState("Bãi tắm Phạm Văn Đồng");
+  const [newDate, setNewDate] = useState<string>(todayStr);
+  const [newStartTime, setNewStartTime] = useState<string>("06:00");
+  const [newEndTime, setNewEndTime] = useState<string>("08:00");
+  const [newInventoryType, setNewInventoryType] = useState<InventoryType>("PERSON_LIMIT");
+  const [newCapacity, setNewCapacity] = useState<number>(10);
+  const [newUnits, setNewUnits] = useState<CreateSlotUnitRequest[]>([
+    { unitNumber: 1, capacity: 5 },
+    { unitNumber: 2, capacity: 5 },
+  ]);
+  const [isSubmittingSlot, setIsSubmittingSlot] = useState(false);
 
-  // Modal State: Edit Capacity
-  const [editingSlot, setEditingSlot] = useState<SlotData | null>(null);
-  const [inputCapacity, setInputCapacity] = useState<number>(12);
+  // Modal State: Edit Slot
+  const [editingSlot, setEditingSlot] = useState<VendorServiceSlotDto | null>(null);
+  const [inputCapacity, setInputCapacity] = useState<number>(10);
+  const [inputStatus, setInputStatus] = useState<SlotStatus>("OPEN");
   const [capacityError, setCapacityError] = useState<string | null>(null);
+  const [isUpdatingSlot, setIsUpdatingSlot] = useState(false);
 
-  // Quick Lock/Block Slot
-  const handleToggleBlockSlot = (id: string) => {
-    setSlots((prev) =>
-      prev.map((s) => {
-        if (s.id === id) {
-          const nextStatus = s.status === "BLOCKED" ? "OPEN" : "BLOCKED";
-          showToast(`Đã ${nextStatus === "BLOCKED" ? "khóa nhận thêm khách" : "mở lại"} cho ${s.name}!`);
-          return { ...s, status: nextStatus };
+  const [previousQueryService, setPreviousQueryService] = useState(queryServiceId);
+  if (previousQueryService !== queryServiceId) {
+    setPreviousQueryService(queryServiceId);
+    setIsLoadingServices(true);
+  }
+  const [previousService, setPreviousService] = useState(selectedServiceId);
+  if (previousService !== selectedServiceId) {
+    setPreviousService(selectedServiceId);
+    setSlots([]);
+    setSlotsErrorMessage(null);
+    setIsLoadingSlots(Boolean(selectedServiceId));
+  }
+
+  // 1. Fetch vendor services
+  useEffect(() => {
+    vendorService.getMyServices()
+      .then((data) => {
+        const list = data || [];
+        setServices(list);
+        if (queryServiceId && list.some(s => s.id === queryServiceId)) {
+          setSelectedServiceId(queryServiceId);
+        } else if (list.length > 0) {
+          setSelectedServiceId(list[0].id);
         }
-        return s;
       })
-    );
+      .catch((err) => {
+        console.error("[Schedule] Lỗi nạp danh sách dịch vụ:", err);
+      })
+      .finally(() => {
+        setIsLoadingServices(false);
+      });
+  }, [queryServiceId]);
+
+  // 2. Fetch slots for selected service
+  const loadSlots = useCallback((serviceId: string) => {
+    if (!serviceId) return;
+    return vendorService.getSlots(serviceId).then((data) => {
+      setSlotsErrorMessage(null);
+      setSlots(data || []);
+    }).catch((err: unknown) => {
+      console.error("[Schedule] Lỗi nạp danh sách ca:", err);
+      const msg = err instanceof Error ? err.message : "Không thể nạp lịch ca";
+      setSlotsErrorMessage(msg);
+    }).finally(() => {
+      setIsLoadingSlots(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (selectedServiceId) {
+      loadSlots(selectedServiceId);
+    }
+  }, [selectedServiceId, loadSlots]);
+
+  // Toggle status between OPEN and CLOSED
+  const handleToggleStatus = async (slot: VendorServiceSlotDto) => {
+    if (!selectedServiceId) return;
+    const nextStatus: SlotStatus = slot.status === "OPEN" ? "CLOSED" : "OPEN";
+    try {
+      const updated = await vendorService.updateSlot(selectedServiceId, slot.id, {
+        status: nextStatus,
+      });
+      setSlots((prev) => prev.map((s) => (s.id === slot.id ? updated : s)));
+      showToast(
+        nextStatus === "CLOSED"
+          ? "Đã đóng ca vận hành (tạm ngừng nhận khách)!"
+          : "Đã mở lại ca vận hành đón khách!"
+      );
+    } catch (err: unknown) {
+      console.error('[Schedule] Lỗi đổi trạng thái ca:', err);
+      const msg = extractErrorMessage(err, 'Đổi trạng thái ca thất bại');
+      toast.error(msg);
+    }
   };
 
   // Open Edit Capacity Modal
-  const handleOpenEditCapacity = (slot: SlotData) => {
+  const handleOpenEditCapacity = (slot: VendorServiceSlotDto) => {
     setEditingSlot(slot);
     setInputCapacity(slot.capacity);
+    setInputStatus(slot.status);
     setCapacityError(null);
   };
 
-  // Save Capacity with strict validation (Capacity >= booked + holds)
-  const handleSaveCapacity = (e: React.FormEvent) => {
+  // Save Slot Edit
+  const handleSaveCapacity = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingSlot) return;
+    if (!editingSlot || !selectedServiceId) return;
 
-    const minAllowed = editingSlot.booked + editingSlot.holds;
-    if (inputCapacity < minAllowed) {
+    const booked = editingSlot.bookedCount || 0;
+    if (inputCapacity < booked) {
       setCapacityError(
-        `Không thể giảm sức chứa xuống dưới ${minAllowed} khách vì đã có ${editingSlot.booked} khách đặt cọc và ${editingSlot.holds} khách đang giữ chỗ!`
+        `Không thể giảm sức chứa xuống dưới ${booked} vì đã có ${booked} khách đặt thành công!`
       );
       return;
     }
 
-    setSlots((prev) =>
-      prev.map((s) => (s.id === editingSlot.id ? { ...s, capacity: inputCapacity } : s))
-    );
-    showToast(`Đã cập nhật sức chứa ${editingSlot.name} thành ${inputCapacity} khách.`);
-    setEditingSlot(null);
+    setIsUpdatingSlot(true);
+    try {
+      const updated = await vendorService.updateSlot(selectedServiceId, editingSlot.id, {
+        status: inputStatus,
+        capacity: editingSlot.inventoryType === "PERSON_LIMIT" ? inputCapacity : undefined,
+      });
+      setSlots((prev) => prev.map((s) => (s.id === editingSlot.id ? updated : s)));
+      showToast(`Đã cập nhật cấu hình ca thành công!`);
+      setEditingSlot(null);
+    } catch (err: unknown) {
+      console.error("[Schedule] Lỗi sửa ca:", err);
+      const msg = err instanceof Error ? err.message : "Cập nhật ca thất bại";
+      setCapacityError(msg);
+    } finally {
+      setIsUpdatingSlot(false);
+    }
   };
 
-  // Create Slot with validation
-  const handleCreateSlot = (e: React.FormEvent) => {
+  // Create Slot
+  const handleCreateSlot = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedServiceId) {
+      toast.warning("Vui lòng chọn dịch vụ trước khi tạo ca.");
+      return;
+    }
 
     if (newEndTime <= newStartTime) {
-      showToast("Lỗi: Giờ kết thúc ca biển phải sau giờ bắt đầu!");
+      toast.warning("Giờ kết thúc ca biển phải sau giờ bắt đầu!");
       return;
     }
 
-    // Check overlap
-    const isOverlap = slots.some(
-      (s) => s.timeRange.split(" - ")[0] === newStartTime
-    );
-    if (isOverlap) {
-      showToast("Lỗi: Đã có ca khởi hành trùng giờ bắt đầu này!");
-      return;
+    // Format start/end time HH:mm:ss if needed
+    const formatTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
+
+    setIsSubmittingSlot(true);
+    try {
+      const payload = {
+        date: newDate,
+        startTime: formatTime(newStartTime),
+        endTime: formatTime(newEndTime),
+        inventoryType: newInventoryType,
+        capacity: newInventoryType === "PERSON_LIMIT" ? newCapacity : undefined,
+        units: newInventoryType === "SHARED_CAPACITY_UNITS" ? newUnits : undefined,
+      };
+
+      const created = await vendorService.createSlot(selectedServiceId, payload);
+      setSlots((prev) => [...prev, created]);
+      showToast(`Đã tạo ca khởi hành mới (${newStartTime} - ${newEndTime}) thành công!`);
+      setIsCreateModalOpen(false);
+    } catch (err: unknown) {
+      console.error('[Schedule] Lỗi tạo ca:', err);
+      const msg = extractErrorMessage(err, 'Không thể tạo ca khởi hành');
+      toast.error(msg);
+    } finally {
+      setIsSubmittingSlot(false);
     }
-
-    const newSlotItem: SlotData = {
-      id: `slot-${Date.now()}`,
-      name: `Ca ${slots.length + 1}`,
-      timeRange: `${newStartTime} - ${newEndTime}`,
-      subTitle: "(Ca mới)",
-      location: newLocation,
-      capacity: Number(newCapacity),
-      booked: 0,
-      holds: 0,
-      status: "OPEN",
-      note: "Đã phê duyệt điều phối luồng bến Cảng vụ",
-    };
-
-    setSlots((prev) => [...prev, newSlotItem]);
-    setIsCreateModalOpen(false);
-    showToast(`Đã tạo thành công ca khởi hành mới (${newStartTime} - ${newEndTime})!`);
   };
 
-  return (
-    <div className="w-full pt-4 pb-20 bg-background flex-1">
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 border border-slate-700 animate-bounce">
-          <span className="material-symbols-outlined text-emerald-400 text-[22px]">check_circle</span>
-          <span className="text-sm font-medium">{toastMessage}</span>
-        </div>
-      )}
+  // Filter slots by selected date if set
+  const filteredSlots = slots.filter((s) => {
+    if (selectedDate && s.date !== selectedDate) return false;
+    return true;
+  });
 
-      <div className="w-full px-6 py-4 space-y-4">
-        {/* Top Action Bar & Filters */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+  const selectedServiceObj = services.find((s) => s.id === selectedServiceId);
+
+  return (
+    <div className="w-full bg-background flex-1">
+      <div className="flex flex-col w-full px-6 py-4 space-y-4">
+        {/* Header Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-300">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
-              Lịch khởi hành
+            <h1 className="text-xl md:text-2xl font-bold text-black tracking-tight">
+              Lịch Dịch vụ &amp; Sức chứa
             </h1>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Cấu hình các ca vận hành biển, quản lý tồn chỗ, đóng/mở ca và bảo vệ chỗ đã cam kết với du khách
+            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Service Selector Dropdown */}
-            <div className="relative min-w-[260px]">
-              <div className="flex items-center bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs">
-                <span className="material-symbols-outlined text-primary text-[18px] mr-2">surfing</span>
-                <select
-                  value={selectedService}
-                  onChange={(e) => setSelectedService(e.target.value)}
-                  className="w-full bg-transparent text-slate-800 text-xs font-medium focus:outline-none cursor-pointer"
-                >
-                  <option value="sup-sunrise">Chèo SUP đón bình minh biển Mỹ Khê (280.000 đ)</option>
-                  <option value="jetski-sontra">Mô tô nước Bán đảo Sơn Trà (650.000 đ)</option>
-                  <option value="coral-diving">Lặn ngắm san hô Hòn Sụp cano cao tốc (450.000 đ)</option>
-                </select>
-              </div>
-            </div>
-
-            {/* View Segmented Switch */}
-            <div className="inline-flex p-0.5 bg-slate-100 rounded-lg border border-slate-200">
-              <button
-                onClick={() => setViewMode("WEEK")}
-                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  viewMode === "WEEK" ? "bg-primary text-white shadow-xs" : "text-slate-600 hover:bg-slate-200"
-                }`}
-                type="button"
-              >
-                Tuần
-              </button>
-              <button
-                onClick={() => setViewMode("MONTH")}
-                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                  viewMode === "MONTH" ? "bg-primary text-white shadow-xs" : "text-slate-600 hover:bg-slate-200"
-                }`}
-                type="button"
-              >
-                Tháng
-              </button>
-            </div>
-
-            {/* New Slot Action Button */}
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-primary hover:bg-primary-container text-white rounded-lg text-xs font-semibold shadow-xs transition-all cursor-pointer"
+              disabled={!selectedServiceId}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary/90 transition-colors shadow-xs disabled:opacity-50"
               type="button"
             >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              <span>Tạo ca khởi hành</span>
+              <span className="material-symbols-outlined text-[16px]">add_circle</span>
+              <span>Tạo ca khởi hành mới</span>
             </button>
           </div>
         </div>
 
-        {/* Date Navigation Strip */}
-        <div className="bg-white p-2 rounded-xl shadow-xs border border-slate-200">
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {[
-              { date: "2024-10-23", label: "Hôm nay", sub: "23/10", count: "3 ca" },
-              { date: "2024-10-24", label: "Ngày mai", sub: "24/10", count: `${slots.length} ca`, active: true },
-              { date: "2024-10-25", label: "Thứ Sáu", sub: "25/10", count: "4 ca" },
-              { date: "2024-10-26", label: "Thứ Bảy", sub: "26/10", count: "Cao điểm", badge: true },
-              { date: "2024-10-27", label: "Chủ Nhật", sub: "27/10", count: "Cao điểm", badge: true },
-            ].map((d) => (
-              <button
-                key={d.date}
-                onClick={() => setSelectedDate(d.date)}
-                className={`flex flex-col items-center justify-center py-2 px-3 rounded-lg transition-all cursor-pointer ${
-                  selectedDate === d.date
-                    ? "bg-primary text-white shadow-xs font-semibold"
-                    : "text-slate-700 hover:bg-slate-50 border border-slate-200"
-                }`}
-                type="button"
+        {/* Filter & Service Selection Panel */}
+        <div className="p-3.5 rounded-xl bg-white border border-slate-300 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            {/* Service Dropdown */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-lg min-w-[240px]">
+              <span className="material-symbols-outlined text-slate-600 text-[18px]">surfing</span>
+              <select
+                value={selectedServiceId}
+                onChange={(e) => setSelectedServiceId(e.target.value)}
+                className="bg-transparent text-black text-xs font-bold focus:outline-none cursor-pointer w-full"
+                disabled={isLoadingServices}
               >
-                <span className={`text-[11px] ${selectedDate === d.date ? "text-white/80" : "text-slate-500"}`}>{d.label}</span>
-                <span className="text-xs font-bold my-0.5">{d.sub}</span>
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full ${
-                    selectedDate === d.date ? "bg-white/20 text-white font-medium" : "bg-slate-100 text-slate-600"
-                  }`}
+                {services.length === 0 ? (
+                  <option value="">(Chưa có dịch vụ nào)</option>
+                ) : (
+                  services.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.status})
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            {/* Date Picker */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-lg">
+              <span className="material-symbols-outlined text-slate-600 text-[18px]">calendar_today</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent text-black text-xs font-semibold focus:outline-none cursor-pointer"
+              />
+              {selectedDate && (
+                <button
+                  onClick={() => setSelectedDate("")}
+                  className="text-slate-400 hover:text-black"
+                  title="Xem tất cả ngày"
+                  type="button"
                 >
-                  {d.count}
-                </span>
-              </button>
+                  <span className="material-symbols-outlined text-[14px]">close</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { if (selectedServiceId) { setIsLoadingSlots(true); loadSlots(selectedServiceId); } }}
+              className="p-1.5 rounded-lg bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200 transition-colors"
+              title="Làm mới lịch ca"
+              type="button"
+            >
+              <span className="material-symbols-outlined text-[16px]">refresh</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Error Fallback */}
+        {slotsErrorMessage && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between text-rose-800 text-xs">
+            <span>Lỗi tải danh sách ca: {slotsErrorMessage}</span>
+            <button
+              onClick={() => { if (selectedServiceId) { setIsLoadingSlots(true); loadSlots(selectedServiceId); } }}
+              className="px-2.5 py-1 bg-rose-600 text-white rounded font-bold hover:bg-rose-700"
+              type="button"
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {/* Loading Skeleton */}
+        {isLoadingSlots && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-44 bg-slate-100 rounded-xl border border-slate-200"></div>
             ))}
           </div>
-        </div>
+        )}
 
-        {/* Main Content Layout: Slots List & Quick Control Rail */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-          {/* Primary Slots List (8 Cols) */}
-          <div key={`${selectedDate}-${viewMode}`} className="xl:col-span-8 space-y-2.5">
-            <div className="flex items-center justify-between h-7">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-800 font-bold">
-                  Lịch khởi hành: {selectedDate}
-                </span>
-                <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-full text-xs font-semibold text-slate-600">
-                  {slots.length} ca
-                </span>
-              </div>
-            </div>
+        {/* Slots Grid */}
+        {!isLoadingSlots && !slotsErrorMessage && (
+          <>
+            {filteredSlots.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredSlots.map((slot) => {
+                  const booked = slot.bookedCount || 0;
+                  const available = slot.availableCapacity != null ? slot.availableCapacity : (slot.capacity - booked);
+                  const isClosed = slot.status === "CLOSED";
+                  const isFull = available <= 0;
 
-            {/* Unified Timeline Schedule Ledger */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs divide-y divide-slate-200 overflow-hidden">
-              {slots.map((slot) => {
-                const available = Math.max(0, slot.capacity - (slot.booked + slot.holds));
-                const percentBooked = Math.min(100, Math.round((slot.booked / slot.capacity) * 100));
+                  return (
+                    <div
+                      key={slot.id}
+                      className={`rounded-xl border p-4 bg-white shadow-xs transition-all flex flex-col justify-between ${
+                        isClosed ? "border-slate-200 opacity-70 bg-slate-50" : "border-slate-200 hover:border-primary/50"
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        {/* Time & Status Badge */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-primary text-[18px]">schedule</span>
+                            <span className="font-bold text-sm text-black">
+                              {slot.startTime.substring(0, 5)} - {slot.endTime.substring(0, 5)}
+                            </span>
+                          </div>
 
-                return (
-                  <div
-                    key={slot.id}
-                    className="p-3.5 hover:bg-slate-50 transition-colors space-y-2.5"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 border border-slate-200 font-mono text-xs font-bold">
-                          {slot.name}
-                        </span>
-                        <span className="font-bold text-sm text-slate-900">
-                          {slot.timeRange}
-                        </span>
-                        <span className="text-xs text-slate-500">{slot.subTitle}</span>
-                      </div>
+                          <div>
+                            {isClosed ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">
+                                Đã đóng
+                              </span>
+                            ) : isFull ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
+                                Hết chỗ
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                Đang mở
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-                      <div className="flex items-center gap-2">
-                        {slot.status === "BLOCKED" ? (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                            Đã khóa ca
+                        {/* Date & Inventory Type */}
+                        <div className="text-xs text-slate-600 flex items-center justify-between">
+                          <span>Ngày: <strong className="text-black">{slot.date}</strong></span>
+                          <span className="text-[11px] px-1.5 py-0.2 bg-slate-100 rounded text-slate-600">
+                            {slot.inventoryType === "SHARED_CAPACITY_UNITS" ? "Đơn vị chia sẻ" : "Theo đầu người"}
                           </span>
-                        ) : available === 0 ? (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                            Đầy chỗ
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            Đang mở ({available} chỗ trống)
-                          </span>
+                        </div>
+
+                        {/* Capacity Progress Bar */}
+                        <div className="space-y-1 pt-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-slate-500">Đã đặt:</span>
+                            <span className="font-bold text-black">
+                              {booked} / {slot.capacity} khách
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                isFull ? "bg-rose-500" : "bg-emerald-500"
+                              }`}
+                              style={{ width: `${Math.min(100, (booked / Math.max(1, slot.capacity)) * 100)}%` }}
+                            ></div>
+                          </div>
+                          <div className="flex justify-between text-[11px] text-slate-500">
+                            <span>Còn trống: <strong className="text-emerald-700">{Math.max(0, available)}</strong></span>
+                          </div>
+                        </div>
+
+                        {/* Units Details if Shared Capacity Units */}
+                        {slot.units && slot.units.length > 0 && (
+                          <div className="pt-2 border-t border-slate-100 space-y-1">
+                            <p className="text-[11px] font-semibold text-slate-700">Chi tiết phương tiện / units:</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {slot.units.map((u) => (
+                                <span
+                                  key={u.id}
+                                  className="text-[10px] px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-slate-700"
+                                >
+                                  Cano #{u.unitNumber}: {u.bookedCount}/{u.capacity}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </div>
 
-                    <p className="text-xs text-slate-600 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[15px] text-slate-400">location_on</span>
-                      <span>{slot.location}</span>
-                    </p>
+                      {/* Actions */}
+                      <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <button
+                          onClick={() => handleToggleStatus(slot)}
+                          className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors flex items-center gap-1 ${
+                            isClosed
+                              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          }`}
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">
+                            {isClosed ? "lock_open" : "lock"}
+                          </span>
+                          <span>{isClosed ? "Mở lại ca" : "Đóng ca"}</span>
+                        </button>
 
-                    {/* Inline Capacity Metrics & Progress */}
-                    <div className="bg-slate-50 p-2.5 rounded-lg space-y-1.5 border border-slate-200">
-                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <div className="flex items-center gap-3">
-                          <div>
-                            <span className="text-slate-500">Sức chứa:</span>
-                            <span className="font-semibold text-slate-800 ml-1">{slot.capacity} khách</span>
-                          </div>
-                          <span className="text-slate-300">•</span>
-                          <div>
-                            <span className="text-slate-500">Đã đặt:</span>
-                            <span className="font-semibold text-slate-800 ml-1">{slot.booked} khách</span>
-                          </div>
-                          <span className="text-slate-300">•</span>
-                          <div>
-                            <span className="text-slate-500">Giữ tạm:</span>
-                            <span className="font-semibold text-slate-800 ml-1">{slot.holds} khách</span>
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-slate-500">Còn lại:</span>
-                          <span className="font-semibold text-slate-800 ml-1">{available} chỗ</span>
-                        </div>
-                      </div>
-
-                      <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
-                        <div
-                          className="bg-primary h-full transition-all duration-300"
-                          style={{ width: `${percentBooked}%` }}
-                        ></div>
-                      </div>
-
-                      <div className="flex justify-between text-[11px] text-slate-500">
-                        <span>Lấp đầy: {percentBooked}%</span>
-                        <span>{slot.note}</span>
+                        <button
+                          onClick={() => handleOpenEditCapacity(slot)}
+                          className="px-2.5 py-1 rounded border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-1"
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined text-[14px]">edit</span>
+                          <span>Cấu hình</span>
+                        </button>
                       </div>
                     </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button
-                        onClick={() => handleOpenEditCapacity(slot)}
-                        className="px-2.5 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer shadow-xs"
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-[15px] text-slate-500">edit</span>
-                        <span>Sửa sức chứa</span>
-                      </button>
-                      <button
-                        onClick={() => handleToggleBlockSlot(slot.id)}
-                        className={`px-2.5 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer border shadow-xs ${
-                          slot.status === "BLOCKED"
-                            ? "bg-slate-800 text-white border-slate-800 hover:bg-slate-900"
-                            : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
-                        }`}
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-[15px]">
-                          {slot.status === "BLOCKED" ? "lock_open" : "lock"}
-                        </span>
-                        <span>{slot.status === "BLOCKED" ? "Mở khóa ca" : "Khóa ca tạm"}</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Right Rail: Safety Rules & Capacity Guidelines (4 Cols) */}
-          <div className="xl:col-span-4 space-y-2.5">
-            <div className="flex items-center justify-between h-7">
-              <span className="text-sm text-slate-800 font-bold">
-                Tiêu chuẩn an toàn bến bãi
-              </span>
-            </div>
-
-            <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200 space-y-3.5">
-              <div className="flex items-center gap-2 text-slate-800">
-                <span className="material-symbols-outlined text-primary text-[20px]">phishing</span>
-                <h3 className="text-sm font-bold">Tỷ lệ cứu hộ quy chuẩn</h3>
+                  );
+                })}
               </div>
-              <div className="space-y-2.5 text-xs">
-                <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
-                  <span className="text-slate-500">Tỷ lệ HDV : Khách SUP</span>
-                  <span className="font-bold text-slate-800">1 : 6 khách</span>
+            ) : (
+              /* Empty State */
+              <div className="w-full bg-white rounded-xl border border-slate-200 p-12 text-center">
+                <div className="flex flex-col items-center justify-center space-y-2 text-slate-500">
+                  <span className="material-symbols-outlined text-4xl text-slate-400">event_busy</span>
+                  <p className="font-semibold text-slate-700">Chưa có ca khởi hành nào</p>
+                  <p className="text-xs text-slate-500 max-w-sm">
+                    {selectedServiceObj
+                      ? `Dịch vụ "${selectedServiceObj.name}" chưa có ca khởi hành trong ngày đã chọn. Hãy tạo ca mới để bắt đầu đón khách!`
+                      : "Vui lòng chọn một dịch vụ từ danh sách phía trên."}
+                  </p>
+                  {selectedServiceId && (
+                    <button
+                      onClick={() => setIsCreateModalOpen(true)}
+                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary/90 transition-colors"
+                      type="button"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">add</span>
+                      <span>Tạo ca khởi hành mới</span>
+                    </button>
+                  )}
                 </div>
-                <div className="flex items-center justify-between py-1.5 border-b border-slate-100">
-                  <span className="text-slate-500">Cano cứu hộ túc trực</span>
-                  <span className="font-bold text-primary">Sẵn sàng (Bến A2)</span>
-                </div>
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-slate-500">Giới hạn vùng chèo</span>
-                  <span className="font-bold text-slate-800">Cách bờ tối đa 350m</span>
-                </div>
-              </div>
-              <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-start gap-2">
-                <span className="material-symbols-outlined text-primary text-[18px] shrink-0 mt-0.5">anchor</span>
-                <span className="text-xs text-slate-600 leading-relaxed">
-                  Tuyệt đối không giảm sức chứa nhỏ hơn số khách đã đặt.
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* MODAL: SỬA SỨC CHỨA (Portaled to body) */}
-      {editingSlot && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-scale-in">
-          <div className="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-space-xl shadow-2xl border border-outline-variant/30 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-headline-md">published_with_changes</span>
-                <h3 className="font-headline-md text-headline-md text-on-surface font-bold">
-                  Điều chỉnh sức chứa {editingSlot.name}
-                </h3>
-              </div>
-              <button
-                onClick={() => setEditingSlot(null)}
-                className="p-1 rounded-xl text-on-surface-variant hover:bg-surface-container cursor-pointer"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            <p className="font-body-md text-body-md text-on-surface-variant">
-              Cập nhật số lượng chỗ nhận khách cho khung giờ <strong>{editingSlot.timeRange}</strong>.
-            </p>
-
-            <div className="p-space-md rounded-xl bg-surface-container-low space-y-2">
-              <div className="flex justify-between font-label-md text-label-md">
-                <span className="text-on-surface-variant">Đã thanh toán cọc:</span>
-                <span className="text-primary font-bold">{editingSlot.booked} khách</span>
-              </div>
-              <div className="flex justify-between font-label-md text-label-md">
-                <span className="text-on-surface-variant">Đang giữ tạm:</span>
-                <span className="text-secondary font-bold">{editingSlot.holds} khách</span>
-              </div>
-              <div className="h-[1px] bg-outline-variant/30"></div>
-              <div className="flex justify-between font-label-md text-label-md font-bold">
-                <span className="text-on-surface">Giới hạn tối thiểu cho phép:</span>
-                <span className="text-secondary">{editingSlot.booked + editingSlot.holds} chỗ</span>
-              </div>
-            </div>
-
-            {capacityError && (
-              <div className="p-3 rounded-xl bg-error-container/40 text-error text-body-sm font-semibold flex items-center gap-2">
-                <span className="material-symbols-outlined text-[20px]">warning</span>
-                <span>{capacityError}</span>
               </div>
             )}
+          </>
+        )}
 
-            <form onSubmit={handleSaveCapacity} className="space-y-4">
-              <div>
-                <label className="font-label-md text-label-md text-on-surface font-semibold block mb-1">
-                  Nhập sức chứa mới (khách)
-                </label>
-                <input
-                  type="number"
-                  min={editingSlot.booked + editingSlot.holds}
-                  max={50}
-                  required
-                  value={inputCapacity}
-                  onChange={(e) => {
-                    setInputCapacity(Number(e.target.value));
-                    setCapacityError(null);
-                  }}
-                  className="w-full px-4 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/30 font-headline-sm font-bold text-primary focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingSlot(null)}
-                  className="px-4 py-2 rounded-xl bg-surface-container text-on-surface font-label-md cursor-pointer"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-primary text-on-primary font-label-md font-bold cursor-pointer hover:bg-primary-container"
-                >
-                  Lưu thay đổi
+        {/* Modal: Create Slot */}
+        {isCreateModalOpen && createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-xl shadow-lg border border-slate-200 w-full max-w-md p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="font-bold text-sm text-black">Tạo ca khởi hành mới</h3>
+                <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-black">
+                  <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
               </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
 
-      {/* MODAL: TẠO THÊM CA KHỞI HÀNH (Portaled to body) */}
-      {isCreateModalOpen && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-scale-in">
-          <div className="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-space-xl shadow-2xl border border-outline-variant/30 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-headline-md">add_circle</span>
-                <h3 className="font-headline-md text-headline-md text-on-surface font-bold">
-                  Tạo ca khởi hành mới
-                </h3>
-              </div>
-              <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="p-1 rounded-xl text-on-surface-variant hover:bg-surface-container cursor-pointer"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
+              <form onSubmit={handleCreateSlot} className="space-y-3 text-xs">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Dịch vụ:</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={selectedServiceObj?.name || "Chưa chọn"}
+                    className="w-full px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-700 font-bold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Ngày diễn ra:</label>
+                  <input
+                    type="date"
+                    required
+                    min={todayStr}
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Giờ bắt đầu:</label>
+                    <input
+                      type="time"
+                      required
+                      value={newStartTime}
+                      onChange={(e) => setNewStartTime(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Giờ kết thúc:</label>
+                    <input
+                      type="time"
+                      required
+                      value={newEndTime}
+                      onChange={(e) => setNewEndTime(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Mô hình tồn chỗ:</label>
+                  <select
+                    value={newInventoryType}
+                    onChange={(e) => setNewInventoryType(e.target.value as InventoryType)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none bg-white cursor-pointer"
+                  >
+                    <option value="PERSON_LIMIT">Giới hạn theo đầu người (PERSON_LIMIT)</option>
+                    <option value="SHARED_CAPACITY_UNITS">Chia theo đơn vị/cano (SHARED_CAPACITY_UNITS)</option>
+                  </select>
+                </div>
+
+                {newInventoryType === "PERSON_LIMIT" ? (
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Tổng sức chứa (khách):</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      value={newCapacity}
+                      onChange={(e) => setNewCapacity(Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none font-bold"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-700">Danh sách cano / units:</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setNewUnits((prev) => [
+                            ...prev,
+                            { unitNumber: prev.length + 1, capacity: 5 },
+                          ])
+                        }
+                        className="text-primary font-bold hover:underline"
+                      >
+                        + Thêm cano
+                      </button>
+                    </div>
+                    {newUnits.map((u, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="text-slate-600 font-medium">#{u.unitNumber}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={u.capacity}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setNewUnits((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, capacity: val } : item))
+                            );
+                          }}
+                          className="w-24 px-2 py-1 border border-slate-300 rounded bg-white text-xs"
+                          placeholder="Sức chứa"
+                        />
+                        <span className="text-slate-500">khách</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    onClick={() => setIsCreateModalOpen(false)}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    type="button"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingSlot}
+                    className="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    {isSubmittingSlot ? "Đang tạo..." : "Xác nhận tạo ca"}
+                  </button>
+                </div>
+              </form>
             </div>
+          </div>,
+          document.body
+        )}
 
-            <form onSubmit={handleCreateSlot} className="space-y-4">
-              <div>
-                <label className="font-label-md text-label-md text-on-surface font-semibold block mb-1">
-                  Chọn tour / trải nghiệm biển
-                </label>
-                <select
-                  value={newServiceId}
-                  onChange={(e) => setNewServiceId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/30 font-body-md"
-                >
-                  <option value="tour-1">Tour Chèo SUP ngắm bình minh Bán đảo Sơn Trà</option>
-                  <option value="tour-2">Lặn biển ngắm san hô Hòn Sụp</option>
-                  <option value="tour-3">Cano cao tốc khám phá Mũi Nghê</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="font-label-md text-label-md text-on-surface font-semibold block mb-1">
-                  Ngày khởi hành
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/30 font-body-md"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="font-label-md text-label-md text-on-surface font-semibold block mb-1">
-                    Giờ bắt đầu
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={newStartTime}
-                    onChange={(e) => setNewStartTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/30 font-body-md"
-                  />
-                </div>
-                <div>
-                  <label className="font-label-md text-label-md text-on-surface font-semibold block mb-1">
-                    Giờ kết thúc
-                  </label>
-                  <input
-                    type="time"
-                    required
-                    value={newEndTime}
-                    onChange={(e) => setNewEndTime(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/30 font-body-md"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-label-md text-label-md text-on-surface font-semibold block mb-1">
-                  Sức chứa tối đa (Khách)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  required
-                  value={newCapacity}
-                  onChange={(e) => setNewCapacity(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/30 font-body-md"
-                />
-              </div>
-
-              <div>
-                <label className="font-label-md text-label-md text-on-surface font-semibold block mb-1">
-                  Điểm tập kết bến bãi
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newLocation}
-                  onChange={(e) => setNewLocation(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-surface-container-low border border-outline-variant/30 font-body-md"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-surface-container text-on-surface font-label-md cursor-pointer"
-                >
-                  Hủy bỏ
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-primary text-on-primary font-label-md font-bold cursor-pointer hover:bg-primary-container shadow-md"
-                >
-                  Tạo ca khởi hành
+        {/* Modal: Edit Slot Capacity / Status */}
+        {editingSlot && createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <div className="bg-white rounded-xl shadow-lg border border-slate-200 w-full max-w-sm p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 className="font-bold text-sm text-black">Cấu hình ca vận hành</h3>
+                <button onClick={() => setEditingSlot(null)} className="text-slate-400 hover:text-black">
+                  <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
               </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
+
+              <form onSubmit={handleSaveCapacity} className="space-y-3 text-xs">
+                <div>
+                  <p className="text-slate-600">
+                    Thời gian: <strong className="text-black">{editingSlot.startTime.substring(0, 5)} - {editingSlot.endTime.substring(0, 5)}</strong> ({editingSlot.date})
+                  </p>
+                  <p className="text-slate-600 mt-0.5">
+                    Số khách đã đặt: <strong className="text-emerald-700">{editingSlot.bookedCount || 0} khách</strong>
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Trạng thái ca:</label>
+                  <select
+                    value={inputStatus}
+                    onChange={(e) => setInputStatus(e.target.value as SlotStatus)}
+                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none bg-white cursor-pointer"
+                  >
+                    <option value="OPEN">Mở đón khách (OPEN)</option>
+                    <option value="CLOSED">Đóng ca (CLOSED)</option>
+                  </select>
+                </div>
+
+                {editingSlot.inventoryType === "PERSON_LIMIT" && (
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Tổng sức chứa mới:
+                    </label>
+                    <input
+                      type="number"
+                      min={editingSlot.bookedCount || 1}
+                      value={inputCapacity}
+                      onChange={(e) => setInputCapacity(Number(e.target.value))}
+                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black font-bold focus:ring-1 focus:ring-primary focus:outline-none"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Không được đặt nhỏ hơn số khách đã đặt ({editingSlot.bookedCount || 0} khách).
+                    </p>
+                  </div>
+                )}
+
+                {capacityError && (
+                  <p className="p-2 bg-rose-50 border border-rose-200 rounded text-rose-700 text-[11px]">
+                    {capacityError}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    onClick={() => setEditingSlot(null)}
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    type="button"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isUpdatingSlot}
+                    className="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    {isUpdatingSlot ? "Đang lưu..." : "Lưu thay đổi"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body
+        )}
+
+        
+      </div>
     </div>
   );
 }

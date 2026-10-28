@@ -48,13 +48,11 @@ export const AuthCinematicBackdrop: React.FC<AuthCinematicBackdropProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [progressKey, setProgressKey] = useState<number>(0);
 
   // 1. Auto-transition interval
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % AUTH_SCENES.length);
-      setProgressKey((k) => k + 1);
     }, autoRotateInterval);
 
     return () => clearInterval(timer);
@@ -122,17 +120,6 @@ export const AuthCinematicBackdrop: React.FC<AuthCinematicBackdropProps> = ({
 
   return (
     <>
-      {/* Top Countdown Progress Line */}
-      <div className="fixed top-0 left-0 right-0 h-[2.5px] z-[60] bg-slate-800/40 pointer-events-none">
-        <div
-          key={progressKey}
-          className="h-full bg-gradient-to-r from-cyan-400 via-teal-300 to-amber-300 origin-left"
-          style={{
-            animation: `sceneCountdown ${autoRotateInterval}ms linear forwards`,
-          }}
-        />
-      </div>
-
       {/* Full-Page Background Container */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden bg-slate-950 select-none">
         {/* Parallax Container */}
