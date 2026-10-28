@@ -120,7 +120,7 @@ export function Search() {
     }
     loadCategories();
     return () => { isMounted = false; };
-  }, []);
+  }, [language]);
 
   // 2. Synchronize URL query parameter when changed
   useEffect(() => {
@@ -244,7 +244,7 @@ export function Search() {
 
     fetchServices();
     return () => { isMounted = false; };
-  }, [matchedCategory, selectedCategorySlug, keyword, sortBy]);
+  }, [matchedCategory, selectedCategorySlug, keyword, sortBy, language]);
 
   // Client-side filtering by max price & sorting if needed
   const displayServices = useMemo(() => {

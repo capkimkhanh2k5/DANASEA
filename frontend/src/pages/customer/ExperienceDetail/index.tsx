@@ -2,11 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useCartStore } from '../../../store/useCartStore';
 import { useWishlistStore } from '../../../store/useWishlistStore';
+import { useLanguageStore } from '../../../store/useLanguageStore';
 import { serviceCatalogService } from '../../../services/serviceCatalogService';
 import type { ServiceDetailDto, ServiceOptionDto, StructuredSlotDto } from '../../../types/service';
 import { FEATURED_SERVICES, MOCK_SLOTS, MOCK_IMAGES } from '../../../mockData';
 
 export function ExperienceDetail() {
+  const { language } = useLanguageStore();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -201,7 +203,7 @@ export function ExperienceDetail() {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, language]);
 
   // Derived selected option
   const selectedOption: ServiceOptionDto | undefined = useMemo(() => {

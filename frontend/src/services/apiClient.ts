@@ -1,6 +1,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
 import { useLoadingStore } from '../store/useLoadingStore';
+import { useLanguageStore } from '../store/useLanguageStore';
 
 // Smart Latency Threshold: Only trigger full-screen wave if request takes > 600ms
 let activeRequestsCount = 0;
@@ -44,6 +45,11 @@ apiClient.interceptors.request.use(
 
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    const currentLang = useLanguageStore.getState().language || 'vi';
+    if (config.headers) {
+      config.headers['Accept-Language'] = currentLang;
     }
 
     const skipLoader = config.headers?.['X-Skip-Loader'] === 'true' || Boolean(config.url?.includes('/weather'));
@@ -101,6 +107,9 @@ apiClient.interceptors.response.use(
     if (status === 401 && !url?.includes('/auth/')) {
       console.warn('[API Auth] Session expired or unauthorized (401). Clearing credentials...');
       useAuthStore.getState().logout();
+      if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/vendor') || window.location.pathname.startsWith('/admin'))) {
+        window.location.href = '/auth';
+      }
     }
 
 

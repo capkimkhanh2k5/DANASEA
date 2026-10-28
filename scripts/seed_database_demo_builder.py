@@ -57,7 +57,8 @@ def main():
 
     # 2. USERS (exact columns: id, email, password_hash, full_name, phone, role, is_locked, is_email_verified, session_version, locale, created_at, updated_at)
     print("Processing users...")
-    DEV_PW_HASH = "$2b$10$3fCoF56b5jsG8q3bUupZg./efkbVWACn48bwoMUAmwD2mTdomPc7a"
+    # Hash bcrypt chuẩn Backend cho mật khẩu mặc định "Password123!"
+    DEV_PW_HASH = "$2a$10$1.6qVy2H8TWp7VbO2awv3uA3Hql/tc0NkJUqHk4tKbRWQ45GsgPB."
     users = json.load(open(DATA_DIR / 'users.json', encoding='utf-8'))['records']
     lines.append("-- 2. BẢNG USERS (12 Tài khoản demo: 1 Admin, 9 Vendor, 2 Customer - Mật khẩu: password123)")
     lines.append("INSERT INTO users (id, email, password_hash, full_name, phone, role, is_locked, is_email_verified, session_version, locale, created_at, updated_at) VALUES")
