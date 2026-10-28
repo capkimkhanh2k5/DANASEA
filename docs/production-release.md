@@ -1,6 +1,6 @@
 # Production releases and recovery
 
-Current implementation status: the owner authorized fixing frontend issues directly. Source corrections and the hardened frontend image have been restored; the former FE handoff file was removed. Lint/build/image gates remain mandatory.
+Current implementation status: frontend issues and the backend cache-visibility/shared-test-schema defects have been corrected under the owner's authorization. The former FE handoff file was removed. Lint/build/image gates and the new backend regressions remain mandatory.
 
 ## Release contract
 
@@ -14,7 +14,7 @@ The server requires root-owned policy/signer files, verifies the envelope signat
 
 ## External prerequisites: do these before enabling the new CD
 
-1. **Protect `main`:** require PR review, code-owner review for `.github/`, deployment scripts, Dockerfiles and migrations; require `Required CI gate`; require branches up to date; block force pushes/deletion and restrict bypass. The live branch API must report `protected=true` and include the required gate. Account-plan limits must be resolved by the owner; this change does not upgrade billing or make the repository public.
+1. **Protect `main`:** require PRs and `Required CI gate`, require branches up to date, block force pushes/deletion and restrict bypass. Enforce independent approval/code-owner review for workflows, deployment scripts, Dockerfiles and migrations when eligible reviewers other than the author are configured. A solo configuration without those reviewers does not establish independent review; see the Vietnamese steps below to avoid an impossible self-approval rule. The live branch API must report `protected=true` and include the required gate. Account-plan limits must be resolved by the owner; this change does not upgrade billing or make the repository public.
 2. **Production environment:** restrict deployments to protected branches. Store production SSH/Tailscale credentials in this environment. Add reviewers if the team's release policy requires a human gate. `environment: production` by itself does not establish those restrictions.
 3. **Registry:** the deploy account needs read access to private GHCR packages. Keep accepted digests available beyond the recovery window. Candidate artifacts are retained for 90 days; GHCR retention must preserve accepted images independently of artifact retention.
 4. **Host:** Linux, Python >=3.11, Docker Compose supporting `--wait`, OpenSSH signing support, `flock`, a separate unprivileged deployment user with Docker access, and the existing forced-command authorized key. Install `python3-yaml` if the proxy management panel writes YAML. Keep the current MacBook/operator access unchanged.
@@ -91,13 +91,89 @@ python3 scripts/rehearse.py \
 
 CI/CD use signed, namespace-validated digest manifests instead of local image names. Rehearsal diagnostics contain only disposable data and stay in a mode-600 local failure log; production diagnostics intentionally omit application/provider/customer logs. Do not upload whole database dumps, `.env`, OAuth tokens, SSH keys, private manifests or raw provider responses as workflow artifacts.
 
-## GitHub setup for this local server
+## Thiết lập GitHub từng bước cho server local
 
-1. Keep repository variable `PRODUCTION_DEPLOY_ENABLED=false` under **Settings → Secrets and variables → Actions → Variables** while reviewing the PR and preparing the host. The job condition reads this at repository scope. Set `VITE_GOOGLE_CLIENT_ID` here as well: the frontend build job does not use the production environment.
-2. After a PR run registers the check, use **Settings → Branches → Add classic branch protection rule**, pattern `main`. Require a pull request, `Required CI gate`, up-to-date branches and conversation resolution; leave force pushes/deletions disallowed and disable bypass. Configure approval/code-owner requirements with an eligible reviewer other than the PR author; do not create a review rule with no eligible reviewer. Classic required checks match the release-policy checker implemented here.
-3. Use **Settings → Environments → production**, with **Protected branches only**. Configure `SERVER_TAILSCALE_IP`, `SERVER_USER`, `SSH_PRIVATE_KEY`, `SSH_KNOWN_HOSTS`, `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` as environment secrets. Preserve existing operator access and use the same CI keypair for SSH and release signing. Do not paste credentials into chat or issue/PR comments.
-4. Private repositories require a supported GitHub plan for branch/environment restrictions. If GitHub shows an upgrade requirement, the account owner must resolve the plan; this change does not upgrade billing or publish the repository. Environment approval/reviewer features have separate plan restrictions.
-5. Keep accepted GHCR image digests available and verify that the existing deployment user can pull them. The local server's current operator/wrapper configuration and existing backup directory can be reused; the one-time signed-protocol update above remains required. No public SSH port or additional hosted server is required: the GitHub runner connects through Tailscale OAuth and strict-host-key SSH.
-6. All frontend lint/build/image checks must pass; the owner must configure the actual commission policy. After CI is green, repository/environment checks pass and the forced command supports the signed protocol, enable `PRODUCTION_DEPLOY_ENABLED=true` for the deliberately prepared release. On the first transition, re-run CI for the reviewed main commit if it was merged while deployment was disabled. Normal deployment is triggered by a successful main push CI run; manual dispatch is reserved for an explicit rollback.
+Thực hiện trên repository [capkimkhanh2k5/DANASEA](https://github.com/capkimkhanh2k5/DANASEA), bằng tài khoản có quyền quản trị. Các tên nút bên dưới giữ nguyên tiếng Anh để đối chiếu với giao diện GitHub.
 
-Official references: [branch protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/managing-a-branch-protection-rule), [deployment environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
+### Bước 1 — Giữ deploy tắt trong lúc cấu hình
+
+1. Vào **Settings → Secrets and variables → Actions → Variables**.
+2. Trong **Repository variables**, chọn **New repository variable** hoặc sửa biến đã có.
+3. Đặt tên `PRODUCTION_DEPLOY_ENABLED`, giá trị `false`, rồi lưu.
+4. Tạo/sửa `VITE_GOOGLE_CLIENT_ID` với Google OAuth Client ID đang dùng cho ứng dụng web. Đây là client ID công khai, không phải client secret.
+
+Hai biến này phải ở **Repository variables**. Không chỉ đặt trong environment `production`: điều kiện chạy job deploy cần biến trước khi job vào environment, còn job build FE không dùng environment đó. Khi tắt deploy, CD vẫn có thể build image; dấu xanh của phần build chưa chứng minh server đã được cập nhật.
+
+### Bước 2 — Kiểm tra GitHub Actions được phép chạy
+
+1. Vào **Settings → Actions → General**.
+2. Kiểm tra chính sách cho phép các action đang được ghim trong workflow: `actions/*`, `docker/*`, `tailscale/github-action`.
+3. Không cần cấp quyền ghi mặc định cho mọi workflow. CI/CD đã khai báo quyền ở từng job; `GITHUB_TOKEN` do GitHub tự tạo, không cần thêm secret cùng tên hoặc tạo PAT chỉ để build/push image.
+4. Mở **Actions → CI** hoặc trang PR đang làm; xác nhận có check **Required CI gate**. Nếu chưa hiện, chờ workflow CI của PR chạy để GitHub nhận diện tên check.
+
+### Bước 3 — Bảo vệ nhánh `main`
+
+1. Vào **Settings → Branches**.
+2. Chọn **Add classic branch protection rule**. Dùng classic rule vì script kiểm tra release hiện đọc required checks trên branch protection.
+3. Trong **Branch name pattern**, nhập chính xác `main`.
+4. Bật **Require a pull request before merging**.
+5. Bật **Require status checks to pass before merging**; tìm và chọn **Required CI gate**. Chọn nguồn **GitHub Actions** nếu có ô chọn nguồn check.
+6. Bật **Require branches to be up to date before merging**.
+7. Bật **Require conversation resolution before merging**.
+8. Bật **Do not allow bypassing the above settings** nếu giao diện có mục này. Giữ **Allow force pushes** và **Allow deletions** tắt.
+9. Nếu có thành viên khác đủ quyền review, bật **Require approvals**, chọn ít nhất **1**, và có thể bật **Dismiss stale pull request approvals when new commits are pushed**.
+10. Chỉ bật **Require review from Code Owners** khi có CODEOWNER hợp lệ khác tác giả PR. File `.github/CODEOWNERS` hiện chỉ định `@capkimkhanh2k5`; nếu chính tài khoản này tạo PR thì cần bổ sung người/nhóm có quyền ghi vào các dòng tương ứng trước khi bắt buộc code-owner approval. Tác giả không thể tự duyệt PR của mình. Nếu đang làm một mình, giữ bắt buộc PR và CI; ghi nhận review độc lập chưa được thiết lập.
+11. Chọn **Create** hoặc **Save changes**.
+
+Repository đang private: branch protection cần gói hỗ trợ private repository, ví dụ GitHub Pro cho tài khoản cá nhân hoặc Team cho tổ chức. Nếu GitHub yêu cầu nâng cấp, chủ tài khoản phải xử lý gói trước; không coi việc lưu một rule không được thực thi là đã bảo vệ. Không cần chuyển repository sang public. [Tài liệu GitHub về branch protection](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/managing-a-branch-protection-rule).
+
+### Bước 4 — Tạo environment `production`
+
+1. Vào **Settings → Environments**.
+2. Chọn environment `production` nếu đã tồn tại; nếu chưa có, chọn **New environment**, nhập `production`, rồi **Configure environment**.
+3. Tìm **Deployment branches and tags** hoặc **Deployment branches**.
+4. Chọn **Protected branches only**, rồi lưu. Cấu hình này phụ thuộc việc `main` đã được bảo vệ ở bước 3. Script release hiện yêu cầu đúng chế độ này.
+5. Nếu gói tài khoản hỗ trợ và đội có người duyệt, có thể thêm **Required reviewers**. Đây là phê duyệt deploy, tách biệt với review PR. Tính năng này có giới hạn gói riêng; Pro/Team không mặc nhiên có required environment reviewers cho repository private.
+
+Nếu không thấy Environments hoặc deployment branch restrictions do repository private/gói tài khoản, cần xử lý gói tài khoản trước khi bật deploy. Chỉ viết `environment: production` trong YAML không tự tạo ra bảo vệ. [Tài liệu GitHub về environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
+
+### Bước 5 — Kiểm tra SSH/Tailscale secrets
+
+Trong **Settings → Environments → production → Environment secrets**, dùng **Add environment secret** cho từng tên:
+
+- `SERVER_TAILSCALE_IP`: IP Tailscale của server; lần kiểm tra gần nhất là `100.112.174.58`.
+- `SERVER_USER`: tài khoản deploy không phải root; server hiện dùng `capkimkhanh`.
+- `SSH_PRIVATE_KEY`: toàn bộ private key Ed25519 của CI đang được server cho phép deploy. Cùng key này ký release manifest; không thay bằng key cá nhân một cách tùy ý.
+- `SSH_KNOWN_HOSTS`: dòng host key đã xác minh của đúng server/IP trên. Giữ kiểm tra host key nghiêm ngặt.
+- `TS_OAUTH_CLIENT_ID`: OAuth client ID Tailscale hiện có.
+- `TS_OAUTH_SECRET`: OAuth client secret tương ứng. Workflow dùng `tag:ci`; client/tailnet policy phải cho phép tag này và đường SSH tới server.
+
+CD cũ đã dùng SSH/Tailscale thành công, nên ưu tiên tái sử dụng các giá trị đúng đang có. Nếu secrets đang ở **Repository secrets**, job vẫn có thể đọc chúng khi environment chưa có secret cùng tên. GitHub không cho xem lại giá trị secret; chỉ chuyển sang environment khi có giá trị gốc, và không xoá cấu hình cũ trước khi kiểm chứng đường mới. Không đưa key/token vào chat, ảnh chụp hoặc PR. Không cần mở cổng SSH public cho server local.
+
+### Bước 6 — Hoàn thành điều kiện phía server
+
+Đây là bước chuẩn bị trước khi bật CD, không phải cài một dịch vụ backup chạy nền:
+
+1. Cập nhật một lần forced-command script/policy theo phần **One-time host transition** bên trên. Wrapper cũ chưa hiểu lệnh `status` và signed release manifest của workflow mới.
+2. Tái sử dụng thư mục backup `/home/capkimkhanh/backups/danasea` bằng tham số thứ sáu của installer. Mỗi lần deploy chỉ tạo một backup trước thay đổi dịch vụ, giữ tối đa **7 bản tổng cộng**, gồm backup cũ nhận diện được. Không cài timer/service backup định kỳ.
+3. Giữ quyền đọc private GHCR packages của user deploy; không xoá image digest đang được chấp nhận hoặc còn cần rollback.
+4. Cấu hình `PLATFORM_COMMISSION_RATE` thật bằng API Admin: `PUT /api/admin/settings/PLATFORM_COMMISSION_RATE`, dùng bearer token ADMIN và JSON có trường `value` là chuỗi phần trăm từ `0` đến `100`. Ví dụ `"10"` có nghĩa 10%, chỉ là minh hoạ; chủ hệ thống quyết định tỷ lệ thật. Đọc lại bằng `GET` cùng endpoint để xác nhận đã lưu. Trang FE Admin Settings hiện dùng mock/state cục bộ, nên nút lưu tại trang đó chưa chứng minh database đã nhận giá trị.
+5. Xác minh restricted SSH `status` trả về release đang được chấp nhận, và policy checker đọc được branch/environment. Khi có `gh` đã đăng nhập bằng tài khoản đủ quyền, có thể kiểm tra từ máy local:
+
+```bash
+python3 scripts/check_repository_controls.py --repository capkimkhanh2k5/DANASEA
+```
+
+Lệnh phải kết thúc thành công. Lỗi quyền API, gói tài khoản hoặc thiếu setting vẫn chặn release; không bỏ qua checker để ép deploy. Lần authoring này chưa cài wrapper mới hay deploy lên production.
+
+### Bước 7 — Bật deploy sau khi mọi điều kiện đạt
+
+1. Chờ **Required CI gate** xanh trên commit muốn merge; hoàn tất review theo quy tắc đã cấu hình.
+2. Sau khi bước 3–6 đều đạt và đã chuẩn bị khôi phục phù hợp cho lần chuyển giao đầu tiên, sửa **Repository variable** `PRODUCTION_DEPLOY_ENABLED` thành `true`.
+3. Merge PR đã review vào `main`. Không push trực tiếp lên `main`.
+4. Mở **Actions → CI** của commit `main`: phải xanh. Sau đó **Actions → CD** phải build/scan đủ ba image và job deploy phải thực sự chạy, không ở trạng thái **skipped**.
+5. Kiểm tra job deploy hoàn thành acceptance/stability và artifact `accepted-release` trỏ đúng SHA; đối chiếu với SSH `status` trên server.
+
+Nếu đã merge trong lúc deploy tắt, sau khi chuẩn bị xong hãy bật biến rồi **Re-run all jobs** của lần CI có event **push** trên đúng commit `main` đã review. Không chọn CI của PR và không dùng **Run workflow** của CD để deploy thường: manual dispatch của CD dành cho rollback với SHA/run ID đã được chấp nhận. Nếu CI đang chạy cho commit đó, chờ nó hoàn tất trước khi quyết định rerun.
+
+Nếu deploy lỗi, giữ nguyên gate và đọc job lỗi. Tắt biến chỉ ngăn job deploy được lên lịch ở lần sau; không dừng job đang chạy và không tự rollback server. Không bật deploy chỉ vì các job build đang xanh.

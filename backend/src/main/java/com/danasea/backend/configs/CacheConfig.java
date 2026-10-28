@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair;
@@ -31,7 +32,9 @@ public class CacheConfig {
                 .disableCachingNullValues()
                 .serializeValuesWith(SerializationPair.fromSerializer(serializer));
 
-        return RedisCacheManager.builder(connectionFactory)
+        // Account locks and role changes must be visible as soon as the transaction commits.
+        RedisCacheWriter writer = RedisCacheWriter.create(connectionFactory, config -> config.immediateWrites());
+        return RedisCacheManager.builder(writer)
                 .cacheDefaults(cacheConfig)
                 .transactionAware()
                 .build();

@@ -5,7 +5,10 @@
     "com.danasea.backend.PostgreSqlMigrationIntegrationTest",
     "com.danasea.backend.AiChatStorageMigrationIntegrationTest",
     "com.danasea.backend.modules.ai.QuyetDecisionAdapterTest",
-    "com.danasea.backend.security.authentication.integration.PasswordResetSecurityIntegrationTest"
+    "com.danasea.backend.security.authentication.integration.PasswordResetSecurityIntegrationTest",
+    "com.danasea.backend.security.authorization.RbacCacheInvalidationIntegrationTest",
+    "com.danasea.backend.configs.CacheWriteVisibilityIntegrationTest",
+    "com.danasea.backend.security.authorization.SharedSecuritySchemaIntegrationTest"
   ],
   "allowed_skipped_classes": [
     "com.danasea.backend.modules.service.e2e.ServiceTier1FeatureCoverageE2ETest",

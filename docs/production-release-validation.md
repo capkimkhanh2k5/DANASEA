@@ -41,7 +41,7 @@ Before FE withdrawal, latest-main integration exposed 4 additional ESLint errors
 - Real public HTTPS, provider routes, rollout outage budget, predeploy backup execution and host reboot/recovery have not been exercised with this new implementation. No production deployment, provider/payment call or live database replacement was performed in this local verification.
 - Backups remain local in the selected server BackUp directory, per the owner. Host-loss recovery, high availability, semantic AI accuracy and payment settlement are outside the evidence above.
 
-No remote push was performed: `docs/GIT_PUSH_PRINCIPLES.md` requires an explicit written user instruction before any push. The implementation and merge are saved as local commits.
+At that initial local checkpoint, no remote push had been performed. The owner subsequently authorized pushing the hardening branch, and the changes are available in [PR 117](https://github.com/capkimkhanh2k5/DANASEA/pull/117); no production merge/deployment has been performed by this task.
 
 ## Backup scope correction
 
@@ -82,3 +82,16 @@ Fresh FE image: `sha256:328ca4da64c7c4c868c051880d107f19786e805de7cf0e5090c814b3
 The preceding GitHub run passed the complete backend Maven/report gate, the native seven-task worker job, backend/worker image scans and deployment/source quality checks. Its only remaining failures were the then-unmodified frontend lint/image jobs, which this correction now addresses.
 
 After browser inspection, the unmodified release-rehearsal entrypoint was run again against the final images and passed in 52.72 seconds. Restore verification, existing-data preservation, booking/order and native worker flags were all true; only owned temporary resources were removed. This clean run did not use the browser-only loopback proxy adaptation. The local deployment-tooling suite also passed all 53 tests after restoring FE.
+
+## Backend CI failures: reproduced and corrected
+
+The final FE commit `d18c172` passed GitHub frontend/worker and all three image jobs. Its first backend attempt failed an immediate user-cache read; the diagnostic second attempt failed transactional cache eviction and 39 AI fixtures with missing `users.locale` defaults. An unchanged local pass and a 500-repetition probe had not established that these bugs were fixed. The owner explicitly authorized backend fixes.
+
+Two root causes were reproduced before implementation:
+
+- Spring Data Redis 4.1.2 defaults to asynchronous cache writes/eviction/clear with Lettuce. Transaction awareness schedules eviction after commit, but does not itself wait for that asynchronous Redis operation. Three regression cases using the real configured cache and real Redis, with only the asynchronous transport deliberately deferred, failed deterministically on the old configuration: put returned before visibility, and evict/clear returned while stale values remained. `CacheConfig` now uses an immediate-write writer while retaining transaction awareness and the existing serializer/TTL. See [the Spring API contract](https://docs.spring.io/spring-data/redis/docs/current/api/org/springframework/data/redis/cache/RedisCacheWriter.RedisCacheWriterConfigurer.html).
+- `ServiceIntegrationE2ETest` activated the test profile's `create-drop` against the PostgreSQL database shared by security/AI suites. Running Service before AI reproduced missing migration history/schema; a new test-profile regression also reproduced the missing locale default. The shared base now enforces Flyway migration and Hibernate validation for all inherited contexts. Global fixture deletion then exposed a real foreign-key conflict in the full suite; Service now uses unique transactional fixtures/rollback, and RBAC deletes only the user IDs it created. The old polling sleep for email-cache eviction was removed so the assertion checks immediate visibility.
+
+Four new regression cases fail before these fixes and pass afterwards. The complete final local `clean verify` passes **2,651 cases: 2,513 executed, 138 allowlisted skips, zero failures/errors**. The report policy passes and now requires nine classes, including RBAC and the new cache/schema regressions. The 53 deployment-tooling tests, strict FE lint/build, actionlint, Bash syntax and diff whitespace checks also pass. A second full suite with alphabetical class ordering and GitHub CI are separate follow-up evidence; no production installation/deployment was performed.
+
+The production runbook now includes Vietnamese, click-by-click GitHub setup. It also identifies that the current FE Admin Settings page still uses mock/local state, so production commission must be persisted and read back through the real Admin API.
