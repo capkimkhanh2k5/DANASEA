@@ -9,7 +9,6 @@ import type {
   OrderResponse,
   SubOrderResponse,
   CancellationPreviewResponse,
-  RefundRequest,
   RefundResponse,
   QrCodeResponse,
 } from "../../../types/order";
@@ -130,11 +129,20 @@ export function Orders() {
   }, [isAuthenticated, accessToken, serviceDetails]);
 
   useEffect(() => {
-    if (isAuthenticated && accessToken) {
-      fetchOrders(page);
-    } else {
-      setLoading(false);
-    }
+    let ignore = false;
+    const run = async () => {
+      await Promise.resolve();
+      if (ignore) return;
+      if (isAuthenticated && accessToken) {
+        fetchOrders(page);
+      } else {
+        setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      ignore = true;
+    };
   }, [page, isAuthenticated, accessToken, fetchOrders]);
 
   // Quick Login helper for testing / unauthenticated state
@@ -606,6 +614,25 @@ export function Orders() {
                 const latestRefund = hasRefund ? refunds[0] : null;
                 const canCancelOrder = masterStatus === "PAID" && !hasRefund;
 
+                const cancelledCount = subOrders.filter(
+                  (s) => s.status === "CANCELLED" || s.status === "REFUNDED" || s.status === "PARTIALLY_REFUNDED"
+                ).length;
+                const isPartialRefund = hasRefund && cancelledCount > 0 && cancelledCount < subOrders.length;
+
+                const displayedSubOrders = subOrders.filter((subOrder) => {
+                  const sStatus = (subOrder.status || "").toUpperCase();
+                  if (filter === "cancelled") {
+                    return sStatus === "CANCELLED" || sStatus === "REFUNDED" || sStatus === "PARTIALLY_REFUNDED";
+                  }
+                  if (filter === "upcoming") {
+                    return sStatus === "CONFIRMED" || sStatus === "PENDING";
+                  }
+                  if (filter === "completed") {
+                    return sStatus === "COMPLETED" || sStatus === "CHECKED_IN";
+                  }
+                  return true;
+                });
+
                 return (
                   <article
                     key={masterOrder.id}
@@ -630,7 +657,9 @@ export function Orders() {
                                     : "bg-amber-50 text-amber-700 border-amber-200"
                                 }`}
                               >
-                                {latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
+                                {isPartialRefund
+                                  ? `Hoàn tiền 1 phần (${cancelledCount}/${subOrders.length} dịch vụ)`
+                                  : latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
                                   ? "Đã hoàn tiền"
                                   : "Đang xử lý hoàn"}
                               </span>
@@ -700,19 +729,28 @@ export function Orders() {
 
                     {/* Sub-Orders List */}
                     <div className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                           <span className="material-symbols-outlined text-[18px] text-cyan-600">layers</span>
-                          Các dịch vụ ({subOrders.length})
+                          {filter === "all"
+                            ? `Các dịch vụ (${subOrders.length})`
+                            : `Dịch vụ thuộc mục này (${displayedSubOrders.length}/${subOrders.length})`}
                         </span>
+                        {filter !== "all" && displayedSubOrders.length < subOrders.length && (
+                          <span className="text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md">
+                            {filter === "cancelled" && `${subOrders.length - displayedSubOrders.length} dịch vụ khác còn hiệu lực (xem ở tab Sắp tới/Đã hoàn thành)`}
+                            {filter === "upcoming" && `${subOrders.length - displayedSubOrders.length} dịch vụ khác đã check-in hoặc bị huỷ`}
+                            {filter === "completed" && `${subOrders.length - displayedSubOrders.length} dịch vụ khác sắp tới hoặc bị huỷ`}
+                          </span>
+                        )}
                       </div>
 
-                      {subOrders.length === 0 ? (
+                      {displayedSubOrders.length === 0 ? (
                         <div className="p-4 rounded-xl bg-slate-50 text-center text-xs text-slate-500">
-                          Không có dịch vụ con trong đơn hàng này.
+                          Không có dịch vụ con nào thuộc mục này.
                         </div>
                       ) : (
-                        subOrders.map((subOrder) => {
+                        displayedSubOrders.map((subOrder) => {
                           const serviceDetail = serviceDetails[subOrder.serviceId];
                           const serviceName = serviceDetail?.name || subOrder.serviceName || `Dịch vụ #${subOrder.serviceId.slice(0, 8)}`;
                           const serviceImage = serviceDetail?.imageUrls?.[0] || subOrder.serviceThumbnail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80";
@@ -750,8 +788,8 @@ export function Orders() {
                                   <div className="flex items-start justify-between gap-2">
                                     <div>
                                       <div className="flex items-center gap-2">
-                                        <span className="font-mono font-bold text-xs text-cyan-700">
-                                          #{subOrder.id.slice(0, 8).toUpperCase()}
+                                        <span className="font-mono font-bold text-xs text-cyan-700" title={`Mã vé đầy đủ: ${subOrder.id}`}>
+                                          #VE-{(subOrder.id || "").replace(/-/g, "").slice(-6).toUpperCase()}
                                         </span>
                                       </div>
 
@@ -942,7 +980,7 @@ export function Orders() {
                 <div className="flex justify-between">
                   <span className="text-slate-500">Mã vé (Sub-order):</span>
                   <span className="font-mono font-bold text-cyan-700">
-                    #{selectedSubOrder.id.slice(0, 8).toUpperCase()}
+                    #VE-{(selectedSubOrder.id || "").replace(/-/g, "").slice(-6).toUpperCase()}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -1138,7 +1176,7 @@ export function Orders() {
 
               <div className="space-y-1">
                 <span className="text-xs text-slate-500 font-mono">
-                  Mã vé: #{reviewingSubOrder.id.slice(0, 8).toUpperCase()}
+                  Mã vé: #VE-{(reviewingSubOrder.id || "").replace(/-/g, "").slice(-6).toUpperCase()}
                 </span>
                 <p className="text-sm font-bold text-slate-800">
                   {serviceDetails[reviewingSubOrder.serviceId]?.name || "Dịch vụ du lịch biển"}
@@ -1223,7 +1261,7 @@ export function Orders() {
 
               <div className="space-y-1">
                 <span className="text-xs text-slate-500 font-mono">
-                  Mã vé: #{disputingSubOrder.id.slice(0, 8).toUpperCase()}
+                  Mã vé: #VE-{(disputingSubOrder.id || "").replace(/-/g, "").slice(-6).toUpperCase()}
                 </span>
                 <p className="text-sm font-bold text-slate-800">
                   {serviceDetails[disputingSubOrder.serviceId]?.name || "Dịch vụ du lịch biển"}

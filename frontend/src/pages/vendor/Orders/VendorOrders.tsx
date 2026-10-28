@@ -516,7 +516,7 @@ export function VendorOrders() {
 
         mergedList.push({
           id: subId,
-          orderNumber: b.bookingId ? `DNS-${b.bookingId.slice(0, 5).toUpperCase()}` : `DNS-ORD`,
+          orderNumber: `DNS-${(b.itemId || b.bookingId || subId).replace(/-/g, '').slice(-5).toUpperCase()}`,
           bookingItemId: b.itemId,
           serviceId: b.serviceId,
           slotId: b.slotId || undefined,
@@ -550,7 +550,7 @@ export function VendorOrders() {
           const payout = total - commission;
           mergedList.push({
             id: so.id,
-            orderNumber: `DNS-${so.id.slice(0, 5).toUpperCase()}`,
+            orderNumber: `DNS-${(so.id || '').replace(/-/g, '').slice(-5).toUpperCase()}`,
             serviceId: so.serviceId,
             slotId: so.slotId || undefined,
             serviceTitle: srv?.name || "Trải nghiệm thể thao biển",
