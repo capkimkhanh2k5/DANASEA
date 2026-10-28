@@ -37,10 +37,10 @@ Files: scripts/release.py, scripts/tests/test_release.py, scripts/deploy.sh, doc
 
 ### Task 2: Verified backup and acceptance
 
-Files: scripts/backup.py, scripts/acceptance.py, scripts/tests/test_backup.py, scripts/tests/test_acceptance.py, scripts/deploy.sh, scripts/systemd/*.
+Files: scripts/backup.py, scripts/acceptance.py, scripts/tests/test_backup.py, scripts/tests/test_acceptance.py, scripts/deploy.sh.
 
 - [x] Write failing tests for backup/restore isolation, failed local backup verification and HTTP contract failures; verify acceptance-before-state behavior in the deploy harness.
-- [x] Implement reusable backup verification, verified local archive retention, timer units, readiness checks and acceptance-before-state ordering.
+- [x] Implement reusable backup verification, verified local archive retention capped at seven, readiness checks and acceptance-before-state ordering.
 - [x] Run full scripts unittest discovery.
 
 ### Task 3: Required tests and lint
@@ -62,7 +62,7 @@ Files: Dockerfiles, .github/workflows/ci.yml, .github/workflows/cd.yml, .github/
 
 ### Task 5: Disposable release rehearsal and operations
 
-Files: scripts/rehearse.py, scripts/tests/test_rehearse.py, docs/production-release.md, scripts/systemd/*.
+Files: scripts/rehearse.py, scripts/tests/test_rehearse.py, docs/production-release.md.
 
 - [x] Write isolation and incompatible-migration rollback failure tests.
 - [x] Rehearse migration, backup/restore and candidate acceptance on disposable Docker resources; bind evidence to candidate images and baseline SHA. Actual historical-production-image rehearsal remains a CD-time check.
@@ -87,9 +87,13 @@ User clarification (2026-10-28): local server BackUp storage is sufficient; off-
 - Disposable final image rehearsal: successful dump/restore, migration/data preservation, real inference and booking/order API path.
 - Independent review: four material findings resolved (named volume isolation, worker Python imports, exact candidate config revision, policy app directory). Regression tests and real container checks cover the fixes.
 - No production deployment, data replacement, account-plan changes or repository-visibility changes performed.
-- External controls remain pending: GitHub account administrator protection/environment setup; reviewed Linux host installation and real backup/timer/SSH/provider acceptance. The implementation blocks deployment until controls are available.
+- External controls remain pending: GitHub account administrator protection/environment setup; reviewed Linux host installation and real predeploy backup/SSH/provider acceptance. The implementation blocks deployment until controls are available.
 - Fresh Linux amd64 GitHub Actions execution and actual older-production-image upgrade rehearsal have not run in this local session.
 
 Latest main d0bda178ec4624aa2d5167a18c240258bdf9cfcd was integrated locally. Its additional 4 ESLint errors and 6 warnings were fixed; the merged frontend passes strict lint/build, image scan and the disposable rehearsal. No push: the new repository push principles require explicit written user authorization.
 
 Current frontend verification after withdrawal: strict lint exits 1 (16 errors, 35 warnings); build exits 0; npm audit reports 0 vulnerabilities; actual original-Dockerfile image scan exits 1 (3 HIGH package findings, 2 CVEs). No release gate was weakened.
+
+Backup scope correction (2026-10-28): one restore-verified backup before each deploy attempt; maximum seven retained archives, no periodic schedule. Removed draft systemd service/timer and their installer setup. Added retention regression coverage, including latest-archive preservation and failed-verification preservation.
+
+Backup correction verified: 48/48 scripts tests, Ruff, actionlint and Bash syntax pass. The deployment harness checks exactly one backup before service mutation; frontend remains unchanged and delegated.

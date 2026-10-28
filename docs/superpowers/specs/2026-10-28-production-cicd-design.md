@@ -8,7 +8,7 @@ Keep CI and CD separate. CI must run worker boundary tests, Flash Sale integrati
 
 Automatic deploy only advances the deployed Git history. Explicit rollback requires a separately signed rollback authorization and a rehearsed compatibility contract. Any changed migration disables application rollback; this implementation does not attempt to prove reverse schema compatibility. The first hardened release blocks rollback to a legacy release when infrastructure differs or a digest manifest is unavailable.
 
-Backup uses PostgreSQL custom-format archives, verifies restore into an isolated database, and retains the verified archive in the operator-selected local BackUp directory before migration. Scheduled backups use the same tested entrypoint and systemd timer. Credentials remain server-side. Restore is explicit and never automatically overwrites the live database.
+Backup uses PostgreSQL custom-format archives, verifies restore into an isolated database, and retains the verified archive in the operator-selected local BackUp directory before migration. Each deployment attempt creates exactly one verified archive; retain at most seven archives. There is no scheduled backup service or timer. Credentials remain server-side. Restore is explicit and never automatically overwrites the live database.
 
 Acceptance checks the public HTTPS frontend/API, authorization rejection, worker authenticated inference, and provider inference. Destructive booking/payment checks run only in isolated rehearsal. Successful acceptance and a configurable stability window precede atomic state publication. A single host permits measurable maintenance downtime; high availability needs additional infrastructure and is not represented as implemented.
 
@@ -25,3 +25,5 @@ Acceptance checks the public HTTPS frontend/API, authorization rejection, worker
 Exercise release validation/signatures, stale deployment rejection, compatibility decisions, backup corruption/restore failures, acceptance failures, and state publication with automated tests. Run full Maven verify, worker tests, frontend lint/build, workflow validation, image builds/scans and disposable release rehearsal where the local runtime supports them. Record real boundaries and outstanding host/GitHub setup in the production runbook.
 
 User clarification (2026-10-28): local server BackUp storage is sufficient; off-host replication and age encryption are explicitly out of scope. Default to ~/BackUp/danasea, with an installer override.
+
+User correction (2026-10-28): backup only immediately before deploy, one archive per attempt, maximum seven retained archives. Periodic backups are not required and their draft systemd units have been removed.

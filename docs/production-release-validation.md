@@ -36,9 +36,15 @@ Before FE withdrawal, latest-main integration exposed 4 additional ESLint errors
 ## Production activation still required
 
 - GitHub administrator: enable protected main with Required CI gate/code-owner review and production environment branch restrictions. The live branch was unprotected during inspection; the connected integration cannot administer protection and ruleset access returned an account-plan restriction. No billing or visibility change was made.
-- Linux host: install the reviewed root-owned wrapper/policy/helpers, adopt the verified current release, test the real local backup, inspect the six-hour timer, verify SSH status and required commission configuration, then enable the new CD protocol. See [the production runbook](production-release.md).
+- Linux host: install the reviewed root-owned wrapper/policy/helpers, adopt the verified current release, verify the single predeploy backup, seven-archive retention and SSH status and required commission configuration, then enable the new CD protocol. See [the production runbook](production-release.md).
 - Run the new pipeline on GitHub Linux amd64 and rehearse the actual accepted production baseline. The local fresh-database rehearsal does not prove compatibility with unknown production data or older application images.
-- Real public HTTPS, provider routes, rollout outage budget, systemd backup execution and host reboot/recovery have not been exercised with this new implementation. No production deployment, provider/payment call or live database replacement was performed in this local verification.
+- Real public HTTPS, provider routes, rollout outage budget, predeploy backup execution and host reboot/recovery have not been exercised with this new implementation. No production deployment, provider/payment call or live database replacement was performed in this local verification.
 - Backups remain local in the selected server BackUp directory, per the owner. Host-loss recovery, high availability, semantic AI accuracy and payment settlement are outside the evidence above.
 
 No remote push was performed: `docs/GIT_PUSH_PRINCIPLES.md` requires an explicit written user instruction before any push. The implementation and merge are saved as local commits.
+
+## Backup scope correction
+
+The owner requires one backup before each deployment attempt and at most seven retained archives. The draft periodic backup service/timer and installer schedule have been removed. The latest archive is always retained, older archives rotate only after successful verification, and a legacy retention setting above seven is capped. No server schedule or production backup was modified during this local change.
+
+Verification of the backup correction: all 48 release-tooling unittests passed; isolated Ruff, actionlint, Bash syntax and diff whitespace checks passed. The real deploy-shell harness confirms exactly one backup call before image pull/service update. Retention tests exercise real archive/metadata files, with only Docker dump/restore boundaries simulated. Existing frontend lint/image blockers remain assigned to Role FE.

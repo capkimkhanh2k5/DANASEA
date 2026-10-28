@@ -5,9 +5,15 @@ from deploy_fixture import simulate
 
 class ReleaseDeploymentTest(unittest.TestCase):
     def test_successful_acceptance_advances_state(self):
-        result, _calls, state = simulate(deploy_fails=False)
+        result, calls, state = simulate(deploy_fails=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(state, 'a' * 40)
+        backups = [index for index, call in enumerate(calls)
+                   if call[0] == 'python3' and call[1].endswith('/backup.py')]
+        self.assertEqual(len(backups), 1)
+        mutation = next(index for index, call in enumerate(calls)
+                        if call[0] == 'docker' and ('pull' in call or 'up' in call))
+        self.assertLess(backups[0], mutation)
 
     def test_non_default_app_directory_is_resolved_from_host_policy(self):
         result, _calls, state = simulate(deploy_fails=False, app_dir_in_environment=False)

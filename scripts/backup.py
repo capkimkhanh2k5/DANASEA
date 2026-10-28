@@ -47,9 +47,11 @@ def backup(config):
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     if directory.stat().st_mode & 0o077:
         raise ValueError('Backup directory must have mode 700')
-    keep = config.get('keep', 28)
-    if type(keep) is not int or keep < 2:
-        raise ValueError('Keep at least two verified local backups')
+    keep = config.get('keep', 7)
+    if type(keep) is not int or keep < 1:
+        raise ValueError('Keep at least one verified local backup')
+    # The owner's maximum also applies to an older host policy with a larger value.
+    keep = min(keep, 7)
     with tempfile.TemporaryDirectory(prefix='.backup-', dir=directory) as temporary:
         archive = Path(temporary) / 'database.dump'
         with archive.open('wb') as output:
@@ -79,7 +81,9 @@ def backup(config):
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
-    for old in sorted(directory.glob('verified-*.dump'), reverse=True)[keep:]:
+    previous = sorted((path for path in directory.glob('verified-*.dump') if path != final),
+                      key=lambda path: (path.stat().st_mtime_ns, path.name), reverse=True)
+    for old in previous[keep - 1:]:
         old.unlink()
         Path(str(old) + '.json').unlink(missing_ok=True)
     print(json.dumps({'backup': final.name, 'restore_verified': True, 'storage': 'local'}))
