@@ -46,7 +46,7 @@ services:
       retries: 5
 
   rabbitmq:
-    image: rabbitmq:4.3.7-management-alpine@sha256:ddbbe6b99ce941f74f566947463e3f47f99c3bf0fe80d4ee250cf30b942b1800
+    image: rabbitmq:4.4.0-management-alpine@sha256:0452ee3fd3b9a74160b251e693338616b464f22df4d4ba43304c101bebdca292
     container_name: danasea-rabbitmq
     hostname: danasea-rabbitmq
     restart: unless-stopped
