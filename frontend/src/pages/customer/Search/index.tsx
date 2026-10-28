@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { CinematicSceneBackdrop } from '../../../components/customer/CinematicSceneBackdrop';
 import { TourCardSkeleton } from '../../../components/common/skeletons';
@@ -6,7 +6,6 @@ import { useWishlistStore } from '../../../store/useWishlistStore';
 import { useLanguageStore } from '../../../store/useLanguageStore';
 import { serviceCatalogService, type ServiceQueryParams } from '../../../services/serviceCatalogService';
 import { categoryService } from '../../../services/categoryService';
-import type { ServiceSummaryDto } from '../../../types/service';
 import type { CategoryDto } from '../../../types/category';
 import { FEATURED_SERVICES, CATEGORIES, MOCK_IMAGES } from '../../../mockData';
 
@@ -76,7 +75,7 @@ const CATEGORY_META: Record<string, { titleVi: string; titleEn: string; descVi: 
 export function Search() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { language, t } = useLanguageStore();
+  const { language } = useLanguageStore();
   const { toggleWishlist, isInWishlist } = useWishlistStore();
 
   const categoryParam = searchParams.get('category');
@@ -122,10 +121,11 @@ export function Search() {
     return () => { isMounted = false; };
   }, []);
 
-  // 2. Synchronize URL query parameter when changed
-  useEffect(() => {
+  const [previousCategory, setPreviousCategory] = useState(categoryParam);
+  if (categoryParam !== previousCategory) {
+    setPreviousCategory(categoryParam);
     setSelectedCategorySlug(categoryParam);
-  }, [categoryParam]);
+  }
 
   // Resolve matching category entity from selectedCategorySlug
   const matchedCategory = useMemo(() => {
@@ -179,7 +179,7 @@ export function Search() {
         if (isMounted) {
           if (response && response.content && response.content.length > 0) {
             console.log(`[Bước 2/3] Backend trả về ${response.content.length} dịch vụ trực tiếp`);
-            const mapped: DisplayExperience[] = response.content.map((item, idx) => ({
+            const mapped: DisplayExperience[] = response.content.map((item) => ({
               id: item.id,
               name: item.name,
               description: item.shortDescription || 'Trải nghiệm thể thao biển chuẩn an toàn hàng hải tại vịnh Đà Nẵng.',
@@ -213,7 +213,7 @@ export function Search() {
               return true;
             });
 
-            const mappedMock: DisplayExperience[] = filteredMock.map((item, idx) => {
+            const mappedMock: DisplayExperience[] = filteredMock.map((item) => {
               const img = MOCK_IMAGES.find(i => i.serviceId === item.id && i.isPrimary)?.imageUrl ||
                 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80';
               return {
@@ -453,7 +453,7 @@ export function Search() {
                   <span className="text-slate-500 dark:text-slate-400">{language === 'en' ? 'Sort:' : 'Xếp:'}</span>
                   <select
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
+                    onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                     className="bg-transparent text-slate-800 dark:text-white font-bold outline-none cursor-pointer text-xs"
                   >
                     <option value="popular" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">

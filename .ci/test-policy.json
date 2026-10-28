@@ -1,0 +1,25 @@
+{
+  "required_classes": [
+    "com.danasea.backend.modules.flashsale.FlashSaleHttpIntegrationTest",
+    "com.danasea.backend.modules.flashsale.FlashSaleCommissionUnificationIntegrationTest",
+    "com.danasea.backend.PostgreSqlMigrationIntegrationTest",
+    "com.danasea.backend.AiChatStorageMigrationIntegrationTest",
+    "com.danasea.backend.modules.ai.QuyetDecisionAdapterTest",
+    "com.danasea.backend.security.authentication.integration.PasswordResetSecurityIntegrationTest"
+  ],
+  "allowed_skipped_classes": [
+    "com.danasea.backend.modules.service.e2e.ServiceTier1FeatureCoverageE2ETest",
+    "com.danasea.backend.modules.service.e2e.ServiceTier2BoundaryCornerCaseE2ETest",
+    "com.danasea.backend.modules.service.e2e.ServiceTier3PairwiseCombinationE2ETest",
+    "com.danasea.backend.modules.service.e2e.ServiceTier4RealWorldScenarioE2ETest",
+    "com.danasea.backend.modules.ai.infrastructure.cliproxy.ProxyLiveSmokeTest",
+    "Tier 2: Services Module Boundary & Corner Cases E2E Tests",
+    "Tier 4: Services Module Real-World Application Scenarios E2E Tests",
+    "Tier 1: Services Module Feature Coverage E2E Tests",
+    "Tier 3: Services Module Pairwise Cross-Feature Combinations E2E Tests"
+  ],
+  "allowed_skipped_tests": [
+    "com.danasea.backend.modules.ai.QuyetDecisionAdapterTest#actualPinnedLocalWorkerExecutesAllSevenTasksThroughJavaAdapter"
+  ],
+  "reason": "Legacy ServiceTier suites are superseded by executable integration/controller tests. Provider acceptance runs on the server after deployment; actual Quyet inference is required in image rehearsal. All other skips fail CI."
+}

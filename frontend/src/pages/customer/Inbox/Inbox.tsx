@@ -2,7 +2,7 @@ import { useState } from "react";
 
 export function Inbox() {
   const [activeTab, setActiveTab] = useState("messages");
-  const [activeChat, setActiveChat] = useState<number | null>(1);
+  const [, setActiveChat] = useState<number | null>(1);
   const [showOrder, setShowOrder] = useState(false);
 
   return (

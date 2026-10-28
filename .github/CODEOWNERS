@@ -1,0 +1,7 @@
+# GitHub must enforce code-owner review through the branch rules configured in the runbook.
+/.github/ @capkimkhanh2k5
+/scripts/ @capkimkhanh2k5
+/docker-compose.prod.yml @capkimkhanh2k5
+/**/Dockerfile @capkimkhanh2k5
+/backend/src/main/resources/db/migration/ @capkimkhanh2k5
+/.ci/ @capkimkhanh2k5
