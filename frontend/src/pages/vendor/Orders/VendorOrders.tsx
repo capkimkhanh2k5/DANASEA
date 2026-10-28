@@ -622,21 +622,47 @@ export function VendorOrders() {
       return;
     }
 
-    setIsCheckingIn(true);
-    try {
-      let tokenToSend = rawInput;
-      if (!rawInput.includes(".")) {
-        try {
-          const qrData = await orderService.getCheckinQrCode(rawInput);
-          if (qrData.qrToken) {
-            tokenToSend = qrData.qrToken;
-          }
-        } catch {
-          // Fallback to rawInput
+    // Backend VerifyCheckinUseCase requires an HMAC-SHA256 signed QR token formatted as '<subOrderId>:<expiresAt>.<signature>'
+    if (!rawInput.includes(".") || !rawInput.includes(":")) {
+      const matched = orders.find(
+        (o) => o.id.toUpperCase() === rawInput.toUpperCase() || o.orderNumber.toUpperCase() === rawInput.toUpperCase()
+      );
+      if (matched) {
+        if (matched.checked_in_at !== null) {
+          setScannerResult({
+            type: "USED",
+            order: matched,
+            message: `Vé #${matched.id} của khách ${matched.customerName} đã được check-in vào lúc ${matched.checked_in_at}. Không được check-in lặp lại!`
+          });
+          return;
+        }
+        if (matched.status === "PENDING") {
+          setScannerResult({
+            type: "INVALID",
+            order: matched,
+            message: `Đơn hàng #${matched.id} chưa được thanh toán/xác nhận, chưa thể thực hiện check-in!`
+          });
+          return;
+        }
+        if (matched.status === "REJECTED" || matched.status === "CANCELLED" || matched.status === "REFUNDED") {
+          setScannerResult({
+            type: "INVALID",
+            order: matched,
+            message: `Đơn hàng #${matched.id} ở trạng thái ${matched.status}, không thể thực hiện check-in!`
+          });
+          return;
         }
       }
+      setScannerResult({
+        type: "INVALID",
+        message: "Mã quét không đúng định dạng QR ký số. Vui lòng quét trực tiếp mã QR trên vé của du khách hoặc nhập đầy đủ chuỗi token ký số từ vé."
+      });
+      return;
+    }
 
-      const verifyRes = await vendorOrderService.verifyCheckin(tokenToSend);
+    setIsCheckingIn(true);
+    try {
+      const verifyRes = await vendorOrderService.verifyCheckin(rawInput);
       const checkinTime = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) + " " + new Date().toLocaleDateString("vi-VN");
 
       setOrders((prev) =>
