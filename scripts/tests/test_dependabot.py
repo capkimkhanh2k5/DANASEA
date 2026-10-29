@@ -45,6 +45,40 @@ class DependabotConfigTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_config('version: 2\nversion: 1\nupdates: []\n')
 
+    def standalone(self):
+        return {'version': 2, 'updates': [{
+            'package-ecosystem': 'docker', 'directories': ['/backend', '/frontend'],
+            'schedule': {'interval': 'weekly'}, 'open-pull-requests-limit': 1,
+            'groups': {'docker-weekly': {'patterns': ['*']}},
+        }]}
+
+    def test_valid_standalone_groups_across_directories(self):
+        validate(self.standalone())
+
+    def test_standalone_rejects_multi_ecosystem_patterns(self):
+        config = self.standalone()
+        config['updates'][0]['patterns'] = ['*']
+        with self.assertRaisesRegex(ValueError, 'patterns.*groups'):
+            validate(config)
+
+    def test_standalone_requires_schedule_and_unambiguous_directory(self):
+        for change in ({'schedule': {'interval': 'invalid'}}, {'schedule': None},
+                       {'directory': '/'}, {'directories': []}):
+            config = self.standalone()
+            config['updates'][0].update(change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                validate(config)
+
+    def test_standalone_rejects_invalid_limit_and_group_rules(self):
+        for change in ({'open-pull-requests-limit': True},
+                       {'groups': []}, {'groups': {'weekly': {'patterns': []}}},
+                       {'groups': {'weekly': {'patterns': ['*'], 'applies-to': 'invalid'}}},
+                       {'groups': {'weekly': {'patterns': ['*'], 'update-types': ['semver-major']}}}):
+            config = self.standalone()
+            config['updates'][0].update(change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                validate(config)
+
     def test_invalid_limit_or_schedule_is_rejected(self):
         for change in ({'open-pull-requests-limit': True}, {'schedule': {'interval': 'invalid'}}):
             config = copy.deepcopy(self.config)

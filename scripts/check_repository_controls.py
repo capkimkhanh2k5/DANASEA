@@ -29,7 +29,7 @@ def main():
         validate_controls(fetch('branches/main'), fetch('environments/production'))
         print('GitHub branch/status/environment release boundaries verified')
     except (ValueError, OSError, KeyError, subprocess.SubprocessError):
-        print('Repository release policy failed or is unavailable. Configure branch/environment protection and token read permissions; see docs/production-release.md.', file=sys.stderr)
+        print('Repository release policy failed or is unavailable. Configure branch/environment protection and token read permissions.', file=sys.stderr)
         return 1
     return 0
 
