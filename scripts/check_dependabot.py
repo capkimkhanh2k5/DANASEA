@@ -15,6 +15,10 @@ class UniqueKeysLoader(yaml.SafeLoader):
         keys = [self.construct_object(key, deep=deep) for key, _ in node.value]
         if any(keys.count(key) > 1 for key in keys):
             raise ValueError('Duplicate Dependabot YAML key')
+        # GitHub's YAML parser treats unquoted 08:00 as an integer; PyYAML does not.
+        for key, (_, value) in zip(keys, node.value):
+            if key == 'time' and value.style not in ("'", '"'):
+                raise ValueError('Quote schedule time to preserve its string type on GitHub')
         return super().construct_mapping(node, deep=deep)
 
 

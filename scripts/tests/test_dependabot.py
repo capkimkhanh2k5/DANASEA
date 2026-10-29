@@ -45,6 +45,12 @@ class DependabotConfigTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             load_config('version: 2\nversion: 1\nupdates: []\n')
 
+    def test_schedule_time_is_quoted_for_github_yaml_parser(self):
+        with self.assertRaisesRegex(ValueError, 'Quote.*time'):
+            load_config('version: 2\nupdates:\n- schedule:\n    time: 08:00\n')
+        config = load_config('version: 2\nupdates:\n- schedule:\n    time: "08:00"\n')
+        self.assertEqual(config['updates'][0]['schedule']['time'], '08:00')
+
     def standalone(self):
         return {'version': 2, 'updates': [{
             'package-ecosystem': 'docker', 'directories': ['/backend', '/frontend'],
