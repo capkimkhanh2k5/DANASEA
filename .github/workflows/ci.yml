@@ -96,13 +96,16 @@ jobs:
       - name: Check Python release tooling
         run: |
           python3 -m venv "$RUNNER_TEMP/quality-venv"
-          "$RUNNER_TEMP/quality-venv/bin/pip" install ruff==0.16.10 PyYAML==6.0.3
+          "$RUNNER_TEMP/quality-venv/bin/pip" install ruff==0.16.10 PyYAML==6.0.3 bcrypt==4.3.0
           "$RUNNER_TEMP/quality-venv/bin/python" scripts/check_dependabot.py
           "$RUNNER_TEMP/quality-venv/bin/ruff" check --isolated --select E4,E7,E9,F,I scripts ai-decision/scripts/build_runtime.py ai-decision/scripts/container_entrypoint.py
       - name: Validate workflows and deploy entrypoints
+        env:
+          RUN_DEMO_DATABASE_TESTS: '1'
         run: |
           actionlint
-          bash -n scripts/deploy.sh scripts/install-production-controls.sh
+          bash -n scripts/deploy.sh scripts/install-production-controls.sh scripts/install-demo-data-controls.sh
+          "$RUNNER_TEMP/quality-venv/bin/python" -B -m unittest discover -s demo_data_handoff/tests -v
           "$RUNNER_TEMP/quality-venv/bin/python" -m unittest discover -s scripts/tests -v
       - name: Scan dependencies and committed secrets
         run: |

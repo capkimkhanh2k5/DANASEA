@@ -49,9 +49,12 @@ PYCODE
 fi
 
 read -r action tag _ <<< "${SSH_ORIGINAL_COMMAND:-$*}" || true
-if [[ "${SSH_ORIGINAL_COMMAND:-$*}" != "${action:-} ${tag:-}" || ! "${action:-}" =~ ^(deploy|rollback)$ || ! "${tag:-}" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "Usage: deploy <40-char git sha> (or explicitly authorized rollback <sha>)" >&2
+if [[ "${SSH_ORIGINAL_COMMAND:-$*}" != "${action:-} ${tag:-}" || ! "${action:-}" =~ ^(deploy|rollback|demo-data)$ || ! "${tag:-}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Usage: deploy|rollback|demo-data <40-char git sha>" >&2
   exit 2
+fi
+if [[ "$action" == demo-data ]]; then
+  exec python3 "$TOOLS_DIR/demo_data.py" --sha "$tag" --policy "$DEPLOY_POLICY"
 fi
 resolve_app_dir
 cd "$APP_DIR"

@@ -357,6 +357,11 @@ class Session:
                 self.p.terminate()
                 self.p.wait(timeout=10)
             self.closed = True
+        for stream in (self.p.stdin, self.p.stdout, self.p.stderr):
+            try:
+                stream.close()
+            except (OSError, ValueError):
+                pass
 
 
 def preflight_audit(session, base_rows, trans_rows):
@@ -537,6 +542,174 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     }
 
 
+# Replacement accepts only the exact reviewed V1-V43 table/column/FK/trigger inventory.
+RESET_INVENTORY_SQL = """
+SELECT json_build_object(
+ 'schemas',(SELECT json_agg(nspname ORDER BY nspname) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),
+ 'tables',(SELECT json_agg(x ORDER BY x.name) FROM (
+   SELECT n.nspname||'.'||c.relname name,c.relkind kind,
+     (SELECT json_agg(json_build_array(a.attname,format_type(a.atttypid,a.atttypmod),a.attnotnull,a.attgenerated) ORDER BY a.attnum)
+      FROM pg_attribute a WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped) columns
+   FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+   WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND c.relkind IN ('r','p','f','v','m')) x),
+ 'foreignKeys',(SELECT coalesce(json_agg(x ORDER BY x.child,x.name),'[]'::json) FROM (
+   SELECT c.conname name,cn.nspname||'.'||ch.relname child,pn.nspname||'.'||pa.relname parent,
+     (SELECT json_agg(a.attname ORDER BY k.ord) FROM unnest(c.conkey) WITH ORDINALITY k(num,ord)
+      JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=k.num) childColumns,
+     (SELECT json_agg(a.attname ORDER BY k.ord) FROM unnest(c.confkey) WITH ORDINALITY k(num,ord)
+      JOIN pg_attribute a ON a.attrelid=c.confrelid AND a.attnum=k.num) parentColumns,
+     pg_get_constraintdef(c.oid) definition,c.convalidated validated
+   FROM pg_constraint c JOIN pg_class ch ON ch.oid=c.conrelid JOIN pg_namespace cn ON cn.oid=ch.relnamespace
+   JOIN pg_class pa ON pa.oid=c.confrelid JOIN pg_namespace pn ON pn.oid=pa.relnamespace
+   WHERE c.contype='f' AND (cn.nspname !~ '^pg_' OR pn.nspname !~ '^pg_')) x),
+ 'triggers',(SELECT coalesce(json_agg(x ORDER BY x.table_name,x.name),'[]'::json) FROM (
+   SELECT n.nspname||'.'||c.relname table_name,t.tgname name,t.tgenabled enabled,
+     pg_get_triggerdef(t.oid) definition,md5(pg_get_functiondef(t.tgfoid)) function_md5
+   FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+   WHERE NOT t.tgisinternal AND n.nspname !~ '^pg_') x))
+"""
+
+PROTECTED_TABLES = ('flyway_schema_history', 'system_configs', 'category_safety_rules', 'vendor_commission_policies')
+# These source-defined relationships predate explicit FK constraints.
+PROTECTED_LEGACY_REFERENCES = (
+    ('system_configs', 'updated_by', 'users'),
+    ('categories', 'parent_id', 'categories'),
+    ('vendors', 'user_id', 'users'),
+    ('vendors', 'verified_by', 'users'),
+)
+
+
+def replacement_inventory(session):
+    reviewed = json.loads((ROOT / 'expected_database_schema.json').read_text(encoding='utf8'))
+    actual = session.query(RESET_INVENTORY_SQL)
+    require(actual == reviewed['schema'], 'Unreviewed schema/table/column/foreign-key/trigger inventory; replacement blocked')
+    tables = reviewed['classification']
+    require(set(tables) == {t['name'].removeprefix('public.') for t in actual['tables']} and
+            all(v == ('preserve' if t in PROTECTED_TABLES else 'replace') for t, v in tables.items()),
+            'Incomplete reviewed replacement inventory')
+    # All table names come from this checked package, never from an operator argument.
+    require(all(re.fullmatch('[a-z_]+', t) for t in tables), 'Unsafe reviewed table inventory')
+    session.send('LOCK TABLE ' + ','.join('public.' + t for t in sorted(tables)) + ' IN ACCESS EXCLUSIVE MODE')
+    # Recheck after locks; concurrent schema changes cannot silently broaden scope.
+    require(session.query(RESET_INVENTORY_SQL) == actual, 'Schema inventory changed while acquiring locks')
+    return reviewed
+
+
+def protected_snapshot(session, tables):
+    result = {}
+    for table in tables:
+        condition = '' if table in PROTECTED_TABLES else f" WHERE EXISTS(SELECT 1 FROM pg_temp.demo_reset_keep k WHERE k.table_name={lit(table)} AND k.id=t.id)"
+        rows = session.query(f"SELECT coalesce(json_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]'::json) FROM public.{table} t" + condition)
+        result[table] = {'count': len(rows), 'sha256': hashlib.sha256(json.dumps(rows, sort_keys=True, separators=(',', ':')).encode()).hexdigest()}
+    return result
+
+
+def execute_replace(session, base_rows, trans_rows, demo_password):
+    reviewed = replacement_inventory(session)
+    tables = list(reviewed['classification'])
+    identity = session.query("SELECT json_build_object('database',current_database(),'schema','public','flyway',"
+                             "(SELECT coalesce(max(version::int),0)::text FROM public.flyway_schema_history WHERE success),"
+                             "'failed',(SELECT count(*) FROM public.flyway_schema_history WHERE NOT success))")
+    validate_identity(identity, identity['database'])
+    session.send('CREATE TEMP TABLE demo_reset_keep(table_name text NOT NULL,id uuid NOT NULL,PRIMARY KEY(table_name,id)) ON COMMIT DROP')
+    for table in PROTECTED_TABLES:
+        if table != 'flyway_schema_history':
+            session.send(f"INSERT INTO pg_temp.demo_reset_keep SELECT {lit(table)},id FROM public.{table}")
+    session.send("INSERT INTO pg_temp.demo_reset_keep SELECT 'categories',c.id FROM public.categories c JOIN public.category_safety_rules r ON r.category_slug=c.slug ON CONFLICT DO NOTHING")
+    refs = []
+    for fk in reviewed['schema']['foreignKeys']:
+        require(len(fk['childcolumns']) == 1 and fk['parentcolumns'] == ['id'], 'Unsupported reviewed foreign key')
+        refs.append((fk['child'].removeprefix('public.'), fk['childcolumns'][0], fk['parent'].removeprefix('public.')))
+    refs.extend(PROTECTED_LEGACY_REFERENCES)
+    # Follow only parents of protected rows. Unrelated business children remain replaceable.
+    while True:
+        added = 0
+        for child, column, parent in refs:
+            missing = session.query(f"SELECT to_json(count(*)) FROM public.{child} c JOIN pg_temp.demo_reset_keep k ON k.table_name={lit(child)} AND k.id=c.id "
+                                    f'WHERE c."{column}" IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.{parent} p WHERE p.id=c."{column}")') if child != 'flash_sale_hold_requests' and child != 'ai_confirmation_outcomes' else 0
+            require(missing == 0, 'Protected configuration contains a dangling reference in ' + child)
+            # Tables with composite primary keys cannot become protected in this reviewed graph.
+            if child in ('flash_sale_hold_requests', 'ai_confirmation_outcomes'):
+                continue
+            added += session.query(f"WITH added AS (INSERT INTO pg_temp.demo_reset_keep SELECT DISTINCT {lit(parent)},p.id FROM public.{child} c "
+                                   f"JOIN pg_temp.demo_reset_keep k ON k.table_name={lit(child)} AND k.id=c.id JOIN public.{parent} p ON p.id=c.\"{column}\" "
+                                   'ON CONFLICT DO NOTHING RETURNING id) SELECT to_json(count(*)) FROM added')
+        if not added:
+            break
+    protected_tables = session.query("SELECT coalesce(json_agg(DISTINCT table_name),'[]'::json) FROM pg_temp.demo_reset_keep")
+    snapshot_tables = sorted(set(PROTECTED_TABLES) | set(protected_tables))
+    before = protected_snapshot(session, snapshot_tables)
+    # Preflight permits replaceable old data to differ, but every protected fixture must match.
+    audit = preflight_audit(session, base_rows, trans_rows)
+    keep = session.query("SELECT coalesce(json_agg(json_build_object('table',table_name,'id',id)),'[]'::json) FROM pg_temp.demo_reset_keep")
+    protected_ids = {(r['table'], r['id']) for r in keep}
+    require(not any((c['table'], c['id']) in protected_ids for c in audit['fatalConflicts']),
+            'Protected fixture conflict; configuration will not be overwritten')
+    require(not any(t == 'users' and i in {u['id'] for u in base_rows['users']} for t, i in protected_ids),
+            'Protected fixture account conflict; credentials will not be overwritten')
+    for table, column in (('users', 'email'), ('categories', 'slug'), ('vendors', 'user_id')):
+        fixtures = dict(base_rows, **trans_rows)[table]
+        collision = session.query(f"SELECT to_json(count(*)) FROM public.{table} t JOIN pg_temp.demo_reset_keep k ON k.table_name={lit(table)} AND k.id=t.id "
+                                  f"JOIN {source(table, fixtures)} e ON t.\"{column}\"=e.\"{column}\" WHERE t.id<>e.id")
+        require(collision == 0, 'Protected fixture natural-key conflict in ' + table)
+    # This reviewed business trigger forbids deletion of enabled/cancelled promotions.
+    # Disable only this named trigger transactionally, with its full definition already checked.
+    session.send('ALTER TABLE public.flash_sales DISABLE TRIGGER flash_sale_terms_immutable')
+    remaining = set(tables) - set(PROTECTED_TABLES)
+    dependencies = {(fk['child'].removeprefix('public.'), fk['parent'].removeprefix('public.')) for fk in reviewed['schema']['foreignKeys']}
+    deleted = {}
+    while remaining:
+        ready = sorted(t for t in remaining if not any(child in remaining and child != t and parent == t for child, parent in dependencies))
+        require(bool(ready), 'Unreviewed cyclic replacement dependencies')
+        for table in ready:
+            condition = f" WHERE NOT EXISTS(SELECT 1 FROM pg_temp.demo_reset_keep k WHERE k.table_name={lit(table)} AND k.id=t.id)" if table in protected_tables else ''
+            deleted[table] = session.query(f'WITH removed AS (DELETE FROM public.{table} t' + condition + ' RETURNING 1) SELECT to_json(count(*)) FROM removed')
+            remaining.remove(table)
+    session.send('ALTER TABLE public.flash_sales ENABLE TRIGGER flash_sale_terms_immutable')
+    clean_audit = preflight_audit(session, base_rows, trans_rows)
+    result = execute_sync(session, base_rows, trans_rows, clean_audit, demo_password)
+    # Re-read all fixtures, relationships, amounts and statuses before the caller can commit.
+    validated = preflight_audit(session, base_rows, trans_rows)
+    require(validated['status'] == 'PREFLIGHT_PASS' and all(v['presentInDb'] == v['expected'] and v['conflicts'] == 0 for v in validated['tables'].values()),
+            'Replacement canonical fixture verification failed')
+    require(result['totalVerifiedInDb'] == 270, 'Replacement requires 270 canonical rows')
+    historical = {i['slot_id'] for i in trans_rows['booking_items']}
+    today = datetime.now(timezone(timedelta(hours=7))).date().isoformat()
+    require(all(s['date'] > today for s in base_rows['service_slots'] if s['id'] not in historical), 'Replacement requires future demo slots')
+    after = protected_snapshot(session, snapshot_tables)
+    require(before == after, 'Protected configuration fingerprint changed; replacement rolled back')
+    session.send('SET CONSTRAINTS ALL IMMEDIATE')
+    result.update(status='REPLACE_SUCCESS', deletedByTable=deleted,
+                  preservedByTable={t: v['count'] for t, v in before.items()},
+                  protectedFingerprint=hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest())
+    result['_protectedIds'] = protected_ids
+    return result
+
+
+def fsync_directory(path):
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def write_pending_receipt(path, receipt):
+    require(not path.is_symlink(), 'Pending receipt must not be a symlink')
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, 'w', encoding='utf8') as stream:
+        json.dump(receipt, stream, indent=2)
+        stream.flush()
+        os.fsync(stream.fileno())
+    fsync_directory(path.parent)
+
+
+def validate_modes(args):
+    require(not args.replace or ((args.dry_run or args.apply) and not args.cleanup and not args.validate_only),
+            '--replace requires --dry-run or --apply and cannot be combined with cleanup/preflight')
+    require(not args.cleanup or args.dry_run or args.apply, 'Cleanup requires --dry-run or --apply')
+
+
 def row_fingerprints(session, table, ids):
     if not ids:
         return {}
@@ -657,6 +830,8 @@ def build_parser():
     mode.add_argument('--apply', action='store_true',
                       help='Commit demo data and URL reconciliation to database (requires --confirm-backup or --backup-file)')
 
+    parser.add_argument('--replace', action='store_true', help='Atomically replace reviewed application data, preserving configuration; requires --dry-run or --apply')
+
     parser.add_argument('--cleanup', action='store_true',
                         help='Delete demo records by UUID in reverse FK order (use with --dry-run or --apply)')
 
@@ -682,6 +857,7 @@ def main():
     parser = build_parser()
     args = parser.parse_args()
 
+    validate_modes(args)
     if not args.dry_run and not args.apply and not args.cleanup:
         args.validate_only = True
 
@@ -691,7 +867,7 @@ def main():
 
     base_rows, trans_rows, manifest_data = load_fixtures()
     ownership = load_ownership(args, base_rows, trans_rows)
-    prepare_slots(base_rows, trans_rows, ownership)
+    prepare_slots(base_rows, trans_rows, {} if args.replace else ownership)
 
     if getattr(args, 'docker_container', None) is None:
         if os.environ.get('PGPASSWORD'):
@@ -742,8 +918,10 @@ def main():
     if args.apply:
         require(args.ownership_file.parent.is_dir(), 'Ownership receipt parent directory must exist')
         receipt_temp = args.ownership_file.with_suffix(args.ownership_file.suffix + '.pending')
-    receipt_stream = None
+    if args.apply:
+        require(not receipt_temp.exists(), 'Existing pending receipt; inspect transaction/recovery state before retry')
     commit_attempted = False
+    pending_created = False
 
     session = Session(args, readonly=False)
     try:
@@ -751,35 +929,43 @@ def main():
         validate_identity(audit['identity'], args.database)
         require(audit['flywayCompliant'],
                 f"Target database Flyway version is {audit['identity']['flyway']} (< 43). Apply migrations V25-V43 first.")
-        require(audit['conflictsCount'] == 0,
+        require(args.replace or audit['conflictsCount'] == 0,
                 f"Found {audit['conflictsCount']} data conflicts. Refusing to overwrite.")
         if args.apply:
-            receipt_stream = receipt_temp.open('x', encoding='utf8')
+            write_pending_receipt(receipt_temp, {'version': 1, 'target': ownership_target(args), 'state': 'PREPARING',
+                                                  'operationId': uuid.uuid4().hex, 'replacement': args.replace})
+            pending_created = True
 
-        result = execute_sync(session, base_rows, trans_rows, audit, demo_password)
-        owned = {t: dict(ownership.get('owned', {}).get(t, {})) for t in ALL_TABLES}
+        result = execute_replace(session, base_rows, trans_rows, demo_password) if args.replace else execute_sync(session, base_rows, trans_rows, audit, demo_password)
+        protected_ids = result.pop('_protectedIds', set())
+        owned = {t: {} if args.replace else dict(ownership.get('owned', {}).get(t, {})) for t in ALL_TABLES}
         for t, ids in result.pop('insertedIds').items():
             if t == 'categories':
                 ids = [i for i in ids if i not in FLYWAY_BASELINE_CATEGORIES]
+            ids = [i for i in ids if (t, i) not in protected_ids]
             owned[t].update(row_fingerprints(session, t, ids))
         receipt = {'version': 1, 'target': ownership_target(args), 'owned': owned,
                    'slotDates': {s['id']: s['date'] for s in base_rows['service_slots']
                                  if s['id'] not in {i['slot_id'] for i in trans_rows['booking_items']}}}
-        if receipt_stream:
-            json.dump(receipt, receipt_stream, indent=2)
-            receipt_stream.flush()
-            os.fsync(receipt_stream.fileno())
+        if args.apply:
+            receipt['state'] = 'COMMIT_PENDING'
+            receipt['replacement'] = args.replace
+            receipt['operationId'] = json.loads(receipt_temp.read_text(encoding='utf8'))['operationId']
+            receipt_writing = receipt_temp.with_suffix(receipt_temp.suffix + '.writing')
+            write_pending_receipt(receipt_writing, receipt)
+            os.replace(receipt_writing, receipt_temp)
+            fsync_directory(receipt_temp.parent)
         commit_attempted = args.apply
         session.finish(commit=args.apply)
     finally:
         session.close()
-        if receipt_stream:
-            receipt_stream.close()
-            if not commit_attempted:
-                receipt_temp.unlink()
+        if pending_created and not commit_attempted:
+            receipt_temp.unlink()
+            fsync_directory(receipt_temp.parent)
 
     if args.apply:
         os.replace(receipt_temp, args.ownership_file)
+        fsync_directory(args.ownership_file.parent)
 
     result['transaction'] = 'COMMITTED' if args.apply else 'ROLLED_BACK'
     print(json.dumps(result, indent=2))
