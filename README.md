@@ -109,6 +109,12 @@ The platform is designed around a **Modular Clean Monolith** adhering to Hexagon
 
 ---
 
+## Server Demo Data
+
+The manual **Demo Data** GitHub Actions workflow can inspect, replace and restore
+application demo data after a verified backup. See the [operator runbook](docs/demo-data-workflow.md)
+for the required server bootstrap, production secrets and recovery procedure.
+
 ## Authors
 
 This project was developed as part of **PBL6 — Capstone Project in Information Technology**, Department of Information Technology, Da Nang University of Science and Technology (DUT).

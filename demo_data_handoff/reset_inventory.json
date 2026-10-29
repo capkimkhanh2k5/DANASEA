@@ -1,0 +1,5658 @@
+{
+  "reviewedMigrations": "V1-V43",
+  "classification": {
+    "ai_assessment_cases": "replace",
+    "ai_chat_requests": "replace",
+    "ai_confirmation_outcomes": "replace",
+    "ai_conversations": "replace",
+    "ai_customer_preferences": "replace",
+    "ai_customer_support_requests": "replace",
+    "ai_itineraries": "replace",
+    "ai_itinerary_items": "replace",
+    "ai_itinerary_previews": "replace",
+    "ai_itinerary_proposals": "replace",
+    "ai_itinerary_revisions": "replace",
+    "ai_messages": "replace",
+    "ai_recommendation_feedback": "replace",
+    "ai_recommendations": "replace",
+    "assistant_audit_logs": "replace",
+    "audit_logs": "replace",
+    "booking_item_allocations": "replace",
+    "booking_items": "replace",
+    "bookings": "replace",
+    "categories": "replace",
+    "category_safety_rules": "preserve",
+    "checkin_tokens": "replace",
+    "conversations": "replace",
+    "discount_codes": "replace",
+    "discount_redemptions": "replace",
+    "disputes": "replace",
+    "flash_sale_allocations": "replace",
+    "flash_sale_hold_requests": "replace",
+    "flash_sales": "replace",
+    "flyway_schema_history": "preserve",
+    "invoices": "replace",
+    "master_orders": "replace",
+    "messages": "replace",
+    "notifications": "replace",
+    "password_reset_tokens": "replace",
+    "payments": "replace",
+    "payout_requests": "replace",
+    "recently_vieweds": "replace",
+    "refresh_tokens": "replace",
+    "refunds": "replace",
+    "reviews": "replace",
+    "safety_rule_evaluations": "replace",
+    "service_images": "replace",
+    "service_options": "replace",
+    "service_safety_documents": "replace",
+    "service_slot_units": "replace",
+    "service_slots": "replace",
+    "services": "replace",
+    "settlement_items": "replace",
+    "settlement_line_items": "replace",
+    "settlements": "replace",
+    "sub_order_disruptions": "replace",
+    "sub_order_reschedule_history": "replace",
+    "sub_order_reschedule_proposals": "replace",
+    "sub_orders": "replace",
+    "system_configs": "preserve",
+    "users": "replace",
+    "vendor_commission_policies": "preserve",
+    "vendor_documents": "replace",
+    "vendors": "replace",
+    "weather_caches": "replace",
+    "wishlists": "replace"
+  },
+  "schema": {
+    "schemas": [
+      "public"
+    ],
+    "tables": [
+      {
+        "name": "public.ai_assessment_cases",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "kind",
+            "character varying(40)",
+            true,
+            ""
+          ],
+          [
+            "source_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "requested_by",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "status",
+            "character varying(40)",
+            true,
+            ""
+          ],
+          [
+            "evidence_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "decision_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "resolved_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "resolution_note",
+            "character varying(1000)",
+            false,
+            ""
+          ],
+          [
+            "version",
+            "bigint",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_chat_requests",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "actor_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "request_key",
+            "character varying(128)",
+            true,
+            ""
+          ],
+          [
+            "request_fingerprint",
+            "character varying(64)",
+            true,
+            ""
+          ],
+          [
+            "conversation_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(16)",
+            true,
+            ""
+          ],
+          [
+            "response_json",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_confirmation_outcomes",
+        "kind": "r",
+        "columns": [
+          [
+            "card_id",
+            "character varying(128)",
+            true,
+            ""
+          ],
+          [
+            "owner_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "conversation_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "card_fingerprint",
+            "character varying(64)",
+            true,
+            ""
+          ],
+          [
+            "state",
+            "character varying(16)",
+            true,
+            ""
+          ],
+          [
+            "booking_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "response_json",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_conversations",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "ended_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "started_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "user_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "locale",
+            "character varying(2)",
+            true,
+            ""
+          ],
+          [
+            "structured_context",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "processing_token",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "processing_until",
+            "timestamp with time zone",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_customer_preferences",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "owner_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "enabled",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "interests_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "exclusions_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "version",
+            "bigint",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_customer_support_requests",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "owner_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "order_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "kind",
+            "character varying(24)",
+            true,
+            ""
+          ],
+          [
+            "message",
+            "character varying(1800)",
+            true,
+            ""
+          ],
+          [
+            "desired_date",
+            "date",
+            false,
+            ""
+          ],
+          [
+            "desired_slot_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "response_note",
+            "character varying(1800)",
+            false,
+            ""
+          ],
+          [
+            "handled_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "handled_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(24)",
+            true,
+            ""
+          ],
+          [
+            "idempotency_key",
+            "character varying(120)",
+            true,
+            ""
+          ],
+          [
+            "request_hash",
+            "character varying(64)",
+            true,
+            ""
+          ],
+          [
+            "version",
+            "bigint",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_itineraries",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "owner_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "plan_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "version",
+            "bigint",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "lifecycle",
+            "character varying(20)",
+            true,
+            ""
+          ],
+          [
+            "locale",
+            "character varying(5)",
+            true,
+            ""
+          ],
+          [
+            "idempotency_key",
+            "character varying(128)",
+            false,
+            ""
+          ],
+          [
+            "request_fingerprint",
+            "text",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_itinerary_items",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "itinerary_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "slot_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "activity_date",
+            "date",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_itinerary_previews",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "owner_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "locale",
+            "character varying(5)",
+            true,
+            ""
+          ],
+          [
+            "alternatives_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_itinerary_proposals",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "itinerary_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "owner_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "base_version",
+            "bigint",
+            true,
+            ""
+          ],
+          [
+            "state",
+            "character varying(20)",
+            true,
+            ""
+          ],
+          [
+            "plan_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "original_plan_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "trigger",
+            "character varying(40)",
+            true,
+            ""
+          ],
+          [
+            "source_event_id",
+            "character varying(200)",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_itinerary_revisions",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "itinerary_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "itinerary_version",
+            "bigint",
+            true,
+            ""
+          ],
+          [
+            "lifecycle",
+            "character varying(20)",
+            true,
+            ""
+          ],
+          [
+            "plan_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "reason",
+            "character varying(40)",
+            true,
+            ""
+          ],
+          [
+            "proposal_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_messages",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "conversation_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "content",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "role",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "tool_calls",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "response_payload",
+            "text",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_recommendation_feedback",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "owner_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "recommendation_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "signal",
+            "character varying(16)",
+            true,
+            ""
+          ],
+          [
+            "idempotency_key",
+            "character varying(120)",
+            true,
+            ""
+          ],
+          [
+            "request_hash",
+            "character varying(64)",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_recommendations",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "owner_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_ids_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "criteria_fingerprint",
+            "character varying(128)",
+            true,
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.assistant_audit_logs",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "conversation_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "user_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "tool_name",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "key_masked",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "request_payload",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "response_payload",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "executed_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "is_deleted",
+            "boolean",
+            false,
+            ""
+          ],
+          [
+            "deleted_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.audit_logs",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "actor_user_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "entity_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "action",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "entity_type",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "metadata",
+            "text",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.booking_item_allocations",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "booking_item_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "slot_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "unit_number",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "allocated_seats",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "is_private_lock",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.booking_items",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "booking_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "quantity",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "booking_date",
+            "date",
+            true,
+            ""
+          ],
+          [
+            "booking_time",
+            "time without time zone",
+            true,
+            ""
+          ],
+          [
+            "price",
+            "numeric(15,2)",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "slot_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "option_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "pricing_unit",
+            "character varying(50)",
+            false,
+            ""
+          ],
+          [
+            "participants_count",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "capacity_released",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "max_pax_per_package",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "allow_split",
+            "boolean",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.bookings",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "customer_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "status",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "total_amount",
+            "numeric(15,2)",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "hold_expires_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.categories",
+        "kind": "r",
+        "columns": [
+          [
+            "is_active",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "requires_safety_cert",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "parent_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "name",
+            "character varying(100)",
+            true,
+            ""
+          ],
+          [
+            "name_en",
+            "character varying(100)",
+            false,
+            ""
+          ],
+          [
+            "slug",
+            "character varying(120)",
+            true,
+            ""
+          ],
+          [
+            "icon_url",
+            "text",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.category_safety_rules",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "category_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "category_slug",
+            "character varying(120)",
+            true,
+            ""
+          ],
+          [
+            "category_name",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "caution_wave_height_m",
+            "numeric(5,2)",
+            false,
+            ""
+          ],
+          [
+            "max_wave_height_m",
+            "numeric(5,2)",
+            true,
+            ""
+          ],
+          [
+            "caution_wind_speed_kmh",
+            "numeric(5,2)",
+            false,
+            ""
+          ],
+          [
+            "max_wind_speed_kmh",
+            "numeric(5,2)",
+            true,
+            ""
+          ],
+          [
+            "max_wind_gust_kmh",
+            "numeric(5,2)",
+            false,
+            ""
+          ],
+          [
+            "max_ocean_current_ms",
+            "numeric(5,2)",
+            false,
+            ""
+          ],
+          [
+            "min_visibility_m",
+            "numeric(7,2)",
+            false,
+            ""
+          ],
+          [
+            "fatal_thunderstorm_codes",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.checkin_tokens",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "sub_order_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "qr_token_hash",
+            "character varying(64)",
+            true,
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "used_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "used_by_vendor_staff_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.conversations",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "customer_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "master_order_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "last_message_sequence",
+            "bigint",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.discount_codes",
+        "kind": "r",
+        "columns": [
+          [
+            "discount_value",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "is_active",
+            "boolean",
+            false,
+            ""
+          ],
+          [
+            "max_uses",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "used_count",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "valid_from",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "valid_to",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "code",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "discount_type",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "scope",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "sponsor_type",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "min_order_amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "max_discount_amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "max_uses_per_user",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "recipient_customer_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "replacement_sub_order_id",
+            "uuid",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.discount_redemptions",
+        "kind": "r",
+        "columns": [
+          [
+            "amount_deducted",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "discount_code_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "master_order_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "customer_id",
+            "uuid",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.disputes",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "order_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "sub_order_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "customer_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "reason",
+            "character varying(100)",
+            true,
+            ""
+          ],
+          [
+            "description",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "evidence_urls",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "refund_percentage",
+            "numeric(5,2)",
+            false,
+            ""
+          ],
+          [
+            "admin_note",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "resolved_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "resolved_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "vendor_response",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "vendor_evidence_urls",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "vendor_responded_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.flash_sale_allocations",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "flash_sale_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "booking_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "booking_item_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "state",
+            "character varying(20)",
+            true,
+            ""
+          ],
+          [
+            "pricing_unit",
+            "character varying(30)",
+            true,
+            ""
+          ],
+          [
+            "quantity",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "original_unit_price",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "original_amount",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "policy_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "policy_version",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "commission_rate",
+            "numeric(9,6)",
+            true,
+            ""
+          ],
+          [
+            "commission_amount",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "unit_subsidy",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "subsidy_amount",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "customer_payable",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "vendor_receivable",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "platform_contribution",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.flash_sale_hold_requests",
+        "kind": "r",
+        "columns": [
+          [
+            "customer_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "request_key",
+            "character varying(120)",
+            true,
+            ""
+          ],
+          [
+            "fingerprint",
+            "character varying(64)",
+            true,
+            ""
+          ],
+          [
+            "booking_id",
+            "uuid",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.flash_sales",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "option_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "status",
+            "character varying(20)",
+            true,
+            ""
+          ],
+          [
+            "funding_source",
+            "character varying(20)",
+            true,
+            ""
+          ],
+          [
+            "unit_subsidy",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "starts_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "ends_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "quota",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "budget",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "original_unit_price",
+            "numeric(19,2)",
+            false,
+            ""
+          ],
+          [
+            "policy_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "created_by",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.flyway_schema_history",
+        "kind": "r",
+        "columns": [
+          [
+            "installed_rank",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "version",
+            "character varying(50)",
+            false,
+            ""
+          ],
+          [
+            "description",
+            "character varying(200)",
+            true,
+            ""
+          ],
+          [
+            "type",
+            "character varying(20)",
+            true,
+            ""
+          ],
+          [
+            "script",
+            "character varying(1000)",
+            true,
+            ""
+          ],
+          [
+            "checksum",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "installed_by",
+            "character varying(100)",
+            true,
+            ""
+          ],
+          [
+            "installed_on",
+            "timestamp without time zone",
+            true,
+            ""
+          ],
+          [
+            "execution_time",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "success",
+            "boolean",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.invoices",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "issued_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "master_order_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "invoice_number",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "pdf_url",
+            "character varying(255)",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.master_orders",
+        "kind": "r",
+        "columns": [
+          [
+            "discount_amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "total_amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "customer_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "discount_code_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "status",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "booking_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "idempotency_key",
+            "character varying(100)",
+            false,
+            ""
+          ],
+          [
+            "payment_deadline",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "payment_status",
+            "character varying(50)",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.messages",
+        "kind": "r",
+        "columns": [
+          [
+            "is_read",
+            "boolean",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "conversation_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "sender_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "attachment_url",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "content",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "message_sequence",
+            "bigint",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.notifications",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "sent_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "related_entity_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "user_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "body",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "channel",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "related_entity_type",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "title",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "type",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "locale",
+            "character varying(2)",
+            true,
+            ""
+          ],
+          [
+            "is_read",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "read_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "idempotency_key",
+            "character varying(160)",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.password_reset_tokens",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "used_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "user_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "token_hash",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "failed_attempts",
+            "integer",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.payments",
+        "kind": "r",
+        "columns": [
+          [
+            "amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "master_order_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "provider",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "provider_transaction_id",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "raw_webhook_payload",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "idempotency_key",
+            "character varying(100)",
+            false,
+            ""
+          ],
+          [
+            "webhook_event_id",
+            "character varying(150)",
+            false,
+            ""
+          ],
+          [
+            "payment_url",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "qr_code_url",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "provider_order_id",
+            "character varying(100)",
+            false,
+            ""
+          ],
+          [
+            "provider_amount",
+            "numeric(20,2)",
+            false,
+            ""
+          ],
+          [
+            "provider_currency",
+            "character varying(3)",
+            false,
+            ""
+          ],
+          [
+            "provider_transaction_date",
+            "character varying(14)",
+            false,
+            ""
+          ],
+          [
+            "capture_request_id",
+            "character varying(100)",
+            false,
+            ""
+          ],
+          [
+            "capture_requested_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "last_error",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "paid_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "reconciliation_attempts",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "reconciliation_next_attempt_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "last_reconciled_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.payout_requests",
+        "kind": "r",
+        "columns": [
+          [
+            "amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "processed_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "processed_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "settlement_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(255)",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.recently_vieweds",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "viewed_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "user_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "session_id",
+            "character varying(255)",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.refresh_tokens",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "revoked_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "family_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "replaced_by_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "user_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "token_hash",
+            "character varying(255)",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.refunds",
+        "kind": "r",
+        "columns": [
+          [
+            "amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "refund_percentage",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "processed_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "sub_order_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "reason",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "requested_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "idempotency_key",
+            "character varying(100)",
+            false,
+            ""
+          ],
+          [
+            "provider_refund_id",
+            "character varying(150)",
+            false,
+            ""
+          ],
+          [
+            "provider",
+            "character varying(50)",
+            false,
+            ""
+          ],
+          [
+            "webhook_event_id",
+            "character varying(150)",
+            false,
+            ""
+          ],
+          [
+            "retry_count",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "last_error",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "provider_transaction_id",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "payment_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "provider_amount",
+            "numeric(20,2)",
+            false,
+            ""
+          ],
+          [
+            "provider_currency",
+            "character varying(3)",
+            false,
+            ""
+          ],
+          [
+            "gateway_request_id",
+            "character varying(100)",
+            false,
+            ""
+          ],
+          [
+            "gateway_requested_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "next_attempt_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "verification_attempts",
+            "integer",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.reviews",
+        "kind": "r",
+        "columns": [
+          [
+            "is_flagged",
+            "boolean",
+            false,
+            ""
+          ],
+          [
+            "rating",
+            "smallint",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "vendor_replied_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "customer_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "sub_order_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "comment",
+            "character varying(2000)",
+            false,
+            ""
+          ],
+          [
+            "images",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "vendor_reply",
+            "character varying(2000)",
+            false,
+            ""
+          ],
+          [
+            "is_visible",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "flag_reason",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "moderation_note",
+            "character varying(255)",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.safety_rule_evaluations",
+        "kind": "r",
+        "columns": [
+          [
+            "is_safe",
+            "boolean",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "evaluated_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "slot_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "warning_message",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(50)",
+            false,
+            ""
+          ],
+          [
+            "alert_level",
+            "character varying(20)",
+            false,
+            ""
+          ],
+          [
+            "peak_wave_height_m",
+            "numeric(5,2)",
+            false,
+            ""
+          ],
+          [
+            "peak_wind_speed_kmh",
+            "numeric(5,2)",
+            false,
+            ""
+          ],
+          [
+            "peak_wind_gust_kmh",
+            "numeric(5,2)",
+            false,
+            ""
+          ],
+          [
+            "peak_ocean_current_ms",
+            "numeric(5,2)",
+            false,
+            ""
+          ],
+          [
+            "min_visibility_m",
+            "numeric(7,2)",
+            false,
+            ""
+          ],
+          [
+            "severe_weather_code",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "findings_json",
+            "jsonb",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.service_images",
+        "kind": "r",
+        "columns": [
+          [
+            "sort_order",
+            "smallint",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "url",
+            "character varying(255)",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.service_options",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "name",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "option_type",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "pricing_unit",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "price",
+            "numeric(15,2)",
+            true,
+            ""
+          ],
+          [
+            "max_pax_per_package",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "benefits",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.service_safety_documents",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "reviewed_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "reviewed_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "file_url",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "rejection_reason",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(255)",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.service_slot_units",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "slot_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "unit_number",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "capacity",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "booked_count",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.service_slots",
+        "kind": "r",
+        "columns": [
+          [
+            "booked_count",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "capacity",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "date",
+            "date",
+            false,
+            ""
+          ],
+          [
+            "end_time",
+            "time(0) without time zone",
+            false,
+            ""
+          ],
+          [
+            "start_time",
+            "time(0) without time zone",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "inventory_type",
+            "character varying(50)",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.services",
+        "kind": "r",
+        "columns": [
+          [
+            "avg_rating",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "capacity_per_slot",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "duration_minutes",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "latitude",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "longitude",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "max_wavem",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "min_wind_kmh",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "price",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "rating_count",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "view_count",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "weather_sensitive",
+            "boolean",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "category_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "address",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "description",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "description_en",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "location_name",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "name",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "name_en",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "rejection_reason",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "slug",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "waiver_content",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "waiver_content_en",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "search_vector",
+            "tsvector",
+            false,
+            "s"
+          ],
+          [
+            "waiver_required",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "waiver_version",
+            "integer",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.settlement_items",
+        "kind": "r",
+        "columns": [
+          [
+            "amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "settlement_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "sub_order_id",
+            "uuid",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.settlement_line_items",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "settlement_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "sub_order_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "gross_amount",
+            "numeric(15,2)",
+            true,
+            ""
+          ],
+          [
+            "refund_amount",
+            "numeric(15,2)",
+            true,
+            ""
+          ],
+          [
+            "commission_rate",
+            "numeric(5,4)",
+            true,
+            ""
+          ],
+          [
+            "commission_amount",
+            "numeric(15,2)",
+            true,
+            ""
+          ],
+          [
+            "net_amount",
+            "numeric(15,2)",
+            true,
+            ""
+          ],
+          [
+            "excluded_reason",
+            "character varying(50)",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.settlements",
+        "kind": "r",
+        "columns": [
+          [
+            "commission_amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "gross_amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "net_payable_amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "period_end",
+            "date",
+            false,
+            ""
+          ],
+          [
+            "period_start",
+            "date",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "generated_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "version",
+            "bigint",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.sub_order_disruptions",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "sub_order_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "original_slot_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "original_departure_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "decision_deadline",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "reason",
+            "character varying(30)",
+            true,
+            ""
+          ],
+          [
+            "details",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "source_key",
+            "character varying(150)",
+            true,
+            ""
+          ],
+          [
+            "verified_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(30)",
+            true,
+            ""
+          ],
+          [
+            "refund_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "notification_sent_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.sub_order_reschedule_history",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "sub_order_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "booking_item_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "proposal_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "from_slot_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "to_slot_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "from_booking_date",
+            "date",
+            true,
+            ""
+          ],
+          [
+            "from_booking_time",
+            "time without time zone",
+            true,
+            ""
+          ],
+          [
+            "to_booking_date",
+            "date",
+            true,
+            ""
+          ],
+          [
+            "to_booking_time",
+            "time without time zone",
+            true,
+            ""
+          ],
+          [
+            "performed_by",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "reason_type",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "reason",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "idempotency_key",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "payload_hash",
+            "character varying(64)",
+            false,
+            ""
+          ],
+          [
+            "reschedule_version",
+            "bigint",
+            true,
+            ""
+          ],
+          [
+            "notification_sent_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.sub_order_reschedule_proposals",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "sub_order_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "proposed_slot_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "reason",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "reason_type",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "status",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "proposal_version",
+            "bigint",
+            true,
+            ""
+          ],
+          [
+            "notification_sent_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.sub_orders",
+        "kind": "r",
+        "columns": [
+          [
+            "commission_amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "commission_rate",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "quantity",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "subtotal_amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "unit_price",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "vendor_payout_amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "waiver_accepted",
+            "boolean",
+            false,
+            ""
+          ],
+          [
+            "checked_in_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "waiver_accepted_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "master_order_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "qr_secret",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "slot_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "booking_item_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "vendor_notified_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "cancellation_reason",
+            "character varying(30)",
+            false,
+            ""
+          ],
+          [
+            "discount_amount",
+            "numeric(38,2)",
+            true,
+            ""
+          ],
+          [
+            "vendor_discount_amount",
+            "numeric(38,2)",
+            true,
+            ""
+          ],
+          [
+            "platform_discount_amount",
+            "numeric(38,2)",
+            true,
+            ""
+          ],
+          [
+            "commission_basis_amount",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "final_amount",
+            "numeric(38,2)",
+            true,
+            ""
+          ],
+          [
+            "waiver_required",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "waiver_version",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "waiver_content",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "waiver_content_en",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "waiver_accepted_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "waiver_accepted_language",
+            "character varying(10)",
+            false,
+            ""
+          ],
+          [
+            "waiver_accepted_content",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "reschedule_version",
+            "bigint",
+            true,
+            ""
+          ],
+          [
+            "rescheduled_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "original_slot_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "cancellation_policy_version",
+            "character varying(40)",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.system_configs",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "updated_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "description",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "key",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "value",
+            "character varying(255)",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.users",
+        "kind": "r",
+        "columns": [
+          [
+            "is_email_verified",
+            "boolean",
+            false,
+            ""
+          ],
+          [
+            "is_locked",
+            "boolean",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "avatar_url",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "email",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "full_name",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "locale",
+            "character varying(2)",
+            true,
+            ""
+          ],
+          [
+            "password_hash",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "phone",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "role",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "session_version",
+            "bigint",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.vendor_commission_policies",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "version",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "commission_rate",
+            "numeric(9,6)",
+            true,
+            ""
+          ],
+          [
+            "maximum_subsidy_ratio",
+            "numeric(9,6)",
+            true,
+            ""
+          ],
+          [
+            "estimated_unit_cost",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "minimum_unit_margin",
+            "numeric(19,2)",
+            true,
+            ""
+          ],
+          [
+            "provenance",
+            "character varying(200)",
+            true,
+            ""
+          ],
+          [
+            "created_by",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.vendor_documents",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "reviewed_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "reviewed_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "doc_type",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "file_url",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "status",
+            "character varying(255)",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.vendors",
+        "kind": "r",
+        "columns": [
+          [
+            "rating_avg",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "rating_count",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "verified_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "user_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "verified_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "address",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "badge_tier",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "bank_account_holder",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "bank_account_number",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "bank_name",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "business_name",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "tax_code",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "verification_status",
+            "character varying(255)",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.weather_caches",
+        "kind": "r",
+        "columns": [
+          [
+            "precipitation_mm",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "wave_heightm",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "wind_speed_kmh",
+            "numeric(38,2)",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "fetched_at",
+            "timestamp(6) with time zone",
+            false,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "location_key",
+            "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "raw_payload",
+            "text",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.wishlists",
+        "kind": "r",
+        "columns": [
+          [
+            "created_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp(6) with time zone",
+            true,
+            ""
+          ],
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "user_id",
+            "uuid",
+            false,
+            ""
+          ]
+        ]
+      }
+    ],
+    "foreignKeys": [
+      {
+        "name": "ai_assessment_cases_requested_by_fkey",
+        "child": "public.ai_assessment_cases",
+        "parent": "public.users",
+        "childcolumns": [
+          "requested_by"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (requested_by) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_assessment_cases_resolved_by_fkey",
+        "child": "public.ai_assessment_cases",
+        "parent": "public.users",
+        "childcolumns": [
+          "resolved_by"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (resolved_by) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_chat_requests_conversation_id_fkey",
+        "child": "public.ai_chat_requests",
+        "parent": "public.ai_conversations",
+        "childcolumns": [
+          "conversation_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (conversation_id) REFERENCES ai_conversations(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_confirmation_outcomes_booking_id_fkey",
+        "child": "public.ai_confirmation_outcomes",
+        "parent": "public.bookings",
+        "childcolumns": [
+          "booking_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (booking_id) REFERENCES bookings(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_confirmation_outcomes_conversation_id_fkey",
+        "child": "public.ai_confirmation_outcomes",
+        "parent": "public.ai_conversations",
+        "childcolumns": [
+          "conversation_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (conversation_id) REFERENCES ai_conversations(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_confirmation_outcomes_owner_id_fkey",
+        "child": "public.ai_confirmation_outcomes",
+        "parent": "public.users",
+        "childcolumns": [
+          "owner_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (owner_id) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_itineraries_owner_id_fkey",
+        "child": "public.ai_itineraries",
+        "parent": "public.users",
+        "childcolumns": [
+          "owner_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (owner_id) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_itinerary_items_itinerary_id_fkey",
+        "child": "public.ai_itinerary_items",
+        "parent": "public.ai_itineraries",
+        "childcolumns": [
+          "itinerary_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (itinerary_id) REFERENCES ai_itineraries(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_itinerary_previews_owner_id_fkey",
+        "child": "public.ai_itinerary_previews",
+        "parent": "public.users",
+        "childcolumns": [
+          "owner_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (owner_id) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_itinerary_proposals_itinerary_id_fkey",
+        "child": "public.ai_itinerary_proposals",
+        "parent": "public.ai_itineraries",
+        "childcolumns": [
+          "itinerary_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (itinerary_id) REFERENCES ai_itineraries(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_itinerary_proposals_owner_id_fkey",
+        "child": "public.ai_itinerary_proposals",
+        "parent": "public.users",
+        "childcolumns": [
+          "owner_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (owner_id) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_itinerary_revisions_itinerary_id_fkey",
+        "child": "public.ai_itinerary_revisions",
+        "parent": "public.ai_itineraries",
+        "childcolumns": [
+          "itinerary_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (itinerary_id) REFERENCES ai_itineraries(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_itinerary_revisions_proposal_id_fkey",
+        "child": "public.ai_itinerary_revisions",
+        "parent": "public.ai_itinerary_proposals",
+        "childcolumns": [
+          "proposal_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (proposal_id) REFERENCES ai_itinerary_proposals(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_recommendation_feedback_recommendation_id_fkey",
+        "child": "public.ai_recommendation_feedback",
+        "parent": "public.ai_recommendations",
+        "childcolumns": [
+          "recommendation_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (recommendation_id) REFERENCES ai_recommendations(id)",
+        "validated": true
+      },
+      {
+        "name": "booking_item_allocations_booking_item_id_fkey",
+        "child": "public.booking_item_allocations",
+        "parent": "public.booking_items",
+        "childcolumns": [
+          "booking_item_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (booking_item_id) REFERENCES booking_items(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "booking_item_allocations_slot_id_fkey",
+        "child": "public.booking_item_allocations",
+        "parent": "public.service_slots",
+        "childcolumns": [
+          "slot_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (slot_id) REFERENCES service_slots(id)",
+        "validated": true
+      },
+      {
+        "name": "booking_items_booking_id_fkey",
+        "child": "public.booking_items",
+        "parent": "public.bookings",
+        "childcolumns": [
+          "booking_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "booking_items_option_id_fkey",
+        "child": "public.booking_items",
+        "parent": "public.service_options",
+        "childcolumns": [
+          "option_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (option_id) REFERENCES service_options(id)",
+        "validated": true
+      },
+      {
+        "name": "booking_items_service_id_fkey",
+        "child": "public.booking_items",
+        "parent": "public.services",
+        "childcolumns": [
+          "service_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (service_id) REFERENCES services(id)",
+        "validated": true
+      },
+      {
+        "name": "booking_items_slot_id_fkey",
+        "child": "public.booking_items",
+        "parent": "public.service_slots",
+        "childcolumns": [
+          "slot_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (slot_id) REFERENCES service_slots(id)",
+        "validated": true
+      },
+      {
+        "name": "bookings_customer_id_fkey",
+        "child": "public.bookings",
+        "parent": "public.users",
+        "childcolumns": [
+          "customer_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (customer_id) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "category_safety_rules_category_id_fkey",
+        "child": "public.category_safety_rules",
+        "parent": "public.categories",
+        "childcolumns": [
+          "category_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "checkin_tokens_sub_order_id_fkey",
+        "child": "public.checkin_tokens",
+        "parent": "public.sub_orders",
+        "childcolumns": [
+          "sub_order_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (sub_order_id) REFERENCES sub_orders(id)",
+        "validated": true
+      },
+      {
+        "name": "checkin_tokens_used_by_vendor_staff_id_fkey",
+        "child": "public.checkin_tokens",
+        "parent": "public.users",
+        "childcolumns": [
+          "used_by_vendor_staff_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (used_by_vendor_staff_id) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "discount_codes_recipient_customer_id_fkey",
+        "child": "public.discount_codes",
+        "parent": "public.users",
+        "childcolumns": [
+          "recipient_customer_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (recipient_customer_id) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "discount_codes_replacement_sub_order_id_fkey",
+        "child": "public.discount_codes",
+        "parent": "public.sub_orders",
+        "childcolumns": [
+          "replacement_sub_order_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (replacement_sub_order_id) REFERENCES sub_orders(id)",
+        "validated": true
+      },
+      {
+        "name": "disputes_customer_id_fkey",
+        "child": "public.disputes",
+        "parent": "public.users",
+        "childcolumns": [
+          "customer_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (customer_id) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "disputes_resolved_by_fkey",
+        "child": "public.disputes",
+        "parent": "public.users",
+        "childcolumns": [
+          "resolved_by"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (resolved_by) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "disputes_sub_order_id_fkey",
+        "child": "public.disputes",
+        "parent": "public.sub_orders",
+        "childcolumns": [
+          "sub_order_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (sub_order_id) REFERENCES sub_orders(id)",
+        "validated": true
+      },
+      {
+        "name": "flash_sale_allocations_booking_id_fkey",
+        "child": "public.flash_sale_allocations",
+        "parent": "public.bookings",
+        "childcolumns": [
+          "booking_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED",
+        "validated": true
+      },
+      {
+        "name": "flash_sale_allocations_booking_item_id_fkey",
+        "child": "public.flash_sale_allocations",
+        "parent": "public.booking_items",
+        "childcolumns": [
+          "booking_item_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (booking_item_id) REFERENCES booking_items(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED",
+        "validated": true
+      },
+      {
+        "name": "flash_sale_allocations_flash_sale_id_fkey",
+        "child": "public.flash_sale_allocations",
+        "parent": "public.flash_sales",
+        "childcolumns": [
+          "flash_sale_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (flash_sale_id) REFERENCES flash_sales(id) ON DELETE RESTRICT",
+        "validated": true
+      },
+      {
+        "name": "flash_sale_hold_requests_booking_id_fkey",
+        "child": "public.flash_sale_hold_requests",
+        "parent": "public.bookings",
+        "childcolumns": [
+          "booking_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED",
+        "validated": true
+      },
+      {
+        "name": "flash_sale_hold_requests_customer_id_fkey",
+        "child": "public.flash_sale_hold_requests",
+        "parent": "public.users",
+        "childcolumns": [
+          "customer_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (customer_id) REFERENCES users(id) ON DELETE RESTRICT",
+        "validated": true
+      },
+      {
+        "name": "flash_sales_created_by_fkey",
+        "child": "public.flash_sales",
+        "parent": "public.users",
+        "childcolumns": [
+          "created_by"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT",
+        "validated": true
+      },
+      {
+        "name": "flash_sales_option_id_fkey",
+        "child": "public.flash_sales",
+        "parent": "public.service_options",
+        "childcolumns": [
+          "option_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (option_id) REFERENCES service_options(id) ON DELETE RESTRICT",
+        "validated": true
+      },
+      {
+        "name": "flash_sales_service_id_fkey",
+        "child": "public.flash_sales",
+        "parent": "public.services",
+        "childcolumns": [
+          "service_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE RESTRICT",
+        "validated": true
+      },
+      {
+        "name": "master_orders_booking_id_fkey",
+        "child": "public.master_orders",
+        "parent": "public.bookings",
+        "childcolumns": [
+          "booking_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (booking_id) REFERENCES bookings(id)",
+        "validated": true
+      },
+      {
+        "name": "refunds_payment_id_fkey",
+        "child": "public.refunds",
+        "parent": "public.payments",
+        "childcolumns": [
+          "payment_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (payment_id) REFERENCES payments(id)",
+        "validated": true
+      },
+      {
+        "name": "refunds_requested_by_fkey",
+        "child": "public.refunds",
+        "parent": "public.users",
+        "childcolumns": [
+          "requested_by"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (requested_by) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "service_options_service_id_fkey",
+        "child": "public.service_options",
+        "parent": "public.services",
+        "childcolumns": [
+          "service_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "service_slot_units_slot_id_fkey",
+        "child": "public.service_slot_units",
+        "parent": "public.service_slots",
+        "childcolumns": [
+          "slot_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (slot_id) REFERENCES service_slots(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "settlement_line_items_settlement_id_fkey",
+        "child": "public.settlement_line_items",
+        "parent": "public.settlements",
+        "childcolumns": [
+          "settlement_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "settlement_line_items_sub_order_id_fkey",
+        "child": "public.settlement_line_items",
+        "parent": "public.sub_orders",
+        "childcolumns": [
+          "sub_order_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (sub_order_id) REFERENCES sub_orders(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_order_disruptions_original_slot_id_fkey",
+        "child": "public.sub_order_disruptions",
+        "parent": "public.service_slots",
+        "childcolumns": [
+          "original_slot_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (original_slot_id) REFERENCES service_slots(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_order_disruptions_refund_id_fkey",
+        "child": "public.sub_order_disruptions",
+        "parent": "public.refunds",
+        "childcolumns": [
+          "refund_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (refund_id) REFERENCES refunds(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_order_disruptions_sub_order_id_fkey",
+        "child": "public.sub_order_disruptions",
+        "parent": "public.sub_orders",
+        "childcolumns": [
+          "sub_order_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (sub_order_id) REFERENCES sub_orders(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_order_disruptions_verified_by_fkey",
+        "child": "public.sub_order_disruptions",
+        "parent": "public.users",
+        "childcolumns": [
+          "verified_by"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (verified_by) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_order_reschedule_history_booking_item_id_fkey",
+        "child": "public.sub_order_reschedule_history",
+        "parent": "public.booking_items",
+        "childcolumns": [
+          "booking_item_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (booking_item_id) REFERENCES booking_items(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_order_reschedule_history_from_slot_id_fkey",
+        "child": "public.sub_order_reschedule_history",
+        "parent": "public.service_slots",
+        "childcolumns": [
+          "from_slot_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (from_slot_id) REFERENCES service_slots(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_order_reschedule_history_performed_by_fkey",
+        "child": "public.sub_order_reschedule_history",
+        "parent": "public.users",
+        "childcolumns": [
+          "performed_by"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (performed_by) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_order_reschedule_history_proposal_id_fkey",
+        "child": "public.sub_order_reschedule_history",
+        "parent": "public.sub_order_reschedule_proposals",
+        "childcolumns": [
+          "proposal_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (proposal_id) REFERENCES sub_order_reschedule_proposals(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_order_reschedule_history_sub_order_id_fkey",
+        "child": "public.sub_order_reschedule_history",
+        "parent": "public.sub_orders",
+        "childcolumns": [
+          "sub_order_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (sub_order_id) REFERENCES sub_orders(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "sub_order_reschedule_history_to_slot_id_fkey",
+        "child": "public.sub_order_reschedule_history",
+        "parent": "public.service_slots",
+        "childcolumns": [
+          "to_slot_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (to_slot_id) REFERENCES service_slots(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_order_reschedule_proposals_proposed_slot_id_fkey",
+        "child": "public.sub_order_reschedule_proposals",
+        "parent": "public.service_slots",
+        "childcolumns": [
+          "proposed_slot_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (proposed_slot_id) REFERENCES service_slots(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_order_reschedule_proposals_sub_order_id_fkey",
+        "child": "public.sub_order_reschedule_proposals",
+        "parent": "public.sub_orders",
+        "childcolumns": [
+          "sub_order_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (sub_order_id) REFERENCES sub_orders(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "sub_order_reschedule_proposals_vendor_id_fkey",
+        "child": "public.sub_order_reschedule_proposals",
+        "parent": "public.vendors",
+        "childcolumns": [
+          "vendor_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (vendor_id) REFERENCES vendors(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_orders_booking_item_id_fkey",
+        "child": "public.sub_orders",
+        "parent": "public.booking_items",
+        "childcolumns": [
+          "booking_item_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (booking_item_id) REFERENCES booking_items(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_orders_original_slot_id_fkey",
+        "child": "public.sub_orders",
+        "parent": "public.service_slots",
+        "childcolumns": [
+          "original_slot_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (original_slot_id) REFERENCES service_slots(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_orders_waiver_accepted_by_fkey",
+        "child": "public.sub_orders",
+        "parent": "public.users",
+        "childcolumns": [
+          "waiver_accepted_by"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (waiver_accepted_by) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "vendor_commission_policies_created_by_fkey",
+        "child": "public.vendor_commission_policies",
+        "parent": "public.users",
+        "childcolumns": [
+          "created_by"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE RESTRICT",
+        "validated": true
+      },
+      {
+        "name": "vendor_commission_policies_vendor_id_fkey",
+        "child": "public.vendor_commission_policies",
+        "parent": "public.vendors",
+        "childcolumns": [
+          "vendor_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE RESTRICT",
+        "validated": true
+      }
+    ],
+    "triggers": [
+      {
+        "table_name": "public.bookings",
+        "name": "flash_sale_booking_lifecycle",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER flash_sale_booking_lifecycle AFTER UPDATE OF status ON public.bookings FOR EACH ROW WHEN (((old.status)::text IS DISTINCT FROM (new.status)::text)) EXECUTE FUNCTION transition_flash_sale_allocations()",
+        "function_md5": "76d580961799dc73de6efa8c1a437c69"
+      },
+      {
+        "table_name": "public.flash_sale_allocations",
+        "name": "flash_sale_allocation_guard",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER flash_sale_allocation_guard BEFORE INSERT OR UPDATE ON public.flash_sale_allocations FOR EACH ROW EXECUTE FUNCTION guard_flash_sale_allocation()",
+        "function_md5": "55ef34e35fd693f34a4ec6b1b2dcd4c1"
+      },
+      {
+        "table_name": "public.flash_sales",
+        "name": "flash_sale_terms_immutable",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER flash_sale_terms_immutable BEFORE DELETE OR UPDATE ON public.flash_sales FOR EACH ROW EXECUTE FUNCTION protect_enabled_flash_sale()",
+        "function_md5": "063f1fce36888ea993803d966aa7d642"
+      },
+      {
+        "table_name": "public.vendor_commission_policies",
+        "name": "commission_policy_immutable",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER commission_policy_immutable BEFORE DELETE OR UPDATE ON public.vendor_commission_policies FOR EACH ROW EXECUTE FUNCTION protect_commission_policy()",
+        "function_md5": "55d2bc15181d37ab323f4bc01b7b351f"
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 # Demo Data workflow for the application server
 
-Status: proposed; awaiting approval before implementation.
+Status: approved by owner on 2026-10-29; implementation and disposable testing authorized.
 Branch: `code/demo-data-workflow`, based on `main` after PR #155.
 
 ## Intent and agreed behavior
