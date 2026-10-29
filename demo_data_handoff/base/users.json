@@ -1,0 +1,209 @@
+{
+  "classification": "DEVELOPMENT_SYNTHETIC",
+  "records": [
+    {
+      "sqlRow": {
+        "id": "06223bd1-3fae-525c-afc3-4f42943be6e3",
+        "role": "VENDOR",
+        "email": "vender_8@danasea.test",
+        "phone": null,
+        "locale": "vi",
+        "full_name": "Go N Chill SUP Club",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "1066fe9e-e4d4-5aa9-9178-84f1d006f75b",
+        "role": "VENDOR",
+        "email": "vender_7@danasea.test",
+        "phone": null,
+        "locale": "vi",
+        "full_name": "DaNaFi – Tour Câu Cá Đà Nẵng",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "322173c1-c330-54d9-9d1b-b69c7e480920",
+        "role": "VENDOR",
+        "email": "vender_2@danasea.test",
+        "phone": null,
+        "locale": "vi",
+        "full_name": "Công ty TNHH Kajin Vina",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "32797f00-04d0-53fc-b55d-6672984aba55",
+        "role": "VENDOR",
+        "email": "vender_9@danasea.test",
+        "phone": null,
+        "locale": "vi",
+        "full_name": "Surf Shack Da Nang",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "3ad7d9af-4d4c-59b7-9897-288fcce5be79",
+        "role": "VENDOR",
+        "email": "vender_3@danasea.test",
+        "phone": null,
+        "locale": "vi",
+        "full_name": "Da Nang Outdoor Adventures (DNOA)",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "44d76fc6-fc8b-5031-87ce-2ee2191bd900",
+        "role": "VENDOR",
+        "email": "vender_4@danasea.test",
+        "phone": null,
+        "locale": "vi",
+        "full_name": "Loca Travel Đà Nẵng",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "4e428199-0ca1-5e4c-98dd-35d20a52692e",
+        "role": "VENDOR",
+        "email": "vender_6@danasea.test",
+        "phone": null,
+        "locale": "vi",
+        "full_name": "Khuê Nguyễn – Dịch Vụ Câu Mực Đà Nẵng",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "5777bfcf-0c5a-5957-a83f-83a3253668e4",
+        "role": "VENDOR",
+        "email": "vender_5@danasea.test",
+        "phone": null,
+        "locale": "vi",
+        "full_name": "Công ty Cổ phần D BLUE",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "865a115c-d7f9-5ebd-a36b-1834a590177a",
+        "role": "VENDOR",
+        "email": "vender_1@danasea.test",
+        "phone": null,
+        "locale": "vi",
+        "full_name": "Danabeach Club (Điểm dịch vụ thể thao biển)",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "role": "ADMIN",
+        "email": "admin_demo@danasea.test",
+        "phone": null,
+        "locale": "vi",
+        "full_name": "DANASEA DEMO Admin",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+        "role": "CUSTOMER",
+        "email": "customer_1@danasea.test",
+        "phone": "0900000001",
+        "locale": "vi",
+        "full_name": "Customer Number 1",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+        "role": "CUSTOMER",
+        "email": "customer_2@danasea.test",
+        "phone": "0900000002",
+        "locale": "vi",
+        "full_name": "Customer Number 2",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    }
+  ]
+}

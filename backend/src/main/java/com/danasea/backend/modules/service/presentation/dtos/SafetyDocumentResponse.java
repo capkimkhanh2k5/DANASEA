@@ -16,10 +16,17 @@ public record SafetyDocumentResponse(
         OffsetDateTime createdAt
 ) {
     public static SafetyDocumentResponse from(ServiceSafetyDocumentJpaEntity entity) {
+        return from(entity, entity != null ? entity.getFileUrl() : null);
+    }
+
+    public static SafetyDocumentResponse from(ServiceSafetyDocumentJpaEntity entity, String deliveryUrl) {
+        if (entity == null) {
+            return null;
+        }
         return new SafetyDocumentResponse(
                 entity.getId(),
                 entity.getServiceId(),
-                entity.getFileUrl(),
+                deliveryUrl != null ? deliveryUrl : entity.getFileUrl(),
                 entity.getStatus(),
                 entity.getReviewedBy(),
                 entity.getReviewedAt(),

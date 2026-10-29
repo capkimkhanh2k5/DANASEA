@@ -3,6 +3,7 @@ package com.danasea.backend.e2e.p2;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotUnitRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotUnitJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceOptionJpaEntity;
@@ -110,7 +111,7 @@ class P2RegressionTest extends BaseE2ETest {
     }
 
     @Test void discoveryMustNotReturnDepartedSlots() throws Exception {
-        slotA1TomorrowMorning.setDate(LocalDate.now().minusDays(1));
+        slotA1TomorrowMorning.setDate(LocalDate.now(Booking.VIETNAM_ZONE).minusDays(1));
         serviceSlotRepository.saveAndFlush(slotA1TomorrowMorning);
         var response=mockMvc.perform(get("/api/services").param("date",slotA1TomorrowMorning.getDate().toString()).param("guests","7"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
@@ -188,6 +189,11 @@ class P2RegressionTest extends BaseE2ETest {
     }
 
     @Test void availabilityMustFilterBeforePaginationAndCount() throws Exception {
+        slotA2TomorrowEarly.setDate(LocalDate.now(Booking.VIETNAM_ZONE).plusDays(1));
+        slotA2TomorrowEarly.setStartTime(LocalTime.of(9, 30));
+        slotA2TomorrowEarly.setEndTime(LocalTime.of(10, 30));
+        serviceSlotRepository.saveAndFlush(slotA2TomorrowEarly);
+
         redis.opsForHash().put("inventory:slot:" + slotA1TomorrowMorning.getId() + ":holds", "review-hold",
                 (System.currentTimeMillis()+600000) + "|PERSON_LIMIT:8");
         var response = mockMvc.perform(get("/api/services").param("vendorId", vendorProfileA.getId().toString())

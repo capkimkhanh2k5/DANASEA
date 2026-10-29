@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.service.infrastructure.storage;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -13,6 +14,7 @@ import com.danasea.backend.modules.service.domain.exceptions.FileStorageExceptio
 public class CloudinaryStorageAdapter implements FileStoragePort {
 
     private static final Logger log = LoggerFactory.getLogger(CloudinaryStorageAdapter.class);
+    private static final int DEFAULT_EXPIRY_SECONDS = 300;
 
     private final Cloudinary cloudinary;
 
@@ -30,6 +32,9 @@ public class CloudinaryStorageAdapter implements FileStoragePort {
             Map<String, Object> params = new HashMap<>();
             if (folder != null && !folder.isBlank()) {
                 params.put("folder", folder);
+                if (folder.contains("document")) {
+                    params.put("type", "authenticated");
+                }
             }
             params.put("resource_type", "auto");
 
@@ -75,11 +80,45 @@ public class CloudinaryStorageAdapter implements FileStoragePort {
             if (fileUrl.contains("/raw/")) {
                 params.put("resource_type", "raw");
             }
+            if (fileUrl.contains("/authenticated/")) {
+                params.put("type", "authenticated");
+            }
 
             cloudinary.uploader().destroy(publicId, params);
         } catch (Exception e) {
             log.error("Failed to delete file from Cloudinary: {}", e.getMessage(), e);
             throw new FileStorageException("Failed to delete file from Cloudinary: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public String generateDeliveryUrl(String fileUrl) {
+        return generateDeliveryUrl(fileUrl, DEFAULT_EXPIRY_SECONDS);
+    }
+
+    @Override
+    public String generateDeliveryUrl(String fileUrl, int expirySeconds) {
+        if (fileUrl == null || fileUrl.isBlank() || !fileUrl.contains("/authenticated/")) {
+            return fileUrl;
+        }
+
+        try {
+            String publicId = extractPublicId(fileUrl);
+            String format = "png";
+            int dotIndex = fileUrl.lastIndexOf('.');
+            if (dotIndex != -1 && dotIndex > fileUrl.lastIndexOf('/')) {
+                format = fileUrl.substring(dotIndex + 1);
+            }
+
+            long expiresAt = Instant.now().getEpochSecond() + expirySeconds;
+            Map<String, Object> options = new HashMap<>();
+            options.put("type", "authenticated");
+            options.put("expires_at", expiresAt);
+
+            return cloudinary.privateDownload(publicId, format, options);
+        } catch (Exception e) {
+            log.warn("Failed to generate private download URL for {}: {}", fileUrl, e.getMessage());
+            return fileUrl;
         }
     }
 
@@ -93,11 +132,20 @@ public class CloudinaryStorageAdapter implements FileStoragePort {
         }
 
         int uploadIndex = fileUrl.indexOf("/upload/");
-        if (uploadIndex == -1) {
+        int authIndex = fileUrl.indexOf("/authenticated/");
+        int prefixLength;
+        int startIndex;
+        if (uploadIndex != -1) {
+            startIndex = uploadIndex;
+            prefixLength = "/upload/".length();
+        } else if (authIndex != -1) {
+            startIndex = authIndex;
+            prefixLength = "/authenticated/".length();
+        } else {
             return fileUrl;
         }
 
-        String pathAfterUpload = fileUrl.substring(uploadIndex + "/upload/".length());
+        String pathAfterUpload = fileUrl.substring(startIndex + prefixLength);
 
         // Strip version or transformations followed by version (e.g. "v1234567890/" or "c_fill,w_300/v1234567890/")
         if (pathAfterUpload.matches("^v\\d+/.*")) {

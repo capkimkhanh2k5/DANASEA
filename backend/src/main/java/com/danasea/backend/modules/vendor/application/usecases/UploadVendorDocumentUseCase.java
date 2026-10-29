@@ -65,7 +65,11 @@ public class UploadVendorDocumentUseCase {
         entity.setReviewedAt(null);
 
         VendorDocumentJpaEntity saved = jpaVendorDocumentRepository.save(entity);
-        return vendorDocumentMapper.toDomain(saved);
+        VendorDocument doc = vendorDocumentMapper.toDomain(saved);
+        if (doc != null && doc.getFileUrl() != null) {
+            doc.setFileUrl(documentStoragePort.generateDeliveryUrl(doc.getFileUrl()));
+        }
+        return doc;
     }
 
     private DocType parseDocType(String docTypeStr) {
