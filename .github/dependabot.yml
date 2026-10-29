@@ -1,34 +1,119 @@
+# Weekly groups per ecosystem retain required CI and strict up-to-date checks.
+# Runtime major upgrades and the Maven/JDK Docker image require separate validation.
 version: 2
 updates:
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker
-    directory: /backend
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker
-    directory: /frontend
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker
-    directory: /ai-decision
-    schedule:
-      interval: weekly
-  - package-ecosystem: docker-compose
-    directory: /
-    schedule:
-      interval: weekly
-  - package-ecosystem: maven
-    directory: /backend
-    schedule:
-      interval: weekly
-  - package-ecosystem: npm
-    directory: /frontend
-    schedule:
-      interval: weekly
-  - package-ecosystem: pip
-    directory: /ai-decision/config
-    schedule:
-      interval: weekly
+- package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+    time: "08:00"
+    timezone: Asia/Ho_Chi_Minh
+  open-pull-requests-limit: 1
+  groups:
+    github-actions-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'
+- package-ecosystem: docker
+  schedule:
+    interval: weekly
+    day: monday
+    time: "08:00"
+    timezone: Asia/Ho_Chi_Minh
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  - dependency-name: maven
+  directories:
+  - /backend
+  - /frontend
+  - /ai-decision
+  open-pull-requests-limit: 1
+  groups:
+    docker-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'
+- package-ecosystem: docker-compose
+  directory: /
+  schedule:
+    interval: weekly
+    day: monday
+    time: "08:00"
+    timezone: Asia/Ho_Chi_Minh
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  - dependency-name: rabbitmq
+    versions:
+    - '>=4.4'
+  open-pull-requests-limit: 1
+  groups:
+    docker-compose-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'
+- package-ecosystem: maven
+  directory: /backend
+  schedule:
+    interval: weekly
+    day: monday
+    time: "08:00"
+    timezone: Asia/Ho_Chi_Minh
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  open-pull-requests-limit: 1
+  groups:
+    maven-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'
+- package-ecosystem: npm
+  directory: /frontend
+  schedule:
+    interval: weekly
+    day: monday
+    time: "08:00"
+    timezone: Asia/Ho_Chi_Minh
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  open-pull-requests-limit: 1
+  groups:
+    npm-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'
+- package-ecosystem: pip
+  directory: /ai-decision/config
+  schedule:
+    interval: weekly
+    day: monday
+    time: "08:00"
+    timezone: Asia/Ho_Chi_Minh
+  ignore:
+  - dependency-name: '*'
+    update-types:
+    - version-update:semver-major
+  - dependency-name: mpmath
+    versions:
+    - '>=1.4'
+  - dependency-name: networkx
+    versions:
+    - '>=3.7'
+  # NumPy 2.5 drops the worker's Python 3.11 baseline.
+  - dependency-name: numpy
+    versions:
+    - '>=2.5'
+  open-pull-requests-limit: 1
+  groups:
+    pip-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'

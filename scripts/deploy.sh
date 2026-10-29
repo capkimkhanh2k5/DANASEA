@@ -201,20 +201,35 @@ python3 "$TOOLS_DIR/availability.py" --url "$public_origin/api/services?size=1" 
   --max-outage-seconds "$max_outage_seconds" &
 monitor_pid=$!
 failed=false
-if ! compose "$tag" up -d --wait --wait-timeout "$WAIT_TIMEOUT" --remove-orphans \
+# Keep the public applications running while dependencies and the model start.
+# --no-deps prevents Compose from recreating an already verified dependency.
+if ! compose "$tag" up -d --wait --wait-timeout "$WAIT_TIMEOUT" postgres redis rabbitmq cli-proxy-api \
+  || ! compose "$tag" run --rm --no-deps migrate \
+  || ! compose "$tag" up -d --no-deps --wait --wait-timeout "$WAIT_TIMEOUT" quyet \
+  || ! compose "$tag" up -d --no-deps --wait --wait-timeout "$WAIT_TIMEOUT" backend \
+  || ! compose "$tag" up -d --no-deps --wait --wait-timeout "$WAIT_TIMEOUT" frontend \
   || ! python3 "$TOOLS_DIR/acceptance.py" --url "$public_origin" --stability-seconds "$stability_seconds"; then
   failed=true
 fi
 touch "$runtime_dir/monitor.stop"
 if ! wait "$monitor_pid"; then failed=true; fi
 monitor_pid=''
+event_path="$APP_DIR/.release-events/$tag-$(date -u +%Y%m%dT%H%M%S)-$$.json"
+if [[ -f "$runtime_dir/availability.json" ]] \
+  && mkdir -p "$APP_DIR/.release-events" \
+  && cp "$runtime_dir/availability.json" "$event_path"; then
+  log "Availability evidence retained: $event_path"
+  cat "$event_path" || true
+else
+  failed=true
+  log "Availability evidence unavailable; release cannot be accepted"
+fi
 if [[ "$failed" == true ]]; then
   log "Release failed healthchecks, acceptance or its outage budget"
   diagnostics "$tag"
   rollback || log "Manual recovery required; successful release state was not advanced"
   exit 1
 fi
-mkdir -p "$APP_DIR/.release-events"
 cp "$runtime_dir/availability.json" "$APP_DIR/.release-events/$tag.json"
 python3 "$TOOLS_DIR/release.py" publish "$runtime_dir/release.json" --root "$APP_DIR"
 log "Release ${tag:0:7} accepted; deploy/verification elapsed $((SECONDS - started)) seconds"
