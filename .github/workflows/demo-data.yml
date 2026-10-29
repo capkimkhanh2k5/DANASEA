@@ -83,6 +83,6 @@ jobs:
           if [[ "$DEMO_ACTION" == replace ]]; then password_args=(--password-env DEMO_USER_PASSWORD); fi
           python3 scripts/demo_request.py envelope --request "$private_dir/request.json" --signature "$private_dir/request.json.sig" "${password_args[@]}" > "$private_dir/envelope.json"
           result=0
-          ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" "demo-data $GITHUB_SHA" < "$private_dir/envelope.json" > "$private_dir/result.json" || result=$?
+          ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" 'demo-data '"$GITHUB_SHA" < "$private_dir/envelope.json" > "$private_dir/result.json" || result=$?
           python3 scripts/demo_report.py "$private_dir/result.json" --output "$GITHUB_STEP_SUMMARY"
           exit "$result"
