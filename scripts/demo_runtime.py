@@ -191,7 +191,7 @@ a=types.SimpleNamespace(docker_container=sys.argv[2],database=sys.argv[3],user=s
 s=m.Session(a,readonly=True)
 try:
  actual=s.query(m.RESET_INVENTORY_SQL)
- m.require(actual==json.loads((m.ROOT/'reset_inventory.json').read_text())['schema'],'Unreviewed reset schema')
+ m.require(actual==json.loads((m.ROOT/'expected_database_schema.json').read_text())['schema'],'Unreviewed reset schema')
  s.finish(commit=False)
 finally:s.close()
 """

@@ -580,7 +580,7 @@ PROTECTED_LEGACY_REFERENCES = (
 
 
 def replacement_inventory(session):
-    reviewed = json.loads((ROOT / 'reset_inventory.json').read_text(encoding='utf8'))
+    reviewed = json.loads((ROOT / 'expected_database_schema.json').read_text(encoding='utf8'))
     actual = session.query(RESET_INVENTORY_SQL)
     require(actual == reviewed['schema'], 'Unreviewed schema/table/column/foreign-key/trigger inventory; replacement blocked')
     tables = reviewed['classification']
