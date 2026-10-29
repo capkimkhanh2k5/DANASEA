@@ -1,56 +1,48 @@
-# Weekly consolidated updates retain the same required CI and up-to-date checks.
-# Runtime major changes require a separately tested migration. Security alerts remain enabled.
-# Maven Docker tags also encode the JDK: update this image manually within Java 21.
+# Weekly groups per ecosystem retain required CI and strict up-to-date checks.
+# Runtime major upgrades and the Maven/JDK Docker image require separate validation.
 version: 2
 updates:
 - package-ecosystem: github-actions
   directory: /
   schedule:
     interval: weekly
-  multi-ecosystem-group: weekly-maintenance
-  patterns:
-  - '*'
+    day: monday
+    time: 08:00
+    timezone: Asia/Ho_Chi_Minh
+  open-pull-requests-limit: 1
+  groups:
+    github-actions-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'
 - package-ecosystem: docker
-  directory: /backend
   schedule:
     interval: weekly
-  multi-ecosystem-group: weekly-maintenance
-  patterns:
-  - '*'
+    day: monday
+    time: 08:00
+    timezone: Asia/Ho_Chi_Minh
   ignore:
   - dependency-name: '*'
     update-types:
     - version-update:semver-major
   - dependency-name: maven
-- package-ecosystem: docker
-  directory: /frontend
-  schedule:
-    interval: weekly
-  multi-ecosystem-group: weekly-maintenance
-  patterns:
-  - '*'
-  ignore:
-  - dependency-name: '*'
-    update-types:
-    - version-update:semver-major
-- package-ecosystem: docker
-  directory: /ai-decision
-  schedule:
-    interval: weekly
-  multi-ecosystem-group: weekly-maintenance
-  patterns:
-  - '*'
-  ignore:
-  - dependency-name: '*'
-    update-types:
-    - version-update:semver-major
+  directories:
+  - /backend
+  - /frontend
+  - /ai-decision
+  open-pull-requests-limit: 1
+  groups:
+    docker-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'
 - package-ecosystem: docker-compose
   directory: /
   schedule:
     interval: weekly
-  multi-ecosystem-group: weekly-maintenance
-  patterns:
-  - '*'
+    day: monday
+    time: 08:00
+    timezone: Asia/Ho_Chi_Minh
   ignore:
   - dependency-name: '*'
     update-types:
@@ -58,35 +50,53 @@ updates:
   - dependency-name: rabbitmq
     versions:
     - '>=4.4'
+  open-pull-requests-limit: 1
+  groups:
+    docker-compose-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'
 - package-ecosystem: maven
   directory: /backend
   schedule:
     interval: weekly
-  multi-ecosystem-group: weekly-maintenance
-  patterns:
-  - '*'
+    day: monday
+    time: 08:00
+    timezone: Asia/Ho_Chi_Minh
   ignore:
   - dependency-name: '*'
     update-types:
     - version-update:semver-major
+  open-pull-requests-limit: 1
+  groups:
+    maven-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'
 - package-ecosystem: npm
   directory: /frontend
   schedule:
     interval: weekly
-  multi-ecosystem-group: weekly-maintenance
-  patterns:
-  - '*'
+    day: monday
+    time: 08:00
+    timezone: Asia/Ho_Chi_Minh
   ignore:
   - dependency-name: '*'
     update-types:
     - version-update:semver-major
+  open-pull-requests-limit: 1
+  groups:
+    npm-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'
 - package-ecosystem: pip
   directory: /ai-decision/config
   schedule:
     interval: weekly
-  multi-ecosystem-group: weekly-maintenance
-  patterns:
-  - '*'
+    day: monday
+    time: 08:00
+    timezone: Asia/Ho_Chi_Minh
   ignore:
   - dependency-name: '*'
     update-types:
@@ -97,10 +107,9 @@ updates:
   - dependency-name: networkx
     versions:
     - '>=3.7'
-multi-ecosystem-groups:
-  weekly-maintenance:
-    schedule:
-      interval: weekly
-      day: monday
-      time: 08:00
-      timezone: Asia/Ho_Chi_Minh
+  open-pull-requests-limit: 1
+  groups:
+    pip-weekly:
+      applies-to: version-updates
+      patterns:
+      - '*'

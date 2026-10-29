@@ -22,6 +22,35 @@ def load_config(text):
     return yaml.load(text, Loader=UniqueKeysLoader)
 
 
+def nonempty_strings(value):
+    return isinstance(value, list) and bool(value) and all(isinstance(v, str) and v for v in value)
+
+
+def validate_standalone(update):
+    schedule = update.get('schedule')
+    if not isinstance(schedule, dict) or schedule.get('interval') not in INTERVALS:
+        raise ValueError('Standalone updates require a valid schedule')
+    if 'patterns' in update:
+        raise ValueError('Standalone patterns must be configured under groups')
+    limit = update.get('open-pull-requests-limit', 5)
+    if type(limit) is not int or limit < 0:
+        raise ValueError('Update open-pull-requests-limit must be a nonnegative integer')
+    groups = update.get('groups', {})
+    if not isinstance(groups, dict):
+        raise ValueError('Ecosystem groups must be a mapping')
+    for group in groups.values():
+        if not isinstance(group, dict) or not {'patterns', 'dependency-type', 'update-types'}.intersection(group):
+            raise ValueError('Ecosystem groups require matching rules')
+        for field in ('patterns', 'exclude-patterns'):
+            if field in group and not nonempty_strings(group[field]):
+                raise ValueError('Group patterns must be nonempty strings')
+        if group.get('applies-to', 'version-updates') not in ('version-updates', 'security-updates'):
+            raise ValueError('Invalid group applies-to')
+        if 'update-types' in group and (not nonempty_strings(group['update-types'])
+                                       or set(group['update-types']) - {'major', 'minor', 'patch'}):
+            raise ValueError('Invalid group update-types')
+
+
 def validate(config):
     if not isinstance(config, dict) or config.get('version') != 2:
         raise ValueError('Dependabot version must be 2')
@@ -40,8 +69,14 @@ def validate(config):
     for update in updates:
         if not isinstance(update, dict) or not isinstance(update.get('package-ecosystem'), str):
             raise ValueError('Invalid ecosystem entry')
+        if ('directory' in update) == ('directories' in update):
+            raise ValueError('Specify exactly one of directory or directories')
+        directories = update.get('directories') if 'directories' in update else [update['directory']]
+        if not nonempty_strings(directories) or any(not d.startswith('/') for d in directories):
+            raise ValueError('Manifest directories must be nonempty absolute repository paths')
         group = update.get('multi-ecosystem-group')
         if group is None:
+            validate_standalone(update)
             continue
         if not isinstance(group, str) or group not in groups:
             raise ValueError('Unknown multi-ecosystem group')
