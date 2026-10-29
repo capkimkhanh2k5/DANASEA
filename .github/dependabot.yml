@@ -107,6 +107,10 @@ updates:
   - dependency-name: networkx
     versions:
     - '>=3.7'
+  # NumPy 2.5 drops the worker's Python 3.11 baseline.
+  - dependency-name: numpy
+    versions:
+    - '>=2.5'
   open-pull-requests-limit: 1
   groups:
     pip-weekly:
