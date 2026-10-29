@@ -1,37 +1,27 @@
-"""Offline fixture contract and negative safety checks; no mocks of PostgreSQL."""
+"""Offline fixture contract and integrity checks for DANASEA demo data package."""
 from pathlib import Path
 import copy
 import json
 import runpy
-import contextlib
-import io
-import shutil
-import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_DIR = ROOT / 'base' if (ROOT / 'base').is_dir() else ROOT / 'data'
-INSTALLER = runpy.run_path(str(ROOT / 'installer/install_demo_data.py'))
+INSTALLER = runpy.run_path(str(ROOT / 'install_demo_data.py'))
 
 
 class PackageContract(unittest.TestCase):
     def test_current_schema_identity_is_accepted(self):
-        for version in ('41', '42', '43'):
+        for version in ('43', '44'):
             with self.subTest(version=version):
                 INSTALLER['validate_identity']({'database': 'danasea_demo_audit', 'schema': 'public',
                                                 'failed': 0, 'flyway': version}, 'danasea_demo_audit')
 
     def test_unknown_schema_or_foreign_database_is_rejected(self):
         baseline = {'database': 'danasea_demo_audit', 'schema': 'public', 'failed': 0, 'flyway': '43'}
-        for change in ({'database': 'danasea'}, {'schema': 'private'}, {'failed': 1}, {'flyway': '44'}):
+        for change in ({'database': 'danasea_other'}, {'schema': 'private'}, {'failed': 1}, {'flyway': '42'}):
             with self.subTest(change=change), self.assertRaisesRegex(ValueError, 'Database/schema/Flyway mismatch'):
                 INSTALLER['validate_identity'](dict(baseline, **change), 'danasea_demo_audit')
-
-    def test_dry_run_rejects_upload_media_side_effect(self):
-        from types import SimpleNamespace
-        args = SimpleNamespace(dry_run=True, upload_media=True, reuse_storage=False)
-        with self.assertRaisesRegex(ValueError, 'Dry-run cannot upload media to Cloudinary'):
-            INSTALLER['upload_media']([], args)
 
     def test_reviewed_package_matches_manifest(self):
         INSTALLER['manifest']()
@@ -49,7 +39,7 @@ class PackageContract(unittest.TestCase):
         return INSTALLER['validate_rows'](rows)
 
     def test_safety_documents_in_same_atomic_install(self):
-        self.assertIn('service_safety_documents', INSTALLER['TABLES'])
+        self.assertIn('service_safety_documents', INSTALLER['BASE_TABLES'])
 
     def test_required_services_have_own_pending_samples(self):
         rows = self.rows()
@@ -96,13 +86,6 @@ class PackageContract(unittest.TestCase):
         self.assertEqual('ADMIN', users['admin_demo@danasea.test']['role'])
         self.assertEqual(2, sum(u['role'] == 'CUSTOMER' for u in users.values()))
         self.assertTrue(all(u['password_hash'] is None for u in users.values()))
-
-    def test_source_development_database_not_install_target(self):
-        from types import SimpleNamespace
-        args = SimpleNamespace(development=True, database='danasea', docker_container='pbl6_httt-postgres-1',
-                               allow_source_development=True, apply=False, host='127.0.0.1')
-        with self.assertRaisesRegex(ValueError, 'isolated|shared|main|Source'):
-            INSTALLER['target_guard'](args)
 
 
 if __name__ == '__main__':

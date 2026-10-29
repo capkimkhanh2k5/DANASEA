@@ -12,7 +12,7 @@
         "service_id": "088d874c-a61e-5b58-a7a9-497f32a56901",
         "start_time": "09:00:00",
         "updated_at": "2026-10-16T17:25:02.669209+00:00",
-        "booked_count": 0,
+        "booked_count": 1,
         "inventory_type": "PERSON_LIMIT"
       }
     },
@@ -27,7 +27,7 @@
         "service_id": "160e67fc-f236-5871-9971-5555cf855d02",
         "start_time": "09:00:00",
         "updated_at": "2026-10-16T17:25:02.669209+00:00",
-        "booked_count": 0,
+        "booked_count": 2,
         "inventory_type": "PERSON_LIMIT"
       }
     },
@@ -49,7 +49,7 @@
     {
       "sqlRow": {
         "id": "ace7c208-edec-5b15-8702-3d8dbef22db0",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -64,7 +64,7 @@
     {
       "sqlRow": {
         "id": "3ab9e274-fba3-5c18-b9ab-43a52d48c7a0",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -79,7 +79,7 @@
     {
       "sqlRow": {
         "id": "ff3410cb-c474-55e3-827e-1e403260d0d8",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -94,7 +94,7 @@
     {
       "sqlRow": {
         "id": "b5467dcf-a9f3-5162-b268-a21c3f62fbd4",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -109,7 +109,7 @@
     {
       "sqlRow": {
         "id": "194b949e-7efd-5390-8f2f-7b0e378468d1",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -124,7 +124,7 @@
     {
       "sqlRow": {
         "id": "1ae4ed72-991c-54c4-a040-1fc1f2dcf06a",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -139,7 +139,7 @@
     {
       "sqlRow": {
         "id": "38f2aed5-9335-5d28-92fe-dc863243c79e",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -154,7 +154,7 @@
     {
       "sqlRow": {
         "id": "7d2f3bcc-ec43-59bc-9c76-0fec6567470d",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -169,7 +169,7 @@
     {
       "sqlRow": {
         "id": "335c0a39-70a4-5bcc-bba8-0ebf65c756e6",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -184,7 +184,7 @@
     {
       "sqlRow": {
         "id": "a84c6881-b67b-5ef3-9821-7acf398303ea",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -199,7 +199,7 @@
     {
       "sqlRow": {
         "id": "86bd99b8-2040-56db-aa9b-ab3da84d94e0",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -214,7 +214,7 @@
     {
       "sqlRow": {
         "id": "a593f000-eaf6-5927-aee7-d4746e892837",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -229,7 +229,7 @@
     {
       "sqlRow": {
         "id": "ccda1e00-ac70-5f91-88e3-3b3032d57f6f",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -244,7 +244,7 @@
     {
       "sqlRow": {
         "id": "bae8f6b0-6f87-55b2-9433-46279828274e",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -259,7 +259,7 @@
     {
       "sqlRow": {
         "id": "a960d339-d63f-5536-9be2-55a5f33a8155",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -274,7 +274,7 @@
     {
       "sqlRow": {
         "id": "f52fb85f-5d4c-586c-a78e-72b4658433a9",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -289,7 +289,7 @@
     {
       "sqlRow": {
         "id": "aaacd384-583f-5fa5-83d6-ebd70c540544",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -304,7 +304,7 @@
     {
       "sqlRow": {
         "id": "e90aaad4-0b3b-5eb3-96d2-f3e041eb49e5",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 30,
         "end_time": "10:00:00",
@@ -319,7 +319,7 @@
     {
       "sqlRow": {
         "id": "5b35ea57-bc52-5a45-bfba-0b9ae2413790",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -334,7 +334,7 @@
     {
       "sqlRow": {
         "id": "c3cef036-a674-5385-953c-10c53edc8c4d",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",
@@ -349,7 +349,7 @@
     {
       "sqlRow": {
         "id": "db4c9f41-03a1-5664-b047-43450c0d4817",
-        "date": "2026-10-25",
+        "date": "2026-11-20",
         "status": "OPEN",
         "capacity": 4,
         "end_time": "10:00:00",

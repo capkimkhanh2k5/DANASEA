@@ -4,7 +4,8 @@ Validates referential integrity, financial calculations, state transitions,
 and backend contract compliance without database connection.
 """
 from pathlib import Path
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
+from datetime import datetime, timedelta
 import json
 import unittest
 
@@ -124,7 +125,12 @@ class TransactionDatasetContract(unittest.TestCase):
             ref = Decimal(sli['refund_amount'])
             comm = Decimal(sli['commission_amount'])
             net = Decimal(sli['net_amount'])
-            self.assertEqual(gross - ref - comm, net, 'Line item net must equal gross - refund - commission')
+            so = next(s for s in self.data['sub_orders'] if s['id'] == sli['sub_order_id'])
+            basis = Decimal(so['commission_basis_amount'])
+            reversed_basis = (basis * ref / Decimal(so['final_amount'])).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            self.assertEqual(basis - reversed_basis, gross)
+            self.assertEqual((gross * Decimal(sli['commission_rate'])).quantize(Decimal('0.01')), comm)
+            self.assertEqual(gross - comm, net, 'Post-refund gross must not deduct refund twice')
             line_items_by_settlement.setdefault(sli['settlement_id'], []).append(sli)
 
         for s in self.data['settlements']:
@@ -132,11 +138,54 @@ class TransactionDatasetContract(unittest.TestCase):
             expected_gross = sum(Decimal(i['gross_amount']) for i in items)
             expected_comm = sum(Decimal(i['commission_amount']) for i in items)
             expected_ref = sum(Decimal(i['refund_amount']) for i in items)
-            expected_net = expected_gross - expected_comm - expected_ref
+            expected_net = sum(Decimal(i['net_amount']) for i in items)
 
             self.assertEqual(expected_gross, Decimal(s['gross_amount']))
             self.assertEqual(expected_comm, Decimal(s['commission_amount']))
             self.assertEqual(expected_net, Decimal(s['net_payable_amount']))
+
+    def test_unit_prices_dates_and_customer_ownership(self):
+        for booking in self.data['bookings']:
+            items = [i for i in self.data['booking_items'] if i['booking_id'] == booking['id']]
+            self.assertEqual(Decimal(booking['total_amount']), sum(Decimal(i['price']) * i['quantity'] for i in items))
+            self.assertEqual(timedelta(minutes=15), datetime.fromisoformat(booking['hold_expires_at']) - datetime.fromisoformat(booking['created_at']))
+            for item in items:
+                self.assertEqual(item['booking_date'], self.slots[item['slot_id']]['date'])
+                self.assertEqual(item['vendor_id'], self.services[item['service_id']]['vendor_id'])
+                start = datetime.fromisoformat(item['booking_date'] + 'T' + item['booking_time'] + '+07:00')
+                self.assertLess(datetime.fromisoformat(booking['created_at']), start)
+        for order in self.data['master_orders']:
+            booking = next(b for b in self.data['bookings'] if b['id'] == order['booking_id'])
+            self.assertEqual(booking['customer_id'], order['customer_id'])
+            self.assertEqual(Decimal(booking['total_amount']), Decimal(order['total_amount']))
+
+    def test_refund_payment_links_and_payout_balance(self):
+        for refund in self.data['refunds']:
+            self.assertIn('payment_id', refund, 'Refund must link its original payment')
+            payment = next(p for p in self.data['payments'] if p['id'] == refund['payment_id'])
+            so = next(s for s in self.data['sub_orders'] if s['id'] == refund['sub_order_id'])
+            self.assertEqual(payment['master_order_id'], so['master_order_id'])
+            self.assertEqual(payment['provider'], refund['provider'])
+            self.assertEqual(Decimal(so['final_amount']) * Decimal(refund['refund_percentage']) / 100, Decimal(refund['amount']))
+        for settlement in self.data['settlements']:
+            payouts = [p for p in self.data['payout_requests'] if p['settlement_id'] == settlement['id'] and p['status'] != 'REJECTED']
+            self.assertLessEqual(sum(Decimal(p['amount']) for p in payouts), Decimal(settlement['net_payable_amount']))
+            self.assertTrue(all(p['vendor_id'] == settlement['vendor_id'] for p in payouts))
+
+    def test_checkin_window_and_no_fabricated_gateway_evidence(self):
+        for so in self.data['sub_orders']:
+            if so['checked_in_at']:
+                item = next(i for i in self.data['booking_items'] if i['id'] == so['booking_item_id'])
+                start = datetime.fromisoformat(item['booking_date'] + 'T' + item['booking_time'] + '+07:00')
+                checkin = datetime.fromisoformat(so['checked_in_at'])
+                self.assertLessEqual(start - timedelta(hours=2), checkin)
+                end = datetime.fromisoformat(item['booking_date'] + 'T' + self.slots[item['slot_id']]['end_time'] + '+07:00')
+                self.assertLessEqual(checkin, end + timedelta(minutes=30))
+        for p in self.data['payments']:
+            self.assertTrue(all(p[k] is None for k in ('provider_transaction_id', 'provider_order_id', 'payment_url', 'qr_code_url', 'raw_webhook_payload', 'webhook_event_id', 'last_reconciled_at')))
+            self.assertEqual(0, p['reconciliation_attempts'])
+            self.assertNotEqual('PENDING', p['status'], 'Historical mock intents must not enter gateway jobs')
+        self.assertTrue(all(i['pdf_url'] is None and i['invoice_number'].startswith('SYNTHETIC-') for i in self.data['invoices']))
 
     def test_domain_enum_compliance(self):
         valid_providers = {'VNPAY', 'MOMO', 'SEPAY', 'PAYPAL'}
