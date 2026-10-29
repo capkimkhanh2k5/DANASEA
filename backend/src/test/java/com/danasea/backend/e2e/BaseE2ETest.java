@@ -4,6 +4,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.cache.CacheManager;
 import org.springframework.beans.factory.annotation.Qualifier;
 import java.util.List;
+import com.danasea.backend.modules.booking.domain.models.Booking;
 import com.danasea.backend.security.authentication.domain.models.Authentication;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceOptionRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceOptionJpaEntity;
@@ -258,11 +259,11 @@ public abstract class BaseE2ETest extends BaseSecurityIntegrationTest {
         serviceA1 = serviceRepository.save(serviceA1);
 
         // Slot A1 Tomorrow morning: capacity 10, booked 2 -> available 8
-        slotA1TomorrowMorning = createSlot(serviceA1.getId(), LocalDate.now().plusDays(1),
+        slotA1TomorrowMorning = createSlot(serviceA1.getId(), LocalDate.now(Booking.VIETNAM_ZONE).plusDays(1),
                 LocalTime.of(8, 0), LocalTime.of(10, 0), 10, 2, SlotStatus.OPEN);
 
         // Slot A1 Tomorrow afternoon: capacity 10, booked 10 -> available 0 (fully booked)
-        slotA1TomorrowAfternoon = createSlot(serviceA1.getId(), LocalDate.now().plusDays(1),
+        slotA1TomorrowAfternoon = createSlot(serviceA1.getId(), LocalDate.now(Booking.VIETNAM_ZONE).plusDays(1),
                 LocalTime.of(14, 0), LocalTime.of(16, 0), 10, 10, SlotStatus.OPEN);
 
         // Service A2 (Vendor A, Price 250k, Rating 4.5)
@@ -285,8 +286,8 @@ public abstract class BaseE2ETest extends BaseSecurityIntegrationTest {
         serviceA2.setLongitude(new BigDecimal("108.2400"));
         serviceA2 = serviceRepository.save(serviceA2);
 
-        slotA2TomorrowEarly = createSlot(serviceA2.getId(), LocalDate.now().plusDays(1),
-                LocalTime.of(5, 30), LocalTime.of(6, 30), 6, 1, SlotStatus.OPEN);
+        slotA2TomorrowEarly = createSlot(serviceA2.getId(), LocalDate.now(Booking.VIETNAM_ZONE).plusDays(1),
+                LocalTime.of(9, 30), LocalTime.of(10, 30), 6, 1, SlotStatus.OPEN);
 
         // Service B1 (Vendor B, Price 800k, Rating 3.9)
         serviceB1 = new ServiceJpaEntity();
@@ -306,7 +307,7 @@ public abstract class BaseE2ETest extends BaseSecurityIntegrationTest {
         serviceB1.setAddress("Bãi biển Mỹ Khê, Đà Nẵng");
         serviceB1 = serviceRepository.save(serviceB1);
 
-        slotB1TomorrowLate = createSlot(serviceB1.getId(), LocalDate.now().plusDays(1),
+        slotB1TomorrowLate = createSlot(serviceB1.getId(), LocalDate.now(Booking.VIETNAM_ZONE).plusDays(1),
                 LocalTime.of(15, 0), LocalTime.of(16, 30), 4, 1, SlotStatus.OPEN);
 
         for (var service : List.of(serviceA1, serviceA2, serviceB1)) {

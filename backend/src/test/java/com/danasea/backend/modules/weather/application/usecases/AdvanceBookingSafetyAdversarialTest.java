@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.danasea.backend.modules.booking.domain.models.Booking;
+import java.time.Clock;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaCategoryRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
@@ -61,7 +63,7 @@ public class AdvanceBookingSafetyAdversarialTest {
     private WeatherRuleEngine weatherRuleEngine;
     private CheckAdvanceBookingSafetyUseCase useCase;
 
-    private final LocalDate today = LocalDate.now();
+    private final LocalDate today = LocalDate.now(Booking.VIETNAM_ZONE);
     private CategorySafetyRule supRule;
     private CategorySafetyRule parasailingRule;
 
@@ -74,7 +76,8 @@ public class AdvanceBookingSafetyAdversarialTest {
                 weatherRuleEngine,
                 slotRepository,
                 serviceRepository,
-                categoryRepository
+                categoryRepository,
+                Clock.system(Booking.VIETNAM_ZONE)
         );
 
         supRule = CategorySafetyRule.getBySlug("cheo-sup-kayak");

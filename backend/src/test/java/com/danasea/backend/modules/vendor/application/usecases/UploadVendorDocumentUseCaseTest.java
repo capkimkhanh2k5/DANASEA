@@ -84,9 +84,13 @@ class UploadVendorDocumentUseCaseTest {
     @Test
     @DisplayName("Should successfully upload BUSINESS_LICENSE document with PENDING status and null reviewedBy/reviewedAt")
     void shouldUploadBusinessLicenseDocumentSuccessfully() {
+        String canonicalUrl = "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1792170628/danasea_demo_data_package/vendor_documents/business_license.pdf";
+        String deliveryUrl = "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--SIG--/v1792170628/danasea_demo_data_package/vendor_documents/business_license.pdf";
+
         when(jpaVendorRepository.findByUserId(userId)).thenReturn(Optional.of(vendorEntity));
         when(documentStoragePort.uploadDocument(eq(validFile), eq("vendor_documents")))
-                .thenReturn("https://cloudinary.com/danasea/docs/business_license.pdf");
+                .thenReturn(canonicalUrl);
+        when(documentStoragePort.generateDeliveryUrl(canonicalUrl)).thenReturn(deliveryUrl);
 
         UUID generatedDocId = UUID.randomUUID();
         when(jpaVendorDocumentRepository.save(any(VendorDocumentJpaEntity.class))).thenAnswer(invocation -> {
@@ -101,7 +105,7 @@ class UploadVendorDocumentUseCaseTest {
         assertEquals(generatedDocId, result.getId());
         assertEquals(vendorId, result.getVendorId());
         assertEquals(DocType.BUSINESS_LICENSE, result.getDocType());
-        assertEquals("https://cloudinary.com/danasea/docs/business_license.pdf", result.getFileUrl());
+        assertEquals(deliveryUrl, result.getFileUrl());
         assertEquals(DocStatus.PENDING, result.getStatus());
         assertNull(result.getReviewedBy());
         assertNull(result.getReviewedAt());
@@ -111,18 +115,24 @@ class UploadVendorDocumentUseCaseTest {
         VendorDocumentJpaEntity savedEntity = entityCaptor.getValue();
         assertEquals(vendorId, savedEntity.getVendorId());
         assertEquals(DocType.BUSINESS_LICENSE, savedEntity.getDocType());
-        assertEquals("https://cloudinary.com/danasea/docs/business_license.pdf", savedEntity.getFileUrl());
+        assertEquals(canonicalUrl, savedEntity.getFileUrl());
         assertEquals(DocStatus.PENDING, savedEntity.getStatus());
         assertNull(savedEntity.getReviewedBy());
         assertNull(savedEntity.getReviewedAt());
+
+        verify(documentStoragePort).generateDeliveryUrl(canonicalUrl);
     }
 
     @Test
     @DisplayName("Should successfully upload SAFETY_CERT document with case-insensitive doc_type string")
     void shouldUploadSafetyCertDocumentSuccessfully() {
+        String canonicalUrl = "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1792170628/danasea_demo_data_package/vendor_documents/safety_cert.pdf";
+        String deliveryUrl = "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--SIG--/v1792170628/danasea_demo_data_package/vendor_documents/safety_cert.pdf";
+
         when(jpaVendorRepository.findByUserId(userId)).thenReturn(Optional.of(vendorEntity));
         when(documentStoragePort.uploadDocument(eq(validFile), eq("vendor_documents")))
-                .thenReturn("https://cloudinary.com/danasea/docs/safety_cert.pdf");
+                .thenReturn(canonicalUrl);
+        when(documentStoragePort.generateDeliveryUrl(canonicalUrl)).thenReturn(deliveryUrl);
         when(jpaVendorDocumentRepository.save(any(VendorDocumentJpaEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -130,7 +140,9 @@ class UploadVendorDocumentUseCaseTest {
 
         assertNotNull(result);
         assertEquals(DocType.SAFETY_CERT, result.getDocType());
+        assertEquals(deliveryUrl, result.getFileUrl());
         assertEquals(DocStatus.PENDING, result.getStatus());
+        verify(documentStoragePort).generateDeliveryUrl(canonicalUrl);
     }
 
     @Test
