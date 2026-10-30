@@ -1,0 +1,289 @@
+/* DANASEA Admin — Categories Stylesheet */
+.admin-categories {
+  min-width: 0;
+}
+
+.admin-categories .admin-workspace-metric {
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease;
+}
+
+.admin-categories .admin-workspace-metric:hover {
+  border-color: #9ac3c8;
+}
+
+.admin-categories .admin-workspace-metric[aria-pressed="true"] {
+  border-color: #83b8bf;
+  background: #f4fafa;
+}
+
+.admin-categories-header-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--admin-muted, #737373);
+  font-size: 13px;
+}
+
+.admin-categories-list {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid var(--admin-border, #e0e8eb);
+  border-radius: 14px;
+}
+
+.admin-categories-list-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 20px 12px;
+}
+
+.admin-categories-list-heading h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 5px;
+  color: var(--admin-ink, #171717);
+}
+
+.admin-categories-list-heading p,
+.admin-categories-list-heading > span {
+  font-size: 13px;
+  color: var(--admin-secondary, #525252);
+  margin: 0;
+}
+
+.admin-categories-list > .admin-filter-tabs {
+  margin: 0 24px;
+}
+
+.admin-categories-table-scroll {
+  overflow-x: auto;
+}
+
+.admin-categories-table {
+  min-width: 980px;
+}
+
+.admin-categories-table th:first-child {
+  width: 34%;
+}
+
+.admin-categories-table td {
+  vertical-align: middle;
+}
+
+.admin-categories-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.admin-categories-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #e6f3f4;
+  border: 1px solid #c2e2e5;
+  color: #00646f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-categories-identity strong {
+  display: block;
+  line-height: 1.4;
+  font-size: 13.5px;
+  color: var(--admin-ink, #171717);
+}
+
+.admin-categories-identity span {
+  display: block;
+  font-size: 11.5px;
+  color: var(--admin-secondary, #525252);
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.admin-categories-slug-chip {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--admin-body, #262626);
+  background: #f1f5f9;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.admin-categories-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  background: #f8fafc;
+}
+
+.admin-categories-toggle-btn[data-active="true"] {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.admin-categories-toggle-btn[data-active="false"] {
+  background: #f1f5f9;
+  color: var(--admin-secondary, #525252);
+  border-color: #e2e8f0;
+}
+
+.admin-categories-toggle-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.admin-categories-toggle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.admin-categories-actions-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.admin-categories-list-footer {
+  border-top: 1px solid #e2e8f0;
+  padding: 15px 24px;
+  color: var(--admin-muted, #737373);
+  font-size: 12px;
+}
+
+/* Category Drawer / Form Styles */
+.admin-categories-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.admin-categories-icon-picker {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.admin-categories-icon-opt {
+  height: 42px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: var(--admin-secondary, #525252);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.admin-categories-icon-opt:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.admin-categories-icon-opt[data-selected="true"] {
+  background: #00646f;
+  color: #ffffff;
+  border-color: #00646f;
+  box-shadow: 0 1px 3px rgba(0, 100, 111, 0.25);
+}
+
+.admin-categories-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.admin-categories-toggle-row span strong {
+  display: block;
+  font-size: 13px;
+  color: var(--admin-ink, #171717);
+}
+
+.admin-categories-toggle-row span small {
+  display: block;
+  color: var(--admin-secondary, #525252);
+  font-size: 11.5px;
+  margin-top: 2px;
+}
+
+.admin-categories-toggle-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #00646f;
+  cursor: pointer;
+}
+
+.admin-categories-form-error {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  font-size: 12.5px;
+}
+
+.admin-categories-drawer-footer {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.admin-categories-delete-dialog {
+  display: grid;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--admin-body, #262626);
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .admin-categories-list-heading {
+    padding: 18px;
+    align-items: flex-start;
+  }
+  .admin-categories-list-heading > span {
+    white-space: nowrap;
+  }
+  .admin-categories-list > .admin-filter-tabs {
+    margin: 0 18px;
+  }
+  .admin-categories-icon-picker {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-categories-toggle-btn,
+  .admin-categories-icon-opt {
+    transition: none !important;
+  }
+}

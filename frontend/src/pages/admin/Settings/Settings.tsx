@@ -1,269 +1,402 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import {
+  AlertTriangle,
+  Clock,
+  RotateCcw,
+  Save,
+  ShieldAlert,
+  ShieldCheck,
+  Wallet,
+  Waves,
+} from 'lucide-react';
 import { MOCK_ADMIN_CONFIGS } from '../../../data/adminMockData';
 import type { SystemConfig } from '../../../types';
+import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
+import {
+  AdminButton,
+  AdminNotice,
+  AdminPreviewBanner,
+} from '../../../components/admin/AdminWorkspace';
+import { AdminDialog } from '../../../components/admin/AdminDialog';
+import {
+  CONFIG_DEFINITIONS,
+  DEFAULT_CONFIG_VALUES,
+  extractFormDataFromConfigs,
+  formatDateTimeVN,
+  getChangedKeys,
+  hasFormChanges,
+  validateSettingsForm,
+  type ConfigDefinition,
+  type SettingsErrors,
+  type SettingsFormData,
+} from './settingsModel';
+import './Settings.css';
 
 export function Settings() {
+  const location = useLocation();
+  const demo = import.meta.env.DEV && new URLSearchParams(location.search).get('demo') === '1';
+
+  // State management
   const [configs, setConfigs] = useState<SystemConfig[]>(MOCK_ADMIN_CONFIGS);
+  const activeFormData = useMemo(() => extractFormDataFromConfigs(configs), [configs]);
+  const [formData, setFormData] = useState<SettingsFormData>(activeFormData);
+  const [errors, setErrors] = useState<SettingsErrors>({});
+  const [notice, setNotice] = useState<string | null>(null);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [previewState, setPreviewState] = useState<'normal' | 'loading' | 'error' | 'empty'>('normal');
 
-  // Form states mapping to system_configs table
-  const [commissionRate, setCommissionRate] = useState<string>(
-    configs.find(c => c.key === 'PLATFORM_COMMISSION_RATE')?.value || '10'
-  );
-  const [payoutCycle, setPayoutCycle] = useState<string>(
-    configs.find(c => c.key === 'AUTO_PAYOUT_CYCLE_DAYS')?.value || '15'
-  );
-  const [maxSafeWave, setMaxSafeWave] = useState<string>(
-    configs.find(c => c.key === 'WEATHER_MAX_SAFE_WAVE_M')?.value || '1.5'
-  );
-  const [maxSafeWind, setMaxSafeWind] = useState<string>(
-    configs.find(c => c.key === 'WEATHER_MAX_SAFE_WIND_KMH')?.value || '25'
-  );
-  const [emergencyHotline, setEmergencyHotline] = useState<string>(
-    configs.find(c => c.key === 'EMERGENCY_PORT_HOTLINE')?.value || '1900 8989'
-  );
+  // Change detection
+  const isDirty = useMemo(() => hasFormChanges(formData, activeFormData), [formData, activeFormData]);
+  const changedKeys = useMemo(() => getChangedKeys(formData, activeFormData), [formData, activeFormData]);
 
-  // Toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  // Handle input change
+  const handleChange = (key: keyof SettingsFormData, value: string) => {
+    const updated = { ...formData, [key]: value };
+    setFormData(updated);
+
+    // Validate field on change
+    const validation = validateSettingsForm(updated);
+    setErrors(prev => ({ ...prev, [key]: validation[key] }));
   };
 
-  const handleSaveAll = () => {
+  // Save changes
+  const handleSave = () => {
+    const validation = validateSettingsForm(formData);
+    setErrors(validation);
+
+    if (Object.keys(validation).length > 0) {
+      setNotice('Vui lòng kiểm tra và sửa các giá trị chưa hợp lệ.');
+      return;
+    }
+
+    setIsSaving(true);
+    setTimeout(() => {
+      const now = new Date().toISOString();
+      setConfigs(prev =>
+        prev.map(c => {
+          if (c.key === 'PLATFORM_COMMISSION_RATE') return { ...c, value: formData.commissionRate, updatedBy: 'Vũ Hải Đăng', updatedAt: now };
+          if (c.key === 'AUTO_PAYOUT_CYCLE_DAYS') return { ...c, value: formData.payoutCycle, updatedBy: 'Vũ Hải Đăng', updatedAt: now };
+          if (c.key === 'WEATHER_MAX_SAFE_WAVE_M') return { ...c, value: formData.maxSafeWave, updatedBy: 'Vũ Hải Đăng', updatedAt: now };
+          if (c.key === 'WEATHER_MAX_SAFE_WIND_KMH') return { ...c, value: formData.maxSafeWind, updatedBy: 'Vũ Hải Đăng', updatedAt: now };
+          if (c.key === 'EMERGENCY_PORT_HOTLINE') return { ...c, value: formData.emergencyHotline, updatedBy: 'Vũ Hải Đăng', updatedAt: now };
+          return c;
+        })
+      );
+      setIsSaving(false);
+      setNotice('Đã lưu thành công các tham số cấu hình hệ thống.');
+    }, 400);
+  };
+
+  // Revert unsaved edits back to active values
+  const handleDiscardChanges = () => {
+    setFormData(activeFormData);
+    setErrors({});
+    setNotice('Đã hủy các thay đổi chưa lưu.');
+  };
+
+  // Reset all to system defaults
+  const handleConfirmReset = () => {
+    setFormData(DEFAULT_CONFIG_VALUES);
+    const now = new Date().toISOString();
     setConfigs(prev =>
       prev.map(c => {
-        if (c.key === 'PLATFORM_COMMISSION_RATE') return { ...c, value: commissionRate, updatedBy: 'Vũ Hải Đăng' };
-        if (c.key === 'AUTO_PAYOUT_CYCLE_DAYS') return { ...c, value: payoutCycle, updatedBy: 'Vũ Hải Đăng' };
-        if (c.key === 'WEATHER_MAX_SAFE_WAVE_M') return { ...c, value: maxSafeWave, updatedBy: 'Vũ Hải Đăng' };
-        if (c.key === 'WEATHER_MAX_SAFE_WIND_KMH') return { ...c, value: maxSafeWind, updatedBy: 'Vũ Hải Đăng' };
-        if (c.key === 'EMERGENCY_PORT_HOTLINE') return { ...c, value: emergencyHotline, updatedBy: 'Vũ Hải Đăng' };
+        if (c.key === 'PLATFORM_COMMISSION_RATE') return { ...c, value: DEFAULT_CONFIG_VALUES.commissionRate, updatedBy: 'Hệ thống (Mặc định)', updatedAt: now };
+        if (c.key === 'AUTO_PAYOUT_CYCLE_DAYS') return { ...c, value: DEFAULT_CONFIG_VALUES.payoutCycle, updatedBy: 'Hệ thống (Mặc định)', updatedAt: now };
+        if (c.key === 'WEATHER_MAX_SAFE_WAVE_M') return { ...c, value: DEFAULT_CONFIG_VALUES.maxSafeWave, updatedBy: 'Hệ thống (Mặc định)', updatedAt: now };
+        if (c.key === 'WEATHER_MAX_SAFE_WIND_KMH') return { ...c, value: DEFAULT_CONFIG_VALUES.maxSafeWind, updatedBy: 'Hệ thống (Mặc định)', updatedAt: now };
+        if (c.key === 'EMERGENCY_PORT_HOTLINE') return { ...c, value: DEFAULT_CONFIG_VALUES.emergencyHotline, updatedBy: 'Hệ thống (Mặc định)', updatedAt: now };
         return c;
       })
     );
-    showToast("Đã lưu các tham số hệ thống và đồng bộ vào AuditLog!");
+    setErrors({});
+    setIsResetDialogOpen(false);
+    setNotice('Đã khôi phục các tham số cấu hình về giá trị mặc định.');
   };
 
-  const handleResetDefaults = () => {
-    setCommissionRate('10');
-    setPayoutCycle('15');
-    setMaxSafeWave('1.5');
-    setMaxSafeWind('25');
-    setEmergencyHotline('1900 8989');
-    showToast("Đã khôi phục các tham số mặc định của Cảng vụ.");
-  };
+  // Group definitions for direct display (no tabs)
+  const operationDefs = useMemo(() => CONFIG_DEFINITIONS.filter(d => d.group === 'operations'), []);
+  const maritimeDefs = useMemo(() => CONFIG_DEFINITIONS.filter(d => d.group === 'maritime_safety'), []);
 
   return (
-    <main className="w-full pt-16 bg-surface px-6 md:px-8 pb-12 min-h-screen">
-      <div className="flex flex-col w-full animate-fade-in-up">
-        {/* Toast */}
-        {toastMessage && (
-          <div className="fixed top-20 right-8 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-primary text-white shadow-xl animate-fade-in-up">
-            <span className="material-symbols-outlined text-[20px]">check_circle</span>
-            <span className="text-sm font-semibold">{toastMessage}</span>
-          </div>
+    <main className="admin-workspace-page" aria-label="Trang cấu hình hệ thống">
+      {/* Settings Actions Toolbar */}
+      <div className="admin-settings-actions" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: '2px', marginBottom: '8px' }}>
+        <AdminButton
+          variant="secondary"
+          onClick={() => setIsResetDialogOpen(true)}
+          aria-label="Khôi phục mặc định toàn bộ cấu hình"
+        >
+          <RotateCcw size={15} aria-hidden="true" />
+          Khôi phục mặc định
+        </AdminButton>
+        {isDirty && (
+          <AdminButton
+            variant="primary"
+            onClick={handleSave}
+            loading={isSaving}
+            aria-label="Lưu các tham số cấu hình đã sửa đổi"
+          >
+            <Save size={15} aria-hidden="true" />
+            Lưu cài đặt ({changedKeys.length})
+          </AdminButton>
         )}
-
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-slate-200">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
-              Cài đặt Hệ thống
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handleResetDefaults}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium border border-slate-200 transition-colors shadow-xs"
-            >
-              <span className="material-symbols-outlined text-[18px]">restart_alt</span>
-              <span>Khôi phục mặc định</span>
-            </button>
-            <button 
-              onClick={handleSaveAll}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-container transition-colors shadow-xs"
-            >
-              <span className="material-symbols-outlined text-[18px]">save</span>
-              <span>Lưu Cài đặt</span>
-            </button>
-          </div>
-        </div>
-
-        {/* System & Telemetry Banner */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
-              <span className="material-symbols-outlined text-[20px]">verified_user</span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
-                <span>Kiểm soát Bất biến &amp; Nhật ký Kiểm toán</span>
-                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono text-[10px]">audit_logs</span>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Mọi thay đổi tham số được ghi vết tự động. Không làm thay đổi tỷ lệ hoa hồng lịch sử của các đơn đã chốt.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs shrink-0">
-            <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-              <span className="material-symbols-outlined text-primary text-[16px]">routine</span>
-              <span>Bộ đệm thời tiết:</span>
-            </div>
-            <div className="flex items-center gap-3 font-semibold text-slate-900">
-              <span>Sóng: <strong className="text-primary">0.5m</strong></span>
-              <span>Gió: <strong className="text-primary">12km/h</strong></span>
-              <span>Mưa: <strong className="text-primary">0mm</strong></span>
-            </div>
-          </div>
-        </div>
-
-        {/* Configuration Form Sections (Vertical Document Layout) */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xs divide-y divide-slate-200">
-          {/* Section 1: Vận hành & Giao dịch */}
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                <span className="material-symbols-outlined text-[18px]">payments</span>
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Vận hành &amp; Giao dịch Sàn</h2>
-                <p className="text-xs text-slate-500">Tham số tài chính, trích xuất hoa hồng và chu kỳ kế toán</p>
-              </div>
-            </div>
-
-            <div className="space-y-6 divide-y divide-slate-200">
-              {/* Row 1: Commission Rate */}
-              <div className="pt-4 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="max-w-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">Tỷ lệ hoa hồng mặc định sàn</span>
-                    <code className="font-mono text-[11px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">PLATFORM_COMMISSION_RATE</code>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Khấu trừ tự động vào ví bảo chứng của đối tác trên mỗi dịch vụ con (SubOrder) hoàn tất.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <input 
-                    type="number"
-                    step="0.5"
-                    value={commissionRate}
-                    onChange={(e) => setCommissionRate(e.target.value)}
-                    className="w-24 h-9 px-3 rounded-lg bg-slate-50 text-right font-bold text-sm text-primary border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <span className="text-xs font-bold text-slate-400">%</span>
-                </div>
-              </div>
-
-              {/* Row 2: Auto Payout Cycle */}
-              <div className="pt-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="max-w-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">Chu kỳ rút tiền đối tác</span>
-                    <code className="font-mono text-[11px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">AUTO_PAYOUT_CYCLE_DAYS</code>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Thời hạn chốt sổ quyết toán settlement và cho phép nhà cung cấp tạo lệnh giải ngân định kỳ.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <input 
-                    type="number"
-                    value={payoutCycle}
-                    onChange={(e) => setPayoutCycle(e.target.value)}
-                    className="w-24 h-9 px-3 rounded-lg bg-slate-50 text-right font-bold text-sm text-slate-900 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <span className="text-xs font-bold text-slate-400">ngày</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Section 2: An toàn Hàng hải */}
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600">
-                <span className="material-symbols-outlined text-[18px]">waves</span>
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Định Mức An Toàn Hàng Hải</h2>
-                <p className="text-xs text-slate-500">Ngưỡng thời tiết tự động kích hoạt cảnh báo Cờ Vàng hoặc Cấm Biển xuất bến</p>
-              </div>
-            </div>
-
-            <div className="space-y-6 divide-y divide-slate-200">
-              {/* Row 3: Max Safe Wave */}
-              <div className="pt-4 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="max-w-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">Ngưỡng sóng tối đa cho phép</span>
-                    <code className="font-mono text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">WEATHER_MAX_SAFE_WAVE_M</code>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Nếu sóng biển thực đo vượt ngưỡng này, hệ thống tự động cảnh báo cấm xuất bến tour SUP và cano.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <input 
-                    type="number"
-                    step="0.1"
-                    value={maxSafeWave}
-                    onChange={(e) => setMaxSafeWave(e.target.value)}
-                    className="w-24 h-9 px-3 rounded-lg bg-slate-50 text-right font-bold text-sm text-amber-700 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                  <span className="text-xs font-bold text-slate-400">mét (m)</span>
-                </div>
-              </div>
-
-              {/* Row 4: Max Safe Wind */}
-              <div className="pt-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="max-w-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">Ngưỡng gió giật tối đa</span>
-                    <code className="font-mono text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">WEATHER_MAX_SAFE_WIND_KMH</code>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Kích hoạt thông báo cảnh báo Cờ Vàng tới tất cả thuyền trưởng khi gió giật chạm ngưỡng.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <input 
-                    type="number"
-                    value={maxSafeWind}
-                    onChange={(e) => setMaxSafeWind(e.target.value)}
-                    className="w-24 h-9 px-3 rounded-lg bg-slate-50 text-right font-bold text-sm text-amber-700 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                  <span className="text-xs font-bold text-slate-400">km/h</span>
-                </div>
-              </div>
-
-              {/* Row 5: Emergency Hotline */}
-              <div className="pt-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="max-w-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">Đường dây nóng cứu hộ Cảng vụ</span>
-                    <code className="font-mono text-[11px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">EMERGENCY_PORT_HOTLINE</code>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Số điện thoại trực ban cứu hộ hiển thị khẩn cấp trên ứng dụng của tài xế cano và hướng dẫn viên.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <input 
-                    type="text"
-                    value={emergencyHotline}
-                    onChange={(e) => setEmergencyHotline(e.target.value)}
-                    className="w-36 h-9 px-3 rounded-lg bg-slate-50 text-center font-bold text-sm text-primary border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
+
+      {/* Demo Banner */}
+      <AdminPreviewBanner demo={demo} href="/admin/settings?demo=1" />
+
+      {/* Demo State Controller (Dev only) */}
+      {demo && (
+        <div className="admin-demo-controls-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, fontSize: 12 }}>
+          <label htmlFor="settings-preview-select" style={{ color: 'var(--admin-muted)', fontWeight: 500 }}>
+            Mô phỏng trạng thái trang:
+          </label>
+          <select
+            id="settings-preview-select"
+            aria-label="Mô phỏng trạng thái trang"
+            value={previewState}
+            onChange={e => setPreviewState(e.target.value as 'normal' | 'loading' | 'error' | 'empty')}
+            className="admin-field"
+            style={{ minHeight: 32, width: 'auto', padding: '4px 10px', fontSize: 12 }}
+          >
+            <option value="normal">Bình thường (4 tham số)</option>
+            <option value="loading">Đang tải cấu hình</option>
+            <option value="error">Lỗi kết nối tham số</option>
+            <option value="empty">Chưa có cấu hình</option>
+          </select>
+        </div>
+      )}
+
+      {/* State Switcher */}
+      {previewState === 'loading' ? (
+        <AdminState kind="loading" title="Đang tải dữ liệu cấu hình hệ thống…" />
+      ) : previewState === 'error' ? (
+        <AdminState
+          kind="error"
+          title="Không thể tải bảng tham số cấu hình"
+          description="Đã xảy ra lỗi khi đồng bộ cấu hình từ hệ thống. Vui lòng thử lại sau."
+          action={
+            <AdminButton variant="secondary" onClick={() => setPreviewState('normal')}>
+              Thử tải lại
+            </AdminButton>
+          }
+        />
+      ) : previewState === 'empty' ? (
+        <AdminState
+          kind="empty"
+          title="Chưa có tham số cấu hình nào"
+          description="Bảng cấu hình hệ thống hiện đang trống hoặc chưa được khởi tạo."
+          action={
+            <AdminButton variant="primary" onClick={handleConfirmReset}>
+              Khởi tạo tham số mặc định
+            </AdminButton>
+          }
+        />
+      ) : (
+        <div className="admin-settings-container">
+          {/* Telemetry & Audit Integrity Card */}
+          <section className="admin-settings-telemetry" aria-label="Thông tin kiểm soát hệ thống">
+            <div className="admin-telemetry-left">
+              <span className="admin-telemetry-icon" aria-hidden="true">
+                <ShieldCheck size={20} />
+              </span>
+              <div className="admin-telemetry-copy">
+                <strong>
+                  Kiểm soát bất biến &amp; Nhật ký kiểm toán
+                  <span className="admin-config-key">audit_logs</span>
+                </strong>
+                <p>
+                  Mọi thay đổi tham số được ghi vết tự động kèm định danh quản trị viên. Không hồi tố tỷ lệ hoa hồng của các đơn hàng và chu kỳ đã quyết toán xong.
+                </p>
+              </div>
+            </div>
+
+            <div className="admin-telemetry-metrics" aria-label="Chỉ số bộ đệm thời tiết tham chiếu">
+              <span style={{ color: 'var(--admin-muted)', fontWeight: 600 }}>Bộ đệm thời tiết:</span>
+              <span>Sóng: <strong>0.5m</strong></span>
+              <span>·</span>
+              <span>Gió: <strong>12 km/h</strong></span>
+              <span>·</span>
+              <span>Mưa: <strong>0 mm</strong></span>
+            </div>
+          </section>
+
+          {/* Group 1: Vận hành & Giao dịch Sàn */}
+          {operationDefs.length > 0 && (
+            <section className="admin-config-group" aria-labelledby="heading-operations-group">
+              <div className="admin-config-group-header">
+                <div>
+                  <h2 id="heading-operations-group">
+                    <Wallet size={18} className="text-primary" aria-hidden="true" />
+                    Vận hành &amp; Giao dịch Sàn
+                  </h2>
+                  <p>Tham số tài chính, trích xuất hoa hồng và chu kỳ kế toán đối soát</p>
+                </div>
+                <AdminBadge tone="teal">Tài chính</AdminBadge>
+              </div>
+
+              <div className="admin-config-list">
+                {operationDefs.map(def => renderConfigRow(def))}
+              </div>
+            </section>
+          )}
+
+          {/* Group 2: Tham số An toàn Biển & Cứu hộ */}
+          {maritimeDefs.length > 0 && (
+            <section className="admin-config-group" aria-labelledby="heading-safety-group">
+              <div className="admin-config-group-header">
+                <div>
+                  <h2 id="heading-safety-group">
+                    <Waves size={18} style={{ color: '#00646f' }} aria-hidden="true" />
+                    Định mức Tham chiếu An toàn Biển &amp; Cứu hộ
+                  </h2>
+                  <p>Ngưỡng cảnh báo thời tiết tự động kích hoạt cờ an toàn và thông tin hỗ trợ khẩn cấp</p>
+                </div>
+                <AdminBadge tone="amber">Tham chiếu nội bộ</AdminBadge>
+              </div>
+
+              <div className="admin-config-list">
+                {maritimeDefs.map(def => renderConfigRow(def))}
+              </div>
+            </section>
+          )}
+
+          {/* Sticky Floating Save / Discard Bar */}
+          {isDirty && (
+            <aside className="admin-settings-action-bar" role="region" aria-label="Thanh tác vụ lưu thay đổi">
+              <div className="admin-action-bar-info">
+                <AlertTriangle size={18} style={{ color: '#f59e0b' }} aria-hidden="true" />
+                <span>
+                  Bạn có <strong>{changedKeys.length} thay đổi</strong> chưa được lưu vào hệ thống.
+                </span>
+              </div>
+              <div className="admin-action-bar-buttons">
+                <AdminButton
+                  variant="secondary"
+                  onClick={handleDiscardChanges}
+                  style={{ background: 'rgba(255,255,255,0.12)', color: 'white', borderColor: 'transparent' }}
+                  aria-label="Hủy toàn bộ thay đổi chưa lưu"
+                >
+                  Hủy thay đổi
+                </AdminButton>
+                <AdminButton
+                  variant="primary"
+                  onClick={handleSave}
+                  loading={isSaving}
+                  aria-label="Lưu các thay đổi cấu hình vào hệ thống"
+                >
+                  <Save size={15} aria-hidden="true" />
+                  Lưu cấu hình
+                </AdminButton>
+              </div>
+            </aside>
+          )}
+        </div>
+      )}
+
+      {/* Confirmation Dialog for Reset Defaults */}
+      <AdminDialog
+        open={isResetDialogOpen}
+        title="Xác nhận khôi phục cấu hình mặc định"
+        description="Thao tác này sẽ đặt lại toàn bộ 4 tham số hệ thống về giá trị ban đầu. Lịch sử thay đổi sẽ được ghi vào nhật ký kiểm toán (Audit Log)."
+        onClose={() => setIsResetDialogOpen(false)}
+        footer={
+          <>
+            <AdminButton variant="secondary" onClick={() => setIsResetDialogOpen(false)}>
+              Hủy bỏ
+            </AdminButton>
+            <AdminButton variant="danger" onClick={handleConfirmReset}>
+              Xác nhận khôi phục
+            </AdminButton>
+          </>
+        }
+      >
+        <div style={{ fontSize: 13, color: '#4d6978', lineHeight: 1.6 }}>
+          <p>Các tham số sẽ được khôi phục về:</p>
+          <ul style={{ margin: '8px 0 0 18px', padding: 0 }}>
+            <li>Tỷ lệ hoa hồng sàn: <strong>10%</strong></li>
+            <li>Ngưỡng sóng tham chiếu: <strong>1.5m</strong></li>
+            <li>Ngưỡng gió giật tham chiếu: <strong>25 km/h</strong></li>
+            <li>Số liên hệ BQL bán đảo Sơn Trà &amp; bãi biển: <strong>0236 3920 477</strong></li>
+          </ul>
+        </div>
+      </AdminDialog>
+
+      {/* Toast Notification */}
+      <AdminNotice message={notice} onDismiss={() => setNotice(null)} />
     </main>
   );
+
+  function renderConfigRow(def: ConfigDefinition) {
+    const activeVal = activeFormData[def.key];
+    const draftVal = formData[def.key];
+    const isModified = activeVal !== draftVal;
+    const errorMsg = errors[def.key];
+    const originalConfig = configs.find(c => c.key === def.dbKey);
+
+    return (
+      <div className="admin-config-row" key={def.key} data-modified={isModified}>
+        <div className="admin-config-info">
+          <div className="admin-config-heading">
+            <strong>{def.label}</strong>
+            <span className="admin-config-key">{def.dbKey}</span>
+            {isModified ? (
+              <AdminBadge tone="amber">Chưa lưu</AdminBadge>
+            ) : (
+              <AdminBadge tone="neutral">Đang áp dụng</AdminBadge>
+            )}
+          </div>
+
+          <p className="admin-config-description">{def.description}</p>
+
+          {def.disclaimer && (
+            <div className="admin-config-disclaimer">
+              <ShieldAlert size={14} aria-hidden="true" />
+              <span>{def.disclaimer}</span>
+            </div>
+          )}
+
+          <div className="admin-config-meta">
+            <span>
+              <Clock size={12} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 4 }} />
+              Cập nhật: {formatDateTimeVN(originalConfig?.updatedAt)}
+            </span>
+            <span>·</span>
+            <span>Người cập nhật: <strong>{originalConfig?.updatedBy || 'Hệ thống'}</strong></span>
+          </div>
+        </div>
+
+        <div className="admin-config-control">
+          <div className="admin-config-input-wrap">
+            <input
+              id={`config-input-${def.key}`}
+              type={def.inputType}
+              step={def.step}
+              value={draftVal}
+              onChange={e => handleChange(def.key, e.target.value)}
+              placeholder={def.placeholder}
+              className="admin-config-input"
+              aria-invalid={Boolean(errorMsg)}
+              aria-describedby={errorMsg ? `error-${def.key}` : undefined}
+            />
+            {def.unit && <span className="admin-config-unit">{def.unit}</span>}
+          </div>
+
+          <div className="admin-config-status-tag">
+            <span>Giá trị đang lưu: <strong>{activeVal} {def.unit}</strong></span>
+          </div>
+
+          {errorMsg && (
+            <div id={`error-${def.key}`} className="admin-config-error" role="alert">
+              {errorMsg}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 }
 
 export default Settings;
