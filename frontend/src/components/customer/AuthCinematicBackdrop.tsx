@@ -48,13 +48,11 @@ export const AuthCinematicBackdrop: React.FC<AuthCinematicBackdropProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [progressKey, setProgressKey] = useState<number>(0);
 
   // 1. Auto-transition interval
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % AUTH_SCENES.length);
-      setProgressKey((k) => k + 1);
     }, autoRotateInterval);
 
     return () => clearInterval(timer);

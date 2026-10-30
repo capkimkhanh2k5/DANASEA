@@ -11,3 +11,6 @@ README.md
 scripts/*
 !scripts/run.sh
 config/quyet-small.lock.txt
+
+!scripts/build_runtime.py
+!scripts/container_entrypoint.py

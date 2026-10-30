@@ -29,6 +29,12 @@ cli-proxy/logs/
 .deploy-state
 .deploy.lock
 .product.env
-
 .taste-skill/
 DESIGN.md
+
+.releases/
+.superpowers/
+.release-events/
+
+# Local GitHub production credential archive (never commit)
+/private/github-production-secrets*

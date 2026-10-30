@@ -31,14 +31,20 @@ import { reviewService, type ReviewResponse } from '../../../services/reviewServ
 import type { ServiceDetailDto, ServiceOptionDto, StructuredSlotDto } from '../../../types/service';
 import { FEATURED_SERVICES, MOCK_SLOTS, MOCK_IMAGES } from '../../../mockData';
 
+const FALLBACK_IMAGES = ['https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800'];
+
 export function ExperienceDetail() {
-  const { language } = useLanguageStore();
   const { id } = useParams<{ id: string }>();
+  return <ExperienceDetailPage key={id} id={id} />;
+}
+
+function ExperienceDetailPage({ id }: { id: string | undefined }) {
+  const { language } = useLanguageStore();
   const navigate = useNavigate();
 
   const [service, setService] = useState<ServiceDetailDto | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [loadError, setLoadError] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(Boolean(id));
+  const [loadError, setLoadError] = useState<boolean>(!id);
 
   // Booking selections
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
@@ -70,15 +76,9 @@ export function ExperienceDetail() {
 
   // Fetch Service Detail from Backend API (with graceful fallback to mock if legacy ID)
   useEffect(() => {
-    if (!id) {
-      setLoadError(true);
-      setIsLoading(false);
-      return;
-    }
+    if (!id) return;
 
     let isMounted = true;
-    setIsLoading(true);
-    setLoadError(false);
 
     serviceCatalogService
       .getServiceDetail(id)
@@ -373,7 +373,7 @@ export function ExperienceDetail() {
     return cartItems.some(
       (item) => item.serviceId === service.id && item.slotId === activeSlot.slotId
     );
-  }, [cartItems, service?.id, activeSlot?.slotId]);
+  }, [cartItems, service, activeSlot]);
 
   // Pure Vietnamese normalizers for demo/seed data
   const localizedSafetyRules = useMemo(() => {
@@ -436,10 +436,13 @@ export function ExperienceDetail() {
 
   // Sync track position when images list changes
   useEffect(() => {
-    setTrackIndex(allImages.length > 1 ? 1 : 0);
-    setIsTransitioning(false);
-    const raf = requestAnimationFrame(() => setIsTransitioning(true));
-    return () => cancelAnimationFrame(raf);
+    let enableFrame = 0;
+    const resetFrame = requestAnimationFrame(() => {
+      setTrackIndex(allImages.length > 1 ? 1 : 0);
+      setIsTransitioning(false);
+      enableFrame = requestAnimationFrame(() => setIsTransitioning(true));
+    });
+    return () => { cancelAnimationFrame(resetFrame); cancelAnimationFrame(enableFrame); };
   }, [allImages.length]);
 
   // Active Real Image Index (0..N-1) for dots, badge counter and thumbnail strip

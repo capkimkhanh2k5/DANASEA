@@ -1,3 +1,4 @@
+import type { HttpRequestError } from "../../../types/http";
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { authService } from "../../../services/authService";
@@ -71,7 +72,8 @@ export function ForgotPassword() {
       // Theo Anti-Enumeration Defense của Backend, dù email tồn tại hay không đều trả về 200 OK
       setStep(2);
       setTimer(60); // 60s cooldown
-    } catch (err: any) {
+    } catch (caught: unknown) {
+      const err = caught as HttpRequestError;
       console.error("[ForgotPassword] Gửi yêu cầu thất bại:", err);
       const status = err.response?.status;
       if (status === 429) {
@@ -95,7 +97,8 @@ export function ForgotPassword() {
       console.log("[ForgotPassword] Yêu cầu gửi lại mã OTP cho:", email);
       await authService.forgotPassword(email.trim());
       setTimer(60);
-    } catch (err: any) {
+    } catch (caught: unknown) {
+      const err = caught as HttpRequestError;
       console.error("[ForgotPassword] Gửi lại mã thất bại:", err);
       const status = err.response?.status;
       if (status === 429) {
@@ -158,7 +161,8 @@ export function ForgotPassword() {
 
       console.log("[ForgotPassword] Đặt lại mật khẩu thành công!");
       setStep(3); // Chuyển sang màn Thành công
-    } catch (err: any) {
+    } catch (caught: unknown) {
+      const err = caught as HttpRequestError;
       console.error("[ForgotPassword] Đặt lại mật khẩu thất bại:", err);
       const status = err.response?.status;
       const code = err.response?.data?.code;

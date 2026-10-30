@@ -1,0 +1,584 @@
+{
+  "records": [
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_001_BUSINESS_LICENSE.png",
+      "sha256": "4d57d2cce0f3615296eda03f1e8e326efab6e6ac11b8a8d63060d810e1bef1e2",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_001_SAFETY_CERT.png",
+      "sha256": "8b86998251bf0504f41826f6c1077ca8229c981c038575aac8a3559ad1457f1f",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_002_BUSINESS_LICENSE.png",
+      "sha256": "5b0900bc26b63590a5d5e3eb794ce18ab31fb64db57a4c2850d2c688c6923370",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_002_SAFETY_CERT.png",
+      "sha256": "3646b4cbe8cc9c6fb8fcc218b6f43db2067067f605b5564fdbf62713aafd1d14",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_004_BUSINESS_LICENSE.png",
+      "sha256": "7b7ac9900f4443fc8ad9d2a2dd41e0951f4b73987020feffe18e5abc8b508ea0",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_004_SAFETY_CERT.png",
+      "sha256": "c8c7ec288c9ff473d8d2aad0597ebb05b925d377535d3beb01e024ae95ea9c98",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_006_BUSINESS_LICENSE.png",
+      "sha256": "9ccf1af2724b1e4f9c880c4b6b256bdde5941e2c6c371bb528f9dcb030e67ea2",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_006_SAFETY_CERT.png",
+      "sha256": "67a51b1aac4fecaf5b32f7cb4631d75de5160d5b8e1189bdb7f83c762936d7a8",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_007_BUSINESS_LICENSE.png",
+      "sha256": "c9ef94b4ff2afd0f0aa35ebab8f96fe7db99a93507f33ea8baaa15c92d348e05",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_007_SAFETY_CERT.png",
+      "sha256": "b545cd9822153e324e98f51255b0c4cc8774d19ef143fd84e880403c887fd9a2",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_009_BUSINESS_LICENSE.png",
+      "sha256": "2e6d342bd4eedbe42874982266bf7f49c656c5a4f26b053a73b71e409c0a7ee0",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_009_SAFETY_CERT.png",
+      "sha256": "2677d8c2c3f8cf9f1ab0eb083ffc28441437ca018c911608fb73095ad5fd05fe",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_013_BUSINESS_LICENSE.png",
+      "sha256": "49598920767dad5826647fc5f7bc1b35dba8c227b71e96d3ed254658d0a80e0f",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_013_SAFETY_CERT.png",
+      "sha256": "192cdb89e8e3258d8d79eea30e08f28a7ede274cd0d6b1338b704b4cc4a726ac",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_025_BUSINESS_LICENSE.png",
+      "sha256": "4b2bcb5ac50d6465827ae90b136efe3cb51e81ce6d1c9ffe2a348ca822158cad",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_025_SAFETY_CERT.png",
+      "sha256": "cc47a0b7a3cdee37707668a73cede5373eb215c6f835e05003ae09582d307ca6",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_034_BUSINESS_LICENSE.png",
+      "sha256": "58d5676137c186b3ce2e24b6ab8c18d5b3c7ba7500a56060bdf1c59d5bdfe76f",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/vendor_documents/VENDOR_DRAFT_034_SAFETY_CERT.png",
+      "sha256": "552535108aa080b3da7fe904caa19076ec55f53e877f5c42209c7f0ac02a3fd7",
+      "kind": "vendor_documents",
+      "classification": "SYNTHETIC_TEST_DOCUMENT_NOT_A_LEGAL_CERTIFICATE"
+    },
+    {
+      "path": "media/services/4e2c3ef039c4edb4cc0e99dbf0094c9359c11449d874018d50d51ba0d62440d6.jpg",
+      "sha256": "4e2c3ef039c4edb4cc0e99dbf0094c9359c11449d874018d50d51ba0d62440d6",
+      "kind": "services",
+      "sourcePageUrl": "https://danangwander.com/diem-den/danabeach-the-thao-bien/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/0a1b442572982a4991eb9a9cf92981fd0c9625a3a6a933c09e68a212ac4f0243.jpg",
+      "sha256": "0a1b442572982a4991eb9a9cf92981fd0c9625a3a6a933c09e68a212ac4f0243",
+      "kind": "services",
+      "sourcePageUrl": "https://danangwander.com/diem-den/danabeach-the-thao-bien/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/17a54a81eb3c35ee657d0b2251d07327ce7c23b9375ff6f53e1c78eb730be104.jpg",
+      "sha256": "17a54a81eb3c35ee657d0b2251d07327ce7c23b9375ff6f53e1c78eb730be104",
+      "kind": "services",
+      "sourcePageUrl": "https://kajinvina.com/ve-the-thao-bien/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/9100eb08f65de610ad17f64ca5a6e4c33c4c75bb3ee58a603b5c65bc85f2f9be.jpg",
+      "sha256": "9100eb08f65de610ad17f64ca5a6e4c33c4c75bb3ee58a603b5c65bc85f2f9be",
+      "kind": "services",
+      "sourcePageUrl": "https://danangwander.com/diem-den/danabeach-the-thao-bien/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/4e27d8b87d5db9c764d9665fbc1ada8828975a8e2895f7af7ea59020c215021a.jpg",
+      "sha256": "4e27d8b87d5db9c764d9665fbc1ada8828975a8e2895f7af7ea59020c215021a",
+      "kind": "services",
+      "sourcePageUrl": "https://kajinvina.com/ve-the-thao-bien/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/9b714014dbdac254b2c734239581a5ab3e7e2faf787d15b3b1bd2e203fa0577b.jpg",
+      "sha256": "9b714014dbdac254b2c734239581a5ab3e7e2faf787d15b3b1bd2e203fa0577b",
+      "kind": "services",
+      "sourcePageUrl": "https://danangnet.com",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/0b2bf3a19500472f8a03a69de42a79f46d19f1b8f615df165926501a53721378.jpg",
+      "sha256": "0b2bf3a19500472f8a03a69de42a79f46d19f1b8f615df165926501a53721378",
+      "kind": "services",
+      "sourcePageUrl": "https://danangadventures.com/product/parasailing/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/ab4a8314e201346fee644b25a13546fb6f6a74594e3fdd3df5ac9621eb189291.jpg",
+      "sha256": "ab4a8314e201346fee644b25a13546fb6f6a74594e3fdd3df5ac9621eb189291",
+      "kind": "services",
+      "sourcePageUrl": "https://danangadventures.com/product/parasailing/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/bc81df4c51b939e998bded29057599dd7c603e544be39a9247376d8d203674e7.jpg",
+      "sha256": "bc81df4c51b939e998bded29057599dd7c603e544be39a9247376d8d203674e7",
+      "kind": "services",
+      "sourcePageUrl": "https://danangwander.com/diem-den/danabeach-the-thao-bien/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/8e58ad2c06e1906f936f1b5945e898d71d75e87b08c834cdc213d34ce2d303a9.jpg",
+      "sha256": "8e58ad2c06e1906f936f1b5945e898d71d75e87b08c834cdc213d34ce2d303a9",
+      "kind": "services",
+      "sourcePageUrl": "https://danangwander.com/diem-den/danabeach-the-thao-bien/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/9ebd84a34215f1062eb962dbcb85c8a6dde98b5021b782eb12acec23a404873a.jpg",
+      "sha256": "9ebd84a34215f1062eb962dbcb85c8a6dde98b5021b782eb12acec23a404873a",
+      "kind": "services",
+      "sourcePageUrl": "https://kajinvina.com/ve-the-thao-bien/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/c22561c35c60ced73503b148612fec858e342e4a6c41e4ef2105706fb7f77cee.jpg",
+      "sha256": "c22561c35c60ced73503b148612fec858e342e4a6c41e4ef2105706fb7f77cee",
+      "kind": "services",
+      "sourcePageUrl": "https://kajinvina.com/ve-the-thao-bien/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/fe5c9b03fb93156d6f597230f7ae343c4e02130fb1e64c7b2be9039532c82d4d.jpg",
+      "sha256": "fe5c9b03fb93156d6f597230f7ae343c4e02130fb1e64c7b2be9039532c82d4d",
+      "kind": "services",
+      "sourcePageUrl": "https://danangadventures.com/product/kayk-snorkel-tour/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/b3be427d39c1a0d10f757c4d72aba3000ec40ca51750f273e324fe51310dbf16.jpg",
+      "sha256": "b3be427d39c1a0d10f757c4d72aba3000ec40ca51750f273e324fe51310dbf16",
+      "kind": "services",
+      "sourcePageUrl": "https://danangadventures.com/product/kayk-snorkel-tour/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/3e37bd681726ca29a1c3299d21774334d14beca695a3095ed855a0717ebc1818.jpg",
+      "sha256": "3e37bd681726ca29a1c3299d21774334d14beca695a3095ed855a0717ebc1818",
+      "kind": "services",
+      "sourcePageUrl": "https://danangadventures.com/product/kayk-snorkel-tour/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/e0e219e46907c2d674641ba11aa791050dbd83a6114eadb7f8c6c98ecf39b4e1.jpg",
+      "sha256": "e0e219e46907c2d674641ba11aa791050dbd83a6114eadb7f8c6c98ecf39b4e1",
+      "kind": "services",
+      "sourcePageUrl": "https://locatravel.vn/combo-lan-ngam-san-ho-son-tra",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/dc63eea6d60afe4eeb9b0c38ff071ddd11a7b497d5bce2924885330172a7ff59.jpg",
+      "sha256": "dc63eea6d60afe4eeb9b0c38ff071ddd11a7b497d5bce2924885330172a7ff59",
+      "kind": "services",
+      "sourcePageUrl": "https://locatravel.vn/combo-lan-ngam-san-ho-son-tra",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/b6e49062d5efeac164c60e16ea70cf6279381aba8d81c81dadb84743b5248ef1.jpg",
+      "sha256": "b6e49062d5efeac164c60e16ea70cf6279381aba8d81c81dadb84743b5248ef1",
+      "kind": "services",
+      "sourcePageUrl": "https://locatravel.vn/combo-lan-ngam-san-ho-son-tra",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/d21880b501df83d4cdcd7827a3ed37c3e75e475f836c992e4ca972a206bda3ef.jpg",
+      "sha256": "d21880b501df83d4cdcd7827a3ed37c3e75e475f836c992e4ca972a206bda3ef",
+      "kind": "services",
+      "sourcePageUrl": "https://locatravel.vn/ve-lan-ngam-san-ho-ban-dao-son-tra",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/6cec30c2b104dfe7b98344d72b0e31b8561fe7e50424966188fa1f37f44e2b7f.jpg",
+      "sha256": "6cec30c2b104dfe7b98344d72b0e31b8561fe7e50424966188fa1f37f44e2b7f",
+      "kind": "services",
+      "sourcePageUrl": "https://d2tourdanang.com",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/345f6e5467cef0601056595006e73920a96b63e3c9b6d9f814962f4fd43d4042.jpg",
+      "sha256": "345f6e5467cef0601056595006e73920a96b63e3c9b6d9f814962f4fd43d4042",
+      "kind": "services",
+      "sourcePageUrl": "https://danangfishing.net",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/967000f0c8510ccef5d46347772f6a3f5437705b55ad148a9a4673d28b6efc29.jpg",
+      "sha256": "967000f0c8510ccef5d46347772f6a3f5437705b55ad148a9a4673d28b6efc29",
+      "kind": "services",
+      "sourcePageUrl": "https://danangfishing.net",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/1739726d36f3a4c5a0ef107c044d3a2db7561cd8c3f0cb541895282756842570.jpg",
+      "sha256": "1739726d36f3a4c5a0ef107c044d3a2db7561cd8c3f0cb541895282756842570",
+      "kind": "services",
+      "sourcePageUrl": "https://facebook.com/caumucdanang",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/8f24782eb79852f086eaba03de1fc686f64dcbbbef7c35284593ae3e9dfd497c.jpg",
+      "sha256": "8f24782eb79852f086eaba03de1fc686f64dcbbbef7c35284593ae3e9dfd497c",
+      "kind": "services",
+      "sourcePageUrl": "https://phanvantravel.com",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/b91ec0c7599683d766e946a6fe1d78c2771a6d6c6d10da0f0c1acff98071a30d.jpg",
+      "sha256": "b91ec0c7599683d766e946a6fe1d78c2771a6d6c6d10da0f0c1acff98071a30d",
+      "kind": "services",
+      "sourcePageUrl": "https://tourdananggiare.net",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/d3c4421e7ef1274cec257faccbc3b59e0dd381ebf8ce37620eda97ec29a5091f.jpg",
+      "sha256": "d3c4421e7ef1274cec257faccbc3b59e0dd381ebf8ce37620eda97ec29a5091f",
+      "kind": "services",
+      "sourcePageUrl": "https://d2tourdanang.com",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/93f54f4f80a8f37f06991fd009463fefebd557d6aced5f3dd2c129625c99cc00.jpg",
+      "sha256": "93f54f4f80a8f37f06991fd009463fefebd557d6aced5f3dd2c129625c99cc00",
+      "kind": "services",
+      "sourcePageUrl": "https://www.facebook.com/Toursupdanang",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/b286bf8acabb5a75083cfd25c1fbc9be8e41b125cd3970ba93d757d5e674d431.jpg",
+      "sha256": "b286bf8acabb5a75083cfd25c1fbc9be8e41b125cd3970ba93d757d5e674d431",
+      "kind": "services",
+      "sourcePageUrl": "https://danangadventures.com/product/kayk-snorkel-tour/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/7889368687d626c60cb67e575770e0005ebcb10cc14f407179023d4509bf8af1.jpg",
+      "sha256": "7889368687d626c60cb67e575770e0005ebcb10cc14f407179023d4509bf8af1",
+      "kind": "services",
+      "sourcePageUrl": "https://www.facebook.com/supdanang",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/7d6578c15209aa54393941a2939795bd46c67c9c14362f51dc2657aafc5d79e6.jpg",
+      "sha256": "7d6578c15209aa54393941a2939795bd46c67c9c14362f51dc2657aafc5d79e6",
+      "kind": "services",
+      "sourcePageUrl": "https://www.facebook.com/surfshackdanang/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/7d68fe4e8cdff5877e831f8ad41694a102d3b48b95b36e8479e2d404a82b08a5.jpg",
+      "sha256": "7d68fe4e8cdff5877e831f8ad41694a102d3b48b95b36e8479e2d404a82b08a5",
+      "kind": "services",
+      "sourcePageUrl": "https://www.facebook.com/surfshackdanang/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/3da0604fc1638a401faec9a4bf72b7f5f8c820c420977075177b132e76e569fd.jpg",
+      "sha256": "3da0604fc1638a401faec9a4bf72b7f5f8c820c420977075177b132e76e569fd",
+      "kind": "services",
+      "sourcePageUrl": "https://www.facebook.com/surfshackdanang/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/af9152e9aa2a0304b4bdd517b0dc9f46675056e596a6f4b2adcc8729b37c425b.jpg",
+      "sha256": "af9152e9aa2a0304b4bdd517b0dc9f46675056e596a6f4b2adcc8729b37c425b",
+      "kind": "services",
+      "sourcePageUrl": "https://danangwander.com/diem-den/danabeach-the-thao-bien/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/144696ca08b2f74d034dbedbfaec7e3b4b93ff0e3cd9f260e63de31a92dff70c.jpg",
+      "sha256": "144696ca08b2f74d034dbedbfaec7e3b4b93ff0e3cd9f260e63de31a92dff70c",
+      "kind": "services",
+      "sourcePageUrl": "https://danangwander.com/diem-den/danabeach-the-thao-bien/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/services/57fe8334b9c337f2595a1f0c17c642e6eee00a9df84ae54c41f15883b1907955.jpg",
+      "sha256": "57fe8334b9c337f2595a1f0c17c642e6eee00a9df84ae54c41f15883b1907955",
+      "kind": "services",
+      "sourcePageUrl": "https://www.facebook.com/khamphasontra/",
+      "rightsStatus": "REVIEW_REQUIRED",
+      "illustrationOnly": true
+    },
+    {
+      "path": "media/service_safety_documents/088d874c-a61e-5b58-a7a9-497f32a56901.png",
+      "sha256": "5e97fc6bf646c883c59afa4737408d3767605a0bc392f99a1e43d443dda2985f",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/160e67fc-f236-5871-9971-5555cf855d02.png",
+      "sha256": "602bde70900cda830b758949bb30b5f68140d2e49b856e03b8b3b43e26a20e62",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/1dd26db5-f863-5b03-b562-ac46f43df9d2.png",
+      "sha256": "eb9300f10cb2b1e19e6faec7648141422582433f5ac73f5b5accf0ce1804b239",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/2cdfabcf-13a2-550a-8f9e-283aad7053c9.png",
+      "sha256": "489d1b8f9cf4a770318dc15b335c554bc984422b088f99091984c429d9f85f75",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/3758c297-54ff-5887-89bd-62220227570b.png",
+      "sha256": "54bf937fa13a35fcd86bc8c67a35f6bf247fc85612dd1c9dd273864aa0865add",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/4190046d-112a-5b93-beb2-bcc8b1cd16d4.png",
+      "sha256": "ffe538b73900a45268a3448eb6e007a431d318eab775ffb83e3e70442662db5b",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/4b79c4cd-a138-59ca-83c3-d396c1208ac4.png",
+      "sha256": "da85ae5629fdfe5ad5b8bccf3ff8b64fbbf9a042d909a6a25c2719f075fd25d4",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/508d4dad-4227-527b-9df3-8416dd870c04.png",
+      "sha256": "1119ddd1163bb37e125d6548cae2ab651d3bd4b0a2f1ac1bb0cd96833080d6ac",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/5536f743-3b6d-518e-af2b-05634a218195.png",
+      "sha256": "54fc74ea3fb46574af9a718e25dc1d18240f96ac34bcac958f0d92f70ea66297",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/57c22a43-22fd-57da-894c-257ade02450d.png",
+      "sha256": "2c68f95b23a40b95d6170adb009cc8d72633e3089e154a9a357efcaaec6be927",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/5943ecd7-6480-5b4a-b42b-43abc0988776.png",
+      "sha256": "21144cf05e5e2f6e8c7c73e6d23b0246c2299a147e59ec496478e7c1e93ffadb",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/6d4249fe-a82b-5537-a712-818b23c177d2.png",
+      "sha256": "109310baae25bf881971dd7872a65e20f6b632174b75898683e12e3714d637df",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/83ee83c5-c08b-5f6e-924e-db3ceaacd364.png",
+      "sha256": "02556a44153e3069ff99e02e870888dac7aec746a97da209167dbeece80c2a01",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08.png",
+      "sha256": "1159b4689aae193dfc7de167e5815241d8e86486f6d40eb81b60d23ba5bc361a",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/9b3444ce-b7c7-5f40-9f14-2c1ca4258dea.png",
+      "sha256": "a4a1274a184a6b8dc697f817991e1c07d60ac3f47ac67b49861622bc2aefffbe",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/9b575c51-196b-56eb-940e-aaf2f61c966f.png",
+      "sha256": "44b19c21154d1459290be3d200ca3d72e73989de5d4495c8b59125abe3964b45",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/9f4eb04d-9ec6-5295-8de6-475b728e5cfc.png",
+      "sha256": "a2ab9d8685be38e9f83f4a4af39f6198d1566e2e0020303144408a4c0cab0677",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/a6f4ab9c-4794-542b-a443-e3013e6bbe47.png",
+      "sha256": "5261f234392111b97cc4063a6d8b97586451381b68ba69823b9a6a7644858600",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/bf8626cd-2271-59ab-9273-4fdd10eb451e.png",
+      "sha256": "93e4d43760bbef620a64339fa04a5dd4016fd1ef2f9aeed49ca0469513e8d786",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/c4c56ae2-5f9b-555c-81f1-f0d4c8dd7c1b.png",
+      "sha256": "b6b1f7c48c287b63879d1859ea9a61deead4b911fdb7486fae04698b26db66bc",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/cd0c7a8d-b0b8-579a-968c-a1783174a0fc.png",
+      "sha256": "e56e9922db97bafd3f3892fe9969965655e036e9a8e3d4a1950c84b813ba40c3",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/d51355fc-bf7e-5366-b199-6272efe7f52b.png",
+      "sha256": "a8cd88ae8af34fa3c39e4b7f8242aaa18e2d22896034e98f41efc40335292582",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/dab42f5f-e61d-5ebf-811d-34ab8d293143.png",
+      "sha256": "c13ad138841daac82db8c6a811d1a9ffc1ad339b2410906433debff8cbd78832",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    },
+    {
+      "path": "media/service_safety_documents/fd6fced2-812e-56ce-817f-80bb3d0841e9.png",
+      "sha256": "3bd048a730806b97141247d13e9bd5cb37d00aef15b9fb0cd576cf6ffdbf4f00",
+      "kind": "service_safety_documents",
+      "classification": "DEVELOPMENT_SYNTHETIC_BLANK_CHECKLIST_NOT_CERTIFICATION",
+      "author": "DANASEA project development fixture",
+      "publicReuse": "ORIGINAL_PROJECT_FIXTURE_NO_THIRD_PARTY_ASSETS"
+    }
+  ]
+}

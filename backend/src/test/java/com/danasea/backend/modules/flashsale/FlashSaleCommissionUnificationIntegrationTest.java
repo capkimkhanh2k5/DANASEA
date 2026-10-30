@@ -27,7 +27,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -55,19 +54,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
     "spring.data.redis.database=15", "app.scheduler.enabled=false", "management.health.mail.enabled=false"
 })
 @ActiveProfiles("test")
-@EnabledIfEnvironmentVariable(named = "FLASH_SALE_TEST_JDBC_URL", matches = ".*/danasea_flashsale_test")
-class FlashSaleCommissionUnificationIntegrationTest {
-
-    @DynamicPropertySource
-    static void infrastructure(DynamicPropertyRegistry r) {
-        r.add("spring.datasource.url", () -> System.getenv("FLASH_SALE_TEST_JDBC_URL"));
-        r.add("spring.datasource.username", () -> "postgres");
-        r.add("spring.datasource.password", () -> System.getenv("FLASH_SALE_TEST_DB_PASSWORD"));
-        r.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        r.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.PostgreSQLDialect");
-        r.add("spring.data.redis.host", () -> "localhost");
-        r.add("spring.data.redis.port", () -> 6380);
-    }
+class FlashSaleCommissionUnificationIntegrationTest extends BaseFlashSaleIntegrationTest {
 
     @LocalServerPort
     int port;

@@ -21,6 +21,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -32,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@Transactional
 public class ServiceIntegrationE2ETest extends BaseSecurityIntegrationTest {
 
     @Autowired
@@ -55,16 +57,16 @@ public class ServiceIntegrationE2ETest extends BaseSecurityIntegrationTest {
     private UUID testVendorId;
     private UUID testVendorProfileId;
     private UUID testCategoryId;
+    private String testVendorEmail;
+    private String testAdminEmail;
 
     @BeforeEach
     void setup() {
-        vendorRepository.deleteAll();
-        userRepository.deleteAll();
-        categoryRepository.deleteAll();
-
+        testVendorEmail = UUID.randomUUID() + "@vendor.example.test";
+        testAdminEmail = UUID.randomUUID() + "@admin.example.test";
         // 1. Create a Vendor user in the DB
         UserJpaEntity vendor = new UserJpaEntity();
-        vendor.setEmail("vendor@example.com");
+        vendor.setEmail(testVendorEmail);
         vendor.setPasswordHash(passwordEncoder.encode("Password123!"));
         vendor.setFullName("Test Vendor");
         vendor.setRole(Role.VENDOR);
@@ -82,7 +84,7 @@ public class ServiceIntegrationE2ETest extends BaseSecurityIntegrationTest {
 
         // 2. Create an Admin user for other tests (optional)
         UserJpaEntity admin = new UserJpaEntity();
-        admin.setEmail("admin@example.com");
+        admin.setEmail(testAdminEmail);
         admin.setPasswordHash(passwordEncoder.encode("Password123!"));
         admin.setFullName("Test Admin");
         admin.setRole(Role.ADMIN);
@@ -93,7 +95,7 @@ public class ServiceIntegrationE2ETest extends BaseSecurityIntegrationTest {
         // 3. Create a Category
         CategoryJpaEntity category = new CategoryJpaEntity();
         category.setName("Water Sports");
-        category.setSlug("water-sports");
+        category.setSlug("water-sports-" + UUID.randomUUID());
         category.setIsActive(true);
         category = categoryRepository.save(category);
         testCategoryId = category.getId();
@@ -102,7 +104,7 @@ public class ServiceIntegrationE2ETest extends BaseSecurityIntegrationTest {
     @Test
     void testVendorCanLoginAndCreateService() throws Exception {
         // Step 1: Login to get real JWT token
-        LoginRequest loginRequest = new LoginRequest("vendor@example.com", "Password123!");
+        LoginRequest loginRequest = new LoginRequest(testVendorEmail, "Password123!");
         
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -138,7 +140,7 @@ public class ServiceIntegrationE2ETest extends BaseSecurityIntegrationTest {
     @Test
     void testAdminCannotCreateService() throws Exception {
         // Step 1: Login as Admin
-        LoginRequest loginRequest = new LoginRequest("admin@example.com", "Password123!");
+        LoginRequest loginRequest = new LoginRequest(testAdminEmail, "Password123!");
         
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)

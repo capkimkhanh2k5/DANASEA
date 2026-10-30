@@ -1,0 +1,257 @@
+{
+  "classification": "DEVELOPMENT_SYNTHETIC",
+  "records": [
+    {
+      "mediaSha256": "4d57d2cce0f3615296eda03f1e8e326efab6e6ac11b8a8d63060d810e1bef1e2",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "BUSINESS_LICENSE",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793215399/danasea_demo_data_package/vendor_documents/4d57d2cce0f3615296eda03f1e8e326efab6e6ac11b8a8d63060d810e1bef1e2.png",
+        "id": "c6bfd9b2-af29-5f0a-b899-a922e83ba2a9",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "27afde91-58fd-5daa-b9fa-7f93f00135f0"
+      }
+    },
+    {
+      "mediaSha256": "8b86998251bf0504f41826f6c1077ca8229c981c038575aac8a3559ad1457f1f",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "SAFETY_CERT",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218756/danasea_demo_data_package/vendor_documents/8b86998251bf0504f41826f6c1077ca8229c981c038575aac8a3559ad1457f1f.png",
+        "id": "13346a1d-6881-5c7a-abf9-342c6e2a256e",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "27afde91-58fd-5daa-b9fa-7f93f00135f0"
+      }
+    },
+    {
+      "mediaSha256": "5b0900bc26b63590a5d5e3eb794ce18ab31fb64db57a4c2850d2c688c6923370",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "BUSINESS_LICENSE",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218743/danasea_demo_data_package/vendor_documents/5b0900bc26b63590a5d5e3eb794ce18ab31fb64db57a4c2850d2c688c6923370.png",
+        "id": "4065550e-0303-5bdd-87c9-276c3ef1354c",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "baea9605-392b-5003-93f1-60f2c0582f65"
+      }
+    },
+    {
+      "mediaSha256": "3646b4cbe8cc9c6fb8fcc218b6f43db2067067f605b5564fdbf62713aafd1d14",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "SAFETY_CERT",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218718/danasea_demo_data_package/vendor_documents/3646b4cbe8cc9c6fb8fcc218b6f43db2067067f605b5564fdbf62713aafd1d14.png",
+        "id": "75b085f2-126f-5a38-8575-12774fd2c5d8",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "baea9605-392b-5003-93f1-60f2c0582f65"
+      }
+    },
+    {
+      "mediaSha256": "7b7ac9900f4443fc8ad9d2a2dd41e0951f4b73987020feffe18e5abc8b508ea0",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "BUSINESS_LICENSE",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218752/danasea_demo_data_package/vendor_documents/7b7ac9900f4443fc8ad9d2a2dd41e0951f4b73987020feffe18e5abc8b508ea0.png",
+        "id": "ac0be7f7-1c27-5141-a2cf-6938d4c53897",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "631db4cf-1ec4-5b06-8f98-56abcf3406d0"
+      }
+    },
+    {
+      "mediaSha256": "c8c7ec288c9ff473d8d2aad0597ebb05b925d377535d3beb01e024ae95ea9c98",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "SAFETY_CERT",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218769/danasea_demo_data_package/vendor_documents/c8c7ec288c9ff473d8d2aad0597ebb05b925d377535d3beb01e024ae95ea9c98.png",
+        "id": "31a28047-e146-5b0a-93b5-f5a588d76a4d",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "631db4cf-1ec4-5b06-8f98-56abcf3406d0"
+      }
+    },
+    {
+      "mediaSha256": "9ccf1af2724b1e4f9c880c4b6b256bdde5941e2c6c371bb528f9dcb030e67ea2",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "BUSINESS_LICENSE",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218760/danasea_demo_data_package/vendor_documents/9ccf1af2724b1e4f9c880c4b6b256bdde5941e2c6c371bb528f9dcb030e67ea2.png",
+        "id": "82778ec8-c118-50a9-b775-6abdeb2ad737",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "10f8ffc5-e987-592f-9d38-426ad7f97066"
+      }
+    },
+    {
+      "mediaSha256": "67a51b1aac4fecaf5b32f7cb4631d75de5160d5b8e1189bdb7f83c762936d7a8",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "SAFETY_CERT",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218747/danasea_demo_data_package/vendor_documents/67a51b1aac4fecaf5b32f7cb4631d75de5160d5b8e1189bdb7f83c762936d7a8.png",
+        "id": "7aac626d-9222-54ed-91de-a7ce1c784d6e",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "10f8ffc5-e987-592f-9d38-426ad7f97066"
+      }
+    },
+    {
+      "mediaSha256": "c9ef94b4ff2afd0f0aa35ebab8f96fe7db99a93507f33ea8baaa15c92d348e05",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "BUSINESS_LICENSE",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218773/danasea_demo_data_package/vendor_documents/c9ef94b4ff2afd0f0aa35ebab8f96fe7db99a93507f33ea8baaa15c92d348e05.png",
+        "id": "f96f8daa-620a-54c8-b10c-849d3f641232",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "128672c5-94e7-5560-896c-158794913b8c"
+      }
+    },
+    {
+      "mediaSha256": "b545cd9822153e324e98f51255b0c4cc8774d19ef143fd84e880403c887fd9a2",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "SAFETY_CERT",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218764/danasea_demo_data_package/vendor_documents/b545cd9822153e324e98f51255b0c4cc8774d19ef143fd84e880403c887fd9a2.png",
+        "id": "845f51b9-c8f0-525c-a562-49beda1cec95",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "128672c5-94e7-5560-896c-158794913b8c"
+      }
+    },
+    {
+      "mediaSha256": "2e6d342bd4eedbe42874982266bf7f49c656c5a4f26b053a73b71e409c0a7ee0",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "BUSINESS_LICENSE",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218713/danasea_demo_data_package/vendor_documents/2e6d342bd4eedbe42874982266bf7f49c656c5a4f26b053a73b71e409c0a7ee0.png",
+        "id": "f838437c-58a3-500e-a467-dd3eb1041d2f",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "2680f19f-8b5a-5aa8-8474-cb13e2ff1c22"
+      }
+    },
+    {
+      "mediaSha256": "2677d8c2c3f8cf9f1ab0eb083ffc28441437ca018c911608fb73095ad5fd05fe",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "SAFETY_CERT",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218709/danasea_demo_data_package/vendor_documents/2677d8c2c3f8cf9f1ab0eb083ffc28441437ca018c911608fb73095ad5fd05fe.png",
+        "id": "5ecdeef4-dcd7-52ff-8a3e-18e9bfd30394",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "2680f19f-8b5a-5aa8-8474-cb13e2ff1c22"
+      }
+    },
+    {
+      "mediaSha256": "49598920767dad5826647fc5f7bc1b35dba8c227b71e96d3ed254658d0a80e0f",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "BUSINESS_LICENSE",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218723/danasea_demo_data_package/vendor_documents/49598920767dad5826647fc5f7bc1b35dba8c227b71e96d3ed254658d0a80e0f.png",
+        "id": "5f46f940-f8ed-5baa-a287-1dfd9d67f780",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "5fb18fee-16fd-5b9f-bcbd-759b47768d9b"
+      }
+    },
+    {
+      "mediaSha256": "192cdb89e8e3258d8d79eea30e08f28a7ede274cd0d6b1338b704b4cc4a726ac",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "SAFETY_CERT",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218705/danasea_demo_data_package/vendor_documents/192cdb89e8e3258d8d79eea30e08f28a7ede274cd0d6b1338b704b4cc4a726ac.png",
+        "id": "5eb6d58c-6579-5be0-83ae-944cb60456f6",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "5fb18fee-16fd-5b9f-bcbd-759b47768d9b"
+      }
+    },
+    {
+      "mediaSha256": "4b2bcb5ac50d6465827ae90b136efe3cb51e81ce6d1c9ffe2a348ca822158cad",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "BUSINESS_LICENSE",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218728/danasea_demo_data_package/vendor_documents/4b2bcb5ac50d6465827ae90b136efe3cb51e81ce6d1c9ffe2a348ca822158cad.png",
+        "id": "b90decc5-9c5a-5453-9c4e-b948d1ad20b1",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "c7dcff25-f5dc-5fee-a719-5c23b6a899cb"
+      }
+    },
+    {
+      "mediaSha256": "cc47a0b7a3cdee37707668a73cede5373eb215c6f835e05003ae09582d307ca6",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "SAFETY_CERT",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218778/danasea_demo_data_package/vendor_documents/cc47a0b7a3cdee37707668a73cede5373eb215c6f835e05003ae09582d307ca6.png",
+        "id": "11860728-6a2a-5d31-b842-e0793c49d9e2",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "c7dcff25-f5dc-5fee-a719-5c23b6a899cb"
+      }
+    },
+    {
+      "mediaSha256": "58d5676137c186b3ce2e24b6ab8c18d5b3c7ba7500a56060bdf1c59d5bdfe76f",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "BUSINESS_LICENSE",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218739/danasea_demo_data_package/vendor_documents/58d5676137c186b3ce2e24b6ab8c18d5b3c7ba7500a56060bdf1c59d5bdfe76f.png",
+        "id": "4c9c7ccc-c561-5128-bbce-5731c98cb860",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "5a53c8e5-3a76-5383-b104-17b22d4af50f"
+      }
+    },
+    {
+      "mediaSha256": "552535108aa080b3da7fe904caa19076ec55f53e877f5c42209c7f0ac02a3fd7",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "doc_type": "SAFETY_CERT",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1793218735/danasea_demo_data_package/vendor_documents/552535108aa080b3da7fe904caa19076ec55f53e877f5c42209c7f0ac02a3fd7.png",
+        "id": "3fb5f9a6-4b9a-5eb3-9dbd-7a735300c44b",
+        "reviewed_at": null,
+        "reviewed_by": null,
+        "status": "PENDING",
+        "updated_at": "2026-10-16T17:25:02.669209+00:00",
+        "vendor_id": "5a53c8e5-3a76-5383-b104-17b22d4af50f"
+      }
+    }
+  ]
+}

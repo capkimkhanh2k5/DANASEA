@@ -32,7 +32,6 @@ export function Checkout() {
 
   // Booking Hold State
   const [bookingHold, setBookingHold] = useState<BookingHoldResponse | null>(null);
-  const [_isHolding, setIsHolding] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number>(900); // 15 minutes default
   const [sessionCode] = useState(() => Math.floor(10000 + Math.random() * 90000));
 
@@ -78,14 +77,14 @@ export function Checkout() {
     }
   }, [items.length, isProcessingPayment]);
 
-  // Sync user info if auth updates
-  useEffect(() => {
-    if (user) {
-      if (user.fullName) setFullName(user.fullName);
-      if (user.phone) setPhone(user.phone);
-      if (user.email) setEmail(user.email);
-    }
-  }, [user]);
+  // Update editable defaults only when the authenticated user object changes.
+  const [previousUser, setPreviousUser] = useState(user);
+  if (user !== previousUser) {
+    setPreviousUser(user);
+    if (user?.fullName) setFullName(user.fullName);
+    if (user?.phone) setPhone(user.phone);
+    if (user?.email) setEmail(user.email);
+  }
 
   // Request backend slot hold on mount
   const holdRequestedRef = useRef<boolean>(false);
@@ -106,7 +105,6 @@ export function Checkout() {
     const allUuids = holdItems.every((item) => validUuidRegex.test(item.slotId));
 
     if (allUuids && isAuthenticated) {
-      setIsHolding(true);
       bookingService
         .holdBooking({ items: holdItems })
         .then((res) => {
@@ -121,9 +119,6 @@ export function Checkout() {
         })
         .catch((err) => {
           console.warn('[Checkout] Không thể giữ chỗ qua API, dùng chế độ giữ chỗ cục bộ:', err);
-        })
-        .finally(() => {
-          setIsHolding(false);
         });
     }
   }, [items, isAuthenticated]);
@@ -312,38 +307,40 @@ export function Checkout() {
           }
         }
 
-        // Store snapshot in sessionStorage for return page
-        const orderSnapshot = {
-          orderCode: `#DNS-${orderRes.id.slice(0, 8)}`,
-          customerName: fullName,
-          phone,
-          email,
-          specialRequest: notes,
-          paymentProvider,
-          items: items.map((i) => ({
-            id: i.id,
-            serviceId: i.serviceId,
-            slotId: i.slotId,
-            serviceName: i.serviceName,
-            thumbnailUrl: i.thumbnailUrl,
-            unitPrice: i.unitPrice,
-            quantity: i.quantity,
-            date: i.selectedDate || i.date || 'Hôm nay',
-            timeSlot: i.timeSlot || '08:00 - 10:00',
-            locationName: i.locationName || 'Đà Nẵng',
-            vendorName: i.vendorName || 'DANASEA Partner',
-            ticketCode: `TKT-${orderRes.id.slice(0, 4)}-${Math.floor(100 + Math.random() * 900)}`,
-          })),
-          rawTotal,
-          discountAmount,
-          appliedPromoCode,
-          finalTotal,
-          paidAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' • Hôm nay',
-        };
-        sessionStorage.setItem("danasea_last_order", JSON.stringify(orderSnapshot));
-
-        if (payRes?.paymentUrl) {
-          window.location.href = payRes.paymentUrl;
+        // 4. Backend returns paymentReference (which contains the gateway redirect URL)
+        const gatewayUrl = payRes.paymentReference || payRes.paymentUrl;
+        if (gatewayUrl && (gatewayUrl.startsWith("http://") || gatewayUrl.startsWith("https://"))) {
+          
+          // Save order snapshot for Step 3 (PaymentResult) when returning from VNPay gateway
+          const orderSnapshot = {
+            orderCode: `DNS-${sessionCode}`,
+            customerName: fullName.trim() || "Khách Hàng DANASEA",
+            customerPhone: phone.trim() || "0912 345 678",
+            customerEmail: email.trim() || "khachhang@danasea.vn",
+            specialRequest: notes.trim(),
+            paymentProvider: paymentProvider,
+            items: items.map((item, idx) => ({
+              id: item.id || `item-${idx}`,
+              serviceId: item.serviceId,
+              slotId: item.slotId,
+              serviceName: item.serviceName || 'Trải nghiệm biển Đà Nẵng',
+              thumbnailUrl: item.thumbnailUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5',
+              unitPrice: item.unitPrice,
+              quantity: item.quantity,
+              date: item.selectedDate || item.date || 'Hôm nay',
+              timeSlot: item.timeSlot || '08:00 - 10:00',
+              locationName: item.locationName || 'Bán đảo Sơn Trà, Đà Nẵng',
+              vendorName: item.vendorName || 'DanaSea Marine Club',
+              ticketCode: `TKT-${sessionCode || '89412'}-0${idx + 1}`
+            })),
+            rawTotal: rawTotal,
+            discountAmount: discountAmount,
+            appliedPromoCode: appliedPromoCode,
+            finalTotal: finalTotal,
+            paidAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' • ' + new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+          };
+          sessionStorage.setItem('danasea_last_order', JSON.stringify(orderSnapshot));
+          window.location.assign(gatewayUrl);
           return;
         } else {
           setIsProcessingPayment(false);

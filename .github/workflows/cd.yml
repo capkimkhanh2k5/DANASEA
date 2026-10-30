@@ -1,33 +1,36 @@
 name: CD
-
-# Runs only after CI has passed on main -> broken code never reaches the server
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
-
+  workflow_dispatch:
+    inputs:
+      rollback_sha:
+        description: Previously accepted SHA to roll back to (unchanged migrations only)
+        required: true
+      release_run_id:
+        description: Successful CD run containing the accepted-release artifact
+        required: true
 permissions:
   contents: read
-
 concurrency:
   group: cd-production
   cancel-in-progress: false
-
 env:
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/danasea
-  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-
+  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || inputs.rollback_sha }}
 jobs:
   build:
-    name: Build & push ${{ matrix.service }}
-    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository
+    name: Build and scan ${{ matrix.service }}
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     permissions:
       contents: read
       packages: write
     strategy:
+      fail-fast: false
       matrix:
         include:
           - service: backend
@@ -37,76 +40,178 @@ jobs:
           - service: quyet
             context: ./ai-decision
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.DEPLOY_SHA }}
-
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+      - run: python3 scripts/ci/install_tools.py
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        id: image
         with:
           context: ${{ matrix.context }}
           build-args: |
             ${{ matrix.service == 'frontend' && format('VITE_GOOGLE_CLIENT_ID={0}', vars.VITE_GOOGLE_CLIENT_ID) || '' }}
             ${{ matrix.service == 'frontend' && 'REQUIRE_GOOGLE_CLIENT_ID=true' || '' }}
           push: true
-          tags: |
-            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:${{ env.DEPLOY_SHA }}
-            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:latest
-          cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
-
+          tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:candidate-${{ github.run_id }}-${{ env.DEPLOY_SHA }}
+          provenance: mode=max
+          sbom: generator=docker/buildkit-syft-scanner@sha256:873a7458c3c8ac8e32c7b796c10e1600b07b963d2aa000a72a2d97aaaa2d6315
+          labels: |
+            org.opencontainers.image.revision=${{ env.DEPLOY_SHA }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=release-${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=release-${{ matrix.service }}
+      - name: Scan and record immutable candidate
+        env:
+          SERVICE: ${{ matrix.service }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release security-reports
+          image="${IMAGE_PREFIX}-${SERVICE}@${DIGEST}"
+          trivy image --image-src remote --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output security-reports/image.json "$image"
+          trivy image --image-src remote --format cyclonedx --output security-reports/sbom.cdx.json "$image"
+          IMAGE_REF="$image" python3 - <<'PY'
+          import json, os, pathlib
+          body = {'image': os.environ['IMAGE_REF'], 'sha': os.environ['DEPLOY_SHA'], 'run_id': int(os.environ['GITHUB_RUN_ID'])}
+          pathlib.Path('release/' + os.environ['SERVICE'] + '.json').write_text(json.dumps(body))
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-metadata-${{ matrix.service }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 90
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: release-security-${{ matrix.service }}
+          path: security-reports/
+          retention-days: 90
   deploy:
-    name: Deploy to home server
-    if: vars.PRODUCTION_DEPLOY_ENABLED == 'true'
+    name: Rehearse and deploy verified release
+    if: always() && vars.PRODUCTION_DEPLOY_ENABLED == 'true' && ((github.event_name == 'workflow_run' && needs.build.result == 'success') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     environment: production
+    permissions:
+      contents: read
+      packages: read
+      actions: read
+      deployments: read
     steps:
-      - name: Validate Tailscale configuration
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check live branch and production restrictions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/check_repository_controls.py --repository "$GITHUB_REPOSITORY"
+      - name: Validate release and connection configuration
         env:
           TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
-          SERVER_TAILSCALE_IP: ${{ secrets.SERVER_TAILSCALE_IP }}
-        run: |
-          for name in TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET SERVER_TAILSCALE_IP; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Missing $name in GitHub Actions secrets for production."
-              exit 1
-            fi
-          done
-
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@6cae46e2d796f265265cfcf628b72a32b4d7cade # v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-
-      - name: Configure SSH
-        env:
+          DEPLOY_HOST: ${{ secrets.SERVER_TAILSCALE_IP }}
+          DEPLOY_USER: ${{ secrets.SERVER_USER }}
           DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          for name in TS_OAUTH_CLIENT_ID TS_OAUTH_SECRET DEPLOY_HOST DEPLOY_USER DEPLOY_KEY DEPLOY_KNOWN_HOSTS; do
+            [[ -n "${!name}" ]] || { echo "::error::Missing $name"; exit 1; }
+          done
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
-
-      # Server key is locked to a forced command; we can only pass "deploy <sha>"
-      - name: Deploy
+      - uses: tailscale/github-action@99a8333667fff04fdd6cffb46dfd409f8329a7bf # v4.3.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: python3 scripts/ci/install_tools.py
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: github.event_name == 'workflow_run'
+        with:
+          pattern: image-metadata-*
+          merge-multiple: true
+          path: candidate/
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: accepted-release
+          run-id: ${{ inputs.release_run_id }}
+          github-token: ${{ github.token }}
+          path: candidate/
+      - name: Assemble candidate and obtain current release baseline
         env:
           DEPLOY_USER: ${{ secrets.SERVER_USER }}
           DEPLOY_HOST: ${{ secrets.SERVER_TAILSCALE_IP }}
+          RELEASE_ACTION: ${{ github.event_name == 'workflow_dispatch' && 'rollback' || 'deploy' }}
         run: |
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=15 -o ConnectionAttempts=3 \
-            "$DEPLOY_USER@$DEPLOY_HOST" \
-            "deploy ${DEPLOY_SHA}"
+          mkdir -p release
+          if [[ "$RELEASE_ACTION" == deploy ]]; then
+            python3 scripts/release.py create --sha "$DEPLOY_SHA" --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --directory candidate --output release/candidate.json
+          else
+            cp candidate/release.json release/candidate.json
+            python3 scripts/release.py validate release/candidate.json --sha "$DEPLOY_SHA" --repository "$GITHUB_REPOSITORY" --action deploy > /dev/null
+          fi
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ConnectionAttempts=3 "$DEPLOY_USER@$DEPLOY_HOST" status > release/baseline.json
+          python3 - <<'PY'
+          import json, pathlib, sys
+          sys.path.insert(0, 'scripts')
+          import release
+          body = release.read('release/baseline.json')
+          pathlib.Path('release/baseline.sha').write_text(body['sha'])
+          PY
+      - name: Extract the exact candidate runtime configuration
+        run: |
+          git fetch --no-tags --depth=1 origin "$DEPLOY_SHA"
+          mkdir -p "$RUNNER_TEMP/candidate-source"
+          git archive "$DEPLOY_SHA" | tar -x -C "$RUNNER_TEMP/candidate-source"
+      - name: Scan exact images and fetch the pinned public model
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p release/security "$RUNNER_TEMP/quyet-model"
+          python3 scripts/release.py images release/candidate.json > release/images.env
+          while IFS='=' read -r key image; do
+            trivy image --image-src remote --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output "release/security/${key}.json" "$image"
+            docker pull "$image"
+          done < release/images.env
+          worker_image=$(python3 -c 'import json; print(json.load(open("release/candidate.json"))["images"]["quyet"])')
+          docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v "$RUNNER_TEMP/quyet-model:/models" "$worker_image" python -c "from huggingface_hub import snapshot_download; snapshot_download('chinhnc/Quyet-1.0-Small',revision='233167bba5df61b5375a522bf8a042d8d2189379',local_dir='/models')"
+          chmod -R a+rX "$RUNNER_TEMP/quyet-model"
+      - name: Rehearse upgrade, recovery and booking against disposable infrastructure
+        run: python3 scripts/rehearse.py --root "$RUNNER_TEMP/candidate-source" --manifest release/candidate.json --baseline release/baseline.json --model-dir "$RUNNER_TEMP/quyet-model" --output release/rehearsal.json
+      - name: Sign the rehearsed release and deploy its immutable images
+        env:
+          DEPLOY_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_HOST: ${{ secrets.SERVER_TAILSCALE_IP }}
+          RELEASE_ACTION: ${{ github.event_name == 'workflow_dispatch' && 'rollback' || 'deploy' }}
+        run: |
+          baseline_sha=$(cat release/baseline.sha)
+          python3 scripts/release.py promote release/candidate.json --rehearsal release/rehearsal.json --baseline-sha "$baseline_sha" --action "$RELEASE_ACTION" --output release/release.json
+          ssh-keygen -Y sign -f ~/.ssh/id_ed25519 -n danasea-release release/release.json
+          python3 scripts/release.py envelope release/release.json --signature release/release.json.sig > release/envelope.json
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ConnectionAttempts=3 "$DEPLOY_USER@$DEPLOY_HOST" "$RELEASE_ACTION $DEPLOY_SHA" < release/envelope.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: accepted-release
+          path: |
+            release/release.json
+            release/release.json.sig
+            release/rehearsal.json
+          if-no-files-found: error
+          retention-days: 90

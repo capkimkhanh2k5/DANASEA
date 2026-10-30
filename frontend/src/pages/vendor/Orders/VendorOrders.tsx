@@ -882,13 +882,6 @@ export function VendorOrders() {
   const countCancelled = orders.filter((o) => o.status === "CANCELLED").length;
   const countRefunded = orders.filter((o) => o.status === "REFUNDED").length;
 
-  // Total Net Payout
-  const totalNetRevenue = useMemo(() => {
-    return orders
-      .filter((o) => o.status === "CONFIRMED" || o.status === "COMPLETED")
-      .reduce((acc, curr) => acc + curr.payoutAmount, 0);
-  }, [orders]);
-
   // Pagination calculation
   const totalItems = filteredOrders.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -901,6 +894,13 @@ export function VendorOrders() {
 
   // Selected Order for Drawer
   const drawerOrder = orders.find((o) => o.id === drawerOrderId) || null;
+
+  // Total Net Revenue calculation for header
+  const totalNetRevenue = useMemo(() => {
+    return orders
+      .filter((o) => o.status === "COMPLETED" || o.status === "CONFIRMED")
+      .reduce((sum, o) => sum + (o.payoutAmount || o.totalAmount || 0), 0);
+  }, [orders]);
 
   return (
     <div className="w-full min-h-screen bg-background flex flex-col">
@@ -1085,7 +1085,7 @@ export function VendorOrders() {
               </span>
               <select
                 value={selectedShift}
-                onChange={(e) => { setSelectedShift(e.target.value as "ALL" | "MORNING" | "AFTERNOON"); setCurrentPage(1); }}
+                onChange={(e) => { setSelectedShift(e.target.value as typeof selectedShift); setCurrentPage(1); }}
                 className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-black font-semibold cursor-pointer focus:outline-none"
               >
                 <option value="ALL">Tất cả các ca</option>
