@@ -658,8 +658,8 @@ export const MOCK_ADMIN_CONFIGS: SystemConfig[] = [
   {
     id: "cfg-05",
     key: "EMERGENCY_PORT_HOTLINE",
-    value: "1900 8989",
-    description: "Đường dây nóng cứu hộ cứu nạn Cảng vụ Hàng hải Đà Nẵng 24/7",
+    value: "0236 3920 477",
+    description: "Số điện thoại liên hệ BQL bán đảo Sơn Trà và các bãi biển du lịch Đà Nẵng",
     updatedBy: "Vũ Hải Đăng",
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2024-01-01T00:00:00Z"

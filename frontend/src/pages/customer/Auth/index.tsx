@@ -150,8 +150,19 @@ export function Auth() {
         console.warn('[Auth Flow] Sai tài khoản hoặc mật khẩu (401 Unauthorized)');
         setBanner('wrong_creds');
       } else if (status === 403) {
-        console.warn('[Auth Flow] Tài khoản bị khóa (403 Forbidden)');
-        setBanner('locked');
+        const errCode = (err.response?.data as { code?: string })?.code;
+        const isLocked = errCode === 'USER_LOCKED' ||
+          serverMessage?.toLowerCase().includes('khóa') ||
+          serverMessage?.toLowerCase().includes('locked') ||
+          serverMessage?.toLowerCase().includes('bị vô hiệu');
+        if (isLocked) {
+          console.warn('[Auth Flow] Tài khoản bị khóa (403 Forbidden - USER_LOCKED)');
+          setBanner('locked');
+        } else {
+          console.warn('[Auth Flow] 403 Forbidden - Không có quyền hoặc bị từ chối:', serverMessage);
+          setBanner('custom_error');
+          setErrorMessage(serverMessage || 'Truy cập bị từ chối (403 Forbidden).');
+        }
       } else if (!err.response || err.code === 'ERR_NETWORK') {
         console.error('[Auth Flow] Không thể kết nối tới Backend (Network Error)');
         setBanner('network_error');
