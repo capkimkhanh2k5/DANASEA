@@ -1,25 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ArrowRight, Search, SlidersHorizontal } from 'lucide-react';
+import { Eye, Search, SlidersHorizontal } from 'lucide-react';
 import { MOCK_ADMIN_VENDORS } from '../../../data/adminMockData';
 import { adminVendorService, getAdminVendorError } from '../../../services/adminVendorService';
 import type { AdminVendorResponse } from '../../../types/adminVendor';
 import type { BadgeTier } from '../../../types';
 import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
-import { AdminButton, AdminFilterTabs, AdminNotice, AdminPreviewBanner } from '../../../components/admin/AdminWorkspace';
+import { AdminButton, AdminFilterTabs, AdminNotice, AdminPagination } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
-import { applyVendorDecision, filterVendors, type VendorRecord, type VendorReviewState } from './vendorApprovalModel';
+import { applyVendorDecision, filterVendors, formatTaxCode, type VendorRecord, type VendorReviewState } from './vendorApprovalModel';
 import { VendorProfile, VendorStatus } from './VendorProfile';
 import './VendorApproval.css';
 
 const tiers: BadgeTier[] = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM'];
 
 function mapVendorResponseToRecord(v: AdminVendorResponse): VendorRecord {
+  const isTest = !v.taxCode || v.taxCode.startsWith('TEST-DS-') || v.taxCode.startsWith('TEST-');
   return {
     id: v.id,
     userId: v.userId,
     businessName: v.businessName,
-    taxCode: v.taxCode,
+    taxCode: isTest ? '' : v.taxCode,
     email: '',
     phone: '',
     address: v.address || 'Đà Nẵng',
@@ -85,7 +86,22 @@ export function VendorApproval() {
   const selected = visibleVendors.find(vendor => vendor.id === selectedId);
   const filtered = useMemo(() => filterVendors(visibleVendors, search, status, tierFilter), [visibleVendors, search, status, tierFilter]);
   const count = (value: string) => visibleVendors.filter(vendor => vendor.verificationStatus === value).length;
-  const resetFilters = () => { setSearch(''); setStatus('all'); setTierFilter('all'); };
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const resetFilters = () => {
+    setSearch('');
+    setStatus('all');
+    setTierFilter('all');
+    setCurrentPage(1);
+  };
+
+  const paginatedVendors = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, activePage]);
   const openProfile = (vendor: VendorRecord) => {
     setSelectedId(vendor.id);
     setTier(vendor.badgeTier);
@@ -133,32 +149,34 @@ export function VendorApproval() {
   };
 
   return <div className="admin-workspace-page admin-vendors">
-    <AdminPreviewBanner demo={demo} href={`${location.pathname}?demo=1`} />
-    <div className="admin-workspace-summary" aria-label="Tổng quan hồ sơ">
-      {[
-        { label: 'Tổng hồ sơ', value: visibleVendors.length, detail: demo ? 'Trong bản xem trước' : 'Từ cơ sở dữ liệu', filter: 'all' },
-        { label: 'Chờ duyệt', value: count('PENDING'), detail: 'Cần xem hồ sơ', filter: 'PENDING' },
-        { label: 'Đã duyệt', value: count('VERIFIED'), detail: 'Đã cấp quyền kinh doanh', filter: 'VERIFIED' },
-        { label: 'Từ chối', value: count('REJECTED'), detail: 'Hồ sơ chưa đạt', filter: 'REJECTED' },
-      ].map(metric => <button key={metric.filter} type="button" className="admin-workspace-metric" aria-pressed={status === metric.filter}
-        onClick={() => setStatus(metric.filter)}><span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.detail}</small></button>)}
-    </div>
-
     <section className="admin-vendors-list" aria-labelledby="vendor-list-title">
-      <div className="admin-vendors-list-heading"><div><h2 id="vendor-list-title">Danh sách đối tác</h2><p>Mở hồ sơ để xem thông tin và lịch sử thao tác.</p></div>
-        <span>{filtered.length} / {visibleVendors.length} hồ sơ</span></div>
-      <AdminFilterTabs label="Lọc trạng thái hồ sơ" value={status} onChange={setStatus} items={[
+      <div className="admin-vendors-list-heading">
+        <h2 id="vendor-list-title">Danh sách đối tác</h2>
+        <span>{filtered.length} / {visibleVendors.length} hồ sơ</span>
+      </div>
+      <AdminFilterTabs label="Lọc trạng thái hồ sơ" value={status} onChange={val => { setStatus(val); setCurrentPage(1); }} items={[
         { value: 'all', label: 'Tất cả', count: visibleVendors.length },
         { value: 'PENDING', label: 'Chờ duyệt', count: count('PENDING') },
         { value: 'VERIFIED', label: 'Đã duyệt', count: count('VERIFIED') },
         { value: 'REJECTED', label: 'Từ chối', count: count('REJECTED') },
       ]} />
       <div className="admin-workspace-toolbar">
-        <label className="admin-search-field"><Search size={18} aria-hidden="true" /><input type="search" value={search} onChange={event => setSearch(event.target.value)}
-          aria-label="Tìm đối tác theo tên hoặc mã số thuế" placeholder="Tìm tên đối tác hoặc mã số thuế…" /></label>
-        <label className="admin-field admin-vendors-tier-filter"><SlidersHorizontal size={16} aria-hidden="true" /><span>Huy hiệu</span>
-          <select value={tierFilter} onChange={event => setTierFilter(event.target.value)}><option value="all">Tất cả hạng</option>{tiers.map(value => <option key={value}>{value}</option>)}</select></label>
-        {(search || status !== 'all' || tierFilter !== 'all') && <AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>}
+        <label className="admin-search-field">
+          <Search size={18} aria-hidden="true" />
+          <input type="search" value={search} onChange={event => { setSearch(event.target.value); setCurrentPage(1); }}
+            aria-label="Tìm đối tác theo tên hoặc mã số thuế" placeholder="Tìm tên đối tác hoặc mã số thuế…" />
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <label className="admin-field admin-vendors-tier-filter">
+            <SlidersHorizontal size={16} aria-hidden="true" />
+            <span>Huy hiệu</span>
+            <select value={tierFilter} onChange={event => { setTierFilter(event.target.value); setCurrentPage(1); }}>
+              <option value="all">Tất cả hạng</option>
+              {tiers.map(value => <option key={value}>{value}</option>)}
+            </select>
+          </label>
+          {(search || status !== 'all' || tierFilter !== 'all') && <AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>}
+        </div>
       </div>
 
       {loading && (
@@ -172,19 +190,66 @@ export function VendorApproval() {
       <div key={status} className="admin-vendors-table-scroll admin-tab-pane" role="region" aria-label="Bảng đối tác" tabIndex={0}>
         <table className="admin-workspace-table admin-vendors-table"><caption className="sr-only">Hồ sơ đối tác; chọn Xem hồ sơ để mở chi tiết</caption><thead><tr>
           <th scope="col">Đối tác</th><th scope="col">Mã số thuế</th><th scope="col">Khu vực & đánh giá</th><th scope="col">Trạng thái</th><th scope="col">Huy hiệu</th><th scope="col"><span className="sr-only">Thao tác</span></th>
-        </tr></thead><tbody>{filtered.map(vendor => <tr key={vendor.id} data-selected={vendor.id === selectedId}>
-          <td><div className="admin-vendors-identity"><img src={vendor.avatarUrl} alt="" width="40" height="40" /><div><strong>{vendor.businessName}</strong>
-            <span>{vendor.bankAccountHolder || vendor.email || 'Chưa cập nhật đại diện'}</span><small>{vendor.id}</small></div></div></td>
-          <td><span className="admin-vendors-mono">{vendor.taxCode}</span><small>{vendor.bankName}</small></td>
+        </tr></thead><tbody>{paginatedVendors.map(vendor => <tr key={vendor.id} data-selected={vendor.id === selectedId}>
+          <td><div className="admin-vendors-identity"><img src={vendor.avatarUrl} alt="" width="38" height="38" /><div><strong>{vendor.businessName}</strong>
+            <span>{vendor.bankAccountHolder || vendor.email || 'Chưa cập nhật đại diện'}</span></div></div></td>
+          <td>
+            {formatTaxCode(vendor.taxCode) === 'Chưa cập nhật' ? (
+              <span style={{ fontStyle: 'italic', color: '#64748b' }}>Chưa cập nhật</span>
+            ) : (
+              <span className="admin-vendors-mono">{vendor.taxCode}</span>
+            )}
+            <small>{vendor.bankName || 'Chưa cập nhật ngân hàng'}</small>
+          </td>
           <td className="admin-vendors-area"><span>{vendor.address}</span><small>{vendor.ratingAvg} / 5 · {vendor.ratingCount} đánh giá</small></td>
           <td><VendorStatus status={vendor.verificationStatus} /></td><td><AdminBadge tone="neutral">{vendor.badgeTier}</AdminBadge></td>
-          <td><AdminButton aria-label={`Xem hồ sơ ${vendor.businessName}`} aria-haspopup="dialog" aria-expanded={drawerOpen && vendor.id === selectedId}
-            variant={vendor.id === selectedId ? 'primary' : 'secondary'} onClick={() => openProfile(vendor)}>Xem hồ sơ <ArrowRight size={15} aria-hidden="true" /></AdminButton></td>
+          <td>
+            <button
+              type="button"
+              className="admin-action-icon-btn"
+              aria-label={`Xem hồ sơ ${vendor.businessName}`}
+              title="Xem hồ sơ"
+              aria-haspopup="dialog"
+              aria-expanded={drawerOpen && vendor.id === selectedId}
+              onClick={() => openProfile(vendor)}
+            >
+              <Eye size={17} aria-hidden="true" />
+            </button>
+          </td>
         </tr>)}</tbody></table>
       </div>
       )}
-      {!loading && !errorMessage && filtered.length === 0 && <AdminState kind="empty" compact title="Không có hồ sơ phù hợp" description="Thử tìm tên hoặc mã số thuế khác, hoặc xóa bộ lọc hiện tại."
-        action={<AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>} />}
+      {!loading && !errorMessage && filtered.length > 0 && (
+        <AdminPagination
+          currentPage={activePage}
+          totalPages={totalPages}
+          totalRecords={filtered.length}
+          pageSize={PAGE_SIZE}
+          recordLabel="đối tác"
+          onPageChange={setCurrentPage}
+        />
+      )}
+      {!loading && !errorMessage && filtered.length === 0 && (
+        <AdminState
+          kind="empty"
+          compact
+          title={
+            search || status !== 'all' || tierFilter !== 'all'
+              ? 'Không tìm thấy hồ sơ đối tác phù hợp'
+              : 'Hiện không có hồ sơ đối tác cần xử lý'
+          }
+          description={
+            search || status !== 'all' || tierFilter !== 'all'
+              ? 'Không có kết quả khớp với từ khóa tìm kiếm hoặc điều kiện lọc hiện tại. Hãy thử điều chỉnh hoặc xóa bộ lọc.'
+              : 'Tất cả hồ sơ đăng ký đối tác đã được thẩm định hoặc chưa có hồ sơ mới gửi yêu cầu.'
+          }
+          action={
+            (search || status !== 'all' || tierFilter !== 'all') ? (
+              <AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>
+            ) : undefined
+          }
+        />
+      )}
       <div className="admin-vendors-list-footer">Hiển thị {filtered.length} hồ sơ {demo ? 'mẫu' : 'từ hệ thống DANASEA'} · Chi tiết mở trong ngăn riêng, giữ nguyên danh sách và bộ lọc.</div>
     </section>
     {!drawerOpen && <AdminNotice message={notice} onDismiss={() => setNotice(null)} />}

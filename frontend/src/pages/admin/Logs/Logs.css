@@ -47,8 +47,8 @@
 }
 
 .admin-logs-select:focus {
-  border-color: #098f9e;
-  box-shadow: 0 0 0 3px rgba(0, 100, 111, 0.1);
+  border-color: var(--admin-primary, #0B5D6F);
+  box-shadow: 0 0 0 3px rgba(11, 93, 111, 0.12);
 }
 
 .admin-logs-card {
@@ -76,7 +76,7 @@
   padding: 14px 20px;
   background: #f8fafb;
   color: var(--admin-secondary, #525252);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 650;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -103,7 +103,7 @@
 
 .admin-logs-row:focus-visible {
   background: #edf7f8;
-  outline: 2px solid #098f9e;
+  outline: 2px solid var(--admin-primary, #0B5D6F);
   outline-offset: -2px;
 }
 
@@ -128,7 +128,7 @@
 
 .admin-log-time-cell small {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--admin-muted);
   margin-top: 2px;
 }
@@ -143,9 +143,9 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #e6f3f5;
-  color: var(--admin-primary);
-  font-size: 11px;
+  background: var(--admin-tint, #e8f3f5);
+  color: var(--admin-primary, #0B5D6F);
+  font-size: 12px;
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -162,7 +162,7 @@
 
 .admin-actor-info small {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--admin-muted);
 }
 

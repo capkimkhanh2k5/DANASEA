@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { CheckCircle2, ChevronDown, FlaskConical, LoaderCircle, X } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, X } from 'lucide-react';
 
 export function AdminButton({ loading = false, variant = 'secondary', className = '', disabled, children, type = 'button', ...props }:
   ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean; variant?: 'primary' | 'secondary' | 'danger' }) {
@@ -69,17 +68,125 @@ export function AdminFilterTabs({ label, value, items, onChange }: {
   </div>;
 }
 
-export function AdminPreviewBanner({ demo, href }: { demo: boolean; href: string }) {
-  return <div className="admin-data-banner admin-workspace-preview"><FlaskConical size={18} aria-hidden="true" /><span>{demo
-    ? <><strong>DEMO MODE</strong> · Dữ liệu mẫu. Các thao tác chỉ thay đổi bản xem thử.</>
-    : <>Bản xem trước sử dụng <strong>dữ liệu mẫu</strong>. Chưa phải hồ sơ hay giao dịch của hệ thống.</>}</span>
-    {!demo && import.meta.env.DEV && <Link to={href}>Bật thao tác demo</Link>}
-    {demo && <span className="admin-preview-label">Không thực hiện giao dịch thật</span>}
-  </div>;
+export function AdminPreviewBanner(_props: { demo: boolean; href: string }) {
+  return null;
 }
 
 export function AdminNotice({ message, onDismiss }: { message: string | null; onDismiss: () => void }) {
   return <div className="admin-notice" data-visible={Boolean(message)} role="status" aria-live="polite" aria-atomic="true">
     <CheckCircle2 size={18} aria-hidden="true" /><span>{message}</span>{message && <button type="button" onClick={onDismiss} aria-label="Đóng thông báo"><X size={16} /></button>}
   </div>;
+}
+
+export interface AdminPaginationProps {
+  currentPage: number;
+  totalPages: number;
+  totalRecords: number;
+  pageSize?: number;
+  recordLabel?: string;
+  onPageChange: (page: number) => void;
+  className?: string;
+  hideOnSinglePage?: boolean;
+}
+
+export function AdminPagination({
+  currentPage,
+  totalPages,
+  totalRecords,
+  pageSize = 8,
+  recordLabel = 'bản ghi',
+  onPageChange,
+  className = '',
+  hideOnSinglePage = true,
+}: AdminPaginationProps) {
+  if (totalRecords === 0) return null;
+  if (hideOnSinglePage && totalPages <= 1 && totalRecords <= pageSize) return null;
+
+  const fromRecord = Math.min((currentPage - 1) * pageSize + 1, totalRecords);
+  const toRecord = Math.min(currentPage * pageSize, totalRecords);
+
+  const getPageNumbers = () => {
+    if (totalPages <= 5) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    const pages: (number | 'ellipsis')[] = [];
+    pages.push(1);
+    if (currentPage > 3) {
+      pages.push('ellipsis');
+    }
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    if (currentPage < totalPages - 2) {
+      pages.push('ellipsis');
+    }
+    pages.push(totalPages);
+    return pages;
+  };
+
+  const pageNumbers = getPageNumbers();
+
+  return (
+    <nav
+      className={`admin-pagination ${className}`}
+      role="navigation"
+      aria-label={`Phân trang ${recordLabel}`}
+    >
+      <div className="admin-pagination__info">
+        Hiển thị <strong>{fromRecord}–{toRecord}</strong> / <strong>{totalRecords}</strong> {recordLabel}
+      </div>
+      <div className="admin-pagination__controls">
+        <button
+          type="button"
+          className="admin-pagination__btn admin-pagination__btn--prev"
+          disabled={currentPage <= 1}
+          onClick={() => onPageChange(currentPage - 1)}
+          aria-label="Trang trước"
+        >
+          <ChevronLeft size={15} aria-hidden="true" style={{ marginRight: 2 }} />
+          Trước
+        </button>
+
+        <div className="admin-pagination__pages" role="group" aria-label="Các trang">
+          {pageNumbers.map((p, idx) => {
+            if (p === 'ellipsis') {
+              return (
+                <span key={`ellipsis-${idx}`} className="admin-pagination__ellipsis" aria-hidden="true">
+                  …
+                </span>
+              );
+            }
+            const isActive = p === currentPage;
+            return (
+              <button
+                key={p}
+                type="button"
+                className={`admin-pagination__btn admin-pagination__btn--page ${
+                  isActive ? 'admin-pagination__btn--active' : ''
+                }`}
+                aria-current={isActive ? 'page' : undefined}
+                aria-label={`Trang ${p}`}
+                onClick={() => onPageChange(p)}
+              >
+                {p}
+              </button>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          className="admin-pagination__btn admin-pagination__btn--next"
+          disabled={currentPage >= totalPages}
+          onClick={() => onPageChange(currentPage + 1)}
+          aria-label="Trang sau"
+        >
+          Sau
+          <ChevronRight size={15} aria-hidden="true" style={{ marginLeft: 2 }} />
+        </button>
+      </div>
+    </nav>
+  );
 }

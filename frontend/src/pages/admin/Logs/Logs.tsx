@@ -18,7 +18,7 @@ import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
 import {
   AdminButton,
   AdminNotice,
-  AdminPreviewBanner,
+  AdminPagination,
 } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import {
@@ -50,12 +50,18 @@ export function Logs() {
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [previewState, setPreviewState] = useState<'normal' | 'loading' | 'error' | 'empty'>('normal');
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(() => demo ? Math.max(1, Math.ceil(MOCK_ADMIN_AUDIT_LOGS.length / PAGE_SIZE)) : 1);
+  const [totalElements, setTotalElements] = useState(() => demo ? MOCK_ADMIN_AUDIT_LOGS.length : 0);
 
   useEffect(() => {
-    if (demo) return;
+    if (demo) {
+      return;
+    }
 
     let isMounted = true;
-    adminAuditLogService.getAuditLogs(0, 50)
+    adminAuditLogService.getAuditLogs(currentPage - 1, PAGE_SIZE)
       .then(res => {
         if (!isMounted) return;
         const mapped: AdminAuditLogItem[] = (res.content || []).map(l => ({
@@ -71,6 +77,8 @@ export function Logs() {
           updatedAt: l.timestamp,
         }));
         setLogs(mapped);
+        setTotalPages(res.totalPages || 1);
+        setTotalElements(res.totalElements || mapped.length);
         setLoading(false);
       })
       .catch(err => {
@@ -83,12 +91,23 @@ export function Logs() {
     return () => {
       isMounted = false;
     };
-  }, [demo]);
+  }, [demo, currentPage]);
 
   // Filtered data
   const filteredLogs = useMemo(() => {
     return filterAuditLogs(logs, search, selectedAction, selectedEntity);
   }, [logs, search, selectedAction, selectedEntity]);
+
+  const calculatedTotalPages = demo
+    ? (Math.ceil(filteredLogs.length / PAGE_SIZE) || 1)
+    : totalPages;
+  const activePage = Math.min(Math.max(1, currentPage), calculatedTotalPages);
+
+  const paginatedLogs = useMemo(() => {
+    if (!demo) return filteredLogs;
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filteredLogs.slice(start, start + PAGE_SIZE);
+  }, [demo, filteredLogs, activePage]);
 
   // Statistics
   const stats = useMemo(() => {
@@ -103,6 +122,7 @@ export function Logs() {
     setSearch('');
     setSelectedAction('ALL');
     setSelectedEntity('ALL');
+    setCurrentPage(1);
     setNotice('Đã đặt lại toàn bộ bộ lọc nhật ký.');
   };
 
@@ -133,9 +153,6 @@ export function Logs() {
 
   return (
     <main className="admin-workspace-page" aria-label="Trang nhật ký kiểm toán hệ thống">
-      {/* Demo Banner */}
-      <AdminPreviewBanner demo={demo} href="/admin/logs?demo=1" />
-
       {/* Demo State Controller (Dev only) */}
       {demo && (
         <div className="admin-demo-controls-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, fontSize: 12 }}>
@@ -212,13 +229,19 @@ export function Logs() {
                   type="text"
                   placeholder="Tìm theo mã log, tên người thực hiện, đối tượng..."
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={e => {
+                    setSearch(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   aria-label="Tìm kiếm nhật ký kiểm toán"
                 />
                 {search && (
                   <button
                     type="button"
-                    onClick={() => setSearch('')}
+                    onClick={() => {
+                      setSearch('');
+                      setCurrentPage(1);
+                    }}
                     aria-label="Xóa nội dung tìm kiếm"
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--admin-muted)' }}
                   >
@@ -231,30 +254,44 @@ export function Logs() {
               <select
                 aria-label="Lọc theo loại hành động"
                 value={selectedAction}
-                onChange={e => setSelectedAction(e.target.value as LogActionFilter)}
+                onChange={e => {
+                  setSelectedAction(e.target.value as LogActionFilter);
+                  setCurrentPage(1);
+                }}
                 className="admin-logs-select"
               >
                 <option value="ALL">Tất cả hành động ({logs.length})</option>
-                <option value="APPROVE_PAYOUT">Duyệt quyết toán (APPROVE_PAYOUT)</option>
-                <option value="VERIFY_VENDOR">Xác minh đối tác (VERIFY_VENDOR)</option>
-                <option value="RESOLVE_DISPUTE">Giải quyết khiếu nại (RESOLVE_DISPUTE)</option>
-                <option value="UPDATE_SYSTEM_CONFIG">Cập nhật cấu hình (UPDATE_SYSTEM_CONFIG)</option>
-                <option value="LOCK_USER_ACCOUNT">Khóa tài khoản (LOCK_USER_ACCOUNT)</option>
+                <option value="APPROVE_PAYOUT">Duyệt quyết toán</option>
+                <option value="VERIFY_VENDOR">Xác minh đối tác</option>
+                <option value="REJECT_VENDOR">Từ chối đối tác</option>
+                <option value="RESOLVE_DISPUTE">Giải quyết khiếu nại</option>
+                <option value="PROCESS_REFUND">Xử lý hoàn tiền</option>
+                <option value="UPDATE_PROMOTION">Cập nhật khuyến mãi</option>
+                <option value="CREATE_PROMOTION">Tạo mã khuyến mãi</option>
+                <option value="GENERATE_SETTLEMENT">Tạo kỳ quyết toán</option>
+                <option value="UPDATE_SYSTEM_CONFIG">Cập nhật cấu hình</option>
+                <option value="LOCK_USER_ACCOUNT">Khóa tài khoản</option>
+                <option value="ADMIN_LOGIN">Đăng nhập quản trị</option>
               </select>
 
               {/* Entity Type Filter */}
               <select
                 aria-label="Lọc theo đối tượng tác động"
                 value={selectedEntity}
-                onChange={e => setSelectedEntity(e.target.value as LogEntityFilter)}
+                onChange={e => {
+                  setSelectedEntity(e.target.value as LogEntityFilter);
+                  setCurrentPage(1);
+                }}
                 className="admin-logs-select"
               >
                 <option value="ALL">Tất cả đối tượng</option>
-                <option value="PayoutRequest">Quyết toán (PayoutRequest)</option>
-                <option value="Vendor">Đối tác (Vendor)</option>
-                <option value="Dispute">Khiếu nại (Dispute)</option>
-                <option value="SystemConfig">Cấu hình (SystemConfig)</option>
-                <option value="User">Người dùng (User)</option>
+                <option value="PayoutRequest">Yêu cầu quyết toán</option>
+                <option value="Vendor">Hồ sơ đối tác</option>
+                <option value="Dispute">Khiếu nại khách hàng</option>
+                <option value="SystemConfig">Tham số hệ thống</option>
+                <option value="User">Tài khoản người dùng</option>
+                <option value="Promotion">Mã khuyến mãi</option>
+                <option value="Order">Đơn hàng</option>
               </select>
             </div>
 
@@ -329,11 +366,11 @@ export function Logs() {
                       <th scope="col" style={{ width: '250px' }}>Người thực hiện</th>
                       <th scope="col" style={{ width: '200px' }}>Hành động</th>
                       <th scope="col">Đối tượng tác động</th>
-                      <th scope="col" style={{ width: '90px', textAlign: 'right' }}>Chi tiết</th>
+                      <th scope="col" style={{ width: '80px', textAlign: 'center' }}>Chi tiết</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredLogs.map(log => {
+                    {paginatedLogs.map(log => {
                       const meta = getActionMeta(log.action);
                       const isSelected = selectedLog?.id === log.id;
                       const initials = (log.actorName || log.actorUserId || 'AD')
@@ -389,11 +426,19 @@ export function Logs() {
                               <span className="admin-log-entity-id">#{log.entityId}</span>
                             </div>
                           </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <span className="admin-queue-action" aria-hidden="true">
-                              <Eye size={13} />
-                              Xem
-                            </span>
+                          <td style={{ textAlign: 'center' }}>
+                            <button
+                              type="button"
+                              className="admin-action-icon-btn"
+                              aria-label={`Xem chi tiết nhật ký #${log.id}`}
+                              title="Xem chi tiết"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenDetail(log);
+                              }}
+                            >
+                              <Eye size={16} aria-hidden="true" />
+                            </button>
                           </td>
                         </tr>
                       );
@@ -401,6 +446,16 @@ export function Logs() {
                   </tbody>
                 </table>
               </div>
+            )}
+            {!loading && !errorMessage && filteredLogs.length > 0 && (
+              <AdminPagination
+                currentPage={activePage}
+                totalPages={calculatedTotalPages}
+                totalRecords={demo ? filteredLogs.length : totalElements}
+                pageSize={PAGE_SIZE}
+                recordLabel="bản ghi nhật ký"
+                onPageChange={setCurrentPage}
+              />
             )}
           </div>
         </div>
@@ -424,7 +479,7 @@ export function Logs() {
             {/* Header badges */}
             <div className="admin-log-drawer-header">
               <AdminBadge tone={getActionMeta(selectedLog.action).tone}>
-                {getActionMeta(selectedLog.action).label} ({selectedLog.action})
+                {getActionMeta(selectedLog.action).label}
               </AdminBadge>
               <span className="admin-config-key">{selectedLog.id}</span>
             </div>

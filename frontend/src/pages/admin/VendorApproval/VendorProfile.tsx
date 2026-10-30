@@ -2,7 +2,7 @@ import { FileText, History, Info } from 'lucide-react';
 import type { BadgeTier, VerificationStatus } from '../../../types';
 import { AdminBadge } from '../../../components/admin/AdminUI';
 import { AdminButton, AdminDisclosure } from '../../../components/admin/AdminWorkspace';
-import type { VendorRecord, VendorReviewEvent } from './vendorApprovalModel';
+import { formatTaxCode, type VendorRecord, type VendorReviewEvent } from './vendorApprovalModel';
 
 function date(value?: string) {
   if (!value) return 'Chưa có dữ liệu';
@@ -26,7 +26,7 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
         <div className="admin-vendors-profile-badges"><VendorStatus status={vendor.verificationStatus} /><AdminBadge tone="neutral">{vendor.badgeTier}</AdminBadge></div></div></div>
       <p>{vendor.address}</p>
       <dl className="admin-detail-grid"><div><dt>Email</dt><dd>{vendor.email || 'Chưa cập nhật'}</dd></div><div><dt>Điện thoại</dt><dd>{vendor.phone || 'Chưa cập nhật'}</dd></div>
-        <div><dt>Mã số thuế</dt><dd className="admin-vendors-mono">{vendor.taxCode}</dd></div><div><dt>Đánh giá</dt><dd>{vendor.ratingAvg} / 5 · {vendor.ratingCount} đánh giá</dd></div></dl>
+        <div><dt>Mã số thuế</dt><dd>{formatTaxCode(vendor.taxCode) === 'Chưa cập nhật' ? <span style={{ fontStyle: 'italic', color: '#64748b' }}>Chưa cập nhật</span> : <span className="admin-vendors-mono">{vendor.taxCode}</span>}</dd></div><div><dt>Đánh giá</dt><dd>{vendor.ratingAvg} / 5 · {vendor.ratingCount} đánh giá</dd></div></dl>
     </section>
 
     <section className="admin-detail-section" aria-labelledby="vendor-documents-heading"><div className="admin-vendors-section-heading"><h3 id="vendor-documents-heading">Tài liệu minh họa</h3><span>2 bản xem trước mẫu</span></div>
@@ -64,7 +64,7 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
     </section>
 
     <AdminDisclosure title="Pháp lý & tài khoản thụ hưởng" description="Mã số thuế, ngân hàng và thông tin người thụ hưởng">
-      <dl className="admin-detail-grid"><div><dt>Mã số thuế</dt><dd>{vendor.taxCode}</dd></div><div><dt>Ngân hàng</dt><dd>{vendor.bankName}</dd></div>
+      <dl className="admin-detail-grid"><div><dt>Mã số thuế</dt><dd>{formatTaxCode(vendor.taxCode) === 'Chưa cập nhật' ? <span style={{ fontStyle: 'italic', color: '#64748b' }}>Chưa cập nhật</span> : <span className="admin-vendors-mono">{vendor.taxCode}</span>}</dd></div><div><dt>Ngân hàng</dt><dd>{vendor.bankName}</dd></div>
         <div><dt>Số tài khoản</dt><dd className="admin-vendors-mono">{vendor.bankAccountNumber}</dd></div><div><dt>Chủ tài khoản</dt><dd>{vendor.bankAccountHolder}</dd></div></dl>
     </AdminDisclosure>
 

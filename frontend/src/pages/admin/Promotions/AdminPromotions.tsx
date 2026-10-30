@@ -7,13 +7,9 @@ import {
   Percent,
   Banknote,
   Calendar,
-  Ticket,
-  CheckCircle2,
-  PauseCircle,
-  AlertCircle,
-  Edit2,
-  Play,
   Pause,
+  Pencil,
+  Play,
 } from 'lucide-react';
 import { MOCK_ADMIN_PROMOTIONS } from '../../../data/adminMockData';
 import { adminDiscountCodeService, getAdminDiscountError } from '../../../services/adminDiscountCodeService';
@@ -23,10 +19,10 @@ import {
   AdminState,
 } from '../../../components/admin/AdminUI';
 import {
-  AdminPreviewBanner,
   AdminFilterTabs,
   AdminButton,
   AdminNotice,
+  AdminPagination,
 } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import {
@@ -122,25 +118,42 @@ export function AdminPromotions() {
     let active = 0;
     let inactive = 0;
     let expired = 0;
+    let depleted = 0;
 
     promotions.forEach(p => {
-      const isExp = isPromotionExpired(p) || isPromotionDepleted(p);
+      const isExp = isPromotionExpired(p);
+      const isDep = isPromotionDepleted(p);
       if (isExp) {
         expired++;
-      } else if (p.isActive) {
+      }
+      if (isDep) {
+        depleted++;
+      }
+      if (p.isActive && !isExp && !isDep) {
         active++;
-      } else {
+      } else if (!p.isActive && !isExp && !isDep) {
         inactive++;
       }
     });
 
-    return { total, active, inactive, expired };
+    return { total, active, inactive, expired, depleted };
   }, [promotions]);
 
   // Filtered List
   const filteredPromotions = useMemo(() => {
     return filterPromotions(promotions, searchQuery, statusFilter, typeFilter);
   }, [promotions, searchQuery, statusFilter, typeFilter]);
+
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(filteredPromotions.length / PAGE_SIZE) || 1;
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedPromotions = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filteredPromotions.slice(start, start + PAGE_SIZE);
+  }, [filteredPromotions, activePage]);
 
   // Drawer Handlers
   const handleOpenCreateDrawer = () => {
@@ -318,86 +331,20 @@ export function AdminPromotions() {
 
   return (
     <div className="admin-promotions">
-      {/* Preview Banner */}
-      <AdminPreviewBanner demo={demo} href={`${location.pathname}?demo=1`} />
-
-      {/* KPI Cards */}
-      <div className="admin-promotions__metrics" aria-label="Tổng quan khuyến mãi">
-        <button
-          type="button"
-          className="admin-promotions__metric-card"
-          onClick={() => setStatusFilter('all')}
-          style={{ textAlign: 'left', cursor: 'pointer' }}
-        >
-          <div className="admin-promotions__metric-header">
-            <span className="admin-promotions__metric-label">Tổng chương trình</span>
-            <span className="admin-promotions__metric-icon admin-promotions__metric-icon--primary">
-              <Ticket size={18} />
-            </span>
-          </div>
-          <div className="admin-promotions__metric-value">{metrics.total}</div>
-          <div className="admin-promotions__metric-desc">Mã voucher trong hệ thống</div>
-        </button>
-
-        <button
-          type="button"
-          className="admin-promotions__metric-card"
-          onClick={() => setStatusFilter('active')}
-          style={{ textAlign: 'left', cursor: 'pointer' }}
-        >
-          <div className="admin-promotions__metric-header">
-            <span className="admin-promotions__metric-label">Đang kích hoạt</span>
-            <span className="admin-promotions__metric-icon admin-promotions__metric-icon--info">
-              <CheckCircle2 size={18} />
-            </span>
-          </div>
-          <div className="admin-promotions__metric-value">{metrics.active}</div>
-          <div className="admin-promotions__metric-desc">Sẵn sàng áp dụng cho giỏ hàng</div>
-        </button>
-
-        <button
-          type="button"
-          className="admin-promotions__metric-card"
-          onClick={() => setStatusFilter('inactive')}
-          style={{ textAlign: 'left', cursor: 'pointer' }}
-        >
-          <div className="admin-promotions__metric-header">
-            <span className="admin-promotions__metric-label">Tạm dừng</span>
-            <span className="admin-promotions__metric-icon admin-promotions__metric-icon--warning">
-              <PauseCircle size={18} />
-            </span>
-          </div>
-          <div className="admin-promotions__metric-value">{metrics.inactive}</div>
-          <div className="admin-promotions__metric-desc">Tạm ngưng nhận áp dụng</div>
-        </button>
-
-        <button
-          type="button"
-          className="admin-promotions__metric-card"
-          onClick={() => setStatusFilter('expired')}
-          style={{ textAlign: 'left', cursor: 'pointer' }}
-        >
-          <div className="admin-promotions__metric-header">
-            <span className="admin-promotions__metric-label">Hết hạn / Hết lượt</span>
-            <span className="admin-promotions__metric-icon admin-promotions__metric-icon--danger">
-              <AlertCircle size={18} />
-            </span>
-          </div>
-          <div className="admin-promotions__metric-value">{metrics.expired}</div>
-          <div className="admin-promotions__metric-desc">Đã quá ngày hoặc hết số suất</div>
-        </button>
-      </div>
-
       {/* Filter Tabs */}
       <AdminFilterTabs
         label="Lọc trạng thái mã khuyến mãi"
         value={statusFilter}
-        onChange={(val) => setStatusFilter(val as PromotionStatusFilter)}
+        onChange={(val) => {
+          setStatusFilter(val as PromotionStatusFilter);
+          setCurrentPage(1);
+        }}
         items={[
           { value: 'all', label: 'Tất cả chương trình', count: metrics.total },
           { value: 'active', label: 'Đang áp dụng', count: metrics.active },
           { value: 'inactive', label: 'Tạm dừng', count: metrics.inactive },
-          { value: 'expired', label: 'Đã kết thúc', count: metrics.expired },
+          { value: 'expired', label: 'Đã hết hạn', count: metrics.expired },
+          { value: 'depleted', label: 'Hết lượt', count: metrics.depleted },
         ]}
       />
 
@@ -410,7 +357,10 @@ export function AdminPromotions() {
             className="admin-promotions__search-input"
             placeholder="Tìm theo mã voucher (VD: DANASEA50)..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             aria-label="Tìm theo mã voucher"
           />
         </div>
@@ -419,7 +369,10 @@ export function AdminPromotions() {
           <select
             className="admin-promotions__select"
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as PromotionTypeFilter)}
+            onChange={(e) => {
+              setTypeFilter(e.target.value as PromotionTypeFilter);
+              setCurrentPage(1);
+            }}
             aria-label="Lọc theo loại hình chiết khấu"
           >
             <option value="all">Tất cả loại ưu đãi</option>
@@ -483,11 +436,11 @@ export function AdminPromotions() {
                   <th>Tiến độ sử dụng</th>
                   <th>Thời hạn áp dụng</th>
                   <th>Trạng thái</th>
-                  <th style={{ textAlign: 'right' }}>Thao tác</th>
+                  <th style={{ textAlign: 'center', width: '96px' }}>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredPromotions.map((promo) => {
+                {paginatedPromotions.map((promo) => {
                   const isExpired = isPromotionExpired(promo);
                   const isDepleted = isPromotionDepleted(promo);
                   const isConcluded = isExpired || isDepleted;
@@ -569,29 +522,30 @@ export function AdminPromotions() {
                       </td>
 
                       {/* Actions */}
-                      <td>
+                      <td style={{ textAlign: 'center' }}>
                         <div className="admin-promotions__actions">
-                          <AdminButton
+                          <button
+                            type="button"
+                            className="admin-action-icon-btn"
+                            aria-label={`Chỉnh sửa mã ưu đãi ${promo.code}`}
+                            title="Chỉnh sửa mã ưu đãi"
                             onClick={() => handleOpenEditDrawer(promo)}
                           >
-                            <Edit2 size={14} aria-hidden="true" />
-                            Sửa
-                          </AdminButton>
-                          <AdminButton
+                            <Pencil size={15} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            className={`admin-action-icon-btn ${promo.isActive ? 'admin-action-icon-btn--danger' : ''}`}
+                            aria-label={promo.isActive ? `Tạm tắt mã ưu đãi ${promo.code}` : `Kích hoạt mã ưu đãi ${promo.code}`}
+                            title={promo.isActive ? 'Tạm tắt mã ưu đãi' : 'Kích hoạt lại mã ưu đãi'}
                             onClick={() => handleRequestToggle(promo)}
                           >
                             {promo.isActive ? (
-                              <>
-                                <Pause size={14} aria-hidden="true" />
-                                Tạm tắt
-                              </>
+                              <Pause size={15} aria-hidden="true" />
                             ) : (
-                              <>
-                                <Play size={14} aria-hidden="true" />
-                                Bật lại
-                              </>
+                              <Play size={15} aria-hidden="true" />
                             )}
-                          </AdminButton>
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -600,6 +554,17 @@ export function AdminPromotions() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {!loading && !errorMessage && filteredPromotions.length > 0 && (
+          <AdminPagination
+            currentPage={activePage}
+            totalPages={totalPages}
+            totalRecords={filteredPromotions.length}
+            pageSize={PAGE_SIZE}
+            recordLabel="mã ưu đãi"
+            onPageChange={setCurrentPage}
+          />
         )}
       </div>
 
@@ -697,7 +662,7 @@ export function AdminPromotions() {
 
             {/* Quick Presets */}
             <div className="admin-promotions__presets">
-              <span style={{ fontSize: 11, color: 'var(--admin-muted, #737373)', fontWeight: 600 }}>Chọn nhanh:</span>
+              <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)', fontWeight: 600 }}>Chọn nhanh:</span>
               {formData.discountType === 'PERCENTAGE'
                 ? [5, 10, 15, 20, 30, 50].map((pct) => (
                     <button
@@ -747,7 +712,7 @@ export function AdminPromotions() {
             <label className="admin-promotions__form-label">THỜI GIAN HIỆU LỰC</label>
             <div className="admin-promotions__date-grid">
               <div>
-                <span style={{ fontSize: 11, color: 'var(--admin-muted, #737373)', display: 'block', marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)', display: 'block', marginBottom: 4 }}>
                   Từ ngày
                 </span>
                 <input
@@ -759,7 +724,7 @@ export function AdminPromotions() {
                 />
               </div>
               <div>
-                <span style={{ fontSize: 11, color: 'var(--admin-muted, #737373)', display: 'block', marginBottom: 4 }}>
+                <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)', display: 'block', marginBottom: 4 }}>
                   Đến ngày (tối thiểu {formData.validFrom ? getLastDayOfMonth(formData.validFrom) : 'cuối tháng'})
                 </span>
                 <input

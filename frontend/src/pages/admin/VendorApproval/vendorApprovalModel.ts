@@ -12,12 +12,31 @@ export type VendorDecision = {
 export type VendorReviewEvent = VendorDecision & { previousStatus: VerificationStatus };
 export type VendorReviewState = { vendors: VendorRecord[]; timeline: VendorReviewEvent[] };
 
+export function isTestTaxCode(taxCode?: string): boolean {
+  if (!taxCode) return true;
+  return taxCode.startsWith('TEST-DS-') || taxCode.startsWith('TEST-');
+}
+
+export function formatTaxCode(taxCode?: string): string {
+  if (!taxCode || isTestTaxCode(taxCode)) {
+    return 'Chưa cập nhật';
+  }
+  return taxCode;
+}
+
 export function filterVendors(vendors: VendorRecord[], query: string, status: string, tier: string) {
   const search = query.trim().toLocaleLowerCase('vi');
-  return vendors.filter(vendor =>
-    (vendor.businessName.toLocaleLowerCase('vi').includes(search) || vendor.taxCode.includes(search)) &&
-    (status === 'all' || vendor.verificationStatus === status) &&
-    (tier === 'all' || vendor.badgeTier === tier));
+  return vendors.filter(vendor => {
+    const rawTax = vendor.taxCode || '';
+    const formattedTax = formatTaxCode(rawTax).toLocaleLowerCase('vi');
+    const matchesSearch = !search ||
+      vendor.businessName.toLocaleLowerCase('vi').includes(search) ||
+      rawTax.toLocaleLowerCase('vi').includes(search) ||
+      formattedTax.includes(search);
+    const matchesStatus = status === 'all' || vendor.verificationStatus === status;
+    const matchesTier = tier === 'all' || vendor.badgeTier === tier;
+    return matchesSearch && matchesStatus && matchesTier;
+  });
 }
 
 export function applyVendorDecision(state: VendorReviewState, decision: VendorDecision, demo: boolean): VendorReviewState {

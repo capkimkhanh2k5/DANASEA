@@ -11,9 +11,8 @@ export function useAdminDashboard(range: DateRange, demo: boolean) {
   const userRole = useAuthStore(state => state.user?.role);
   const [revision, setRevision] = useState(0);
 
-  const isMockSession = Boolean(import.meta.env.DEV && (token?.startsWith('mock_jwt_token_') || !token));
   const isRealAdmin = Boolean(isAuthenticated && token && !token.startsWith('mock_jwt_token_') && userRole === 'ADMIN');
-  const shouldUseDemo = Boolean(demo || isMockSession);
+  const shouldUseDemo = demo;
 
   const key = `${range.from}/${range.to}/${shouldUseDemo}/${revision}/${token}`;
   const [result, setResult] = useState<{ key: string; data?: DashboardData; error?: string; loadedAt?: Date }>(() => {

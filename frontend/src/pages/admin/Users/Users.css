@@ -30,33 +30,33 @@
   overflow: hidden;
   background: #ffffff;
   border: 1px solid var(--admin-border, #e0e8eb);
-  border-radius: 14px;
+  border-radius: 12px;
 }
 
 .admin-users-list-heading {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 20px;
-  padding: 14px 20px 12px;
+  gap: 16px;
+  padding: 14px 20px 10px;
 }
 
 .admin-users-list-heading h2 {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  margin: 0 0 5px;
+  margin: 0;
   color: var(--admin-ink, #171717);
 }
 
 .admin-users-list-heading p,
 .admin-users-list-heading > span {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--admin-secondary, #525252);
   margin: 0;
 }
 
 .admin-users-list > .admin-filter-tabs {
-  margin: 0 24px;
+  margin: 0 20px;
 }
 
 .admin-users-email-filter {
@@ -91,7 +91,34 @@
 }
 
 .admin-users-table th:first-child {
-  width: 30%;
+  width: 28%;
+}
+
+.admin-users-table th:nth-child(2) {
+  width: 14%;
+}
+
+.admin-users-table th:nth-child(3) {
+  width: 120px;
+}
+
+.admin-users-table th:nth-child(4) {
+  width: 130px;
+}
+
+.admin-users-table th:nth-child(5) {
+  width: 130px;
+}
+
+.admin-users-table th:nth-child(6) {
+  width: 130px;
+}
+
+.admin-users-table th:last-child,
+.admin-users-table td:last-child {
+  width: 96px;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .admin-users-table td {
@@ -114,6 +141,21 @@
   flex-shrink: 0;
 }
 
+.admin-users-avatar-initials {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: #e1eff0;
+  color: var(--admin-primary, #0B5D6F);
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1px solid #d0e2e5;
+  user-select: none;
+}
+
 .admin-users-identity strong {
   display: block;
   line-height: 1.4;
@@ -123,7 +165,7 @@
 
 .admin-users-identity span {
   display: block;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--admin-secondary, #525252);
   margin-top: 2px;
 }
@@ -132,7 +174,7 @@
   display: inline-block;
   margin-top: 3px;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 10.5px;
+  font-size: 11.5px;
   color: var(--admin-muted, #737373);
   background: #f1f5f9;
   padding: 1px 6px;
@@ -151,7 +193,7 @@
   gap: 5px;
   padding: 3px 8px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.3px;
 }
@@ -163,8 +205,8 @@
 }
 
 .admin-users-role-badge[data-role="VENDOR"] {
-  background: #e6f3f4;
-  color: #00646f;
+  background: var(--admin-tint, #e8f3f5);
+  color: var(--admin-primary, #0B5D6F);
   border: 1px solid #bce1e5;
 }
 
@@ -180,7 +222,7 @@
   gap: 6px;
   padding: 2.5px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 
@@ -204,10 +246,17 @@
 }
 
 .admin-users-actions-group {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 6px;
+}
+
+.admin-users-actions-group .admin-button {
+  min-height: 28px;
+  padding: 4px 9px;
+  font-size: 12px;
+  gap: 5px;
 }
 
 .admin-users-list-footer {
@@ -243,17 +292,35 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
+.admin-users-profile-avatar-lg-initials {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: #e1eff0;
+  color: var(--admin-primary, #0B5D6F);
+  font-size: 20px;
+  font-weight: 700;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  flex-shrink: 0;
+  user-select: none;
+}
+
 .admin-users-profile-header h3 {
   margin: 0;
   font-size: 16px;
   font-weight: 700;
   color: var(--admin-ink, #171717);
+  text-wrap: balance;
 }
 
 .admin-users-profile-header p {
   margin: 3px 0 0;
   font-size: 12.5px;
   color: var(--admin-secondary, #525252);
+  text-wrap: pretty;
 }
 
 .admin-users-profile-tags {
@@ -288,9 +355,9 @@
 }
 
 .admin-users-role-opt[data-selected="true"] {
-  border-color: #00646f;
+  border-color: var(--admin-primary, #0B5D6F);
   background: #edf7f7;
-  box-shadow: inset 0 0 0 1px #00646f;
+  box-shadow: inset 0 0 0 1px var(--admin-primary, #0B5D6F);
 }
 
 .admin-users-role-opt strong {
@@ -300,7 +367,7 @@
 }
 
 .admin-users-role-opt small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--admin-secondary, #525252);
   margin-top: 4px;
   line-height: 1.4;

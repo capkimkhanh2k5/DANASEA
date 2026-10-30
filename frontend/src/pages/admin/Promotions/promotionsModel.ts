@@ -1,6 +1,6 @@
 import type { DiscountCode, DiscountType } from '../../../types';
 
-export type PromotionStatusFilter = 'all' | 'active' | 'inactive' | 'expired';
+export type PromotionStatusFilter = 'all' | 'active' | 'inactive' | 'expired' | 'depleted';
 export type PromotionTypeFilter = 'all' | DiscountType;
 
 export function isPromotionExpired(promo: DiscountCode): boolean {
@@ -31,9 +31,11 @@ export function filterPromotions(
     if (status === 'active') {
       matchesStatus = promo.isActive && !isPromotionExpired(promo) && !isPromotionDepleted(promo);
     } else if (status === 'inactive') {
-      matchesStatus = !promo.isActive && !isPromotionExpired(promo);
+      matchesStatus = !promo.isActive && !isPromotionExpired(promo) && !isPromotionDepleted(promo);
     } else if (status === 'expired') {
-      matchesStatus = isPromotionExpired(promo) || isPromotionDepleted(promo);
+      matchesStatus = isPromotionExpired(promo);
+    } else if (status === 'depleted') {
+      matchesStatus = isPromotionDepleted(promo);
     }
 
     return matchesSearch && matchesType && matchesStatus;

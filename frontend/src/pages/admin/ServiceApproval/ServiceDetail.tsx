@@ -69,21 +69,22 @@ export function ServiceDetail({
               className="admin-services-hero-image"
             />
             <div className="admin-services-hero-badges">
-              <span className="admin-services-id-tag">#{service.id}</span>
               <ServiceStatusBadge status={service.status} />
-              {service.weatherSensitive && (
-                <AdminBadge tone="neutral">
-                  <Waves size={13} aria-hidden="true" /> Nhạy cảm thời tiết
-                </AdminBadge>
-              )}
             </div>
           </div>
         )}
 
         <div className="admin-services-title-block">
-          <span className="admin-services-category-label">
-            <Compass size={14} aria-hidden="true" /> {service.categoryName || 'Dịch vụ trải nghiệm biển'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+            <span className="admin-services-category-label">
+              <Compass size={14} aria-hidden="true" /> {service.categoryName || 'Dịch vụ trải nghiệm biển'}
+            </span>
+            {service.weatherSensitive && (
+              <AdminBadge tone="neutral">
+                <Waves size={13} aria-hidden="true" /> Nhạy cảm thời tiết
+              </AdminBadge>
+            )}
+          </div>
           <h3 className="admin-services-main-title">{service.name}</h3>
           {service.nameEn && <p className="admin-services-en-title">{service.nameEn}</p>}
         </div>
@@ -99,7 +100,6 @@ export function ServiceDetail({
           <div className="admin-services-vendor-quick">
             <span className="admin-services-vendor-label">Đơn vị vận hành</span>
             <strong>{service.vendorName || 'Chưa liên kết đối tác'}</strong>
-            <small className="admin-services-mono">Mã đối tác: {service.vendorId}</small>
           </div>
         </div>
       </section>

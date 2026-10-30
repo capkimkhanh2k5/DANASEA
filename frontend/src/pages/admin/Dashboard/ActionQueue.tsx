@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowUpRight, Building2, CircleHelp, ListFilter, RotateCcw, Scale, ShieldCheck, Wallet } from 'lucide-react';
+import { ArrowRight, Building2, CircleHelp, ListFilter, RotateCcw, Scale, ShieldCheck, Wallet } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
 import { formatNumber, operationGroups, type OperationCounts } from './dashboardModel';
@@ -25,8 +25,7 @@ export function ActionQueue({ counts, loading, onRetry, demo = false }: { counts
   return <section className="admin-card" aria-labelledby="admin-queue-heading">
     <div className="admin-panel-header"><div className="admin-panel-title">
       <h2 id="admin-queue-heading"><ListFilter size={17} />Hàng đợi ưu tiên <span className="admin-count">{loading || !counts || allFailed ? '—' : `${formatNumber(knownTotal)}${unknown ? '+' : ''}`}</span></h2>
-      <AdminBadge tone="teal">P1 → P3 · Theo mức độ khẩn</AdminBadge>
-    </div><p>Ưu tiên phản hồi khách hàng, sau đó đến hồ sơ và đối soát.</p></div>
+    </div><p>Ưu tiên phản hồi khách hàng (P1), sau đó đến kiểm duyệt hồ sơ (P2) và đối soát (P3).</p></div>
     {!loading && customerAttention !== null && customerAttention > 0 && <div className="admin-queue-summary">
       <span className="admin-queue-summary-icon"><Scale size={20} strokeWidth={1.6} /></span>
       <div><span className="admin-eyebrow">ƯU TIÊN XỬ LÝ</span><strong>{formatNumber(customerAttention)} mục cần phản hồi khách hàng</strong><p>Khiếu nại đang mở và yêu cầu hoàn tiền đang chờ.</p></div>
@@ -68,7 +67,7 @@ export function ActionQueue({ counts, loading, onRetry, demo = false }: { counts
                 </div>
                 <Link to={href(group.path)} className="admin-queue-action" aria-label={`Mở ${group.label.toLowerCase()}`}>
                   {actions[group.key]}
-                  <ArrowUpRight size={14} className="admin-queue-action-arrow" />
+                  <ArrowRight size={14} className="admin-queue-action-arrow" />
                 </Link>
               </motion.div>;
             })}

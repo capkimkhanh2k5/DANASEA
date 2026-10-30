@@ -5,11 +5,11 @@
 .admin-payouts {
   display: flex;
   flex-direction: column;
-  gap: var(--adm-space-5, 20px);
+  gap: 20px;
   width: 100%;
-  max-width: 1440px;
+  max-width: 1700px;
   margin: 0 auto;
-  padding: 0 var(--adm-space-4, 16px) var(--adm-space-8, 32px);
+  padding: 10px 24px 32px;
   box-sizing: border-box;
 }
 
@@ -21,8 +21,8 @@
   gap: 12px;
   padding: 12px 18px;
   background: #ffffff;
-  border: 1px solid var(--adm-color-border, #e2e8f0);
-  border-radius: var(--adm-radius-lg, 12px);
+  border: 1px solid var(--admin-border, #e3eaed);
+  border-radius: var(--admin-radius, 14px);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
@@ -66,7 +66,7 @@
 .admin-payouts__workspace {
   display: grid;
   grid-template-columns: minmax(380px, 1.15fr) minmax(420px, 1.35fr);
-  gap: var(--adm-space-5, 20px);
+  gap: 20px;
   align-items: start;
 }
 
@@ -81,8 +81,8 @@
   display: flex;
   flex-direction: column;
   background: #ffffff;
-  border: 1px solid var(--adm-color-border, #e2e8f0);
-  border-radius: var(--adm-radius-lg, 12px);
+  border: 1px solid var(--admin-border, #e3eaed);
+  border-radius: var(--admin-radius, 14px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   position: sticky;
@@ -132,7 +132,7 @@
   width: 100%;
   height: 38px;
   padding: 0 12px 0 38px;
-  border: 1px solid var(--adm-color-border, #e2e8f0);
+  border: 1px solid var(--admin-border, #e3eaed);
   border-radius: 8px;
   font-size: 13px;
   color: var(--admin-ink, #171717);
@@ -143,9 +143,9 @@
 }
 
 .admin-payouts__search-input:focus {
-  border-color: #00646f;
+  border-color: var(--admin-primary, #0B5D6F);
   background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(0, 100, 111, 0.1);
+  box-shadow: 0 0 0 3px rgba(11, 93, 111, 0.1);
 }
 
 /* Master List Items */
@@ -175,9 +175,9 @@
 }
 
 .admin-payouts__item--active {
-  background: #f2fafb;
-  border-left-color: #00646f;
-  box-shadow: inset 0 0 0 1px rgba(0, 100, 111, 0.08);
+  background: var(--admin-tint, #e8f3f5);
+  border-left-color: var(--admin-primary, #0B5D6F);
+  box-shadow: inset 0 0 0 1px rgba(11, 93, 111, 0.08);
 }
 
 .admin-payouts__item-top {
@@ -191,7 +191,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
   font-weight: 700;
-  color: #00646f;
+  color: var(--admin-primary, #0B5D6F);
 }
 
 .admin-payouts__item-vendor {
@@ -218,8 +218,8 @@
 /* --- Detail Column (Right) --- */
 .admin-payouts__detail {
   background: #ffffff;
-  border: 1px solid var(--adm-color-border, #e2e8f0);
-  border-radius: var(--adm-radius-lg, 12px);
+  border: 1px solid var(--admin-border, #e3eaed);
+  border-radius: var(--admin-radius, 14px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   padding: 24px;
   display: flex;
@@ -247,8 +247,8 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
   font-weight: 700;
-  color: #00646f;
-  background: #e6f4f5;
+  color: var(--admin-primary, #0B5D6F);
+  background: var(--admin-tint, #e8f3f5);
   padding: 2px 8px;
   border-radius: 4px;
   display: inline-block;
@@ -270,7 +270,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #00646f;
+  color: var(--admin-primary, #0B5D6F);
 }
 
 .admin-payouts__amount-value {
@@ -288,7 +288,7 @@
 }
 
 .admin-payouts__info-title {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -328,7 +328,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 14px;
   font-weight: 700;
-  color: #00646f;
+  color: var(--admin-primary, #0B5D6F);
   letter-spacing: 0.04em;
 }
 
@@ -363,7 +363,7 @@
   border-radius: 6px;
   border: 1px solid #d0e2e5;
   background: #f0f7f8;
-  color: #00646f;
+  color: var(--admin-primary, #0B5D6F);
   cursor: pointer;
   transition: background 150ms, border-color 150ms;
 }

@@ -116,18 +116,18 @@ export function AnalyticsChart({ points, metric, loading, error, onRetry }: {
             <small>{isRevenue ? `Hoa hồng: ${formatVND(active.point.commission)}` : `Hoàn thành: ${active.point.completed} · Hủy: ${active.point.cancelled}`}</small>
           </div>}
           <svg ref={svgRef} viewBox="0 0 560 199" role="group" aria-label={`${title}, ${points.length} ngày. Dùng Tab để xem từng ngày hoặc mở bảng số liệu.`}>
-            <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#087f8c" stopOpacity=".23" /><stop offset="100%" stopColor="#087f8c" stopOpacity=".01" /></linearGradient></defs>
+            <defs><linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#0B5D6F" stopOpacity=".12" /><stop offset="100%" stopColor="#0B5D6F" stopOpacity="0" /></linearGradient></defs>
             {[0, 1, 2, 3, 4].map(index => {
               const value = min + ((max - min) * index / 4);
               return <g key={index}><line x1={left} x2={left + width} y1={y(value)} y2={y(value)} stroke="#e8eef1" strokeDasharray={value === 0 ? undefined : '3 4'} /><text x={left - 10} y={y(value) + 3} textAnchor="end" fill="#6a7f8b" fontSize="11">{axisLabel(value)}</text></g>;
             })}
-            {isRevenue && <><path className="admin-chart-area" d={area} fill={`url(#${gradientId})`} /><path className="admin-chart-line" d={line} fill="none" stroke="#087f8c" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" /></>}
+            {isRevenue && <><path className="admin-chart-area" d={area} fill={`url(#${gradientId})`} /><path className="admin-chart-line" d={line} fill="none" stroke="#0B5D6F" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" /></>}
             {plot.map(({ point, x, y: pointY }, index) => <g key={point.date} tabIndex={0} className="admin-chart-point" role="img"
               aria-label={`${point.date}: ${format(point[metric])}${isRevenue ? '' : ' đơn'}`}
               onFocus={() => setActiveDate(point.date)} onBlur={() => setActiveDate(null)} onPointerEnter={() => setActiveDate(point.date)} onPointerDown={() => setActiveDate(point.date)}>
               <rect className="admin-point-target" x={x - step / 2} y={top} width={step} height={height} fill="transparent" />
-              {!isRevenue && <rect className="admin-chart-bar" x={x - Math.min(13, step * .28)} y={Math.min(y(0), pointY)} width={Math.min(26, step * .56)} height={Math.abs(y(0) - pointY)} rx="3" fill={activeDate === point.date || index === plot.length - 1 ? '#00646f' : '#86bdc1'} pointerEvents="none" />}
-              {isRevenue && <circle className="admin-chart-circle" cx={x} cy={pointY} r={activeDate === point.date ? 4.5 : points.length === 7 ? 3 : 0} fill="white" stroke="#087f8c" strokeWidth="2" pointerEvents="none" />}
+              {!isRevenue && <rect className="admin-chart-bar" x={x - Math.min(13, step * .28)} y={Math.min(y(0), pointY)} width={Math.min(26, step * .56)} height={Math.abs(y(0) - pointY)} rx="3" fill={activeDate === point.date || index === plot.length - 1 ? '#0B5D6F' : '#82a9b3'} pointerEvents="none" />}
+              {isRevenue && <circle className="admin-chart-circle" cx={x} cy={pointY} r={activeDate === point.date ? 4.5 : points.length === 7 ? 3 : 0} fill="white" stroke="#0B5D6F" strokeWidth="2" pointerEvents="none" />}
               {(points.length <= 7 || index % 5 === 0 || index === points.length - 1) && <text x={x} y={187} textAnchor="middle" fill="#6a7f8b" fontSize="11">{shortDate(point.date)}</text>}
             </g>)}
           </svg>

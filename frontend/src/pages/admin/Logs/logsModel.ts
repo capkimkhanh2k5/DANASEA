@@ -9,9 +9,15 @@ export type LogActionFilter =
   | 'ALL'
   | 'APPROVE_PAYOUT'
   | 'VERIFY_VENDOR'
+  | 'REJECT_VENDOR'
   | 'RESOLVE_DISPUTE'
+  | 'PROCESS_REFUND'
+  | 'UPDATE_PROMOTION'
+  | 'CREATE_PROMOTION'
+  | 'GENERATE_SETTLEMENT'
   | 'UPDATE_SYSTEM_CONFIG'
-  | 'LOCK_USER_ACCOUNT';
+  | 'LOCK_USER_ACCOUNT'
+  | 'ADMIN_LOGIN';
 
 export type LogEntityFilter =
   | 'ALL'
@@ -19,7 +25,11 @@ export type LogEntityFilter =
   | 'Vendor'
   | 'Dispute'
   | 'SystemConfig'
-  | 'User';
+  | 'User'
+  | 'Promotion'
+  | 'Order'
+  | 'Refund'
+  | 'Settlement';
 
 export interface ActionMeta {
   label: string;
@@ -38,20 +48,50 @@ export const ACTION_METAS: Record<string, ActionMeta> = {
     tone: 'teal',
     description: 'Thẩm định hồ sơ năng lực và cấp huy hiệu đối tác tin cậy.',
   },
+  REJECT_VENDOR: {
+    label: 'Từ chối đối tác',
+    tone: 'rose',
+    description: 'Từ chối hồ sơ đăng ký đối tác chưa đạt tiêu chuẩn an toàn.',
+  },
   RESOLVE_DISPUTE: {
     label: 'Giải quyết khiếu nại',
     tone: 'amber',
     description: 'Phân xử tranh chấp giữa khách hàng và nhà cung cấp dịch vụ.',
   },
+  PROCESS_REFUND: {
+    label: 'Xử lý hoàn tiền',
+    tone: 'amber',
+    description: 'Chấp thuận và thực hiện hoàn tiền giao dịch cho khách hàng.',
+  },
+  UPDATE_PROMOTION: {
+    label: 'Cập nhật khuyến mãi',
+    tone: 'neutral',
+    description: 'Điều chỉnh hạn mức hoặc thông tin chương trình ưu đãi.',
+  },
+  CREATE_PROMOTION: {
+    label: 'Tạo mã khuyến mãi',
+    tone: 'teal',
+    description: 'Phát hành chương trình ưu đãi hoặc mã voucher toàn sàn mới.',
+  },
+  GENERATE_SETTLEMENT: {
+    label: 'Tạo kỳ quyết toán',
+    tone: 'neutral',
+    description: 'Tổng hợp đối soát và kết chuyển doanh thu kỳ hạn cho đối tác.',
+  },
   UPDATE_SYSTEM_CONFIG: {
     label: 'Cập nhật cấu hình',
     tone: 'neutral',
-    description: 'Thay đổi tham số vận hành sàn hoặc an toàn biển.',
+    description: 'Thay đổi tham số vận hành sàn hoặc tiêu chuẩn an toàn biển.',
   },
   LOCK_USER_ACCOUNT: {
     label: 'Khóa tài khoản',
     tone: 'rose',
     description: 'Tạm dừng hoặc vô hiệu hóa tài khoản vi phạm chính sách.',
+  },
+  ADMIN_LOGIN: {
+    label: 'Đăng nhập quản trị',
+    tone: 'neutral',
+    description: 'Phiên xác thực bảo mật truy cập bảng điều khiển quản trị.',
   },
 };
 
@@ -61,6 +101,10 @@ export const ENTITY_LABELS: Record<string, string> = {
   Dispute: 'Khiếu nại khách hàng',
   SystemConfig: 'Tham số hệ thống',
   User: 'Tài khoản người dùng',
+  Promotion: 'Mã khuyến mãi',
+  Order: 'Đơn hàng',
+  Refund: 'Yêu cầu hoàn tiền',
+  Settlement: 'Kỳ quyết toán',
 };
 
 export function getActionMeta(action: string): ActionMeta {
@@ -291,6 +335,8 @@ export function filterAuditLogs(
     const matchesEntityId = log.entityId.toLowerCase().includes(q);
     const matchesEntityType = log.entityType.toLowerCase().includes(q);
     const matchesAction = log.action.toLowerCase().includes(q);
+    const matchesActionLabel = getActionMeta(log.action).label.toLowerCase().includes(q);
+    const matchesEntityLabel = (ENTITY_LABELS[log.entityType] || '').toLowerCase().includes(q);
     const matchesMeta = Boolean(log.metadata && log.metadata.toLowerCase().includes(q));
 
     return (
@@ -299,7 +345,9 @@ export function filterAuditLogs(
       matchesActorEmail ||
       matchesEntityId ||
       matchesEntityType ||
+      matchesEntityLabel ||
       matchesAction ||
+      matchesActionLabel ||
       matchesMeta
     );
   });

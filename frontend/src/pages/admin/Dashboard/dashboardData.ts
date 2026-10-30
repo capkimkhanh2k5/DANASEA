@@ -87,6 +87,8 @@ export async function loadAdminDashboard(get: DashboardGet, range: DateRange, si
   ]);
   return {
     bookings, revenue, recentOrders, errors,
+    hotServices: null,
+    topVendors: null,
     operations: {
       vendors, services, refunds,
       disputes: disputesOpen === null || disputesReview === null ? null : disputesOpen + disputesReview,

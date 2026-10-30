@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Download,
+  Eye,
   Lock,
+  LockOpen,
   Mail,
   Shield,
-  Unlock,
   UserCheck,
   UserPlus,
   Users as UsersIcon,
@@ -19,7 +20,7 @@ import {
   AdminButton,
   AdminFilterTabs,
   AdminNotice,
-  AdminPreviewBanner,
+  AdminPagination,
 } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import {
@@ -33,6 +34,11 @@ import {
   type UserStatusFilter,
 } from './usersModel';
 import './Users.css';
+
+function getUserInitials(name?: string, email?: string): string {
+  const source = name || email || 'U';
+  return source.split(' ').filter(Boolean).slice(-2).map(w => w[0]).join('').toUpperCase();
+}
 
 export function Users() {
   const location = useLocation();
@@ -81,7 +87,7 @@ export function Users() {
           email: u.email,
           phone: u.phone || '',
           role: u.role,
-          avatarUrl: u.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.email)}&background=00646F&color=fff`,
+          avatarUrl: u.avatarUrl || '',
           isEmailVerified: u.isEmailVerified,
           isLocked: u.isLocked,
           locale: 'vi',
@@ -117,12 +123,23 @@ export function Users() {
   const adminCount = visibleUsers.filter(u => u.role === 'ADMIN').length;
   const lockedCount = visibleUsers.filter(u => u.isLocked).length;
 
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+
   const resetFilters = () => {
     setSearchQuery('');
     setRoleFilter('all');
     setStatusFilter('all');
     setEmailFilter('all');
+    setCurrentPage(1);
   };
+
+  const paginatedUsers = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, activePage]);
 
   const openDrawer = (user: User) => {
     setSelectedUser(user);
@@ -255,51 +272,10 @@ export function Users() {
 
   return (
     <div className="admin-workspace-page admin-users">
-      {/* 1. Preview Banner */}
-      <AdminPreviewBanner demo={demo} href={`${location.pathname}?demo=1`} />
-
-      {/* 3. Summary Metrics */}
-      <div className="admin-workspace-summary" aria-label="Tổng quan người dùng">
-        {[
-          { label: 'Tổng tài khoản', value: visibleUsers.length, detail: 'Trong hồ sơ mẫu', tab: 'all' as const },
-          { label: 'Khách hàng', value: customerCount, detail: 'Tài khoản đặt dịch vụ', tab: 'CUSTOMER' as const },
-          { label: 'Đối tác (Vendor)', value: vendorCount, detail: 'Đơn vị cung cấp tour', tab: 'VENDOR' as const },
-          { label: 'Quản trị viên', value: adminCount, detail: 'Điều hành hệ thống', tab: 'ADMIN' as const },
-          { label: 'Đang bị khóa', value: lockedCount, detail: 'Vô hiệu hóa truy cập', tab: 'locked' as const },
-        ].map(metric => (
-          <button
-            key={metric.tab}
-            type="button"
-            className="admin-workspace-metric"
-            aria-pressed={
-              metric.tab === 'locked'
-                ? statusFilter === 'locked'
-                : roleFilter === metric.tab && statusFilter === 'all'
-            }
-            onClick={() => {
-              if (metric.tab === 'locked') {
-                setStatusFilter(statusFilter === 'locked' ? 'all' : 'locked');
-                setRoleFilter('all');
-              } else {
-                setRoleFilter(metric.tab);
-                setStatusFilter('all');
-              }
-            }}
-          >
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-            <small>{metric.detail}</small>
-          </button>
-        ))}
-      </div>
-
       {/* 4. Main List Section */}
       <section className="admin-users-list" aria-labelledby="users-list-title">
         <div className="admin-users-list-heading">
-          <div>
-            <h2 id="users-list-title">Danh sách tài khoản hệ thống</h2>
-            <p>Xem thông tin người dùng, trạng thái bảo mật tài khoản và phân quyền vai trò.</p>
-          </div>
+          <h2 id="users-list-title">Danh sách tài khoản hệ thống</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span>
               {filtered.length} / {visibleUsers.length} tài khoản
@@ -318,6 +294,7 @@ export function Users() {
           label="Lọc theo vai trò hoặc trạng thái"
           value={statusFilter === 'locked' ? 'locked' : roleFilter}
           onChange={val => {
+            setCurrentPage(1);
             if (val === 'locked') {
               setStatusFilter('locked');
               setRoleFilter('all');
@@ -342,7 +319,10 @@ export function Users() {
             <input
               type="search"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={e => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               aria-label="Tìm theo tên, email, số điện thoại hoặc ID"
               placeholder="Tìm theo tên, email, số điện thoại hoặc mã ID..."
             />
@@ -353,7 +333,10 @@ export function Users() {
             <span>Xác thực email</span>
             <select
               value={emailFilter}
-              onChange={e => setEmailFilter(e.target.value as UserEmailFilter)}
+              onChange={e => {
+                setEmailFilter(e.target.value as UserEmailFilter);
+                setCurrentPage(1);
+              }}
               aria-label="Lọc theo xác thực email"
             >
               <option value="all">Tất cả tình trạng</option>
@@ -404,19 +387,22 @@ export function Users() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(user => {
-                const avatar =
-                  user.avatarUrl ||
-                  `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName)}&background=00646F&color=fff`;
+              {paginatedUsers.map(user => {
+                const hasValidAvatar = user.avatarUrl && !user.avatarUrl.includes('ui-avatars.com');
                 return (
                   <tr key={user.id}>
                     <td>
                       <div className="admin-users-identity">
-                        <img src={avatar} alt="" className="admin-users-avatar" />
+                        {hasValidAvatar ? (
+                          <img src={user.avatarUrl} alt="" className="admin-users-avatar" />
+                        ) : (
+                          <span className="admin-users-avatar-initials" aria-hidden="true">
+                            {getUserInitials(user.fullName, user.email)}
+                          </span>
+                        )}
                         <div>
                           <strong>{user.fullName}</strong>
                           <span>{user.email}</span>
-                          <span className="admin-users-id-chip">#{user.id}</span>
                         </div>
                       </div>
                     </td>
@@ -459,28 +445,28 @@ export function Users() {
                     </td>
                     <td>
                       <div className="admin-users-actions-group">
-                        <AdminButton
-                          variant="secondary"
+                        <button
+                          type="button"
+                          className="admin-action-icon-btn"
                           aria-label={`Xem chi tiết tài khoản ${user.fullName}`}
+                          title="Xem chi tiết"
                           onClick={() => openDrawer(user)}
                         >
-                          Chi tiết
-                        </AdminButton>
-                        <AdminButton
-                          variant={user.isLocked ? 'secondary' : 'danger'}
+                          <Eye size={17} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className={`admin-action-icon-btn ${user.isLocked ? '' : 'admin-action-icon-btn--danger'}`}
                           aria-label={user.isLocked ? `Mở khóa ${user.fullName}` : `Khóa ${user.fullName}`}
+                          title={user.isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
                           onClick={e => promptLockToggle(user, e)}
                         >
                           {user.isLocked ? (
-                            <>
-                              <Unlock size={14} aria-hidden="true" /> Mở khóa
-                            </>
+                            <LockOpen size={16} aria-hidden="true" />
                           ) : (
-                            <>
-                              <Lock size={14} aria-hidden="true" /> Khóa
-                            </>
+                            <Lock size={16} aria-hidden="true" />
                           )}
-                        </AdminButton>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -489,6 +475,17 @@ export function Users() {
             </tbody>
           </table>
         </div>
+        )}
+
+        {!loading && !errorMessage && filtered.length > 0 && (
+          <AdminPagination
+            currentPage={activePage}
+            totalPages={totalPages}
+            totalRecords={filtered.length}
+            pageSize={PAGE_SIZE}
+            recordLabel="người dùng"
+            onPageChange={setCurrentPage}
+          />
         )}
 
         {/* Empty State */}
@@ -529,7 +526,7 @@ export function Users() {
               >
                 {selectedUser.isLocked ? (
                   <>
-                    <Unlock size={15} aria-hidden="true" /> Mở khóa tài khoản
+                    <LockOpen size={15} aria-hidden="true" /> Mở khóa tài khoản
                   </>
                 ) : (
                   <>
@@ -546,14 +543,17 @@ export function Users() {
           <div className="admin-users-profile-detail">
             {/* Profile Header */}
             <div className="admin-users-profile-header">
-              <img
-                src={
-                  selectedUser.avatarUrl ||
-                  `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.fullName)}&background=00646F&color=fff`
-                }
-                alt=""
-                className="admin-users-profile-avatar-lg"
-              />
+              {selectedUser.avatarUrl && !selectedUser.avatarUrl.includes('ui-avatars.com') ? (
+                <img
+                  src={selectedUser.avatarUrl}
+                  alt=""
+                  className="admin-users-profile-avatar-lg"
+                />
+              ) : (
+                <span className="admin-users-profile-avatar-lg-initials" aria-hidden="true">
+                  {getUserInitials(selectedUser.fullName, selectedUser.email)}
+                </span>
+              )}
               <div>
                 <h3>{selectedUser.fullName}</h3>
                 <p>{selectedUser.email}</p>

@@ -1,9 +1,20 @@
 import type { MasterOrder, SubOrder } from '../../../types/index.ts';
 
+export interface AdminDisplayOrder extends MasterOrder {
+  customerName?: string;
+  paymentStatus?: string;
+}
+
 export function filterMasterOrders(orders: MasterOrder[], query: string, status: string) {
   const search = query.trim().toLowerCase();
-  return orders.filter(order => (status === 'all' || order.status === status)
-    && (order.id.toLowerCase().includes(search) || order.customerId.toLowerCase().includes(search)));
+  return orders.filter(order => {
+    const matchesStatus = status === 'all' || order.status === status;
+    const customerName = ((order as AdminDisplayOrder).customerName || '').toLowerCase();
+    const customerId = (order.customerId || '').toLowerCase();
+    const orderId = (order.id || '').toLowerCase();
+    const matchesSearch = !search || orderId.includes(search) || customerId.includes(search) || customerName.includes(search);
+    return matchesStatus && matchesSearch;
+  });
 }
 
 export function relatedSubOrders(orders: SubOrder[], masterOrderId: string) {
@@ -13,8 +24,17 @@ export function relatedSubOrders(orders: SubOrder[], masterOrderId: string) {
 export function ordersToCsv(orders: MasterOrder[]) {
   const quote = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
   return [
-    ['Mã Đơn', 'Khách Hàng', 'Trạng Thái', 'Tổng Tiền', 'Giảm Giá', 'Thời Gian'],
-    ...orders.map(order => [order.id, order.customerId, order.status, order.totalAmount, order.discountAmount, order.createdAt || '']),
+    ['Mã Đơn', 'Khách Hàng', 'Mã Khách Hàng', 'Trạng Thái', 'Tổng Tiền', 'Giảm Giá', 'Thanh Toán', 'Thời Gian'],
+    ...orders.map(order => [
+      order.id,
+      (order as AdminDisplayOrder).customerName || order.customerId,
+      order.customerId,
+      order.status,
+      order.totalAmount,
+      order.discountAmount,
+      (order as AdminDisplayOrder).paymentStatus || '',
+      order.createdAt || ''
+    ]),
   ].map(row => row.map(quote).join(',')).join('\r\n');
 }
 

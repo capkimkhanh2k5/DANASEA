@@ -7,7 +7,7 @@
   --admin-ease: cubic-bezier(0.23, 1, 0.32, 1);
   --admin-ease-soft: cubic-bezier(0.215, 0.61, 0.355, 1);
   --admin-ease-away: cubic-bezier(0.33, 0.17, 0.67, 0.5);
-  --admin-sidebar-transition: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --admin-sidebar-transition: 280ms cubic-bezier(0.2, 0, 0, 1);
 }
 .admin-sidebar {
   overflow-x: hidden;
@@ -18,7 +18,7 @@
   transition: margin-left var(--admin-sidebar-transition);
   will-change: margin-left;
 }
-.admin-shell :is(.admin-button,.admin-icon-button,.admin-nav-link,.admin-queue-action,.admin-filter-tabs button,.admin-queue-tabs button,.admin-range button,.admin-search-results a,.admin-shortcuts a,.admin-overview-row) {
+.admin-shell :is(.admin-button,.admin-icon-button,.admin-nav-link,.admin-queue-action,.admin-filter-tabs button,.admin-queue-tabs button,.admin-range button,.admin-shortcuts a,.admin-overview-row) {
   transition: background-color var(--admin-motion-fast) var(--admin-ease), border-color var(--admin-motion-fast) var(--admin-ease), color var(--admin-motion-fast) var(--admin-ease), box-shadow var(--admin-motion-fast) var(--admin-ease), transform 140ms var(--admin-ease);
 }
 .admin-shell :is(.admin-button,.admin-icon-button):active:not(:disabled):not([aria-busy='true']) { transform: scale(0.96); }
@@ -26,11 +26,10 @@
 .admin-shell button:disabled { cursor: not-allowed; }
 .admin-shell button[aria-busy='true'] { cursor: progress; }
 .admin-shell :is(input,select,textarea) { transition: border-color var(--admin-motion-fast), box-shadow var(--admin-motion-fast); }
-.admin-shell :is(input,select,textarea):focus-visible { outline: 2px solid #098f9e; outline-offset: 2px; }
+.admin-shell :is(input,select,textarea):focus-visible { outline: 2px solid var(--admin-primary); outline-offset: 2px; }
 .admin-button--danger { border-color: #dfb8bc; color: #a53642; background: #fff8f8; }
 .admin-button--danger:hover:not(:disabled) { background: #fbecee; border-color: #c88d96; color: #8e2632; }
-.admin-button--primary:hover:not(:disabled) { box-shadow: 0 2px 8px rgba(0, 100, 111, 0.2); }
-.admin-search-results,.admin-notification-menu { animation: adminDropdownIn var(--admin-motion-fast) var(--admin-ease); transform-origin: top right; }
+.admin-button--primary:hover:not(:disabled) { box-shadow: 0 2px 8px rgba(11, 93, 111, 0.2); }
 .admin-content > :is(main,.admin-workspace-page) { animation: adminPageIn var(--admin-motion) var(--admin-ease); }
 .admin-brand-copy {
   display: flex;
@@ -119,7 +118,7 @@
 .admin-shell--collapsed .admin-nav--icons .admin-nav-link.is-active {
   background: var(--admin-primary);
   color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(0, 100, 111, 0.28);
+  box-shadow: 0 4px 12px rgba(11, 93, 111, 0.28);
 }
 .admin-shell .admin-nav-link.is-active .admin-nav-icon,
 .admin-shell--collapsed .admin-nav--icons .admin-nav-link.is-active .admin-nav-icon {
@@ -145,13 +144,10 @@
 }
 .admin-shell--collapsed .admin-brand-row {
   justify-content: center;
-  padding: 18px 0;
+  padding: 12px 0;
 }
-.admin-shell--collapsed .admin-brand {
-  justify-content: center;
-}
-.admin-shell--collapsed .admin-brand-mark {
-  margin: 0 auto;
+.admin-shell--collapsed .admin-brand-container {
+  display: none;
 }
 .admin-shell--collapsed .admin-brand-copy {
   max-width: 0;
@@ -177,7 +173,7 @@
 }
 .admin-account-action {
   opacity: 1;
-  max-width: 24px;
+  max-width: 32px;
   overflow: hidden;
   transition: max-width var(--admin-sidebar-transition), opacity 160ms ease;
 }
@@ -190,10 +186,16 @@
   transform: translateX(-8px);
   pointer-events: none;
 }
-.admin-shell--collapsed .admin-account-action {
+.admin-shell--collapsed .admin-account-action:not(.admin-account-action--logout) {
   max-width: 0;
   opacity: 0;
   pointer-events: none;
+}
+.admin-shell--collapsed .admin-account-action--logout {
+  display: inline-flex !important;
+  opacity: 1 !important;
+  max-width: 32px !important;
+  pointer-events: auto !important;
 }
 @media (max-width: 1023px) {
   .admin-shell--collapsed .admin-brand-copy { max-width: 190px; opacity: 1; transform: none; pointer-events: auto; }
@@ -275,22 +277,22 @@
 .admin-workspace-metric strong { display: block; color: var(--admin-ink); font-size: 27px; font-weight: 650; letter-spacing: -.7px; font-variant-numeric: tabular-nums; margin-top: 3px; }
 .admin-workspace-metric small { font-size: 12px; color: var(--admin-muted); }
 .admin-workspace-preview { flex-wrap: wrap; }
-.admin-workspace-preview > .admin-preview-label { flex: 0 0 auto; color: #8b713d; font-size: 11px; }
+.admin-workspace-preview > .admin-preview-label { flex: 0 0 auto; color: #8b713d; font-size: 12px; }
 .admin-workspace-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 12px 18px; }
 .admin-search-field { display: flex; align-items: center; gap: 9px; min-width: 210px; max-width: 430px; flex: 1; padding: 0 12px; min-height: 40px; border: 1px solid #dce5e9; border-radius: 8px; background: white; color: var(--admin-muted); }
-.admin-search-field:focus-within { border-color: #098f9e; box-shadow: 0 0 0 3px #00646f0d; }
+.admin-search-field:focus-within { border-color: var(--admin-primary); box-shadow: 0 0 0 3px rgba(11, 93, 111, 0.1); }
 .admin-search-field input { border: 0 !important; min-width: 0; width: 100%; outline: none !important; background: transparent; min-height: 38px; color: var(--admin-ink); font-size: 13px; }
 .admin-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--admin-secondary); }
 :is(input,select,textarea).admin-field,.admin-field :is(input,select,textarea) { width: 100%; min-height: 40px; background: white; color: var(--admin-ink); border: 1px solid #dce5e9; border-radius: 8px; padding: 9px 12px; font: inherit; }
 .admin-field textarea,textarea.admin-field { min-height: 110px; resize: vertical; }
 .admin-filter-tabs { position: relative; display: flex; gap: 23px; padding: 0 20px; border-bottom: 1px solid var(--admin-border); overflow-x: auto; }
 .admin-filter-tabs button { position: relative; display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; padding: 10px 0; color: var(--admin-secondary); font-size: 13px; font-weight: 600; border-bottom: 2px solid transparent; transition: color var(--admin-motion-fast) var(--admin-ease); }
-.admin-filter-tabs button > span { display: inline-grid; place-items: center; min-width: 20px; padding: 1px 5px; border-radius: 5px; background: #eef3f5; color: var(--admin-secondary); font-size: 11px; font-variant-numeric: tabular-nums; transition: background-color var(--admin-motion-fast) var(--admin-ease), color var(--admin-motion-fast) var(--admin-ease); }
+.admin-filter-tabs button > span { display: inline-grid; place-items: center; min-width: 20px; padding: 1px 5px; border-radius: 5px; background: #eef3f5; color: var(--admin-secondary); font-size: 11.5px; font-variant-numeric: tabular-nums; transition: background-color var(--admin-motion-fast) var(--admin-ease), color var(--admin-motion-fast) var(--admin-ease); }
 .admin-filter-tabs button[aria-pressed='true'] { color: var(--admin-primary); border-bottom-color: transparent; }
-.admin-filter-tabs button[aria-pressed='true'] > span { background: #e5f2f3; color: var(--admin-primary); }
-.admin-filter-tabs__indicator { position: absolute; bottom: 0; left: 0; height: 3px; background-color: var(--admin-primary); border-radius: 3px 3px 0 0; box-shadow: 0 0 10px rgba(0, 100, 111, 0.45); pointer-events: none; transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), width 240ms cubic-bezier(0.2, 0.8, 0.2, 1); will-change: transform, width; }
+.admin-filter-tabs button[aria-pressed='true'] > span { background: var(--admin-tint); color: var(--admin-primary); }
+.admin-filter-tabs__indicator { position: absolute; bottom: 0; left: 0; height: 3px; background-color: var(--admin-primary); border-radius: 3px 3px 0 0; box-shadow: 0 0 10px rgba(11, 93, 111, 0.45); pointer-events: none; transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), width 240ms cubic-bezier(0.2, 0.8, 0.2, 1); will-change: transform, width; }
 .admin-workspace-table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.6; text-align: left; }
-.admin-workspace-table th { padding: 10px 16px; color: var(--admin-secondary); background: #f8fafb; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .045em; border-top: 1px solid var(--admin-border); border-bottom: 1px solid var(--admin-border); white-space: nowrap; }
+.admin-workspace-table th { padding: 10px 16px; color: var(--admin-secondary); background: #f8fafb; font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .045em; border-top: 1px solid var(--admin-border); border-bottom: 1px solid var(--admin-border); white-space: nowrap; }
 .admin-workspace-table td { padding: 12px 16px; border-bottom: 1px solid #edf1f3; vertical-align: middle; color: var(--admin-body); }
 .admin-workspace-table tbody tr { transition: background var(--admin-motion-fast); }
 .admin-workspace-table tbody tr:hover { background: #f9fcfc; }
@@ -333,7 +335,7 @@
 .admin-timeline > li { position: relative; padding: 0 0 20px 21px; border-left: 1px solid #d8e5e8; font-size: 13px; }
 .admin-timeline > li::before { content: ''; position: absolute; left: -4px; top: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--admin-primary); box-shadow: 0 0 0 4px white; }
 .admin-timeline > li:last-child { padding-bottom: 0; }
-.admin-timeline time,.admin-timeline small { display: block; font-size: 11px; color: var(--admin-muted); margin-bottom: 3px; }
+.admin-timeline time,.admin-timeline small { display: block; font-size: 12px; color: var(--admin-muted); margin-bottom: 3px; }
 .admin-timeline strong { font-weight: 600; }
 .admin-notice { position: fixed; bottom: 24px; right: 24px; z-index: 140; display: flex; align-items: center; gap: 10px; max-width: min(480px,calc(100vw - 32px)); padding: 14px 17px; border-radius: 10px; background: #155665; color: white; font-size: 13px; box-shadow: 0 8px 30px #12333d26; opacity: 0; transform: translateY(12px) scale(0.96); pointer-events: none; transition: opacity var(--admin-motion-exit) var(--admin-ease-away), transform var(--admin-motion-exit) var(--admin-ease-away); }
 .admin-notice[data-visible='true'] { opacity: 1; transform: none; pointer-events: auto; transition: opacity var(--admin-motion-enter) var(--admin-ease), transform var(--admin-motion-enter) var(--admin-ease); }

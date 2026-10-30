@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, Outlet, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { ArrowUpRight, Bell, ChevronDown, ChevronRight, Menu, PanelLeftClose, Search, ShieldAlert, X } from 'lucide-react';
+import { Outlet, useLocation, Navigate, Link } from 'react-router-dom';
+import { FlaskConical, Menu, PanelLeftClose, ShieldAlert, X } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { adminPages } from '../components/admin/adminRoutes';
 import { AdminNavigation } from '../components/admin/AdminNavigation';
@@ -12,7 +12,6 @@ import '../components/admin/adminInteractions.css';
 
 export function AdminLayout() {
   const location = useLocation();
-  const navigate = useNavigate();
   const user = useAuthStore(state => state.user);
   const token = useAuthStore(state => state.accessToken);
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
@@ -25,13 +24,7 @@ export function AdminLayout() {
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [query, setQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const notificationRef = useRef<HTMLDivElement>(null);
+  const [days, setDays] = useState<7 | 30>(7);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
 
@@ -45,21 +38,9 @@ export function AdminLayout() {
     };
   }, []);
 
-  function closeOverlays() { setMobileOpen(false); setSearchOpen(false); setNotificationsOpen(false); }
-
-  useEffect(() => {
-    const onPointer = (event: PointerEvent) => {
-      if (!searchRef.current?.contains(event.target as Node)) setSearchOpen(false);
-      if (!notificationRef.current?.contains(event.target as Node)) setNotificationsOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); inputRef.current?.focus(); setSearchOpen(true); }
-      if (event.key === 'Escape') { setSearchOpen(false); setNotificationsOpen(false); }
-    };
-    document.addEventListener('pointerdown', onPointer);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('pointerdown', onPointer); document.removeEventListener('keydown', onKey); };
-  }, []);
+  function closeOverlays() {
+    setMobileOpen(false);
+  }
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -72,17 +53,26 @@ export function AdminLayout() {
       if (event.key === 'Escape') setMobileOpen(false);
       if (event.key !== 'Tab') return;
       const targets = focusables();
-      const first = targets[0]; const last = targets.at(-1);
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      const first = targets[0];
+      const last = targets.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
     };
     const media = window.matchMedia('(min-width: 1024px)');
-    const onResize = () => { if (media.matches) setMobileOpen(false); };
+    const onResize = () => {
+      if (media.matches) setMobileOpen(false);
+    };
     document.addEventListener('keydown', onKey);
     media.addEventListener('change', onResize);
     return () => {
       document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', onKey); media.removeEventListener('change', onResize);
+      document.removeEventListener('keydown', onKey);
+      media.removeEventListener('change', onResize);
       menuButton?.focus();
     };
   }, [mobileOpen]);
@@ -132,132 +122,174 @@ export function AdminLayout() {
   }
 
   const demo = accessResult.allowed && accessResult.reason === 'demo';
-  const adminHref = (path: string) => `${path}${demo ? '?demo=1' : ''}`;
   const page = adminPages.find(item => item.to === location.pathname) ?? adminPages[0];
-  const searchResults = adminPages.filter(item => `${item.label} ${item.group}`.toLocaleLowerCase('vi').includes(query.trim().toLocaleLowerCase('vi')));
-  const initials = (demo ? 'Admin xem thử' : user?.fullName || 'Chưa đăng nhập').split(' ').filter(Boolean).slice(-2).map(word => word[0]).join('').toUpperCase();
 
-  return <div className={`admin-shell ${collapsed ? 'admin-shell--collapsed' : ''} ${mobileOpen ? 'admin-shell--mobile-open' : ''}`}>
-    <a href="#admin-content" className="admin-skip-link">Đến nội dung chính</a>
-    {mobileOpen && <button className="admin-backdrop" aria-label="Đóng menu" onClick={() => setMobileOpen(false)} tabIndex={-1} />}
-    <aside id="admin-navigation" ref={sidebarRef} className="admin-sidebar" aria-label="Điều hướng quản trị" role={mobileOpen ? 'dialog' : undefined} aria-modal={mobileOpen || undefined}>
-      <div className="admin-brand-row">
-        <Link to={adminHref('/admin')} className="admin-brand" onClick={closeOverlays} aria-label="DANASEA Admin — Tổng quan">
-          <span className="admin-brand-mark">
-            <img src="/images/danasea-logo.png" alt="DANASEA Logo" className="admin-brand-logo" />
-          </span>
-          <span className="admin-brand-copy"><strong>DANASEA<span>ADMIN</span></strong><small>Marine Experience Platform</small></span>
-        </Link>
-        <button className="admin-icon-button admin-mobile-only" onClick={() => setMobileOpen(false)} aria-label="Đóng menu điều hướng"><X size={20} /></button>
-      </div>
-      <AdminNavigation collapsed={collapsed && !mobileOpen} onNavigate={closeOverlays} />
-      <div className="admin-sidebar-bottom">
-        <AdminAccount user={user} token={token} demo={demo} onNavigate={closeOverlays} />
-      </div>
-    </aside>
-    <div className="admin-workspace" inert={mobileOpen || undefined}>
-      <header className="admin-topbar">
-        <div className="admin-topbar-context">
-          <button ref={menuRef} className="admin-icon-button admin-mobile-only" aria-label="Mở menu điều hướng" aria-controls="admin-navigation" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}><Menu size={21} /></button>
-          <button
-            className="admin-icon-button admin-desktop-only"
-            onClick={() => setCollapsed(value => !value)}
-            aria-label={collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'}
-            title={collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'}
-            aria-expanded={!collapsed}
-            aria-controls="admin-navigation"
-          >
-            <span
-              className="admin-collapse-toggle-icon"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'transform 280ms cubic-bezier(0.4, 0, 0.2, 1)',
-                transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)',
-              }}
+  return (
+    <div className={`admin-shell ${collapsed ? 'admin-shell--collapsed' : ''} ${mobileOpen ? 'admin-shell--mobile-open' : ''}`}>
+      <a href="#admin-content" className="admin-skip-link">Đến nội dung chính</a>
+      {mobileOpen && <button className="admin-backdrop" aria-label="Đóng menu" onClick={() => setMobileOpen(false)} tabIndex={-1} />}
+
+      {/* GEMINI-STYLE SIDEBAR */}
+      <aside
+        id="admin-navigation"
+        ref={sidebarRef}
+        className="admin-sidebar"
+        aria-label="Điều hướng quản trị"
+        role={mobileOpen ? 'dialog' : undefined}
+        aria-modal={mobileOpen || undefined}
+      >
+        <div className="admin-brand-row">
+          {collapsed && !mobileOpen ? (
+            /* Khi thu gọn: hiển thị logo ở đầu thanh bên, bấm vào logo thì mở rộng ra lại */
+            <button
+              type="button"
+              className="admin-brand-collapsed-btn admin-desktop-only"
+              onClick={() => setCollapsed(false)}
+              aria-label="Mở rộng thanh bên"
+              title="Mở rộng thanh bên"
             >
-              <PanelLeftClose size={20} />
-            </span>
-          </button>
-          <h1 className="admin-topbar-title">{(page as { pageTitle?: string; label: string }).pageTitle || page.label}</h1>
-        </div>
-        <div className="admin-topbar-tools">
-          <div
-            ref={searchRef}
-            className="admin-search"
-            onClick={(event) => {
-              if ((event.target as HTMLElement).closest('.admin-search-results')) return;
-              inputRef.current?.focus();
-              setSearchOpen(true);
-            }}
-          >
-            <Search size={17} aria-hidden="true" />
-            <input
-              ref={inputRef}
-              role="combobox"
-              aria-label="Tìm trang quản trị"
-              aria-expanded={searchOpen}
-              aria-controls="admin-search-results"
-              aria-autocomplete="list"
-              aria-activedescendant={searchOpen && searchResults[highlight] ? `admin-search-${highlight}` : undefined}
-              value={query}
-              placeholder="Tìm trang quản trị…"
-              onFocus={() => setSearchOpen(true)}
-              onClick={() => setSearchOpen(true)}
-              onChange={event => { setQuery(event.target.value); setHighlight(0); setSearchOpen(true); }}
-              onKeyDown={event => {
-                if (event.key === 'ArrowDown') { event.preventDefault(); setHighlight(value => Math.max(0, Math.min(value + 1, searchResults.length - 1))); }
-                if (event.key === 'ArrowUp') { event.preventDefault(); setHighlight(value => Math.max(value - 1, 0)); }
-                if (event.key === 'Enter' && searchResults[highlight]) {
-                  navigate(adminHref(searchResults[highlight].to));
-                  closeOverlays();
-                  inputRef.current?.blur();
-                  setQuery('');
-                }
-              }}
-            />
-            <kbd>⌘ K</kbd>
-            {searchOpen && (
-              <div
-                className="admin-search-results"
-                id="admin-search-results"
-                role="listbox"
-                aria-label="Trang quản trị"
-                onClick={e => e.stopPropagation()}
-              >
-                {searchResults.length === 0 && <p>Không tìm thấy trang phù hợp.</p>}
-                {searchResults.map((item, index) => (
-                  <Link
-                    role="option"
-                    aria-selected={highlight === index}
-                    id={`admin-search-${index}`}
-                    key={item.to}
-                    to={adminHref(item.to)}
-                    onClick={() => {
-                      closeOverlays();
-                      inputRef.current?.blur();
-                      setQuery('');
-                    }}
-                  >
-                    <item.icon size={17} /><span>{item.label}<small>{item.group}</small></span><ChevronRight size={14} />
-                  </Link>
-                ))}
+              <span className="admin-brand-mark">
+                <img src="/images/danasea-logo.png" alt="DANASEA Logo" className="admin-brand-logo" />
+              </span>
+            </button>
+          ) : (
+            /* Khi mở rộng: logo và tên thương hiệu là tĩnh (không bấm chuyển trang), nút đóng ở bên phải */
+            <>
+              <div className="admin-brand-container">
+                <div className="admin-brand admin-brand--static" aria-label="DANASEA Admin — Hệ thống quản trị">
+                  <span className="admin-brand-mark">
+                    <img src="/images/danasea-logo.png" alt="DANASEA Logo" className="admin-brand-logo" />
+                  </span>
+                  <span className="admin-brand-copy">
+                    <strong>DANASEA</strong>
+                    <small>Marine Experience Platform</small>
+                  </span>
+                </div>
               </div>
-            )}
-          </div>
-          <div ref={notificationRef} className="admin-notification">
-            <button className={`admin-icon-button ${notificationsOpen ? 'is-active' : ''}`} aria-label="Thông báo và công việc" aria-expanded={notificationsOpen} aria-controls="admin-notification-menu" onClick={() => setNotificationsOpen(value => !value)}><Bell size={20} /></button>
-            {notificationsOpen && <div className="admin-notification-menu" id="admin-notification-menu"><strong>Công việc vận hành</strong><p>Theo dõi các mục đang chờ tại bảng điều khiển.</p>
-              {[['/admin', 'Mở hàng đợi ưu tiên'], ['/admin/vendor-approval', 'Hồ sơ đối tác'], ['/admin/disputes', 'Khiếu nại & tranh chấp'], ['/admin/payouts', 'Đối soát & quyết toán']].map(([to, label]) => <Link key={to} to={adminHref(to)} onClick={closeOverlays}>{label}<ArrowUpRight size={15} /></Link>)}
-            </div>}
-          </div>
-          <span className="admin-topbar-divider" />
-          <Link to={adminHref('/admin/users')} className="admin-topbar-account" aria-label="Quản lý người dùng"><span className="admin-avatar">{initials}</span><ChevronDown size={14} /></Link>
+              <button
+                type="button"
+                className="admin-sidebar-toggle-btn admin-desktop-only"
+                onClick={() => setCollapsed(true)}
+                aria-label="Đóng thanh bên"
+                title="Đóng thanh bên"
+              >
+                <PanelLeftClose size={20} />
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            className="admin-icon-button admin-mobile-only"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Đóng menu điều hướng"
+          >
+            <X size={20} />
+          </button>
         </div>
-      </header>
-      {!demo && user && user.role !== 'ADMIN' && <div className="admin-role-context" role="status"><ShieldAlert size={17} /><span>Phiên hiện tại mang vai trò <strong>{user.role === 'VENDOR' ? 'Đối tác (Vendor)' : 'Khách hàng'}</strong>. Dữ liệu Admin vẫn yêu cầu quyền do Backend kiểm tra.</span></div>}
-      <div id="admin-content" className="admin-content" tabIndex={-1}><Outlet /></div>
+
+        <AdminNavigation collapsed={collapsed && !mobileOpen} onNavigate={closeOverlays} />
+
+        <div className="admin-sidebar-bottom">
+          <AdminAccount
+            user={user}
+            token={token}
+            demo={demo}
+            collapsed={collapsed && !mobileOpen}
+            onNavigate={closeOverlays}
+          />
+        </div>
+      </aside>
+
+      {/* WORKSPACE AREA - NO TOPBAR */}
+      <div className="admin-workspace" inert={mobileOpen || undefined}>
+        {!demo && user && user.role !== 'ADMIN' && (
+          <div className="admin-role-context" role="status">
+            <ShieldAlert size={17} />
+            <span>Phiên hiện tại mang vai trò <strong>{user.role === 'VENDOR' ? 'Đối tác (Vendor)' : 'Khách hàng'}</strong>. Dữ liệu Admin vẫn yêu cầu quyền do Backend kiểm tra.</span>
+          </div>
+        )}
+        <div id="admin-content" className="admin-content" tabIndex={-1}>
+          <header className="admin-main-header">
+            <div className="admin-main-header-row">
+              <div className="admin-main-header-left">
+                <button
+                  ref={menuRef}
+                  className="admin-icon-button admin-mobile-only"
+                  aria-label="Mở menu điều hướng"
+                  aria-controls="admin-navigation"
+                  aria-expanded={mobileOpen}
+                  onClick={() => setMobileOpen(true)}
+                >
+                  <Menu size={20} />
+                </button>
+                <div>
+                  <h1 className="admin-main-page-title">
+                    {location.pathname === '/admin' || location.pathname === '/admin/'
+                      ? 'Dashboard'
+                      : (page as { pageTitle?: string; label: string }).pageTitle || page.label}
+                  </h1>
+                  {(location.pathname === '/admin' || location.pathname === '/admin/') && (
+                    <p className="admin-main-page-sub">Tổng quan vận hành</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="admin-main-header-right">
+                {demo ? (
+                  <div className="admin-demo-toggle-cluster">
+                    <span
+                      className="admin-demo-pill"
+                      title="Dữ liệu mẫu độc lập. Thao tác chỉ thay đổi bản xem thử, không ảnh hưởng dữ liệu thật."
+                      aria-label="Chế độ Demo Mode: Bật"
+                    >
+                      <span className="admin-demo-pulse-dot" />
+                      DEMO MODE: Bật
+                    </span>
+                    <Link
+                      to={location.pathname}
+                      className="admin-demo-toggle-btn admin-demo-toggle-btn--off"
+                      title="Tắt chế độ xem trước, chuyển về dữ liệu hệ thống"
+                    >
+                      Tắt
+                    </Link>
+                  </div>
+                ) : (
+                  isDev && (
+                    <Link
+                      to={`${location.pathname}?demo=1`}
+                      className="admin-demo-toggle-btn admin-demo-toggle-btn--on"
+                      title="Bật chế độ xem trước với dữ liệu mẫu độc lập"
+                    >
+                      <FlaskConical size={14} aria-hidden="true" />
+                      Bật dữ liệu mẫu
+                    </Link>
+                  )
+                )}
+
+                {(location.pathname === '/admin' || location.pathname === '/admin/') && (
+                  <div className="admin-time-segmented" role="group" aria-label="Kỳ thống kê">
+                    <button
+                      type="button"
+                      aria-pressed={days === 7}
+                      onClick={() => setDays(7)}
+                    >
+                      7 ngày qua
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={days === 30}
+                      onClick={() => setDays(30)}
+                    >
+                      30 ngày qua
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
+          <Outlet context={{ days, setDays }} />
+        </div>
+      </div>
     </div>
-  </div>;
+  );
 }

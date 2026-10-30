@@ -1,35 +1,23 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
-  AlertTriangle,
-  Clock,
+  Check,
+  Copy,
+  Pencil,
+  PhoneCall,
   RotateCcw,
-  Save,
-  ShieldAlert,
-  ShieldCheck,
   Wallet,
   Waves,
+  Wind,
+  X,
 } from 'lucide-react';
-import { MOCK_ADMIN_CONFIGS } from '../../../data/adminMockData';
-import type { SystemConfig } from '../../../types';
-import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
-import {
-  AdminButton,
-  AdminNotice,
-  AdminPreviewBanner,
-} from '../../../components/admin/AdminWorkspace';
+import { AdminState } from '../../../components/admin/AdminUI';
+import { AdminButton, AdminNotice } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import {
-  CONFIG_DEFINITIONS,
-  DEFAULT_CONFIG_VALUES,
-  extractFormDataFromConfigs,
-  formatDateTimeVN,
-  getChangedKeys,
-  hasFormChanges,
-  validateSettingsForm,
-  type ConfigDefinition,
-  type SettingsErrors,
-  type SettingsFormData,
+  DEFAULT_SETTINGS,
+  validateCommissionRate,
+  validateHotline,
 } from './settingsModel';
 import './Settings.css';
 
@@ -37,139 +25,195 @@ export function Settings() {
   const location = useLocation();
   const demo = import.meta.env.DEV && new URLSearchParams(location.search).get('demo') === '1';
 
-  // State management
-  const [configs, setConfigs] = useState<SystemConfig[]>(MOCK_ADMIN_CONFIGS);
-  const activeFormData = useMemo(() => extractFormDataFromConfigs(configs), [configs]);
-  const [formData, setFormData] = useState<SettingsFormData>(activeFormData);
-  const [errors, setErrors] = useState<SettingsErrors>({});
+  // Core values state
+  const [commissionRate, setCommissionRate] = useState<string>(DEFAULT_SETTINGS.commissionRate);
+  const [emergencyHotline, setEmergencyHotline] = useState<string>(DEFAULT_SETTINGS.emergencyHotline);
+
+  // Edit mode state for Commission
+  const [isEditingCommission, setIsEditingCommission] = useState(false);
+  const [draftCommission, setDraftCommission] = useState(commissionRate);
+  const [commissionError, setCommissionError] = useState<string | null>(null);
+  const [isSavingCommission, setIsSavingCommission] = useState(false);
+
+  // Edit mode state for Hotline
+  const [isEditingHotline, setIsEditingHotline] = useState(false);
+  const [draftHotline, setDraftHotline] = useState(emergencyHotline);
+  const [hotlineError, setHotlineError] = useState<string | null>(null);
+  const [isSavingHotline, setIsSavingHotline] = useState(false);
+
+  // Copy feedback state
+  const [hasCopiedHotline, setHasCopiedHotline] = useState(false);
+
+  // UI state
   const [notice, setNotice] = useState<string | null>(null);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [previewState, setPreviewState] = useState<'normal' | 'loading' | 'error' | 'empty'>('normal');
 
-  // Change detection
-  const isDirty = useMemo(() => hasFormChanges(formData, activeFormData), [formData, activeFormData]);
-  const changedKeys = useMemo(() => getChangedKeys(formData, activeFormData), [formData, activeFormData]);
-
-  // Handle input change
-  const handleChange = (key: keyof SettingsFormData, value: string) => {
-    const updated = { ...formData, [key]: value };
-    setFormData(updated);
-
-    // Validate field on change
-    const validation = validateSettingsForm(updated);
-    setErrors(prev => ({ ...prev, [key]: validation[key] }));
+  // --- Handlers for Commission Rate Edit ---
+  const handleStartEditCommission = () => {
+    setDraftCommission(commissionRate);
+    setCommissionError(null);
+    setIsEditingCommission(true);
   };
 
-  // Save changes
-  const handleSave = () => {
-    const validation = validateSettingsForm(formData);
-    setErrors(validation);
+  const handleCommissionChange = (val: string) => {
+    setDraftCommission(val);
+    const err = validateCommissionRate(val);
+    setCommissionError(err);
+  };
 
-    if (Object.keys(validation).length > 0) {
-      setNotice('Vui lòng kiểm tra và sửa các giá trị chưa hợp lệ.');
+  const handleSaveCommission = () => {
+    const err = validateCommissionRate(draftCommission);
+    if (err) {
+      setCommissionError(err);
       return;
     }
 
-    setIsSaving(true);
+    setIsSavingCommission(true);
     setTimeout(() => {
-      const now = new Date().toISOString();
-      setConfigs(prev =>
-        prev.map(c => {
-          if (c.key === 'PLATFORM_COMMISSION_RATE') return { ...c, value: formData.commissionRate, updatedBy: 'Vũ Hải Đăng', updatedAt: now };
-          if (c.key === 'AUTO_PAYOUT_CYCLE_DAYS') return { ...c, value: formData.payoutCycle, updatedBy: 'Vũ Hải Đăng', updatedAt: now };
-          if (c.key === 'WEATHER_MAX_SAFE_WAVE_M') return { ...c, value: formData.maxSafeWave, updatedBy: 'Vũ Hải Đăng', updatedAt: now };
-          if (c.key === 'WEATHER_MAX_SAFE_WIND_KMH') return { ...c, value: formData.maxSafeWind, updatedBy: 'Vũ Hải Đăng', updatedAt: now };
-          if (c.key === 'EMERGENCY_PORT_HOTLINE') return { ...c, value: formData.emergencyHotline, updatedBy: 'Vũ Hải Đăng', updatedAt: now };
-          return c;
-        })
-      );
-      setIsSaving(false);
-      setNotice('Đã lưu thành công các tham số cấu hình hệ thống.');
-    }, 400);
+      setCommissionRate(draftCommission.trim());
+      setIsEditingCommission(false);
+      setIsSavingCommission(false);
+      setNotice(`Đã cập nhật hoa hồng mặc định của sàn thành ${draftCommission.trim()}%.`);
+    }, 300);
   };
 
-  // Revert unsaved edits back to active values
-  const handleDiscardChanges = () => {
-    setFormData(activeFormData);
-    setErrors({});
-    setNotice('Đã hủy các thay đổi chưa lưu.');
+  const handleCancelCommission = () => {
+    setDraftCommission(commissionRate);
+    setCommissionError(null);
+    setIsEditingCommission(false);
   };
 
-  // Reset all to system defaults
+  const handleKeyDownCommission = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveCommission();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelCommission();
+    }
+  };
+
+  // --- Handlers for Hotline Edit ---
+  const handleStartEditHotline = () => {
+    setDraftHotline(emergencyHotline);
+    setHotlineError(null);
+    setIsEditingHotline(true);
+  };
+
+  const handleHotlineChange = (val: string) => {
+    setDraftHotline(val);
+    const err = validateHotline(val);
+    setHotlineError(err);
+  };
+
+  const handleSaveHotline = () => {
+    const err = validateHotline(draftHotline);
+    if (err) {
+      setHotlineError(err);
+      return;
+    }
+
+    setIsSavingHotline(true);
+    setTimeout(() => {
+      setEmergencyHotline(draftHotline.trim());
+      setIsEditingHotline(false);
+      setIsSavingHotline(false);
+      setNotice(`Đã cập nhật số điện thoại liên hệ thành ${draftHotline.trim()}.`);
+    }, 300);
+  };
+
+  const handleCancelHotline = () => {
+    setDraftHotline(emergencyHotline);
+    setHotlineError(null);
+    setIsEditingHotline(false);
+  };
+
+  const handleKeyDownHotline = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveHotline();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelHotline();
+    }
+  };
+
+  // --- Handler for Copy Hotline ---
+  const handleCopyHotline = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(emergencyHotline);
+      } else if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = emergencyHotline;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+    } catch {
+      // Best-effort copy
+    }
+
+    setHasCopiedHotline(true);
+    setNotice(`Đã sao chép số điện thoại Ban Quản lý Bán đảo Sơn Trà: ${emergencyHotline}`);
+    setTimeout(() => setHasCopiedHotline(false), 2000);
+  };
+
+  // --- Handler for Reset Defaults ---
+  const isAnyModified =
+    commissionRate !== DEFAULT_SETTINGS.commissionRate ||
+    emergencyHotline !== DEFAULT_SETTINGS.emergencyHotline;
+
   const handleConfirmReset = () => {
-    setFormData(DEFAULT_CONFIG_VALUES);
-    const now = new Date().toISOString();
-    setConfigs(prev =>
-      prev.map(c => {
-        if (c.key === 'PLATFORM_COMMISSION_RATE') return { ...c, value: DEFAULT_CONFIG_VALUES.commissionRate, updatedBy: 'Hệ thống (Mặc định)', updatedAt: now };
-        if (c.key === 'AUTO_PAYOUT_CYCLE_DAYS') return { ...c, value: DEFAULT_CONFIG_VALUES.payoutCycle, updatedBy: 'Hệ thống (Mặc định)', updatedAt: now };
-        if (c.key === 'WEATHER_MAX_SAFE_WAVE_M') return { ...c, value: DEFAULT_CONFIG_VALUES.maxSafeWave, updatedBy: 'Hệ thống (Mặc định)', updatedAt: now };
-        if (c.key === 'WEATHER_MAX_SAFE_WIND_KMH') return { ...c, value: DEFAULT_CONFIG_VALUES.maxSafeWind, updatedBy: 'Hệ thống (Mặc định)', updatedAt: now };
-        if (c.key === 'EMERGENCY_PORT_HOTLINE') return { ...c, value: DEFAULT_CONFIG_VALUES.emergencyHotline, updatedBy: 'Hệ thống (Mặc định)', updatedAt: now };
-        return c;
-      })
-    );
-    setErrors({});
+    setCommissionRate(DEFAULT_SETTINGS.commissionRate);
+    setEmergencyHotline(DEFAULT_SETTINGS.emergencyHotline);
+    setIsEditingCommission(false);
+    setIsEditingHotline(false);
+    setCommissionError(null);
+    setHotlineError(null);
     setIsResetDialogOpen(false);
     setNotice('Đã khôi phục các tham số cấu hình về giá trị mặc định.');
   };
 
-  // Group definitions for direct display (no tabs)
-  const operationDefs = useMemo(() => CONFIG_DEFINITIONS.filter(d => d.group === 'operations'), []);
-  const maritimeDefs = useMemo(() => CONFIG_DEFINITIONS.filter(d => d.group === 'maritime_safety'), []);
-
   return (
-    <main className="admin-workspace-page" aria-label="Trang cấu hình hệ thống">
-      {/* Settings Actions Toolbar */}
-      <div className="admin-settings-actions" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: '2px', marginBottom: '8px' }}>
-        <AdminButton
-          variant="secondary"
-          onClick={() => setIsResetDialogOpen(true)}
-          aria-label="Khôi phục mặc định toàn bộ cấu hình"
-        >
-          <RotateCcw size={15} aria-hidden="true" />
-          Khôi phục mặc định
-        </AdminButton>
-        {isDirty && (
+    <main className="admin-workspace-page admin-settings-page" aria-label="Trang cấu hình hệ thống">
+      {/* Settings Toolbar */}
+      <div className="admin-settings-toolbar">
+        {demo && (
+          <div className="admin-settings-preview-ctrl">
+            <label htmlFor="settings-preview-select">Trạng thái xem thử:</label>
+            <select
+              id="settings-preview-select"
+              aria-label="Mô phỏng trạng thái trang"
+              value={previewState}
+              onChange={e => setPreviewState(e.target.value as 'normal' | 'loading' | 'error' | 'empty')}
+              className="admin-settings-preview-select"
+            >
+              <option value="normal">Bình thường</option>
+              <option value="loading">Đang tải</option>
+              <option value="error">Lỗi kết nối</option>
+              <option value="empty">Dữ liệu trống</option>
+            </select>
+          </div>
+        )}
+
+        {isAnyModified && (
           <AdminButton
-            variant="primary"
-            onClick={handleSave}
-            loading={isSaving}
-            aria-label="Lưu các tham số cấu hình đã sửa đổi"
+            variant="secondary"
+            onClick={() => setIsResetDialogOpen(true)}
+            aria-label="Khôi phục mặc định"
           >
-            <Save size={15} aria-hidden="true" />
-            Lưu cài đặt ({changedKeys.length})
+            <RotateCcw size={14} aria-hidden="true" />
+            Khôi phục mặc định
           </AdminButton>
         )}
       </div>
 
-      {/* Demo Banner */}
-      <AdminPreviewBanner demo={demo} href="/admin/settings?demo=1" />
-
-      {/* Demo State Controller (Dev only) */}
-      {demo && (
-        <div className="admin-demo-controls-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, fontSize: 12 }}>
-          <label htmlFor="settings-preview-select" style={{ color: 'var(--admin-muted)', fontWeight: 500 }}>
-            Mô phỏng trạng thái trang:
-          </label>
-          <select
-            id="settings-preview-select"
-            aria-label="Mô phỏng trạng thái trang"
-            value={previewState}
-            onChange={e => setPreviewState(e.target.value as 'normal' | 'loading' | 'error' | 'empty')}
-            className="admin-field"
-            style={{ minHeight: 32, width: 'auto', padding: '4px 10px', fontSize: 12 }}
-          >
-            <option value="normal">Bình thường (4 tham số)</option>
-            <option value="loading">Đang tải cấu hình</option>
-            <option value="error">Lỗi kết nối tham số</option>
-            <option value="empty">Chưa có cấu hình</option>
-          </select>
-        </div>
-      )}
-
-      {/* State Switcher */}
+      {/* Preview States Switcher */}
       {previewState === 'loading' ? (
         <AdminState kind="loading" title="Đang tải dữ liệu cấu hình hệ thống…" />
       ) : previewState === 'error' ? (
@@ -196,103 +240,262 @@ export function Settings() {
         />
       ) : (
         <div className="admin-settings-container">
-          {/* Telemetry & Audit Integrity Card */}
-          <section className="admin-settings-telemetry" aria-label="Thông tin kiểm soát hệ thống">
-            <div className="admin-telemetry-left">
-              <span className="admin-telemetry-icon" aria-hidden="true">
-                <ShieldCheck size={20} />
-              </span>
-              <div className="admin-telemetry-copy">
-                <strong>
-                  Kiểm soát bất biến &amp; Nhật ký kiểm toán
-                  <span className="admin-config-key">audit_logs</span>
-                </strong>
-                <p>
-                  Mọi thay đổi tham số được ghi vết tự động kèm định danh quản trị viên. Không hồi tố tỷ lệ hoa hồng của các đơn hàng và chu kỳ đã quyết toán xong.
-                </p>
-              </div>
-            </div>
-
-            <div className="admin-telemetry-metrics" aria-label="Chỉ số bộ đệm thời tiết tham chiếu">
-              <span style={{ color: 'var(--admin-muted)', fontWeight: 600 }}>Bộ đệm thời tiết:</span>
-              <span>Sóng: <strong>0.5m</strong></span>
-              <span>·</span>
-              <span>Gió: <strong>12 km/h</strong></span>
-              <span>·</span>
-              <span>Mưa: <strong>0 mm</strong></span>
-            </div>
-          </section>
-
-          {/* Group 1: Vận hành & Giao dịch Sàn */}
-          {operationDefs.length > 0 && (
-            <section className="admin-config-group" aria-labelledby="heading-operations-group">
-              <div className="admin-config-group-header">
-                <div>
-                  <h2 id="heading-operations-group">
-                    <Wallet size={18} className="text-primary" aria-hidden="true" />
-                    Vận hành &amp; Giao dịch Sàn
-                  </h2>
-                  <p>Tham số tài chính, trích xuất hoa hồng và chu kỳ kế toán đối soát</p>
+          {/* HÀNG 1 — GRID 2 CỘT: TÀI CHÍNH & LIÊN HỆ HỖ TRỢ */}
+          <div className="admin-settings-grid-row">
+            {/* KHU VỰC A — TÀI CHÍNH */}
+            <section
+              className={`admin-settings-card ${isEditingCommission ? 'admin-settings-card--editing' : ''}`}
+              aria-labelledby="heading-finance-card"
+            >
+              <div className="admin-card-header-row">
+                <div className="admin-card-category" id="heading-finance-card">
+                  <span className="admin-card-category-icon" aria-hidden="true">
+                    <Wallet size={16} />
+                  </span>
+                  <span>Tài chính</span>
                 </div>
-                <AdminBadge tone="teal">Tài chính</AdminBadge>
+
+                {!isEditingCommission ? (
+                  <button
+                    type="button"
+                    className="admin-card-action-btn"
+                    onClick={handleStartEditCommission}
+                    aria-label="Chỉnh sửa hoa hồng mặc định của sàn"
+                  >
+                    <Pencil size={12} aria-hidden="true" />
+                    <span>Chỉnh sửa</span>
+                  </button>
+                ) : (
+                  <span className="admin-card-status-badge">Đang chỉnh sửa</span>
+                )}
               </div>
 
-              <div className="admin-config-list">
-                {operationDefs.map(def => renderConfigRow(def))}
+              <div className="admin-card-body">
+                <span className="admin-setting-label">Hoa hồng mặc định của sàn</span>
+
+                {!isEditingCommission ? (
+                  <div className="admin-setting-value-wrap">
+                    <span className="admin-setting-value-number">{commissionRate}</span>
+                    <span className="admin-setting-value-unit">%</span>
+                  </div>
+                ) : (
+                  <div className="admin-setting-edit-box">
+                    <div className="admin-setting-edit-inputs">
+                      <div className="admin-setting-input-field-wrap">
+                        <input
+                          id="commission-rate-input"
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="100"
+                          value={draftCommission}
+                          onChange={e => handleCommissionChange(e.target.value)}
+                          onKeyDown={handleKeyDownCommission}
+                          autoFocus
+                          className="admin-setting-edit-input"
+                          aria-label="Tỷ lệ hoa hồng mặc định"
+                          aria-invalid={Boolean(commissionError)}
+                        />
+                        <span className="admin-setting-edit-suffix" aria-hidden="true">%</span>
+                      </div>
+
+                      <div className="admin-setting-edit-buttons">
+                        <button
+                          type="button"
+                          className="admin-setting-btn-save"
+                          onClick={handleSaveCommission}
+                          disabled={isSavingCommission || Boolean(commissionError)}
+                          aria-label="Lưu tỷ lệ hoa hồng"
+                        >
+                          <Check size={14} aria-hidden="true" />
+                          <span>{isSavingCommission ? 'Đang lưu…' : 'Lưu'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-setting-btn-cancel"
+                          onClick={handleCancelCommission}
+                          disabled={isSavingCommission}
+                          aria-label="Hủy chỉnh sửa hoa hồng"
+                        >
+                          <X size={14} aria-hidden="true" />
+                          <span>Hủy</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {commissionError && (
+                      <p className="admin-setting-error-msg" role="alert">
+                        {commissionError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <p className="admin-setting-description">Áp dụng trên giá trị dịch vụ con.</p>
               </div>
             </section>
-          )}
 
-          {/* Group 2: Tham số An toàn Biển & Cứu hộ */}
-          {maritimeDefs.length > 0 && (
-            <section className="admin-config-group" aria-labelledby="heading-safety-group">
-              <div className="admin-config-group-header">
-                <div>
-                  <h2 id="heading-safety-group">
-                    <Waves size={18} style={{ color: '#00646f' }} aria-hidden="true" />
-                    Định mức Tham chiếu An toàn Biển &amp; Cứu hộ
-                  </h2>
-                  <p>Ngưỡng cảnh báo thời tiết tự động kích hoạt cờ an toàn và thông tin hỗ trợ khẩn cấp</p>
+            {/* KHU VỰC B — LIÊN HỆ HỖ TRỢ */}
+            <section
+              className={`admin-settings-card ${isEditingHotline ? 'admin-settings-card--editing' : ''}`}
+              aria-labelledby="heading-support-card"
+            >
+              <div className="admin-card-header-row">
+                <div className="admin-card-category" id="heading-support-card">
+                  <span className="admin-card-category-icon" aria-hidden="true">
+                    <PhoneCall size={16} />
+                  </span>
+                  <span>Liên hệ hỗ trợ</span>
                 </div>
-                <AdminBadge tone="amber">Tham chiếu nội bộ</AdminBadge>
+
+                {!isEditingHotline ? (
+                  <button
+                    type="button"
+                    className="admin-card-action-btn"
+                    onClick={handleStartEditHotline}
+                    aria-label="Chỉnh sửa số điện thoại liên hệ Ban Quản lý Bán đảo Sơn Trà"
+                  >
+                    <Pencil size={12} aria-hidden="true" />
+                    <span>Chỉnh sửa</span>
+                  </button>
+                ) : (
+                  <span className="admin-card-status-badge">Đang chỉnh sửa</span>
+                )}
               </div>
 
-              <div className="admin-config-list">
-                {maritimeDefs.map(def => renderConfigRow(def))}
+              <div className="admin-card-body">
+                <span className="admin-setting-label">Ban Quản lý Bán đảo Sơn Trà</span>
+
+                {!isEditingHotline ? (
+                  <div className="admin-setting-value-wrap">
+                    <span className="admin-setting-value-number admin-setting-value-number--phone">
+                      {emergencyHotline}
+                    </span>
+                    <button
+                      type="button"
+                      className={`admin-mini-copy-btn ${hasCopiedHotline ? 'admin-mini-copy-btn--copied' : ''}`}
+                      onClick={handleCopyHotline}
+                      title={hasCopiedHotline ? 'Đã sao chép' : 'Sao chép số điện thoại'}
+                      aria-label="Sao chép số điện thoại"
+                    >
+                      {hasCopiedHotline ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="admin-setting-edit-box">
+                    <div className="admin-setting-edit-inputs">
+                      <div className="admin-setting-input-field-wrap">
+                        <input
+                          id="hotline-input"
+                          type="text"
+                          value={draftHotline}
+                          onChange={e => handleHotlineChange(e.target.value)}
+                          onKeyDown={handleKeyDownHotline}
+                          autoFocus
+                          className="admin-setting-edit-input admin-setting-edit-input--phone"
+                          aria-label="Số điện thoại liên hệ"
+                          aria-invalid={Boolean(hotlineError)}
+                        />
+                      </div>
+
+                      <div className="admin-setting-edit-buttons">
+                        <button
+                          type="button"
+                          className="admin-setting-btn-save"
+                          onClick={handleSaveHotline}
+                          disabled={isSavingHotline || Boolean(hotlineError)}
+                          aria-label="Lưu số điện thoại"
+                        >
+                          <Check size={14} aria-hidden="true" />
+                          <span>{isSavingHotline ? 'Đang lưu…' : 'Lưu'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-setting-btn-cancel"
+                          onClick={handleCancelHotline}
+                          disabled={isSavingHotline}
+                          aria-label="Hủy chỉnh sửa số điện thoại"
+                        >
+                          <X size={14} aria-hidden="true" />
+                          <span>Hủy</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {hotlineError && (
+                      <p className="admin-setting-error-msg" role="alert">
+                        {hotlineError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <p className="admin-setting-description">Thông tin liên hệ tham khảo.</p>
               </div>
             </section>
-          )}
+          </div>
 
-          {/* Sticky Floating Save / Discard Bar */}
-          {isDirty && (
-            <aside className="admin-settings-action-bar" role="region" aria-label="Thanh tác vụ lưu thay đổi">
-              <div className="admin-action-bar-info">
-                <AlertTriangle size={18} style={{ color: '#f59e0b' }} aria-hidden="true" />
-                <span>
-                  Bạn có <strong>{changedKeys.length} thay đổi</strong> chưa được lưu vào hệ thống.
-                </span>
-              </div>
-              <div className="admin-action-bar-buttons">
-                <AdminButton
-                  variant="secondary"
-                  onClick={handleDiscardChanges}
-                  style={{ background: 'rgba(255,255,255,0.12)', color: 'white', borderColor: 'transparent' }}
-                  aria-label="Hủy toàn bộ thay đổi chưa lưu"
-                >
-                  Hủy thay đổi
-                </AdminButton>
-                <AdminButton
-                  variant="primary"
-                  onClick={handleSave}
-                  loading={isSaving}
-                  aria-label="Lưu các thay đổi cấu hình vào hệ thống"
-                >
-                  <Save size={15} aria-hidden="true" />
-                  Lưu cấu hình
-                </AdminButton>
-              </div>
-            </aside>
-          )}
+          {/* KHU VỰC C — NGƯỠNG THAM CHIẾU AN TOÀN BIỂN */}
+          <div className="admin-safety-group" role="region" aria-labelledby="heading-safety-group">
+            {/* HÀNG 2 — TIÊU ĐỀ NHÓM & DÒNG MÔ TẢ DÙNG CHUNG */}
+            <div className="admin-safety-group-header">
+              <h2 id="heading-safety-group" className="admin-safety-group-title">
+                Ngưỡng tham chiếu an toàn biển
+              </h2>
+              <p className="admin-safety-group-desc">
+                Thông số tham khảo phục vụ vận hành, không phải tiêu chuẩn pháp lý nhà nước.
+              </p>
+            </div>
+
+            {/* HÀNG 3 — GRID 2 CỘT: CHIỀU CAO SÓNG & TỐC ĐỘ GIÓ GIẬT */}
+            <div className="admin-settings-grid-row">
+              {/* Card 1 — Chiều cao sóng */}
+              <section className="admin-settings-card" aria-labelledby="heading-wave-card">
+                <div className="admin-card-header-row">
+                  <div className="admin-card-category" id="heading-wave-card">
+                    <span className="admin-card-category-icon" aria-hidden="true">
+                      <Waves size={16} />
+                    </span>
+                    <span>Chiều cao sóng</span>
+                  </div>
+                </div>
+
+                <div className="admin-card-body">
+                  <span className="admin-setting-label">Chiều cao sóng</span>
+
+                  <div className="admin-setting-value-wrap">
+                    <span className="admin-setting-value-number">{DEFAULT_SETTINGS.maxSafeWave}</span>
+                    <span className="admin-setting-value-unit">m</span>
+                  </div>
+
+                  <p className="admin-setting-description">Ngưỡng tham chiếu vận hành</p>
+                </div>
+              </section>
+
+              {/* Card 2 — Tốc độ gió giật */}
+              <section className="admin-settings-card" aria-labelledby="heading-wind-card">
+                <div className="admin-card-header-row">
+                  <div className="admin-card-category" id="heading-wind-card">
+                    <span className="admin-card-category-icon" aria-hidden="true">
+                      <Wind size={16} />
+                    </span>
+                    <span>Tốc độ gió giật</span>
+                  </div>
+                </div>
+
+                <div className="admin-card-body">
+                  <span className="admin-setting-label">Tốc độ gió giật</span>
+
+                  <div className="admin-setting-value-wrap">
+                    <span className="admin-setting-value-number">{DEFAULT_SETTINGS.maxSafeWind}</span>
+                    <span className="admin-setting-value-unit">km/h</span>
+                  </div>
+
+                  <p className="admin-setting-description">Ngưỡng tham chiếu cảnh báo</p>
+                </div>
+              </section>
+            </div>
+          </div>
         </div>
       )}
 
@@ -300,7 +503,7 @@ export function Settings() {
       <AdminDialog
         open={isResetDialogOpen}
         title="Xác nhận khôi phục cấu hình mặc định"
-        description="Thao tác này sẽ đặt lại toàn bộ 4 tham số hệ thống về giá trị ban đầu. Lịch sử thay đổi sẽ được ghi vào nhật ký kiểm toán (Audit Log)."
+        description="Thao tác này sẽ đặt lại tỷ lệ hoa hồng (10%) và số điện thoại liên hệ (0236 3920 477) về giá trị mặc định ban đầu."
         onClose={() => setIsResetDialogOpen(false)}
         footer={
           <>
@@ -313,90 +516,19 @@ export function Settings() {
           </>
         }
       >
-        <div style={{ fontSize: 13, color: '#4d6978', lineHeight: 1.6 }}>
-          <p>Các tham số sẽ được khôi phục về:</p>
-          <ul style={{ margin: '8px 0 0 18px', padding: 0 }}>
-            <li>Tỷ lệ hoa hồng sàn: <strong>10%</strong></li>
-            <li>Ngưỡng sóng tham chiếu: <strong>1.5m</strong></li>
-            <li>Ngưỡng gió giật tham chiếu: <strong>25 km/h</strong></li>
-            <li>Số liên hệ BQL bán đảo Sơn Trà &amp; bãi biển: <strong>0236 3920 477</strong></li>
-          </ul>
-        </div>
+        <p style={{ fontSize: 13, color: 'var(--admin-secondary, #525252)', margin: 0 }}>
+          Các tham số sẽ được khôi phục về giá trị mặc định:
+        </p>
+        <ul style={{ margin: '8px 0 0 18px', padding: 0, fontSize: 13, color: 'var(--admin-secondary, #525252)' }}>
+          <li>Hoa hồng mặc định của sàn: <strong>10%</strong></li>
+          <li>Số điện thoại liên hệ BQL: <strong>0236 3920 477</strong></li>
+        </ul>
       </AdminDialog>
 
       {/* Toast Notification */}
       <AdminNotice message={notice} onDismiss={() => setNotice(null)} />
     </main>
   );
-
-  function renderConfigRow(def: ConfigDefinition) {
-    const activeVal = activeFormData[def.key];
-    const draftVal = formData[def.key];
-    const isModified = activeVal !== draftVal;
-    const errorMsg = errors[def.key];
-    const originalConfig = configs.find(c => c.key === def.dbKey);
-
-    return (
-      <div className="admin-config-row" key={def.key} data-modified={isModified}>
-        <div className="admin-config-info">
-          <div className="admin-config-heading">
-            <strong>{def.label}</strong>
-            <span className="admin-config-key">{def.dbKey}</span>
-            {isModified ? (
-              <AdminBadge tone="amber">Chưa lưu</AdminBadge>
-            ) : (
-              <AdminBadge tone="neutral">Đang áp dụng</AdminBadge>
-            )}
-          </div>
-
-          <p className="admin-config-description">{def.description}</p>
-
-          {def.disclaimer && (
-            <div className="admin-config-disclaimer">
-              <ShieldAlert size={14} aria-hidden="true" />
-              <span>{def.disclaimer}</span>
-            </div>
-          )}
-
-          <div className="admin-config-meta">
-            <span>
-              <Clock size={12} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 4 }} />
-              Cập nhật: {formatDateTimeVN(originalConfig?.updatedAt)}
-            </span>
-            <span>·</span>
-            <span>Người cập nhật: <strong>{originalConfig?.updatedBy || 'Hệ thống'}</strong></span>
-          </div>
-        </div>
-
-        <div className="admin-config-control">
-          <div className="admin-config-input-wrap">
-            <input
-              id={`config-input-${def.key}`}
-              type={def.inputType}
-              step={def.step}
-              value={draftVal}
-              onChange={e => handleChange(def.key, e.target.value)}
-              placeholder={def.placeholder}
-              className="admin-config-input"
-              aria-invalid={Boolean(errorMsg)}
-              aria-describedby={errorMsg ? `error-${def.key}` : undefined}
-            />
-            {def.unit && <span className="admin-config-unit">{def.unit}</span>}
-          </div>
-
-          <div className="admin-config-status-tag">
-            <span>Giá trị đang lưu: <strong>{activeVal} {def.unit}</strong></span>
-          </div>
-
-          {errorMsg && (
-            <div id={`error-${def.key}`} className="admin-config-error" role="alert">
-              {errorMsg}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
 }
 
 export default Settings;

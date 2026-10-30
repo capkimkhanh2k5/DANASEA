@@ -3,8 +3,8 @@ import { useLocation } from 'react-router-dom';
 import {
   Anchor,
   Compass,
-  Edit3,
   FolderKanban,
+  Pencil,
   Plus,
   Search,
   ShieldCheck,
@@ -22,7 +22,7 @@ import {
   AdminButton,
   AdminFilterTabs,
   AdminNotice,
-  AdminPreviewBanner,
+  AdminPagination,
 } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import {
@@ -129,11 +129,22 @@ export function Categories() {
   const inactiveCount = visibleCategories.filter(c => !c.isActive).length;
   const certRequiredCount = visibleCategories.filter(c => c.requiresSafetyCert).length;
 
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+
   const resetFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
     setCertFilter('all');
+    setCurrentPage(1);
   };
+
+  const paginatedCategories = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, activePage]);
 
   const openCreateDrawer = () => {
     setEditingCategory(null);
@@ -294,49 +305,10 @@ export function Categories() {
 
   return (
     <div className="admin-workspace-page admin-categories">
-      {/* 1. Preview Banner */}
-      <AdminPreviewBanner demo={demo} href={`${location.pathname}?demo=1`} />
-
-      {/* 2. Summary Metrics */}
-      <div className="admin-workspace-summary" aria-label="Tổng quan danh mục">
-        {[
-          { label: 'Tổng danh mục', value: visibleCategories.length, detail: 'Trong hồ sơ mẫu', filter: 'all' as const },
-          { label: 'Đang hiển thị', value: activeCount, detail: 'Khách hàng có thể thấy', filter: 'active' as const },
-          { label: 'Tạm ẩn', value: inactiveCount, detail: 'Đang ngưng cung cấp', filter: 'inactive' as const },
-          { label: 'Yêu cầu chứng chỉ', value: certRequiredCount, detail: 'Khai báo an toàn bắt buộc', filter: 'cert' as const },
-        ].map(metric => (
-          <button
-            key={metric.filter}
-            type="button"
-            className="admin-workspace-metric"
-            aria-pressed={
-              metric.filter === 'cert'
-                ? certFilter === 'required'
-                : statusFilter === metric.filter
-            }
-            onClick={() => {
-              if (metric.filter === 'cert') {
-                setCertFilter(certFilter === 'required' ? 'all' : 'required');
-              } else {
-                setStatusFilter(metric.filter);
-                setCertFilter('all');
-              }
-            }}
-          >
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-            <small>{metric.detail}</small>
-          </button>
-        ))}
-      </div>
-
       {/* 4. Category Table Workspace */}
       <section className="admin-categories-list" aria-labelledby="categories-list-title">
         <div className="admin-categories-list-heading">
-          <div>
-            <h2 id="categories-list-title">Danh sách phân loại trải nghiệm</h2>
-            <p>Chọn một danh mục để xem thông số cấu hình hoặc mở ngăn chỉnh sửa.</p>
-          </div>
+          <h2 id="categories-list-title">Danh sách phân loại trải nghiệm</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span>
               {filtered.length} / {visibleCategories.length} danh mục
@@ -352,6 +324,7 @@ export function Categories() {
           label="Lọc trạng thái danh mục"
           value={certFilter === 'required' ? 'cert_required' : statusFilter}
           onChange={val => {
+            setCurrentPage(1);
             if (val === 'cert_required') {
               setCertFilter('required');
               setStatusFilter('all');
@@ -375,7 +348,10 @@ export function Categories() {
             <input
               type="search"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={e => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               aria-label="Tìm theo tên danh mục hoặc slug URL"
               placeholder="Tìm theo tên danh mục hoặc slug..."
             />
@@ -420,7 +396,7 @@ export function Categories() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(cat => {
+              {paginatedCategories.map(cat => {
                 const IconComponent = getCategoryIcon(cat.iconUrl);
                 return (
                   <tr key={cat.id}>
@@ -461,20 +437,24 @@ export function Categories() {
                     </td>
                     <td>
                       <div className="admin-categories-actions-group">
-                        <AdminButton
-                          variant="secondary"
+                        <button
+                          type="button"
+                          className="admin-action-icon-btn"
                           aria-label={`Chỉnh sửa ${cat.name}`}
+                          title="Chỉnh sửa danh mục"
                           onClick={() => openEditDrawer(cat)}
                         >
-                          <Edit3 size={15} aria-hidden="true" /> Sửa
-                        </AdminButton>
-                        <AdminButton
-                          variant="danger"
+                          <Pencil size={16} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-action-icon-btn admin-action-icon-btn--danger"
                           aria-label={`Xóa danh mục ${cat.name}`}
+                          title="Xóa danh mục"
                           onClick={e => promptDelete(cat, e)}
                         >
-                          <Trash2 size={15} aria-hidden="true" />
-                        </AdminButton>
+                          <Trash2 size={16} aria-hidden="true" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -483,6 +463,17 @@ export function Categories() {
             </tbody>
           </table>
         </div>
+        )}
+
+        {!loading && !errorMessage && filtered.length > 0 && (
+          <AdminPagination
+            currentPage={activePage}
+            totalPages={totalPages}
+            totalRecords={filtered.length}
+            pageSize={PAGE_SIZE}
+            recordLabel="danh mục"
+            onPageChange={setCurrentPage}
+          />
         )}
 
         {/* Empty State */}
@@ -523,39 +514,57 @@ export function Categories() {
         <form onSubmit={handleSave} className="admin-categories-form">
           {formError && <div className="admin-categories-form-error">{formError}</div>}
 
-          <label className="admin-field">
-            <span>Tên danh mục (Tiếng Việt) *</span>
-            <input
-              type="text"
-              value={formName}
-              onChange={e => handleNameChange(e.target.value)}
-              placeholder="VD: Chèo SUP & Kayak"
-              required
-            />
-          </label>
+          <div className="admin-categories-form-row">
+            <label className="admin-field">
+              <span>Tên danh mục (Tiếng Việt) *</span>
+              <input
+                type="text"
+                value={formName}
+                onChange={e => handleNameChange(e.target.value)}
+                placeholder="VD: Chèo SUP & Kayak"
+                required
+              />
+            </label>
 
-          <label className="admin-field">
-            <span>Tên tiếng Anh (name_en) *</span>
-            <input
-              type="text"
-              value={formNameEn}
-              onChange={e => setFormNameEn(e.target.value)}
-              placeholder="VD: Stand-Up Paddleboarding & Kayak"
-              required
-            />
-          </label>
+            <label className="admin-field">
+              <span>Tên tiếng Anh (name_en) *</span>
+              <input
+                type="text"
+                value={formNameEn}
+                onChange={e => setFormNameEn(e.target.value)}
+                placeholder="VD: Stand-Up Paddleboarding & Kayak"
+                required
+              />
+            </label>
+          </div>
 
-          <label className="admin-field">
-            <span>Mã định danh URL (slug) *</span>
-            <input
-              type="text"
-              value={formSlug}
-              onChange={e => setFormSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
-              placeholder="VD: cheo-sup-kayak"
-              required
-            />
-            <small>Đường dẫn hiển thị trên thanh địa chỉ: danasea.vn/{formSlug || 'ten-danh-muc'}</small>
-          </label>
+          <div className="admin-categories-form-row">
+            <label className="admin-field">
+              <span>Mã định danh URL (slug) *</span>
+              <input
+                type="text"
+                value={formSlug}
+                onChange={e => setFormSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                placeholder="VD: cheo-sup-kayak"
+                required
+              />
+              <small>Đường dẫn hiển thị: danasea.vn/{formSlug || 'ten-danh-muc'}</small>
+            </label>
+
+            <label className="admin-field">
+              <span>Danh mục cha (tùy chọn)</span>
+              <select value={formParentId} onChange={e => setFormParentId(e.target.value)}>
+                <option value="">Không có danh mục cha (Cấp 1)</option>
+                {categories
+                  .filter(c => !editingCategory || c.id !== editingCategory.id)
+                  .map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
 
           <label className="admin-field">
             <span>Biểu tượng hiển thị</span>
@@ -577,20 +586,6 @@ export function Categories() {
                 );
               })}
             </div>
-          </label>
-
-          <label className="admin-field">
-            <span>Danh mục cha (tùy chọn)</span>
-            <select value={formParentId} onChange={e => setFormParentId(e.target.value)}>
-              <option value="">Không có danh mục cha (Cấp 1)</option>
-              {categories
-                .filter(c => !editingCategory || c.id !== editingCategory.id)
-                .map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-            </select>
           </label>
 
           <div className="admin-categories-toggle-row">

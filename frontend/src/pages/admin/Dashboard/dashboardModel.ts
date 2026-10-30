@@ -24,6 +24,21 @@ export interface DailyMetric {
 }
 export type OperationKind = 'vendors' | 'services' | 'refunds' | 'disputes' | 'settlements';
 export type OperationCounts = Record<OperationKind, number | null>;
+
+export interface WorkloadGroup {
+  key: 'vendors' | 'services' | 'settlements' | 'disputes';
+  label: string;
+  path: string;
+  color: string;
+}
+
+export const workloadGroups: WorkloadGroup[] = [
+  { key: 'vendors', label: 'Đối tác', path: '/admin/vendor-approval', color: '#E07A5F' },
+  { key: 'services', label: 'Dịch vụ', path: '/admin/service-approval', color: '#0B5D6F' },
+  { key: 'settlements', label: 'Quyết toán', path: '/admin/payouts', color: '#64748B' },
+  { key: 'disputes', label: 'Khiếu nại', path: '/admin/disputes', color: '#D9534F' },
+];
+
 export const operationGroups: { key: OperationKind; label: string; title: string; description: string; path: string; priority: number }[] = [
   { key: 'disputes', label: 'Khiếu nại', title: 'khiếu nại đang chờ giải quyết', description: 'Đối chiếu phản hồi và bằng chứng từ khách hàng, đối tác.', path: '/admin/disputes', priority: 1 },
   { key: 'refunds', label: 'Đơn hàng', title: 'yêu cầu hoàn tiền cần theo dõi', description: 'Kiểm tra tiến trình hoàn tiền và thông tin đơn liên quan.', path: '/admin/orders', priority: 1 },
@@ -31,6 +46,23 @@ export const operationGroups: { key: OperationKind; label: string; title: string
   { key: 'services', label: 'Dịch vụ', title: 'dịch vụ đang chờ kiểm duyệt', description: 'Kiểm tra nội dung, điều kiện và hồ sơ an toàn trải nghiệm.', path: '/admin/service-approval', priority: 2 },
   { key: 'settlements', label: 'Quyết toán', title: 'kỳ quyết toán chưa chốt', description: 'Rà soát bảng kê và các khoản đối soát với đối tác.', path: '/admin/payouts', priority: 3 },
 ];
+
+export interface HotServiceItem {
+  serviceId: string;
+  serviceName: string;
+  vendorName?: string;
+  bookingCount: number;
+  sharePercent: number;
+}
+
+export interface TopVendorItem {
+  vendorId: string;
+  vendorName: string;
+  revenue: number;
+  completedOrders: number;
+  sharePercent: number;
+}
+
 export interface RecentOrder {
   id: string;
   status: string;
@@ -42,6 +74,8 @@ export interface DashboardData {
   bookings: BookingMetric[] | null;
   revenue: RevenueMetric[] | null;
   operations: OperationCounts;
+  hotServices?: HotServiceItem[] | null;
+  topVendors?: TopVendorItem[] | null;
   recentOrders: RecentOrder[] | null;
   errors: string[];
 }

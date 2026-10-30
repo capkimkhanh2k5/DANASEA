@@ -19,10 +19,10 @@ import {
   AdminState,
 } from '../../../components/admin/AdminUI';
 import {
-  AdminPreviewBanner,
   AdminFilterTabs,
   AdminButton,
   AdminNotice,
+  AdminPagination,
 } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import {
@@ -114,6 +114,17 @@ export function Disputes() {
     return filterDisputes(disputes, searchQuery, statusFilter);
   }, [disputes, searchQuery, statusFilter]);
 
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(filteredDisputes.length / PAGE_SIZE) || 1;
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedDisputes = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filteredDisputes.slice(start, start + PAGE_SIZE);
+  }, [filteredDisputes, activePage]);
+
   // Currently Selected Dispute
   const selectedDispute = useMemo(() => {
     return disputes.find(d => d.id === selectedDisputeId) || filteredDisputes[0] || disputes[0];
@@ -199,9 +210,6 @@ export function Disputes() {
 
   return (
     <div className="admin-disputes">
-      {/* Preview Banner */}
-      <AdminPreviewBanner demo={demo} href={`${location.pathname}?demo=1`} />
-
       {/* Compact Summary Strip */}
       <div className="admin-disputes__summary-strip" aria-label="Tóm tắt tình trạng khiếu nại">
         <div className="admin-disputes__summary-item">
@@ -234,10 +242,10 @@ export function Disputes() {
           <div className="admin-disputes__master-header">
             <div className="admin-disputes__master-title-row">
               <span className="admin-disputes__master-title">
-                <ShieldAlert size={18} style={{ color: '#00646f' }} />
+                <ShieldAlert size={18} style={{ color: 'var(--admin-primary, #0B5D6F)' }} />
                 Danh sách hồ sơ khiếu nại
               </span>
-              <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)', fontWeight: 600 }}>
+              <span style={{ fontSize: 12, color: 'var(--admin-muted, #595959)', fontWeight: 600 }}>
                 {filteredDisputes.length} / {disputes.length} hồ sơ
               </span>
             </div>
@@ -246,7 +254,10 @@ export function Disputes() {
             <AdminFilterTabs
               label="Lọc trạng thái tranh chấp"
               value={statusFilter}
-              onChange={(val) => setStatusFilter(val as DisputeStatusFilter)}
+              onChange={(val) => {
+                setStatusFilter(val as DisputeStatusFilter);
+                setCurrentPage(1);
+              }}
               items={[
                 { value: 'all', label: 'Tất cả', count: metrics.totalCount },
                 { value: 'OPEN', label: 'Chờ xử lý', count: metrics.pendingActionCount },
@@ -262,7 +273,10 @@ export function Disputes() {
                 className="admin-disputes__search-input"
                 placeholder="Tìm mã hồ sơ, tên khách, đối tác hoặc dịch vụ..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
                 aria-label="Tìm kiếm khiếu nại"
               />
             </div>
@@ -306,7 +320,7 @@ export function Disputes() {
                 />
               </div>
             ) : (
-              filteredDisputes.map(d => {
+              paginatedDisputes.map(d => {
                 const isSelected = d.id === selectedDispute?.id;
                 return (
                   <div
@@ -353,6 +367,17 @@ export function Disputes() {
             )}
             </div>
           </div>
+
+          {!loading && !errorMessage && filteredDisputes.length > 0 && (
+            <AdminPagination
+              currentPage={activePage}
+              totalPages={totalPages}
+              totalRecords={filteredDisputes.length}
+              pageSize={PAGE_SIZE}
+              recordLabel="vụ việc"
+              onPageChange={setCurrentPage}
+            />
+          )}
         </div>
 
         {/* Right Column: Detail Dossier */}
@@ -364,14 +389,14 @@ export function Disputes() {
               <div>
                 <div className="admin-disputes__detail-tag-row">
                   <span className="admin-disputes__tag-pill">HỒ SƠ #{selectedDispute.id}</span>
-                  <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--admin-muted, #595959)' }}>
                     Đơn hàng: <strong>{selectedDispute.subOrderId}</strong>
                   </span>
-                  <span style={{ fontSize: 12, color: '#00646f', fontWeight: 600 }}>
+                  <span style={{ fontSize: 12, color: 'var(--admin-primary, #0B5D6F)', fontWeight: 600 }}>
                     · {DISPUTE_CATEGORY_LABELS[selectedDispute.category] || selectedDispute.category}
                   </span>
                 </div>
-                <h2 id="dispute-detail-heading" className="admin-disputes__detail-service-title">
+                <h2 id="dispute-detail-heading" className="admin-disputes__detail-service-title" style={{ textWrap: 'balance' }}>
                   {selectedDispute.serviceName}
                 </h2>
               </div>
@@ -405,8 +430,8 @@ export function Disputes() {
                 <div className="admin-disputes__party-card">
                   <span className="admin-disputes__party-role">Đối tác vận hành tour</span>
                   <span className="admin-disputes__party-name">{selectedDispute.vendorName}</span>
-                  <span className="admin-disputes__party-sub" style={{ fontWeight: 600, color: '#00646f' }}>
-                    Giá trị đơn: {selectedDispute.orderAmount ? `${selectedDispute.orderAmount.toLocaleString('vi-VN')} đ` : 'N/A'}
+                  <span className="admin-disputes__party-sub" style={{ fontWeight: 600, color: 'var(--admin-primary, #0B5D6F)' }}>
+                    Giá trị đơn: {selectedDispute.orderAmount ? `${selectedDispute.orderAmount.toLocaleString('vi-VN')} VNĐ` : 'N/A'}
                   </span>
                 </div>
               </div>
@@ -538,8 +563,8 @@ export function Disputes() {
                     fontSize: 13,
                     fontWeight: 700,
                     border: '1px solid',
-                    borderColor: refundPercentage === pct ? '#00646f' : '#cbd5e1',
-                    background: refundPercentage === pct ? '#00646f' : '#f8fafc',
+                    borderColor: refundPercentage === pct ? '#0B5D6F' : '#cbd5e1',
+                    background: refundPercentage === pct ? '#0B5D6F' : '#f8fafc',
                     color: refundPercentage === pct ? '#ffffff' : 'var(--admin-body, #262626)',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
@@ -551,9 +576,9 @@ export function Disputes() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: '#f0fdfa', borderRadius: 8, border: '1px solid #ccfbf1' }}>
-            <span style={{ fontSize: 12, color: '#00646f', fontWeight: 600 }}>Số tiền hoàn trả dự kiến:</span>
-            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--admin-ink, #171717)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--admin-tint, #e8f3f5)', borderRadius: 8, border: '1px solid #c2e0e5' }}>
+            <span style={{ fontSize: 12, color: 'var(--admin-primary, #0B5D6F)', fontWeight: 600 }}>Số tiền hoàn trả dự kiến:</span>
+            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--admin-ink, #171717)', fontVariantNumeric: 'tabular-nums' }}>
               {Math.round(((selectedDispute?.orderAmount || 1000000) * refundPercentage) / 100).toLocaleString('vi-VN')} VNĐ
             </span>
           </div>
@@ -605,14 +630,37 @@ export function Disputes() {
         onClose={() => setPreviewImage(null)}
         variant="modal"
         title="Bằng chứng hiện trường"
-        description="Xem chi tiết hình ảnh phản ánh từ du khách"
+        description="Xem chi tiết hình ảnh phản ánh từ du khách phục vụ thẩm định"
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)' }}>
+              Nhấn phím Esc hoặc nút Đóng để quay lại
+            </span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {previewImage && (
+                <a
+                  href={previewImage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="admin-button"
+                  style={{ fontSize: 12, textDecoration: 'none' }}
+                >
+                  Mở ảnh gốc
+                </a>
+              )}
+              <AdminButton variant="secondary" onClick={() => setPreviewImage(null)}>
+                Đóng
+              </AdminButton>
+            </div>
+          </div>
+        }
       >
         {previewImage && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '10px 0', background: '#0b1320', borderRadius: 8, overflow: 'hidden' }}>
             <img
               src={previewImage}
-              alt="Ảnh bằng chứng"
-              style={{ maxWidth: '100%', maxHeight: '65vh', objectFit: 'contain', borderRadius: 12 }}
+              alt="Ảnh bằng chứng hiện trường"
+              style={{ maxWidth: '100%', maxHeight: '68vh', objectFit: 'contain', display: 'block' }}
             />
           </div>
         )}

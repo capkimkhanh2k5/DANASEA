@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ArrowRight, Filter, Search } from 'lucide-react';
+import { FileSearch, Filter, Search } from 'lucide-react';
 import { MOCK_ADMIN_SERVICES, MOCK_ADMIN_CATEGORIES, MOCK_ADMIN_VENDORS } from '../../../data/adminMockData';
 import { adminServiceApprovalService, getAdminServiceError } from '../../../services/adminServiceApprovalService';
 import { adminVendorService } from '../../../services/adminVendorService';
 import { adminCategoryService } from '../../../services/adminCategoryService';
 import type { AdminServiceResult } from '../../../types/adminServiceApproval';
 import { AdminState } from '../../../components/admin/AdminUI';
-import { AdminButton, AdminFilterTabs, AdminNotice, AdminPreviewBanner } from '../../../components/admin/AdminWorkspace';
+import { AdminButton, AdminFilterTabs, AdminNotice, AdminPagination } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import {
   applyServiceDecision,
@@ -153,6 +153,16 @@ export function ServiceApproval() {
     [visibleServices, search, status, categoryFilter]
   );
 
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedServices = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, activePage]);
+
   const countByStatus = (statusValue: string) =>
     visibleServices.filter(s => s.status === statusValue).length;
 
@@ -160,6 +170,7 @@ export function ServiceApproval() {
     setSearch('');
     setStatus('all');
     setCategoryFilter('all');
+    setCurrentPage(1);
   };
 
   const openServiceDrawer = (service: ServiceRecord) => {
@@ -233,39 +244,10 @@ export function ServiceApproval() {
 
   return (
     <div className="admin-workspace-page admin-services">
-      {/* 1. Preview & Demo Banner */}
-      <AdminPreviewBanner demo={demo} href={`${location.pathname}?demo=1`} />
-
-      {/* 3. Action Summary / Quick Filter Metrics */}
-      <div className="admin-workspace-summary" aria-label="Tổng quan dịch vụ kiểm duyệt">
-        {[
-          { label: 'Tổng dịch vụ', value: visibleServices.length, detail: 'Trong hồ sơ mẫu', filter: 'all' },
-          { label: 'Chờ duyệt', value: countByStatus('PENDING_APPROVAL'), detail: 'Chờ rà soát hồ sơ', filter: 'PENDING_APPROVAL' },
-          { label: 'Đang mở bán', value: countByStatus('ACTIVE'), detail: 'Đạt điều kiện mở bán', filter: 'ACTIVE' },
-          { label: 'Tạm ngưng', value: countByStatus('PAUSED'), detail: 'Tạm ngưng vận hành', filter: 'PAUSED' },
-          { label: 'Bị từ chối', value: countByStatus('REJECTED'), detail: 'Chưa đạt điều kiện', filter: 'REJECTED' },
-        ].map(metric => (
-          <button
-            key={metric.filter}
-            type="button"
-            className="admin-workspace-metric"
-            aria-pressed={status === metric.filter}
-            onClick={() => setStatus(metric.filter)}
-          >
-            <span>{metric.label}</span>
-            <strong>{metric.value}</strong>
-            <small>{metric.detail}</small>
-          </button>
-        ))}
-      </div>
-
       {/* 4. Main Service List & Workspace */}
       <section className="admin-services-list" aria-labelledby="services-list-title">
         <div className="admin-services-list-heading">
-          <div>
-            <h2 id="services-list-title">Danh sách dịch vụ trải nghiệm biển</h2>
-            <p>Mở chi tiết để rà soát điều kiện vận hành biển và lịch sử thao tác trong phiên.</p>
-          </div>
+          <h2 id="services-list-title">Danh sách dịch vụ trải nghiệm biển</h2>
           <span>
             {filtered.length} / {visibleServices.length} dịch vụ
           </span>
@@ -275,7 +257,10 @@ export function ServiceApproval() {
         <AdminFilterTabs
           label="Lọc trạng thái dịch vụ"
           value={status}
-          onChange={setStatus}
+          onChange={val => {
+            setStatus(val);
+            setCurrentPage(1);
+          }}
           items={[
             { value: 'all', label: 'Tất cả', count: visibleServices.length },
             { value: 'PENDING_APPROVAL', label: 'Chờ duyệt', count: countByStatus('PENDING_APPROVAL') },
@@ -292,32 +277,40 @@ export function ServiceApproval() {
             <input
               type="search"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
               aria-label="Tìm dịch vụ theo tên, mã tour hoặc đối tác"
               placeholder="Tìm theo tên tour, mã tour hoặc tên đối tác..."
             />
           </label>
 
-          <label className="admin-field admin-services-category-filter">
-            <Filter size={16} aria-hidden="true" />
-            <span>Danh mục</span>
-            <select
-              value={categoryFilter}
-              onChange={e => setCategoryFilter(e.target.value)}
-              aria-label="Lọc theo danh mục biển"
-            >
-              <option value="all">Tất cả danh mục biển</option>
-              {MOCK_ADMIN_CATEGORIES.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <label className="admin-field admin-services-category-filter">
+              <Filter size={16} aria-hidden="true" />
+              <span>Danh mục</span>
+              <select
+                value={categoryFilter}
+                onChange={e => {
+                  setCategoryFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                aria-label="Lọc theo danh mục biển"
+              >
+                <option value="all">Tất cả danh mục biển</option>
+                {MOCK_ADMIN_CATEGORIES.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          {(search || status !== 'all' || categoryFilter !== 'all') && (
-            <AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>
-          )}
+            {(search || status !== 'all' || categoryFilter !== 'all') && (
+              <AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>
+            )}
+          </div>
         </div>
 
         {/* Loading & Error States */}
@@ -356,7 +349,7 @@ export function ServiceApproval() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(service => {
+              {paginatedServices.map(service => {
                 const isSelected = service.id === selectedId;
                 const price = service.price ?? service.basePrice ?? 0;
                 return (
@@ -377,14 +370,12 @@ export function ServiceApproval() {
                           <span>
                             {service.locationName} • {service.durationMinutes} phút
                           </span>
-                          <span className="admin-services-id-chip">#{service.id}</span>
                         </div>
                       </div>
                     </td>
                     <td>
                       <div className="admin-services-vendor-cell">
                         <strong>{service.vendorName || 'Chưa liên kết'}</strong>
-                        <small className="admin-services-mono">Mã ĐT: {service.vendorId}</small>
                       </div>
                     </td>
                     <td>
@@ -403,15 +394,17 @@ export function ServiceApproval() {
                       <ServiceStatusBadge status={service.status} />
                     </td>
                     <td>
-                      <AdminButton
+                      <button
+                        type="button"
+                        className="admin-action-icon-btn"
                         aria-label={`Thẩm định hồ sơ ${service.name}`}
+                        title="Thẩm định hồ sơ"
                         aria-haspopup="dialog"
                         aria-expanded={drawerOpen && isSelected}
-                        variant={isSelected ? 'primary' : 'secondary'}
                         onClick={() => openServiceDrawer(service)}
                       >
-                        Thẩm định <ArrowRight size={15} aria-hidden="true" />
-                      </AdminButton>
+                        <FileSearch size={17} aria-hidden="true" />
+                      </button>
                     </td>
                   </tr>
                 );
@@ -419,6 +412,17 @@ export function ServiceApproval() {
             </tbody>
           </table>
         </div>
+        )}
+
+        {!loading && !errorMessage && filtered.length > 0 && (
+          <AdminPagination
+            currentPage={activePage}
+            totalPages={totalPages}
+            totalRecords={filtered.length}
+            pageSize={PAGE_SIZE}
+            recordLabel="dịch vụ"
+            onPageChange={setCurrentPage}
+          />
         )}
 
         {/* Empty State */}

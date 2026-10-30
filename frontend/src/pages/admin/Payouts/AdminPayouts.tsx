@@ -20,11 +20,11 @@ import {
   AdminState,
 } from '../../../components/admin/AdminUI';
 import {
-  AdminPreviewBanner,
   AdminFilterTabs,
   AdminButton,
   AdminNotice,
   AdminDisclosure,
+  AdminPagination,
 } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import {
@@ -105,6 +105,17 @@ export function AdminPayouts() {
     return filterPayouts(payouts, searchQuery, statusFilter);
   }, [payouts, searchQuery, statusFilter]);
 
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(filteredPayouts.length / PAGE_SIZE) || 1;
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedPayouts = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filteredPayouts.slice(start, start + PAGE_SIZE);
+  }, [filteredPayouts, activePage]);
+
   // Currently Selected Payout
   const selectedPayout = useMemo(() => {
     return payouts.find(p => p.id === selectedPayoutId) || filteredPayouts[0] || payouts[0];
@@ -184,9 +195,6 @@ export function AdminPayouts() {
 
   return (
     <div className="admin-payouts">
-      {/* Preview Banner */}
-      <AdminPreviewBanner demo={demo} href={`${location.pathname}?demo=1`} />
-
       {/* Compact Summary Strip */}
       <div className="admin-payouts__summary-strip" aria-label="Tóm tắt trạng thái chi trả">
         <div className="admin-payouts__summary-item">
@@ -222,10 +230,10 @@ export function AdminPayouts() {
           <div className="admin-payouts__master-header">
             <div className="admin-payouts__master-title-row">
               <span className="admin-payouts__master-title">
-                <CreditCard size={18} style={{ color: '#00646f' }} />
+                <CreditCard size={18} style={{ color: 'var(--admin-primary, #0B5D6F)' }} />
                 Danh sách lệnh chi trả
               </span>
-              <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)', fontWeight: 600 }}>
+              <span style={{ fontSize: 12, color: 'var(--admin-muted, #595959)', fontWeight: 600 }}>
                 {filteredPayouts.length} / {payouts.length} lệnh
               </span>
             </div>
@@ -234,7 +242,10 @@ export function AdminPayouts() {
             <AdminFilterTabs
               label="Lọc trạng thái lệnh chi"
               value={statusFilter}
-              onChange={(val) => setStatusFilter(val as PayoutStatusFilter)}
+              onChange={(val) => {
+                setStatusFilter(val as PayoutStatusFilter);
+                setCurrentPage(1);
+              }}
               items={[
                 { value: 'all', label: 'Tất cả', count: metrics.totalCount },
                 { value: 'REQUESTED', label: 'Chờ duyệt', count: metrics.pendingCount },
@@ -252,7 +263,10 @@ export function AdminPayouts() {
                   className="admin-payouts__search-input"
                   placeholder="Tìm theo mã lệnh, tên đối tác hoặc số tài khoản..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   aria-label="Tìm kiếm lệnh chi trả"
                 />
               </div>
@@ -304,7 +318,7 @@ export function AdminPayouts() {
                 />
               </div>
             ) : (
-              filteredPayouts.map(p => {
+              paginatedPayouts.map(p => {
                 const isSelected = p.id === selectedPayout?.id;
                 return (
                   <div
@@ -350,6 +364,17 @@ export function AdminPayouts() {
             )}
             </div>
           </div>
+
+          {!loading && !errorMessage && filteredPayouts.length > 0 && (
+            <AdminPagination
+              currentPage={activePage}
+              totalPages={totalPages}
+              totalRecords={filteredPayouts.length}
+              pageSize={PAGE_SIZE}
+              recordLabel="lệnh chi trả"
+              onPageChange={setCurrentPage}
+            />
+          )}
         </div>
 
         {/* Right Column: Detail Dossier */}
@@ -389,7 +414,7 @@ export function AdminPayouts() {
                   {selectedPayout.amount.toLocaleString('vi-VN')} <span style={{ fontSize: 18 }}>VNĐ</span>
                 </div>
               </div>
-              <div style={{ padding: '8px 12px', background: '#ffffff', borderRadius: 8, border: '1px solid #ccfbf1', fontSize: 12, color: '#00646f', fontWeight: 600 }}>
+              <div style={{ padding: '8px 12px', background: '#ffffff', borderRadius: 8, border: '1px solid #ccfbf1', fontSize: 12, color: 'var(--admin-primary, #0B5D6F)', fontWeight: 600 }}>
                 {selectedPayout.totalOrdersCount} đơn tour hoàn tất
               </div>
             </div>
