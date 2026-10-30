@@ -67,14 +67,14 @@ export const ScrollToTopButton: React.FC = () => {
     <button
       onClick={scrollToTop}
       aria-label="Scroll to top"
-      className={`fixed bottom-8 right-8 z-50 w-12 h-12 rounded-full bg-white text-cyan-600 border border-slate-200 shadow-[0_8px_24px_rgba(6,182,212,0.2),0_2px_8px_rgba(0,0,0,0.08)] flex items-center justify-center group hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer overflow-hidden transform-gpu will-change-transform ${
+      className={`fixed bottom-8 right-8 z-50 w-11 h-11 rounded-xl bg-white text-slate-700 hover:text-sky-600 border border-slate-200/90 shadow-md flex items-center justify-center group hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer overflow-hidden ${
         isVisible ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-90 pointer-events-none'
       }`}
     >
-      {/* Wave Ripple on Carousel Click */}
-      {isSliding && (
-        <span className="absolute inset-0 rounded-full bg-cyan-400/40 animate-ping pointer-events-none" />
-      )}
+
+
+
+
 
       {/* SVG Progress Ring */}
       <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 48 48">

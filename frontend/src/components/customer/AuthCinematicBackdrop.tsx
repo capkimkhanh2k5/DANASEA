@@ -148,8 +148,8 @@ export const AuthCinematicBackdrop: React.FC<AuthCinematicBackdropProps> = ({
           })}
         </div>
 
-        {/* Optical Contrast Scrim: Rich coastal gradient ensuring optimal text & card readability */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/85 via-slate-950/50 to-slate-950/70 pointer-events-none" />
+        {/* Optical Contrast Scrim: Flat neutral scrim over photo */}
+        <div className="absolute inset-0 bg-slate-950/75 pointer-events-none" />
       </div>
     </>
   );

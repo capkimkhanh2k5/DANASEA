@@ -4,34 +4,29 @@ interface ImageScene {
   id: string;
   url: string;
   label: string;
-  badge: string;
-}
+  }
 
 const IMAGE_SCENES: ImageScene[] = [
   {
     id: 'hero',
     url: '/images/scenes/sean-oulashin-KMn4VEeEPR8-unsplash.jpg',
     label: 'Bãi biển Mỹ Khê & Biển Sớm',
-    badge: '01 / 04',
-  },
+      },
   {
     id: 'bays',
     url: '/images/scenes/danny-rienecker-19Dam2dFVC8-unsplash.jpg',
     label: 'Vịnh Bán Đảo Sơn Trà',
-    badge: '02 / 04',
-  },
+      },
   {
     id: 'sports',
     url: '/images/scenes/brandon-mcdonald-_oU62drqdho-unsplash.jpg',
     label: 'Đại Dương & Thể Thao Biển',
-    badge: '03 / 04',
-  },
+      },
   {
     id: 'sunset',
     url: '/images/scenes/austin-neill-uHD0uyp79Dg-unsplash.jpg',
     label: 'Hoàng Hôn Non Nước Lãng Mạn',
-    badge: '04 / 04',
-  },
+      },
 ];
 
 export const CinematicSceneBackdrop: React.FC = () => {
@@ -194,7 +189,12 @@ export const CinematicSceneBackdrop: React.FC = () => {
         </div>
 
         {/* Optical Contrast Scrim: Soft ambient layer protecting text legibility over white foam & harsh sunlight */}
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/40 via-slate-950/20 to-slate-950/60 pointer-events-none transition-opacity duration-700" />
+        <div
+          className="absolute inset-0 pointer-events-none transition-opacity duration-700"
+          style={{
+            background: 'linear-gradient(to bottom, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0.2) 50%, rgba(0, 0, 0, 0.65) 100%)', // taste-skill-ignore
+          }}
+        />
       </div>
 
     </>

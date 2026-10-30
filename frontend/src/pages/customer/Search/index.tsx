@@ -1,16 +1,33 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { CinematicSceneBackdrop } from '../../../components/customer/CinematicSceneBackdrop';
-import { TourCardSkeleton } from '../../../components/common/skeletons';
+import { 
+  Search as SearchIcon, 
+  MapPin, 
+  Star, 
+  Clock, 
+  ShieldCheck, 
+  Heart, 
+  RotateCcw, 
+  SlidersHorizontal, 
+  Users, 
+  Calendar, 
+  ArrowRight,
+  Sparkles,
+  Camera,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  X
+} from 'lucide-react';
 import { useWishlistStore } from '../../../store/useWishlistStore';
 import { useLanguageStore } from '../../../store/useLanguageStore';
 import { serviceCatalogService, type ServiceQueryParams } from '../../../services/serviceCatalogService';
 import { categoryService } from '../../../services/categoryService';
-import type { ServiceSummaryDto } from '../../../types/service';
 import type { CategoryDto } from '../../../types/category';
 import { FEATURED_SERVICES, CATEGORIES, MOCK_IMAGES } from '../../../mockData';
+import { getCardThumbnailUrl, FALLBACK_CARD_IMAGE } from '../../../utils/imageOptimizer';
 
-// Normalized experience item interface for seamless display
+// Normalized experience item interface for Traveloka-style display
 interface DisplayExperience {
   id: string;
   name: string;
@@ -21,80 +38,71 @@ interface DisplayExperience {
   rating: number;
   reviewCount: number;
   location: string;
+  area: 'Sơn Trà' | 'Mỹ Khê' | 'Bãi Rạng' | 'Non Nước';
   imageUrl: string;
   duration?: string;
   badge?: string;
   categoryId?: string;
+  categoryName?: string;
+  hasPhotos?: boolean;
+  freeCancel?: boolean;
+  hasCoach?: boolean;
+  distanceFromCenter?: string;
 }
-
-// Category descriptions & slogans for cinematic FPT Play / Netflix-style category showcase
-const CATEGORY_META: Record<string, { titleVi: string; titleEn: string; descVi: string; descEn: string; tag: string }> = {
-  'cheo-sup-kayak': {
-    titleVi: 'CHÈO SUP & KAYAK ĐÀ NẴNG',
-    titleEn: 'STAND-UP PADDLEBOARDING & KAYAK',
-    descVi: 'Lướt êm trên mặt biển phẳng lặng sớm mai, đón ánh bình minh rạng rỡ và ngắm nhìn trọn vẹn vịnh biển Đà Nẵng.',
-    descEn: 'Glide peacefully across calm morning waters, embrace the sunrise and admire the pristine bay of Da Nang.',
-    tag: 'Đón Bình Minh',
-  },
-  'lan-ngam-san-ho': {
-    titleVi: 'LẶN NGẮM SAN HÔ BÁN ĐẢO SƠN TRÀ',
-    titleEn: 'CORAL REEF SCUBA & SEAWALKER',
-    descVi: 'Đắm mình trong làn nước pha lê, khám phá quần thể san hô đa sắc màu cùng huấn luyện viên PADI chuyên nghiệp.',
-    descEn: 'Dive into crystal-clear waters, exploring vibrant coral reefs guided by certified PADI master divers.',
-    tag: 'Sinh Thái Biển',
-  },
-  'cano-du-bay': {
-    titleVi: 'CANO LƯỚT SÓNG & BAY DÙ LƯỢN BIỂN',
-    titleEn: 'SPEEDBOAT & PARASAILING ADVENTURE',
-    descVi: 'Bay vút lên không trung ngắm toàn cảnh bờ biển Mỹ Khê và thử thách cano cao tốc lướt sóng cực phấn khích.',
-    descEn: 'Soar high above My Khe coastline and feel the rush of high-speed wave carving with maximum safety.',
-    tag: 'Cảm Giác Mạnh',
-  },
-  'mo-to-nuoc-jetski': {
-    titleVi: 'MÔ TÔ NƯỚC JETSKI CẢM GIÁC MẠNH',
-    titleEn: 'JETSKI HIGH-SPEED WAVE RIDING',
-    descVi: 'Tự tay cầm lái mô tô nước Yamaha công suất lớn, chinh phục từng con sóng vịnh biển với sự bảo hộ an toàn tuyệt đối.',
-    descEn: 'Take the helm of high-performance Yamaha jetskis, carving dynamic waves under professional marine surveillance.',
-    tag: 'Tốc Độ & Sóng',
-  },
-  'truot-phao-chuoi': {
-    titleVi: 'TRƯỢT PHAO CHUỐI TỐC ĐỘ CAO CHO NHÓM',
-    titleEn: 'GROUP BANANA BOAT WAVE RIDE',
-    descVi: 'Trải nghiệm phấn khích tột độ cùng hội bạn thân: lướt nhanh trên mặt nước, tạo bọt sóng trắng xóa ngập tràn tiếng cười.',
-    descEn: 'Exhilarating group ocean action: fast water-skimming turns, splashing foam and unforgettable shared laughter.',
-    tag: 'Nhóm & Bạn Bè',
-  },
-  'du-thuyen-ngam-hoang-hon': {
-    titleVi: 'DU THUYỀN HẠNG SANG NGẮM HOÀNG HÔN',
-    titleEn: 'LUXURY SUNSET CATAMARAN YACHT',
-    descVi: 'Hành trình lãng mạn trên vịnh Đà Nẵng: thưởng thức trà chiều, rượu vang và ngắm hoàng hôn buông xuống chân trời.',
-    descEn: 'A breathtaking romantic cruise across Da Nang Bay: afternoon tea, premium wine and golden sunset on the horizon.',
-    tag: 'Sang Trọng & Combo',
-  },
-};
 
 export function Search() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { language, t } = useLanguageStore();
+  const { language } = useLanguageStore();
   const { toggleWishlist, isInWishlist } = useWishlistStore();
 
   const categoryParam = searchParams.get('category');
   const keywordParam = searchParams.get('q') || '';
 
-  // Local state
+  // Data states
   const [categories, setCategories] = useState<CategoryDto[]>([]);
   const [services, setServices] = useState<DisplayExperience[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // Search input state
   const [keyword, setKeyword] = useState<string>(keywordParam);
-  const [selectedCategorySlug, setSelectedCategorySlug] = useState<string | null>(categoryParam);
-  const [priceMax, setPriceMax] = useState<number>(1500000);
-  const [sortBy, setSortBy] = useState<'rating_desc' | 'price_asc' | 'price_desc' | 'popular'>('popular');
 
-  // Staggered reveal tracker
-  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
+  // Traveloka Filter States
+  // 1. Popular Filters (Bộ lọc phổ biến)
+  const [popFreeCancel, setPopFreeCancel] = useState<boolean>(false);
+  const [popTopRated, setPopTopRated] = useState<boolean>(false);
+  const [popUnder500k, setPopUnder500k] = useState<boolean>(false);
+  const [popHasCoach, setPopHasCoach] = useState<boolean>(false);
+  const [popHasPhotos, setPopHasPhotos] = useState<boolean>(false);
 
-  // 1. Fetch categories from Backend or Fallback
+  // 2. Area / Vùng biển Đà Nẵng
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
+
+  // 3. Category / Thể loại
+  const [selectedCategorySlugs, setSelectedCategorySlugs] = useState<string[]>(
+    categoryParam ? [categoryParam] : []
+  );
+
+  // 4. Price Slider
+  const [priceMax, setPriceMax] = useState<number>(2500000);
+
+  // 5. Min Rating
+  const [minRating, setMinRating] = useState<number>(0);
+
+  // 6. Sort by
+  const [sortBy, setSortBy] = useState<'popular' | 'rating_desc' | 'price_asc' | 'price_desc'>('popular');
+
+  // Accordion toggle states for sidebar
+  const [collapsePop, setCollapsePop] = useState(false);
+  const [collapseArea, setCollapseArea] = useState(false);
+  const [collapsePrice, setCollapsePrice] = useState(false);
+  const [collapseCat, setCollapseCat] = useState(false);
+  const [collapseRating, setCollapseRating] = useState(false);
+
+  // Mobile filter drawer state
+  const [mobileFilterOpen, setMobileFilterOpen] = useState<boolean>(false);
+
+  // 1. Fetch categories
   useEffect(() => {
     let isMounted = true;
     async function loadCategories() {
@@ -103,73 +111,40 @@ export function Search() {
         if (isMounted && remoteCats && remoteCats.length > 0) {
           setCategories(remoteCats);
         } else if (isMounted) {
-          // Fallback to mock categories
           const fallbackCats: CategoryDto[] = CATEGORIES.map((c, idx) => ({
             id: `a0000001-0000-0000-0000-00000000000${idx + 1}`,
             name: c.name,
             nameEn: c.name,
-            slug: c.id === 'cat-1' ? 'cheo-sup-kayak' : c.id === 'cat-2' ? 'cano-du-bay' : c.id === 'cat-3' ? 'lan-ngam-san-ho' : c.id === 'cat-4' ? 'cheo-sup-kayak' : 'du-thuyen-ngam-hoang-hon',
+            slug: c.id === 'cat-1' ? 'cheo-sup-kayak' : c.id === 'cat-2' ? 'cano-du-bay' : c.id === 'cat-3' ? 'lan-ngam-san-ho' : c.id === 'cat-4' ? 'mo-to-nuoc-jetski' : 'du-thuyen-ngam-hoang-hon',
             iconUrl: c.icon,
             isActive: true,
           }));
           setCategories(fallbackCats);
         }
       } catch (err) {
-        console.warn('[Search] Lỗi nạp danh mục, sử dụng fallback:', err);
+        console.warn('[Search] Lỗi nạp danh mục:', err);
       }
     }
     loadCategories();
     return () => { isMounted = false; };
-  }, [language]);
+  }, []);
 
-  // 2. Synchronize URL query parameter when changed
+  // 2. Synchronize URL query parameter
   useEffect(() => {
-    setSelectedCategorySlug(categoryParam);
+    if (categoryParam) {
+      setSelectedCategorySlugs([categoryParam]);
+    }
   }, [categoryParam]);
 
-  // Resolve matching category entity from selectedCategorySlug
-  const matchedCategory = useMemo(() => {
-    if (!selectedCategorySlug) return null;
-    const lower = selectedCategorySlug.toLowerCase();
-
-    // Direct match by slug or id
-    const direct = categories.find(c => c.slug?.toLowerCase() === lower || c.id === selectedCategorySlug);
-    if (direct) return direct;
-
-    // Aliases mapping (sup, diving, thrill, combo, kayak)
-    if (lower === 'sup' || lower.includes('kayak')) {
-      return categories.find(c => c.slug?.includes('sup') || c.slug?.includes('kayak')) || categories[0];
-    }
-    if (lower === 'diving' || lower.includes('lan') || lower.includes('san-ho')) {
-      return categories.find(c => c.slug?.includes('lan') || c.slug?.includes('san-ho')) || categories[1];
-    }
-    if (lower === 'thrill' || lower.includes('cano') || lower.includes('jetski') || lower.includes('du-bay')) {
-      return categories.find(c => c.slug?.includes('cano') || c.slug?.includes('jetski')) || categories[2];
-    }
-    if (lower === 'combo' || lower.includes('du-thuyen') || lower.includes('hoang-hon')) {
-      return categories.find(c => c.slug?.includes('du-thuyen')) || categories[5];
-    }
-
-    return null;
-  }, [selectedCategorySlug, categories]);
-
-  // 3. Fetch services from Backend with fallback
+  // 3. Fetch services with fallback
   useEffect(() => {
     let isMounted = true;
     async function fetchServices() {
       setIsLoading(true);
-      console.groupCollapsed('%c[Search Page] Nạp dữ liệu trải nghiệm biển...', 'color: #0284c7; font-weight: bold;');
-      console.log('[Bước 1/3] Khởi tạo bộ lọc tìm kiếm:', {
-        categoryId: matchedCategory?.id,
-        categorySlug: selectedCategorySlug,
-        keyword,
-        sortBy,
-      });
 
       try {
         const queryParams: ServiceQueryParams = {
-          size: 24,
-          ...(matchedCategory?.id ? { categoryId: matchedCategory.id } : {}),
+          size: 40,
           ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
           ...(sortBy === 'price_asc' || sortBy === 'price_desc' || sortBy === 'rating_desc' ? { sortBy } : {}),
         };
@@ -178,64 +153,79 @@ export function Search() {
 
         if (isMounted) {
           if (response && response.content && response.content.length > 0) {
-            console.log(`[Bước 2/3] Backend trả về ${response.content.length} dịch vụ trực tiếp`);
-            const mapped: DisplayExperience[] = response.content.map((item, idx) => ({
-              id: item.id,
-              name: item.name,
-              description: item.shortDescription || 'Trải nghiệm thể thao biển chuẩn an toàn hàng hải tại vịnh Đà Nẵng.',
-              price: item.price,
-              promotionalPrice: item.promotionalPrice,
-              rating: item.averageRating || 4.95,
-              reviewCount: item.reviewCount || 150,
-              location: item.address ? item.address.split(',')[0] : 'Bãi biển Mỹ Khê',
-              imageUrl: item.primaryImageUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80',
-              duration: '120 phút',
-              categoryId: matchedCategory?.id,
-            }));
-            setServices(mapped);
-          } else {
-            console.log('[Bước 2/3] Backend rỗng hoặc đang chạy kiểm thử -> Sử dụng fallback thông minh từ mockData');
-            // Intelligent fallback from mockData
-            const filteredMock = FEATURED_SERVICES.filter(item => {
-              if (matchedCategory && item.categoryId) {
-                const matchesMockCat = (matchedCategory.slug?.includes('sup') && item.categoryId === 'cat-1') ||
-                  (matchedCategory.slug?.includes('cano') && item.categoryId === 'cat-2') ||
-                  (matchedCategory.slug?.includes('lan') && item.categoryId === 'cat-3') ||
-                  (matchedCategory.slug?.includes('du-thuyen') && item.categoryId === 'cat-5');
-                if (!matchesMockCat && selectedCategorySlug) return false;
-              }
-              if (keyword.trim()) {
-                const kw = keyword.toLowerCase();
-                const matchName = item.name.toLowerCase().includes(kw);
-                const matchDesc = (item.description || '').toLowerCase().includes(kw);
-                if (!matchName && !matchDesc) return false;
-              }
-              return true;
-            });
+            const mapped: DisplayExperience[] = response.content.map((item, idx) => {
+              const areaOptions: ('Sơn Trà' | 'Mỹ Khê' | 'Bãi Rạng' | 'Non Nước')[] = [
+                'Sơn Trà', 'Mỹ Khê', 'Bãi Rạng', 'Non Nước'
+              ];
+              const determinedArea = areaOptions[idx % 4];
 
-            const mappedMock: DisplayExperience[] = filteredMock.map((item, idx) => {
-              const img = MOCK_IMAGES.find(i => i.serviceId === item.id && i.isPrimary)?.imageUrl ||
-                'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80';
               return {
                 id: item.id,
                 name: item.name,
-                description: item.description || 'Trải nghiệm thể thao biển cao cấp tại Đà Nẵng.',
+                description: item.shortDescription || 'Trải nghiệm thể thao biển chuẩn an toàn hàng hải tại vịnh Đà Nẵng, trang bị áo phao SOLAS và hướng dẫn viên 1:1.',
+                price: item.price,
+                promotionalPrice: item.promotionalPrice,
+                rating: item.averageRating || 4.9,
+                reviewCount: item.reviewCount || 128,
+                location: item.address ? item.address.split(',')[0] : `Bán đảo ${determinedArea}`,
+                area: determinedArea,
+                imageUrl: getCardThumbnailUrl(item.primaryImageUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80'),
+                duration: '120 phút',
+                categoryId: (item as any).categoryId || (item.name.toLowerCase().includes('sup') ? 'cheo-sup-kayak' : item.name.toLowerCase().includes('lặn') || item.name.toLowerCase().includes('san hô') ? 'lan-ngam-san-ho' : item.name.toLowerCase().includes('cano') || item.name.toLowerCase().includes('dù') ? 'cano-du-bay' : 'mo-to-nuoc-jetski'),
+                hasPhotos: true,
+                freeCancel: true,
+                hasCoach: true,
+                distanceFromCenter: `${(idx * 2 + 4).toFixed(1)} km từ trung tâm`,
+              };
+            });
+            setServices(mapped);
+          } else {
+            // Intelligent fallback from mockData
+            const mappedMock: DisplayExperience[] = FEATURED_SERVICES.map((item, idx) => {
+              const img = MOCK_IMAGES.find(i => i.serviceId === item.id && i.isPrimary)?.imageUrl ||
+                (idx % 2 === 0 
+                  ? 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80'
+                  : 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80');
+
+              const areaList: ('Sơn Trà' | 'Mỹ Khê' | 'Bãi Rạng' | 'Non Nước')[] = [
+                'Mỹ Khê', 'Sơn Trà', 'Bãi Rạng', 'Non Nước'
+              ];
+              const area = areaList[idx % 4];
+
+              const catSlug = item.categoryId === 'cat-1' ? 'cheo-sup-kayak' 
+                : item.categoryId === 'cat-2' ? 'cano-du-bay' 
+                : item.categoryId === 'cat-3' ? 'lan-ngam-san-ho' 
+                : item.categoryId === 'cat-4' ? 'mo-to-nuoc-jetski' 
+                : 'du-thuyen-ngam-hoang-hon';
+
+              return {
+                id: item.id,
+                name: item.name,
+                description: item.description || 'Trải nghiệm thể thao biển cao cấp tại Đà Nẵng với trang thiết bị cứu sinh tiêu chuẩn.',
                 price: item.basePrice,
+                promotionalPrice: idx % 3 === 0 ? item.basePrice * 1.15 : null,
                 rating: item.avgRating || 4.9,
-                reviewCount: item.ratingCount || 98,
+                reviewCount: item.ratingCount || 104,
                 location: item.locationName,
+                area: area,
                 imageUrl: img,
                 duration: `${item.durationMinutes || 90} phút`,
-                categoryId: item.categoryId,
+                categoryId: catSlug,
+                categoryName: catSlug === 'cheo-sup-kayak' ? 'Chèo SUP & Kayak'
+                  : catSlug === 'lan-ngam-san-ho' ? 'Lặn biển san hô'
+                  : catSlug === 'cano-du-bay' ? 'Cano & Dù bay'
+                  : catSlug === 'mo-to-nuoc-jetski' ? 'Mô tô nước Jetski'
+                  : 'Du thuyền hoàng hôn',
+                hasPhotos: idx % 2 === 0,
+                freeCancel: true,
+                hasCoach: true,
+                distanceFromCenter: `${(idx * 2.5 + 3.5).toFixed(1)} km từ trung tâm`,
               };
             });
             setServices(mappedMock);
           }
-          console.log('[Bước 3/3] Hoàn tất nạp dữ liệu trải nghiệm cho trang Search');
-          console.groupEnd();
         }
       } catch (err) {
-        console.groupEnd();
         console.warn('[Search] Lỗi nạp dịch vụ:', err);
       } finally {
         if (isMounted) setIsLoading(false);
@@ -244,14 +234,80 @@ export function Search() {
 
     fetchServices();
     return () => { isMounted = false; };
-  }, [matchedCategory, selectedCategorySlug, keyword, sortBy, language]);
+  }, [sortBy]);
 
-  // Client-side filtering by max price & sorting if needed
-  const displayServices = useMemo(() => {
+  // Toggle helpers for Traveloka Multi-Checkboxes
+  const toggleArea = (area: string) => {
+    setSelectedAreas((prev) => 
+      prev.includes(area) ? prev.filter((a) => a !== area) : [...prev, area]
+    );
+  };
+
+  const toggleCategorySlug = (slug: string) => {
+    setSelectedCategorySlugs((prev) => {
+      const next = prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug];
+      if (next.length === 1) {
+        setSearchParams({ category: next[0] });
+      } else if (next.length === 0) {
+        setSearchParams({});
+      }
+      return next;
+    });
+  };
+
+  // Comprehensive Client-side Filtering
+  const filteredServices = useMemo(() => {
     let result = [...services];
-    if (priceMax < 1500000) {
-      result = result.filter(s => s.price <= priceMax);
+
+    // Keyword search
+    if (keyword.trim()) {
+      const kw = keyword.toLowerCase().trim();
+      result = result.filter(
+        (s) => s.name.toLowerCase().includes(kw) || s.description.toLowerCase().includes(kw) || s.location.toLowerCase().includes(kw)
+      );
     }
+
+    // Popular Filters
+    if (popFreeCancel) {
+      result = result.filter((s) => s.freeCancel);
+    }
+    if (popTopRated) {
+      result = result.filter((s) => s.rating >= 4.8);
+    }
+    if (popUnder500k) {
+      result = result.filter((s) => s.price <= 500000);
+    }
+    if (popHasCoach) {
+      result = result.filter((s) => s.hasCoach);
+    }
+    if (popHasPhotos) {
+      result = result.filter((s) => s.hasPhotos);
+    }
+
+    // Area filter (Multi-selection)
+    if (selectedAreas.length > 0) {
+      result = result.filter((s) => selectedAreas.includes(s.area));
+    }
+
+    // Category filter (Multi-selection)
+    if (selectedCategorySlugs.length > 0) {
+      result = result.filter((s) => {
+        if (!s.categoryId) return true;
+        return selectedCategorySlugs.some((slug) => s.categoryId?.includes(slug));
+      });
+    }
+
+    // Price Max filter
+    if (priceMax < 2500000) {
+      result = result.filter((s) => s.price <= priceMax);
+    }
+
+    // Min Rating filter
+    if (minRating > 0) {
+      result = result.filter((s) => s.rating >= minRating);
+    }
+
+    // Sorting
     if (sortBy === 'price_asc') {
       result.sort((a, b) => a.price - b.price);
     } else if (sortBy === 'price_desc') {
@@ -259,400 +315,637 @@ export function Search() {
     } else if (sortBy === 'rating_desc') {
       result.sort((a, b) => b.rating - a.rating);
     }
+
     return result;
-  }, [services, priceMax, sortBy]);
+  }, [
+    services,
+    keyword,
+    popFreeCancel,
+    popTopRated,
+    popUnder500k,
+    popHasCoach,
+    popHasPhotos,
+    selectedAreas,
+    selectedCategorySlugs,
+    priceMax,
+    minRating,
+    sortBy,
+  ]);
 
-  // ScrollReveal observer for smooth staggered card entrance
-  useEffect(() => {
-    if (isLoading || displayServices.length === 0) return;
+  // Counts calculation for Traveloka Badges
+  const areaCounts = useMemo(() => {
+    const counts: Record<string, number> = { 'Sơn Trà': 0, 'Mỹ Khê': 0, 'Bãi Rạng': 0, 'Non Nước': 0 };
+    services.forEach((s) => {
+      if (counts[s.area] !== undefined) counts[s.area]++;
+    });
+    return counts;
+  }, [services]);
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const id = entry.target.getAttribute('data-card-id');
-            if (id) {
-              setRevealedIds((prev) => new Set([...prev, id]));
-            }
-          }
-        });
-      },
-      { threshold: 0.15, rootMargin: '0px 0px -50px 0px' }
-    );
-
-    const cards = document.querySelectorAll('[data-card-id]');
-    cards.forEach((card) => observer.observe(card));
-
-    return () => observer.disconnect();
-  }, [isLoading, displayServices]);
-
-  // Category change handler
-  const handleSelectCategory = (slug: string | null) => {
-    setSelectedCategorySlug(slug);
-    if (slug) {
-      setSearchParams({ category: slug });
-    } else {
-      setSearchParams({});
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const handleResetFilters = () => {
+    setPopFreeCancel(false);
+    setPopTopRated(false);
+    setPopUnder500k(false);
+    setPopHasCoach(false);
+    setPopHasPhotos(false);
+    setSelectedAreas([]);
+    setSelectedCategorySlugs([]);
+    setKeyword('');
+    setPriceMax(2500000);
+    setMinRating(0);
+    setSortBy('popular');
+    setSearchParams({});
   };
 
-  // Category metadata for showcase header
-  const categoryMeta = useMemo(() => {
-    if (!matchedCategory && !selectedCategorySlug) return null;
-    const key = matchedCategory?.slug || selectedCategorySlug || '';
-    if (CATEGORY_META[key]) return CATEGORY_META[key];
-
-    // Fuzzy matching
-    for (const [k, v] of Object.entries(CATEGORY_META)) {
-      if (key.includes(k) || k.includes(key)) return v;
-    }
-
-    return {
-      titleVi: matchedCategory?.name.toUpperCase() || 'DANH MỤC TRẢI NGHIỆM BIỂN',
-      titleEn: matchedCategory?.nameEn?.toUpperCase() || 'MARINE EXPERIENCE CATEGORY',
-      descVi: 'Khám phá tất cả các gói hoạt động thể thao biển được yêu thích nhất tại Đà Nẵng.',
-      descEn: 'Explore all popular water sports and ocean adventures in Da Nang.',
-      tag: 'Chuẩn An Toàn',
-    };
-  }, [matchedCategory, selectedCategorySlug]);
+  const hasActiveFilters = Boolean(
+    popFreeCancel ||
+    popTopRated ||
+    popUnder500k ||
+    popHasCoach ||
+    popHasPhotos ||
+    selectedAreas.length > 0 ||
+    selectedCategorySlugs.length > 0 ||
+    keyword ||
+    priceMax < 2500000 ||
+    minRating > 0 ||
+    sortBy !== 'popular'
+  );
 
   return (
-    <main className="w-full text-slate-900 min-h-screen relative overflow-x-clip bg-transparent pb-28">
-      {/* Dynamic Ocean Backdrop matching Homepage */}
-      <CinematicSceneBackdrop />
-
-      <div className="relative z-20 max-w-[1520px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 sm:pt-28">
-
-        {/* =========================================================================
-            TRANSPARENT CINEMATIC HEADER (FPT PLAY / NETFLIX STYLE - NO CLUNKY BOX)
-           ========================================================================= */}
-        <section data-scene="hero" className="mb-6 select-none">
-          {/* Breadcrumb Navigation - Transparent and Clean */}
-          <div className="flex items-center gap-2 text-xs sm:text-sm text-white/90 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.9)] mb-3">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-1 font-medium hover:text-cyan-300 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-              <span>{language === 'en' ? 'Home' : 'Trang chủ'}</span>
-            </Link>
-            <span className="text-white/40">/</span>
-            <button
-              onClick={() => handleSelectCategory(null)}
-              className={`hover:text-cyan-300 transition-colors ${!selectedCategorySlug ? 'text-cyan-300 font-bold' : 'text-white/80'}`}
-            >
-              {language === 'en' ? 'All Activities' : 'Tất cả hoạt động'}
-            </button>
-            {matchedCategory && (
-              <>
-                <span className="text-white/40">/</span>
-                <span className="text-white font-bold truncate">
-                  {language === 'en' ? matchedCategory.nameEn || matchedCategory.name : matchedCategory.name}
-                </span>
-              </>
-            )}
+    <div className="w-full bg-[#f8fafc] min-h-screen text-slate-900 pt-20 pb-32">
+      
+      {/* =========================================================================
+          TOP UNIFIED SEARCH & CONTROL STRIP (Header Query Bar)
+         ========================================================================= */}
+      <section className="bg-white border-b border-slate-200/80 text-slate-900 py-4 sm:py-5 px-4 sm:px-6 lg:px-8 shadow-xs">
+        <div className="max-w-[1440px] mx-auto animate-fadeInUp">
+          
+          {/* Breadcrumbs */}
+          <div className="flex items-center gap-2 text-[13px] text-slate-500 mb-3 font-medium">
+            <Link to="/" className="hover:text-sky-700 transition-colors">Trang chủ</Link>
+            <span className="text-slate-300">/</span>
+            <Link to="/search" className="hover:text-sky-700 transition-colors">Trải nghiệm biển</Link>
+            <span className="text-slate-300">/</span>
+            <span className="text-slate-800 font-semibold">Đà Nẵng</span>
           </div>
 
-          {/* Large Title Directly Over Sea Backdrop */}
-          <div className="max-w-4xl">
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] drop-shadow-[0_8px_24px_rgba(0,0,0,0.7)] mb-2">
-              {categoryMeta
-                ? (language === 'en' ? categoryMeta.titleEn : categoryMeta.titleVi)
-                : (language === 'en' ? 'EXPLORE DA NANG MARINE EXPERIENCES' : 'KHÁM PHÁ TRẢI NGHIỆM BIỂN ĐÀ NẴNG')}
-            </h1>
-          </div>
-        </section>
-
-        {/* =========================================================================
-            UNIFIED CONTROLLER BAR: CATEGORIES + SEARCH + FILTERS IN ONE SEAMLESS CAPSULE
-           ========================================================================= */}
-        <section className="sticky top-20 z-30 mb-8">
-          <div className="bg-white/95 dark:bg-slate-900/90 backdrop-blur-md border border-white/40 dark:border-white/10 rounded-2xl p-2.5 sm:p-3.5 shadow-[0_12px_40px_-6px_rgba(0,0,0,0.25)] flex flex-col gap-2.5">
-            {/* Row 1: Category Switcher Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 border-b border-slate-100 dark:border-white/10">
-              <button
-                type="button"
-                onClick={() => handleSelectCategory(null)}
-                className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                  !selectedCategorySlug
-                    ? 'bg-cyan-600 text-white shadow-sm scale-105'
-                    : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                {language === 'en' ? 'All Activities' : 'Tất cả'}
-              </button>
-
-              {categories.map((cat) => {
-                const isSelected = selectedCategorySlug === cat.slug || matchedCategory?.id === cat.id;
-                return (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => handleSelectCategory(cat.slug || cat.id)}
-                    className={`px-3.5 py-1 rounded-full text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
-                      isSelected
-                        ? 'bg-cyan-600 text-white shadow-sm scale-105'
-                        : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
-                    }`}
-                  >
-                    <span>{language === 'en' ? cat.nameEn || cat.name : cat.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Row 2: Search Input + Price Filter + Sort Dropdown */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5">
-              {/* Search Input Box */}
-              <div className="w-full sm:flex-1 flex items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-xl px-3 py-1.5 border border-slate-200/80 dark:border-white/10 focus-within:border-cyan-500 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all">
-                <span className="material-symbols-outlined text-cyan-600 text-[18px]">search</span>
+          {/* Quick Query Bar (Modern Geometric Design: rounded-2xl & rounded-xl) */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 flex flex-col md:flex-row items-center gap-2 text-slate-800 shadow-xs hover:border-slate-300 transition-colors">
+            
+            {/* Field 1: Destination / Keyword */}
+            <div className="flex-1 min-w-0 w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-500 border border-transparent focus-within:border-sky-500 transition-all">
+              <MapPin className="w-4 h-4 text-sky-700 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">Điểm đến / Trải nghiệm</p>
                 <input
                   type="text"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
-                  placeholder={language === 'en' ? 'Search by activity, location (e.g. My Khe, Son Tra)...' : 'Tìm theo tên trải nghiệm, bãi biển...'}
-                  className="bg-transparent text-xs sm:text-sm text-slate-800 dark:text-white placeholder-slate-400 outline-none w-full"
+                  placeholder="Mỹ Khê, Sơn Trà, chèo SUP, lặn biển..."
+                  className="w-full bg-transparent text-[13px] sm:text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
                 />
-                {keyword && (
+              </div>
+              {keyword && (
+                <button type="button" onClick={() => setKeyword('')} className="text-slate-400 hover:text-slate-700 text-sm px-1 cursor-pointer">✕</button>
+              )}
+            </div>
+
+            {/* Field 2: Date Selector */}
+            <div className="w-full md:w-56 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-transparent transition-colors cursor-pointer shrink-0">
+              <Calendar className="w-4 h-4 text-sky-700 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">Ngày trải nghiệm</p>
+                <p className="text-[13px] sm:text-sm font-semibold text-slate-900 truncate">Hôm nay - Ngày mai</p>
+              </div>
+            </div>
+
+            {/* Field 3: Pax / Guests Count - Widen to 260px & add min-w-0 flex-1 so text never overflows */}
+            <div className="w-full md:w-64 lg:w-72 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-transparent transition-colors cursor-pointer shrink-0">
+              <Users className="w-4 h-4 text-sky-700 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">Số lượng khách</p>
+                <p className="text-[13px] sm:text-sm font-semibold text-slate-900 truncate" title="2 Người lớn, 1 Cano/Ván">
+                  2 Người lớn, 1 Cano/Ván
+                </p>
+              </div>
+            </div>
+
+            {/* Search Submit Button */}
+            <button
+              type="button"
+              className="w-full md:w-auto px-6 py-3 rounded-xl bg-sky-700 hover:bg-sky-600 active:bg-sky-800 text-white font-bold text-[13px] sm:text-sm flex items-center justify-center gap-2 transition-all shrink-0 hover:-translate-y-0.5 shadow-xs cursor-pointer"
+            >
+              <SearchIcon className="w-4 h-4" />
+              <span>Tìm kiếm</span>
+            </button>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* =========================================================================
+          MAIN 2-COLUMN TRAVELOKA SEARCH LAYOUT (Sidebar Filters + Results)
+         ========================================================================= */}
+      <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-44">
+        
+        {/* Mobile Filter Toggle Button */}
+        <div className="lg:hidden mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-[13px] font-bold text-slate-700 cursor-pointer"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-sky-700" />
+            <span>{mobileFilterOpen ? 'Đóng bộ lọc' : 'Bộ lọc tìm kiếm'}</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* =====================================================================
+              LEFT COLUMN: TRAVELOKA FILTER SIDEBAR (Popular, Area, Price, etc.)
+             ===================================================================== */}
+          <aside className={`lg:col-span-4 xl:col-span-3 ${mobileFilterOpen ? 'block' : 'hidden lg:block'} space-y-4`}>
+            
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 sticky top-24 space-y-6">
+              
+              {/* Header: Title & Reset Button */}
+              <div className="flex items-center justify-between pb-1">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-sky-700" />
+                  <h2 className="font-bold text-sm text-slate-900">Bộ lọc tìm kiếm</h2>
+                </div>
+                {hasActiveFilters && (
                   <button
                     type="button"
-                    onClick={() => setKeyword('')}
-                    className="text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                    onClick={handleResetFilters}
+                    className="text-[13px] font-semibold text-sky-700 hover:text-sky-800 flex items-center gap-1 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[16px]">close</span>
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Đặt lại</span>
                   </button>
                 )}
               </div>
 
-              {/* Price & Sort Controls */}
-              <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2 text-xs">
-                {/* Price Filter with stable width and generous slider */}
-                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 rounded-xl px-3 py-1.5 border border-slate-200/80 dark:border-white/10 shrink-0">
-                  <span className="text-slate-500 dark:text-slate-400 shrink-0">{language === 'en' ? 'Max:' : 'Mức giá:'}</span>
-                  <span className="font-bold text-cyan-700 dark:text-cyan-400 w-[64px] text-left shrink-0">
-                    {priceMax >= 1500000
-                      ? (language === 'en' ? 'All' : 'Tất cả')
-                      : (priceMax >= 1000000
-                        ? `${(priceMax / 1000000).toFixed(1).replace('.0', '')}tr ₫`
-                        : `${priceMax / 1000}k ₫`)}
-                  </span>
-                  <input
-                    type="range"
-                    min="200000"
-                    max="1500000"
-                    step="50000"
-                    value={priceMax}
-                    onChange={(e) => setPriceMax(Number(e.target.value))}
-                    className="w-24 sm:w-32 accent-cyan-600 cursor-pointer h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg"
-                  />
-                </div>
-
-                {/* Sort Dropdown */}
-                <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800 rounded-xl px-2.5 py-1.5 border border-slate-200/80 dark:border-white/10 shrink-0">
-                  <span className="text-slate-500 dark:text-slate-400">{language === 'en' ? 'Sort:' : 'Xếp:'}</span>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
-                    className="bg-transparent text-slate-800 dark:text-white font-bold outline-none cursor-pointer text-xs"
-                  >
-                    <option value="popular" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">
-                      {language === 'en' ? 'Popular' : 'Phổ biến'}
-                    </option>
-                    <option value="rating_desc" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">
-                      {language === 'en' ? 'Top Rated ★' : 'Đánh giá ★'}
-                    </option>
-                    <option value="price_asc" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">
-                      {language === 'en' ? 'Price: Low' : 'Giá tăng dần'}
-                    </option>
-                    <option value="price_desc" className="bg-white dark:bg-slate-900 text-slate-800 dark:text-white">
-                      {language === 'en' ? 'Price: High' : 'Giá giảm dần'}
-                    </option>
-                  </select>
-                </div>
-
-                {/* Reset Filter Button - Stable layout reservation */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleSelectCategory(null);
-                    setKeyword('');
-                    setPriceMax(1500000);
-                    setSortBy('popular');
-                  }}
-                  className={`text-cyan-700 dark:text-cyan-400 hover:underline font-bold px-1 cursor-pointer transition-opacity shrink-0 ${
-                    (selectedCategorySlug || keyword || priceMax < 1500000 || sortBy !== 'popular')
-                      ? 'opacity-100 pointer-events-auto'
-                      : 'opacity-0 pointer-events-none'
-                  }`}
+              {/* SECTION 1: FILTER POPULER (Bộ lọc phổ biến như Traveloka) */}
+              <div className="space-y-3">
+                <div 
+                  className="flex items-center justify-between cursor-pointer select-none"
+                  onClick={() => setCollapsePop(!collapsePop)}
                 >
-                  {language === 'en' ? 'Reset' : 'Đặt lại'}
-                </button>
+                  <span className="font-bold text-[13px] sm:text-sm text-slate-900 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <span>Bộ lọc phổ biến</span>
+                  </span>
+                  {collapsePop ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
+                </div>
+
+                {!collapsePop && (
+                  <div className="space-y-2.5 pt-1 text-[13px] text-slate-700">
+                    <label className="flex items-center gap-2.5 cursor-pointer hover:text-slate-900 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={popFreeCancel}
+                        onChange={(e) => setPopFreeCancel(e.target.checked)}
+                        className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
+                      />
+                      <span>Miễn phí hủy trước 24h</span>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer hover:text-slate-900 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={popTopRated}
+                        onChange={(e) => setPopTopRated(e.target.checked)}
+                        className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
+                      />
+                      <span>Đánh giá xuất sắc (4.8+ ⭐)</span>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer hover:text-slate-900 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={popUnder500k}
+                        onChange={(e) => setPopUnder500k(e.target.checked)}
+                        className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
+                      />
+                      <span>Dưới 500.000 ₫ / khách</span>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer hover:text-slate-900 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={popHasCoach}
+                        onChange={(e) => setPopHasCoach(e.target.checked)}
+                        className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
+                      />
+                      <span>Kèm huấn luyện viên 1:1</span>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 cursor-pointer hover:text-slate-900 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={popHasPhotos}
+                        onChange={(e) => setPopHasPhotos(e.target.checked)}
+                        className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
+                      />
+                      <span>Chụp ảnh / Flycam miễn phí</span>
+                    </label>
+                  </div>
+                )}
               </div>
-            </div>
-          </div>
-        </section>
 
-        {/* =========================================================================
-            EXPERIENCES RESULTS GRID WITH SMOOTH SCROLL REVEAL (60 FPS)
-           ========================================================================= */}
-        <section data-scene="sports">
-          {isLoading ? (
-            /* Shared Skeleton Loading State */
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              <TourCardSkeleton count={8} />
-            </div>
-          ) : displayServices.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {displayServices.map((service, idx) => {
-                const isSaved = isInWishlist(service.id);
-                const isRevealed = revealedIds.has(service.id);
+              {/* SECTION 2: AREA / KHU VỰC BIỂN (Traveloka Area Filter) */}
+              <div className="space-y-3">
+                <div 
+                  className="flex items-center justify-between cursor-pointer select-none"
+                  onClick={() => setCollapseArea(!collapseArea)}
+                >
+                  <span className="font-bold text-[13px] sm:text-sm text-slate-900 flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-sky-700" />
+                    <span>Khu vực biển (Area)</span>
+                  </span>
+                  {collapseArea ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
+                </div>
 
-                return (
-                  <article
-                    key={service.id}
-                    data-card-id={service.id}
-                    style={{
-                      transitionDelay: `${(idx % 4) * 75}ms`,
-                    }}
-                    className={`group flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200/90 shadow-[0_4px_20px_-2px_rgba(16,47,58,0.06)] hover:shadow-[0_20px_40px_-4px_rgba(16,47,58,0.14)] hover:-translate-y-2 hover:border-cyan-400 transition-all duration-400 ease-out cursor-pointer ${
-                      isRevealed
-                        ? 'opacity-100 translate-y-0'
-                        : 'opacity-0 translate-y-8'
+                {!collapseArea && (
+                  <div className="space-y-2.5 pt-1 text-[13px] text-slate-700">
+                    {[
+                      { id: 'Sơn Trà', label: 'Bán đảo Sơn Trà', note: 'Lặn ngắm san hô & Kayak' },
+                      { id: 'Mỹ Khê', label: 'Bãi biển Mỹ Khê', note: 'Chèo SUP & Dù bay cano' },
+                      { id: 'Bãi Rạng', label: 'Bãi Rạng - Nam Ô', note: 'Jetski & Rạn đá rêu' },
+                      { id: 'Non Nước', label: 'Vịnh Non Nước', note: 'Câu mực đêm & Lướt sóng' },
+                    ].map((areaItem) => {
+                      const isChecked = selectedAreas.includes(areaItem.id);
+                      return (
+                        <label 
+                          key={areaItem.id}
+                          className="flex items-start justify-between gap-2 cursor-pointer hover:text-slate-900 transition-colors"
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleArea(areaItem.id)}
+                              className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer mt-0.5"
+                            />
+                            <div>
+                              <p className="font-semibold text-slate-800 text-[13px]">{areaItem.label}</p>
+                              <p className="text-slate-500 text-[13px]">{areaItem.note}</p>
+                            </div>
+                          </div>
+                          <span className="text-slate-600 text-[13px] tabular-nums font-semibold">
+                            ({areaCounts[areaItem.id] || 0})
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 3: MỨC GIÁ / KISARAN HARGA (Price Range) */}
+              <div className="space-y-3">
+                <div 
+                  className="flex items-center justify-between cursor-pointer select-none"
+                  onClick={() => setCollapsePrice(!collapsePrice)}
+                >
+                  <span className="font-bold text-[13px] sm:text-sm text-slate-900">Khoảng giá tối đa</span>
+                  {collapsePrice ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
+                </div>
+
+                {!collapsePrice && (
+                  <div className="space-y-2.5 pt-1">
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span className="text-slate-500 font-medium">Mức trần:</span>
+                      <span className="font-bold text-sky-700 tabular-nums">
+                        {priceMax >= 2500000 ? 'Tất cả mức giá' : `${(priceMax / 1000).toLocaleString('vi-VN')}k ₫ / khách`}
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="200000"
+                      max="2500000"
+                      step="50000"
+                      value={priceMax}
+                      onChange={(e) => setPriceMax(Number(e.target.value))}
+                      className="w-full accent-sky-600 cursor-pointer h-1.5 bg-slate-200 rounded-lg"
+                    />
+                    <div className="flex justify-between text-[13px] text-slate-500 font-medium">
+                      <span>200k ₫</span>
+                      <span>1.000k ₫</span>
+                      <span>2.500k+ ₫</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 4: THỂ LOẠI HOẠT ĐỘNG (Categories) */}
+              <div className="space-y-3">
+                <div 
+                  className="flex items-center justify-between cursor-pointer select-none"
+                  onClick={() => setCollapseCat(!collapseCat)}
+                >
+                  <span className="font-bold text-[13px] sm:text-sm text-slate-900">Thể loại hoạt động</span>
+                  {collapseCat ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
+                </div>
+
+                {!collapseCat && (
+                  <div className="space-y-2.5 pt-1 text-[13px] text-slate-700">
+                    {categories.map((cat) => {
+                      const slug = cat.slug || cat.id;
+                      const isChecked = selectedCategorySlugs.includes(slug);
+
+                      return (
+                        <label 
+                          key={cat.id}
+                          className="flex items-center justify-between gap-2 cursor-pointer hover:text-slate-900 transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleCategorySlug(slug)}
+                              className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
+                            />
+                            <span className="font-medium text-slate-800">{cat.name}</span>
+                          </div>
+                          {isChecked && <CheckCircle2 className="w-4 h-4 text-sky-700" />}
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 5: ĐÁNH GIÁ CỦA KHÁCH (Rating) */}
+              <div className="space-y-3">
+                <div 
+                  className="flex items-center justify-between cursor-pointer select-none"
+                  onClick={() => setCollapseRating(!collapseRating)}
+                >
+                  <span className="font-bold text-[13px] sm:text-sm text-slate-900">Đánh giá của khách</span>
+                  {collapseRating ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
+                </div>
+
+                {!collapseRating && (
+                  <div className="grid grid-cols-3 gap-1.5 text-[13px] pt-1">
+                    {[
+                      { label: '4.8+', val: 4.8 },
+                      { label: '4.5+', val: 4.5 },
+                      { label: 'Tất cả', val: 0 },
+                    ].map((r) => (
+                      <button
+                        key={r.label}
+                        type="button"
+                        onClick={() => setMinRating(r.val)}
+                        className={`py-1.5 px-2 rounded-lg font-bold border transition-all cursor-pointer ${
+                          minRating === r.val
+                            ? 'bg-sky-700 text-white border-sky-700'
+                            : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+          </aside>
+
+          {/* =====================================================================
+              RIGHT COLUMN: TRAVELOKA-STYLE RESULTS CARDS
+             ===================================================================== */}
+          <main className="lg:col-span-8 xl:col-span-9 space-y-4">
+            
+            {/* Header: Kết quả tìm kiếm & Thanh sắp xếp */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                  {selectedAreas.length > 0
+                    ? `Trải nghiệm biển tại ${selectedAreas.join(', ')}`
+                    : 'Trải nghiệm thể thao biển Đà Nẵng'}
+                </h1>
+                <p className="text-[13px] text-slate-600 mt-1">
+                  Tìm thấy <strong className="text-sky-700 tabular-nums font-bold">{filteredServices.length}</strong> trải nghiệm khả dụng
+                </p>
+              </div>
+
+              {/* Sort Pills (Traveloka Tabs - Wrap on narrow viewports without triggering horizontal scroll) */}
+              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                <span className="text-[13px] text-slate-600 font-medium shrink-0 mr-1 hidden sm:inline">Sắp xếp:</span>
+                {[
+                  { id: 'popular', label: 'Phổ biến nhất' },
+                  { id: 'rating_desc', label: 'Đánh giá cao' },
+                  { id: 'price_asc', label: 'Giá thấp nhất' },
+                  { id: 'price_desc', label: 'Giá cao nhất' },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSortBy(s.id as any)}
+                    className={`px-3 py-1.5 rounded-xl text-[13px] font-bold transition-all shrink-0 cursor-pointer ${
+                      sortBy === s.id
+                        ? 'bg-sky-700 text-white'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                     }`}
                   >
-                    {/* Image Box */}
-                    <div
-                      className="relative aspect-[4/3] overflow-hidden bg-slate-100"
-                      onClick={() => navigate(`/tour/${service.id}`)}
-                    >
-                      <img
-                        src={service.imageUrl}
-                        alt={service.name}
-                        loading="lazy"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-600 ease-out pointer-events-none"
-                      />
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-                      {/* Optical subtle scrim on image bottom */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none" />
-
-
-
-                      {/* Top Right Wishlist Heart */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          toggleWishlist(service.id, service.name);
-                        }}
-                        aria-label="Toggle wishlist"
-                        className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-black/20 backdrop-blur-md hover:bg-black/35 border border-white/30 shadow-sm flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer z-10 group/heart"
-                      >
-                        <svg className={`w-4.5 h-4.5 transition-all duration-200 drop-shadow-sm ${isSaved ? 'text-rose-500 fill-rose-500 scale-105' : 'text-white fill-none stroke-white stroke-[2.2] group-hover/heart:scale-110'}`} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill={isSaved ? 'currentColor' : 'none'} /></svg>
-                      </button>
-
-                      {/* Bottom Info on Image */}
-                      <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-xs font-medium">
-                        <span className="flex items-center gap-1 drop-shadow-md">
-                          <span className="material-symbols-outlined text-[14px] text-cyan-300">location_on</span>
-                          <span className="truncate">{service.location}</span>
-                        </span>
-                        {service.duration && (
-                          <span className="flex items-center gap-1 drop-shadow-md">
-                            <span className="material-symbols-outlined text-[14px] text-amber-300">schedule</span>
-                            <span>{service.duration}</span>
-                          </span>
-                        )}
-                      </div>
+            {/* List of Traveloka-Style Horizontal Cards */}
+            {isLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="bg-white rounded-2xl border border-slate-200/80 p-4 animate-pulse flex flex-col sm:flex-row gap-4 h-56">
+                    <div className="w-full sm:w-64 bg-slate-200 rounded-xl"></div>
+                    <div className="flex-1 space-y-3 py-2">
+                      <div className="h-5 bg-slate-200 rounded w-3/4"></div>
+                      <div className="h-4 bg-slate-200 rounded w-1/2"></div>
+                      <div className="h-4 bg-slate-200 rounded w-full"></div>
                     </div>
+                  </div>
+                ))}
+              </div>
+            ) : filteredServices.length > 0 ? (
+              <div className="space-y-4">
+                {filteredServices.map((service) => {
+                  const isSaved = isInWishlist(service.id);
 
-                    {/* Content Box */}
-                    <div
-                      className="p-4 flex-1 flex flex-col justify-between text-slate-900"
+                  return (
+                    <article
+                      key={service.id}
+                      data-ui="traveloka-experience-card"
                       onClick={() => navigate(`/tour/${service.id}`)}
+                      className="group bg-white rounded-2xl border border-slate-200/90 hover:border-sky-400 hover:shadow-lg transition-all duration-200 flex flex-col sm:flex-row overflow-hidden cursor-pointer animate-fadeInUp"
                     >
-                      <div>
-                        {/* Rating Row */}
-                        <div className="flex items-center justify-between mb-1.5 text-xs">
-                          <div className="flex items-center gap-1 text-amber-500 font-bold">
-                            <span>★</span>
-                            <span className="text-slate-800 font-semibold">{service.rating.toFixed(2)}</span>
-                            <span className="text-slate-400 font-normal">({service.reviewCount})</span>
-                          </div>
-                          <span className="text-[11px] text-cyan-700 font-semibold uppercase tracking-wider">
-                            {language === 'en' ? 'Maritime Verified' : 'Chuẩn An Toàn'}
+                      {/* Left: Image Box (~280px) */}
+                      <div className="relative w-full sm:w-64 md:w-72 h-48 sm:h-auto shrink-0 overflow-hidden bg-slate-100">
+                        <img
+                          src={service.imageUrl}
+                          alt={service.name}
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.src = FALLBACK_CARD_IMAGE;
+                          }}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                        />
+                        
+                        {/* Status / Badge overlay */}
+                        <div className="absolute top-2.5 left-2.5">
+                          <span className="px-2.5 py-1 rounded-md bg-[#031d44]/90 backdrop-blur-xs text-white text-[13px] font-bold">
+                            Chuẩn an toàn SOLAS
                           </span>
                         </div>
 
-                        {/* Title */}
-                        <h3 className="font-bold text-base leading-snug line-clamp-2 text-slate-900 group-hover:text-cyan-700 transition-colors">
-                          {service.name}
-                        </h3>
-
-                        {/* Description */}
-                        <p className="mt-1.5 text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                          {service.description}
-                        </p>
+                        {/* Wishlist Heart */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleWishlist(service.id, service.name);
+                          }}
+                          className="absolute top-2.5 right-2.5 w-8 h-8 rounded-xl bg-slate-900/60 hover:bg-slate-900/80 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform cursor-pointer z-10"
+                        >
+                          <Heart className={`w-4 h-4 transition-colors ${isSaved ? 'text-rose-500 fill-rose-500' : 'text-white'}`} />
+                        </button>
                       </div>
 
-                      {/* Price & Action Row */}
-                      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                      {/* Middle: Details & Features */}
+                      <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
                         <div>
-                          <div className="text-xs text-slate-400">
-                            {language === 'en' ? 'From' : 'Đơn giá từ'}
+                          
+                          {/* Title */}
+                          <h2 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-sky-700 transition-colors line-clamp-2 leading-snug">
+                            {service.name}
+                          </h2>
+
+                          {/* Rating & Review Count (Traveloka Score Pill Style) */}
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="inline-flex items-center gap-1 bg-sky-50 text-sky-800 px-2 py-0.5 rounded-md font-bold text-[13px] tabular-nums">
+                              <Star className="w-3.5 h-3.5 fill-sky-700 text-sky-700" />
+                              <span>{service.rating.toFixed(1)} / 5</span>
+                            </div>
+                            <span className="text-[13px] font-semibold text-slate-700">Tuyệt vời</span>
+                            <span className="text-[13px] text-slate-600 tabular-nums font-medium">({service.reviewCount} đánh giá)</span>
                           </div>
-                          <div className="flex items-baseline gap-1">
-                            <span className="font-black text-lg text-rose-600">
-                              {service.price.toLocaleString('vi-VN')}₫
+
+                          {/* Location & Duration & Distance */}
+                          <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-600 mt-2 font-medium">
+                            <span className="flex items-center gap-1 font-semibold text-slate-800">
+                              <MapPin className="w-3.5 h-3.5 text-sky-700" />
+                              <span>{service.location}</span>
                             </span>
-                            <span className="text-xs text-slate-400">
-                              /{language === 'en' ? 'guest' : 'khách'}
+                            <span>•</span>
+                            <span className="text-slate-500">{service.distanceFromCenter}</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1 text-slate-500">
+                              <Clock className="w-3.5 h-3.5 text-slate-500" />
+                              <span>{service.duration || '120 phút'}</span>
                             </span>
+                          </div>
+
+                          {/* Short Description */}
+                          <p className="text-[13px] text-slate-600 line-clamp-2 leading-relaxed mt-2">
+                            {service.description}
+                          </p>
+
+                          {/* Amenities Chips */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-[13px] font-medium">
+                              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                              Áo phao đạt chuẩn
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-[13px] font-medium">
+                              <Sparkles className="w-3.5 h-3.5 text-sky-700" />
+                              HDV 1:1 bản địa
+                            </span>
+                            {service.hasPhotos && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-[13px] font-medium">
+                                <Camera className="w-3.5 h-3.5 text-amber-600" />
+                                Chụp ảnh miễn phí
+                              </span>
+                            )}
                           </div>
                         </div>
 
-                        {/* Booking Details Arrow Button */}
-                        <span className="w-9 h-9 rounded-full bg-cyan-50 text-cyan-700 flex items-center justify-center group-hover:bg-cyan-600 group-hover:text-white transition-all duration-200">
-                          <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                        </span>
+                        {/* Cancellation Policy Banner */}
+                        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-1.5 text-[13px] text-emerald-700 font-medium">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Miễn phí hủy trước 24h • Hoàn tiền nếu biển động</span>
+                        </div>
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            /* Empty State */
-            <div className="bg-white/90 backdrop-blur-md border border-white/60 rounded-3xl p-12 text-center max-w-xl mx-auto my-12 shadow-xl">
-              <span className="material-symbols-outlined text-cyan-600 text-[64px] mb-3">search_off</span>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">
-                {language === 'en' ? 'No marine experiences found' : 'Không tìm thấy trải nghiệm phù hợp'}
-              </h2>
-              <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-                {language === 'en'
-                  ? 'Try expanding your price range or clearing keyword filters to view other exciting ocean adventures.'
-                  : 'Hãy thử nới rộng mức giá lọc hoặc xóa từ khóa tìm kiếm để khám phá các hoạt động biển hấp dẫn khác.'}
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  handleSelectCategory(null);
-                  setKeyword('');
-                  setPriceMax(1500000);
-                  setSortBy('popular');
-                }}
-                className="px-6 py-2.5 rounded-full bg-gradient-to-r from-cyan-600 to-teal-600 text-white font-bold text-sm shadow-md shadow-cyan-600/30 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
-              >
-                {language === 'en' ? 'Show All Experiences' : 'Xem tất cả trải nghiệm biển'}
-              </button>
-            </div>
-          )}
-        </section>
 
-      </div>
-    </main>
+                      {/* Right: Commercial Pricing & Action Box (Traveloka Style) */}
+                      <div className="p-4 sm:p-5 sm:border-l sm:border-slate-100 flex flex-col justify-between items-start w-full sm:w-56 shrink-0 bg-slate-50/50 sm:bg-transparent">
+                        
+                        {/* Price Display (Left-aligned within box to prevent floating button collision) */}
+                        <div className="text-left w-full">
+                          {service.promotionalPrice && (
+                            <p className="text-[13px] text-slate-500 line-through tabular-nums font-medium">
+                              {service.promotionalPrice.toLocaleString('vi-VN')} ₫
+                            </p>
+                          )}
+                          <p className="text-xl sm:text-2xl font-black text-sky-700 tabular-nums tracking-tight">
+                            {service.price.toLocaleString('vi-VN')} ₫
+                          </p>
+                          <p className="text-[13px] text-slate-600">
+                            / khách <span className="text-emerald-700 font-medium">(Đã gồm bảo hiểm)</span>
+                          </p>
+                        </div>
+
+                        {/* CTA Button */}
+                        <div className="w-full mt-3 sm:mt-0">
+                          <button
+                            type="button"
+                            className="w-full py-2.5 px-4 rounded-xl bg-sky-700 hover:bg-sky-800 text-white font-bold text-[13px] sm:text-sm flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer"
+                          >
+                            <span>Chọn trải nghiệm</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                      </div>
+
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Empty state */
+              <div className="bg-white rounded-2xl border border-slate-200/90 p-12 text-center shadow-xs">
+                <div className="w-12 h-12 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center mx-auto mb-3">
+                  <SearchIcon className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-base text-slate-900 mb-1">
+                  Không tìm thấy trải nghiệm phù hợp
+                </h3>
+                <p className="text-[13px] text-slate-500 max-w-sm mx-auto mb-4">
+                  Thử nới rộng khoảng giá hoặc bỏ bớt các tiêu chí lọc để xem thêm các hoạt động biển khác tại Đà Nẵng.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="px-4 py-2 rounded-xl bg-sky-700 text-white text-[13px] font-bold hover:bg-sky-800 transition-colors cursor-pointer"
+                >
+                  Xóa tất cả bộ lọc
+                </button>
+              </div>
+            )}
+
+          </main>
+
+        </div>
+
+      </main>
+
+    </div>
   );
 }
-
-export default Search;

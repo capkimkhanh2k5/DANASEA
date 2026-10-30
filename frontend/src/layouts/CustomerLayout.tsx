@@ -1,8 +1,10 @@
 import { Outlet, useLocation } from "react-router-dom";
 import { Header } from "../components/layout/Header";
 import { Footer } from "../components/layout/Footer";
+import { FloatingCustomerDeck } from "../components/customer/FloatingCustomerDeck";
 import { useEffect, useState } from "react";
 import { useWishlistStore } from "../store/useWishlistStore";
+import { useAuthStore } from "../store/useAuthStore";
 
 // Định nghĩa thứ tự các trang chính để xác định hướng trượt
 const PAGE_ORDER: Record<string, number> = {
@@ -16,9 +18,16 @@ export function CustomerLayout() {
   const location = useLocation();
   const [prevPath, setPrevPath] = useState(location.pathname);
   const [animationClass, setAnimationClass] = useState("animate-fade-in-up");
-  const { toastMessage, toastTimestamp, clearToast } = useWishlistStore();
+  const { toastMessage, toastTimestamp, clearToast, fetchWishlistFromServer } = useWishlistStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const [currentToast, setCurrentToast] = useState<{ text: string; id: number } | null>(null);
   const [isExiting, setIsExiting] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchWishlistFromServer();
+    }
+  }, [isAuthenticated, fetchWishlistFromServer]);
 
   useEffect(() => {
     if (toastMessage && toastTimestamp) {
@@ -69,7 +78,7 @@ export function CustomerLayout() {
       const timer = setTimeout(() => {
         const element = document.querySelector(location.hash);
         if (element) {
-          const headerHeight = 80;
+          const headerHeight = 68;
           const targetPosition = element.getBoundingClientRect().top + window.scrollY - headerHeight;
           window.scrollTo({ top: targetPosition, behavior: "smooth" });
         }
@@ -93,6 +102,7 @@ export function CustomerLayout() {
         <Outlet />
       </div>
       {!isAuthPage && <Footer />}
+      {!isAuthPage && <FloatingCustomerDeck />}
 
       {/* Global Floating Wishlist Toast Notification (Carousel slide: right-to-left in, left-to-right out) */}
       {currentToast && (

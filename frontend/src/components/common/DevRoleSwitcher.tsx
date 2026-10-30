@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { User, Ship, ShieldAlert, ArrowLeftRight, X, ChevronUp, LogOut, Waves } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useLoadingStore } from '../../store/useLoadingStore';
 import { authService } from '../../services/authService';
@@ -33,7 +34,6 @@ export function DevRoleSwitcher() {
   const roleConfig: Record<Role, {
     label: string;
     shortLabel: string;
-    icon: string;
     accountKey: 'customer' | 'vendor' | 'admin';
     targetPath: string;
     color: string;
@@ -43,7 +43,6 @@ export function DevRoleSwitcher() {
     CUSTOMER: {
       label: 'Khách hàng',
       shortLabel: 'Du khách',
-      icon: 'person',
       accountKey: 'customer',
       targetPath: '/',
       color: 'bg-primary text-on-primary',
@@ -53,7 +52,6 @@ export function DevRoleSwitcher() {
     VENDOR: {
       label: 'Đối tác Vendor',
       shortLabel: 'Vendor',
-      icon: 'sailing',
       accountKey: 'vendor',
       targetPath: '/vendor',
       color: 'bg-secondary text-on-secondary',
@@ -63,11 +61,10 @@ export function DevRoleSwitcher() {
     ADMIN: {
       label: 'Quản trị viên',
       shortLabel: 'Admin',
-      icon: 'admin_panel_settings',
       accountKey: 'admin',
       targetPath: '/admin',
       color: 'bg-primary-container text-on-primary',
-      badge: 'bg-indigo-600 text-white',
+      badge: 'bg-sky-600 text-white',
       desc: 'Duyệt hồ sơ vendor, duyệt tour mới, quản lý hoàn tiền, hệ thống',
     },
   };
@@ -117,64 +114,66 @@ export function DevRoleSwitcher() {
   const activeMeta = roleConfig[currentRole] || roleConfig.CUSTOMER;
 
   return (
-    <div ref={menuRef} className="fixed bottom-5 left-5 z-[9999] font-sans">
+    <div ref={menuRef} data-ui="dev-role-switcher" className="hidden sm:block fixed bottom-5 left-5 z-[9999] font-sans">
       {/* Floating Trigger Pill */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="group flex items-center gap-2 px-3.5 py-2 rounded-full bg-surface-container-lowest/95 backdrop-blur-md border border-outline-variant/40 shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-105 cursor-pointer text-left"
+        className="group flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/95 border border-slate-300 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer text-left"
         title="Chuyển đổi phân hệ kiểm tra (Dev Role Switcher)"
       >
-        <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${
-          currentRole === 'ADMIN' ? 'bg-indigo-500' : currentRole === 'VENDOR' ? 'bg-amber-500' : 'bg-emerald-500'
+        <span className={`w-2.5 h-2.5 rounded-full ${
+          currentRole === 'ADMIN' ? 'bg-sky-600' : currentRole === 'VENDOR' ? 'bg-amber-500' : 'bg-emerald-500'
         }`} />
         
-        <div className="flex items-center gap-1.5 text-xs font-bold text-on-surface">
-          <span className="material-symbols-outlined text-[16px] text-primary-container">
-            {activeMeta.icon}
-          </span>
+        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+          {currentRole === 'ADMIN' ? (
+            <ShieldAlert className="w-4 h-4 text-sky-600 shrink-0" />
+          ) : currentRole === 'VENDOR' ? (
+            <Ship className="w-4 h-4 text-amber-600 shrink-0" />
+          ) : (
+            <User className="w-4 h-4 text-emerald-600 shrink-0" />
+          )}
           <span>{activeMeta.shortLabel}</span>
         </div>
 
-        <span className="px-1.5 py-0.5 rounded-md bg-surface-container-high text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">
+        <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-[10px] font-semibold text-slate-600 uppercase tracking-wider">
           Phân hệ
         </span>
 
-        <span className={`material-symbols-outlined text-[16px] text-outline transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
-          expand_less
-        </span>
+        <ChevronUp className={`w-4 h-4 text-slate-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Popover Panel */}
       {isOpen && (
-        <div className="absolute bottom-12 left-0 w-84 sm:w-96 rounded-2xl bg-surface-container-lowest/98 backdrop-blur-xl border border-outline-variant/40 shadow-2xl p-4 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute bottom-12 left-0 w-84 sm:w-96 rounded-2xl bg-white border border-slate-300 p-4 space-y-3">
           {/* Header */}
-          <div className="flex items-center justify-between pb-2 border-b border-outline-variant/30">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-200">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-primary-container/10 flex items-center justify-center text-primary-container">
-                <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
+              <div className="w-7 h-7 rounded-lg bg-sky-50 flex items-center justify-center text-sky-600">
+                <ArrowLeftRight className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="font-headline-sm text-xs font-bold text-on-surface uppercase tracking-wide">
+                <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
                   Chuyển nhanh phân hệ
                 </h4>
-                <p className="font-label-sm text-[10px] text-outline">
-                  Mật khẩu mặc định: <span className="font-mono font-bold text-on-surface">password123</span>
+                <p className="text-[11px] text-slate-500">
+                  Mật khẩu mặc định: <span className="font-semibold text-slate-800">password123</span>
                 </p>
               </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="w-6 h-6 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high flex items-center justify-center cursor-pointer transition-colors"
+              className="w-6 h-6 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer transition-colors"
             >
-              <span className="material-symbols-outlined text-[16px]">close</span>
+              <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Current Active Info */}
-          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-surface-container-low text-xs">
-            <span className="text-outline">Đang đăng nhập:</span>
-            <span className="font-bold text-on-surface truncate max-w-[180px]">
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-slate-50 text-xs">
+            <span className="text-slate-500">Đang đăng nhập:</span>
+            <span className="font-bold text-slate-800 truncate max-w-[180px]">
               {user?.email || 'Chưa đăng nhập'}
             </span>
           </div>
@@ -187,26 +186,24 @@ export function DevRoleSwitcher() {
               onClick={() => handleSelectRole('customer', '/')}
               className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 group ${
                 currentRole === 'CUSTOMER'
-                  ? 'bg-primary/5 border-primary shadow-sm'
-                  : 'bg-surface-container-lowest hover:bg-surface-container-low border-outline-variant/30'
+                  ? 'bg-emerald-50 border-emerald-500'
+                  : 'bg-white hover:bg-slate-50 border-slate-200'
               }`}
             >
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  person
-                </span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <User className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-on-surface">1. Khách hàng (Du khách)</span>
+                  <span className="font-bold text-xs text-slate-900">1. Khách hàng (Du khách)</span>
                   {currentRole === 'CUSTOMER' && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500 text-white">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white">
                       Đang chọn
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-outline font-mono mt-0.5">customer@danasea.vn</p>
-                <p className="text-[10px] text-on-surface-variant truncate mt-1">
+                <p className="text-[11px] text-slate-500 mt-0.5">customer@danasea.vn</p>
+                <p className="text-[11px] text-slate-600 truncate mt-1">
                   {roleConfig.CUSTOMER.desc}
                 </p>
               </div>
@@ -218,26 +215,24 @@ export function DevRoleSwitcher() {
               onClick={() => handleSelectRole('vendor', '/vendor')}
               className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 group ${
                 currentRole === 'VENDOR'
-                  ? 'bg-amber-500/5 border-amber-500 shadow-sm'
-                  : 'bg-surface-container-lowest hover:bg-surface-container-low border-outline-variant/30'
+                  ? 'bg-amber-50 border-amber-500'
+                  : 'bg-white hover:bg-slate-50 border-slate-200'
               }`}
             >
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  sailing
-                </span>
+              <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Ship className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-on-surface">2. Đối tác (Vendor Portal)</span>
+                  <span className="font-bold text-xs text-slate-900">2. Đối tác (Vendor Portal)</span>
                   {currentRole === 'VENDOR' && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-600 text-white">
                       Đang chọn
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-outline font-mono mt-0.5">vendor@danasea.vn</p>
-                <p className="text-[10px] text-on-surface-variant truncate mt-1">
+                <p className="text-[11px] text-slate-500 mt-0.5">vendor@danasea.vn</p>
+                <p className="text-[11px] text-slate-600 truncate mt-1">
                   {roleConfig.VENDOR.desc}
                 </p>
               </div>
@@ -249,26 +244,24 @@ export function DevRoleSwitcher() {
               onClick={() => handleSelectRole('admin', '/admin')}
               className={`w-full p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-3 group ${
                 currentRole === 'ADMIN'
-                  ? 'bg-primary-container/10 border-primary-container shadow-sm'
-                  : 'bg-surface-container-lowest hover:bg-surface-container-low border-outline-variant/30'
+                  ? 'bg-sky-50 border-sky-500'
+                  : 'bg-white hover:bg-slate-50 border-slate-200'
               }`}
             >
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="material-symbols-outlined text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                  admin_panel_settings
-                </span>
+              <div className="w-8 h-8 rounded-lg bg-sky-100 text-sky-700 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <ShieldAlert className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-xs text-on-surface">3. Quản trị viên (Admin Hub)</span>
+                  <span className="font-bold text-xs text-slate-900">3. Quản trị viên (Admin Hub)</span>
                   {currentRole === 'ADMIN' && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white">
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-600 text-white">
                       Đang chọn
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-outline font-mono mt-0.5">admin@danasea.vn</p>
-                <p className="text-[10px] text-on-surface-variant truncate mt-1">
+                <p className="text-[11px] text-slate-500 mt-0.5">admin@danasea.vn</p>
+                <p className="text-[11px] text-slate-600 truncate mt-1">
                   {roleConfig.ADMIN.desc}
                 </p>
               </div>
@@ -282,23 +275,23 @@ export function DevRoleSwitcher() {
               triggerDemoLoading(3000, "Đang kết nối sóng biển DANASEA...", "Chuẩn bị hải trình và cập nhật dữ liệu trải nghiệm");
               setIsOpen(false);
             }}
-            className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-primary/10 via-secondary/10 to-primary-container/10 border border-primary/20 hover:border-primary/40 text-primary flex items-center justify-center gap-2 text-xs font-bold transition-all hover:shadow-sm cursor-pointer"
+            className="w-full py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-700 flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[16px] text-secondary">sailing</span>
+            <Waves className="w-4 h-4 text-sky-600 shrink-0" />
             <span>Xem thử hiệu ứng Sóng nước (Liquid Wave Loader)</span>
           </button>
 
           {/* Footer Actions */}
-          <div className="pt-2 border-t border-outline-variant/30 flex items-center justify-between text-xs">
-            <span className="text-[11px] text-outline">
-              Đường dẫn hiện tại: <span className="font-mono text-on-surface">{location.pathname}</span>
+          <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
+            <span className="text-[11px] text-slate-500">
+              Đường dẫn hiện tại: <span className="font-medium text-slate-800">{location.pathname}</span>
             </span>
             <button
               type="button"
               onClick={handleLogout}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-error hover:text-error/80 cursor-pointer"
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[14px]">logout</span>
+              <LogOut className="w-3.5 h-3.5" />
               Đăng xuất
             </button>
           </div>

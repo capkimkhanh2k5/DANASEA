@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+html, body {
+  background-color: #ffffff;
+  color-scheme: light;
+}
+
 @theme {
   --color-white: #ffffff;
   --color-black: #000000;
@@ -174,27 +179,42 @@
     margin-bottom: 0 !important;
   }
 }
-/* Modern slim scrollbars across the application */
+/* Modern slim transparent scrollbars across the application */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.02);
-  border-radius: 9999px;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 100, 111, 0.25);
+  background: rgba(148, 163, 184, 0.45);
   border-radius: 9999px;
-  transition: background 0.2s;
+  border: 1.5px solid transparent;
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 100, 111, 0.45);
+  background: rgba(100, 116, 139, 0.7);
+  border: 1.5px solid transparent;
+  background-clip: padding-box;
 }
 
-* {
+html {
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 100, 111, 0.25) transparent;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
 }
 
 /* Specific highlighted scrollbar for wide data tables with horizontal scroll */
@@ -581,4 +601,8 @@
 
 .animate-liquid-bubble-4 {
   animation: liquidBubbleFloat2 2.4s ease-in infinite 1.8s;
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined', 'Inter', sans-serif !important;
 }

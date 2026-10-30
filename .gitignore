@@ -19,6 +19,7 @@ frontend/docs/*.mp4
 frontend/docs/*.jpg
 frontend/docs/motionsites_prompts/
 frontend/public/images/*.mp4
+frontend/public/videos/danasea_4k_*.mp4
 private/
 __pycache__/
 *.py[cod]
@@ -28,3 +29,6 @@ cli-proxy/logs/
 .deploy-state
 .deploy.lock
 .product.env
+
+.taste-skill/
+DESIGN.md

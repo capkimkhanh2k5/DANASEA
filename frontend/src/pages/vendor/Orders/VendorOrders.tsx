@@ -1,9 +1,18 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { vendorOrderService } from "../../../services/vendorOrderService";
+import { vendorService } from "../../../services/vendorService";
+import { orderService } from "../../../services/orderService";
+import { toast } from "../../../store/useToastStore";
+import { extractErrorMessage } from "../../../utils/errorHandler";
+import type { VendorServiceDto, VendorServiceSlotDto } from "../../../types/vendorService";
+import type { VendorSubOrderDto, VendorBookingItemDto } from "../../../types/vendorOrder";
 
 export type SubOrderStatus = 
   | "PENDING" 
+  | "PENDING_PAYMENT"
   | "CONFIRMED" 
+  | "CHECKED_IN"
   | "REJECTED" 
   | "COMPLETED" 
   | "CANCELLED" 
@@ -21,6 +30,9 @@ export interface RefundDetail {
 export interface OrderItem {
   id: string; // Sub-order ID (e.g. SUB-89412-01)
   orderNumber: string; // Master order ID (e.g. DNS-89412)
+  bookingItemId?: string; // Booking item ID for API rejection
+  serviceId?: string;
+  slotId?: string;
   serviceTitle: string;
   customerName: string;
   customerPhone: string;
@@ -418,18 +430,13 @@ const INITIAL_ORDERS: OrderItem[] = [
 ];
 
 export function VendorOrders() {
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
-  };
-
   const [activeFilter, setActiveFilter] = useState<"ALL" | SubOrderStatus>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedShift, setSelectedShift] = useState<"ALL" | "MORNING" | "AFTERNOON">("ALL");
   const [showFinancials, setShowFinancials] = useState(false);
   const [orders, setOrders] = useState<OrderItem[]>(INITIAL_ORDERS);
-  
+  const [isLoading, setIsLoading] = useState(true);
+
   // Drawer state for viewing/editing selected order
   const [drawerOrderId, setDrawerOrderId] = useState<string | null>(null);
 
@@ -440,6 +447,7 @@ export function VendorOrders() {
   // Terminal state
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [manualCode, setManualCode] = useState("");
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [scannerResult, setScannerResult] = useState<{
     type: "SUCCESS" | "USED" | "INVALID" | "WRONG_VENDOR" | null;
     order?: OrderItem;
@@ -449,88 +457,299 @@ export function VendorOrders() {
   // Reject dialog
   const [rejectOrderId, setRejectOrderId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("Lệnh cấm biển khẩn cấp từ Cảng vụ / Thời tiết xấu");
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  // Reschedule proposal modal
+  const [isRescheduleOpen, setIsRescheduleOpen] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<VendorServiceSlotDto[]>([]);
+  const [rescheduleSlotId, setRescheduleSlotId] = useState("");
+  const [rescheduleReasonType, setRescheduleReasonType] = useState<"WEATHER" | "OPERATIONAL">("WEATHER");
+  const [rescheduleReason, setRescheduleReason] = useState("Thời tiết biển động sóng lớn cấp 6, đề xuất chuyển ca mới");
+  const [isSubmittingReschedule, setIsSubmittingReschedule] = useState(false);
 
   // Refund detail view modal
   const [selectedRefundOrder, setSelectedRefundOrder] = useState<OrderItem | null>(null);
 
+  // Core loader function
+  const loadData = useCallback(async () => {
+    try {
+      const [ordersRes, bookingsRes, myServices] = await Promise.allSettled([
+        vendorOrderService.getVendorOrders(0, 50),
+        vendorOrderService.getVendorBookings({ page: 0, size: 50 }),
+        vendorService.getMyServices(),
+      ]);
+
+      const subOrders: VendorSubOrderDto[] =
+        ordersRes.status === "fulfilled" ? ordersRes.value.content || [] : [];
+      const bookingItems: VendorBookingItemDto[] =
+        bookingsRes.status === "fulfilled" ? bookingsRes.value.content || [] : [];
+      const servicesList: VendorServiceDto[] =
+        myServices.status === "fulfilled" ? myServices.value || [] : [];
+
+      const serviceMap = new Map<string, VendorServiceDto>();
+      servicesList.forEach((s) => serviceMap.set(s.id, s));
+
+      const mergedList: OrderItem[] = [];
+
+      // 1. Process booking items
+      bookingItems.forEach((b) => {
+        const srv = serviceMap.get(b.serviceId);
+        const matchedSub = subOrders.find(
+          (so) => so.serviceId === b.serviceId && (so.slotId === b.slotId || so.quantity === b.quantity)
+        );
+
+        const subId = matchedSub?.id || b.itemId;
+        const total = b.subtotal || b.price * b.quantity;
+        const commission = total * 0.1;
+        const payout = total - commission;
+
+        let status: SubOrderStatus = "CONFIRMED";
+        if (b.bookingStatus === "CHECKED_IN" || matchedSub?.status === "CHECKED_IN") {
+          status = "COMPLETED";
+        } else if (b.bookingStatus === "CANCELLED" || matchedSub?.status === "CANCELLED") {
+          status = "CANCELLED";
+        } else if (b.bookingStatus === "REJECTED" || matchedSub?.status === "REJECTED") {
+          status = "REJECTED";
+        } else if (matchedSub?.status) {
+          status = matchedSub.status;
+        }
+
+        mergedList.push({
+          id: subId,
+          orderNumber: `DNS-${(b.itemId || b.bookingId || subId).replace(/-/g, '').slice(-5).toUpperCase()}`,
+          bookingItemId: b.itemId,
+          serviceId: b.serviceId,
+          slotId: b.slotId || undefined,
+          serviceTitle: srv?.name || "Dịch vụ thể thao biển",
+          customerName: "Nguyễn Văn Khách",
+          customerPhone: "0905 123 456",
+          customerEmail: "khachhang@danasea.vn",
+          timeSlot: b.bookingTime ? b.bookingTime.slice(0, 5) : "08:00 - 10:00",
+          dateStr: b.bookingDate || "Hôm nay",
+          guestCount: b.quantity || 1,
+          unitPrice: b.price || total / (b.quantity || 1),
+          totalAmount: total,
+          commissionRate: 10,
+          commissionAmount: commission,
+          payoutAmount: payout,
+          status,
+          checked_in_at: matchedSub?.checkedInAt || (status === "COMPLETED" ? "Đã check-in" : null),
+          departurePoint: srv?.locationName || srv?.address || "Bến thủy du lịch Đà Nẵng",
+          image: srv?.images?.[0]?.url || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80",
+          paymentMethod: "VNPay QR",
+        });
+      });
+
+      // 2. Add standalone subOrders
+      subOrders.forEach((so) => {
+        const alreadyAdded = mergedList.some((m) => m.id === so.id);
+        if (!alreadyAdded) {
+          const srv = serviceMap.get(so.serviceId);
+          const total = so.finalAmount ?? so.subtotalAmount;
+          const commission = total * 0.1;
+          const payout = total - commission;
+          mergedList.push({
+            id: so.id,
+            orderNumber: `DNS-${(so.id || '').replace(/-/g, '').slice(-5).toUpperCase()}`,
+            serviceId: so.serviceId,
+            slotId: so.slotId || undefined,
+            serviceTitle: srv?.name || "Trải nghiệm thể thao biển",
+            customerName: "Nguyễn Văn Khách",
+            customerPhone: "0905 123 456",
+            customerEmail: "khachhang@danasea.vn",
+            timeSlot: "08:00 - 10:00",
+            dateStr: "Hôm nay",
+            guestCount: so.quantity || 1,
+            unitPrice: so.unitPrice || total / (so.quantity || 1),
+            totalAmount: total,
+            commissionRate: 10,
+            commissionAmount: commission,
+            payoutAmount: payout,
+            status: so.status,
+            checked_in_at: so.checkedInAt || null,
+            departurePoint: srv?.locationName || srv?.address || "Bến thủy Đà Nẵng",
+            image: srv?.images?.[0]?.url || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80",
+            paymentMethod: "VNPay QR",
+          });
+        }
+      });
+
+      if (mergedList.length > 0) {
+        setOrders(mergedList);
+      } else {
+        setOrders(INITIAL_ORDERS);
+      }
+    } catch (err) {
+      console.error("[VendorOrders] Load error:", err);
+      setOrders(INITIAL_ORDERS);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchOrdersAndBookings = useCallback(async () => {
+    setIsLoading(true);
+    await loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    let ignore = false;
+    const runAsync = async () => {
+      await Promise.resolve();
+      if (!ignore) {
+        await loadData();
+      }
+    };
+    void runAsync();
+    return () => {
+      ignore = true;
+    };
+  }, [loadData]);
+
   // Verification logic for QR check-in
-  const handleVerifyCode = (codeToVerify?: string) => {
-    const code = (codeToVerify || manualCode).trim().toUpperCase();
-    if (!code) {
+  const handleVerifyCode = async (codeToVerify?: string) => {
+    const rawInput = (codeToVerify || manualCode).trim();
+    if (!rawInput) {
       setScannerResult({ type: "INVALID", message: "Vui lòng nhập mã vé hợp lệ." });
       return;
     }
 
-    if (code === "SUB-OTHER-999" || code === "WRONG" || code.includes("OTHER")) {
+    if (rawInput === "SUB-OTHER-999" || rawInput.toUpperCase() === "WRONG" || rawInput.toUpperCase().includes("OTHER")) {
       setScannerResult({
         type: "WRONG_VENDOR",
-        message: "Vé không thuộc quyền phục vụ của Danang Ocean Club (Thuộc Nhà cung cấp Sơn Trà Diving Co.)."
+        message: "Vé không thuộc quyền phục vụ của cơ sở (Thuộc Nhà cung cấp khác)."
       });
       return;
     }
 
-    const matched = orders.find(
-      (o) => o.id.toUpperCase() === code || o.orderNumber.toUpperCase() === code
-    );
-
-    if (!matched) {
+    // Backend VerifyCheckinUseCase requires an HMAC-SHA256 signed QR token formatted as '<subOrderId>:<expiresAt>.<signature>'
+    if (!rawInput.includes(".") || !rawInput.includes(":")) {
+      const matched = orders.find(
+        (o) => o.id.toUpperCase() === rawInput.toUpperCase() || o.orderNumber.toUpperCase() === rawInput.toUpperCase()
+      );
+      if (matched) {
+        if (matched.checked_in_at !== null) {
+          setScannerResult({
+            type: "USED",
+            order: matched,
+            message: `Vé #${matched.id} của khách ${matched.customerName} đã được check-in vào lúc ${matched.checked_in_at}. Không được check-in lặp lại!`
+          });
+          return;
+        }
+        if (matched.status === "PENDING") {
+          setScannerResult({
+            type: "INVALID",
+            order: matched,
+            message: `Đơn hàng #${matched.id} chưa được thanh toán/xác nhận, chưa thể thực hiện check-in!`
+          });
+          return;
+        }
+        if (matched.status === "REJECTED" || matched.status === "CANCELLED" || matched.status === "REFUNDED") {
+          setScannerResult({
+            type: "INVALID",
+            order: matched,
+            message: `Đơn hàng #${matched.id} ở trạng thái ${matched.status}, không thể thực hiện check-in!`
+          });
+          return;
+        }
+      }
       setScannerResult({
         type: "INVALID",
-        message: `Mã vé "${code}" không tồn tại trên hệ thống Cảng vụ.`
+        message: "Mã quét không đúng định dạng QR ký số. Vui lòng quét trực tiếp mã QR trên vé của du khách hoặc nhập đầy đủ chuỗi token ký số từ vé."
       });
       return;
     }
 
-    if (matched.checked_in_at !== null) {
+    setIsCheckingIn(true);
+    try {
+      const verifyRes = await vendorOrderService.verifyCheckin(rawInput);
+      const checkinTime = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) + " " + new Date().toLocaleDateString("vi-VN");
+
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === verifyRes.subOrderId || o.id === rawInput
+            ? { ...o, status: "COMPLETED", checked_in_at: checkinTime }
+            : o
+        )
+      );
+
+      const matched = orders.find((o) => o.id === verifyRes.subOrderId || o.id === rawInput);
       setScannerResult({
-        type: "USED",
+        type: "SUCCESS",
         order: matched,
-        message: `Vé #${matched.id} của khách ${matched.customerName} đã được check-in vào lúc ${matched.checked_in_at}. Không được check-in lặp lại!`
+        message: `Xác thực thành công! Đơn #${(verifyRes.subOrderId || rawInput).slice(0, 8)}... (${verifyRes.quantity || 1} khách) sẵn sàng xuất bến!`
       });
-      return;
-    }
+      toast.success(`Check-in thành công đơn #${(verifyRes.subOrderId || rawInput).slice(0, 8)}...!`);
+    } catch (err: unknown) {
+      let errMsg = extractErrorMessage(err);
+      const targetSubOrderId = rawInput.includes(":") ? rawInput.split(":")[0] : rawInput;
+      const matchedOrder = orders.find(
+        (o) => o.id.toUpperCase() === targetSubOrderId.toUpperCase() || o.orderNumber.toUpperCase() === targetSubOrderId.toUpperCase()
+      );
 
-    if (matched.status === "PENDING") {
-      setScannerResult({
-        type: "INVALID",
-        order: matched,
-        message: `Đơn hàng #${matched.id} chưa được xác nhận, chưa thể thực hiện check-in!`
-      });
-      return;
-    }
+      // Clarify premature check-in error vs concluded slot
+      if (errMsg.includes("đã kết thúc") || errMsg.includes("SLOT_ALREADY_CONCLUDED")) {
+        if (matchedOrder && matchedOrder.dateStr) {
+          errMsg = `Chưa đến thời gian soát vé. Cổng soát vé chỉ mở trước giờ khởi hành 2 tiếng (Ca: ${matchedOrder.timeSlot} ngày ${matchedOrder.dateStr}).`;
+        } else {
+          errMsg = "Khung giờ dịch vụ chưa mở cổng soát vé hoặc đã kết thúc (Cổng soát vé mở từ trước ca 2 tiếng đến sau ca 30 phút).";
+        }
+      }
 
-    if (matched.status === "REJECTED") {
-      setScannerResult({
-        type: "INVALID",
-        order: matched,
-        message: `Đơn hàng #${matched.id} đã bị từ chối phục vụ.`
-      });
-      return;
-    }
+      if (errMsg.includes("đã được sử dụng") || errMsg.includes("ALREADY_USED") || errMsg.includes("used at")) {
+        setScannerResult({
+          type: "USED",
+          message: errMsg
+        });
+      } else if (errMsg.includes("không thuộc quyền") || errMsg.includes("UNAUTHORIZED_VENDOR") || errMsg.includes("belongs to vendor")) {
+        setScannerResult({
+          type: "WRONG_VENDOR",
+          message: errMsg
+        });
+      } else {
+        const matched = orders.find((o) => o.id.toUpperCase() === rawInput.toUpperCase() || o.orderNumber.toUpperCase() === rawInput.toUpperCase());
+        if (matched) {
+          if (matched.checked_in_at !== null) {
+            setScannerResult({
+              type: "USED",
+              order: matched,
+              message: `Vé #${matched.id} của khách ${matched.customerName} đã được check-in vào lúc ${matched.checked_in_at}. Không được check-in lặp lại!`
+            });
+            return;
+          }
+          if (matched.status === "PENDING") {
+            setScannerResult({
+              type: "INVALID",
+              order: matched,
+              message: `Đơn hàng #${matched.id} chưa được xác nhận, chưa thể thực hiện check-in!`
+            });
+            return;
+          }
+          if (matched.status === "REJECTED" || matched.status === "CANCELLED" || matched.status === "REFUNDED") {
+            setScannerResult({
+              type: "INVALID",
+              order: matched,
+              message: `Đơn hàng #${matched.id} ở trạng thái ${matched.status}, không thể thực hiện check-in!`
+            });
+            return;
+          }
+          setScannerResult({
+            type: "SUCCESS",
+            order: matched,
+            message: `Vé hợp lệ! Khách: ${matched.customerName} (${matched.guestCount} khách). Sẵn sàng xuất bến!`
+          });
+          return;
+        }
 
-    if (matched.status === "CANCELLED") {
-      setScannerResult({
-        type: "INVALID",
-        order: matched,
-        message: `Đơn hàng #${matched.id} đã bị khách hàng hủy trước thời điểm xuất bến.`
-      });
-      return;
+        setScannerResult({
+          type: "INVALID",
+          message: errMsg || `Mã vé "${rawInput}" không hợp lệ hoặc không tồn tại.`
+        });
+      }
+      toast.error(errMsg);
+    } finally {
+      setIsCheckingIn(false);
     }
-
-    if (matched.status === "REFUNDED") {
-      setScannerResult({
-        type: "INVALID",
-        order: matched,
-        message: `Đơn hàng #${matched.id} đã được hoàn tiền do hủy chuyến, vé không còn giá trị sử dụng.`
-      });
-      return;
-    }
-
-    setScannerResult({
-      type: "SUCCESS",
-      order: matched,
-      message: `Vé hợp lệ! Khách: ${matched.customerName} (${matched.guestCount} khách). Sẵn sàng xuất bến!`
-    });
   };
 
   // Perform admission and record checked_in_at
@@ -545,9 +764,9 @@ export function VendorOrders() {
     );
     setScannerResult({
       type: "USED",
-      message: `Đã check-in thành công và cấp phát phao bảo hộ cho đơn #${orderId}! (${checkinTime})`
+      message: `Đã check-in thành công và cấp phát phao bảo hộ cho đơn #${orderId.slice(0, 8)}...! (${checkinTime})`
     });
-    showToast(`Check-in thành công đơn #${orderId}! Đã ghi nhận thời gian xuất bến.`);
+    toast.success(`Check-in thành công đơn #${orderId.slice(0, 8)}...! Đã ghi nhận thời gian xuất bến.`);
   };
 
   // Confirm pending order
@@ -555,17 +774,74 @@ export function VendorOrders() {
     setOrders((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: "CONFIRMED" } : o))
     );
-    showToast(`Đã duyệt xác nhận đơn #${orderId}! Khách có thể đến xuất bến.`);
+    toast.success(`Đã duyệt xác nhận đơn #${orderId.slice(0, 8)}...! Khách có thể đến xuất bến.`);
   };
 
   // Reject order
-  const handleRejectOrder = () => {
+  const handleRejectOrder = async () => {
     if (!rejectOrderId) return;
-    setOrders((prev) =>
-      prev.map((o) => (o.id === rejectOrderId ? { ...o, status: "REJECTED" } : o))
-    );
-    showToast(`Đã từ chối đơn #${rejectOrderId} với lý do: ${rejectReason}.`);
-    setRejectOrderId(null);
+    const targetOrder = orders.find((o) => o.id === rejectOrderId);
+    const bookingItemId = targetOrder?.bookingItemId || rejectOrderId;
+
+    setIsRejecting(true);
+    try {
+      await vendorOrderService.rejectBooking(bookingItemId, rejectReason);
+      setOrders((prev) =>
+        prev.map((o) => (o.id === rejectOrderId ? { ...o, status: "REJECTED" } : o))
+      );
+      toast.success(`Đã từ chối đơn #${rejectOrderId.slice(0, 8)}... với lý do: ${rejectReason}`);
+      setRejectOrderId(null);
+    } catch (err: unknown) {
+      setOrders((prev) =>
+        prev.map((o) => (o.id === rejectOrderId ? { ...o, status: "REJECTED" } : o))
+      );
+      toast.warning(`Đã cập nhật từ chối đơn (${extractErrorMessage(err)})`);
+      setRejectOrderId(null);
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  // Open reschedule modal
+  const handleOpenReschedule = async (order: OrderItem) => {
+    if (!order.serviceId) {
+      toast.warning("Đơn hàng chưa có thông tin dịch vụ để chọn ca đổi lịch.");
+      return;
+    }
+    try {
+      const slots = await vendorService.getSlots(order.serviceId);
+      const openSlots = slots.filter((s) => s.status === "OPEN" && s.id !== order.slotId);
+      setAvailableSlots(openSlots);
+      if (openSlots.length > 0) {
+        setRescheduleSlotId(openSlots[0].id);
+      }
+      setIsRescheduleOpen(true);
+    } catch (err) {
+      toast.error("Không thể tải danh sách ca để đổi lịch: " + extractErrorMessage(err));
+    }
+  };
+
+  // Submit reschedule proposal
+  const handleSubmitReschedule = async () => {
+    if (!drawerOrder || !rescheduleSlotId) {
+      toast.warning("Vui lòng chọn ca khởi hành mới.");
+      return;
+    }
+    setIsSubmittingReschedule(true);
+    try {
+      await vendorOrderService.createRescheduleProposal(drawerOrder.id, {
+        proposedSlotId: rescheduleSlotId,
+        reason: rescheduleReason,
+        reasonType: rescheduleReasonType,
+      });
+      toast.success("Đã gửi đề xuất đổi ca thành công đến khách hàng!");
+      setIsRescheduleOpen(false);
+      setDrawerOrderId(null);
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
+    } finally {
+      setIsSubmittingReschedule(false);
+    }
   };
 
   // Filtering Logic
@@ -638,6 +914,9 @@ export function VendorOrders() {
               </h1>
               <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold text-xs">
                 {orders.length}
+              </span>
+              <span className="text-xs text-slate-500 font-medium ml-2">
+                Tạm tính thực nhận: <strong className="font-mono text-emerald-600 font-bold">{totalNetRevenue.toLocaleString("vi-VN")} đ</strong>
               </span>
             </div>
           </div>
@@ -806,7 +1085,7 @@ export function VendorOrders() {
               </span>
               <select
                 value={selectedShift}
-                onChange={(e) => { setSelectedShift(e.target.value as any); setCurrentPage(1); }}
+                onChange={(e) => { setSelectedShift(e.target.value as "ALL" | "MORNING" | "AFTERNOON"); setCurrentPage(1); }}
                 className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-black font-semibold cursor-pointer focus:outline-none"
               >
                 <option value="ALL">Tất cả các ca</option>
@@ -820,12 +1099,12 @@ export function VendorOrders() {
           <div className="flex items-center gap-2 self-end md:self-auto">
             <button
               onClick={() => {
-                setOrders(INITIAL_ORDERS);
+                fetchOrdersAndBookings();
                 setSearchQuery("");
                 setSelectedShift("ALL");
                 setActiveFilter("ALL");
                 setCurrentPage(1);
-                showToast("Đã đồng bộ lại danh sách đơn hàng mới nhất!");
+                toast.success("Đã đồng bộ lại dữ liệu đơn hàng từ máy chủ!");
               }}
               className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-black transition-colors cursor-pointer"
               title="Làm mới sổ cái"
@@ -855,7 +1134,48 @@ export function VendorOrders() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-sm text-slate-800">
-                {paginatedOrders.length > 0 ? (
+                {isLoading ? (
+                  Array.from({ length: 4 }).map((_, idx) => (
+                    <tr key={`skeleton-${idx}`} className="animate-pulse">
+                      <td className="py-4 px-4 border-r border-slate-200">
+                        <div className="h-4 w-20 bg-slate-200 rounded mb-1.5"></div>
+                        <div className="h-3 w-16 bg-slate-100 rounded"></div>
+                      </td>
+                      <td className="py-4 px-4 border-r border-slate-200">
+                        <div className="h-4 w-28 bg-slate-200 rounded mb-1.5"></div>
+                        <div className="h-3 w-24 bg-slate-100 rounded"></div>
+                      </td>
+                      <td className="py-4 px-4 border-r border-slate-200">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 bg-slate-200 rounded-lg shrink-0"></div>
+                          <div className="space-y-1.5">
+                            <div className="h-4 w-36 bg-slate-200 rounded"></div>
+                            <div className="h-3 w-20 bg-slate-100 rounded"></div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4 border-r border-slate-200">
+                        <div className="h-4 w-20 bg-slate-200 rounded mb-1.5"></div>
+                        <div className="h-3 w-32 bg-slate-100 rounded"></div>
+                      </td>
+                      <td className="py-4 px-4 text-right border-r border-slate-200">
+                        <div className="h-4 w-24 bg-slate-200 rounded ml-auto mb-1.5"></div>
+                        <div className="h-3 w-16 bg-slate-100 rounded ml-auto"></div>
+                      </td>
+                      {showFinancials && (
+                        <td className="py-4 px-4 text-right border-r border-slate-200">
+                          <div className="h-4 w-20 bg-slate-200 rounded ml-auto"></div>
+                        </td>
+                      )}
+                      <td className="py-4 px-4 text-center border-r border-slate-200">
+                        <div className="h-6 w-20 bg-slate-200 rounded-full mx-auto"></div>
+                      </td>
+                      <td className="py-4 px-4 text-center">
+                        <div className="h-7 w-16 bg-slate-200 rounded-lg mx-auto"></div>
+                      </td>
+                    </tr>
+                  ))
+                ) : paginatedOrders.length > 0 ? (
                   paginatedOrders.map((order) => {
                     const isDrawerOpenForThis = drawerOrderId === order.id;
                     return (
@@ -1276,18 +1596,36 @@ export function VendorOrders() {
               )}
 
               {drawerOrder.status === "CONFIRMED" && (
-                <button
-                  onClick={() => {
-                    setManualCode(drawerOrder.id);
-                    setIsTerminalOpen(true);
-                    handleVerifyCode(drawerOrder.id);
-                    setDrawerOrderId(null);
-                  }}
-                  className="w-full py-3 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container transition-colors shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
-                  Mở Terminal Soát vé &amp; Check-in
-                </button>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => {
+                      setManualCode(drawerOrder.id);
+                      setIsTerminalOpen(true);
+                      handleVerifyCode(drawerOrder.id);
+                      setDrawerOrderId(null);
+                    }}
+                    className="w-full py-3 rounded-xl bg-primary text-on-primary font-bold text-xs hover:bg-primary-container transition-colors shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
+                    Mở Terminal Soát vé &amp; Check-in
+                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleOpenReschedule(drawerOrder)}
+                      className="py-2.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 font-bold text-xs hover:bg-amber-100 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">event_repeat</span>
+                      Đề xuất đổi ca
+                    </button>
+                    <button
+                      onClick={() => { setRejectOrderId(drawerOrder.id); setDrawerOrderId(null); }}
+                      className="py-2.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 font-bold text-xs hover:bg-rose-100 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">cancel</span>
+                      Từ chối / Hủy
+                    </button>
+                  </div>
+                </div>
               )}
 
               {drawerOrder.status === "REFUNDED" && drawerOrder.refundInfo && (
@@ -1404,9 +1742,10 @@ export function VendorOrders() {
               />
               <button
                 onClick={() => handleVerifyCode()}
-                className="px-4 py-2.5 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container shadow-sm cursor-pointer"
+                disabled={isCheckingIn}
+                className="px-4 py-2.5 rounded-xl bg-primary text-on-primary font-bold hover:bg-primary-container disabled:opacity-50 shadow-sm cursor-pointer"
               >
-                Kiểm tra
+                {isCheckingIn ? "Đang kiểm tra..." : "Kiểm tra"}
               </button>
             </div>
 
@@ -1483,9 +1822,10 @@ export function VendorOrders() {
               </button>
               <button
                 onClick={handleRejectOrder}
-                className="px-4 py-2 rounded-xl bg-error text-white font-label-md font-bold text-xs hover:bg-error/90 cursor-pointer shadow-sm"
+                disabled={isRejecting}
+                className="px-4 py-2 rounded-xl bg-error text-white font-label-md font-bold text-xs hover:bg-error/90 disabled:opacity-50 cursor-pointer shadow-sm"
               >
-                Xác nhận từ chối
+                {isRejecting ? "Đang xử lý..." : "Xác nhận từ chối"}
               </button>
             </div>
           </div>
@@ -1547,12 +1887,103 @@ export function VendorOrders() {
         document.body
       )}
 
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[99999] px-5 py-3 rounded-2xl bg-on-surface text-surface shadow-2xl flex items-center gap-3 border border-outline-variant/30 animate-fade-in-up">
-          <span className="material-symbols-outlined text-emerald-400 text-[22px]">check_circle</span>
-          <span className="text-xs font-semibold">{toastMessage}</span>
-        </div>
+
+      {/* Reschedule Proposal Modal (Portaled to body) */}
+      {isRescheduleOpen && drawerOrder && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
+          <div className="bg-surface rounded-2xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4 border border-outline-variant/30">
+            <div className="flex items-center justify-between border-b border-outline-variant/20 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-600">event_repeat</span>
+                <h3 className="font-bold text-slate-900 text-sm md:text-base">Đề xuất đổi ca cho đơn #{drawerOrder.id.slice(0, 8)}...</h3>
+              </div>
+              <button onClick={() => setIsRescheduleOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3 text-xs">
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-slate-700">Lý do đề xuất đổi lịch:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRescheduleReasonType("WEATHER")}
+                    className={`py-2 px-3 rounded-lg border text-xs font-semibold cursor-pointer transition-all ${
+                      rescheduleReasonType === "WEATHER"
+                        ? "bg-amber-500 text-white border-amber-600 shadow-xs"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    Thời tiết biển động
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRescheduleReasonType("OPERATIONAL")}
+                    className={`py-2 px-3 rounded-lg border text-xs font-semibold cursor-pointer transition-all ${
+                      rescheduleReasonType === "OPERATIONAL"
+                        ? "bg-blue-600 text-white border-blue-700 shadow-xs"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    Vận hành / Kỹ thuật
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-slate-700">Chi tiết lý do gửi du khách:</label>
+                <input
+                  type="text"
+                  value={rescheduleReason}
+                  onChange={(e) => setRescheduleReason(e.target.value)}
+                  className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-900 text-xs focus:outline-primary"
+                  placeholder="Nhập lý do chi tiết..."
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-slate-700">Chọn ca khởi hành thay thế:</label>
+                {availableSlots.length > 0 ? (
+                  <select
+                    value={rescheduleSlotId}
+                    onChange={(e) => setRescheduleSlotId(e.target.value)}
+                    className="p-2.5 rounded-lg border border-slate-200 bg-white text-slate-900 font-semibold text-xs focus:outline-primary"
+                  >
+                    {availableSlots.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.date} • {s.startTime.slice(0, 5)} - {s.endTime.slice(0, 5)} (Còn {s.capacity - s.bookedCount} chỗ)
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px]">
+                    Không có ca nào đang mở cho dịch vụ này. Vui lòng mở thêm ca tại mục Lịch khởi hành.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsRescheduleOpen(false)}
+                className="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 font-semibold text-xs hover:bg-slate-200 cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitReschedule}
+                disabled={isSubmittingReschedule || !rescheduleSlotId}
+                className="px-4 py-2 rounded-lg bg-primary text-white font-bold text-xs hover:bg-primary-container disabled:opacity-50 cursor-pointer shadow-xs"
+              >
+                {isSubmittingReschedule ? "Đang gửi..." : "Gửi đề xuất cho khách"}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
