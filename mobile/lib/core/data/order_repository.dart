@@ -336,12 +336,25 @@ class OrderRepository {
       final slotDate = matchedSlot != null
           ? (DateTime.tryParse(matchedSlot.date) ?? createdAt)
           : createdAt;
+      final slotObj = item['slot'] as Map<String, dynamic>? ??
+          item['serviceSlot'] as Map<String, dynamic>?;
+      final rawSlotStart = slotObj?['startTime']?.toString() ??
+          item['slotStartTime']?.toString() ??
+          '';
+      final rawSlotEnd = slotObj?['endTime']?.toString() ??
+          item['slotEndTime']?.toString() ??
+          '';
+
       final slotTime =
           matchedSlot != null &&
               matchedSlot.startTime.isNotEmpty &&
               matchedSlot.endTime.isNotEmpty
           ? '${matchedSlot.startTime} - ${matchedSlot.endTime}'
-          : 'Slot #${_shortId(slotId)}';
+          : (rawSlotStart.isNotEmpty && rawSlotEnd.isNotEmpty
+              ? '$rawSlotStart - $rawSlotEnd'
+              : (slotId.isNotEmpty
+                  ? 'Slot #${_shortId(slotId)}'
+                  : 'Theo lịch đặt'));
 
       final rawStatus = item['status']?.toString() ?? 'PENDING';
       final unitPrice = ((item['unitPrice'] as num?) ?? 0).round();

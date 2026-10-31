@@ -88,87 +88,306 @@ class _CreateDisputeScreenState extends State<CreateDisputeScreen> {
     super.dispose();
   }
 
+  String _formatShortId(String rawId) {
+    if (rawId.isEmpty) return '';
+    return rawId.length > 8
+        ? rawId.substring(0, 8).toUpperCase()
+        : rawId.toUpperCase();
+  }
+
+  IconData _getCategoryIcon(String category) {
+    if (category.contains('Chất lượng')) return Icons.thumb_down_alt_outlined;
+    if (category.contains('an toàn') || category.contains('phao')) {
+      return Icons.health_and_safety_outlined;
+    }
+    if (category.contains('giờ xuất phát') || category.contains('dời')) {
+      return Icons.schedule_outlined;
+    }
+    if (category.contains('thanh toán') || category.contains('phụ phí')) {
+      return Icons.payments_outlined;
+    }
+    return Icons.report_problem_outlined;
+  }
+
+  void _openCategoryPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Phân loại vấn đề',
+                      style: AppTypography.headlineSm(
+                        color: AppColors.onSurface,
+                        fontWeight: FontWeight.w800,
+                      ).copyWith(fontSize: 18),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.close,
+                        size: 20,
+                        color: Color(0xFF64748B),
+                      ),
+                      onPressed: () => Navigator.pop(sheetContext),
+                    ),
+                  ],
+                ),
+                const Text(
+                  'Chọn lý do khiếu nại phù hợp nhất với trải nghiệm thực tế của bạn:',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 14),
+                ..._categories.map((cat) {
+                  final isSel = _selectedCategory == cat;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() => _selectedCategory = cat);
+                        Navigator.pop(sheetContext);
+                      },
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSel
+                              ? const Color(0xFFE8F6F8)
+                              : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isSel
+                                ? AppColors.secondary
+                                : const Color(0xFFE2E8F0),
+                            width: isSel ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: isSel
+                                    ? AppColors.secondary
+                                    : Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _getCategoryIcon(cat),
+                                size: 18,
+                                color: isSel
+                                    ? Colors.white
+                                    : AppColors.secondary,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                cat,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: isSel
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: isSel
+                                      ? AppColors.secondary
+                                      : AppColors.onSurface,
+                                ),
+                              ),
+                            ),
+                            if (isSel)
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: AppColors.secondary,
+                                size: 20,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _addEvidence() async {
     if (_uploadingEvidence || _submitting) return;
     final pathController = TextEditingController();
     final mode = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: AppShapes.gutterMobile,
-              right: AppShapes.gutterMobile,
-              top: AppShapes.gutterMobile,
-              bottom:
-                  MediaQuery.of(sheetContext).viewInsets.bottom +
-                  AppShapes.gutterMobile,
-            ),
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 14,
+            bottom:
+                MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+          ),
+          child: SafeArea(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(
-                      child: LocalizedText(
-                        'Tải bằng chứng khiếu nại',
-                        style: AppTypography.headlineSm(
-                          color: AppColors.onSurface,
-                        ),
-                      ),
+                    Text(
+                      'Tải bằng chứng khiếu nại',
+                      style: AppTypography.headlineSm(
+                        color: AppColors.onSurface,
+                        fontWeight: FontWeight.w800,
+                      ).copyWith(fontSize: 18),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(
+                        Icons.close,
+                        size: 20,
+                        color: Color(0xFF64748B),
+                      ),
                       onPressed: () => Navigator.pop(sheetContext),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
+                const Text(
+                  'Chọn tải tệp ảnh minh chứng từ máy hoặc đính kèm đường dẫn ảnh:',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: pathController,
                   decoration: InputDecoration(
-                    hintText: tr(
-                      sheetContext,
-                      'Đường dẫn tệp trên máy hoặc URL (tùy chọn)...',
+                    hintText: 'Nhập liên kết ảnh URL hoặc đường dẫn tệp...',
+                    hintStyle: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF94A3B8),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.secondary,
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
+                  height: 46,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     onPressed: () => Navigator.pop(sheetContext, 'upload'),
                     icon: const Icon(
                       Icons.cloud_upload_outlined,
-                      size: 18,
-                      color: Colors.white,
+                      size: 20,
                     ),
-                    label: const LocalizedText(
-                      'Tải tệp lên máy chủ (/api/disputes/evidence)',
-                      style: TextStyle(color: Colors.white),
+                    label: const Text(
+                      'Tải tệp ảnh minh chứng lên',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
+                  height: 46,
                   child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.onSurface,
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     onPressed: () => Navigator.pop(sheetContext, 'url'),
-                    icon: const Icon(Icons.link, size: 18),
-                    label: const LocalizedText('Đính kèm từ liên kết URL'),
+                    icon: const Icon(
+                      Icons.link,
+                      size: 20,
+                      color: AppColors.secondary,
+                    ),
+                    label: const Text(
+                      'Đính kèm từ liên kết URL',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -418,7 +637,7 @@ class _CreateDisputeScreenState extends State<CreateDisputeScreen> {
                             return DropdownMenuItem<SubOrderModel>(
                               value: sub,
                               child: Text(
-                                '${sub.serviceName} (#${sub.id})',
+                                '${sub.serviceName} (#${_formatShortId(sub.id)})',
                                 overflow: TextOverflow.ellipsis,
                                 style: AppTypography.bodySm(
                                   color: AppColors.onSurface,
@@ -463,8 +682,8 @@ class _CreateDisputeScreenState extends State<CreateDisputeScreen> {
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                LocalizedText(
-                                  '${selectedSub.vendorName} • Mã đơn: #${selectedSub.id}',
+                                Text(
+                                  '${selectedSub.vendorName} • Mã đơn: #${_formatShortId(selectedSub.id)}',
                                   style: AppTypography.bodySm(
                                     color: AppColors.onSurfaceVariant,
                                   ).copyWith(fontSize: 11),
@@ -477,41 +696,52 @@ class _CreateDisputeScreenState extends State<CreateDisputeScreen> {
                     ),
                   const SizedBox(height: 16),
 
-                  // 2. CATEGORY DROPDOWN
+                  // 2. CATEGORY SELECTOR
                   LocalizedText(
                     '2. Phân loại vấn đề',
                     style: AppTypography.labelLg(color: AppColors.onSurface),
                   ),
                   const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLowest,
-                      borderRadius: AppShapes.radiusDefault,
-                      border: Border.all(color: AppColors.borderSubtle),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedCategory,
-                        isExpanded: true,
-                        items: _categories.map((cat) {
-                          return DropdownMenuItem(
-                            value: cat,
-                            child: LocalizedText(
-                              cat,
-                              style: AppTypography.bodySm(
+                  InkWell(
+                    onTap: _submitting ? null : _openCategoryPicker,
+                    borderRadius: AppShapes.radiusDefault,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 13,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLowest,
+                        borderRadius: AppShapes.radiusDefault,
+                        border: Border.all(
+                          color: const Color(0xFFCBD5E1),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _getCategoryIcon(_selectedCategory),
+                            size: 20,
+                            color: AppColors.secondary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _selectedCategory,
+                              style: const TextStyle(
                                 color: AppColors.onSurface,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          );
-                        }).toList(),
-                        onChanged: _submitting
-                            ? null
-                            : (val) {
-                                if (val != null) {
-                                  setState(() => _selectedCategory = val);
-                                }
-                              },
+                          ),
+                          const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Color(0xFF64748B),
+                            size: 22,
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -666,7 +896,6 @@ class _CreateDisputeScreenState extends State<CreateDisputeScreen> {
                         : 'Gửi hồ sơ khiếu nại',
                     variant: AppButtonVariant.primary,
                     width: double.infinity,
-                    isLoading: _submitting,
                     onPressed: (_submitting || selectedSub == null)
                         ? null
                         : _submitDispute,

@@ -76,6 +76,36 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
     }
   }
 
+  bool _isExpiredNotice(String err) {
+    final lower = err.toLowerCase();
+    return lower.contains('kết thúc') ||
+        lower.contains('hết hạn') ||
+        lower.contains('quá hạn') ||
+        lower.contains('hoàn thành');
+  }
+
+  String _getNoticeTitle(String err) {
+    final lower = err.toLowerCase();
+    if (lower.contains('kết thúc')) {
+      return 'Khung giờ dịch vụ đã kết thúc';
+    }
+    if (lower.contains('hết hạn')) {
+      return 'Vé đã hết hạn sử dụng';
+    }
+    return 'Thông báo trạng thái vé';
+  }
+
+  String _getNoticeMessage(String err) {
+    final lower = err.toLowerCase();
+    if (lower.contains('kết thúc')) {
+      return 'Khung giờ trải nghiệm cho vé này đã kết thúc. Mã QR check-in đã được khóa an toàn theo quy định.';
+    }
+    if (lower.contains('hết hạn')) {
+      return 'Vé đã quá hạn sử dụng và không còn hiệu lực check-in tại bãi biển.';
+    }
+    return err;
+  }
+
   @override
   Widget build(BuildContext context) {
     final tickets = widget.allSubOrders ?? [_currentSubOrder];
@@ -261,7 +291,9 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                             decoration: BoxDecoration(
                               color: qrData != null
                                   ? AppColors.secondaryContainer
-                                  : AppColors.surfaceContainerHigh,
+                                  : _qrError != null
+                                      ? const Color(0xFFFFEBEE)
+                                      : AppColors.surfaceContainerHigh,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
@@ -269,23 +301,32 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                                 Icon(
                                   qrData != null
                                       ? Icons.verified
-                                      : Icons.hourglass_top,
+                                      : _qrError != null
+                                          ? Icons.event_busy
+                                          : Icons.hourglass_top,
                                   size: 12,
                                   color: qrData != null
                                       ? AppColors.onSecondaryContainer
-                                      : AppColors.onSurfaceVariant,
+                                      : _qrError != null
+                                          ? const Color(0xFFC62828)
+                                          : AppColors.onSurfaceVariant,
                                 ),
                                 const SizedBox(width: 4),
-                                LocalizedText(
+                                Text(
                                   qrData != null
                                       ? 'HỢP LỆ CHECK-IN'
-                                      : 'CHỜ MÃ QR',
-                                  style: AppTypography.labelSm(
+                                      : _qrError != null
+                                          ? 'ĐÃ KẾT THÚC'
+                                          : 'CHỜ MÃ QR',
+                                  style: TextStyle(
                                     color: qrData != null
                                         ? AppColors.onSecondaryContainer
-                                        : AppColors.onSurfaceVariant,
+                                        : _qrError != null
+                                            ? const Color(0xFFC62828)
+                                            : AppColors.onSurfaceVariant,
                                     fontWeight: FontWeight.w800,
-                                  ).copyWith(fontSize: 10),
+                                    fontSize: 10,
+                                  ),
                                 ),
                               ],
                             ),
@@ -343,7 +384,12 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                               child: _buildMetaBox(
                                 Icons.schedule,
                                 'Khung giờ biển',
-                                _currentSubOrder.slotTime,
+                                _currentSubOrder.slotTime.startsWith('Slot #')
+                                    ? 'Theo lịch đặt'
+                                    : _currentSubOrder.slotTime.replaceAllMapped(
+                                        RegExp(r'(\d{1,2}:\d{2}):00'),
+                                        (m) => m.group(1) ?? '',
+                                      ),
                               ),
                             ),
                           ],
@@ -485,35 +531,91 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                         else if (_qrError != null && qrData == null)
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 22,
+                            ),
                             decoration: BoxDecoration(
-                              color: AppColors.errorContainer,
+                              color: const Color(0xFFF9FAFB),
                               borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: const Color(0xFFE5E7EB),
+                                width: 1,
+                              ),
                             ),
                             child: Column(
                               children: [
-                                const Icon(
-                                  Icons.error_outline,
-                                  color: AppColors.error,
-                                  size: 36,
-                                ),
-                                const SizedBox(height: 8),
-                                LocalizedText(
-                                  _qrError!,
-                                  textAlign: TextAlign.center,
-                                  style: AppTypography.bodySm(
-                                    color: AppColors.error,
+                                Container(
+                                  width: 46,
+                                  height: 46,
+                                  decoration: BoxDecoration(
+                                    color: _isExpiredNotice(_qrError!)
+                                        ? const Color(0xFFFFF3E0)
+                                        : const Color(0xFFE0F2F1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    _isExpiredNotice(_qrError!)
+                                        ? Icons.event_busy_rounded
+                                        : Icons.info_outline_rounded,
+                                    color: _isExpiredNotice(_qrError!)
+                                        ? const Color(0xFFE65100)
+                                        : AppColors.secondary,
+                                    size: 24,
                                   ),
                                 ),
-                                const SizedBox(height: 10),
-                                OutlinedButton.icon(
-                                  onPressed: _loadingQr
-                                      ? null
-                                      : () => _loadQrForCurrentTicket(
-                                          forceRefresh: true,
+                                const SizedBox(height: 12),
+                                Text(
+                                  _getNoticeTitle(_qrError!),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.onSurface,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _getNoticeMessage(_qrError!),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.onSurfaceVariant,
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 7,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(0xFFEEEEEE),
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.support_agent_rounded,
+                                        size: 15,
+                                        color: AppColors.secondary,
+                                      ),
+                                      SizedBox(width: 6),
+                                      Text(
+                                        'Hỗ trợ bãi biển: 1900 6868',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.secondary,
                                         ),
-                                  icon: const Icon(Icons.refresh, size: 16),
-                                  label: const LocalizedText('Thử lại'),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),

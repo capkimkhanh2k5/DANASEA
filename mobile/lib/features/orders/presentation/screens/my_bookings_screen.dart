@@ -565,7 +565,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 const SizedBox(height: 12),
                 AppPillButton(
                   label: _cancelling ? 'Đang gửi yêu cầu...' : 'Hủy booking',
-                  variant: AppButtonVariant.outline,
+                  variant: AppButtonVariant.secondary,
                   onPressed: _cancelling || _creatingOrder ? null : _cancel,
                 ),
               ],

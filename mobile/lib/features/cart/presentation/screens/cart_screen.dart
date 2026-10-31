@@ -1,18 +1,18 @@
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import '../../../../core/data/mock_database_data.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/app_pill_button.dart';
 import '../../../checkout/presentation/screens/checkout_screen.dart';
-import '../../../experience_detail/presentation/widgets/booking_slot_sheet.dart';
+import '../../../experience_detail/presentation/widgets/service_availability_sheet.dart';
+import '../../data/cart_manager.dart';
 
 class CartItemData {
   final String id;
   final ServiceModel service;
-  final ServiceSlotModel slot;
+  ServiceSlotModel slot;
   int quantity;
   bool isSelected;
 
@@ -42,38 +42,7 @@ class _CartScreenState extends State<CartScreen> {
   @override
   void initState() {
     super.initState();
-    _items = [
-      CartItemData(
-        id: 'cart-1',
-        service: MockDatabaseData.services[0], // Chèo SUP Mỹ Khê
-        slot: ServiceSlotModel(
-          id: 'slt-1',
-          serviceId: MockDatabaseData.services[0].id,
-          date: DateTime.now().add(const Duration(days: 1)),
-          startTime: '05:00',
-          endTime: '07:00',
-          capacity: 15,
-          bookedCount: 12,
-        ),
-        quantity: 2,
-        isSelected: true,
-      ),
-      CartItemData(
-        id: 'cart-2',
-        service: MockDatabaseData.services[1], // Lặn san hô Sơn Trà
-        slot: ServiceSlotModel(
-          id: 'slt-2',
-          serviceId: MockDatabaseData.services[1].id,
-          date: DateTime.now().add(const Duration(days: 2)),
-          startTime: '08:30',
-          endTime: '11:00',
-          capacity: 10,
-          bookedCount: 8,
-        ),
-        quantity: 1,
-        isSelected: true,
-      ),
-    ];
+    _items = CartManager.instance.items;
   }
 
   int get _selectedSubtotal => _items
@@ -98,17 +67,28 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _openChangeSlot(CartItemData item) {
-    final slots = MockDatabaseData.getSlotsForService(item.service.id, item.slot.date);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return BookingSlotSheet(
+        return ServiceAvailabilitySheet(
           service: item.service,
-          availableSlots: slots,
-          onConfirm: (newSlot, newGuests, _) {
+          isCartEdit: true,
+          initialQuantity: item.quantity,
+          initialDate: item.slot.date,
+          initialSlotId: item.slot.id,
+          onUpdateCart: (newSlot, newGuests) {
             setState(() {
+              item.slot = ServiceSlotModel(
+                id: newSlot.id,
+                serviceId: item.service.id,
+                date: DateTime.tryParse(newSlot.date) ?? item.slot.date,
+                startTime: newSlot.startTime,
+                endTime: newSlot.endTime,
+                capacity: newSlot.availableCapacity ?? item.slot.capacity,
+                bookedCount: 0,
+              );
               item.quantity = newGuests;
             });
           },
@@ -136,7 +116,7 @@ class _CartScreenState extends State<CartScreen> {
           if (_items.isNotEmpty)
             TextButton.icon(
               onPressed: () {
-                setState(() => _items.clear());
+                setState(() => CartManager.instance.clear());
               },
               icon: const Icon(Icons.delete_sweep, size: 18, color: AppColors.outline),
               label: LocalizedText(

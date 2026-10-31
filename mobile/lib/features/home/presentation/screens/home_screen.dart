@@ -1,7 +1,7 @@
-import '../../../../core/data/library_store.dart';
-import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:mobile/core/l10n/app_localizations.dart';
 import '../../../../core/data/catalog_repository.dart';
+import '../../../../core/data/library_store.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
@@ -15,16 +15,14 @@ import '../../../orders/presentation/screens/my_orders_screen.dart';
 import '../../../profile/presentation/screens/profile_screen.dart';
 import '../../../search/presentation/screens/search_screen.dart';
 import '../../../wishlist/presentation/screens/wishlist_screen.dart';
-import '../../data/mock_home_data.dart';
 import '../../domain/models/home_models.dart';
+import 'flash_sale_screen.dart';
 import '../widgets/ai_assistant_section.dart';
-import '../widgets/category_tabs_widget.dart';
-import '../widgets/editorial_region_card.dart';
 import '../widgets/experience_card.dart';
+import '../widgets/flash_sale_section.dart';
 import '../widgets/hero_search_widget.dart';
 import '../widgets/home_footer.dart';
 import '../widgets/home_header.dart';
-import '../widgets/how_it_works_section.dart';
 import '../widgets/recently_viewed_section.dart';
 import '../widgets/weather_ocean_section.dart';
 
@@ -37,12 +35,28 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentNavIndex = 0;
+  final GlobalKey<MyOrdersScreenState> _ordersKey =
+      GlobalKey<MyOrdersScreenState>();
   List<ExperienceItem> _experiences = [];
-  List<CategoryModel> _categories = [];
+  List<FlashSaleModel> _flashSales = [];
   final _catalog = CatalogRepository();
   final _library = LibraryStore.instance;
   bool _loading = true;
   String? _error;
+
+  late final ScrollController _exploreScrollController;
+  bool _isScrolled = false;
+
+  String _formatDuration(int minutes) {
+    if (minutes <= 0) return '2 giờ';
+    if (minutes >= 60 && minutes % 60 == 0) {
+      return '${minutes ~/ 60} giờ';
+    }
+    if (minutes >= 60) {
+      return '${(minutes / 60).toStringAsFixed(1)} giờ';
+    }
+    return '$minutes phút';
+  }
 
   Future<void> _loadCatalog() async {
     setState(() {
@@ -51,24 +65,31 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     try {
       final results = await Future.wait([
-        _catalog.categories(),
-        _catalog.search(),
+        _catalog.search(size: 7, sortBy: 'popularity'),
+        _catalog.flashSales(),
       ]);
       if (!mounted) return;
+      final apiServices = (results[0] as CatalogPage).items;
+      final apiFlashSales = results[1] as List<FlashSaleModel>;
       setState(() {
-        _categories = results[0] as List<CategoryModel>;
-        _experiences = (results[1] as CatalogPage).items
+        _flashSales = apiFlashSales;
+        _experiences = apiServices
+            .take(7)
             .map(
               (s) => ExperienceItem(
                 id: s.id,
                 title: s.name,
-                location: s.address,
-                duration: '',
+                location: s.locationName.isNotEmpty
+                    ? s.locationName
+                    : s.address,
+                duration: _formatDuration(s.durationMinutes),
                 rating: s.avgRating,
                 reviewCount: s.ratingCount,
                 price: s.price,
-                imageUrl: s.imageUrls.isEmpty ? '' : s.imageUrls.first,
-                isVerified: false,
+                imageUrl: s.imageUrls.isEmpty
+                    ? 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&auto=format&fit=crop&q=80'
+                    : s.imageUrls.first,
+                isVerified: true,
               ),
             )
             .toList();
@@ -83,6 +104,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _exploreScrollController = ScrollController();
+    _exploreScrollController.addListener(() {
+      final scrolled = _exploreScrollController.hasClients &&
+          _exploreScrollController.offset > 40;
+      if (scrolled != _isScrolled) {
+        setState(() => _isScrolled = scrolled);
+      }
+    });
     _loadCatalog();
     _library.addListener(_libraryChanged);
   }
@@ -93,6 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _exploreScrollController.dispose();
     _library.removeListener(_libraryChanged);
     super.dispose();
   }
@@ -135,10 +165,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _openAiAssistant() {
+  void _openAiAssistant([String? prompt]) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const AiAssistantScreen()),
+      MaterialPageRoute(
+        builder: (_) => AiAssistantScreen(initialPrompt: prompt),
+      ),
     );
   }
 
@@ -159,19 +191,23 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
+      extendBodyBehindAppBar: _currentNavIndex == 0,
       backgroundColor: AppColors.surface,
       appBar: _currentNavIndex == 0
           ? HomeHeader(
-              onAiTap: _openAiAssistant,
+              isScrolled: _isScrolled,
               onNotificationTap: _openNotifications,
               onCartTap: _openCart,
               onSearchTap: () => _openSearch(),
-              onProfileTap: () => setState(() => _currentNavIndex = 3),
             )
           : null,
       bottomNavigationBar: AppBottomNavBar(
         currentIndex: _currentNavIndex,
         onTap: (index) {
+          if (index == 2) {
+            _ordersKey.currentState?.reload();
+          }
           setState(() => _currentNavIndex = index);
         },
       ),
@@ -180,7 +216,10 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           _buildExploreBody(),
           WishlistScreen(onExplore: () => setState(() => _currentNavIndex = 0)),
-          MyOrdersScreen(onExplore: () => setState(() => _currentNavIndex = 0)),
+          MyOrdersScreen(
+            key: _ordersKey,
+            onExplore: () => setState(() => _currentNavIndex = 0),
+          ),
           const ProfileScreen(),
         ],
       ),
@@ -189,6 +228,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildExploreBody() {
     return SingleChildScrollView(
+      controller: _exploreScrollController,
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -196,17 +237,39 @@ class _HomeScreenState extends State<HomeScreen> {
           HeroSearchWidget(
             onExploreTap: () => _openSearch(),
             onAiSuggestTap: _openAiAssistant,
-            onSearchTap: () => _openSearch(),
+            onSearchTap: (location, date, guests) {
+              final query = (location != null &&
+                      location != 'Mỹ Khê, Sơn Trà, Non Nước' &&
+                      location != 'Tất cả khu vực biển')
+                  ? location
+                  : null;
+              _openSearch(query);
+            },
           ),
 
-          // 2. CATEGORY TABS ("Khám phá theo sở thích")
-          CategoryTabsWidget(
-            categories: _categories,
-            onShowAll: () => _openSearch(),
-            onCategoryChanged: (index) =>
-                _openSearch(null, _categories[index].id),
-          ),
-          const SizedBox(height: AppShapes.spaceLg),
+          // 2. FLASH SALE SECTION ("Giờ vàng săn deal" - Mặc định tối đa 7 deal)
+          if (_flashSales.isNotEmpty)
+            FlashSaleSection(
+              items: _flashSales.take(7).toList(),
+              onItemTap: (item) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CatalogDetailScreen(
+                      serviceId: item.serviceId,
+                    ),
+                  ),
+                );
+              },
+              onSeeAll: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FlashSaleScreen(initialItems: _flashSales),
+                  ),
+                );
+              },
+            ),
 
           // 3. FEATURED EXPERIENCES ("Trải nghiệm nổi bật tại Đà Nẵng")
           Padding(
@@ -218,16 +281,14 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 LocalizedText(
                   'Trải nghiệm nổi bật tại Đà Nẵng',
-                  style: AppTypography.headlineMd(color: AppColors.onSurface),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.headlineSm(
+                    color: AppColors.onSurface,
+                    fontWeight: FontWeight.w800,
+                  ).copyWith(fontSize: 17.5),
                 ),
-                const SizedBox(height: 2),
-                LocalizedText(
-                  'Lựa chọn được yêu thích nhất trong tuần',
-                  style: AppTypography.bodySm(
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
                 if (_loading) const LinearProgressIndicator(),
                 if (_error != null) ...[
@@ -237,78 +298,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: const LocalizedText('Thử lại'),
                   ),
                 ],
-                if (!_loading && _error == null && _experiences.isEmpty)
-                  const LocalizedText('Không tìm thấy trải nghiệm.'),
                 // Cards List
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _experiences.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: AppShapes.spaceLg),
-                  itemBuilder: (context, index) {
-                    final exp = _experiences[index];
-                    return ExperienceCard(
-                      item: exp.copyWith(isFavorite: _library.contains(exp.id)),
-                      onFavoriteToggle: _library.busy(exp.id)
-                          ? null
-                          : () => _toggleFavorite(index),
-                      onTap: () => _openDetail(exp),
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-                Center(
-                  child: TextButton(
-                    onPressed: () => _openSearch(),
-                    child: LocalizedText(
-                      'Khám phá tất cả trải nghiệm',
-                      style: AppTypography.labelSm(
-                        color: AppColors.outline,
-                        fontWeight: FontWeight.w400,
-                      ).copyWith(fontStyle: FontStyle.italic),
-                    ),
-                  ),
+                Column(
+                  children: [
+                    for (int index = 0; index < _experiences.length; index++) ...[
+                      if (index > 0) const SizedBox(height: AppShapes.spaceLg),
+                      ExperienceCard(
+                        item: _experiences[index].copyWith(
+                          isFavorite: _library.contains(_experiences[index].id),
+                        ),
+                        onFavoriteToggle: _library.busy(_experiences[index].id)
+                            ? null
+                            : () => _toggleFavorite(index),
+                        onTap: () => _openDetail(_experiences[index]),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
           ),
           const SizedBox(height: AppShapes.spaceLg),
-
-          // 4. EXPLORE BY BEACH REGION ("Vùng biển bạn muốn đến?")
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppShapes.gutterMobile,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                LocalizedText(
-                  'Vùng biển bạn muốn đến?',
-                  style: AppTypography.headlineMd(color: AppColors.onSurface),
-                ),
-                const SizedBox(height: 2),
-                LocalizedText(
-                  'Điểm đến phong phú dọc bờ duyên hải miền Trung',
-                  style: AppTypography.bodySm(
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                ...MockHomeData.beachRegions.map((region) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: EditorialRegionCard(
-                      item: region,
-                      onTap: () => _openSearch(region.title),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppShapes.spaceMd),
 
           // 5. AI SMART ASSISTANT SECTION
           Padding(
@@ -317,7 +327,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             child: AiAssistantSection(
               onPlanWithAiTap: _openAiAssistant,
-              onPromptSelected: (prompt) => _openAiAssistant(),
+              onPromptSelected: (prompt) => _openAiAssistant(prompt),
+              onExploreAllTap: () => _openSearch(),
             ),
           ),
           const SizedBox(height: AppShapes.spaceLg),
@@ -326,13 +337,6 @@ class _HomeScreenState extends State<HomeScreen> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: AppShapes.gutterMobile),
             child: WeatherOceanSection(),
-          ),
-          const SizedBox(height: AppShapes.spaceLg),
-
-          // 7. HOW IT WORKS SECTION
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: AppShapes.gutterMobile),
-            child: HowItWorksSection(),
           ),
           const SizedBox(height: AppShapes.spaceLg),
 
@@ -350,6 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // 9. FOOTER
           const HomeFooter(),
+          const SizedBox(height: 100),
         ],
       ),
     );

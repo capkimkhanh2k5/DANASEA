@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/auth/auth_session.dart';
@@ -10,6 +11,8 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/app_pill_button.dart';
 import '../../../cart/presentation/screens/cart_screen.dart';
 import 'payment_result_screen.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final List<CartItemData> selectedItems;
@@ -48,6 +51,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final Map<PaymentProvider, String> _idempotencyKeys =
       <PaymentProvider, String>{};
   String? _error;
+  Timer? _countdownTimer;
+  Duration _holdRemaining = const Duration(minutes: 14, seconds: 55);
 
   String? get _targetOrderId => widget.orderId ?? widget.masterOrder?.id;
   String? get _targetBookingId => widget.bookingId ?? _order?.bookingId;
@@ -61,13 +66,51 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         (s) => !s.waiverRequired || s.waiverAccepted,
       );
     }
+    _initHoldCountdown();
     if (_targetOrderId != null && _targetOrderId!.isNotEmpty) {
       _loadOrderAndPaymentStatus();
     }
   }
 
+  void _initHoldCountdown() {
+    _updateHoldCountdown();
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_holdRemaining.inSeconds > 0) {
+        setState(() {
+          _holdRemaining = _holdRemaining - const Duration(seconds: 1);
+        });
+      } else {
+        _countdownTimer?.cancel();
+      }
+    });
+  }
+
+  void _updateHoldCountdown() {
+    if (_order != null) {
+      final deadline = _order!.createdAt.add(const Duration(minutes: 15));
+      final diff = deadline.difference(DateTime.now());
+      setState(() {
+        _holdRemaining = diff.isNegative ? Duration.zero : diff;
+      });
+    } else {
+      setState(() {
+        _holdRemaining = const Duration(minutes: 14, seconds: 55);
+      });
+    }
+  }
+
+  String _formatCountdown(Duration d) {
+    if (d.isNegative || d.inSeconds <= 0) return '00:00';
+    final minutes = d.inMinutes;
+    final seconds = d.inSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _discountController.dispose();
     super.dispose();
   }
@@ -94,6 +137,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           (s) => !s.waiverRequired || s.waiverAccepted,
         );
       });
+      _updateHoldCountdown();
     } on AuthFailure catch (e) {
       if (mounted) {
         setState(() => _error = e.message);
@@ -340,6 +384,65 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           detail?.status.toUpperCase() == 'SUCCESS' ||
           intent.status.toUpperCase() == 'SUCCESS';
 
+      // Nếu là thanh toán qua link (PayPal, VNPay, v.v.), chuyển hướng trực tiếp sang Chrome và không cần hiện trang kết quả
+      final redirectUrl = (detail?.paymentUrl != null && detail!.paymentUrl!.trim().isNotEmpty)
+          ? detail.paymentUrl!.trim()
+          : (intent.hasRedirectUrl ? intent.paymentReference.trim() : null);
+
+      if (redirectUrl != null &&
+          (redirectUrl.startsWith('http://') || redirectUrl.startsWith('https://')) &&
+          !confirmedSuccess) {
+        try {
+          final uri = Uri.parse(redirectUrl);
+          final launched = await launchUrl(
+            uri,
+            mode: LaunchMode.externalApplication,
+          );
+          if (!launched) {
+            Clipboard.setData(ClipboardData(text: redirectUrl));
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: LocalizedText(
+                    'Không thể tự mở trình duyệt. Đã sao chép liên kết thanh toán!',
+                  ),
+                  backgroundColor: AppColors.secondary,
+                ),
+              );
+            }
+          }
+        } catch (_) {
+          Clipboard.setData(ClipboardData(text: redirectUrl));
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: LocalizedText(
+                  'Đã sao chép liên kết thanh toán vào bộ nhớ tạm!',
+                ),
+                backgroundColor: AppColors.secondary,
+              ),
+            );
+          }
+        }
+
+        if (!mounted) return;
+        // Sau khi điều hướng sang bên thứ 3 thì mở trang chờ thanh toán
+        await Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PaymentResultScreen(
+              masterOrder: order,
+              provider: _selectedProvider,
+              isSuccess: false,
+              paymentIntent: intent,
+              initialPayment: detail,
+              paymentId: intent.paymentId,
+            ),
+          ),
+        );
+        return;
+      }
+
       await Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -422,21 +525,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.onSurface),
-          onPressed: _submitting ? null : () => Navigator.pop(context),
+          onPressed: _submitting
+              ? null
+              : () {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  Navigator.pop(context);
+                },
         ),
-        title: Column(
-          children: [
-            LocalizedText(
-              'Thanh toán',
-              style: AppTypography.headlineSm(color: AppColors.onSurface),
-            ),
-            LocalizedText(
-              'Bước 2 / 2: Hoàn tất giữ chỗ',
-              style: AppTypography.labelSm(
-                color: AppColors.secondary,
-              ).copyWith(fontSize: 11),
-            ),
-          ],
+        title: LocalizedText(
+          'Thanh toán',
+          style: AppTypography.headlineSm(color: AppColors.onSurface),
         ),
         centerTitle: true,
         actions: [
@@ -460,70 +558,86 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       body: _loadingOrder && order == null
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.all(AppShapes.gutterMobile),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. COUNTDOWN INVENTORY LOCK BANNER
+                  // 1. COUNTDOWN INVENTORY LOCK BANNER (Trải nghiệm FOMO trực quan, không dùng mã kỹ thuật)
                   Container(
-                    padding: const EdgeInsets.all(AppShapes.spaceSm),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
-                      color: AppColors.secondaryFixed.withValues(alpha: 0.4),
+                      color: _holdRemaining.inMinutes < 3
+                          ? const Color(0xFFFFF3E0)
+                          : const Color(0xFFE6F4F1),
                       borderRadius: AppShapes.radiusDefault,
+                      border: Border.all(
+                        color: _holdRemaining.inMinutes < 3
+                            ? const Color(0xFFFFB74D)
+                            : const Color(0xFF80CBC4).withValues(alpha: 0.6),
+                        width: 1,
+                      ),
                     ),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: AppColors.secondary,
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: _holdRemaining.inMinutes < 3
+                                ? const Color(0xFFFF9800)
+                                : AppColors.secondary,
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
-                            Icons.timer,
-                            size: 18,
-                            color: AppColors.onSecondary,
+                            Icons.timer_outlined,
+                            size: 20,
+                            color: Colors.white,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              LocalizedText(
-                                'Thời gian giữ chỗ',
-                                style: AppTypography.labelSm(
-                                  color: AppColors.secondary,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                              Row(
+                                children: [
+                                  LocalizedText(
+                                    'Thời gian giữ chỗ còn lại: ',
+                                    style: AppTypography.labelMd(
+                                      color: AppColors.onSurface,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatCountdown(_holdRemaining),
+                                    style: TextStyle(
+                                      color: _holdRemaining.inMinutes < 3
+                                          ? const Color(0xFFD32F2F)
+                                          : AppColors.secondary,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
                               ),
+                              const SizedBox(height: 3),
                               LocalizedText(
-                                order != null
-                                    ? 'Đơn hàng #${order.id} đang chờ thanh toán'
-                                    : 'Chỗ được khóa tạm thời trên hệ thống',
+                                '(Chỗ của bạn đang được ưu tiên bảo lưu. Vui lòng thanh toán trước khi hết giờ).',
                                 style: AppTypography.bodySm(
                                   color: AppColors.onSurfaceVariant,
-                                ).copyWith(fontSize: 11),
+                                ).copyWith(
+                                  fontSize: 11.5,
+                                  fontStyle: FontStyle.italic,
+                                  height: 1.25,
+                                ),
                               ),
                             ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceContainerLowest,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: LocalizedText(
-                            order != null ? order.status.name.toUpperCase() : 'HOLD',
-                            style: AppTypography.labelSm(
-                              color: AppColors.secondary,
-                              fontWeight: FontWeight.w800,
-                            ),
                           ),
                         ),
                       ],
@@ -868,6 +982,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             controller: _discountController,
                             enabled: !_previewingDiscount && !_submitting,
                             textCapitalization: TextCapitalization.characters,
+                            onTapOutside: (_) =>
+                                FocusManager.instance.primaryFocus?.unfocus(),
                             onChanged: (_) {
                               if (_discountPreview != null) {
                                 setState(() => _discountPreview = null);
@@ -962,73 +1078,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               'Thanh toán quốc tế an toàn qua tài khoản PayPal',
                           icon: Icons.public,
                         ),
-                        _buildPaymentRadio(
-                          provider: PaymentProvider.momo,
-                          title: 'Ví điện tử MoMo',
-                          subtitle: 'Quét mã MoMo thanh toán liền mạch',
-                          icon: Icons.account_balance_wallet,
-                        ),
-                        _buildPaymentRadio(
-                          provider: PaymentProvider.sepay,
-                          title: 'Chuyển khoản VietQR (SePay)',
-                          subtitle: 'Xác nhận giao dịch tự động 24/7',
-                          icon: Icons.qr_code,
-                        ),
                       ],
                     ),
                   ),
-                  if (_existingPayments.isNotEmpty && order != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(AppShapes.spaceSm),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerLow,
-                        borderRadius: AppShapes.radiusDefault,
-                        border: Border.all(color: AppColors.borderSubtle),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.history,
-                            size: 18,
-                            color: AppColors.secondary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: LocalizedText(
-                              'Giao dịch gần nhất: ${_existingPayments.first.provider} • ${_existingPayments.first.status}',
-                              style: AppTypography.bodySm(
-                                color: AppColors.onSurface,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              final latest = _existingPayments.first;
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PaymentResultScreen(
-                                    masterOrder: order,
-                                    provider:
-                                        PaymentRepository.providerFromBackend(
-                                          latest.provider,
-                                        ),
-                                    isSuccess:
-                                        latest.status.toUpperCase() ==
-                                        'SUCCESS',
-                                    initialPayment: latest,
-                                    paymentId: latest.id,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: const LocalizedText('Xem trạng thái'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+
                   const SizedBox(height: 16),
 
                   // 6. WAIVER AGREEMENT CHECKBOX
@@ -1144,7 +1197,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                               : 'Xác nhận thanh toán ${_formatPrice(_finalTotal)}',
                           variant: AppButtonVariant.primary,
                           width: double.infinity,
-                          isLoading: _submitting,
                           onPressed: _submitting ? null : _processPayment,
                         ),
                       ],

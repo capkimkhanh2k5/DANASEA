@@ -1,6 +1,8 @@
 // English UI catalog. Vietnamese source phrases are stable lookup keys.
 // Numbered placeholders retain values from the existing presentation layer.
 const englishTranslations = <String, String>{
+  "Lịch khởi hành & Suất biển": "Schedule a Visit",
+  "Chọn suất biển": "Choose a slot",
   "Giữ chỗ": "Hold reservation",
   "Bỏ giữ chỗ": "Release hold",
   "Số gói": "Number of packages",

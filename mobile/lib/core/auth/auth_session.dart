@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../l10n/app_localizations.dart';
@@ -16,6 +17,24 @@ class AuthFailure implements Exception {
 
 class AuthSession {
   static final instance = AuthSession();
+  static String normalizeBaseUrl(String? custom) {
+    var raw = (custom ??
+            const String.fromEnvironment(
+              'API_BASE_URL',
+              defaultValue: 'http://127.0.0.1:8080',
+            ))
+        .trim();
+    while (raw.endsWith('/')) {
+      raw = raw.substring(0, raw.length - 1);
+    }
+    // On physical Android devices or emulators, localhost attempts IPv6 ::1 first
+    // which fails with adb reverse (adb reverse only binds IPv4 127.0.0.1).
+    if (!kIsWeb && Platform.isAndroid && raw.contains('//localhost')) {
+      raw = raw.replaceFirst('//localhost', '//127.0.0.1');
+    }
+    return raw;
+  }
+
   final FlutterSecureStorage storage;
   final HttpClient client;
   final String baseUrl;
@@ -25,12 +44,7 @@ class AuthSession {
     String? baseUrl,
   }) : storage = storage ?? const FlutterSecureStorage(),
        client = client ?? HttpClient(),
-       baseUrl =
-           baseUrl ??
-           const String.fromEnvironment(
-             'API_BASE_URL',
-             defaultValue: 'http://127.0.0.1:8080',
-           );
+       baseUrl = normalizeBaseUrl(baseUrl);
   String? _access, _refresh;
   String? pendingName;
   String? pendingEmail;
@@ -135,12 +149,14 @@ class AuthSession {
       if (body is Map && body['accessToken'] is String)
         _access = body['accessToken'];
       return body;
-    } on SocketException {
+    } on SocketException catch (e) {
+      debugPrint('[AuthSession] SocketException on $method $uri: $e');
       throw AuthFailure(
-        'Không kết nối được máy chủ. Kiểm tra mạng và địa chỉ backend.',
+        'Không kết nối được máy chủ ($baseUrl). Kiểm tra: chạy lệnh "adb reverse tcp:8080 tcp:8080" (cáp USB) hoặc kiểm tra địa chỉ IP backend.',
       );
-    } on TimeoutException {
-      throw AuthFailure('Máy chủ phản hồi quá lâu. Vui lòng thử lại.');
+    } on TimeoutException catch (e) {
+      debugPrint('[AuthSession] TimeoutException on $method $uri: $e');
+      throw AuthFailure('Máy chủ ($baseUrl) phản hồi quá lâu. Vui lòng thử lại.');
     }
   }
 
@@ -196,12 +212,14 @@ class AuthSession {
         );
       }
       return Uint8List.fromList(chunks);
-    } on SocketException {
+    } on SocketException catch (e) {
+      debugPrint('[AuthSession] SocketException on $method $uri: $e');
       throw AuthFailure(
-        'Không kết nối được máy chủ. Kiểm tra mạng và địa chỉ backend.',
+        'Không kết nối được máy chủ ($baseUrl). Kiểm tra: chạy lệnh "adb reverse tcp:8080 tcp:8080" (cáp USB) hoặc kiểm tra địa chỉ IP backend.',
       );
-    } on TimeoutException {
-      throw AuthFailure('Máy chủ phản hồi quá lâu. Vui lòng thử lại.');
+    } on TimeoutException catch (e) {
+      debugPrint('[AuthSession] TimeoutException on $method $uri: $e');
+      throw AuthFailure('Máy chủ ($baseUrl) phản hồi quá lâu. Vui lòng thử lại.');
     }
   }
 
@@ -287,12 +305,14 @@ class AuthSession {
         throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
       }
       return body;
-    } on SocketException {
+    } on SocketException catch (e) {
+      debugPrint('[AuthSession] SocketException on POST $uri: $e');
       throw AuthFailure(
-        'Không kết nối được máy chủ. Kiểm tra mạng và địa chỉ backend.',
+        'Không kết nối được máy chủ ($baseUrl). Kiểm tra: chạy lệnh "adb reverse tcp:8080 tcp:8080" (cáp USB) hoặc kiểm tra địa chỉ IP backend.',
       );
-    } on TimeoutException {
-      throw AuthFailure('Máy chủ phản hồi quá lâu. Vui lòng thử lại.');
+    } on TimeoutException catch (e) {
+      debugPrint('[AuthSession] TimeoutException on POST $uri: $e');
+      throw AuthFailure('Máy chủ ($baseUrl) phản hồi quá lâu. Vui lòng thử lại.');
     }
   }
 
@@ -353,10 +373,13 @@ class AuthSession {
   }
 
   Future<void> login(String email, String password) async {
+    await clear();
     await request(
       '/api/auth/login',
       method: 'POST',
       data: {'email': email.trim(), 'password': password},
+      authenticated: false,
+      retry: false,
     );
     pendingVerification = false;
     if (pendingEmail?.toLowerCase() != email.trim().toLowerCase())
@@ -367,10 +390,13 @@ class AuthSession {
   }
 
   Future<void> register(String name, String email, String password) async {
+    await clear();
     await request(
       '/api/auth/register',
       method: 'POST',
       data: {'email': email.trim(), 'password': password},
+      authenticated: false,
+      retry: false,
     );
     pendingName = name.trim();
     pendingEmail = email.trim();

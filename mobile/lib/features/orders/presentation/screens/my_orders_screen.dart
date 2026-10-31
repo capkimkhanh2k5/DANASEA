@@ -1,6 +1,5 @@
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/order_repository.dart';
 import '../../../../core/models/danasea_models.dart';
@@ -8,9 +7,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../shared/widgets/app_pill_button.dart';
+import '../../../checkout/presentation/screens/checkout_screen.dart';
 import '../../../checkout/presentation/screens/e_ticket_qr_screen.dart';
+import '../../../experience_detail/presentation/screens/catalog_detail_screen.dart';
 import 'order_detail_screen.dart';
-import 'my_bookings_screen.dart';
 
 class MyOrdersScreen extends StatefulWidget {
   final VoidCallback? onExplore;
@@ -18,10 +18,10 @@ class MyOrdersScreen extends StatefulWidget {
   const MyOrdersScreen({super.key, this.onExplore});
 
   @override
-  State<MyOrdersScreen> createState() => _MyOrdersScreenState();
+  State<MyOrdersScreen> createState() => MyOrdersScreenState();
 }
 
-class _MyOrdersScreenState extends State<MyOrdersScreen> {
+class MyOrdersScreenState extends State<MyOrdersScreen> {
   final OrderRepository _repository = OrderRepository();
   int _selectedFilterIndex = 0;
   List<MasterOrderModel> _orders = [];
@@ -39,6 +39,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     'Đã hoàn thành',
     'Đã hủy',
   ];
+
+  void reload() {
+    _loadOrders();
+  }
 
   @override
   void initState() {
@@ -174,37 +178,13 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            LocalizedText(
-              'Đơn hàng của tôi',
-              style: AppTypography.headlineSm(color: AppColors.onSurface),
-            ),
-            LocalizedText(
-              'Quản lý vé & lịch trình trải nghiệm biển',
-              style: AppTypography.bodySm(color: AppColors.onSurfaceVariant)
-                  .copyWith(fontSize: 11),
-            ),
-          ],
+        title: LocalizedText(
+          'Đơn hàng của tôi',
+          style: AppTypography.headlineSm(color: AppColors.onSurface),
         ),
       ),
       body: Column(
         children: [
-          ListTile(
-            leading: const Icon(Icons.event_note, color: AppColors.secondary),
-            title: const LocalizedText('Booking của tôi'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () async {
-              await Navigator.push<void>(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const MyBookingsScreen(),
-                ),
-              );
-              if (mounted) _loadOrders();
-            },
-          ),
           // STATUS FILTER TABS
           Container(
             height: 48,
@@ -218,7 +198,12 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
               itemBuilder: (context, index) {
                 final isSel = _selectedFilterIndex == index;
                 return InkWell(
-                  onTap: () => setState(() => _selectedFilterIndex = index),
+                  onTap: () {
+                    if (_selectedFilterIndex != index) {
+                      setState(() => _selectedFilterIndex = index);
+                      _loadOrders();
+                    }
+                  },
                   borderRadius: BorderRadius.circular(18),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
@@ -364,6 +349,10 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
             s.status == SubOrderStatus.confirmed ||
             s.status == SubOrderStatus.completed)
         .length;
+    final vendorName = order.subOrders.isNotEmpty &&
+            order.subOrders.first.vendorName.isNotEmpty
+        ? order.subOrders.first.vendorName
+        : 'Đối tác DanaSea';
 
     return Container(
       decoration: BoxDecoration(
@@ -376,109 +365,74 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Order Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: LocalizedText(
-                        '#${order.id}',
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.headlineSm(
-                          color: AppColors.onSurface,
+          // Shop / Vendor Header (Shopee Style)
+          InkWell(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OrderDetailScreen(masterOrder: order),
+                ),
+              );
+              if (mounted) _loadOrders();
+            },
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.verified,
+                        size: 16,
+                        color: AppColors.secondary,
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          vendorName,
+                          style: AppTypography.labelMd(
+                            color: AppColors.onSurface,
+                            fontWeight: FontWeight.w800,
+                          ).copyWith(fontSize: 14.5),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    InkWell(
-                      onTap: () {
-                        Clipboard.setData(ClipboardData(text: order.id));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: LocalizedText('Đã sao chép mã đơn hàng!'),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                      },
-                      child: const Icon(Icons.copy,
-                          size: 15, color: AppColors.secondary),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: LocalizedText(
-                  _getStatusName(order.status),
-                  style: AppTypography.labelSm(
-                    color: statusColor,
-                    fontWeight: FontWeight.w700,
+                      const SizedBox(width: 3),
+                      const Icon(
+                        Icons.chevron_right,
+                        size: 16,
+                        color: AppColors.outline,
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
-          LocalizedText(
-            'Ngày đặt: ${order.createdAt.day}/${order.createdAt.month}/${order.createdAt.year}',
-            style: AppTypography.bodySm(color: AppColors.outline)
-                .copyWith(fontSize: 11),
-          ),
-          const SizedBox(height: 10),
-
-          // Activation Progress Bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: LocalizedText(
-                        'TIẾN TRÌNH KÍCH HOẠT',
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.labelSm(
-                          color: AppColors.secondary,
-                          fontWeight: FontWeight.w700,
-                        ).copyWith(fontSize: 10),
-                      ),
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: LocalizedText(
+                    _getStatusName(order.status),
+                    style: AppTypography.labelSm(
+                      color: statusColor,
+                      fontWeight: FontWeight.w700,
                     ),
-                    const SizedBox(width: 8),
-                    LocalizedText(
-                      '$confirmedCount / ${order.subOrders.length} sẵn sàng',
-                      style: AppTypography.labelSm(
-                        color: AppColors.onSurface,
-                        fontWeight: FontWeight.w700,
-                      ).copyWith(fontSize: 10),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                LinearProgressIndicator(
-                  value: order.subOrders.isNotEmpty
-                      ? confirmedCount / order.subOrders.length
-                      : 0,
-                  backgroundColor: AppColors.surfaceContainerHighest,
-                  color: AppColors.secondary,
-                  minHeight: 4,
-                  borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 3),
+          LocalizedText(
+            'Ngày đặt: ${order.createdAt.day.toString().padLeft(2, '0')}/${order.createdAt.month.toString().padLeft(2, '0')}/${order.createdAt.year}',
+            style: AppTypography.bodySm(color: AppColors.outline)
+                .copyWith(fontSize: 11),
           ),
           const SizedBox(height: 10),
 
@@ -506,7 +460,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                           ? Image.network(
                               sub.serviceImageUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              errorBuilder: (_, _, _) => Container(
                                 color: AppColors.surfaceContainerHigh,
                                 child: const Icon(
                                   Icons.waves,
@@ -540,7 +494,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         LocalizedText(
-                          '${sub.vendorName} • ${sub.quantity} khách • ${sub.slotTime}',
+                          '${sub.quantity} khách • ${sub.slotTime}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTypography.bodySm(
@@ -660,6 +614,32 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                     style: AppTypography.labelSm(color: AppColors.onSurface),
                   ),
                 ),
+                if (order.status == MasterOrderStatus.pendingPayment)
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                    onPressed: () async {
+                      await Navigator.push<void>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CheckoutScreen(masterOrder: order),
+                        ),
+                      );
+                      if (mounted) _loadOrders();
+                    },
+                    icon: const Icon(Icons.payment,
+                        size: 16, color: Colors.white),
+                    label: LocalizedText(
+                      'Thanh toán ngay',
+                      style: AppTypography.labelSm(color: Colors.white),
+                    ),
+                  ),
                 if (confirmedCount > 0)
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
@@ -685,6 +665,34 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                         size: 16, color: Colors.white),
                     label: LocalizedText(
                       'Vé QR & Kích hoạt',
+                      style: AppTypography.labelSm(color: Colors.white),
+                    ),
+                  ),
+                if (order.status == MasterOrderStatus.cancelled &&
+                    order.subOrders.isNotEmpty)
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CatalogDetailScreen(
+                            serviceId: order.subOrders.first.serviceId,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.replay,
+                        size: 16, color: Colors.white),
+                    label: LocalizedText(
+                      'Đặt lại',
                       style: AppTypography.labelSm(color: Colors.white),
                     ),
                   ),

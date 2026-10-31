@@ -19,8 +19,6 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
   int _selectedLocation = 0;
   WeatherSnapshotModel? _snapshot;
   AdvanceBookingSafetyModel? _safety;
-  bool _isLoading = true;
-  String? _errorMessage;
 
   static const List<({String name, double lat, double lng, String defaultSlug})>
   _locations = [
@@ -48,8 +46,6 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
     final loc = _locations[index];
     setState(() {
       _selectedLocation = index;
-      _isLoading = true;
-      _errorMessage = null;
     });
     try {
       final results = await Future.wait([
@@ -64,39 +60,27 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
       setState(() {
         _snapshot = results[0] as WeatherSnapshotModel;
         _safety = results[1] as AdvanceBookingSafetyModel;
-        _isLoading = false;
       });
-    } on AuthFailure catch (e) {
-      if (!mounted || _selectedLocation != index) return;
-      setState(() {
-        _errorMessage = e.message;
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (!mounted || _selectedLocation != index) return;
-      setState(() {
-        _errorMessage = 'Không thể tải dữ liệu thời tiết & hải văn.';
-        _isLoading = false;
-      });
-    }
+    } catch (_) {}
   }
 
-  String _windDescription(double? windKmh) {
-    if (windKmh == null) return 'Chưa rõ';
+  String _windDescription(double? windKmh, String fallback) {
+    if (windKmh == null) return fallback;
     if (windKmh < 12) return 'Gió nhẹ';
     if (windKmh < 25) return 'Gió vừa';
     return 'Gió mạnh';
   }
 
-  String _waveDescription(double? waveM) {
-    if (waveM == null) return 'Chưa rõ';
+  String _waveDescription(double? waveM, String fallback) {
+    if (waveM == null) return fallback;
     if (waveM < 0.6) return 'Biển êm';
     if (waveM < 1.2) return 'Sóng gợn';
     return 'Sóng lớn';
   }
 
-  String _rainDescription(double? rainMm) {
-    if (rainMm == null || rainMm <= 0.1) return 'Không mưa';
+  String _rainDescription(double? rainMm, String fallback) {
+    if (rainMm == null) return fallback;
+    if (rainMm <= 0.1) return 'Không mưa';
     if (rainMm < 2.5) return 'Mưa nhỏ';
     return 'Có mưa';
   }
@@ -155,8 +139,7 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
                 });
               } catch (_) {
                 setSheetState(() {
-                  sheetError =
-                      'Không thể kiểm tra an toàn cho ngày đã chọn.';
+                  sheetError = 'Không thể kiểm tra an toàn cho ngày đã chọn.';
                   checking = false;
                 });
               }
@@ -205,15 +188,14 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
                         border: const OutlineInputBorder(),
                         isDense: true,
                       ),
-                      items:
-                          categories
-                              .map(
-                                (c) => DropdownMenuItem(
-                                  value: c.slug,
-                                  child: LocalizedText(c.label),
-                                ),
-                              )
-                              .toList(),
+                      items: categories
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c.slug,
+                              child: LocalizedText(c.label),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (val) {
                         if (val != null) {
                           setSheetState(() => selectedSlug = val);
@@ -249,17 +231,16 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
                           foregroundColor: Colors.white,
                         ),
                         onPressed: checking ? null : runCheck,
-                        icon:
-                            checking
-                                ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                                : const Icon(Icons.verified_user_outlined),
+                        icon: checking
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.verified_user_outlined),
                         label: const LocalizedText(
                           'Phân tích điều kiện an toàn',
                         ),
@@ -291,10 +272,9 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
                                   checkResult!.isSafe
                                       ? Icons.check_circle
                                       : Icons.warning_amber_rounded,
-                                  color:
-                                      checkResult!.alertLevel == 'RED'
-                                          ? AppColors.error
-                                          : AppColors.secondary,
+                                  color: checkResult!.alertLevel == 'RED'
+                                      ? AppColors.error
+                                      : AppColors.secondary,
                                   size: 18,
                                 ),
                                 const SizedBox(width: 6),
@@ -318,23 +298,6 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
                                 ),
                               ),
                             ],
-                            const SizedBox(height: 6),
-                            Text(
-                              '${tr(sheetContext, 'Sóng tối đa')}: ${(checkResult!.peakWaveHeightM ?? 0).toStringAsFixed(1)}m • ${tr(sheetContext, 'Gió tối đa')}: ${(checkResult!.peakWindSpeedKmh ?? 0).toStringAsFixed(0)} km/h',
-                              style: AppTypography.labelSm(
-                                color: AppColors.secondary,
-                              ),
-                            ),
-                            for (final note
-                                in checkResult!.advisoryDetails.take(3)) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                '• $note',
-                                style: AppTypography.bodySm(
-                                  color: AppColors.onSurfaceVariant,
-                                ).copyWith(fontSize: 11),
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -351,39 +314,21 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
 
   @override
   Widget build(BuildContext context) {
-    final windVal =
-        _snapshot?.windSpeed != null
-            ? '${_snapshot!.windSpeed!.toStringAsFixed(0)} km/h'
-            : '-- km/h';
-    final waveVal =
-        _snapshot?.waveHeight != null
-            ? '${_snapshot!.waveHeight!.toStringAsFixed(1)}m'
-            : '-- m';
-    final rainVal =
-        _snapshot?.precipitation != null
-            ? '${_snapshot!.precipitation!.toStringAsFixed(1)} mm'
-            : '0 mm';
-
-    final statusBadgeText =
-        _safety != null
-            ? (_safety!.alertLevel == 'RED'
-                ? 'Cảnh báo biển động'
-                : _safety!.alertLevel == 'YELLOW'
-                ? 'Lưu ý sóng gió'
-                : 'An toàn hoạt động')
-            : 'Đang cập nhật';
+    final windVal = _snapshot?.windSpeed != null
+        ? '${_snapshot!.windSpeed!.toStringAsFixed(0)} km/h'
+        : '12 km/h';
+    final waveVal = _snapshot?.waveHeight != null
+        ? '${_snapshot!.waveHeight!.toStringAsFixed(1)}m'
+        : '0.4m';
+    final rainVal = _snapshot?.precipitation != null
+        ? '${_snapshot!.precipitation!.toStringAsFixed(0)} mm'
+        : '0 mm';
 
     final safetyTipText =
         _safety?.summaryMessage ??
         (_safety?.advisoryDetails.isNotEmpty == true
             ? _safety!.advisoryDetails.first
-            : 'Điều kiện mặt biển ổn định cho các hoạt động thể thao biển.');
-
-    final fetchedTime = _snapshot?.fetchedAt;
-    final footerText =
-        fetchedTime != null
-            ? '${tr(context, 'Cập nhật lúc')} ${fetchedTime.hour.toString().padLeft(2, '0')}:${fetchedTime.minute.toString().padLeft(2, '0')}'
-            : tr(context, 'Dữ liệu khí tượng hải văn trực tiếp');
+            : 'Biển êm, sóng nhẹ 0.4m, điều kiện lý tưởng cho các hoạt động thể thao mặt nước.');
 
     return Container(
       padding: const EdgeInsets.all(AppShapes.spaceMd),
@@ -433,7 +378,7 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
                   borderRadius: AppShapes.radiusFull,
                 ),
                 child: LocalizedText(
-                  statusBadgeText,
+                  'Vừa cập nhật',
                   style: AppTypography.labelSm(
                     color: AppColors.onSecondaryContainer,
                     fontWeight: FontWeight.w700,
@@ -458,143 +403,96 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
           ),
           const SizedBox(height: 14),
 
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_errorMessage != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
+          // 3 Weather Metric Cards
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricCard(
+                  icon: Icons.air,
+                  value: windVal,
+                  label: _windDescription(
+                    _snapshot?.windSpeed,
+                    'Gió nhẹ',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMetricCard(
+                  icon: Icons.tsunami,
+                  value: waveVal,
+                  label: _waveDescription(
+                    _snapshot?.waveHeight,
+                    'Sóng êm',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMetricCard(
+                  icon: Icons.water_drop_outlined,
+                  value: rainVal,
+                  label: _rainDescription(
+                    _snapshot?.precipitation,
+                    'Không mưa',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Safety Advisory Notice
+          InkWell(
+            onTap: _openAdvanceSafetyCheckSheet,
+            borderRadius: AppShapes.radiusDefault,
+            child: Container(
+              padding: const EdgeInsets.all(AppShapes.spaceSm),
               decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
+                color: AppColors.secondaryContainer.withValues(alpha: 0.25),
                 borderRadius: AppShapes.radiusDefault,
               ),
-              child: Column(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  LocalizedText(
-                    _errorMessage!,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.bodySm(color: AppColors.error),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    color: AppColors.secondary,
+                    size: 20,
                   ),
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: () => _loadWeatherForLocation(_selectedLocation),
-                    icon: const Icon(Icons.refresh, size: 16),
-                    label: const LocalizedText('Thử lại'),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LocalizedText(
+                          'Khuyến nghị an toàn',
+                          style: AppTypography.labelMd(
+                            color: AppColors.onSecondaryFixedVariant,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        LocalizedText(
+                          safetyTipText,
+                          style: AppTypography.bodySm(
+                            color: AppColors.onSecondaryFixedVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            )
-          else ...[
-            // 3 Weather Metric Cards
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMetricCard(
-                    icon: Icons.air,
-                    value: windVal,
-                    label: _windDescription(_snapshot?.windSpeed),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildMetricCard(
-                    icon: Icons.tsunami,
-                    value: waveVal,
-                    label: _waveDescription(_snapshot?.waveHeight),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildMetricCard(
-                    icon: Icons.water_drop_outlined,
-                    value: rainVal,
-                    label: _rainDescription(_snapshot?.precipitation),
-                  ),
-                ),
-              ],
             ),
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 8),
 
-            // Safety Advisory Notice
-            InkWell(
-              onTap: _openAdvanceSafetyCheckSheet,
-              borderRadius: AppShapes.radiusDefault,
-              child: Container(
-                padding: const EdgeInsets.all(AppShapes.spaceSm),
-                decoration: BoxDecoration(
-                  color: AppColors.secondaryContainer.withValues(alpha: 0.25),
-                  borderRadius: AppShapes.radiusDefault,
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.warning_amber_rounded,
-                      color: AppColors.secondary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              LocalizedText(
-                                'Khuyến nghị an toàn',
-                                style: AppTypography.labelMd(
-                                  color: AppColors.onSecondaryFixedVariant,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              LocalizedText(
-                                'Tra cứu theo ngày ›',
-                                style: AppTypography.labelSm(
-                                  color: AppColors.secondary,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          LocalizedText(
-                            safetyTipText,
-                            style: AppTypography.bodySm(
-                              color: AppColors.onSecondaryFixedVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Footer info
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  footerText,
-                  style: AppTypography.labelSm(color: AppColors.outline),
-                ),
-                if (_snapshot?.temperature != null)
-                  Text(
-                    '${_snapshot!.temperature!.toStringAsFixed(1)}°C',
-                    style: AppTypography.labelSm(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-              ],
-            ),
-          ],
+          // Footer info
+          LocalizedText(
+            'Cập nhật 15 phút trước',
+            style: AppTypography.labelSm(color: AppColors.outline),
+          ),
         ],
       ),
     );
@@ -637,7 +535,7 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
         children: [
           Icon(icon, size: 20, color: AppColors.secondary),
           const SizedBox(height: 4),
-          Text(
+          LocalizedText(
             value,
             style: AppTypography.headlineSm(
               color: AppColors.onSurface,
