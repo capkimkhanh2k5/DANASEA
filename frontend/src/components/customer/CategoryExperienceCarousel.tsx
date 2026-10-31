@@ -5,6 +5,7 @@ import type { ActivityCardData } from '../../data/customerHomeData';
 import { useWishlistStore } from '../../store/useWishlistStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { ArrowRight, Star } from 'lucide-react';
+import { getTourUrl } from '../../utils/seo';
 
 interface CategoryExperienceCarouselProps {
   title: string;
@@ -175,7 +176,7 @@ export function CategoryExperienceCarousel({
                   style={{ zIndex: isThisHovered ? 20 : 1 }}
                 >
                   <Link
-                    to={`/tour/${item.id}`}
+                    to={getTourUrl(item)}
                     onMouseEnter={() => setHoveredCardId(item.id)}
                     onMouseLeave={() => setHoveredCardId(null)}
                     style={{

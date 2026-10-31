@@ -58,6 +58,7 @@ public class SearchServicesUseCase {
         return ServiceSummaryResult.builder()
                 .id(service.getId())
                 .name(localize(service.getName(), service.getNameEn()))
+                .slug(service.getSlug())
                 .shortDescription(localize(service.getDescription(), service.getDescriptionEn()))
                 .price(service.getPrice())
                 .address(service.getAddress())

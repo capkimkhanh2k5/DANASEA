@@ -14,6 +14,7 @@ import com.danasea.backend.modules.service.domain.ports.CategoryRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceImageRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
+import com.danasea.backend.shared.utils.SlugUtils;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import com.danasea.backend.modules.vendor.domain.models.VerificationStatus;
 import java.util.List;
@@ -51,12 +52,16 @@ public class CreateServiceUseCase {
             throw new WaiverContentRequiredException();
         }
 
+        // Generate unique SEO slug
+        String slug = SlugUtils.resolveUniqueSlug(cmd.name(), serviceRepository::existsBySlug);
+
         // 3. Build service domain object
         Service service = Service.builder()
                 .vendorId(vendor.getId())
                 .categoryId(cmd.categoryId())
                 .name(cmd.name())
                 .nameEn(cmd.nameEn())
+                .slug(slug)
                 .description(cmd.description())
                 .descriptionEn(cmd.descriptionEn())
                 .price(cmd.price())

@@ -288,7 +288,7 @@ export function Wishlist() {
 
   const handleBook = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    navigate(`/experience/${id}`);
+    navigate(`/tour/${id}`);
   };
 
   // Compute filtered wishlist
@@ -412,7 +412,7 @@ export function Wishlist() {
                   <article
                     key={service.id}
                     className="flex flex-col bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs hover:shadow-md transition-all duration-200 group cursor-pointer hover:-translate-y-0.5"
-                    onClick={() => navigate(`/experience/${service.id}`)}
+                    onClick={() => navigate(`/tour/${service.id}`)}
                   >
                     {/* Card Photo & Actions */}
                     <div className="relative w-full aspect-[4/3] overflow-hidden bg-slate-100">

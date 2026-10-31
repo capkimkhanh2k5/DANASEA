@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+Allow: /explore
+Allow: /search
+Allow: /tour/
+
+Disallow: /admin/
+Disallow: /vendor/
+Disallow: /profile/
+Disallow: /cart
+Disallow: /checkout
+Disallow: /payment/
+Disallow: /auth
+Disallow: /api/
+
+Sitemap: https://danasea.vn/sitemap.xml

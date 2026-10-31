@@ -110,4 +110,49 @@ class CatalogControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SERVICE_NOT_FOUND"));
     }
+
+    @Test
+    void getServiceDetail_BySlug_ShouldReturn200() throws Exception {
+        String slug = "tour-lan-bien-ngam-san-ho";
+        ServiceDetailResult result = ServiceDetailResult.builder()
+                .id(UUID.randomUUID())
+                .name("Tour Lặn Biển Ngắm San Hô")
+                .slug(slug)
+                .build();
+
+        when(getServiceDetailUseCase.executeByIdOrSlug(eq(slug), any(), any())).thenReturn(result);
+
+        mockMvc.perform(get("/api/v1/catalog/" + slug))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.slug").value(slug))
+                .andExpect(jsonPath("$.name").value("Tour Lặn Biển Ngắm San Hô"));
+    }
+
+    @Test
+    void generateSitemap_ShouldReturnValidXml() throws Exception {
+        mockMvc.perform(get("/api/v1/catalog/sitemap.xml"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_XML))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<urlset")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("https://danasea.vn/")));
+    }
+
+    @Test
+    void getOpenGraphPreview_ShouldReturnHtml() throws Exception {
+        String slug = "tour-lan-bien";
+        ServiceDetailResult result = ServiceDetailResult.builder()
+                .id(UUID.randomUUID())
+                .name("Tour Lặn Biển")
+                .slug(slug)
+                .description("Mô tả tour lặn")
+                .build();
+
+        when(getServiceDetailUseCase.readOnlySnapshotByIdOrSlug(eq(slug))).thenReturn(result);
+
+        mockMvc.perform(get("/api/v1/catalog/og/" + slug))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("og:title")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(slug)));
+    }
 }

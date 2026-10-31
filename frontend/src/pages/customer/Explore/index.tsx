@@ -16,6 +16,8 @@ import {
   FALLBACK_CARD_IMAGE,
 } from '../../../utils/imageOptimizer';
 import { Star, ArrowRight, Clock } from 'lucide-react';
+import { SEOHead } from '../../../components/common/SEOHead';
+import { getTourUrl } from '../../../utils/seo';
 
 interface HeroFeaturedSpot {
   id: string;
@@ -392,7 +394,7 @@ export function Explore() {
           price: formatPrice(s.price, fallback.price),
           imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallback.imageUrl),
           searchFilter: fallback.searchFilter,
-          link: `/experience/${s.id}`,
+          link: getTourUrl(s),
         };
       })
     : TOP_10_EXPERIENCES;
@@ -439,13 +441,22 @@ export function Explore() {
           price: formatPrice(s.price, fallback.price),
           imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallback.imageUrl),
           searchFilter: fallback.searchFilter,
-          link: `/experience/${s.id}`,
+          link: getTourUrl(s),
         };
       })
     : WEATHER_RECOMMENDED_EXPERIENCES;
 
   return (
     <main className="w-full min-h-screen bg-white text-slate-900 pb-20">
+      <SEOHead
+        title={language === 'en' ? 'Explore Ocean Adventures in Da Nang' : 'Khám Phá Các Hoạt Động Biển Đà Nẵng'}
+        description={
+          language === 'en'
+            ? 'Discover top-rated coastal destinations, snorkeling tours, paddleboarding, and water sports in Da Nang. Plan your seaside getaway with DANASEA.'
+            : 'Khám phá các điểm đến biển hàng đầu, tour lặn ngắm san hô, chèo SUP, kayak và các hoạt động thể thao biển hấp dẫn tại Đà Nẵng cùng DANASEA.'
+        }
+        canonicalUrl="/explore"
+      />
       
       {/* 1. Cinematic Split Hero Carousel (Nền ảnh chuyển động mượt mà tương ứng từng Card) */}
       <section

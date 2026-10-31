@@ -24,6 +24,7 @@ import { useWishlistStore } from '../../../store/useWishlistStore';
 import { useLanguageStore } from '../../../store/useLanguageStore';
 import { serviceCatalogService } from '../../../services/serviceCatalogService';
 import { reviewService, type ReviewResponse } from '../../../services/reviewService';
+import { SEOHead } from '../../../components/common/SEOHead';
 import type { ServiceDetailDto, ServiceOptionDto, StructuredSlotDto } from '../../../types/service';
 import { FEATURED_SERVICES, MOCK_SLOTS, MOCK_IMAGES } from '../../../mockData';
 
@@ -151,7 +152,9 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
         console.warn('[ExperienceDetail] Lỗi nạp dịch vụ từ BE, kiểm tra mock fallback:', err);
         if (!isMounted) return;
 
-        const fallback = FEATURED_SERVICES.find((s) => s.id === id || s.id === `tour-${id}` || id.includes(s.id));
+        const fallback = FEATURED_SERVICES.find(
+          (s) => s.id === id || s.id === `tour-${id}` || (s.slug && s.slug === id) || (id && id.includes(s.id))
+        );
         if (fallback) {
           const today = new Date();
           const todayStr = today.toISOString().split('T')[0];
@@ -215,6 +218,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
           const mappedFallback: ServiceDetailDto = {
             id: fallback.id,
             name: fallback.name,
+            slug: fallback.slug,
             description: fallback.description || '',
             price: fallback.basePrice,
             address: fallback.locationName,
@@ -272,17 +276,17 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
     };
   }, [id, language]);
 
-  // Customer Reviews state & fetch effect
+  // Customer Reviews state & fetch effect using resolved service.id (UUID)
   const [reviews, setReviews] = useState<ReviewResponse[]>([]);
-  const hasReviewId = Boolean(id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
-  const [isLoadingReviews, setIsLoadingReviews] = useState(hasReviewId);
+  const reviewTargetId = service?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(service.id) ? service.id : null;
+  const [isLoadingReviews, setIsLoadingReviews] = useState<boolean>(Boolean(reviewTargetId));
   const [reviewsTotal, setReviewsTotal] = useState<number>(0);
 
   useEffect(() => {
-    if (!id || !hasReviewId) return;
+    if (!reviewTargetId) return;
 
     let isMounted = true;
-    reviewService.getServiceReviews(id, 0, 10)
+    reviewService.getServiceReviews(reviewTargetId, 0, 10)
       .then((res) => {
         if (isMounted) {
           setReviews(res.content || []);
@@ -303,7 +307,92 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
     return () => {
       isMounted = false;
     };
-  }, [id, hasReviewId]);
+  }, [reviewTargetId]);
+
+  // Auto-normalize Canonical URL: redirect /experience/* or /tour/<uuid> to /tour/<slug>
+  useEffect(() => {
+    if (!service) return;
+    const currentPath = window.location.pathname;
+    const targetSlug = service.slug || service.id;
+    if (targetSlug && (currentPath.startsWith('/experience/') || currentPath !== `/tour/${targetSlug}`)) {
+      navigate(`/tour/${targetSlug}`, { replace: true });
+    }
+  }, [service, navigate]);
+
+  // Schema.org JSON-LD Structured Data
+  const jsonLd = useMemo(() => {
+    if (!service) return undefined;
+    const primaryImg = service.imageUrls?.[0] || 'https://danasea.vn/logo192.png';
+    const tourSlug = service.slug || service.id;
+    const tourUrl = `https://danasea.vn/tour/${encodeURIComponent(tourSlug)}`;
+
+    return [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        '@id': `${tourUrl}#product`,
+        name: service.name,
+        description: service.description || service.name,
+        image: service.imageUrls?.length ? service.imageUrls : [primaryImg],
+        offers: {
+          '@type': 'Offer',
+          url: tourUrl,
+          priceCurrency: 'VND',
+          price: service.promotionalPrice || service.price || 0,
+          availability: 'https://schema.org/InStock',
+          validFrom: new Date().toISOString().split('T')[0],
+        },
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: service.averageRating || 4.9,
+          reviewCount: Math.max(1, service.reviewCount || 1),
+          bestRating: '5',
+          worstRating: '1',
+        },
+        brand: {
+          '@type': 'Brand',
+          name: service.businessName || 'DANASEA',
+        },
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'TouristTrip',
+        '@id': `${tourUrl}#touristtrip`,
+        name: service.name,
+        description: service.description || service.name,
+        touristType: ['Sports Enthusiast', 'Nature Lover', 'Adventure Seeker'],
+        provider: {
+          '@type': 'Organization',
+          name: service.businessName || 'DANASEA',
+          url: 'https://danasea.vn',
+        },
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Trang chủ',
+            item: 'https://danasea.vn/',
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Khám phá',
+            item: 'https://danasea.vn/explore',
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: service.name,
+            item: tourUrl,
+          },
+        ],
+      },
+    ];
+  }, [service]);
 
   // Derived selected option
   const selectedOption: ServiceOptionDto | undefined = useMemo(() => {
@@ -550,6 +639,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
   if (loadError || !service) {
     return (
       <main className="w-full pt-32 pb-20 bg-slate-50 flex-1 flex flex-col items-center justify-center min-h-[70vh]">
+        <SEOHead title="Không tìm thấy trải nghiệm" noIndex />
         <div className="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 mb-4">
           <SearchX className="w-8 h-8 text-sky-600" />
         </div>
@@ -575,6 +665,14 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
 
   return (
     <main className="w-full pt-20 bg-slate-50/60 flex-1">
+      <SEOHead
+        title={service.name}
+        description={service.description ? service.description.slice(0, 160) : undefined}
+        canonicalUrl={`/tour/${service.slug || service.id}`}
+        ogImage={service.imageUrls?.[0]}
+        ogType="product"
+        jsonLd={jsonLd}
+      />
       <div className="flex flex-col w-full">
         {/* Breadcrumb Navigation */}
         <div data-ui="breadcrumb" className="animate-hero-1 w-full bg-white">

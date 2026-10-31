@@ -1,6 +1,7 @@
 export interface ServiceSummaryDto {
   id: string;
   name: string;
+  slug?: string;
   shortDescription?: string;
   price: number;
   promotionalPrice?: number | null;
@@ -51,6 +52,7 @@ export interface StructuredSlotDto {
 export interface ServiceDetailDto {
   id: string;
   name: string;
+  slug?: string;
   description: string;
   price: number;
   promotionalPrice?: number | null;
