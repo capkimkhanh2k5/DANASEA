@@ -38,7 +38,7 @@ public class P2Tier4RealWorldScenarioTest extends BaseE2ETest {
         assumeEndpoint("/api/vendors/{id}", RequestMethod.GET);
         assumeEndpoint("/api/orders/{id}/receipt", RequestMethod.GET);
 
-        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        LocalDate tomorrow = slotA1TomorrowMorning.getDate();
 
         // 1. Customer searches services for tomorrow with 2 guests and rating >= 4.5
         MvcResult discoveryResult = mockMvc.perform(get("/api/services")

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { vendorOrderService } from "../../../services/vendorOrderService";
 import { vendorService } from "../../../services/vendorService";
-import { orderService } from "../../../services/orderService";
+
 import { toast } from "../../../store/useToastStore";
 import { extractErrorMessage } from "../../../utils/errorHandler";
 import type { VendorServiceDto, VendorServiceSlotDto } from "../../../types/vendorService";
@@ -1886,7 +1886,6 @@ export function VendorOrders() {
         </div>,
         document.body
       )}
-
 
       {/* Reschedule Proposal Modal (Portaled to body) */}
       {isRescheduleOpen && drawerOrder && createPortal(

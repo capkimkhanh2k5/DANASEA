@@ -94,6 +94,7 @@ export const TOP_RATED_DESTINATIONS: TopDestination[] = [
 ];
 
 export interface VisitedExperience {
+  link?: string;
   name: string;
   nameEn: string;
   location: string;
@@ -197,6 +198,7 @@ export const TOP_VISITED_EXPERIENCES: VisitedExperience[] = [
 ];
 
 export interface WeatherExperience {
+  link?: string;
   name: string;
   nameEn: string;
   location: string;

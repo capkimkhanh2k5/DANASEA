@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ExploreCarouselDeck } from '../../../components/customer/ExploreCarouselDeck';
 import {
@@ -15,7 +15,7 @@ import {
   FALLBACK_HERO_IMAGE,
   FALLBACK_CARD_IMAGE,
 } from '../../../utils/imageOptimizer';
-import { Star, ArrowRight, ChevronLeft, ChevronRight, Clock, Waves, MapPin, Compass } from 'lucide-react';
+import { Star, ArrowRight, Clock } from 'lucide-react';
 
 interface HeroFeaturedSpot {
   id: string;
@@ -100,9 +100,8 @@ const HERO_FEATURED_SPOTS: HeroFeaturedSpot[] = [
   }
 ];
 
-
-
 interface TopExperience {
+  link?: string;
   name: string;
   nameEn: string;
   location: string;
@@ -571,7 +570,7 @@ export function Explore() {
         subtitle={language === 'en' ? 'Highest rated water sports and island tours voted by travelers' : 'Bảng xếp hạng các hoạt động thể thao nước và tour biển được du khách đánh giá cao nhất'}
         viewAllLink="/search"
         items={top10Activities}
-        renderItem={(item: any) => (
+        renderItem={(item) => (
           <Link
             to={item.link || `/search?category=${item.searchFilter}`}
             className="group flex-1 flex flex-col bg-slate-50 hover:bg-slate-100/90 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-0.5 justify-between border border-slate-200/60 hover:border-slate-300"
@@ -657,7 +656,7 @@ export function Explore() {
         subtitle={language === 'en' ? 'Popular marine excursions with highest verified booking volumes' : 'Những tour thể thao biển thu hút đông đảo lượng khách trải nghiệm và tỷ lệ hài lòng cao'}
         viewAllLink="/search"
         items={topVisitedList}
-        renderItem={(item: any) => (
+        renderItem={(item) => (
           <Link
             to={item.link || `/search?category=${item.searchFilter}`}
             className="group flex-1 flex flex-col bg-slate-50 hover:bg-slate-100/90 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-0.5 justify-between border border-slate-200/60 hover:border-slate-300"
@@ -700,7 +699,7 @@ export function Explore() {
         subtitle={language === 'en' ? 'Optimized for current wave height, morning water clarity, and ocean wind speeds' : 'Được tính toán tự động dựa trên độ cao sóng, chu kỳ thủy triều và độ trong của nước hôm nay'}
         viewAllLink="/search"
         items={weatherRecommendedList}
-        renderItem={(item: any) => (
+        renderItem={(item) => (
           <Link
             to={item.link || `/search?category=${item.searchFilter}`}
             className="group flex-1 flex flex-col bg-slate-50 hover:bg-slate-100/90 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-0.5 justify-between border border-slate-200/60 hover:border-slate-300"

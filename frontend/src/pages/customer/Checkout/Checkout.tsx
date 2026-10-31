@@ -17,10 +17,6 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowLeft,
-  Clock,
-  MapPin,
-  Lock,
-  Tag,
   Loader2,
 } from "lucide-react";
 

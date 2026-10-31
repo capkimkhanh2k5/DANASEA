@@ -1,26 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { 
-  Search as SearchIcon, 
-  MapPin, 
-  Star, 
-  Clock, 
-  ShieldCheck, 
-  Heart, 
-  RotateCcw, 
-  SlidersHorizontal, 
-  Users, 
-  Calendar, 
+import {
+  Search as SearchIcon,
+  MapPin,
+  Star,
+  Clock,
+  ShieldCheck,
+  Heart,
+  RotateCcw,
+  SlidersHorizontal,
+  Users,
+  Calendar,
   ArrowRight,
   Sparkles,
   Camera,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  X
 } from 'lucide-react';
 import { useWishlistStore } from '../../../store/useWishlistStore';
-import { useLanguageStore } from '../../../store/useLanguageStore';
+
 import { serviceCatalogService, type ServiceQueryParams } from '../../../services/serviceCatalogService';
 import { categoryService } from '../../../services/categoryService';
 import type { CategoryDto } from '../../../types/category';
@@ -53,7 +52,7 @@ interface DisplayExperience {
 export function Search() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { language } = useLanguageStore();
+
   const { toggleWishlist, isInWishlist } = useWishlistStore();
 
   const categoryParam = searchParams.get('category');
@@ -129,12 +128,12 @@ export function Search() {
     return () => { isMounted = false; };
   }, []);
 
-  // 2. Synchronize URL query parameter
-  useEffect(() => {
-    if (categoryParam) {
-      setSelectedCategorySlugs([categoryParam]);
-    }
-  }, [categoryParam]);
+  // Reset category selection when navigation changes the URL category.
+  const [previousCategoryParam, setPreviousCategoryParam] = useState(categoryParam);
+  if (previousCategoryParam !== categoryParam) {
+    setPreviousCategoryParam(categoryParam);
+    if (categoryParam) setSelectedCategorySlugs([categoryParam]);
+  }
 
   // 3. Fetch services with fallback
   useEffect(() => {
@@ -145,7 +144,6 @@ export function Search() {
       try {
         const queryParams: ServiceQueryParams = {
           size: 40,
-          ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
           ...(sortBy === 'price_asc' || sortBy === 'price_desc' || sortBy === 'rating_desc' ? { sortBy } : {}),
         };
 
@@ -171,7 +169,7 @@ export function Search() {
                 area: determinedArea,
                 imageUrl: getCardThumbnailUrl(item.primaryImageUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80'),
                 duration: '120 phút',
-                categoryId: (item as any).categoryId || (item.name.toLowerCase().includes('sup') ? 'cheo-sup-kayak' : item.name.toLowerCase().includes('lặn') || item.name.toLowerCase().includes('san hô') ? 'lan-ngam-san-ho' : item.name.toLowerCase().includes('cano') || item.name.toLowerCase().includes('dù') ? 'cano-du-bay' : 'mo-to-nuoc-jetski'),
+                categoryId: ('categoryId' in item && typeof item.categoryId === 'string' ? item.categoryId : undefined) || (item.name.toLowerCase().includes('sup') ? 'cheo-sup-kayak' : item.name.toLowerCase().includes('lặn') || item.name.toLowerCase().includes('san hô') ? 'lan-ngam-san-ho' : item.name.toLowerCase().includes('cano') || item.name.toLowerCase().includes('dù') ? 'cano-du-bay' : 'mo-to-nuoc-jetski'),
                 hasPhotos: true,
                 freeCancel: true,
                 hasCoach: true,
@@ -737,16 +735,16 @@ export function Search() {
               {/* Sort Pills (Traveloka Tabs - Wrap on narrow viewports without triggering horizontal scroll) */}
               <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                 <span className="text-[13px] text-slate-600 font-medium shrink-0 mr-1 hidden sm:inline">Sắp xếp:</span>
-                {[
+                {([
                   { id: 'popular', label: 'Phổ biến nhất' },
                   { id: 'rating_desc', label: 'Đánh giá cao' },
                   { id: 'price_asc', label: 'Giá thấp nhất' },
                   { id: 'price_desc', label: 'Giá cao nhất' },
-                ].map((s) => (
+                ] as const).map((s) => (
                   <button
                     key={s.id}
                     type="button"
-                    onClick={() => setSortBy(s.id as any)}
+                    onClick={() => setSortBy(s.id)}
                     className={`px-3 py-1.5 rounded-xl text-[13px] font-bold transition-all shrink-0 cursor-pointer ${
                       sortBy === s.id
                         ? 'bg-sky-700 text-white'

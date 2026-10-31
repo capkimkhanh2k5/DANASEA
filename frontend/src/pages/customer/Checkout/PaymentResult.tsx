@@ -14,7 +14,6 @@ import {
   ChevronRight,
   MailCheck,
   Users,
-  RotateCcw,
 } from "lucide-react";
 
 interface OrderItemSnapshot {

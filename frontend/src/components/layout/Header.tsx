@@ -1,31 +1,29 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useCartStore } from "../../store/useCartStore";
 import { useWishlistStore } from "../../store/useWishlistStore";
 import { useLanguageStore } from "../../store/useLanguageStore";
 import { notificationService } from "../../services/notificationService";
-import { 
-  Heart, 
-  ShoppingCart, 
-  Bell, 
-  LogIn, 
-  User, 
-  CheckCheck, 
-  Clock, 
-  ShieldCheck, 
-  Menu, 
-  Globe, 
-  LogOut, 
-  CalendarCheck, 
+import {
+  Heart,
+  ShoppingCart,
+  Bell,
+  User,
+  CheckCheck,
+  Clock,
+  Menu,
+  Globe,
+  LogOut,
+  CalendarCheck,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
 } from "lucide-react";
 import type { NotificationResponse } from "../../types/notification";
 
 export function Header() {
   const location = useLocation();
-  const navigate = useNavigate();
+
   
   const { user, isAuthenticated, logout } = useAuthStore();
   const cartItemCount = useCartStore((state) => state.getTotalItems());
@@ -149,7 +147,6 @@ export function Header() {
     }
   };
 
-
   useEffect(() => {
     let ignore = false;
     const fetchUnread = async () => {
@@ -175,56 +172,17 @@ export function Header() {
   const isHomePage = location.pathname === "/";
   const isExplorePage = location.pathname === "/explore";
   const hasHeroMedia = isHomePage || isExplorePage;
-  const [isScrolled, setIsScrolled] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(() => window.scrollY > 40);
 
   useEffect(() => {
-    if (!hasHeroMedia) {
-      setIsScrolled(true);
-      return;
-    }
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 40);
     };
-    handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [hasHeroMedia]);
+  }, []);
 
   const isTransparent = hasHeroMedia && !isScrolled;
-
-
-  const scrollToSection = (id: string) => {
-    if (location.pathname !== "/") {
-      navigate("/" + id);
-    } else {
-      const element = document.querySelector(id);
-      if (element) {
-        const headerHeight = 68;
-        const targetPosition = element.getBoundingClientRect().top + window.scrollY - headerHeight;
-        const startPosition = window.scrollY;
-        const distance = targetPosition - startPosition;
-        const duration = 500;
-        let start: number | null = null;
-
-        const easeInOutQuad = (t: number, b: number, c: number, d: number) => {
-          t /= d / 2;
-          if (t < 1) return (c / 2) * t * t + b;
-          t--;
-          return (-c / 2) * (t * (t - 2) - 1) + b;
-        };
-
-        const animation = (currentTime: number) => {
-          if (start === null) start = currentTime;
-          const timeElapsed = currentTime - start;
-          const run = easeInOutQuad(timeElapsed, startPosition, distance, duration);
-          window.scrollTo(0, run);
-          if (timeElapsed < duration) requestAnimationFrame(animation);
-        };
-
-        requestAnimationFrame(animation);
-      }
-    }
-  };
 
   return (
     <header data-ui="navbar" className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${

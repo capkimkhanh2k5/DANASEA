@@ -10,9 +10,6 @@ import {
   ShieldCheck,
   ChevronRight,
   ArrowRight,
-  Camera,
-  Bus,
-  Check,
   BadgeCheck,
 } from "lucide-react";
 

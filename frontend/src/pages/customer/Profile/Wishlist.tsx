@@ -80,14 +80,16 @@ export function Wishlist() {
   const { wishlistIds, serverItems, removeFromWishlist, fetchWishlistFromServer } = useWishlistStore();
   const { isAuthenticated } = useAuthStore();
   const [catalogServices, setCatalogServices] = useState<ServiceSummaryDto[]>([]);
-  const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
+  const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchWishlistFromServer();
     }
+  }, [isAuthenticated, fetchWishlistFromServer]);
+
+  useEffect(() => {
     let isMounted = true;
-    setIsLoadingCatalog(true);
     serviceCatalogService.getServices({ size: 100 })
       .then((res) => {
         if (isMounted) {
@@ -103,7 +105,7 @@ export function Wishlist() {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, fetchWishlistFromServer]);
+  }, []);
   
   // State for active filter
   const [activeFilter, setActiveFilter] = useState("all");

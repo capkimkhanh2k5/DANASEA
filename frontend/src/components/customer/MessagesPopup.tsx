@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Minus, Send, ArrowLeft, Check, CheckCheck, Clock, User } from 'lucide-react';
+import { MessageSquare, Minus, Send, ArrowLeft } from 'lucide-react';
 
 interface Conversation {
   id: string;
@@ -146,7 +146,6 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
       );
     }, 900);
   };
-
 
   return (
     <div

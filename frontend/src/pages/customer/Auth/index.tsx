@@ -8,7 +8,6 @@ import { AuthCinematicBackdrop } from "../../../components/customer/AuthCinemati
 import { GoogleLoginButton } from "../../../components/customer/GoogleLoginButton";
 import type { User } from "../../../types";
 import {
-  Waves,
   LogIn,
   UserPlus,
   Lock,
@@ -23,7 +22,6 @@ import {
   ArrowLeft,
   Loader2,
   MailCheck,
-  ShieldCheck,
   Info,
 } from "lucide-react";
 
@@ -184,7 +182,6 @@ export function Auth() {
       setIsLoading(false);
     }
   };
-
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();

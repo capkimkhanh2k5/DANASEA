@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLanguageStore } from "../../../store/useLanguageStore";
-import { useAiModalStore } from "../../../store/useAiModalStore";
 
 // Rich Customer Home Data
 import {
@@ -20,9 +19,8 @@ import { DanaseaAppShowcase } from "../../../components/customer/DanaseaAppShowc
 import { GuestGalleryMarquee } from "../../../components/customer/GuestGalleryMarquee";
 import { CoastalVideoSpotlights } from "../../../components/customer/CoastalVideoSpotlights";
 import { CinematicSceneBackdrop } from "../../../components/customer/CinematicSceneBackdrop";
-import { ScrollReveal } from "../../../components/common/ScrollReveal";
-import { MarineWeatherPill } from "../../../components/customer/MarineWeatherPill";
-import { Search, Compass, CalendarCheck, QrCode, ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, SlidersHorizontal, X, Send } from 'lucide-react';
+
+import { Search, ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import type { ServiceSummaryDto } from "../../../types/service";
 import { getCardThumbnailUrl } from "../../../utils/imageOptimizer";
@@ -126,19 +124,14 @@ const CUSTOM_PROMPT_DATA: Record<string, ChatMessage> = {
   }
 };
 
-
-
 export function Home() {
   const { language, t } = useLanguageStore();
   const navigate = useNavigate();
-  const { openAiModal } = useAiModalStore();
 
   // AI Concierge State
   const activeAIBeach = 'Mỹ Khê';
-  const [activeCustomPrompt, setActiveCustomPrompt] = useState<string | null>(null);
-  const [chatInputValue, setChatInputValue] = useState('');
-  const [isChatLoading, setIsChatLoading] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [activeCustomPrompt] = useState<string | null>(null);
+  const [chatHistory] = useState<ChatMessage[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Search Capsule State
@@ -265,7 +258,6 @@ export function Home() {
 
   const baseMessage = activeCustomPrompt ? CUSTOM_PROMPT_DATA[activeCustomPrompt] : AI_BEACH_DATA[activeAIBeach];
   const displayMessages = useMemo(() => [baseMessage, ...chatHistory], [baseMessage, chatHistory]);
-  const currentBeachData = AI_BEACH_DATA[activeAIBeach] || AI_BEACH_DATA['Mỹ Khê'];
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -297,41 +289,6 @@ export function Home() {
     setActiveDropdown(activeDropdown === dropdown ? null : dropdown);
   };
 
-  const formatDateDisplay = (isoStr: string) => {
-    if (!isoStr) return language === 'en' ? 'Select date' : 'Chọn ngày';
-    const [y, m, d] = isoStr.split('-').map(Number);
-    const target = new Date(y, m - 1, d);
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 3600 * 24));
-    
-    if (diffDays === 0) return language === 'en' ? 'Today' : 'Hôm nay';
-    if (diffDays === 1) return language === 'en' ? 'Tomorrow' : 'Ngày mai';
-    return `${d}/${m}/${y}`;
-  };
-
-  const handleShortcutToday = () => {
-    const today = new Date();
-    setSelectedDate(today.toISOString().split('T')[0]);
-    setActiveDropdown(null);
-  };
-
-  const handleShortcutTomorrow = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    setSelectedDate(tomorrow.toISOString().split('T')[0]);
-    setActiveDropdown(null);
-  };
-
-  const handleShortcutWeekend = () => {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = (6 - day + 7) % 7 || 7;
-    d.setDate(d.getDate() + diff);
-    setSelectedDate(d.toISOString().split('T')[0]);
-    setActiveDropdown(null);
-  };
-
   const handleRegionChange = (region: string) => {
     if (selectedRegions.includes(region)) {
       if (selectedRegions.length > 1) {
@@ -340,35 +297,6 @@ export function Home() {
     } else {
       setSelectedRegions([...selectedRegions, region]);
     }
-  };
-
-  // Fixed immutable chat submission handler
-  const handleChatSubmit = () => {
-    if (!chatInputValue.trim() || isChatLoading) return;
-    const promptText = chatInputValue;
-
-    setChatHistory(prev => [
-      ...prev,
-      {
-        chatPrompt: promptText,
-        chatReply: null,
-      }
-    ]);
-    setChatInputValue('');
-    setIsChatLoading(true);
-
-    setTimeout(() => {
-      const replyText = language === 'en'
-        ? `DANASEA Maritime Radar verified: Best conditions at ${activeAIBeach} with ${currentBeachData.temp.val} temperature and ${currentBeachData.wave.val} swell. Would you like to reserve a slot?`
-        : `DANASEA AI đã tra cứu dữ liệu hải văn: Tại ${activeAIBeach}, nhiệt độ hiện tại ${currentBeachData.temp.val}, sóng ${currentBeachData.wave.val}. Bạn có muốn xem thêm lịch khởi hành chi tiết không?`;
-
-      setChatHistory(prev =>
-        prev.map((msg, idx) =>
-          idx === prev.length - 1 ? { ...msg, chatReply: replyText } : msg
-        )
-      );
-      setIsChatLoading(false);
-    }, 1000);
   };
 
   const handleSearchExecute = () => {

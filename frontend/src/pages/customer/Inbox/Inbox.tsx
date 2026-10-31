@@ -10,12 +10,7 @@ import {
   Send,
   Paperclip,
   ShieldCheck,
-  Check,
   CheckCheck,
-  Calendar,
-  Users,
-  ExternalLink,
-  Image as ImageIcon,
   Phone,
   ChevronDown,
   ArrowRight,
@@ -23,21 +18,20 @@ import {
   Loader2,
   BellOff,
   CalendarCheck,
-  BadgeCheck,
-  Lock,
 } from "lucide-react";
 
 export function Inbox() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabQuery = searchParams.get("tab");
-  const [activeTab, setActiveTab] = useState(tabQuery === "notifications" ? "notifications" : "messages");
-
-  useEffect(() => {
-    if (tabQuery === "notifications" || tabQuery === "messages") {
-      setActiveTab(tabQuery);
-    }
-  }, [tabQuery]);
+  const activeTab = tabQuery === "notifications" ? "notifications" : "messages";
+  const setActiveTab = (tab: "messages" | "notifications") => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      next.set("tab", tab);
+      return next;
+    });
+  };
   const [_activeChat, setActiveChat] = useState<number | null>(1);
   const [showOrder, setShowOrder] = useState(false);
   const [notifications, setNotifications] = useState<NotificationResponse[]>([]);

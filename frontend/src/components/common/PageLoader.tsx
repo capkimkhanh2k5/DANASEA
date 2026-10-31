@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useLoadingStore } from '../../store/useLoadingStore';
 
 export function PageLoader() {
-  const { isLoading, durationMs, hideLoader, showLoader } = useLoadingStore();
+  const { isLoading, durationMs, hideLoader } = useLoadingStore();
   const [progress, setProgress] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
   const rafRef = useRef<number | null>(null);

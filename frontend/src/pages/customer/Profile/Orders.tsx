@@ -24,7 +24,6 @@ import {
   Check,
   Info,
   Loader2,
-  MessageSquare,
   ArrowLeft,
 } from "lucide-react";
 import { orderService } from "../../../services/orderService";
@@ -278,7 +277,6 @@ export function Orders() {
     });
   }, [orders, filter]);
 
-
   // Confirm reschedule proposal handler
   const handleConfirmReschedule = async (
     subOrderId: string,
@@ -453,7 +451,9 @@ export function Orders() {
         const next = { ...prev, [reviewingSubOrder.id]: result };
         try {
           localStorage.setItem("danasea_customer_reviews", JSON.stringify(next));
-        } catch {}
+        } catch {
+          // Storage can be unavailable; keep the review in component state.
+        }
         return next;
       });
       setReviewingSubOrder(null);
@@ -475,7 +475,9 @@ export function Orders() {
         const next = { ...prev, [reviewingSubOrder.id]: fallbackReview };
         try {
           localStorage.setItem("danasea_customer_reviews", JSON.stringify(next));
-        } catch {}
+        } catch {
+          // Storage can be unavailable; keep the review in component state.
+        }
         return next;
       });
       toast.success("Đã ghi nhận đánh giá trải nghiệm!");
@@ -923,6 +925,8 @@ export function Orders() {
                           const isConfirmed = subOrderStatus === "CONFIRMED";
                           const isCheckedIn = subOrderStatus === "CHECKED_IN";
                           const isCompleted = subOrderStatus === "COMPLETED";
+                          const summary = rescheduleMap[subOrder.id];
+                          const vendorOption = summary?.options?.find((option) => option.isProposedByVendor);
 
                           return (
                             <div
@@ -1141,12 +1145,7 @@ export function Orders() {
                                 )}
 
                                 {/* Pending Vendor Reschedule Proposal Banner */}
-                                {rescheduleMap[subOrder.id] && (() => {
-                                  const summary = rescheduleMap[subOrder.id];
-                                  const vendorOption = summary.options?.find((o) => o.isProposedByVendor);
-                                  if (!vendorOption) return null;
-
-                                  return (
+                                {summary && vendorOption && (
                                     <div className="mt-3 p-3.5 sm:p-4 rounded-xl bg-amber-50/90 border border-amber-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xs animate-fade-in">
                                       <div className="flex items-start gap-3">
                                         <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
@@ -1185,8 +1184,7 @@ export function Orders() {
                                         </button>
                                       </div>
                                     </div>
-                                  );
-                                })()}
+                                )}
                               </div>
                             </div>
                           );

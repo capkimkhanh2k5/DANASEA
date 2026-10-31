@@ -14,11 +14,7 @@ import {
   Star,
   Minus,
   Plus,
-  ZoomIn,
   Grid,
-  MapPin,
-  Anchor,
-  Sparkles,
   MessageSquare,
   MessageCircle,
   User,
@@ -30,8 +26,6 @@ import { serviceCatalogService } from '../../../services/serviceCatalogService';
 import { reviewService, type ReviewResponse } from '../../../services/reviewService';
 import type { ServiceDetailDto, ServiceOptionDto, StructuredSlotDto } from '../../../types/service';
 import { FEATURED_SERVICES, MOCK_SLOTS, MOCK_IMAGES } from '../../../mockData';
-
-const FALLBACK_IMAGES = ['https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800'];
 
 export function ExperienceDetail() {
   const { id } = useParams<{ id: string }>();
@@ -63,7 +57,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
   // Gallery slider state for the large main image (Seamless Infinite Carousel)
   const [trackIndex, setTrackIndex] = useState<number>(1);
   const [isTransitioning, setIsTransitioning] = useState<boolean>(true);
-  const [isHoveringGallery, setIsHoveringGallery] = useState<boolean>(false);
+  const [isHoveringGallery] = useState<boolean>(false);
 
   // Lightbox Modal state for full-screen image preview
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
@@ -280,20 +274,14 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
 
   // Customer Reviews state & fetch effect
   const [reviews, setReviews] = useState<ReviewResponse[]>([]);
-  const [isLoadingReviews, setIsLoadingReviews] = useState<boolean>(false);
+  const hasReviewId = Boolean(id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id));
+  const [isLoadingReviews, setIsLoadingReviews] = useState(hasReviewId);
   const [reviewsTotal, setReviewsTotal] = useState<number>(0);
 
   useEffect(() => {
-    if (!id) return;
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-    if (!isUuid) {
-      setReviews([]);
-      setReviewsTotal(0);
-      return;
-    }
+    if (!id || !hasReviewId) return;
 
     let isMounted = true;
-    setIsLoadingReviews(true);
     reviewService.getServiceReviews(id, 0, 10)
       .then((res) => {
         if (isMounted) {
@@ -315,7 +303,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, hasReviewId]);
 
   // Derived selected option
   const selectedOption: ServiceOptionDto | undefined = useMemo(() => {
@@ -396,18 +384,19 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
     return raw || 'Sóng biển ≤ 0.80m, gió ≤ 5.00km/h';
   }, [service?.safetyRules]);
 
+  const imageUrls = service?.imageUrls;
   const allImages: string[] = useMemo(() => {
-    if (service?.imageUrls && service.imageUrls.length >= 4) {
-      return service.imageUrls;
+    if (imageUrls && imageUrls.length >= 4) {
+      return imageUrls;
     }
-    if (service?.imageUrls && service.imageUrls.length > 0) {
+    if (imageUrls && imageUrls.length > 0) {
       const defaults = [
         'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800',
         'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
         'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
         'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=800',
       ];
-      return Array.from(new Set([...service.imageUrls, ...defaults])).slice(0, 6);
+      return Array.from(new Set([...imageUrls, ...defaults])).slice(0, 6);
     }
     return [
       'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800',
@@ -415,7 +404,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
       'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
       'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=800',
     ];
-  }, [service?.imageUrls]);
+  }, [imageUrls]);
 
   const mosaicImages: string[] = useMemo(() => {
     const fallbacks = [
@@ -483,25 +472,6 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
 
     return () => clearInterval(timer);
   }, [allImages.length, isHoveringGallery]);
-
-  const handlePrevImage = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    if (allImages.length <= 1) return;
-    setIsTransitioning(true);
-    setTrackIndex((prev) => prev - 1);
-  };
-
-  const handleNextImage = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    if (allImages.length <= 1) return;
-    setIsTransitioning(true);
-    setTrackIndex((prev) => prev + 1);
-  };
-
-  const handleSelectImage = (realIdx: number) => {
-    setIsTransitioning(true);
-    setTrackIndex(allImages.length > 1 ? realIdx + 1 : 0);
-  };
 
   // Keyboard navigation & body scroll lock for Lightbox Modal
   useEffect(() => {
