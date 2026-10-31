@@ -2,14 +2,6 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLanguageStore } from "../../../store/useLanguageStore";
 
-// Rich Customer Home Data
-import {
-  SUP_KAYAK_EXPERIENCES,
-  DIVING_EXPERIENCES,
-  THRILL_EXPERIENCES,
-  COMBO_SUNSET_EXPERIENCES,
-  FLASH_SALE_EXPERIENCES,
-} from "../../../data/customerHomeData";
 import type { ActivityCardData, FlashSaleExperience } from "../../../data/customerHomeData";
 
 // Customer Home Subcomponents
@@ -19,11 +11,15 @@ import { DanaseaAppShowcase } from "../../../components/customer/DanaseaAppShowc
 import { GuestGalleryMarquee } from "../../../components/customer/GuestGalleryMarquee";
 import { CoastalVideoSpotlights } from "../../../components/customer/CoastalVideoSpotlights";
 import { CinematicSceneBackdrop } from "../../../components/customer/CinematicSceneBackdrop";
+import { ExpandingBaysSection } from "../../../components/customer/ExpandingBaysSection";
+import { OceanSportsShowcase } from "../../../components/customer/OceanSportsShowcase";
+import { flashSaleService } from "../../../services/flashSaleService";
+import type { ActiveFlashSaleItem } from "../../../services/flashSaleService";
 
 import { Search, ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import type { ServiceSummaryDto } from "../../../types/service";
-import { getCardThumbnailUrl } from "../../../utils/imageOptimizer";
+import { getCardThumbnailUrl, FALLBACK_CARD_IMAGE } from "../../../utils/imageOptimizer";
 import { SEOHead } from "../../../components/common/SEOHead";
 
 interface ChatMessage {
@@ -183,8 +179,9 @@ export function Home() {
   // Helper to infer realistic duration from activity title
   const inferDuration = (name: string, fallback: string = '2 giờ') => {
     const n = name.toLowerCase();
+    if (n.includes('phao chuối')) return '20 phút';
     if (n.includes('jetski') || n.includes('mô tô') || n.includes('moto')) return '30 phút';
-    if (n.includes('phao chuối') || n.includes('flyboard')) return '45 phút';
+    if (n.includes('flyboard')) return '45 phút';
     if (n.includes('lặn') || n.includes('diving') || n.includes('scuba')) return '3.5 giờ';
     if (n.includes('dù') || n.includes('parasailing')) return '1.5 giờ';
     if (n.includes('câu cá') || n.includes('tour đảo')) return '4 giờ';
@@ -192,70 +189,54 @@ export function Home() {
     return fallback;
   };
 
-  // Curated Featured Activities from Live Backend Catalog with fallback
-  const featuredActivities: ActivityCardData[] = liveServices.length > 0
-    ? liveServices.slice(0, 10).map((s, idx) => {
-        const fallbacks = [
-          ...DIVING_EXPERIENCES,
-          ...THRILL_EXPERIENCES,
-          ...SUP_KAYAK_EXPERIENCES,
-          ...COMBO_SUNSET_EXPERIENCES,
-        ];
-        const fallbackExp = fallbacks[idx % fallbacks.length];
-        return {
-          id: s.id,
-          title: s.name,
-          titleEn: s.name,
-          category: fallbackExp.category,
-          categoryEn: fallbackExp.categoryEn,
-          location: s.address || fallbackExp.location,
-          duration: inferDuration(s.name, fallbackExp.duration),
-          durationEn: inferDuration(s.name, fallbackExp.durationEn),
-          price: Number(s.price) || fallbackExp.price,
-          rating: Number(s.averageRating) || (4.91 + (idx % 5) * 0.02),
-          reviewCount: s.reviewCount || (80 + (idx * 37) % 150),
-          imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallbackExp.imageUrl),
-        };
-      })
-    : [
-        DIVING_EXPERIENCES[0],
-        THRILL_EXPERIENCES[0],
-        SUP_KAYAK_EXPERIENCES[0],
-        COMBO_SUNSET_EXPERIENCES[0],
-        DIVING_EXPERIENCES[1],
-        THRILL_EXPERIENCES[1],
-        SUP_KAYAK_EXPERIENCES[1],
-        COMBO_SUNSET_EXPERIENCES[1],
-      ];
+  // Curated Featured Activities exclusively from Live Backend Catalog (Zero Mock Data)
+  const featuredActivities: ActivityCardData[] = liveServices.map((s, _idx) => {
+    return {
+      id: s.id,
+      title: s.name,
+      titleEn: s.name,
+      category: 'Trải nghiệm biển',
+      categoryEn: 'Marine Experience',
+      location: s.address || 'Đà Nẵng',
+      duration: inferDuration(s.name, '2 giờ'),
+      durationEn: inferDuration(s.name, '2 hours'),
+      price: Number(s.price) || 0,
+      rating: Number(s.averageRating) || 5.0,
+      reviewCount: s.reviewCount || 0,
+      imageUrl: getCardThumbnailUrl(s.primaryImageUrl || FALLBACK_CARD_IMAGE),
+    };
+  });
 
-  // Flash Sale Experiences derived from live services or fallback data
-  const flashSaleList: FlashSaleExperience[] = liveServices.length > 0
-    ? liveServices.slice(0, 4).map((s, idx) => {
-        const discounts = [33, 28, 22, 25];
-        const discountPct = discounts[idx % discounts.length];
-        const numPrice = Number(s.price) || 350000;
-        const fallbackExp = FLASH_SALE_EXPERIENCES[idx % FLASH_SALE_EXPERIENCES.length];
-        return {
-          id: s.id,
-          title: s.name,
-          titleEn: s.name,
-          category: 'Ưu đãi biển',
-          categoryEn: 'Marine Special',
-          location: s.address || fallbackExp.location,
-          locationEn: s.address || fallbackExp.locationEn,
-          duration: inferDuration(s.name, fallbackExp.duration),
-          durationEn: inferDuration(s.name, fallbackExp.durationEn),
-          originalPrice: Math.round((numPrice / (1 - discountPct / 100)) / 10000) * 10000,
-          salePrice: numPrice,
-          discountPercent: discountPct,
-          rating: Number(s.averageRating) || (4.92 + (idx % 4) * 0.02),
-          reviewCount: s.reviewCount || (120 + (idx * 47) % 180),
-          slotsLeft: 2 + (idx % 3),
-          totalSlots: 10 + (idx % 5),
-          imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallbackExp.imageUrl),
-        };
-      })
-    : FLASH_SALE_EXPERIENCES;
+  // Active Flash Sales loaded from real API GET /api/flash-sales/active
+  const [activeFlashSales, setActiveFlashSales] = useState<ActiveFlashSaleItem[]>([]);
+
+  useEffect(() => {
+    flashSaleService.getActiveFlashSales()
+      .then((items) => setActiveFlashSales(items || []))
+      .catch(() => setActiveFlashSales([]));
+  }, []);
+
+  const flashSaleList: FlashSaleExperience[] = useMemo(() => {
+    return activeFlashSales.map((fs) => ({
+      id: fs.serviceId || fs.id,
+      title: fs.serviceName,
+      titleEn: fs.serviceName,
+      category: 'Ưu đãi biển',
+      categoryEn: 'Marine Special',
+      location: fs.location || 'Đà Nẵng',
+      locationEn: fs.location || 'Da Nang',
+      duration: '2 giờ',
+      durationEn: '2 hours',
+      originalPrice: fs.originalPrice,
+      salePrice: fs.salePrice,
+      discountPercent: fs.discountPercentage,
+      rating: 5.0,
+      reviewCount: 0,
+      slotsLeft: Math.max(0, fs.stockAllocated - fs.stockSold),
+      totalSlots: fs.stockAllocated || 10,
+      imageUrl: getCardThumbnailUrl(fs.imageUrl || FALLBACK_CARD_IMAGE),
+    }));
+  }, [activeFlashSales]);
 
   const baseMessage = activeCustomPrompt ? CUSTOM_PROMPT_DATA[activeCustomPrompt] : AI_BEACH_DATA[activeAIBeach];
   const displayMessages = useMemo(() => [baseMessage, ...chatHistory], [baseMessage, chatHistory]);
@@ -548,7 +529,7 @@ export function Home() {
 
                 {/* Popover: Rich Bay Cards (2x2 Grid) */}
                 {activeDropdown === 'region' && (
-                  <div className="animate-popover-in absolute top-full left-0 mt-3 w-[520px] p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
+                  <div className="animate-popover-in absolute top-full left-0 mt-3 w-[440px] p-3.5 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
                     <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
                       <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                         {language === 'en' ? 'Explore Coastal Bays' : 'Khám phá các vịnh biển'}
@@ -801,7 +782,7 @@ export function Home() {
 
                 {/* Popover: Guests Stepper */}
                 {activeDropdown === 'guests' && (
-                  <div className="animate-popover-in absolute top-full right-0 mt-3 w-72 p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
+                  <div className="animate-popover-in absolute top-full right-0 mt-3 w-64 p-3 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
                     <div className="pb-2 mb-3 border-b border-slate-100">
                       <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                         {language === 'en' ? 'Number of Guests' : 'Số lượng thành viên'}
@@ -1287,6 +1268,10 @@ export function Home() {
           {/* Signature Alternating Video Spotlights with Curving Dashed Connectors */}
           <CoastalVideoSpotlights />
 
+          {/* 2 Card Strips: Coastal Bays & Ocean Sports (Positioned after Video Spotlights & before App Showcase) */}
+          <ExpandingBaysSection />
+          <OceanSportsShowcase />
+
           {/* 9. DANASEA Official Mobile App Showcase */}
           <DanaseaAppShowcase />
 
@@ -1349,6 +1334,30 @@ export function Home() {
                     : 'Vé điện tử gửi thẳng qua ứng dụng. Quét mã check-in trực tiếp tại bến tập kết và bắt đầu hành trình.'}
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Maritime Safety Storytelling Banner */}
+          <div className="relative rounded-2xl overflow-hidden shadow-xl border border-sky-900/40 my-6">
+            <div 
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url('/images/hero/08-cano-cao-toc-luot-vinh-da-nang.jpg')` }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/75 to-slate-950/20" />
+            <div className="relative z-10 p-7 sm:p-10 max-w-2xl text-white space-y-3">
+              <span className="text-xs uppercase tracking-wider font-bold text-sky-400 block">
+                {language === 'en' ? 'Maritime Safety Assurance' : 'Quy Chuẩn An Toàn Hàng Hải'}
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-snug">
+                {language === 'en' 
+                  ? 'Safe Ocean Journeys Grounded in SOLAS Certification' 
+                  : 'Hải Trình Biển Trọn Vẹn Dưới Chuẩn An Toàn Hàng Hải Quốc Tế'}
+              </h2>
+              <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-normal">
+                {language === 'en'
+                  ? 'Every marine journey with DANASEA is protected by strict maritime safety standards: 100% verified vessels, SOLAS-grade life jackets, dedicated rescue teams stationed at Da Nang bays, and comprehensive passenger insurance on every voyage.'
+                  : 'Mỗi hải trình du ngoạn biển cùng DANASEA đều được bảo chứng bởi quy chuẩn an toàn hàng hải nghiêm ngặt: 100% cano cao tốc và thiết bị lặn biển được kiểm định định kỳ, áo phao đạt chuẩn SOLAS quốc tế, đội cứu hộ chuyên trách thường trực tại các bến vịnh Mỹ Khê và Sơn Trà, cùng hợp đồng bảo hiểm du lịch toàn diện bảo vệ trọn vẹn từng khoảnh khắc khám phá đại dương của bạn.'}
+              </p>
             </div>
           </div>
 

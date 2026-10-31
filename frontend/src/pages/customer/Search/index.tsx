@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search as SearchIcon,
   MapPin,
@@ -17,6 +17,8 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useWishlistStore } from '../../../store/useWishlistStore';
 import { useLanguageStore } from '../../../store/useLanguageStore';
@@ -24,7 +26,6 @@ import { useLanguageStore } from '../../../store/useLanguageStore';
 import { serviceCatalogService, type ServiceQueryParams } from '../../../services/serviceCatalogService';
 import { categoryService } from '../../../services/categoryService';
 import type { CategoryDto } from '../../../types/category';
-import { FEATURED_SERVICES, CATEGORIES, MOCK_IMAGES } from '../../../mockData';
 import { getCardThumbnailUrl, FALLBACK_CARD_IMAGE } from '../../../utils/imageOptimizer';
 import { SEOHead } from '../../../components/common/SEOHead';
 import { getTourUrl } from '../../../utils/seo';
@@ -106,27 +107,39 @@ export function Search() {
   // Mobile filter drawer state
   const [mobileFilterOpen, setMobileFilterOpen] = useState<boolean>(false);
 
+  // Pagination state (strictly 10 items per page)
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 10;
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    keyword,
+    selectedAreas,
+    selectedCategorySlugs,
+    priceMax,
+    minRating,
+    sortBy,
+    popFreeCancel,
+    popTopRated,
+    popUnder500k,
+    popHasCoach,
+    popHasPhotos,
+  ]);
+
   // 1. Fetch categories
   useEffect(() => {
     let isMounted = true;
     async function loadCategories() {
       try {
         const remoteCats = await categoryService.getCategories();
-        if (isMounted && remoteCats && remoteCats.length > 0) {
-          setCategories(remoteCats);
-        } else if (isMounted) {
-          const fallbackCats: CategoryDto[] = CATEGORIES.map((c, idx) => ({
-            id: `a0000001-0000-0000-0000-00000000000${idx + 1}`,
-            name: c.name,
-            nameEn: c.name,
-            slug: c.id === 'cat-1' ? 'cheo-sup-kayak' : c.id === 'cat-2' ? 'cano-du-bay' : c.id === 'cat-3' ? 'lan-ngam-san-ho' : c.id === 'cat-4' ? 'mo-to-nuoc-jetski' : 'du-thuyen-ngam-hoang-hon',
-            iconUrl: c.icon,
-            isActive: true,
-          }));
-          setCategories(fallbackCats);
+        if (isMounted) {
+          setCategories(remoteCats || []);
         }
       } catch (err) {
         console.warn('[Search] Lỗi nạp danh mục:', err);
+        if (isMounted) setCategories([]);
       }
     }
     loadCategories();
@@ -174,7 +187,7 @@ export function Search() {
                 location: item.address ? item.address.split(',')[0] : `Bán đảo ${determinedArea}`,
                 area: determinedArea,
                 imageUrl: getCardThumbnailUrl(item.primaryImageUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80'),
-                duration: '120 phút',
+                duration: ('duration' in item && typeof item.duration === 'number' && item.duration > 0 ? `${item.duration} phút` : undefined) || (item.name.toLowerCase().includes('phao chuối') ? '20 phút' : '60 phút'),
                 categoryId: ('categoryId' in item && typeof item.categoryId === 'string' ? item.categoryId : undefined) || (item.name.toLowerCase().includes('sup') ? 'cheo-sup-kayak' : item.name.toLowerCase().includes('lặn') || item.name.toLowerCase().includes('san hô') ? 'lan-ngam-san-ho' : item.name.toLowerCase().includes('cano') || item.name.toLowerCase().includes('dù') ? 'cano-du-bay' : 'mo-to-nuoc-jetski'),
                 hasPhotos: true,
                 freeCancel: true,
@@ -184,54 +197,14 @@ export function Search() {
             });
             setServices(mapped);
           } else {
-            // Intelligent fallback from mockData
-            const mappedMock: DisplayExperience[] = FEATURED_SERVICES.map((item, idx) => {
-              const img = MOCK_IMAGES.find(i => i.serviceId === item.id && i.isPrimary)?.imageUrl ||
-                (idx % 2 === 0 
-                  ? 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80'
-                  : 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80');
-
-              const areaList: ('Sơn Trà' | 'Mỹ Khê' | 'Bãi Rạng' | 'Non Nước')[] = [
-                'Mỹ Khê', 'Sơn Trà', 'Bãi Rạng', 'Non Nước'
-              ];
-              const area = areaList[idx % 4];
-
-              const catSlug = item.categoryId === 'cat-1' ? 'cheo-sup-kayak' 
-                : item.categoryId === 'cat-2' ? 'cano-du-bay' 
-                : item.categoryId === 'cat-3' ? 'lan-ngam-san-ho' 
-                : item.categoryId === 'cat-4' ? 'mo-to-nuoc-jetski' 
-                : 'du-thuyen-ngam-hoang-hon';
-
-              return {
-                id: item.id,
-                name: item.name,
-                slug: item.slug,
-                description: item.description || 'Trải nghiệm thể thao biển cao cấp tại Đà Nẵng với trang thiết bị cứu sinh tiêu chuẩn.',
-                price: item.basePrice,
-                promotionalPrice: idx % 3 === 0 ? item.basePrice * 1.15 : null,
-                rating: item.avgRating || 4.9,
-                reviewCount: item.ratingCount || 104,
-                location: item.locationName,
-                area: area,
-                imageUrl: img,
-                duration: `${item.durationMinutes || 90} phút`,
-                categoryId: catSlug,
-                categoryName: catSlug === 'cheo-sup-kayak' ? 'Chèo SUP & Kayak'
-                  : catSlug === 'lan-ngam-san-ho' ? 'Lặn biển san hô'
-                  : catSlug === 'cano-du-bay' ? 'Cano & Dù bay'
-                  : catSlug === 'mo-to-nuoc-jetski' ? 'Mô tô nước Jetski'
-                  : 'Du thuyền hoàng hôn',
-                hasPhotos: idx % 2 === 0,
-                freeCancel: true,
-                hasCoach: true,
-                distanceFromCenter: `${(idx * 2.5 + 3.5).toFixed(1)} km từ trung tâm`,
-              };
-            });
-            setServices(mappedMock);
+            setServices([]);
           }
         }
       } catch (err) {
         console.warn('[Search] Lỗi nạp dịch vụ:', err);
+        if (isMounted) {
+          setServices([]);
+        }
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -337,6 +310,12 @@ export function Search() {
     sortBy,
   ]);
 
+  const totalPages = Math.ceil(filteredServices.length / pageSize);
+  const paginatedServices = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredServices.slice(start, start + pageSize);
+  }, [filteredServices, currentPage, pageSize]);
+
   // Counts calculation for Traveloka Badges
   const areaCounts = useMemo(() => {
     const counts: Record<string, number> = { 'Sơn Trà': 0, 'Mỹ Khê': 0, 'Bãi Rạng': 0, 'Non Nước': 0 };
@@ -384,15 +363,6 @@ export function Search() {
       <section className="bg-white border-b border-slate-200/80 text-slate-900 py-4 sm:py-5 px-4 sm:px-6 lg:px-8 shadow-xs">
         <div className="max-w-[1440px] mx-auto animate-fadeInUp">
           
-          {/* Breadcrumbs */}
-          <div className="flex items-center gap-2 text-[13px] text-slate-500 mb-3 font-medium">
-            <Link to="/" className="hover:text-sky-700 transition-colors">Trang chủ</Link>
-            <span className="text-slate-300">/</span>
-            <Link to="/search" className="hover:text-sky-700 transition-colors">Trải nghiệm biển</Link>
-            <span className="text-slate-300">/</span>
-            <span className="text-slate-800 font-semibold">Đà Nẵng</span>
-          </div>
-
           {/* Quick Query Bar (Modern Geometric Design: rounded-2xl & rounded-xl) */}
           <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 flex flex-col md:flex-row items-center gap-2 text-slate-800 shadow-xs hover:border-slate-300 transition-colors">
             
@@ -644,7 +614,7 @@ export function Search() {
                   <div className="space-y-2.5 pt-1">
                     <div className="flex items-center justify-between text-[13px]">
                       <span className="text-slate-500 font-medium">Mức trần:</span>
-                      <span className="font-bold text-sky-700 tabular-nums">
+                      <span className="font-bold text-[#991b1b] tabular-nums">
                         {priceMax >= 2500000 ? 'Tất cả mức giá' : `${(priceMax / 1000).toLocaleString('vi-VN')}k ₫ / khách`}
                       </span>
                     </div>
@@ -801,7 +771,7 @@ export function Search() {
               </div>
             ) : filteredServices.length > 0 ? (
               <div className="space-y-4">
-                {filteredServices.map((service) => {
+                {paginatedServices.map((service) => {
                   const isSaved = isInWishlist(service.id);
 
                   return (
@@ -919,7 +889,7 @@ export function Search() {
                               {service.promotionalPrice.toLocaleString('vi-VN')} ₫
                             </p>
                           )}
-                          <p className="text-xl sm:text-2xl font-black text-sky-700 tabular-nums tracking-tight">
+                          <p className="text-xl sm:text-2xl font-black text-[#991b1b] tabular-nums tracking-tight">
                             {service.price.toLocaleString('vi-VN')} ₫
                           </p>
                           <p className="text-[13px] text-slate-600">
@@ -943,6 +913,58 @@ export function Search() {
                     </article>
                   );
                 })}
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs">
+                    <span className="text-xs text-slate-500 font-medium">
+                      Hiển thị <strong className="text-slate-800 font-mono">{(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredServices.length)}</strong> trong tổng số <strong className="text-slate-800 font-mono">{filteredServices.length}</strong> trải nghiệm
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={currentPage === 1}
+                        onClick={() => {
+                          setCurrentPage((p) => Math.max(1, p - 1));
+                          window.scrollTo({ top: 120, behavior: 'smooth' });
+                        }}
+                        className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                        <span>Trước</span>
+                      </button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => {
+                            setCurrentPage(p);
+                            window.scrollTo({ top: 120, behavior: 'smooth' });
+                          }}
+                          className={`w-8 h-8 rounded-xl text-xs font-mono font-bold transition-colors cursor-pointer ${
+                            currentPage === p
+                              ? 'bg-sky-700 text-white shadow-xs'
+                              : 'text-slate-700 hover:bg-slate-100 border border-slate-200'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        disabled={currentPage === totalPages}
+                        onClick={() => {
+                          setCurrentPage((p) => Math.min(totalPages, p + 1));
+                          window.scrollTo({ top: 120, behavior: 'smooth' });
+                        }}
+                        className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <span>Sau</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               /* Empty state */
