@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { OCEAN_SPORTS_SHOWCASE } from '../../data/customerHomeData';
 import type { OceanSportShowcase } from '../../data/customerHomeData';
 import { useLanguageStore } from '../../store/useLanguageStore';
+import { ArrowRight, Check } from 'lucide-react';
 
 export const OceanSportsShowcase: React.FC = () => {
   const { language, t } = useLanguageStore();
@@ -49,26 +50,27 @@ export const OceanSportsShowcase: React.FC = () => {
   }, []);
 
   return (
-    <div className="py-2">
+    <section data-ui="sports-showcase" className="py-8 sm:py-10 mb-6">
       {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 pb-4 border-b border-white/20 gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/20 backdrop-blur-md border border-cyan-300/40 text-cyan-200 text-xs font-bold uppercase mb-2 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span>{language === 'en' ? 'Active Waters' : 'Thể Thao & Năng Lượng Biển'}</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] drop-shadow-[0_8px_20px_rgba(0,0,0,0.7)]">
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
             {t.sportsShowcase.title}
           </h2>
+          <p className="text-sm sm:text-base text-slate-600 mt-1 font-medium">
+            {language === 'en'
+              ? 'High-thrill watersports with certified safety equipment and instructors'
+              : 'Trải nghiệm thể thao nước phấn khích cùng trang thiết bị và huấn luyện viên chuẩn quốc tế'}
+          </p>
         </div>
 
         <Link
           to="/search?category=sports"
           onClick={handleNavigate}
-          className="group/all inline-flex items-center gap-1.5 text-cyan-300 hover:text-white font-bold text-xs sm:text-sm transition-all shrink-0 drop-shadow-md cursor-pointer hover:translate-x-0.5"
+          className="group/all inline-flex items-center gap-1.5 text-slate-600 hover:text-sky-700 font-semibold text-sm transition-colors shrink-0 cursor-pointer hover:translate-x-0.5"
         >
           <span>{t.sections.viewAll}</span>
-          <span className="material-symbols-outlined text-[16px] transition-transform duration-200 group-hover/all:translate-x-1.5">arrow_forward</span>
+          <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover/all:translate-x-1.5" />
         </Link>
       </div>
 
@@ -76,7 +78,7 @@ export const OceanSportsShowcase: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         {/* Left Column: Visual Container with smooth image crossfade */}
         <div className="lg:col-span-6">
-          <div className="relative rounded-2xl overflow-hidden border border-white/20 shadow-xl aspect-[4/3] bg-slate-100">
+          <div className="relative rounded-2xl overflow-hidden border border-white/20 aspect-[4/3] bg-slate-900">
             {OCEAN_SPORTS_SHOWCASE.map((sport: OceanSportShowcase, idx: number) => (
               <img
                 key={sport.id}
@@ -92,22 +94,27 @@ export const OceanSportsShowcase: React.FC = () => {
             ))}
 
             {/* Gradient Scrim */}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/30 via-transparent to-transparent pointer-events-none" />
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: 'linear-gradient(to top, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 50%)', // taste-skill-ignore
+              }}
+            />
 
             {/* Bottom Card Overlay */}
-            <div className="absolute bottom-4 left-4 right-4 z-10 p-3.5 sm:p-4 rounded-xl bg-white/95 backdrop-blur-xl border border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.12)] text-slate-900">
+            <div className="absolute bottom-4 left-4 right-4 z-10 p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200/90 text-slate-900">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-[11px] font-bold text-cyan-700 tracking-wider uppercase block">
-                    {activeSport.index} / 04
+                  <span className="text-[13px] font-semibold text-sky-700 block mb-0.5">
+                    {language === 'en' ? activeSport.levelEn : activeSport.level}
                   </span>
                   <h4 className="text-sm sm:text-base font-extrabold text-slate-900">
                     {language === 'en' ? activeSport.nameEn : activeSport.name}
                   </h4>
                 </div>
                 <div className="text-right">
-                  <span className="text-[11px] text-slate-400 block">{language === 'en' ? 'From' : 'Chỉ từ'}</span>
-                  <span className="text-sm sm:text-base font-black text-rose-600">
+                  <span className="text-[13px] text-slate-500 block">{language === 'en' ? 'From' : 'Chỉ từ'}</span>
+                  <span className="text-sm sm:text-base font-black text-rose-600 tabular-nums">
                     {activeSport.startingPrice.toLocaleString('vi-VN')}₫
                   </span>
                 </div>
@@ -116,7 +123,7 @@ export const OceanSportsShowcase: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Interactive Activity Cards (All 4 cards clearly visible) */}
+        {/* Right Column: Interactive Activity Cards */}
         <div className="lg:col-span-6 space-y-3">
           {OCEAN_SPORTS_SHOWCASE.map((sport: OceanSportShowcase, index: number) => {
             const isActive = index === activeSportIndex;
@@ -130,74 +137,62 @@ export const OceanSportsShowcase: React.FC = () => {
                 onMouseEnter={() => handleMouseEnter(index)}
                 onMouseLeave={handleMouseLeave}
                 onClick={() => setActiveSportIndex(index)}
-                className={`p-3.5 sm:p-4 rounded-2xl cursor-pointer transition-all duration-300 ease-out border backdrop-blur-md ${
+                className={`p-4 rounded-2xl cursor-pointer transition-all duration-200 ease-out border ${
                   isActive
-                    ? 'bg-white/20 border-cyan-400 shadow-xl ring-2 ring-cyan-400/30 -translate-y-0.5'
-                    : 'bg-white/10 border-white/20 hover:bg-white/15 hover:border-white/30 text-white'
+                    ? 'bg-white border-sky-500 -translate-y-0.5 text-slate-900 shadow-md'
+                    : 'bg-white border-slate-200/80 hover:border-slate-300 text-slate-800'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <span
-                      className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md transition-colors ${
-                        isActive
-                          ? 'bg-cyan-500 text-white shadow-sm'
-                          : 'bg-white/15 text-cyan-200'
-                      }`}
-                    >
-                      {sport.index}
-                    </span>
-                    <h3
-                      className={`text-sm sm:text-base font-bold transition-colors ${
-                        isActive ? 'text-white' : 'text-white/90'
-                      } drop-shadow-sm`}
-                    >
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-sky-600' : 'bg-slate-300'}`} />
+                    <h3 className="text-base font-bold text-slate-900">
                       {displayName}
                     </h3>
                   </div>
 
-                  <span className={`text-xs font-extrabold ${isActive ? 'text-cyan-300' : 'text-cyan-200'} drop-shadow-sm`}>
+                  <span className={`text-[13px] font-extrabold tabular-nums ${isActive ? 'text-sky-700' : 'text-slate-600'}`}>
                     {sport.startingPrice.toLocaleString('vi-VN')}₫
                   </span>
                 </div>
 
                 {/* Expanded Details */}
-                <div
-                  className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
-                    isActive ? 'grid-rows-[1fr] opacity-100 mt-2.5 pt-2.5 border-t border-white/15' : 'grid-rows-[0fr] opacity-0'
-                  }`}
-                >
-                  <div className="overflow-hidden">
-                    <p className="text-white/85 text-xs sm:text-sm leading-relaxed mb-3 drop-shadow-sm">
+                {isActive && (
+                  <div className="mt-3 pt-3 border-t border-slate-100">
+                    <p className="text-slate-600 text-sm leading-relaxed mb-3">
                       {displayDesc}
                     </p>
 
-                    <ul className="space-y-1 mb-3.5">
+                    <ul className="space-y-1.5 mb-3.5">
                       {displayHighlights.map((highlight: string, idx: number) => (
-                        <li key={idx} className="flex items-center gap-2 text-xs text-white/90 drop-shadow-sm">
-                          <span className="material-symbols-outlined text-[15px] text-cyan-300 shrink-0">check</span>
+                        <li key={idx} className="flex items-center gap-2 text-[13px] text-slate-700">
+                          <Check className="w-4 h-4 text-sky-600 shrink-0" />
                           <span>{highlight}</span>
                         </li>
                       ))}
                     </ul>
 
                     <div className="flex items-center justify-between pt-1">
-                      <Link
-                        to={`/search?category=${encodeURIComponent(sport.name)}`}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-md transition-colors"
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/search?category=${encodeURIComponent(sport.name)}`);
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white text-[13px] font-semibold transition-colors cursor-pointer"
                       >
                         <span>{t.sportsShowcase.bookThis}</span>
-                        <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                      </Link>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

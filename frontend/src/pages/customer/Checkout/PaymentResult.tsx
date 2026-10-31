@@ -1,6 +1,20 @@
 import { useCartStore } from "../../../store/useCartStore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
+import {
+  CheckCircle2,
+  Download,
+  Phone,
+  ArrowRight,
+  Clock,
+  MapPin,
+  ShieldCheck,
+  AlertCircle,
+  XCircle,
+  ChevronRight,
+  MailCheck,
+  Users,
+} from "lucide-react";
 
 interface OrderItemSnapshot {
   id: string;
@@ -115,7 +129,6 @@ export function PaymentResult() {
     }
   }, [isSuccess, cartItems.length, clearCart]);
 
-  // Safely restore cart items when user retries or changes payment method
   const handleRetryCheckout = () => {
     if (cartItems.length === 0 && order?.items && order.items.length > 0) {
       order.items.forEach((item) => {
@@ -156,333 +169,193 @@ export function PaymentResult() {
     navigate("/cart");
   };
 
-  if (!order) return null;
-
   const handleSaveTicket = (ticketCode: string) => {
     setSavedTicketId(ticketCode);
-    setTimeout(() => setSavedTicketId(null), 3000);
+    setTimeout(() => {
+      setSavedTicketId(null);
+    }, 2500);
   };
 
-  const getProviderLabel = (provider: string) => {
-    switch (provider) {
-      case "MOMO":
-        return "Ví điện tử MoMo";
-      case "SEPAY":
-        return "VietQR 24/7 (SePay)";
-      case "PAYPAL":
-        return "Cổng PayPal";
-      case "VNPAY":
-      default:
-        return "Cổng VNPAY (QR Pay / Thẻ)";
-    }
+  const getProviderLabel = (provider?: string) => {
+    if (provider === "MOMO") return "Ví MoMo";
+    if (provider === "PAYPAL") return "Cổng PayPal";
+    if (provider === "SEPAY") return "Chuyển khoản SePay QR";
+    return "Cổng VNPAY (QR Pay / Thẻ ATM)";
   };
+
+  if (!order) return null;
 
   return (
-    <main className="w-full pt-20 bg-surface flex-1">
+    <main className="w-full pt-24 bg-white min-h-[calc(100vh-80px)] flex-1">
       <div className="flex flex-col w-full">
-        {/* Sub-Header Progress Stepper Bar */}
-        <section className="w-full bg-surface-container-lowest/80 backdrop-blur-md shadow-sm border-b border-slate-100">
-          <div className="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-space-md">
-            <div className="flex items-center justify-between gap-space-md flex-wrap mb-space-sm">
-              <div className="flex items-center gap-space-xs font-label-md text-xs text-slate-500">
-                <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={() => navigate("/")}>
-                  DANASEA
-                </span>
-                <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-                <span className="hover:text-cyan-700 cursor-pointer transition-colors" onClick={handleReturnToCart}>
-                  Giỏ hàng
-                </span>
-                <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-                <span className="text-cyan-700 font-bold">
-                  {isSuccess ? "Nhận vé điện tử QR" : "Kết quả thanh toán"}
-                </span>
-              </div>
+        {/* Sub-Header Progress Stepper Bar - Airbnb Style */}
+        <section className="w-full bg-slate-50 border-b border-slate-200/80">
+          <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            {/* Breadcrumb Navigation */}
+            <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
+              <span 
+                className="hover:text-slate-900 cursor-pointer transition-colors" 
+                onClick={() => navigate('/')}
+              >
+                DANASEA
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span 
+                className="hover:text-slate-900 cursor-pointer transition-colors" 
+                onClick={() => navigate('/profile/orders')}
+              >
+                Đơn hàng
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-slate-900 font-semibold">Kết quả thanh toán</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-space-sm items-center">
-              {/* Step 1 */}
+            {/* Stepper Component */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
               <div 
-                onClick={handleReturnToCart}
-                className="flex items-center gap-space-sm rounded-xl bg-slate-50 border border-slate-100 p-2 cursor-pointer hover:bg-slate-100/90 hover:border-slate-300 transition-all group"
-                title="Quay lại Giỏ hàng"
+                onClick={() => navigate('/cart')}
+                className="flex items-center gap-3 rounded-xl bg-slate-100/70 border border-slate-200/70 p-3 cursor-pointer hover:bg-slate-100 transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm">
-                  <span className="material-symbols-outlined text-[18px]">check</span>
-                </div>
+                <span className="text-sm font-semibold text-emerald-700">01.</span>
                 <div className="min-w-0">
-                  <p className="font-label-sm text-[11px] text-emerald-600 font-bold uppercase tracking-wider">Bước 1 - Hoàn thành</p>
-                  <p className="font-headline-sm text-xs font-bold text-slate-800 truncate">Giỏ hàng</p>
+                  <p className="text-xs text-emerald-700 font-medium">Bước 1 (Đã chọn)</p>
+                  <p className="text-sm font-bold text-slate-900 truncate">Giỏ hàng</p>
                 </div>
               </div>
 
-              {/* Step 2 */}
               <div 
-                onClick={handleRetryCheckout}
-                className={`flex items-center gap-space-sm rounded-xl border p-2 cursor-pointer transition-all ${
-                  isSuccess 
-                    ? "bg-slate-50 border-slate-100 hover:bg-slate-100/90" 
-                    : "bg-cyan-50/80 border-cyan-200 shadow-sm"
-                }`}
-                title="Quay lại Bước 2: Thông tin & Thanh toán"
+                onClick={() => navigate('/checkout')}
+                className="flex items-center gap-3 rounded-xl bg-slate-100/70 border border-slate-200/70 p-3 cursor-pointer hover:bg-slate-100 transition-colors"
               >
-                <div className={`w-8 h-8 rounded-full text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm ${
-                  isSuccess ? "bg-emerald-600" : "bg-cyan-600"
-                }`}>
-                  {isSuccess ? (
-                    <span className="material-symbols-outlined text-[18px]">check</span>
-                  ) : (
-                    <span>2</span>
-                  )}
-                </div>
+                <span className="text-sm font-semibold text-emerald-700">02.</span>
                 <div className="min-w-0">
-                  <p className={`font-label-sm text-[11px] font-bold uppercase tracking-wider ${
-                    isSuccess ? "text-emerald-600" : "text-cyan-600"
-                  }`}>
-                    {isSuccess ? "Bước 2 - Hoàn thành" : "Bước 2 - Cần xử lý"}
-                  </p>
-                  <p className="font-headline-sm text-xs font-bold text-slate-800 truncate">Thông tin &amp; Thanh toán</p>
+                  <p className="text-xs text-emerald-700 font-medium">Bước 2 (Đã chọn)</p>
+                  <p className="text-sm font-bold text-slate-900 truncate">Thông tin &amp; Thanh toán</p>
                 </div>
               </div>
 
-              {/* Step 3 */}
-              <div className={`flex items-center gap-space-sm rounded-xl border p-2 ${
-                isSuccess 
-                  ? "bg-cyan-50/80 border-cyan-200 shadow-sm" 
-                  : isCancelled 
-                  ? "bg-amber-50/80 border-amber-200 shadow-sm" 
-                  : "bg-rose-50/80 border-rose-200 shadow-sm"
-              }`}>
-                <div className={`w-8 h-8 rounded-full text-white flex items-center justify-center flex-shrink-0 font-bold shadow-sm ${
-                  isSuccess ? "bg-emerald-600" : isCancelled ? "bg-amber-600" : "bg-rose-600"
-                }`}>
-                  {isSuccess ? (
-                    <span className="material-symbols-outlined text-[18px]">check</span>
-                  ) : isCancelled ? (
-                    <span className="material-symbols-outlined text-[18px]">close</span>
-                  ) : (
-                    <span className="material-symbols-outlined text-[18px]">priority_high</span>
-                  )}
-                </div>
+              <div className="flex items-center gap-3 rounded-xl bg-white border border-slate-300 p-3 shadow-xs">
+                <span className="text-sm font-bold text-slate-900">03.</span>
                 <div className="min-w-0">
-                  <p className={`font-label-sm text-[11px] font-bold uppercase tracking-wider ${
-                    isSuccess ? "text-emerald-600" : isCancelled ? "text-amber-700" : "text-rose-700"
-                  }`}>
-                    {isSuccess ? "Bước 3 - Hoàn thành" : isCancelled ? "Bước 3 - Đã hủy" : "Bước 3 - Chưa hoàn tất"}
-                  </p>
-                  <p className={`font-headline-sm text-xs font-bold truncate ${
-                    isSuccess ? "text-cyan-900" : isCancelled ? "text-amber-900" : "text-rose-900"
-                  }`}>
-                    {isSuccess ? "Nhận vé điện tử QR" : isCancelled ? "Thanh toán đã hủy" : "Thanh toán thất bại"}
-                  </p>
+                  <p className="text-xs text-slate-500 font-medium">Bước 3</p>
+                  <p className="text-sm font-bold text-slate-900 truncate">Nhận vé điện tử QR</p>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Main Content Body */}
-        <div className="max-w-[1280px] mx-auto px-margin-mobile md:px-margin-desktop py-space-xl sm:py-space-2xl w-full">
+        {/* Main Content Area */}
+        <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           
-          {/* ==================== SCENARIO 1: SUCCESS ==================== */}
+          {/* ==================== SCENARIO 1: SUCCESSFUL PAYMENT ==================== */}
           {isSuccess && (
-            <>
-              {/* SUCCESS HERO BANNER WITH ANIMATED CHECKMARK DRAW */}
-              <div className="flex flex-col items-center text-center mb-space-2xl">
-                <style>{`
-                  @keyframes checkmark-circle {
-                    0% {
-                      stroke-dashoffset: 160;
-                      transform: rotate(-90deg);
-                    }
-                    100% {
-                      stroke-dashoffset: 0;
-                      transform: rotate(0deg);
-                    }
-                  }
-                  @keyframes checkmark-check {
-                    0% {
-                      stroke-dashoffset: 40;
-                      opacity: 0;
-                    }
-                    40% {
-                      opacity: 1;
-                    }
-                    100% {
-                      stroke-dashoffset: 0;
-                      opacity: 1;
-                    }
-                  }
-                  @keyframes checkmark-scale {
-                    0%, 100% {
-                      transform: scale(1);
-                    }
-                    50% {
-                      transform: scale(1.08);
-                    }
-                  }
-                  @keyframes hero-fade-up {
-                    0% {
-                      opacity: 0;
-                      transform: translateY(10px);
-                    }
-                    100% {
-                      opacity: 1;
-                      transform: translateY(0);
-                    }
-                  }
-                  .anim-check-circle {
-                    stroke-dasharray: 160;
-                    stroke-dashoffset: 160;
-                    animation: checkmark-circle 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
-                    transform-origin: 50% 50%;
-                  }
-                  .anim-check-tick {
-                    stroke-dasharray: 40;
-                    stroke-dashoffset: 40;
-                    animation: checkmark-check 0.4s 0.45s cubic-bezier(0.65, 0, 0.45, 1) forwards;
-                  }
-                  .anim-check-container {
-                    animation: checkmark-scale 0.4s 0.75s ease-in-out both;
-                  }
-                  .anim-fade-up-1 {
-                    opacity: 0;
-                    animation: hero-fade-up 0.5s 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-                  }
-                  .anim-fade-up-2 {
-                    opacity: 0;
-                    animation: hero-fade-up 0.5s 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-                  }
-                `}</style>
-
-                {/* Animated Green Circle Checkmark */}
-                <div className="relative mb-3 flex items-center justify-center">
-                  <div className="absolute w-20 h-20 rounded-full bg-emerald-100/50 animate-ping opacity-25 pointer-events-none" />
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center shadow-lg shadow-emerald-500/10 anim-check-container relative z-10">
-                    <svg className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-600" viewBox="0 0 52 52">
-                      <circle
-                        className="anim-check-circle"
-                        cx="26"
-                        cy="26"
-                        r="23"
-                        fill="none"
-                        stroke="#10b981"
-                        strokeWidth="3.5"
-                      />
-                      <path
-                        className="anim-check-tick"
-                        fill="none"
-                        stroke="#059669"
-                        strokeWidth="4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15 27l7 7 15-15"
-                      />
-                    </svg>
-                  </div>
+            <div className="flex flex-col gap-8">
+              {/* Hero Status Banner */}
+              <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mb-3 shadow-xs">
+                  <CheckCircle2 className="w-8 h-8" />
                 </div>
-
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight max-w-2xl anim-fade-up-1">
-                  Thanh toán &amp; Xác nhận đặt chỗ thành công!
+                <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 tracking-tight">
+                  Thanh toán &amp; Xác nhận đặt chỗ thành công
                 </h1>
-
-                {/* Notification Notice */}
-                <div className="mt-3 p-2 px-4 rounded-xl bg-cyan-50/60 border border-cyan-100 text-slate-700 inline-flex items-center gap-2 text-xs sm:text-sm anim-fade-up-2">
-                  <span className="material-symbols-outlined text-cyan-700 text-[18px] flex-shrink-0">mark_email_read</span>
-                  <span>Vé đã được gửi về email</span>
+                <p className="text-sm text-slate-600 mt-1 max-w-md">
+                  Mã đơn hàng: <strong className="text-slate-900 font-mono">{order.orderCode}</strong>
+                </p>
+                <div className="mt-3 px-3.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 inline-flex items-center gap-2 text-xs">
+                  <MailCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Xác nhận đặt chỗ &amp; mã vé QR đã được gửi về {order.email}</span>
                 </div>
               </div>
 
-              {/* MAIN GRID: TICKETS & ORDER SUMMARY */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
-                {/* TICKETS COLUMN (8 cols): Single Unified Card */}
-                <div className="lg:col-span-8 bg-surface-container-lowest rounded-2xl shadow-sm border border-slate-100 p-space-xl flex flex-col">
-                  {/* Card Header: Check-in */}
-                  <div className="flex items-center justify-between border-b pb-space-sm border-slate-100 mb-space-lg">
-                    <h3 className="font-headline-sm text-base sm:text-lg font-bold text-slate-900">
-                      Check-in
-                    </h3>
-                    <span className="px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-800 font-label-sm text-xs font-bold border border-cyan-100">
-                      {order.items.length} Vé dịch vụ
+              {/* Main Content Grid: Tickets & Order Summary */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* Tickets Column (8 cols) */}
+                <div className="lg:col-span-8 bg-white rounded-2xl shadow-xs border border-slate-200/80 p-6 flex flex-col gap-6">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <h2 className="text-lg font-bold text-slate-900">
+                      Vé điện tử check-in
+                    </h2>
+                    <span className="px-2.5 py-1 rounded-md bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200">
+                      {order.items.length} vé dịch vụ
                     </span>
                   </div>
 
-                  {/* TICKET LIST - Separated by clean horizontal divider */}
+                  {/* Ticket List */}
                   <div className="flex flex-col divide-y divide-slate-100">
                     {order.items.map((item, index) => (
                       <div
                         key={item.id || index}
-                        className={`grid grid-cols-1 md:grid-cols-12 gap-space-lg items-center ${
-                          index > 0 ? "pt-space-lg" : ""
-                        } ${index < order.items.length - 1 ? "pb-space-lg" : ""}`}
+                        className={`grid grid-cols-1 sm:grid-cols-12 gap-6 items-center ${
+                          index > 0 ? "pt-6" : ""
+                        } ${index < order.items.length - 1 ? "pb-6" : ""}`}
                       >
-                        {/* Left details */}
-                        <div className="md:col-span-7 flex flex-col gap-space-md">
-                          <div className="flex items-start gap-space-sm">
-                            <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-slate-100 shadow-inner">
+                        {/* Left Details */}
+                        <div className="sm:col-span-7 flex flex-col gap-3">
+                          <div className="flex items-start gap-3">
+                            <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 bg-slate-100 border border-slate-100">
                               <img alt={item.serviceName} className="w-full h-full object-cover" src={item.thumbnailUrl} />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700 text-[10px] font-bold">
+                              <span className="text-[11px] font-semibold text-slate-500">
                                 Trải nghiệm biển Đà Nẵng
                               </span>
-                              <h4 className="font-bold text-sm sm:text-base text-slate-900 leading-tight mt-1 truncate">
+                              <h3 className="font-bold text-sm sm:text-base text-slate-900 leading-tight mt-0.5 truncate">
                                 {item.serviceName}
-                              </h4>
-                              <p className="text-xs text-slate-500 mt-1 truncate">
-                                Nhà cung cấp: <strong className="text-cyan-800">{item.vendorName}</strong>
+                              </h3>
+                              <p className="text-xs text-slate-600 mt-1 truncate">
+                                Đối tác tổ chức: <strong className="text-slate-900 font-medium">{item.vendorName}</strong>
                               </p>
                             </div>
                           </div>
 
-                          {/* Detail metadata boxes */}
-                          <div className="grid grid-cols-2 gap-space-sm p-space-sm rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                          {/* Metadata Details */}
+                          <div className="grid grid-cols-2 gap-2 p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
                             <div>
-                              <span className="text-[11px] text-slate-400 block">Thời gian:</span>
-                              <p className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
-                                <span className="material-symbols-outlined text-[15px] text-cyan-700">schedule</span>
+                              <span className="text-xs text-slate-600 font-medium block">Thời gian:</span>
+                              <p className="font-semibold text-slate-900 flex items-center gap-1 mt-0.5">
+                                <Clock className="w-3.5 h-3.5 text-slate-500" />
                                 {item.timeSlot}
                               </p>
-                              <span className="text-[11px] text-slate-500">{item.date}</span>
+                              <span className="text-xs text-slate-600">{item.date}</span>
                             </div>
                             <div>
-                              <span className="text-[11px] text-slate-400 block">Số lượng &amp; Chi phí:</span>
-                              <p className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
-                                <span className="material-symbols-outlined text-[15px] text-cyan-700">group</span>
+                              <span className="text-xs text-slate-600 font-medium block">Số lượng &amp; Chi phí:</span>
+                              <p className="font-semibold text-slate-900 flex items-center gap-1 mt-0.5">
+                                <Users className="w-3.5 h-3.5 text-slate-500" />
                                 {item.quantity} vé khách
                               </p>
-                              <span className="text-[11px] text-cyan-700 font-bold">
+                              <span className="text-xs text-slate-900 font-bold tabular-nums">
                                 {(item.unitPrice * item.quantity).toLocaleString("vi-VN")}₫
                               </span>
                             </div>
                           </div>
 
-                          {/* Meeting location */}
+                          {/* Meeting Location */}
                           <div className="flex items-start gap-1.5 text-xs text-slate-600">
-                            <span className="material-symbols-outlined text-cyan-700 text-[18px] flex-shrink-0 mt-0.5">
-                              location_on
-                            </span>
+                            <MapPin className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                             <div>
                               <strong className="text-slate-900">Điểm đón / tập kết:</strong> {item.locationName}
                             </div>
                           </div>
 
-                          {/* Action buttons */}
-                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                          {/* Action Button */}
+                          <div className="flex items-center gap-2 pt-1">
                             <button
                               onClick={() => handleSaveTicket(item.ticketCode)}
                               type="button"
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-800 font-medium text-xs transition-colors cursor-pointer"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-800 font-medium text-xs border border-slate-200 transition-colors cursor-pointer"
                             >
-                              <span className="material-symbols-outlined text-[16px]">download</span>
-                              {savedTicketId === item.ticketCode ? "Đã lưu vé vào máy!" : "Lưu ảnh vé QR"}
+                              <Download className="w-3.5 h-3.5" />
+                              {savedTicketId === item.ticketCode ? "Đã lưu mã vé!" : "Lưu ảnh vé QR"}
                             </button>
                           </div>
                         </div>
 
                         {/* Right QR Box */}
-                        <div className="md:col-span-5 flex flex-col items-center justify-center p-space-md rounded-2xl bg-cyan-50/40 border border-cyan-100 text-center">
-                          <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center">
-                            <svg className="w-32 h-32 text-slate-800" fill="currentColor" viewBox="0 0 100 100">
+                        <div className="sm:col-span-5 flex flex-col items-center justify-center p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-center">
+                          <div className="p-3 bg-white rounded-xl shadow-2xs border border-slate-200 flex flex-col items-center">
+                            <svg className="w-28 h-28 text-slate-900" fill="currentColor" viewBox="0 0 100 100">
                               <rect fill="none" height="24" rx="4" stroke="currentColor" strokeWidth="4" width="24" x="10" y="10" />
                               <rect fill="currentColor" height="12" rx="2" width="12" x="16" y="16" />
                               <rect fill="none" height="24" rx="4" stroke="currentColor" strokeWidth="4" width="24" x="66" y="10" />
@@ -494,7 +367,7 @@ export function PaymentResult() {
                               <rect height="10" rx="1" width="6" x="42" y="24" />
                               <rect height="6" rx="1" width="8" x="12" y="42" />
                               <rect height="6" rx="1" width="12" x="24" y="42" />
-                              <rect fill="#0891b2" height="16" rx="2" width="16" x="42" y="42" />
+                              <rect fill="#0284c7" height="16" rx="2" width="16" x="42" y="42" />
                               <rect height="6" rx="1" width="10" x="64" y="42" />
                               <rect height="6" rx="1" width="12" x="78" y="42" />
                               <rect height="12" rx="1" width="6" x="42" y="64" />
@@ -503,11 +376,11 @@ export function PaymentResult() {
                               <rect height="12" rx="1" width="8" x="70" y="78" />
                               <rect height="12" rx="1" width="8" x="82" y="78" />
                             </svg>
-                            <span className="font-mono text-xs font-bold text-slate-800 mt-2">#{item.ticketCode}</span>
-                            <span className="text-[10px] text-cyan-700 font-semibold uppercase tracking-wider">MÃ VÉ CHECK-IN</span>
+                            <span className="font-mono text-xs font-bold text-slate-900 mt-2">#{item.ticketCode}</span>
+                            <span className="text-xs text-slate-600 font-medium">Mã check-in</span>
                           </div>
                           <p className="text-[11px] text-slate-500 mt-2 max-w-[180px] leading-tight">
-                            Quét mã này tại quầy điều hành cano để lên thuyền
+                            Xuất trình mã này tại quầy điều hành cano để lên thuyền
                           </p>
                         </div>
                       </div>
@@ -515,65 +388,65 @@ export function PaymentResult() {
                   </div>
                 </div>
 
-                {/* SIDEBAR SUMMARY (4 cols): Single Unified Card */}
-                <div className="lg:col-span-4 flex flex-col">
-                  <div className="bg-surface-container-lowest p-space-xl rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-space-md">
-                    <div className="flex items-center justify-between pb-space-xs border-b border-slate-100">
-                      <h4 className="font-bold text-sm sm:text-base text-slate-900">Chi tiết thanh toán</h4>
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+                {/* Sidebar Summary (4 cols) */}
+                <div className="lg:col-span-4 flex flex-col gap-4">
+                  <div className="bg-white p-6 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col gap-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <h3 className="font-bold text-base text-slate-900">Chi tiết thanh toán</h3>
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
                         Đã thanh toán
                       </span>
                     </div>
 
-                    <div className="flex flex-col gap-2 text-xs text-slate-600">
+                    <div className="flex flex-col gap-2.5 text-xs text-slate-600">
                       {order.items.map((i, idx) => (
                         <div key={idx} className="flex justify-between items-start">
                           <span className="truncate pr-2">
                             {i.serviceName} ({i.quantity} vé)
                           </span>
-                          <span className="font-medium text-slate-900 flex-shrink-0">
+                          <span className="font-medium text-slate-900 tabular-nums shrink-0">
                             {(i.unitPrice * i.quantity).toLocaleString("vi-VN")}₫
                           </span>
                         </div>
                       ))}
 
                       {order.discountAmount > 0 && (
-                        <div className="flex justify-between items-center text-emerald-600 font-bold">
+                        <div className="flex justify-between items-center text-emerald-700 font-bold">
                           <span>Ưu đãi ({order.appliedPromoCode})</span>
-                          <span>-{order.discountAmount.toLocaleString("vi-VN")}₫</span>
+                          <span className="tabular-nums">-{order.discountAmount.toLocaleString("vi-VN")}₫</span>
                         </div>
                       )}
 
                       <div className="flex justify-between items-center text-slate-500">
                         <span>Phí dịch vụ</span>
-                        <span className="text-emerald-600 font-medium">Miễn phí</span>
+                        <span className="text-emerald-700 font-medium">Miễn phí</span>
                       </div>
 
-                      <div className="pt-3 border-t border-slate-100 mt-1 flex justify-between items-baseline">
+                      <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
                         <div>
-                          <span className="text-sm font-bold text-slate-900">Tổng thanh toán:</span>
-                          <p className="text-[11px] text-slate-400">Đã bao gồm thuế &amp; bảo hiểm</p>
+                          <span className="text-xs text-slate-700 font-semibold">Tổng thanh toán:</span>
+                          <p className="text-xs text-slate-500">Đã gồm thuế &amp; bảo hiểm</p>
                         </div>
-                        <span className="text-xl sm:text-2xl font-black text-cyan-700">
+                        <span className="text-2xl font-extrabold text-slate-900 tabular-nums">
                           {order.finalTotal.toLocaleString("vi-VN")}₫
                         </span>
                       </div>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-2 text-xs text-slate-600">
-                      <span className="material-symbols-outlined text-emerald-600 text-[18px]">verified_user</span>
-                      <span>Đã thanh toán an toàn qua {getProviderLabel(order.paymentProvider)}</span>
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>Thanh toán an toàn qua {getProviderLabel(order.paymentProvider)}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* BOTTOM ACTIONS BAR: Clean footer row beneath the two cards */}
-              <div className="mt-space-2xl pt-space-lg border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+              {/* Bottom Actions Bar */}
+              <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-xs text-slate-600">
                   <span>Cần hỗ trợ về vé hoặc lịch trình?</span>
-                  <a className="text-cyan-700 font-bold hover:underline flex items-center gap-1" href="tel:19008468">
-                    <span className="material-symbols-outlined text-[15px]">call</span>
+                  <a className="text-slate-900 font-bold hover:underline flex items-center gap-1" href="tel:19008468">
+                    <Phone className="w-3.5 h-3.5" />
                     <span>Hotline: 1900 8468</span>
                   </a>
                 </div>
@@ -582,43 +455,43 @@ export function PaymentResult() {
                   <button
                     onClick={() => navigate("/profile/orders")}
                     type="button"
-                    className="px-5 py-3 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                    className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-medium text-xs transition-colors cursor-pointer"
                   >
                     Xem đơn hàng của tôi
                   </button>
                   <button
                     onClick={() => navigate("/")}
                     type="button"
-                    className="px-6 py-3 rounded-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer hover:scale-[1.01]"
+                    className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
                   >
-                    Tiếp tục khám phá trải nghiệm
+                    <span>Khám phá thêm trải nghiệm</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
-            </>
+            </div>
           )}
 
           {/* ==================== SCENARIO 2: CANCELLED BY USER ==================== */}
           {isCancelled && (
             <div className="flex flex-col items-center">
-              <div className="flex flex-col items-center text-center mb-space-xl">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shadow-md mb-3">
-                  <span className="material-symbols-outlined text-[40px]">cancel</span>
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mb-3">
+                  <XCircle className="w-8 h-8" />
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight max-w-2xl">
+                <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 tracking-tight">
                   Giao dịch thanh toán đã bị hủy
                 </h1>
-                <div className="mt-3 p-2 px-4 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-800 inline-flex items-center gap-2 text-xs">
-                  <span className="material-symbols-outlined text-amber-600 text-[18px]">info</span>
-                  <span>Vui lòng thử lại</span>
-                </div>
+                <p className="text-sm text-slate-600 mt-1 max-w-md">
+                  Bạn có thể quay lại giỏ hàng hoặc thực hiện thanh toán lại bất kỳ lúc nào.
+                </p>
               </div>
 
               {/* Summary Card for Retry */}
-              <div className="w-full max-w-2xl bg-surface-container-lowest rounded-2xl shadow-sm border border-slate-100 p-space-xl flex flex-col gap-space-lg">
-                <div className="flex items-center justify-between border-b pb-space-sm border-slate-100">
-                  <h3 className="font-bold text-base text-slate-900">Chi tiết dịch vụ chờ thanh toán</h3>
-                  <span className="font-mono text-xs font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+              <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xs border border-slate-200/80 p-6 flex flex-col gap-6">
+                <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+                  <h2 className="font-bold text-base text-slate-900">Chi tiết dịch vụ chờ thanh toán</h2>
+                  <span className="text-xs font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200">
                     Chờ thanh toán
                   </span>
                 </div>
@@ -627,14 +500,14 @@ export function PaymentResult() {
                   {order.items.map((item, idx) => (
                     <div key={idx} className="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
                       <div className="flex items-center gap-3 min-w-0">
-                        <img src={item.thumbnailUrl} alt={item.serviceName} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                        <img src={item.thumbnailUrl} alt={item.serviceName} className="w-14 h-14 rounded-xl object-cover shrink-0" />
                         <div className="min-w-0">
                           <p className="font-bold text-sm text-slate-900 truncate">{item.serviceName}</p>
                           <p className="text-xs text-slate-500">{item.timeSlot} • {item.date}</p>
                           <p className="text-xs text-slate-500">{item.quantity} vé khách</p>
                         </div>
                       </div>
-                      <span className="font-bold text-sm text-slate-900 flex-shrink-0">
+                      <span className="font-bold text-sm text-slate-900 tabular-nums shrink-0">
                         {(item.unitPrice * item.quantity).toLocaleString("vi-VN")}₫
                       </span>
                     </div>
@@ -642,25 +515,24 @@ export function PaymentResult() {
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
-                  <span className="font-bold text-sm text-slate-700">Tổng thanh toán:</span>
-                  <span className="text-xl font-black text-cyan-700">
+                  <span className="font-bold text-xs text-slate-700">Tổng thanh toán:</span>
+                  <span className="text-2xl font-bold text-slate-900 tabular-nums">
                     {order.finalTotal.toLocaleString("vi-VN")}₫
                   </span>
                 </div>
 
-                {/* Retry action buttons */}
                 <div className="pt-2 flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={handleReturnToCart}
                     type="button"
-                    className="flex-1 py-3 px-4 rounded-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer text-center"
+                    className="flex-1 py-3 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-800 font-medium text-xs transition-colors cursor-pointer text-center"
                   >
                     Quay về giỏ hàng
                   </button>
                   <button
                     onClick={handleRetryCheckout}
                     type="button"
-                    className="flex-1 py-3 px-4 rounded-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer hover:scale-[1.01] text-center"
+                    className="flex-1 py-3 px-4 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer text-center"
                   >
                     Thanh toán lại
                   </button>
@@ -669,30 +541,26 @@ export function PaymentResult() {
             </div>
           )}
 
-          {/* ==================== SCENARIO 3: PAYMENT FAILED (DECLINED) ==================== */}
+          {/* ==================== SCENARIO 3: PAYMENT FAILED ==================== */}
           {isFailed && (
             <div className="flex flex-col items-center">
-              <div className="flex flex-col items-center text-center mb-space-xl">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-md mb-3">
-                  <span className="material-symbols-outlined text-[40px]">error</span>
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mb-3">
+                  <AlertCircle className="w-8 h-8" />
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight max-w-2xl">
+                <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 tracking-tight">
                   Thanh toán không thành công
                 </h1>
-                <p className="text-slate-600 text-sm mt-2 max-w-md">
+                <p className="text-slate-600 text-sm mt-1 max-w-md">
                   {getFailureReason(responseCodeParam)}
                 </p>
-                <div className="mt-3 p-2 px-4 rounded-xl bg-amber-50/80 border border-amber-200 text-amber-800 inline-flex items-center gap-2 text-xs">
-                  <span className="material-symbols-outlined text-amber-600 text-[18px]">info</span>
-                  <span>Vui lòng thử lại</span>
-                </div>
               </div>
 
               {/* Summary Card for Retry */}
-              <div className="w-full max-w-2xl bg-surface-container-lowest rounded-2xl shadow-sm border border-slate-100 p-space-xl flex flex-col gap-space-lg">
-                <div className="flex items-center justify-between border-b pb-space-sm border-slate-100">
-                  <h3 className="font-bold text-base text-slate-900">Chi tiết dịch vụ chưa hoàn tất</h3>
-                  <span className="font-mono text-xs font-bold text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
+              <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xs border border-slate-200/80 p-6 flex flex-col gap-6">
+                <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+                  <h2 className="font-bold text-base text-slate-900">Chi tiết dịch vụ chưa hoàn tất</h2>
+                  <span className="text-xs font-semibold text-rose-800 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-200">
                     Giao dịch thất bại
                   </span>
                 </div>
@@ -701,14 +569,14 @@ export function PaymentResult() {
                   {order.items.map((item, idx) => (
                     <div key={idx} className="py-3 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
                       <div className="flex items-center gap-3 min-w-0">
-                        <img src={item.thumbnailUrl} alt={item.serviceName} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                        <img src={item.thumbnailUrl} alt={item.serviceName} className="w-14 h-14 rounded-xl object-cover shrink-0" />
                         <div className="min-w-0">
                           <p className="font-bold text-sm text-slate-900 truncate">{item.serviceName}</p>
                           <p className="text-xs text-slate-500">{item.timeSlot} • {item.date}</p>
                           <p className="text-xs text-slate-500">{item.quantity} vé khách</p>
                         </div>
                       </div>
-                      <span className="font-bold text-sm text-slate-900 flex-shrink-0">
+                      <span className="font-bold text-sm text-slate-900 tabular-nums shrink-0">
                         {(item.unitPrice * item.quantity).toLocaleString("vi-VN")}₫
                       </span>
                     </div>
@@ -716,18 +584,18 @@ export function PaymentResult() {
                 </div>
 
                 <div className="pt-3 border-t border-slate-100 flex justify-between items-baseline">
-                  <span className="font-bold text-sm text-slate-700">Tổng tiền chưa thanh toán:</span>
-                  <span className="text-xl font-black text-rose-600">
+                  <span className="font-bold text-xs text-slate-700">Tổng tiền chưa thanh toán:</span>
+                  <span className="text-2xl font-bold text-rose-600 tabular-nums">
                     {order.finalTotal.toLocaleString("vi-VN")}₫
                   </span>
                 </div>
 
                 {/* Instructions */}
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
-                  <p className="font-medium text-slate-800 mb-1">Gợi ý xử lý:</p>
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                  <p className="font-semibold text-slate-900 mb-1">Gợi ý xử lý:</p>
                   <ul className="list-disc list-inside space-y-1 text-slate-500">
-                    <li>Kiểm tra lại số dư khả dụng của tài khoản ngân hàng.</li>
-                    <li>Đảm bảo đã kích hoạt tính năng thanh toán trực tuyến (Internet Banking/E-commerce).</li>
+                    <li>Kiểm tra lại số dư khả dụng của tài khoản hoặc hạn mức giao dịch.</li>
+                    <li>Đảm bảo đã bật tính năng thanh toán trực tuyến (Internet Banking/E-commerce).</li>
                     <li>Thử đổi sang phương thức thanh toán khác (PayPal hoặc thẻ ngân hàng khác).</li>
                   </ul>
                 </div>
@@ -736,15 +604,15 @@ export function PaymentResult() {
                 <div className="pt-2 flex flex-col sm:flex-row gap-3">
                   <a
                     href="tel:19008468"
-                    className="flex-1 py-3 px-4 rounded-full border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
+                    className="flex-1 py-3 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-800 font-medium text-xs transition-colors cursor-pointer text-center flex items-center justify-center gap-1.5"
                   >
-                    <span className="material-symbols-outlined text-[16px]">call</span>
+                    <Phone className="w-3.5 h-3.5" />
                     <span>Hotline: 1900 8468</span>
                   </a>
                   <button
                     onClick={handleRetryCheckout}
                     type="button"
-                    className="flex-1 py-3 px-4 rounded-full bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-500 hover:to-cyan-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer hover:scale-[1.01] text-center"
+                    className="flex-1 py-3 px-4 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer text-center"
                   >
                     Đổi phương thức thanh toán
                   </button>
@@ -754,8 +622,6 @@ export function PaymentResult() {
           )}
 
         </div>
-
-
       </div>
     </main>
   );

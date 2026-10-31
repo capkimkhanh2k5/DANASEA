@@ -23,8 +23,8 @@ const TIME_SLOTS: TimeSlotData[] = [
     time: '05:30',
     label: 'Bình Minh Biển Sớm',
     labelEn: 'Early Sunrise',
-    sunCondition: 'Mặt trời mọc êm đềm, mặt biển phẳng lặng như gương soi, nhiệt độ mát mẻ phù hợp nhất cho các hoạt động mặt nước.',
-    sunConditionEn: 'Gentle sunrise, glass-calm water surface with cool morning sea breeze, ideal for paddle sports.',
+    sunCondition: 'Trải nghiệm chèo ván đứng SUP đón bình minh trên vùng biển Mân Thái phẳng lặng, có hướng dẫn viên đồng hành và hỗ trợ chụp ảnh.',
+    sunConditionEn: 'Sunrise stand-up paddleboarding in calm morning waters at Man Thai, with dedicated instructor and photoshoot included.',
     location: 'Bãi biển Mân Thái & Mỹ Khê',
     locationEn: 'Man Thai & My Khe Beach',
     tourTitle: 'Chèo SUP Đón Bình Minh Biển Mỹ Khê & Mân Thái',
@@ -38,8 +38,8 @@ const TIME_SLOTS: TimeSlotData[] = [
     time: '09:00',
     label: 'Biển Nắng Pha Lê',
     labelEn: 'Crystal Waters',
-    sunCondition: 'Ánh nắng xuyên thấu nước biển sâu, tầm nhìn san hô tự nhiên đạt độ trong và rõ nét nhất trong ngày.',
-    sunConditionEn: 'Direct sunlight penetration providing maximum underwater clarity and coral reef visibility.',
+    sunCondition: 'Tour cano cao tốc lặn ngắm rạn san hô tự nhiên Bãi Sụp - Bán đảo Sơn Trà, nước trong vắt và trang bị lặn chuyên nghiệp.',
+    sunConditionEn: 'Speedboat coral snorkeling adventure at Hon Sup - Son Tra Peninsula with high-clarity waters and certified equipment.',
     location: 'Hòn Sụp, Bán đảo Sơn Trà',
     locationEn: 'Hon Sup, Son Tra Peninsula',
     tourTitle: 'Lặn Bình Khí Khám Phá Rạn San Hô Hòn Sụp Bán Đảo Sơn Trà',
@@ -53,8 +53,8 @@ const TIME_SLOTS: TimeSlotData[] = [
     time: '14:30',
     label: 'Gió Biển & Tốc Độ',
     labelEn: 'Ocean Breeze & Speed',
-    sunCondition: 'Gió biển Đông Nam thổi lộng, nhịp sóng dồi dào thích hợp cho các hoạt động thể thao nước tốc độ cao.',
-    sunConditionEn: 'Energizing onshore sea breeze and active waves perfect for high-speed coastal adventures.',
+    sunCondition: 'Bay dù lượn cano kéo trên bầu trời vịnh Mỹ Khê, chiêm ngưỡng toàn cảnh bờ biển Đà Nẵng với trang bị bảo hộ an toàn.',
+    sunConditionEn: 'Parasailing flight over My Khe Beach with panoramic coastline views and certified safety harnesses.',
     location: 'Bãi biển Mỹ Khê',
     locationEn: 'My Khe Beach',
     tourTitle: 'Bay Dù Lượn Cano Kéo Bãi Biển Mỹ Khê',
@@ -68,8 +68,8 @@ const TIME_SLOTS: TimeSlotData[] = [
     time: '17:00',
     label: 'Hoàng Hôn Vịnh Biển',
     labelEn: 'Sunset Horizon',
-    sunCondition: 'Nắng dịu chuyển sắc vàng cam rực rỡ, gió chiều mát rượi, không gian biển lãng mạn và thư thái.',
-    sunConditionEn: 'Soft golden hour glow, soothing sea breeze, peaceful coastal twilight atmosphere.',
+    sunCondition: 'Du ngoạn du thuyền ngắm hoàng hôn vịnh biển buông xuống chân cầu Thuận Phước, thưởng thức tiệc nhẹ và ngắm biển chiều.',
+    sunConditionEn: 'Sunset yacht cruise along Da Nang Bay with light refreshments and panoramic golden hour views.',
     location: 'Vịnh Đà Nẵng & Bán Đảo Sơn Trà',
     locationEn: 'Da Nang Bay & Son Tra',
     tourTitle: 'Du Thuyền Hạng Sang Ngắm Hoàng Hôn Vịnh Đà Nẵng',
@@ -87,16 +87,16 @@ export const SmartOceanPlanner: React.FC = () => {
   const currentSlot = TIME_SLOTS[selectedSlotIndex];
 
   return (
-    <section className="pt-2 pb-6 sm:pt-4 sm:pb-8 bg-transparent relative overflow-hidden">
+    <section data-ui="planner-deck" className="pt-2 pb-6 sm:pt-4 sm:pb-8 bg-transparent relative overflow-hidden">
       <div className="w-full relative z-10 max-w-[1360px] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-6">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] drop-shadow-[0_8px_20px_rgba(0,0,0,0.7)]">
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">
             {language === 'en' ? 'Experiences by Ocean Hours' : 'Trải Nghiệm Theo Khung Giờ Biển'}
           </h2>
         </div>
 
-        {/* Time Preset Buttons - Transparent Glass (No Icons) */}
+        {/* Time Preset Buttons */}
         <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 mb-6">
           {TIME_SLOTS.map((slot: TimeSlotData, index: number) => {
             const isActive = index === selectedSlotIndex;
@@ -105,13 +105,13 @@ export const SmartOceanPlanner: React.FC = () => {
                 key={slot.time}
                 type="button"
                 onClick={() => setSelectedSlotIndex(index)}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-300 cursor-pointer backdrop-blur-md ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] sm:text-sm font-semibold transition-all duration-300 cursor-pointer ${
                   isActive
-                    ? 'bg-cyan-600 text-white border border-cyan-400 shadow-lg scale-105 ring-2 ring-cyan-400/30'
-                    : 'bg-white/10 hover:bg-white/20 text-white border border-white/20 shadow-sm'
+                    ? 'bg-sky-600 text-white border border-sky-400'
+                    : 'bg-white/15 hover:bg-white/25 text-white border border-white/20'
                 }`}
               >
-                <span className={`font-mono font-bold ${isActive ? 'text-white' : 'text-cyan-300'}`}>
+                <span className={`tabular-nums font-bold ${isActive ? 'text-white' : 'text-cyan-300'}`}>
                   {slot.time}
                 </span>
                 <span className="drop-shadow-sm">{language === 'en' ? slot.labelEn : slot.label}</span>
@@ -120,31 +120,28 @@ export const SmartOceanPlanner: React.FC = () => {
           })}
         </div>
 
-        {/* Dynamic Card Container - 100% Transparent Glass (Reveals Ocean Backdrop Completely) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center bg-white/10 backdrop-blur-xl rounded-3xl p-6 sm:p-8 lg:p-10 shadow-2xl border border-white/20">
-          {/* Left Column: Context & Moment Atmosphere (Text White, No Murkiness, No Clutter) */}
+        {/* Dynamic Card Container */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-center bg-slate-950/40 backdrop-blur-xl rounded-2xl p-6 sm:p-8 lg:p-10 border border-white/20">
+          {/* Left Column: Context & Moment Atmosphere */}
           <div className="lg:col-span-7 flex flex-col justify-center space-y-4">
-            <div className="inline-flex items-center self-start gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-cyan-400/20 backdrop-blur-md text-cyan-200 border border-cyan-300/40 shadow-sm">
-              <span>{currentSlot.time}</span>
-              <span>•</span>
-              <span>{language === 'en' ? currentSlot.labelEn : currentSlot.label}</span>
-            </div>
-
-            <h3 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white leading-snug tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)]">
-              {language === 'en' ? currentSlot.sunConditionEn : currentSlot.sunCondition}
+            <h3 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight drop-shadow-sm">
+              {language === 'en' ? currentSlot.labelEn : currentSlot.label} ({currentSlot.time})
             </h3>
+            <p className="text-base text-slate-100 leading-relaxed font-normal drop-shadow-sm">
+              {language === 'en' ? currentSlot.sunConditionEn : currentSlot.sunCondition}
+            </p>
 
-            <div className="pt-2 flex items-center gap-2 text-xs sm:text-sm font-medium text-white/90 drop-shadow-sm">
-              <span className="font-bold text-cyan-200">
+            <div className="pt-2 flex items-center gap-2 text-[13px] sm:text-sm font-medium text-slate-200">
+              <span className="font-bold text-cyan-300">
                 {language === 'en' ? 'Area:' : 'Địa điểm:'}
               </span>
               <span>{language === 'en' ? currentSlot.locationEn : currentSlot.location}</span>
             </div>
           </div>
 
-          {/* Right Column: Experience Card - Transparent Glass, Matching Ocean Backdrop */}
+          {/* Right Column: Experience Card - Solid Grounded White Card */}
           <div className="lg:col-span-5">
-            <div className="rounded-2xl overflow-hidden bg-white/15 backdrop-blur-xl border border-white/25 shadow-2xl group transition-all duration-300 hover:border-white/40">
+            <div className="rounded-2xl overflow-hidden bg-white border border-slate-200/80 group transition-all duration-300 hover:border-slate-300 hover:shadow-md">
               <div className="relative aspect-[16/10] overflow-hidden bg-slate-900/30">
                 <img
                   src={currentSlot.imageUrl}
@@ -153,26 +150,26 @@ export const SmartOceanPlanner: React.FC = () => {
                 />
               </div>
 
-              <div className="p-5 sm:p-6 bg-white/10 backdrop-blur-md">
-                <span className="text-xs font-bold text-cyan-300 uppercase tracking-wider block mb-1.5 drop-shadow-sm">
+              <div className="p-5 sm:p-6 bg-white">
+                <span className="text-[13px] font-semibold text-sky-700 block mb-1">
                   {language === 'en' ? currentSlot.tourCategoryEn : currentSlot.tourCategory}
                 </span>
-                <h4 className="text-base font-bold text-white group-hover:text-cyan-200 transition-colors line-clamp-2 mb-4 leading-snug drop-shadow-sm">
+                <h4 className="text-base font-bold text-slate-900 group-hover:text-sky-600 transition-colors line-clamp-2 mb-4 leading-snug">
                   {language === 'en' ? currentSlot.tourTitleEn : currentSlot.tourTitle}
                 </h4>
 
-                <div className="flex items-center justify-between pt-4 border-t border-white/20">
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                   <div>
-                    <span className="text-[11px] text-white/70 uppercase tracking-wider block">
+                    <span className="text-[13px] text-slate-500 block">
                       {language === 'en' ? 'Ticket Price' : 'Giá vé'}
                     </span>
-                    <span className="text-lg font-black text-cyan-300 drop-shadow-sm">
+                    <span className="text-lg tabular-nums font-black text-slate-900">
                       {currentSlot.price.toLocaleString('vi-VN')}₫
                     </span>
                   </div>
                   <Link
                     to="/search"
-                    className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-all shadow-lg hover:shadow-cyan-500/25"
+                    className="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white font-semibold text-[13px] transition-colors"
                   >
                     {language === 'en' ? 'Book Now' : 'Đặt ngay'}
                   </Link>
@@ -185,3 +182,5 @@ export const SmartOceanPlanner: React.FC = () => {
     </section>
   );
 };
+
+export default SmartOceanPlanner;

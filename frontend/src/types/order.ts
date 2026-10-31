@@ -225,3 +225,56 @@ export interface QrCodeResponse {
   qrToken: string;
   expiresAt: string;
 }
+
+export interface RescheduleOptionItem {
+  slotId: string;
+  bookingDate: string;
+  startTime: string;
+  endTime: string;
+  availableCapacity: number;
+  canAccommodate: boolean;
+  accommodateNote: string;
+  referencePrice: number;
+  additionalFee: number;
+  isProposedByVendor: boolean;
+  proposalId: string | null;
+  proposalExpiresAt: string | null;
+}
+
+export interface RescheduleOptionsSummaryResponse {
+  subOrderId: string;
+  currentSlotId: string;
+  currentBookingDate: string;
+  currentBookingTime: string;
+  serviceId: string;
+  serviceName: string;
+  quantity: number;
+  pricingUnit: string | null;
+  rescheduleVersion: number;
+  rescheduleAllowed: boolean;
+  eligibilityReason: string;
+  options: RescheduleOptionItem[];
+  decisionDeadline: string | null;
+  fullRefundAvailable: boolean;
+  disruptionReason: string | null;
+}
+
+export interface ConfirmRescheduleRequest {
+  targetSlotId: string;
+  proposalId?: string | null;
+  expectedVersion: number;
+}
+
+export interface SubOrderRescheduleResponse {
+  subOrderId: string;
+  historyId: string;
+  fromSlotId: string;
+  toSlotId: string;
+  fromBookingDate: string;
+  fromBookingTime: string;
+  toBookingDate: string;
+  toBookingTime: string;
+  rescheduledAt: string;
+  status: string;
+  rescheduleVersion: number;
+}

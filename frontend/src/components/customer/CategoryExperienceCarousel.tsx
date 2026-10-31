@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import type { ActivityCardData } from '../../data/customerHomeData';
 import { useWishlistStore } from '../../store/useWishlistStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
+import { ArrowRight, Star } from 'lucide-react';
 
 interface CategoryExperienceCarouselProps {
   title: string;
@@ -97,14 +98,14 @@ export function CategoryExperienceCarousel({
   }, [emblaApi]);
 
   return (
-    <div ref={sectionRef} className="py-2">
-      {/* Header: Clean title without duplicate arrow, no subtitle, single 'Xem tất cả →' */}
+    <div ref={sectionRef} data-ui="carousel-deck" className="py-4 sm:py-6">
+      {/* Header: Clean title without duplicate arrow, single 'Xem tất cả →' */}
       <div className="flex items-center justify-between mb-4 gap-4">
         <div>
           <Link
             to={linkHref}
             onClick={handleNavigate}
-            className="font-extrabold text-2xl sm:text-3xl text-white hover:text-cyan-200 transition-colors drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] drop-shadow-[0_8px_20px_rgba(0,0,0,0.7)] tracking-tight block cursor-pointer"
+            className="font-extrabold text-2xl sm:text-3xl text-slate-900 hover:text-sky-700 transition-colors tracking-tight block cursor-pointer"
           >
             {title}
           </Link>
@@ -113,12 +114,10 @@ export function CategoryExperienceCarousel({
         <Link
           to={linkHref}
           onClick={handleNavigate}
-          className="group/all text-xs sm:text-sm font-bold text-cyan-300 hover:text-white transition-all inline-flex items-center gap-1.5 drop-shadow-md cursor-pointer hover:translate-x-0.5"
+          className="group/all text-sm font-semibold text-slate-600 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5 cursor-pointer hover:translate-x-0.5"
         >
           <span>{t.sections.viewAll}</span>
-          <span className="material-symbols-outlined text-[16px] transition-transform duration-200 group-hover/all:translate-x-1.5">
-            arrow_forward
-          </span>
+          <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover/all:translate-x-1.5" />
         </Link>
       </div>
 
@@ -130,7 +129,7 @@ export function CategoryExperienceCarousel({
           onClick={scrollPrev}
           disabled={!canScrollPrev}
           aria-label="Previous slide"
-          className={`absolute -left-3 sm:-left-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-white text-slate-800 border border-slate-200 shadow-md flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+          className={`absolute -left-3 sm:-left-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-xl bg-white text-slate-800 border border-slate-200/90 flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
             canScrollPrev
               ? 'opacity-100 pointer-events-auto translate-x-0'
               : 'opacity-0 pointer-events-none -translate-x-2'
@@ -147,7 +146,7 @@ export function CategoryExperienceCarousel({
           onClick={scrollNext}
           disabled={!canScrollNext}
           aria-label="Next slide"
-          className={`absolute -right-3 sm:-right-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-white text-slate-800 border border-slate-200 shadow-md flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
+          className={`absolute -right-3 sm:-right-4 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-xl bg-white text-slate-800 border border-slate-200/90 flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95 cursor-pointer ${
             canScrollNext
               ? 'opacity-100 pointer-events-auto translate-x-0'
               : 'opacity-0 pointer-events-none translate-x-2'
@@ -163,10 +162,9 @@ export function CategoryExperienceCarousel({
           <div className="flex -ml-4 sm:-ml-5">
             {displayItems.map((item, idx) => {
               const isSaved = isInWishlist(item.id);
-              const title = language === 'en' ? item.titleEn : item.title;
+              const cardTitle = language === 'en' ? item.titleEn : item.title;
               const category = language === 'en' ? item.categoryEn : item.category;
               const duration = language === 'en' ? item.durationEn : item.duration;
-              const _badge = language === 'en' ? item.badgeEn : item.badge;
 
               const isThisHovered = hoveredCardId === item.id;
 
@@ -183,19 +181,19 @@ export function CategoryExperienceCarousel({
                     style={{
                       transitionDelay: isRevealed ? `${idx * 60}ms` : '0ms',
                     }}
-                    className={`group flex-1 flex flex-col bg-white rounded-2xl p-2.5 border border-slate-200/80 transition-all duration-300 ease-out cursor-pointer ${
+                    className={`group flex-1 flex flex-col bg-white rounded-2xl p-3 border transition-all duration-300 ease-out cursor-pointer ${
                       !isRevealed
                         ? 'opacity-0 translate-y-6'
                         : isThisHovered
-                        ? 'scale-[1.03] -translate-y-1.5 shadow-lg border-cyan-300 ring-1 ring-cyan-300/40'
-                        : 'scale-100 translate-y-0 opacity-100 shadow-sm hover:shadow-md'
+                        ? 'border-slate-300 -translate-y-0.5'
+                        : 'border-slate-200/80 hover:border-slate-300'
                     }`}
                   >
                     {/* Image Container */}
                     <div className="relative aspect-[4/3] rounded-xl overflow-hidden bg-slate-100 mb-2.5">
                       <img
                         src={item.imageUrl}
-                        alt={title}
+                        alt={cardTitle}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out pointer-events-none"
                         loading="lazy"
                       />
@@ -214,9 +212,9 @@ export function CategoryExperienceCarousel({
                           }
                         }}
                         aria-label="Save to wishlist"
-                        className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-black/20 backdrop-blur-md hover:bg-black/35 border border-white/30 shadow-sm flex items-center justify-center hover:scale-110 active:scale-90 transition-all cursor-pointer z-10 group/heart"
+                        className="absolute top-2.5 right-2.5 w-8 h-8 rounded-xl bg-slate-900/60 hover:bg-slate-900/80 border border-white/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform cursor-pointer z-10 group/heart"
                       >
-                        <svg className={`w-4.5 h-4.5 transition-all duration-200 drop-shadow-sm ${isSaved ? 'text-rose-500 fill-rose-500 scale-105' : 'text-white fill-none stroke-white stroke-[2.2] group-hover/heart:scale-110'}`} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill={isSaved ? 'currentColor' : 'none'} /></svg>
+                        <svg className={`w-4 h-4 transition-all duration-200 drop-shadow-sm ${isSaved ? 'text-rose-500 fill-rose-500 scale-105' : 'text-white fill-none stroke-white stroke-[2.2] group-hover/heart:scale-110'}`} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill={isSaved ? 'currentColor' : 'none'} /></svg>
                       </button>
                     </div>
 
@@ -224,7 +222,7 @@ export function CategoryExperienceCarousel({
                     <div className="flex-1 flex flex-col justify-between px-1">
                       <div>
                         {/* Category & Duration */}
-                        <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5 min-w-0">
+                        <div className="flex items-center gap-1.5 text-[13px] text-slate-500 mb-1.5 min-w-0">
                           <span className="font-semibold text-cyan-700 whitespace-nowrap shrink-0">{category}</span>
                           <span className="shrink-0 text-slate-300">•</span>
                           <span className="whitespace-nowrap shrink-0 font-medium text-slate-600">{duration}</span>
@@ -233,27 +231,27 @@ export function CategoryExperienceCarousel({
                         </div>
 
                         {/* Title */}
-                        <h3 className="font-bold text-sm text-slate-900 line-clamp-2 leading-snug group-hover:text-cyan-700 transition-colors">
-                          {title}
+                        <h3 className="font-bold text-sm sm:text-base text-slate-900 line-clamp-2 leading-snug group-hover:text-cyan-700 transition-colors">
+                          {cardTitle}
                         </h3>
                       </div>
 
                       {/* Price & Rating (Bottom Row) */}
-                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
-                        <div>
-                          <span className="font-bold text-sm text-slate-900">
+                      <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-bold text-base text-slate-900 tabular-nums">
                             {item.price.toLocaleString('vi-VN')}₫
                           </span>
-                          <span className="text-[11px] text-slate-500 ml-1">
-                            {t.sections.perGuest}
+                          <span className="text-[13px] text-slate-500">
+                            / {t.sections.perGuest}
                           </span>
                         </div>
 
-                        {/* Rating & Review Count */}
-                        <div className="flex items-center gap-1 text-xs text-slate-700">
-                          <span className="text-amber-500 font-bold">★</span>
-                          <span className="font-semibold">{item.rating.toFixed(2)}</span>
-                          <span className="text-slate-400 text-[11px]">({item.reviewCount})</span>
+                        {/* Pro-grade Rating Badge */}
+                        <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200/60 text-amber-900 text-[13px] font-bold tabular-nums">
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500 shrink-0" />
+                          <span>{item.rating.toFixed(2)}</span>
+                          <span className="text-amber-950 font-medium text-[13px]">({item.reviewCount})</span>
                         </div>
                       </div>
                     </div>
