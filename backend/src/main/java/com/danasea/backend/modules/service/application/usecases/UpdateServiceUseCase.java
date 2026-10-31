@@ -15,6 +15,7 @@ import com.danasea.backend.modules.service.domain.ports.CategoryRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceImageRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
+import com.danasea.backend.shared.utils.SlugUtils;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import java.util.List;
 import java.util.Objects;
@@ -62,6 +63,11 @@ public class UpdateServiceUseCase {
         if (cmd.address() != null) service.setAddress(cmd.address());
         if (cmd.latitude() != null) service.setLatitude(cmd.latitude());
         if (cmd.longitude() != null) service.setLongitude(cmd.longitude());
+
+        // Ensure service has an SEO-friendly slug
+        if (service.getSlug() == null || service.getSlug().isBlank()) {
+            service.setSlug(SlugUtils.resolveUniqueSlug(service.getName(), serviceRepository::existsBySlug));
+        }
         // Waiver updates & dirty check
         String currentWc = normalize(service.getWaiverContent());
         String currentWce = normalize(service.getWaiverContentEn());

@@ -24,6 +24,7 @@ import { Search, ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Sli
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import type { ServiceSummaryDto } from "../../../types/service";
 import { getCardThumbnailUrl } from "../../../utils/imageOptimizer";
+import { SEOHead } from "../../../components/common/SEOHead";
 
 interface ChatMessage {
   chatPrompt: string;
@@ -459,6 +460,17 @@ export function Home() {
 
   return (
     <main className="w-full text-slate-900 min-h-screen relative overflow-x-clip bg-transparent">
+      <SEOHead
+        title={language === 'en' ? 'Top Marine Tours & Ocean Experiences in Da Nang' : 'Đặt Tour & Trải Nghiệm Biển Đà Nẵng Hàng Đầu'}
+        description={
+          language === 'en'
+            ? 'Book ocean adventures, scuba diving, SUP paddleboarding, and coastal boat tours in Da Nang with DANASEA. Instant booking, transparent pricing, verified operators.'
+            : 'Khám phá và đặt vé các hoạt động thể thao biển, lặn ngắm san hô Sơn Trà, chèo SUP Mỹ Khê, cano dù bay tại Đà Nẵng cùng DANASEA. An toàn, uy tín và giá tốt nhất.'
+        }
+        canonicalUrl="/"
+        ogImage="https://danasea.vn/logo192.png"
+        ogType="website"
+      />
       {/* =========================================================================
           FULL-PAGE DYNAMIC CINEMATIC SCENE BACKDROP
          ========================================================================= */}

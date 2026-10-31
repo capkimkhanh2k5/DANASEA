@@ -86,16 +86,37 @@ public class GetPublicServiceDetailUseCase {
     }
 
     public ServiceDetailResult execute(UUID id, UUID userId, String sessionId) {
-        return load(id, userId, sessionId, true);
+        return loadByIdOrSlug(id.toString(), userId, sessionId, true);
+    }
+
+    public ServiceDetailResult executeByIdOrSlug(String idOrSlug, UUID userId, String sessionId) {
+        return loadByIdOrSlug(idOrSlug, userId, sessionId, true);
     }
 
     public ServiceDetailResult readOnlySnapshot(UUID id) {
-        return load(id, null, null, false);
+        return loadByIdOrSlug(id.toString(), null, null, false);
     }
 
-    private ServiceDetailResult load(UUID id, UUID userId, String sessionId, boolean recordView) {
-        Service service = serviceRepositoryPort.findPublishedById(id)
-                .orElseThrow(() -> new ServiceNotFoundException("Service not found or not published: " + id));
+    public ServiceDetailResult readOnlySnapshotByIdOrSlug(String idOrSlug) {
+        return loadByIdOrSlug(idOrSlug, null, null, false);
+    }
+
+    private ServiceDetailResult loadByIdOrSlug(String idOrSlug, UUID userId, String sessionId, boolean recordView) {
+        if (idOrSlug == null || idOrSlug.isBlank()) {
+            throw new ServiceNotFoundException("Service identifier is required");
+        }
+
+        Service service;
+        try {
+            UUID uuid = UUID.fromString(idOrSlug.trim());
+            service = serviceRepositoryPort.findPublishedById(uuid)
+                    .orElseThrow(() -> new ServiceNotFoundException("Service not found or not published: " + uuid));
+        } catch (IllegalArgumentException ex) {
+            service = serviceRepositoryPort.findPublishedBySlug(idOrSlug.trim())
+                    .orElseThrow(() -> new ServiceNotFoundException("Service not found or not published with slug: " + idOrSlug));
+        }
+
+        UUID id = service.getId();
 
         if (recordView) {
             serviceRepositoryPort.incrementViewCount(id, ServiceStatus.PUBLISHED);
@@ -182,6 +203,7 @@ public class GetPublicServiceDetailUseCase {
         return ServiceDetailResult.builder()
                 .id(service.getId())
                 .name(localize(service.getName(), service.getNameEn()))
+                .slug(service.getSlug())
                 .description(localize(service.getDescription(), service.getDescriptionEn()))
                 .price(service.getPrice())
                 .address(service.getAddress())

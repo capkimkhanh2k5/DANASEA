@@ -5,6 +5,7 @@ import type { FlashSaleExperience } from '../../data/customerHomeData';
 import { useWishlistStore } from '../../store/useWishlistStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { Clock, Star, MapPin, Flame } from 'lucide-react';
+import { getTourUrl } from '../../utils/seo';
 
 interface FlashSaleSectionProps {
   experiences?: FlashSaleExperience[];
@@ -206,7 +207,7 @@ export function FlashSaleSection({ experiences = FLASH_SALE_EXPERIENCES }: Flash
                     </div>
 
                     <Link
-                      to={`/tour/${item.id}`}
+                      to={getTourUrl(item)}
                       className="px-3.5 py-1.5 rounded-xl bg-sky-700 hover:bg-sky-800 active:bg-sky-900 text-white text-[13px] font-semibold transition-colors"
                     >
                       {t.flashSale.bookNow}

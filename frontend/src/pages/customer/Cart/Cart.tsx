@@ -182,7 +182,7 @@ export function Cart() {
                             </div>
                             
                             <Link 
-                              to={`/experience/${item.serviceId}`} 
+                              to={`/tour/${item.serviceId}`} 
                               className="text-xs text-slate-600 hover:text-slate-900 hover:underline font-medium"
                             >
                               Xem lại chi tiết

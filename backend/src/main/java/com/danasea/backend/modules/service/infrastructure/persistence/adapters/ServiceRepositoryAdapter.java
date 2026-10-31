@@ -89,6 +89,35 @@ public class ServiceRepositoryAdapter implements ServiceRepositoryPort {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<Service> findPublishedBySlug(String slug) {
+        if (slug == null || slug.isBlank()) {
+            return Optional.empty();
+        }
+        return jpaServiceRepository.findBySlugAndStatus(slug.trim(), ServiceStatus.PUBLISHED)
+                .map(serviceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Service> findBySlug(String slug) {
+        if (slug == null || slug.isBlank()) {
+            return Optional.empty();
+        }
+        return jpaServiceRepository.findBySlug(slug.trim())
+                .map(serviceMapper::toDomain);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsBySlug(String slug) {
+        if (slug == null || slug.isBlank()) {
+            return false;
+        }
+        return jpaServiceRepository.existsBySlug(slug.trim());
+    }
+
+    @Override
     @Transactional
     public int incrementViewCount(UUID id, ServiceStatus status) {
         return jpaServiceRepository.incrementViewCount(id, status);

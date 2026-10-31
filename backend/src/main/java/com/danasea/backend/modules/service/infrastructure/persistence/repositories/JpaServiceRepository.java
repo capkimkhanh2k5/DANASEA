@@ -32,6 +32,10 @@ public interface JpaServiceRepository extends JpaRepository<ServiceJpaEntity, UU
 
     boolean existsBySlug(String slug);
 
+    Optional<ServiceJpaEntity> findBySlugAndStatus(String slug, ServiceStatus status);
+
+    Optional<ServiceJpaEntity> findBySlug(String slug);
+
     @Modifying
     @Query("UPDATE ServiceJpaEntity s SET s.viewCount = COALESCE(s.viewCount, 0) + 1 WHERE s.id = :id AND s.status = :status")
     int incrementViewCount(@Param("id") UUID id, @Param("status") ServiceStatus status);
