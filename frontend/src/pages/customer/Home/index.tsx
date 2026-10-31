@@ -1288,9 +1288,6 @@ export function Home() {
               <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
                 {language === 'en' ? 'How to Book on DANASEA' : 'Cách đặt trải nghiệm cùng DANASEA'}
               </h2>
-              <p className="text-base text-slate-600 mt-2 font-medium">
-                {language === 'en' ? 'Three quick steps from browsing to hitting the waves' : 'Ba bước nhanh chóng từ lúc chọn tour đến khi bước chân xuống mặt nước'}
-              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

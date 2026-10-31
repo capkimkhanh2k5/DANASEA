@@ -158,9 +158,11 @@ const SpotlightBlock: React.FC<{
           }`}
         >
           {/* Location Tag (No counting pill) */}
-          <span className="text-xs font-bold text-sky-700 uppercase tracking-widest block">
-            {locationTag}
-          </span>
+          <div className="w-full max-w-xl flex justify-center">
+            <span className="text-xs font-bold text-sky-700 uppercase tracking-widest block text-center">
+              {locationTag}
+            </span>
+          </div>
 
           {/* Heading */}
           <h3 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-snug">
@@ -173,7 +175,7 @@ const SpotlightBlock: React.FC<{
           </p>
 
           {/* CTA Link Button: Outline đen, chữ đen, nền trắng, nội dung "Khám phá" */}
-          <div className="pt-2">
+          <div className="pt-2 w-full max-w-xl flex justify-center">
             <Link
               to={item.link}
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-900 border border-slate-900 font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-xs group hover:-translate-y-0.5"
