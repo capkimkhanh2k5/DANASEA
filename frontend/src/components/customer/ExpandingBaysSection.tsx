@@ -1,101 +1,70 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
 import { COASTAL_BAYS } from '../../data/customerHomeData';
 import type { CoastalBayData } from '../../data/customerHomeData';
 import { useLanguageStore } from '../../store/useLanguageStore';
 
 export const ExpandingBaysSection: React.FC = () => {
   const { language, t } = useLanguageStore();
-  const navigate = useNavigate();
-
-  const handleNavigate = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (typeof document !== 'undefined' && document.startViewTransition) {
-      document.startViewTransition(() => {
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-        navigate('/search?category=bays');
-      });
-    } else {
-      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-      navigate('/search?category=bays');
-    }
-  };
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const [isRevealed, setIsRevealed] = useState(false);
-  const [hoveredBayId, setHoveredBayId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsRevealed(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.1 }
-    );
-    if (sectionRef.current) observer.observe(sectionRef.current);
-    return () => observer.disconnect();
-  }, []);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   return (
-    <div ref={sectionRef} className="py-2">
+    <div className="py-8 sm:py-10">
       {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 pb-4 border-b border-white/20">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/20 backdrop-blur-md border border-cyan-300/40 text-cyan-200 text-xs font-bold uppercase mb-2 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span>{language === 'en' ? 'Coastal Sanctuaries' : 'Kỳ Quan Vịnh Biển Đà Nẵng'}</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] drop-shadow-[0_8px_20px_rgba(0,0,0,0.7)]">
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
             {t.panels.title}
           </h2>
+          <p className="text-base text-slate-600 mt-2 font-medium">
+            {language === 'en'
+              ? 'Pristine coastal bays, limestone peninsulas, and natural marine conservation havens'
+              : 'Khám phá các vịnh biển nguyên sơ, bán đảo đá vôi và khu bảo tồn san hô tự nhiên'}
+          </p>
         </div>
 
         <Link
-          to="/search?category=bays"
-          onClick={handleNavigate}
-          className="group/all text-xs sm:text-sm font-bold text-cyan-300 hover:text-white transition-all inline-flex items-center gap-1.5 shrink-0 drop-shadow-md cursor-pointer hover:translate-x-0.5"
+          to="/search"
+          className="group/all text-[13px] sm:text-sm font-semibold text-slate-600 hover:text-sky-700 transition-colors inline-flex items-center gap-1.5 cursor-pointer hover:translate-x-0.5"
         >
           <span>{t.sections.viewAll}</span>
-          <span className="material-symbols-outlined text-[16px] transition-transform duration-200 group-hover/all:translate-x-1.5">arrow_forward</span>
+          <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover/all:translate-x-1" />
         </Link>
       </div>
 
-      {/* 4 Distinct Coastal Bay Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {COASTAL_BAYS.map((bay: CoastalBayData, idx: number) => {
+      {/* Accordion Bay Panels Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        {COASTAL_BAYS.map((bay: CoastalBayData, index: number) => {
+          const isHovered = hoveredIndex === index;
           const displayName = language === 'en' ? bay.nameEn : bay.name;
           const displayTagline = language === 'en' ? bay.taglineEn : bay.tagline;
-
-          const isThisHovered = hoveredBayId === bay.id;
 
           return (
             <div
               key={bay.id}
-              onMouseEnter={() => setHoveredBayId(bay.id)}
-              onMouseLeave={() => setHoveredBayId(null)}
-              style={{
-                transitionDelay: isRevealed ? `${idx * 70}ms` : '0ms',
-              }}
-              className={`group relative rounded-2xl overflow-hidden bg-slate-900 transition-all duration-300 ease-out flex flex-col justify-end h-[380px] sm:h-[400px] cursor-pointer ${
-                !isRevealed
-                  ? 'opacity-0 translate-y-6'
-                  : isThisHovered
-                  ? 'scale-[1.03] -translate-y-1.5 shadow-xl ring-2 ring-cyan-400/50 z-10'
-                  : 'scale-100 translate-y-0 opacity-100 shadow-sm hover:shadow-md'
+              data-ui="bay-card"
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
+              className={`relative rounded-2xl overflow-hidden border border-white/20 transition-all duration-300 ease-out flex flex-col justify-end min-h-[360px] group ${
+                isHovered ? '-translate-y-0.5 border-cyan-400 z-10' : 'hover:border-white/40'
               }`}
             >
-              {/* Image */}
+              {/* Background Image */}
               <img
                 src={bay.imageUrl}
                 alt={displayName}
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105 pointer-events-none"
                 loading="lazy"
               />
 
               {/* Gradient Scrim */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-slate-950/15 to-transparent" />
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: 'linear-gradient(to top, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0.2) 50%, rgba(0, 0, 0, 0) 100%)', // taste-skill-ignore
+                }}
+              />
 
               {/* Bottom Content Pod */}
               <div className="relative p-4 z-10 text-white flex flex-col justify-end">
@@ -103,16 +72,16 @@ export const ExpandingBaysSection: React.FC = () => {
                   {displayName}
                 </h3>
 
-                <p className="text-xs text-slate-200 line-clamp-2 mb-3 leading-relaxed">
+                <p className="text-[13px] text-slate-100 line-clamp-2 mb-3 leading-relaxed">
                   {displayTagline}
                 </p>
 
                 <Link
                   to={`/search?location=${encodeURIComponent(displayName)}`}
-                  className="w-full py-2 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                  className="w-full py-2 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-[13px] flex items-center justify-center gap-1.5 transition-all"
                 >
                   <span>{t.panels.exploreSpot}</span>
-                  <span>→</span>
+                  <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </div>

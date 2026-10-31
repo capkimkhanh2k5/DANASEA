@@ -1,8 +1,9 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { CustomerLayout } from "./layouts/CustomerLayout";
 import { VendorLayout } from "./layouts/VendorLayout";
 import { AdminLayout } from "./layouts/AdminLayout";
 import { Home } from "./pages/customer/Home";
+import { Explore } from "./pages/customer/Explore";
 import { Auth } from "./pages/customer/Auth";
 import { ForgotPassword } from "./pages/customer/Auth/ForgotPassword";
 import { Search } from "./pages/customer/Search";
@@ -12,10 +13,8 @@ import { Checkout } from "./pages/customer/Checkout/Checkout";
 import { PaymentResult } from "./pages/customer/Checkout/PaymentResult";
 import { Profile } from "./pages/customer/Profile/Profile";
 import { Orders } from "./pages/customer/Profile/Orders";
-import { AiAssistant } from "./pages/customer/Profile/AiAssistant";
 import { ChangePassword } from "./pages/customer/Profile/ChangePassword";
 import { Wishlist } from "./pages/customer/Profile/Wishlist";
-import { Inbox } from "./pages/customer/Inbox/Inbox";
 
 // Vendor Phase 4
 import { Dashboard as VendorDashboard } from "./pages/vendor/Dashboard/Dashboard";
@@ -61,6 +60,7 @@ function App() {
           <Route index element={<Home />} />
           <Route path="auth" element={<Auth />} />
           <Route path="auth/forgot-password" element={<ForgotPassword />} />
+          <Route path="explore" element={<Explore />} />
           <Route path="search" element={<Search />} />
           <Route path="tour/:id" element={<ExperienceDetail />} />
           <Route path="experience/:id" element={<ExperienceDetail />} />
@@ -72,10 +72,10 @@ function App() {
           <Route path="payment/vnpay-return" element={<PaymentResult />} />
           <Route path="profile" element={<Profile />} />
           <Route path="profile/orders" element={<Orders />} />
-          <Route path="profile/ai-assistant" element={<AiAssistant />} />
+          <Route path="profile/ai-assistant" element={<Navigate to="/profile" replace />} />
           <Route path="profile/change-password" element={<ChangePassword />} />
           <Route path="profile/wishlist" element={<Wishlist />} />
-          <Route path="inbox" element={<Inbox />} />
+          <Route path="inbox" element={<Navigate to="/profile" replace />} />
         </Route>
 
         {/* NHÀ CUNG CẤP */}

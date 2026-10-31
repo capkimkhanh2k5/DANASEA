@@ -4,27 +4,26 @@ import { useLanguageStore } from "../../../store/useLanguageStore";
 
 // Rich Customer Home Data
 import {
-  FLASH_SALE_EXPERIENCES,
   SUP_KAYAK_EXPERIENCES,
   DIVING_EXPERIENCES,
   THRILL_EXPERIENCES,
   COMBO_SUNSET_EXPERIENCES,
+  FLASH_SALE_EXPERIENCES,
 } from "../../../data/customerHomeData";
+import type { ActivityCardData, FlashSaleExperience } from "../../../data/customerHomeData";
 
 // Customer Home Subcomponents
 import { FlashSaleSection } from "../../../components/customer/FlashSaleSection";
 import { CategoryExperienceCarousel } from "../../../components/customer/CategoryExperienceCarousel";
-import { ExpandingBaysSection } from "../../../components/customer/ExpandingBaysSection";
-import { OceanSportsShowcase } from "../../../components/customer/OceanSportsShowcase";
-import { SmartOceanPlanner } from "../../../components/customer/SmartOceanPlanner";
+import { DanaseaAppShowcase } from "../../../components/customer/DanaseaAppShowcase";
 import { GuestGalleryMarquee } from "../../../components/customer/GuestGalleryMarquee";
-import { ScrollToTopButton } from "../../../components/customer/ScrollToTopButton";
+import { CoastalVideoSpotlights } from "../../../components/customer/CoastalVideoSpotlights";
 import { CinematicSceneBackdrop } from "../../../components/customer/CinematicSceneBackdrop";
-import { ScrollReveal } from "../../../components/common/ScrollReveal";
-import { MarineWeatherPill } from "../../../components/customer/MarineWeatherPill";
+
+import { Search, ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import type { ServiceSummaryDto } from "../../../types/service";
-import type { FlashSaleExperience, ActivityCardData } from "../../../data/customerHomeData";
+import { getCardThumbnailUrl } from "../../../utils/imageOptimizer";
 
 interface ChatMessage {
   chatPrompt: string;
@@ -131,10 +130,8 @@ export function Home() {
 
   // AI Concierge State
   const activeAIBeach = 'Mỹ Khê';
-  const [activeCustomPrompt, setActiveCustomPrompt] = useState<string | null>(null);
-  const [chatInputValue, setChatInputValue] = useState('');
-  const [isChatLoading, setIsChatLoading] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [activeCustomPrompt] = useState<string | null>(null);
+  const [chatHistory] = useState<ChatMessage[]>([]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Search Capsule State
@@ -147,7 +144,21 @@ export function Home() {
   const [calendarViewDate, setCalendarViewDate] = useState<Date>(() => new Date());
   const [selectedTime, setSelectedTime] = useState<string>('05:30');
   const [guests, setGuests] = useState({ adults: 2, children: 0 });
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [mobileSearchTab, setMobileSearchTab] = useState<'region' | 'date' | 'time' | 'guests'>('region');
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Lock body scroll when mobile search modal is active
+  useEffect(() => {
+    if (isMobileSearchOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileSearchOpen]);
 
   // Live Services from Backend (with intelligent fallback)
   const [liveServices, setLiveServices] = useState<ServiceSummaryDto[]>([]);
@@ -168,123 +179,85 @@ export function Home() {
     };
   }, [language]);
 
-  // Map live services to carousel formats
+  // Helper to infer realistic duration from activity title
+  const inferDuration = (name: string, fallback: string = '2 giờ') => {
+    const n = name.toLowerCase();
+    if (n.includes('jetski') || n.includes('mô tô') || n.includes('moto')) return '30 phút';
+    if (n.includes('phao chuối') || n.includes('flyboard')) return '45 phút';
+    if (n.includes('lặn') || n.includes('diving') || n.includes('scuba')) return '3.5 giờ';
+    if (n.includes('dù') || n.includes('parasailing')) return '1.5 giờ';
+    if (n.includes('câu cá') || n.includes('tour đảo')) return '4 giờ';
+    if (n.includes('sup') || n.includes('kayak')) return '2 giờ';
+    return fallback;
+  };
+
+  // Curated Featured Activities from Live Backend Catalog with fallback
+  const featuredActivities: ActivityCardData[] = liveServices.length > 0
+    ? liveServices.slice(0, 10).map((s, idx) => {
+        const fallbacks = [
+          ...DIVING_EXPERIENCES,
+          ...THRILL_EXPERIENCES,
+          ...SUP_KAYAK_EXPERIENCES,
+          ...COMBO_SUNSET_EXPERIENCES,
+        ];
+        const fallbackExp = fallbacks[idx % fallbacks.length];
+        return {
+          id: s.id,
+          title: s.name,
+          titleEn: s.name,
+          category: fallbackExp.category,
+          categoryEn: fallbackExp.categoryEn,
+          location: s.address || fallbackExp.location,
+          duration: inferDuration(s.name, fallbackExp.duration),
+          durationEn: inferDuration(s.name, fallbackExp.durationEn),
+          price: Number(s.price) || fallbackExp.price,
+          rating: Number(s.averageRating) || (4.91 + (idx % 5) * 0.02),
+          reviewCount: s.reviewCount || (80 + (idx * 37) % 150),
+          imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallbackExp.imageUrl),
+        };
+      })
+    : [
+        DIVING_EXPERIENCES[0],
+        THRILL_EXPERIENCES[0],
+        SUP_KAYAK_EXPERIENCES[0],
+        COMBO_SUNSET_EXPERIENCES[0],
+        DIVING_EXPERIENCES[1],
+        THRILL_EXPERIENCES[1],
+        SUP_KAYAK_EXPERIENCES[1],
+        COMBO_SUNSET_EXPERIENCES[1],
+      ];
+
+  // Flash Sale Experiences derived from live services or fallback data
   const flashSaleList: FlashSaleExperience[] = liveServices.length > 0
-    ? liveServices.slice(0, 4).map((s, idx) => ({
-        id: s.id,
-        title: s.name,
-        titleEn: s.name,
-        category: 'Ưu đãi biển',
-        categoryEn: 'Marine Special',
-        location: 'Đà Nẵng',
-        locationEn: 'Da Nang Coast',
-        duration: '2 giờ',
-        durationEn: '2 hours',
-        originalPrice: Math.round(Number(s.price) * 1.3),
-        salePrice: Number(s.price),
-        discountPercent: 23,
-        rating: Number(s.averageRating) || 4.95,
-        reviewCount: s.reviewCount || 100,
-        slotsLeft: 3 + (idx % 4),
-        totalSlots: 15,
-        imageUrl: s.primaryImageUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800',
-      }))
+    ? liveServices.slice(0, 4).map((s, idx) => {
+        const discounts = [33, 28, 22, 25];
+        const discountPct = discounts[idx % discounts.length];
+        const numPrice = Number(s.price) || 350000;
+        const fallbackExp = FLASH_SALE_EXPERIENCES[idx % FLASH_SALE_EXPERIENCES.length];
+        return {
+          id: s.id,
+          title: s.name,
+          titleEn: s.name,
+          category: 'Ưu đãi biển',
+          categoryEn: 'Marine Special',
+          location: s.address || fallbackExp.location,
+          locationEn: s.address || fallbackExp.locationEn,
+          duration: inferDuration(s.name, fallbackExp.duration),
+          durationEn: inferDuration(s.name, fallbackExp.durationEn),
+          originalPrice: Math.round((numPrice / (1 - discountPct / 100)) / 10000) * 10000,
+          salePrice: numPrice,
+          discountPercent: discountPct,
+          rating: Number(s.averageRating) || (4.92 + (idx % 4) * 0.02),
+          reviewCount: s.reviewCount || (120 + (idx * 47) % 180),
+          slotsLeft: 2 + (idx % 3),
+          totalSlots: 10 + (idx % 5),
+          imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallbackExp.imageUrl),
+        };
+      })
     : FLASH_SALE_EXPERIENCES;
-
-  const supFiltered = liveServices.filter((s) => {
-    const n = s.name.toLowerCase();
-    return n.includes('sup') || n.includes('kayak');
-  });
-  const supKayakList: ActivityCardData[] = supFiltered.length > 0
-    ? supFiltered.map((s) => ({
-        id: s.id,
-        title: s.name,
-        titleEn: s.name,
-        category: 'Chèo SUP & Kayak',
-        categoryEn: 'SUP & Kayak',
-        location: 'Mân Thái, Sơn Trà',
-        duration: '2 giờ',
-        durationEn: '2 hours',
-        price: Number(s.price),
-        rating: Number(s.averageRating) || 4.95,
-        reviewCount: s.reviewCount || 50,
-        imageUrl: s.primaryImageUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800',
-      }))
-    : SUP_KAYAK_EXPERIENCES;
-
-  const divingFiltered = liveServices.filter((s) => {
-    const n = s.name.toLowerCase();
-    return n.includes('lặn') || n.includes('diving') || n.includes('san hô');
-  });
-  const divingList: ActivityCardData[] = divingFiltered.length > 0
-    ? divingFiltered.map((s) => ({
-        id: s.id,
-        title: s.name,
-        titleEn: s.name,
-        category: 'Lặn ngắm san hô',
-        categoryEn: 'Scuba Diving',
-        location: 'Hòn Sụp, Sơn Trà',
-        duration: '3.5 giờ',
-        durationEn: '3.5 hours',
-        price: Number(s.price),
-        rating: Number(s.averageRating) || 4.96,
-        reviewCount: s.reviewCount || 80,
-        imageUrl: s.primaryImageUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
-      }))
-    : DIVING_EXPERIENCES;
-
-  const sunsetYachtFiltered = liveServices.filter((s) => {
-    const n = s.name.toLowerCase();
-    return n.includes('du thuyền') || n.includes('yacht') || n.includes('catamaran') || n.includes('hoàng hôn');
-  });
-  const sunsetYachtList: ActivityCardData[] = sunsetYachtFiltered.length > 0
-    ? sunsetYachtFiltered.map((s) => ({
-        id: s.id,
-        title: s.name,
-        titleEn: s.name,
-        category: 'Du thuyền hoàng hôn',
-        categoryEn: 'Sunset Yacht',
-        location: 'Bến DHC Marina',
-        duration: '2 giờ',
-        durationEn: '2 hours',
-        price: Number(s.price),
-        rating: Number(s.averageRating) || 5.0,
-        reviewCount: s.reviewCount || 90,
-        imageUrl: s.primaryImageUrl || 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
-      }))
-    : COMBO_SUNSET_EXPERIENCES;
-
-  const thrillFiltered = liveServices.filter((s) => {
-    const n = s.name.toLowerCase();
-    return (
-      n.includes('cano') ||
-      n.includes('dù') ||
-      n.includes('jetski') ||
-      n.includes('mô tô nước') ||
-      n.includes('phao chuối') ||
-      n.includes('flying fish')
-    );
-  });
-  const thrillList: ActivityCardData[] = thrillFiltered.length > 0
-    ? thrillFiltered.map((s) => ({
-        id: s.id,
-        title: s.name,
-        titleEn: s.name,
-        category: 'Cảm giác mạnh & Cano',
-        categoryEn: 'Thrill & Watersports',
-        location: 'Biển Mỹ Khê',
-        duration: '1 giờ',
-        durationEn: '1 hour',
-        price: Number(s.price),
-        rating: Number(s.averageRating) || 4.93,
-        reviewCount: s.reviewCount || 120,
-        imageUrl: s.primaryImageUrl || 'https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?w=800',
-      }))
-    : THRILL_EXPERIENCES;
 
   const baseMessage = activeCustomPrompt ? CUSTOM_PROMPT_DATA[activeCustomPrompt] : AI_BEACH_DATA[activeAIBeach];
   const displayMessages = useMemo(() => [baseMessage, ...chatHistory], [baseMessage, chatHistory]);
-  const currentBeachData = AI_BEACH_DATA[activeAIBeach] || AI_BEACH_DATA['Mỹ Khê'];
 
   useEffect(() => {
     if (chatContainerRef.current) {
@@ -316,41 +289,6 @@ export function Home() {
     setActiveDropdown(activeDropdown === dropdown ? null : dropdown);
   };
 
-  const formatDateDisplay = (isoStr: string) => {
-    if (!isoStr) return language === 'en' ? 'Select date' : 'Chọn ngày';
-    const [y, m, d] = isoStr.split('-').map(Number);
-    const target = new Date(y, m - 1, d);
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const diffDays = Math.round((target.getTime() - today.getTime()) / (1000 * 3600 * 24));
-    
-    if (diffDays === 0) return language === 'en' ? 'Today' : 'Hôm nay';
-    if (diffDays === 1) return language === 'en' ? 'Tomorrow' : 'Ngày mai';
-    return `${d}/${m}/${y}`;
-  };
-
-  const handleShortcutToday = () => {
-    const today = new Date();
-    setSelectedDate(today.toISOString().split('T')[0]);
-    setActiveDropdown(null);
-  };
-
-  const handleShortcutTomorrow = () => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    setSelectedDate(tomorrow.toISOString().split('T')[0]);
-    setActiveDropdown(null);
-  };
-
-  const handleShortcutWeekend = () => {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = (6 - day + 7) % 7 || 7;
-    d.setDate(d.getDate() + diff);
-    setSelectedDate(d.toISOString().split('T')[0]);
-    setActiveDropdown(null);
-  };
-
   const handleRegionChange = (region: string) => {
     if (selectedRegions.includes(region)) {
       if (selectedRegions.length > 1) {
@@ -361,38 +299,10 @@ export function Home() {
     }
   };
 
-  // Fixed immutable chat submission handler
-  const handleChatSubmit = () => {
-    if (!chatInputValue.trim() || isChatLoading) return;
-    const promptText = chatInputValue;
-
-    setChatHistory(prev => [
-      ...prev,
-      {
-        chatPrompt: promptText,
-        chatReply: null,
-      }
-    ]);
-    setChatInputValue('');
-    setIsChatLoading(true);
-
-    setTimeout(() => {
-      const replyText = language === 'en'
-        ? `DANASEA Maritime Radar verified: Best conditions at ${activeAIBeach} with ${currentBeachData.temp.val} temperature and ${currentBeachData.wave.val} swell. Would you like to reserve a slot?`
-        : `DANASEA AI đã tra cứu dữ liệu hải văn: Tại ${activeAIBeach}, nhiệt độ hiện tại ${currentBeachData.temp.val}, sóng ${currentBeachData.wave.val}. Bạn có muốn xem thêm lịch khởi hành chi tiết không?`;
-
-      setChatHistory(prev =>
-        prev.map((msg, idx) =>
-          idx === prev.length - 1 ? { ...msg, chatReply: replyText } : msg
-        )
-      );
-      setIsChatLoading(false);
-    }, 1000);
-  };
-
   const handleSearchExecute = () => {
     const locParam = selectedRegions.join(',');
-    navigate(`/search?location=${encodeURIComponent(locParam)}&date=${encodeURIComponent(selectedDate)}&time=${encodeURIComponent(selectedTime)}&guests=${guests.adults + guests.children}&adults=${guests.adults}&children=${guests.children}`);
+    setIsMobileSearchOpen(false);
+    navigate(`/search?location=${encodeURIComponent(locParam)}&q=${encodeURIComponent(locParam)}&date=${encodeURIComponent(selectedDate)}&time=${encodeURIComponent(selectedTime)}&guests=${guests.adults + guests.children}&adults=${guests.adults}&children=${guests.children}`);
   };
 
   const BEACH_OPTIONS = [
@@ -555,53 +465,70 @@ export function Home() {
       <CinematicSceneBackdrop />
 
       {/* =========================================================================
+          BACKDROP SCRIM OVERLAY (AIRBNB / BOOKING OTA GOLD STANDARD)
+          Dims & softens the background when search dropdown is active to focus attention
+         ========================================================================= */}
+      {activeDropdown !== null && (
+        <div
+          className="fixed inset-0 bg-slate-950/45 backdrop-blur-[2px] z-30 transition-opacity duration-200"
+          onClick={() => setActiveDropdown(null)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* =========================================================================
           HERO: BÃI BIỂN TOÀN MÀN HÌNH & THANH TÌM KIẾM TINH GỌN
          ========================================================================= */}
       <section
         id="scene-hero"
         data-scene="hero"
-        className="relative z-20 w-full min-h-[480px] sm:min-h-[540px] flex flex-col justify-center items-center pt-28 sm:pt-32 pb-12 overflow-visible"
+        className={`relative ${activeDropdown !== null ? 'z-40' : 'z-20'} w-full min-h-[480px] sm:min-h-[540px] flex flex-col justify-center items-center pt-28 sm:pt-32 pb-16 sm:pb-20 overflow-visible`}
       >
         <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center overflow-visible">
           {/* Large Headline */}
           <h1 className="animate-hero-2 text-3xl sm:text-5xl lg:text-6xl font-extrabold text-white tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] drop-shadow-[0_8px_24px_rgba(0,0,0,0.7)] mb-2.5">
-            {language === 'en' ? 'Touch The Ocean,' : 'Chạm sóng biển,'}{' '}
-            <span className="text-cyan-300">
-              {language === 'en' ? 'Craft Your Journey' : 'mở chuyến đi riêng'}
-            </span>
+            {language === 'en' ? 'Ocean Tours & Watersports Da Nang' : 'Tour Biển & Thể Thao Nước Đà Nẵng'}
           </h1>
 
           {/* Subtitle */}
-          <p className="animate-hero-3 text-sm sm:text-base text-slate-100 max-w-2xl mb-6 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.95)] drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)] font-medium leading-relaxed">
+          <p className="animate-hero-3 text-base sm:text-lg text-slate-100 max-w-2xl mb-6 drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.95)] drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)] font-medium leading-relaxed">
             {language === 'en'
-              ? 'Handpicked certified marine adventures. Paddleboarding, scuba diving, island speedboats, and tranquil sunset bays.'
-              : 'Nền tảng đặt tour thể thao biển chính hãng tại Đà Nẵng. Khám phá bình minh Mỹ Khê, san hô Sơn Trà và những vịnh biển ngọc bích.'}
+              ? 'Direct booking for sunrise SUP, Son Tra coral scuba diving, Yamaha jetskis, and sunset catamarans.'
+              : 'Đặt chỗ trực tuyến chèo SUP bình minh Mỹ Khê, lặn ngắm san hô Sơn Trà, mô tô nước Jetski và du thuyền hoàng hôn.'}
           </p>
 
-          {/* Professional Airbnb-style Search Capsule (4 Segments: Địa điểm | Ngày | Khung giờ | Khách) */}
+          {/* =========================================================================
+              SEARCH EXPERIENCE (PRO-GRADE FE & DESIGNER CALIBER)
+              - Desktop (sm+): Precision architectural capsule, 8pt spacing, solid brand blue
+              - Mobile (<sm): Compact 56px trigger pill + Dedicated ergonomic bottom sheet
+              - Quick Discovery: Subtle frosted trending tags
+             ========================================================================= */}
+
+          {/* DESKTOP SEARCH CONTAINER - CAPSULE PILL DESIGN (sm:block) */}
           <div
             ref={searchRef}
-            className="animate-hero-4 w-full max-w-4xl bg-white/95 backdrop-blur-xl rounded-3xl sm:rounded-full p-2 sm:p-2 shadow-[0_20px_60px_rgba(0,0,0,0.28)] border border-white/80 ring-1 ring-slate-900/5 transition-all relative z-30"
+            data-ui="search-deck"
+            className="hidden sm:block animate-hero-4 w-full max-w-4xl bg-white/20 hover:bg-white/25 backdrop-blur-xl rounded-full p-2 pl-3 sm:pl-4 pr-2 sm:pr-2.5 shadow-[0_16px_40px_rgba(0,0,0,0.25)] border border-white/40 transition-all duration-300 relative z-30"
           >
-            <div className="flex flex-col sm:flex-row sm:items-center relative">
+            <div className="flex items-center relative">
               {/* 1. Destination / Địa điểm */}
               <div className="relative flex-1">
                 <button
                   type="button"
                   onClick={() => toggleDropdown('region')}
                   aria-expanded={activeDropdown === 'region'}
-                  className={`w-full flex flex-col justify-center px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-2xl sm:rounded-full transition-all text-left cursor-pointer ${
+                  className={`w-full flex flex-col justify-center px-4 sm:px-5 py-2.5 rounded-full transition-all text-left cursor-pointer ${
                     activeDropdown === 'region'
-                      ? 'bg-white shadow-[0_4px_16px_rgba(0,0,0,0.1)] ring-1 ring-slate-200'
+                      ? 'bg-white/30 ring-1 ring-white/60 text-white shadow-xs'
                       : activeDropdown !== null
-                      ? 'opacity-60 hover:opacity-90 hover:bg-slate-100/60'
-                      : 'hover:bg-slate-100/80'
+                      ? 'opacity-75 hover:opacity-100 hover:bg-white/15'
+                      : 'hover:bg-white/15'
                   }`}
                 >
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  <span className="text-[11px] font-bold text-white/80 uppercase tracking-wider block drop-shadow-xs">
                     {t.hero.search.destination}
                   </span>
-                  <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate block mt-0.5">
+                  <span className="text-sm font-bold text-white truncate block mt-0.5 drop-shadow-xs">
                     {selectedRegions.length > 0
                       ? selectedRegions.join(', ')
                       : (language === 'en' ? 'Select bays' : 'Chọn điểm đến')}
@@ -610,38 +537,38 @@ export function Home() {
 
                 {/* Popover: Rich Bay Cards (2x2 Grid) */}
                 {activeDropdown === 'region' && (
-                  <div className="animate-popover-in absolute top-full left-0 sm:left-1/2 sm:-translate-x-1/2 mt-3 w-80 sm:w-[500px] p-3.5 sm:p-4 bg-white border border-slate-200/90 rounded-3xl shadow-2xl z-50 text-left">
-                    <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-100">
+                  <div className="animate-popover-in absolute top-full left-0 mt-3 w-[520px] p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
+                    <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
                       <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                         {language === 'en' ? 'Explore Coastal Bays' : 'Khám phá các vịnh biển'}
                       </span>
-                      <span className="text-[11px] text-slate-400">
+                      <span className="text-[11px] text-slate-400 font-medium">
                         {selectedRegions.length} {language === 'en' ? 'selected' : 'đã chọn'}
                       </span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-2.5">
                       {BEACH_OPTIONS.map((bay) => {
                         const isSelected = selectedRegions.includes(bay.name);
                         return (
                           <div
                             key={bay.name}
                             onClick={() => handleRegionChange(bay.name)}
-                            className={`flex items-center gap-2.5 p-2 rounded-2xl cursor-pointer transition-all border ${
+                            className={`flex items-center gap-2.5 p-2 rounded-xl cursor-pointer transition-all border ${
                               isSelected
-                                ? 'bg-cyan-50/70 border-cyan-400/80 shadow-xs ring-1 ring-cyan-500/30'
+                                ? 'bg-sky-50/80 border-sky-300 ring-1 ring-sky-500/20 '
                                 : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200'
                             }`}
                           >
                             <img
                               src={bay.img}
                               alt={bay.name}
-                              className="w-11 h-11 rounded-xl object-cover shrink-0 shadow-xs"
+                              className="w-11 h-11 rounded-lg object-cover shrink-0 "
                             />
                             <div className="flex-1 min-w-0">
                               <span className="text-xs font-bold text-slate-900 truncate block">
                                 {language === 'en' ? bay.nameEn : bay.name}
                               </span>
-                              <p className="text-[10px] text-cyan-700 font-medium truncate mt-0.5">
+                              <p className="text-[10px] text-sky-700 font-medium truncate mt-0.5">
                                 {language === 'en' ? bay.tagEn : bay.tag}
                               </p>
                               <p className="text-[10px] text-slate-400 truncate">
@@ -650,10 +577,10 @@ export function Home() {
                             </div>
                             <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
                               isSelected
-                                ? 'bg-cyan-600 border-cyan-600 text-white'
+                                ? 'bg-sky-600 border-sky-600 text-white'
                                 : 'border-slate-300 bg-white'
                             }`}>
-                              {isSelected && <span className="material-symbols-outlined text-[12px]">check</span>}
+                              {isSelected && <Check className="w-3.5 h-3.5 text-sky-600 shrink-0" />}
                             </div>
                           </div>
                         );
@@ -663,74 +590,44 @@ export function Home() {
                 )}
               </div>
 
-              {/* Vertical Divider 1 */}
-              <div
-                className={`hidden sm:block w-px h-7 bg-slate-200 shrink-0 transition-opacity ${
-                  activeDropdown === 'region' || activeDropdown === 'date' ? 'opacity-0' : 'opacity-100'
-                }`}
-              />
+              {/* Inset Divider */}
+              <div className="h-8 w-[1px] bg-white/30 shrink-0 mx-0.5" />
 
-              {/* 2. Date / Ngày */}
+              {/* 2. Date / Ngày đi */}
               <div className="relative flex-1">
                 <button
                   type="button"
                   onClick={() => toggleDropdown('date')}
                   aria-expanded={activeDropdown === 'date'}
-                  className={`w-full flex flex-col justify-center px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-2xl sm:rounded-full transition-all text-left cursor-pointer ${
+                  className={`w-full flex flex-col justify-center px-4 sm:px-5 py-2.5 rounded-full transition-all text-left cursor-pointer ${
                     activeDropdown === 'date'
-                      ? 'bg-white shadow-[0_4px_16px_rgba(0,0,0,0.1)] ring-1 ring-slate-200'
+                      ? 'bg-white/30 ring-1 ring-white/60 text-white shadow-xs'
                       : activeDropdown !== null
-                      ? 'opacity-60 hover:opacity-90 hover:bg-slate-100/60'
-                      : 'hover:bg-slate-100/80'
+                      ? 'opacity-75 hover:opacity-100 hover:bg-white/15'
+                      : 'hover:bg-white/15'
                   }`}
                 >
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                    {language === 'en' ? 'Date' : 'Ngày đi'}
+                  <span className="text-[11px] font-bold text-white/80 uppercase tracking-wider block drop-shadow-xs">
+                    {t.hero.search.date}
                   </span>
-                  <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate block mt-0.5">
-                    {formatDateDisplay(selectedDate)}
+                  <span className="text-sm font-bold text-white truncate block mt-0.5 drop-shadow-xs">
+                    {selectedDate || (language === 'en' ? 'Select date' : 'Chọn ngày')}
                   </span>
                 </button>
 
-                {/* Popover: Shortcuts & Mini Calendar */}
+                {/* Popover: Interactive Calendar */}
                 {activeDropdown === 'date' && (
-                  <div className="animate-popover-in absolute top-full left-0 sm:left-1/2 sm:-translate-x-1/2 mt-3 w-80 sm:w-84 p-4 bg-white border border-slate-200/90 rounded-3xl shadow-2xl z-50 text-left">
-                    {/* Quick Shortcuts */}
-                    <div className="flex items-center gap-1.5 pb-3 border-b border-slate-100 mb-3">
-                      <button
-                        type="button"
-                        onClick={handleShortcutToday}
-                        className="flex-1 py-1 px-2 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-cyan-50 hover:text-cyan-700 text-slate-700 transition-colors text-center"
-                      >
-                        {language === 'en' ? 'Today' : 'Hôm nay'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleShortcutTomorrow}
-                        className="flex-1 py-1 px-2 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-cyan-50 hover:text-cyan-700 text-slate-700 transition-colors text-center"
-                      >
-                        {language === 'en' ? 'Tomorrow' : 'Ngày mai'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleShortcutWeekend}
-                        className="flex-1 py-1 px-2 text-[11px] font-semibold rounded-lg bg-slate-100 hover:bg-cyan-50 hover:text-cyan-700 text-slate-700 transition-colors text-center"
-                      >
-                        {language === 'en' ? 'Weekend' : 'Cuối tuần'}
-                      </button>
-                    </div>
-
-                    {/* Month Header */}
-                    <div className="flex items-center justify-between mb-2 px-1">
+                  <div className="animate-popover-in absolute top-full left-1/2 -translate-x-1/2 mt-3 w-80 p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
+                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
                       <button
                         type="button"
                         onClick={handlePrevMonth}
+                        className="p-1 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer text-slate-600"
                         aria-label="Previous month"
-                        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-600 transition-colors"
                       >
-                        <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                        <ChevronLeft className="w-4 h-4 text-slate-600 shrink-0" />
                       </button>
-                      <span className="text-xs font-bold text-slate-900">
+                      <span className="text-xs font-bold text-slate-800">
                         {language === 'en'
                           ? calendarViewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' })
                           : `Tháng ${calendarMonth + 1}, ${calendarYear}`}
@@ -738,47 +635,44 @@ export function Home() {
                       <button
                         type="button"
                         onClick={handleNextMonth}
+                        className="p-1 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer text-slate-600"
                         aria-label="Next month"
-                        className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-600 transition-colors"
                       >
-                        <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                        <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
                       </button>
                     </div>
 
-                    {/* Days of Week */}
                     <div className="grid grid-cols-7 gap-1 text-center mb-1">
-                      {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((dw) => (
-                        <span key={dw} className="text-[10px] font-bold text-slate-400 py-1">
-                          {dw}
+                      {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((day) => (
+                        <span key={day} className="text-[10px] font-bold text-slate-400 uppercase py-1">
+                          {day}
                         </span>
                       ))}
                     </div>
 
-                    {/* Calendar Day Grid */}
-                    <div className="grid grid-cols-7 gap-1 text-center">
+                    <div className="grid grid-cols-7 gap-1">
                       {Array.from({ length: firstDayOfWeek }).map((_, i) => (
                         <div key={`empty-${i}`} className="h-8" />
                       ))}
                       {Array.from({ length: daysInMonth }).map((_, i) => {
                         const day = i + 1;
-                        const past = isPastDay(day);
-                        const selected = isSelectedDay(day);
+                        const isPast = isPastDay(day);
+                        const isSelected = isSelectedDay(day);
                         const isToday = isTodayDay(day);
-
                         return (
                           <button
-                            key={`day-${day}`}
+                            key={day}
                             type="button"
-                            disabled={past}
+                            disabled={isPast}
                             onClick={() => handleSelectDay(day)}
-                            className={`h-8 w-8 mx-auto rounded-full text-xs font-semibold flex items-center justify-center transition-all ${
-                              selected
-                                ? 'bg-cyan-600 text-white shadow-md'
-                                : past
-                                ? 'text-slate-300 cursor-not-allowed'
+                            className={`h-8 rounded-lg text-xs font-semibold flex items-center justify-center transition-all ${
+                              isSelected
+                                ? 'bg-sky-600 text-white '
                                 : isToday
-                                ? 'text-cyan-700 bg-cyan-50 font-bold ring-1 ring-cyan-500'
-                                : 'text-slate-700 hover:bg-slate-100'
+                                ? 'border border-sky-600 text-sky-600 hover:bg-sky-50'
+                                : isPast
+                                ? 'text-slate-300 cursor-not-allowed'
+                                : 'text-slate-700 hover:bg-slate-100 cursor-pointer'
                             }`}
                           >
                             {day}
@@ -790,84 +684,77 @@ export function Home() {
                 )}
               </div>
 
-              {/* Vertical Divider 2 */}
-              <div
-                className={`hidden sm:block w-px h-7 bg-slate-200 shrink-0 transition-opacity ${
-                  activeDropdown === 'date' || activeDropdown === 'time' ? 'opacity-0' : 'opacity-100'
-                }`}
-              />
+              {/* Inset Divider */}
+              <div className="h-8 w-[1px] bg-white/30 shrink-0 mx-0.5" />
 
-              {/* 3. Time Slot / Khung giờ */}
+              {/* 3. Time Window / Khung giờ */}
               <div className="relative flex-1">
                 <button
                   type="button"
                   onClick={() => toggleDropdown('time')}
                   aria-expanded={activeDropdown === 'time'}
-                  className={`w-full flex flex-col justify-center px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-2xl sm:rounded-full transition-all text-left cursor-pointer ${
+                  className={`w-full flex flex-col justify-center px-4 sm:px-5 py-2.5 rounded-full transition-all text-left cursor-pointer ${
                     activeDropdown === 'time'
-                      ? 'bg-white shadow-[0_4px_16px_rgba(0,0,0,0.1)] ring-1 ring-slate-200'
+                      ? 'bg-white/30 ring-1 ring-white/60 text-white shadow-xs'
                       : activeDropdown !== null
-                      ? 'opacity-60 hover:opacity-90 hover:bg-slate-100/60'
-                      : 'hover:bg-slate-100/80'
+                      ? 'opacity-75 hover:opacity-100 hover:bg-white/15'
+                      : 'hover:bg-white/15'
                   }`}
                 >
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  <span className="text-[11px] font-bold text-white/80 uppercase tracking-wider block drop-shadow-xs">
                     {language === 'en' ? 'Time Slot' : 'Khung giờ'}
                   </span>
-                  <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate block mt-0.5">
+                  <span className="text-sm font-bold text-white truncate block mt-0.5 drop-shadow-xs">
                     {selectedTimeObj
                       ? (language === 'en' ? selectedTimeObj.titleEn : selectedTimeObj.title)
-                      : selectedTime}
+                      : '05:30 • Bình Minh'}
                   </span>
                 </button>
 
-                {/* Popover: 4 Large Sun/Ocean Time Chips (2x2 Grid) */}
+                {/* Popover: 4 Maritime Time Slots */}
                 {activeDropdown === 'time' && (
-                  <div className="animate-popover-in absolute top-full left-0 sm:left-1/2 sm:-translate-x-1/2 mt-3 w-80 sm:w-[500px] p-3.5 sm:p-4 bg-white border border-slate-200/90 rounded-3xl shadow-2xl z-50 text-left">
-                    <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-100">
-                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                        {language === 'en' ? 'Select Departure Window' : 'Khung giờ trải nghiệm tối ưu'}
+                  <div className="animate-popover-in absolute top-full left-1/2 -translate-x-1/2 mt-3 w-80 p-3.5 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
+                    <div className="pb-2 mb-2 border-b border-slate-100">
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+                        {language === 'en' ? 'Select Marine Time Window' : 'Khung giờ vàng lướt sóng'}
                       </span>
-                      <span className="text-[11px] text-cyan-700 font-semibold">
-                        {language === 'en' ? 'Synced with Radar' : 'Đồng bộ Hải văn'}
-                      </span>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {language === 'en' ? 'Optimized for tides & wind safety' : 'Dựa trên dự báo hải văn & thủy triều'}
+                      </p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {TIME_OPTIONS.map((opt) => {
-                        const isSelected = selectedTime === opt.val;
+                    <div className="space-y-1.5">
+                      {TIME_OPTIONS.map((slot) => {
+                        const isSelected = selectedTime === slot.val;
                         return (
-                          <button
-                            key={opt.val}
-                            type="button"
+                          <div
+                            key={slot.val}
                             onClick={() => {
-                              setSelectedTime(opt.val);
+                              setSelectedTime(slot.val);
                               setActiveDropdown(null);
                             }}
-                            className={`w-full text-left p-2.5 rounded-2xl transition-all border flex items-center gap-2.5 cursor-pointer ${
+                            className={`flex items-center gap-2.5 p-2 rounded-xl cursor-pointer transition-all border ${
                               isSelected
-                                ? 'bg-cyan-50/70 border-cyan-400/80 ring-2 ring-cyan-500/20 shadow-xs'
-                                : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50'
+                                ? 'bg-sky-50/80 border-sky-300 ring-1 ring-sky-500/20'
+                                : 'bg-white border-slate-100 hover:bg-slate-50'
                             }`}
                           >
-                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                              isSelected ? 'bg-cyan-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600'
+                            <div className={`p-1.5 rounded-lg shrink-0 ${
+                              isSelected ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600'
                             }`}>
-                              {opt.iconSvg}
+                              {slot.iconSvg}
                             </div>
                             <div className="flex-1 min-w-0">
                               <span className="text-xs font-bold text-slate-900 block truncate">
-                                {language === 'en' ? opt.titleEn : opt.title}
+                                {language === 'en' ? slot.titleEn : slot.title}
                               </span>
-                              <span className="text-[10px] text-slate-500 block truncate mt-0.5">
-                                {language === 'en' ? opt.descEn : opt.desc}
-                              </span>
+                              <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                                {language === 'en' ? slot.descEn : slot.desc}
+                              </p>
                             </div>
                             {isSelected && (
-                              <span className="material-symbols-outlined text-cyan-600 text-[18px] shrink-0">
-                                check_circle
-                              </span>
+                              <CheckCircle2 className="w-4 h-4 text-sky-600 shrink-0" />
                             )}
-                          </button>
+                          </div>
                         );
                       })}
                     </div>
@@ -875,111 +762,114 @@ export function Home() {
                 )}
               </div>
 
-              {/* Vertical Divider 3 */}
-              <div
-                className={`hidden sm:block w-px h-7 bg-slate-200 shrink-0 transition-opacity ${
-                  activeDropdown === 'time' || activeDropdown === 'guests' ? 'opacity-0' : 'opacity-100'
-                }`}
-              />
+              {/* Inset Divider */}
+              <div className="h-8 w-[1px] bg-white/30 shrink-0 mx-0.5" />
 
-              {/* 4. Guests / Khách */}
+              {/* 4. Guests / Số khách */}
               <div className="relative flex-1">
                 <button
                   type="button"
                   onClick={() => toggleDropdown('guests')}
                   aria-expanded={activeDropdown === 'guests'}
-                  className={`w-full flex flex-col justify-center px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-2xl sm:rounded-full transition-all text-left cursor-pointer ${
+                  className={`w-full flex flex-col justify-center px-4 sm:px-5 py-2.5 rounded-full transition-all text-left cursor-pointer ${
                     activeDropdown === 'guests'
-                      ? 'bg-white shadow-[0_4px_16px_rgba(0,0,0,0.1)] ring-1 ring-slate-200'
+                      ? 'bg-white/30 ring-1 ring-white/60 text-white shadow-xs'
                       : activeDropdown !== null
-                      ? 'opacity-60 hover:opacity-90 hover:bg-slate-100/60'
-                      : 'hover:bg-slate-100/80'
+                      ? 'opacity-75 hover:opacity-100 hover:bg-white/15'
+                      : 'hover:bg-white/15'
                   }`}
                 >
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                  <span className="text-[11px] font-bold text-white/80 uppercase tracking-wider block drop-shadow-xs">
                     {t.hero.search.guests}
                   </span>
-                  <span className="text-xs sm:text-sm font-semibold text-slate-900 truncate block mt-0.5">
-                    {guests.adults + guests.children} {language === 'en' ? 'Guests' : 'Khách'}
+                  <span className="text-sm font-bold text-white truncate block mt-0.5 drop-shadow-xs">
+                    {guests.adults + guests.children}{' '}
+                    {language === 'en' ? 'guests' : 'khách'}
                   </span>
                 </button>
 
-                {/* Popover: 2-Row Stepper for Adults & Children with age annotations */}
+                {/* Popover: Guests Stepper */}
                 {activeDropdown === 'guests' && (
-                  <div className="animate-popover-in absolute top-full right-0 mt-3 w-72 sm:w-80 p-4 bg-white border border-slate-200/90 rounded-3xl shadow-2xl z-50 text-left space-y-4">
-                    {/* Row 1: Adults */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-bold text-slate-900 block">
-                          {language === 'en' ? 'Adults' : 'Người lớn'}
-                        </span>
-                        <span className="text-[11px] text-slate-400 block">
-                          {language === 'en' ? 'Age 12 and above' : 'Từ 12 tuổi trở lên'}
-                        </span>
+                  <div className="animate-popover-in absolute top-full right-0 mt-3 w-72 p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
+                    <div className="pb-2 mb-3 border-b border-slate-100">
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+                        {language === 'en' ? 'Number of Guests' : 'Số lượng thành viên'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3 mb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-slate-800 block">
+                            {language === 'en' ? 'Adults' : 'Người lớn'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {language === 'en' ? 'Age 13+' : 'Từ 13 tuổi trở lên'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setGuests((g) => ({ ...g, adults: Math.max(1, g.adults - 1) }))}
+                            disabled={guests.adults <= 1}
+                            className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-colors ${
+                              guests.adults <= 1
+                                ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                                : 'border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer'
+                            }`}
+                          >
+                            -
+                          </button>
+                          <span className="text-xs font-bold text-slate-800 w-4 text-center">
+                            {guests.adults}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setGuests((g) => ({ ...g, adults: Math.min(20, g.adults + 1) }))}
+                            className="w-7 h-7 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2.5">
-                        <button
-                          type="button"
-                          disabled={guests.adults <= 1}
-                          onClick={() => setGuests({ ...guests, adults: Math.max(1, guests.adults - 1) })}
-                          aria-label="Decrease adults"
-                          className="w-8 h-8 rounded-full border border-slate-300 hover:border-slate-400 bg-white text-slate-700 font-bold flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                        >
-                          −
-                        </button>
-                        <span className="text-sm font-bold w-5 text-center text-slate-800">
-                          {guests.adults}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={guests.adults >= 20}
-                          onClick={() => setGuests({ ...guests, adults: guests.adults + 1 })}
-                          aria-label="Increase adults"
-                          className="w-8 h-8 rounded-full border border-slate-300 hover:border-slate-400 bg-white text-slate-700 font-bold flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                        >
-                          +
-                        </button>
+
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-bold text-slate-800 block">
+                            {language === 'en' ? 'Children' : 'Trẻ em'}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            {language === 'en' ? 'Age 2-12' : 'Từ 2 - 12 tuổi'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setGuests((g) => ({ ...g, children: Math.max(0, g.children - 1) }))}
+                            disabled={guests.children <= 0}
+                            className={`w-7 h-7 rounded-lg border flex items-center justify-center transition-colors ${
+                              guests.children <= 0
+                                ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                                : 'border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer'
+                            }`}
+                          >
+                            -
+                          </button>
+                          <span className="text-xs font-bold text-slate-800 w-4 text-center">
+                            {guests.children}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setGuests((g) => ({ ...g, children: Math.min(10, g.children + 1) }))}
+                            className="w-7 h-7 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="w-full h-px bg-slate-100" />
-
-                    {/* Row 2: Children */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-bold text-slate-900 block">
-                          {language === 'en' ? 'Children' : 'Trẻ em'}
-                        </span>
-                        <span className="text-[11px] text-slate-400 block">
-                          {language === 'en' ? 'Age 2 – 11' : 'Từ 2 – 11 tuổi'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2.5">
-                        <button
-                          type="button"
-                          disabled={guests.children <= 0}
-                          onClick={() => setGuests({ ...guests, children: Math.max(0, guests.children - 1) })}
-                          aria-label="Decrease children"
-                          className="w-8 h-8 rounded-full border border-slate-300 hover:border-slate-400 bg-white text-slate-700 font-bold flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                        >
-                          −
-                        </button>
-                        <span className="text-sm font-bold w-5 text-center text-slate-800">
-                          {guests.children}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={guests.children >= 10}
-                          onClick={() => setGuests({ ...guests, children: guests.children + 1 })}
-                          aria-label="Increase children"
-                          className="w-8 h-8 rounded-full border border-slate-300 hover:border-slate-400 bg-white text-slate-700 font-bold flex items-center justify-center transition-all disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="pt-1 border-t border-slate-100 text-[10px] text-slate-400 text-center">
+                    <div className="pt-2 border-t border-slate-100 text-[10px] text-slate-400 text-center">
                       {language === 'en'
                         ? 'Children under 2 travel free with adult'
                         : 'Trẻ dưới 2 tuổi miễn phí vé & đi cùng phụ huynh'}
@@ -988,380 +878,497 @@ export function Home() {
                 )}
               </div>
 
-              {/* 5. Search CTA: Round button expanding when activeDropdown is open */}
-              <div className="p-1 sm:p-0 sm:pr-1 flex justify-end shrink-0">
+              {/* 5. Search CTA: Pill Action Button */}
+              <div className="pr-0.5 flex justify-end shrink-0 pl-2">
                 <button
                   type="button"
                   onClick={handleSearchExecute}
                   aria-label="Search"
-                  className={`h-11 sm:h-12 rounded-full bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white flex items-center justify-center shadow-lg hover:shadow-cyan-500/30 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer ${
-                    activeDropdown !== null
-                      ? 'w-full sm:w-auto px-5 gap-2'
-                      : 'w-full sm:w-12 px-0'
-                  }`}
+                  className="h-12 px-6 rounded-full bg-sky-600 hover:bg-sky-500 active:bg-sky-700 text-white flex items-center justify-center gap-2 shadow-md hover:shadow-sky-600/30 transition-all cursor-pointer font-bold text-sm tracking-wide"
                 >
-                  <span className="material-symbols-outlined text-[20px]">search</span>
-                  {activeDropdown !== null && (
-                    <span className="text-xs font-bold tracking-wide">
-                      {language === 'en' ? 'Search' : 'Tìm kiếm'}
-                    </span>
-                  )}
+                  <Search className="w-4 h-4 shrink-0" />
+                  <span>{language === 'en' ? 'Search' : 'Tìm kiếm'}</span>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Real-time Marine Weather & Safety Pill */}
-          <div className="animate-hero-5 mt-4 flex justify-center w-full relative z-20">
-            <MarineWeatherPill />
-          </div>
-
-        </div>
-      </section>
-
-      {/* =========================================================================
-          KHOẢNG THỞ 01 (BÌNH MINH)
-         ========================================================================= */}
-      <div className="py-20 sm:py-28 text-center max-w-3xl mx-auto px-4 select-none">
-        <span className="text-xs font-mono tracking-widest text-white/80 uppercase block mb-3 drop-shadow-sm">
-          {language === 'en' ? 'Chapter 01 • Dawn Awakening' : 'Chương 01 • Bình Minh Thức Giấc'}
-        </span>
-        <p className="text-lg sm:text-2xl font-medium text-white drop-shadow-[0_3px_12px_rgba(0,0,0,0.65)] leading-relaxed italic">
-          {language === 'en'
-            ? '"When the first golden rays awaken the quiet bay, Da Nang’s ocean breathes in its purest serenity."'
-            : '"Khi ánh bình minh đầu tiên nhuộm vàng mặt vịnh, biển Đà Nẵng thức giấc trong sự tĩnh lặng thuần khiết nhất."'}
-        </p>
-      </div>
-
-      {/* =========================================================================
-          CHƯƠNG 01: BÌNH MINH & MẶT NƯỚC ÊM (PANEL SÁNG LIỀN KHỐI)
-         ========================================================================= */}
-      <section id="scene-chapter-1" data-scene="hero" className="max-w-[1600px] w-full mx-auto px-3 sm:px-6 lg:px-8">
-        <ScrollReveal>
-          <div className="space-y-12 sm:space-y-16">
-            {/* Flash Sale Section */}
-            <FlashSaleSection experiences={flashSaleList} />
-
-            {/* Carousel SUP & Kayak Biển */}
-            <CategoryExperienceCarousel
-              title={t.sections.supKayakTitle}
-
-
-
-              categorySlug="cheo-sup-kayak"
-              experiences={supKayakList}
-            />
-          </div>
-        </ScrollReveal>
-      </section>
-
-      {/* =========================================================================
-          KHOẢNG THỞ 02 (CÙNG NHAU)
-         ========================================================================= */}
-      <div className="py-20 sm:py-28 text-center max-w-3xl mx-auto px-4 select-none">
-        <span className="text-xs font-mono tracking-widest text-white/80 uppercase block mb-3 drop-shadow-sm">
-          {language === 'en' ? 'Chapter 02 • Together Over Waves' : 'Chương 02 • Cùng Nhau Vượt Sóng'}
-        </span>
-        <p className="text-lg sm:text-2xl font-medium text-white drop-shadow-[0_3px_12px_rgba(0,0,0,0.65)] leading-relaxed italic">
-          {language === 'en'
-            ? '"The sweetest adventure is not measured in distance, but in the laughter shared over crystal tides."'
-            : '"Hành trình kỳ diệu nhất không phải là đi xa bao nhiêu, mà là cùng ai vượt sóng ngắm nhìn rạn san hô nguyên sơ."'}
-        </p>
-      </div>
-
-      {/* =========================================================================
-          CHƯƠNG 02: CÙNG NHAU & VỊNH ĐẢO (PANEL SÁNG LIỀN KHỐI)
-         ========================================================================= */}
-      <section id="scene-chapter-2" data-scene="bays" className="max-w-[1600px] w-full mx-auto px-3 sm:px-6 lg:px-8">
-        <ScrollReveal>
-          <div className="space-y-12 sm:space-y-16">
-            {/* Vịnh Biển Đà Nẵng */}
-            <ExpandingBaysSection />
-
-            {/* Carousel Lặn biển & San hô Sơn Trà */}
-            <CategoryExperienceCarousel
-              title={t.sections.divingTitle}
-
-
-
-              categorySlug="lan-ngam-san-ho"
-              experiences={divingList}
-            />
-
-            {/* Carousel Combo Trọn Gói & Hoàng Hôn */}
-            <CategoryExperienceCarousel
-              title={t.sections.comboTitle}
-
-
-
-              categorySlug="du-thuyen-ngam-hoang-hon"
-              experiences={sunsetYachtList}
-            />
-          </div>
-        </ScrollReveal>
-      </section>
-
-      {/* =========================================================================
-          KHOẢNG THỞ 03 (SÓNG & NĂNG LƯỢNG ĐẠI DƯƠNG)
-         ========================================================================= */}
-      <div className="py-20 sm:py-28 text-center max-w-3xl mx-auto px-4 select-none">
-        <span className="text-xs font-mono tracking-widest text-white/80 uppercase block mb-3 drop-shadow-sm">
-          {language === 'en' ? 'Chapter 03 • Ocean Pulse & Energy' : 'Chương 03 • Sóng & Năng Lượng Biển'}
-        </span>
-        <p className="text-lg sm:text-2xl font-medium text-white drop-shadow-[0_3px_12px_rgba(0,0,0,0.65)] leading-relaxed italic">
-          {language === 'en'
-            ? '"Let the ocean waves sweep away every hesitation, unleashing boundless energy upon the sea."'
-            : '"Để tiếng sóng cuốn phăng âu lo, đón nhận trọn vẹn sự tự do và cảm giác phấn khích giữa đại dương bao la."'}
-        </p>
-      </div>
-
-      {/* =========================================================================
-          CHƯƠNG 03: SÓNG & THỂ THAO BIỂN (SPLIT STICKY TRÊN PANEL SÁNG)
-         ========================================================================= */}
-      <section id="scene-chapter-3" data-scene="sports" className="max-w-[1600px] w-full mx-auto px-3 sm:px-6 lg:px-8">
-        <ScrollReveal>
-          <div className="space-y-12 sm:space-y-16">
-            {/* Split Sticky Thể Thao Biển */}
-            <OceanSportsShowcase />
-
-            {/* Carousel Thể Thao Cảm Giác Mạnh & Cano */}
-            <CategoryExperienceCarousel
-              title={t.sections.thrillTitle}
-
-
-
-              categorySlug="cano-du-bay"
-              experiences={thrillList}
-            />
-          </div>
-        </ScrollReveal>
-      </section>
-
-      {/* =========================================================================
-          KHOẢNG THỞ 04 (KHÁM PHÁ & THẤU HIỂU BIỂN)
-         ========================================================================= */}
-      <div className="py-20 sm:py-28 text-center max-w-3xl mx-auto px-4 select-none">
-        <span className="text-xs font-mono tracking-widest text-white/80 uppercase block mb-3 drop-shadow-sm">
-          {language === 'en' ? 'Chapter 04 • Harmony with the Tides' : 'Chương 04 • Thấu Hiểu Nhịp Biển'}
-        </span>
-        <p className="text-lg sm:text-2xl font-medium text-white drop-shadow-[0_3px_12px_rgba(0,0,0,0.65)] leading-relaxed italic">
-          {language === 'en'
-            ? '"A memorable voyage begins with understanding the tides, the breeze, and the heartbeat of the coast."'
-            : '"Một chuyến đi hoàn hảo bắt đầu từ việc thấu hiểu thủy triều, hướng gió và nhịp thở của biển cả."'}
-        </p>
-      </div>
-
-      {/* =========================================================================
-          CHƯƠNG 04: KHÁM PHÁ & TRỢ LÝ HẢI VĂN AI (PANEL SÁNG LIỀN KHỐI)
-         ========================================================================= */}
-      <section id="scene-chapter-4" data-scene="sunset" className="max-w-[1600px] w-full mx-auto px-3 sm:px-6 lg:px-8">
-        <ScrollReveal>
-          <div className="space-y-12 sm:space-y-16">
-            {/* Smart Ocean Planner */}
-            <SmartOceanPlanner />
-
-            {/* AI Maritime Concierge */}
-            <div id="ai-concierge">
-              <div className="mb-6">
-                <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] drop-shadow-[0_8px_20px_rgba(0,0,0,0.7)]">
-                  {t.aiStudio.title}
-                </h2>
-                
+          {/* MOBILE SEARCH TRIGGER BAR (block sm:hidden) - CAPSULE PILL DESIGN */}
+          <div data-ui="search-mobile-bar" className="block sm:hidden animate-hero-4 w-full max-w-md mx-auto relative z-30">
+            <button
+              type="button"
+              onClick={() => setIsMobileSearchOpen(true)}
+              className="w-full h-14 bg-white/20 hover:bg-white/25 backdrop-blur-xl rounded-full border border-white/40 px-3.5 flex items-center justify-between gap-3 text-left transition-all active:scale-[0.98] cursor-pointer shadow-lg"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-full bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Search className="w-5 h-5 shrink-0" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-white truncate">
+                    {language === 'en' ? 'Where on Da Nang Coast?' : 'Khám phá biển Đà Nẵng ở đâu?'}
+                  </div>
+                  <div className="text-[11px] text-white/80 truncate flex items-center gap-1.5 mt-0.5">
+                    <span className="font-semibold text-white">{selectedRegions.join(', ') || 'Điểm đến'}</span>
+                    <span>•</span>
+                    <span>{selectedDate.split('-').reverse().slice(0, 2).join('/')}</span>
+                    <span>•</span>
+                    <span>{guests.adults + guests.children} {language === 'en' ? 'guests' : 'khách'}</span>
+                  </div>
+                </div>
               </div>
+              <div className="w-9 h-9 rounded-full border border-white/30 text-white flex items-center justify-center shrink-0 bg-white/15">
+                <SlidersHorizontal className="w-4 h-4 shrink-0" />
+              </div>
+            </button>
+          </div>
 
-              {/* AI Assistant Unified Chat Container */}
-              <div className="max-w-4xl mx-auto bg-white/10 backdrop-blur-xl rounded-3xl p-5 sm:p-6 border border-white/20 shadow-2xl flex flex-col h-[380px]">
-                {/* Messages Scroll Area */}
-                <div ref={chatContainerRef} className="flex-1 overflow-y-auto space-y-3.5 pr-2">
-                  {displayMessages.map((msg, idx) => (
-                    <div key={idx} className="space-y-2 animate-fadeIn">
-                      {/* User message */}
-                      <div className="flex justify-end">
-                        <div className="bg-cyan-600/90 backdrop-blur-sm text-white text-xs font-medium px-4 py-2.5 rounded-2xl rounded-br-none max-w-md shadow-md border border-cyan-400/30">
-                          {language === 'en' ? (msg.chatPromptEn || msg.chatPrompt) : msg.chatPrompt}
+          {/* MOBILE SEARCH SHEET MODAL */}
+          {isMobileSearchOpen && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex flex-col justify-end sm:hidden animate-in fade-in duration-200">
+              <div
+                className="w-full max-h-[90vh] bg-white rounded-t-3xl  flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Sheet Header */}
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-sm bg-sky-600"></span>
+                    <span className="text-sm font-bold text-slate-900">
+                      {language === 'en' ? 'Search Marine Activities' : 'Tìm kiếm hoạt động biển'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileSearchOpen(false)}
+                    className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
+                  >
+                    <X className="w-4 h-4 shrink-0" />
+                  </button>
+                </div>
+
+                {/* Horizontal Tab Switcher */}
+                <div className="grid grid-cols-4 border-b border-slate-100 bg-slate-50/80 p-1 gap-1 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setMobileSearchTab('region')}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all ${
+                      mobileSearchTab === 'region'
+                        ? 'bg-white text-sky-700 '
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {language === 'en' ? 'Bays' : 'Điểm đến'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileSearchTab('date')}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all ${
+                      mobileSearchTab === 'date'
+                        ? 'bg-white text-sky-700 '
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {language === 'en' ? 'Date' : 'Ngày đi'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileSearchTab('time')}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all ${
+                      mobileSearchTab === 'time'
+                        ? 'bg-white text-sky-700 '
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {language === 'en' ? 'Time' : 'Khung giờ'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileSearchTab('guests')}
+                    className={`py-2 rounded-xl text-xs font-bold transition-all ${
+                      mobileSearchTab === 'guests'
+                        ? 'bg-white text-sky-700 '
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {language === 'en' ? 'Guests' : 'Số khách'}
+                  </button>
+                </div>
+
+                {/* Tab Content Body */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {mobileSearchTab === 'region' && (
+                    <div className="space-y-2">
+                      <div className="text-xs font-semibold text-slate-500 px-1">
+                        {language === 'en' ? 'Select Da Nang Coastal Bays' : 'Chọn một hoặc nhiều vịnh biển:'}
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {BEACH_OPTIONS.map((bay) => {
+                          const isSelected = selectedRegions.includes(bay.name);
+                          return (
+                            <div
+                              key={bay.name}
+                              onClick={() => handleRegionChange(bay.name)}
+                              className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'bg-sky-50/90 border-sky-300 ring-1 ring-sky-500/20'
+                                  : 'bg-white border-slate-100 hover:bg-slate-50'
+                              }`}
+                            >
+                              <img
+                                src={bay.img}
+                                alt={bay.name}
+                                className="w-12 h-12 rounded-lg object-cover shrink-0"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <span className="text-xs font-bold text-slate-900 block truncate">
+                                  {language === 'en' ? bay.nameEn : bay.name}
+                                </span>
+                                <span className="text-[11px] text-sky-700 font-medium block truncate">
+                                  {language === 'en' ? bay.tagEn : bay.tag}
+                                </span>
+                                <span className="text-[10px] text-slate-400 block truncate">
+                                  {language === 'en' ? bay.descEn : bay.desc}
+                                </span>
+                              </div>
+                              <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 ${
+                                isSelected ? 'bg-sky-600 border-sky-600 text-white' : 'border-slate-300 bg-white'
+                              }`}>
+                                {isSelected && <Check className="w-3.5 h-3.5 text-sky-600 shrink-0" />}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {mobileSearchTab === 'date' && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <button
+                          type="button"
+                          onClick={handlePrevMonth}
+                          className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 cursor-pointer"
+                        >
+                          <ChevronLeft className="w-4 h-4 text-slate-600 shrink-0" />
+                        </button>
+                        <span className="text-xs font-bold text-slate-800">
+                          {language === 'en'
+                            ? calendarViewDate.toLocaleString('en-US', { month: 'long', year: 'numeric' })
+                            : `Tháng ${calendarMonth + 1}, ${calendarYear}`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleNextMonth}
+                          className="p-1 hover:bg-slate-100 rounded-lg text-slate-600 cursor-pointer"
+                        >
+                          <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-7 gap-1 text-center mb-1">
+                        {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((d) => (
+                          <span key={d} className="text-[10px] font-bold text-slate-400 uppercase py-1">
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-7 gap-1">
+                        {Array.from({ length: firstDayOfWeek }).map((_, i) => (
+                          <div key={`m-empty-${i}`} className="h-9" />
+                        ))}
+                        {Array.from({ length: daysInMonth }).map((_, i) => {
+                          const day = i + 1;
+                          const isPast = isPastDay(day);
+                          const isSelected = isSelectedDay(day);
+                          const isToday = isTodayDay(day);
+                          return (
+                            <button
+                              key={`m-day-${day}`}
+                              type="button"
+                              disabled={isPast}
+                              onClick={() => handleSelectDay(day)}
+                              className={`h-9 rounded-lg text-xs font-semibold flex items-center justify-center transition-all ${
+                                isSelected
+                                  ? 'bg-sky-600 text-white '
+                                  : isToday
+                                  ? 'border border-sky-600 text-sky-600 hover:bg-sky-50'
+                                  : isPast
+                                  ? 'text-slate-300 cursor-not-allowed'
+                                  : 'text-slate-700 hover:bg-slate-100 cursor-pointer'
+                              }`}
+                            >
+                              {day}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {mobileSearchTab === 'time' && (
+                    <div className="space-y-2">
+                      <div className="text-xs font-semibold text-slate-500 px-1">
+                        {language === 'en' ? 'Select Preferred Time Slot' : 'Khung giờ trải nghiệm biển:'}
+                      </div>
+                      {TIME_OPTIONS.map((slot) => {
+                        const isSelected = selectedTime === slot.val;
+                        return (
+                          <div
+                            key={slot.val}
+                            onClick={() => setSelectedTime(slot.val)}
+                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-sky-50/90 border-sky-300 ring-1 ring-sky-500/20'
+                                : 'bg-white border-slate-100 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className={`p-2 rounded-lg shrink-0 ${
+                              isSelected ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {slot.iconSvg}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs font-bold text-slate-900 block truncate">
+                                {language === 'en' ? slot.titleEn : slot.title}
+                              </span>
+                              <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                {language === 'en' ? slot.descEn : slot.desc}
+                              </p>
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 className="w-4 h-4 text-sky-600 shrink-0" />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {mobileSearchTab === 'guests' && (
+                    <div className="p-2 space-y-4">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div>
+                          <span className="text-sm font-bold text-slate-800 block">
+                            {language === 'en' ? 'Adults' : 'Người lớn'}
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {language === 'en' ? 'Age 13 and above' : 'Từ 13 tuổi trở lên'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setGuests((g) => ({ ...g, adults: Math.max(1, g.adults - 1) }))}
+                            disabled={guests.adults <= 1}
+                            className={`w-9 h-9 rounded-lg border flex items-center justify-center font-bold text-base transition-colors ${
+                              guests.adults <= 1
+                                ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                                : 'border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer'
+                            }`}
+                          >
+                            -
+                          </button>
+                          <span className="text-sm font-bold text-slate-800 w-5 text-center">
+                            {guests.adults}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setGuests((g) => ({ ...g, adults: Math.min(20, g.adults + 1) }))}
+                            className="w-9 h-9 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center justify-center font-bold text-base transition-colors cursor-pointer"
+                          >
+                            +
+                          </button>
                         </div>
                       </div>
 
-                      {/* AI response */}
-                      {msg.chatReply && (
-                        <div className="flex justify-start">
-                          <div className="bg-white/15 backdrop-blur-xl text-white text-xs leading-relaxed px-4.5 py-3.5 rounded-2xl rounded-bl-none max-w-lg border border-white/25 shadow-xl">
-                            <div className="flex items-center gap-1.5 mb-1.5 text-cyan-300 font-bold text-[11px]">
-                              <span className="material-symbols-outlined text-[14px]">smart_toy</span>
-                              <span>DANASEA AI</span>
-                            </div>
-                            <p className="text-white/95">{language === 'en' ? (msg.chatReplyEn || msg.chatReply) : msg.chatReply}</p>
-                          </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-sm font-bold text-slate-800 block">
+                            {language === 'en' ? 'Children' : 'Trẻ em'}
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {language === 'en' ? 'Age 2 - 12' : 'Từ 2 đến 12 tuổi'}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                  {isChatLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-white/15 backdrop-blur-xl text-cyan-200 text-xs px-4 py-2.5 rounded-2xl border border-white/25 shadow-md animate-pulse">
-                        {language === 'en' ? 'DANASEA AI is analyzing marine data...' : 'DANASEA AI đang phân tích dữ liệu hải văn...'}
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setGuests((g) => ({ ...g, children: Math.max(0, g.children - 1) }))}
+                            disabled={guests.children <= 0}
+                            className={`w-9 h-9 rounded-lg border flex items-center justify-center font-bold text-base transition-colors ${
+                              guests.children <= 0
+                                ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                                : 'border-slate-300 text-slate-700 hover:bg-slate-100 cursor-pointer'
+                            }`}
+                          >
+                            -
+                          </button>
+                          <span className="text-sm font-bold text-slate-800 w-5 text-center">
+                            {guests.children}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setGuests((g) => ({ ...g, children: Math.min(10, g.children + 1) }))}
+                            className="w-9 h-9 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 flex items-center justify-center font-bold text-base transition-colors cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Quick Suggestion Chips inside Chat */}
-                <div className="pt-3 pb-2 flex flex-wrap items-center gap-2 border-t border-white/15">
-                  <span className="text-[11px] font-bold text-white/70 uppercase tracking-wider shrink-0 mr-1">
-                    {language === 'en' ? 'Suggestions:' : 'Gợi ý nhanh:'}
-                  </span>
-                  {[
-                    { id: 'group', label: language === 'en' ? 'Group of 6, half-day tour?' : 'Nhóm 6 người đi nửa ngày?' },
-                    { id: 'couple', label: language === 'en' ? 'Romantic sunset for couples?' : 'Cặp đôi thư giãn hoàng hôn?' },
-                    { id: 'weather', label: language === 'en' ? 'Best timing for sunny day?' : 'Nắng nóng nên chơi giờ nào?' },
-                  ].map((prompt) => (
-                    <button
-                      key={prompt.id}
-                      type="button"
-                      onClick={() => { setActiveCustomPrompt(prompt.id); }}
-                      className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 hover:border-cyan-300 text-xs font-medium text-white transition-all cursor-pointer backdrop-blur-sm"
-                    >
-                      {prompt.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Input Bar */}
-                <div className="pt-2 flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={chatInputValue}
-                    onChange={(e) => setChatInputValue(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleChatSubmit()}
-                    placeholder={language === 'en' ? 'Ask anything about Da Nang beaches & activities...' : 'Hỏi bất kỳ điều gì về biển và hoạt động tại Đà Nẵng...'}
-                    className="flex-1 bg-white/10 backdrop-blur-sm border border-white/25 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-white/60 focus:outline-none focus:border-cyan-400 focus:bg-white/20 transition-all"
-                  />
+                {/* Sticky Bottom Actions */}
+                <div className="p-3.5 border-t border-slate-100 bg-white flex items-center justify-between gap-3">
                   <button
                     type="button"
-                    onClick={handleChatSubmit}
-                    disabled={isChatLoading || !chatInputValue.trim()}
-                    className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md transition-all disabled:opacity-40 cursor-pointer flex items-center gap-1.5 shrink-0"
+                    onClick={() => {
+                      setSelectedRegions(['Mỹ Khê']);
+                      setSelectedTime('05:30');
+                      setGuests({ adults: 2, children: 0 });
+                    }}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-800 underline px-2 cursor-pointer"
                   >
-                    <span>{language === 'en' ? 'Send' : 'Gửi'}</span>
-                    <span className="material-symbols-outlined text-[14px]">send</span>
+                    {language === 'en' ? 'Reset' : 'Đặt lại'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSearchExecute}
+                    className="flex-1 h-12 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Search className="w-4 h-4 shrink-0" />
+                    <span>
+                      {language === 'en'
+                        ? `Search (${guests.adults + guests.children} guests)`
+                        : `Tìm kiếm (${guests.adults + guests.children} khách)`}
+                    </span>
                   </button>
                 </div>
               </div>
             </div>
-          </div>
-        </ScrollReveal>
+          )}
+        </div>
       </section>
 
       {/* =========================================================================
-          PHẦN KẾT: HỒI ỨC, CÁCH ĐẶT TOUR & CTA (PANEL SÁNG LIỀN KHỐI)
+          CONTENT CANVAS: GROUNDED SOLID LIGHT SURFACE (BG-SLATE-50 / BG-WHITE)
+          - High information density, WCAG AAA text contrast (> 12:1)
+          - 0 fake poetry chapters
          ========================================================================= */}
-      <section id="scene-footer" data-scene="sunset" className="relative z-20 max-w-[1600px] w-full mx-auto px-3 sm:px-6 lg:px-8 my-12">
-        <ScrollReveal>
-          <div className="space-y-12 sm:space-y-16">
-            {/* Gallery Khách */}
-            <GuestGalleryMarquee />
+      <div className="relative z-20 bg-white border-t border-slate-200/80 pt-10 pb-20 text-slate-900">
+        <div className="max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 space-y-14 sm:space-y-16">
+          
+          {/* 1. Flash Sale Section (Ưu đãi giờ vàng giới hạn) */}
+          <FlashSaleSection experiences={flashSaleList} />
 
-            {/* 3 Bước Đặt Tour Đơn Giản */}
-            <div>
-              <div className="text-center max-w-xl mx-auto mb-8">
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.75)]">
-                  {language === 'en' ? 'How to Book on DANASEA' : 'Cách đặt trải nghiệm cùng DANASEA'}
-                </h2>
-                <p className="text-xs sm:text-sm text-white/90 mt-1 font-medium drop-shadow-[0_1px_6px_rgba(0,0,0,0.65)]">
-                  {language === 'en' ? 'Three quick steps from browsing to hitting the waves' : 'Ba bước nhanh chóng từ lúc chọn tour đến khi bước chân xuống mặt nước'}
-                </p>
-              </div>
+          {/* 2. Hoạt Động Biển Nổi Bật (Dải card hoạt động nổi bật duy nhất) */}
+          <CategoryExperienceCarousel
+            title={language === 'en' ? 'Featured Marine Activities' : 'Hoạt Động Biển Nổi Bật'}
+            categorySlug=""
+            categoryLink="/search"
+            experiences={featuredActivities}
+          />
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-20">
-                {/* Step 1 */}
-                <div className="relative z-20 p-6 sm:p-7 rounded-3xl bg-transparent border border-white/20 hover:border-white/40 hover:-translate-y-1.5 transition-all group flex flex-col items-start">
-                  <div className="w-full flex items-center justify-between mb-3">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md">
-                      <span className="material-symbols-outlined text-[24px]">explore</span>
-                    </div>
-                    <span className="text-4xl sm:text-5xl font-mono font-black text-white/30 group-hover:text-white/50 transition-colors select-none">
-                      01
-                    </span>
-                  </div>
-                  <h3 className="text-base sm:text-lg font-bold text-white mb-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">
-                    {language === 'en' ? 'Explore & Pick Activity' : 'Khám phá & Chọn hoạt động'}
-                  </h3>
-                  <p className="text-slate-100 text-xs sm:text-sm leading-relaxed font-medium drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
-                    {language === 'en'
-                      ? 'Filter by preferred bay, fitness level, or consult our AI marine radar planner.'
-                      : 'Tìm theo vùng biển yêu thích, lọc theo thể loại hoặc tham khảo gợi ý thời tiết từ AI.'}
-                  </p>
-                </div>
+          {/* Signature Alternating Video Spotlights with Curving Dashed Connectors */}
+          <CoastalVideoSpotlights />
 
-                {/* Step 2 */}
-                <div className="relative z-20 p-6 sm:p-7 rounded-3xl bg-transparent border border-white/20 hover:border-white/40 hover:-translate-y-1.5 transition-all group flex flex-col items-start">
-                  <div className="w-full flex items-center justify-between mb-3">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-600 to-teal-600 text-white flex items-center justify-center shadow-md">
-                      <span className="material-symbols-outlined text-[24px]">event_available</span>
-                    </div>
-                    <span className="text-4xl sm:text-5xl font-mono font-black text-white/30 group-hover:text-white/50 transition-colors select-none">
-                      02
-                    </span>
-                  </div>
-                  <h3 className="text-base sm:text-lg font-bold text-white mb-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">
-                    {language === 'en' ? 'Select Slot & Instant Pay' : 'Đặt lịch & Giữ chỗ tức thì'}
-                  </h3>
-                  <p className="text-slate-100 text-xs sm:text-sm leading-relaxed font-medium drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
-                    {language === 'en'
-                      ? 'Pick the best wave hour, guest count, and receive instant confirmation.'
-                      : 'Chọn ngày, khung giờ sóng đẹp và số lượng khách. Xác nhận giữ chỗ an toàn qua thẻ & ví điện tử.'}
-                  </p>
-                </div>
+          {/* 9. DANASEA Official Mobile App Showcase */}
+          <DanaseaAppShowcase />
 
-                {/* Step 3 */}
-                <div className="relative z-20 p-6 sm:p-7 rounded-3xl bg-transparent border border-white/20 hover:border-white/40 hover:-translate-y-1.5 transition-all group flex flex-col items-start">
-                  <div className="w-full flex items-center justify-between mb-3">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 text-white flex items-center justify-center shadow-md">
-                      <span className="material-symbols-outlined text-[24px]">qr_code_2</span>
-                    </div>
-                    <span className="text-4xl sm:text-5xl font-mono font-black text-white/30 group-hover:text-white/50 transition-colors select-none">
-                      03
-                    </span>
-                  </div>
-                  <h3 className="text-base sm:text-lg font-bold text-white mb-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">
-                    {language === 'en' ? 'Receive QR Pass & Dive In' : 'Nhận vé QR & Chạm sóng biển'}
-                  </h3>
-                  <p className="text-slate-100 text-xs sm:text-sm leading-relaxed font-medium drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.8)]">
-                    {language === 'en'
-                      ? 'Check-in on mobile at the beach harbor station and enjoy your certified marine tour.'
-                      : 'Vé điện tử gửi thẳng qua ứng dụng. Quét mã check-in trực tiếp tại bến tập kết và bắt đầu hành trình.'}
-                  </p>
-                </div>
-              </div>
+          {/* 10. Guest Gallery Marquee */}
+          <GuestGalleryMarquee />
+
+          {/* 12. 3 Bước Đặt Tour Đơn Giản */}
+          <div data-ui="booking-steps" className="py-6 sm:py-8">
+            <div className="text-center max-w-xl mx-auto mb-8">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                {language === 'en' ? 'How to Book on DANASEA' : 'Cách đặt trải nghiệm cùng DANASEA'}
+              </h2>
+              <p className="text-base text-slate-600 mt-2 font-medium">
+                {language === 'en' ? 'Three quick steps from browsing to hitting the waves' : 'Ba bước nhanh chóng từ lúc chọn tour đến khi bước chân xuống mặt nước'}
+              </p>
             </div>
 
-            {/* Final Call to Action */}
-            <div className="rounded-3xl p-6 sm:p-8 bg-white/10 backdrop-blur-xl border border-white/20 text-white flex flex-col sm:flex-row items-center justify-between gap-6 shadow-2xl">
-              <div>
-                <h3 className="text-lg sm:text-xl font-bold mb-1 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)]">
-                  {language === 'en' ? 'Ready to Touch Da Nang Waters?' : 'Sẵn sàng chạm sóng biển Đà Nẵng ngay hôm nay?'}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Step 1 */}
+              <div className="flex flex-col items-start bg-slate-50 hover:bg-slate-100/90 border border-slate-200/80 rounded-2xl p-6 sm:p-7 transition-all duration-300 hover:-translate-y-0.5 shadow-xs">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl font-black text-sky-700 tabular-nums">01</span>
+                  <div className="h-px w-10 bg-sky-200" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">
+                  {language === 'en' ? 'Explore & Pick Activity' : 'Khám phá & Chọn hoạt động'}
                 </h3>
-                <p className="text-xs sm:text-sm text-white/90 max-w-xl font-medium drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.7)]">
+                <p className="text-slate-600 text-sm sm:text-base leading-relaxed font-normal">
                   {language === 'en'
-                    ? 'Explore 20+ certified water sports and marine expeditions tailored for you.'
-                    : 'Hơn 20+ trải nghiệm thể thao biển chuẩn quốc tế với đầy đủ bảo hiểm và thiết bị chuyên nghiệp.'}
+                    ? 'Filter by preferred bay, fitness level, or consult our AI marine radar planner.'
+                    : 'Tìm theo vùng biển yêu thích, lọc theo thể loại hoặc tham khảo gợi ý thời tiết từ AI.'}
                 </p>
               </div>
 
-              <Link
-                to="/search"
-                className="px-6 py-3.5 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-cyan-600/30 transition-all shrink-0 hover:scale-[1.02] flex items-center gap-1.5"
-              >
-                <span>{language === 'en' ? 'Explore All Tours' : 'Xem toàn bộ tour'}</span>
-                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-              </Link>
+              {/* Step 2 */}
+              <div className="flex flex-col items-start bg-slate-50 hover:bg-slate-100/90 border border-slate-200/80 rounded-2xl p-6 sm:p-7 transition-all duration-300 hover:-translate-y-0.5 shadow-xs">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl font-black text-sky-700 tabular-nums">02</span>
+                  <div className="h-px w-10 bg-sky-200" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">
+                  {language === 'en' ? 'Select Slot & Instant Pay' : 'Đặt lịch & Giữ chỗ tức thì'}
+                </h3>
+                <p className="text-slate-600 text-sm sm:text-base leading-relaxed font-normal">
+                  {language === 'en'
+                    ? 'Pick the best wave hour, guest count, and receive instant confirmation.'
+                    : 'Chọn ngày, khung giờ sóng đẹp và số lượng khách. Xác nhận giữ chỗ an toàn qua thẻ & ví điện tử.'}
+                </p>
+              </div>
+
+              {/* Step 3 */}
+              <div className="flex flex-col items-start bg-slate-50 hover:bg-slate-100/90 border border-slate-200/80 rounded-2xl p-6 sm:p-7 transition-all duration-300 hover:-translate-y-0.5 shadow-xs">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-2xl font-black text-sky-700 tabular-nums">03</span>
+                  <div className="h-px w-10 bg-sky-200" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">
+                  {language === 'en' ? 'Receive QR Pass & Boarding Pass' : 'Nhận vé QR & Xuất bến an toàn'}
+                </h3>
+                <p className="text-slate-600 text-sm sm:text-base leading-relaxed font-normal">
+                  {language === 'en'
+                    ? 'Check-in on mobile at the beach harbor station and enjoy your certified marine tour.'
+                    : 'Vé điện tử gửi thẳng qua ứng dụng. Quét mã check-in trực tiếp tại bến tập kết và bắt đầu hành trình.'}
+                </p>
+              </div>
             </div>
           </div>
-        </ScrollReveal>
-      </section>
 
-      {/* Floating Scroll to Top Button */}
-      <ScrollToTopButton />
+          {/* 13. Final Call to Action */}
+          <div className="rounded-2xl p-6 sm:p-8 bg-[#031d44] border border-sky-950 flex flex-col sm:flex-row items-center justify-between gap-6 text-white shadow-xl shadow-sky-950/20">
+            <div>
+              <h3 className="text-lg sm:text-xl font-bold mb-1 text-white drop-shadow-sm">
+                {language === 'en' ? 'Ready to Explore Da Nang Waters?' : 'Sẵn sàng trải nghiệm biển Đà Nẵng ngay hôm nay?'}
+              </h3>
+              <p className="text-base text-slate-200 max-w-xl font-normal drop-shadow-sm">
+                {language === 'en'
+                  ? 'Explore 20+ certified water sports and marine expeditions tailored for you.'
+                  : 'Hơn 20+ trải nghiệm thể thao biển chuẩn quốc tế với đầy đủ bảo hiểm và thiết bị chuyên nghiệp.'}
+              </p>
+            </div>
+
+            <Link
+              to="/search"
+              className="px-6 py-3.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs sm:text-sm transition-colors shrink-0 flex items-center gap-1.5 shadow-md shadow-sky-900/20"
+            >
+              <span>{language === 'en' ? 'Explore All Tours' : 'Xem toàn bộ tour'}</span>
+              <ArrowRight className="w-4 h-4 shrink-0" />
+            </Link>
+          </div>
+
+        </div>
+      </div>
+
     </main>
   );
 }

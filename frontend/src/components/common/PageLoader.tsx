@@ -2,20 +2,16 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useLoadingStore } from '../../store/useLoadingStore';
 
 export function PageLoader() {
-  const { isLoading, durationMs, hideLoader, showLoader } = useLoadingStore();
+  const { isLoading, durationMs, hideLoader } = useLoadingStore();
   const [progress, setProgress] = useState(0);
   const [isExiting, setIsExiting] = useState(false);
   const rafRef = useRef<number | null>(null);
   const startTimeRef = useRef<number | null>(null);
 
-  // 1. Initial Splash Screen on first session visit
+  // 1. Initial Splash Screen on first session visit - disabled to ensure immediate first-frame paint
   useEffect(() => {
-    const hasSeenSplash = sessionStorage.getItem('danasea_initial_splash_shown');
-    if (!hasSeenSplash) {
-      sessionStorage.setItem('danasea_initial_splash_shown', 'true');
-      showLoader('', '', 2400);
-    }
-  }, [showLoader]);
+    // PageLoader is reserved for programmatic triggers (payments, reservations)
+  }, []);
 
   // 2. Liquid Wave Progress Animation
   useEffect(() => {

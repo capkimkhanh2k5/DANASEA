@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { weatherService } from '../../services/weatherService';
 import type { WeatherInfoDto, MarineSafetySummary } from '../../types/weather';
+import { Thermometer, Waves, Wind } from 'lucide-react';
 
 interface MarineWeatherPillProps {
   className?: string;
@@ -54,15 +55,15 @@ export const MarineWeatherPill: React.FC<MarineWeatherPillProps> = ({ className 
   if (isLoading || !data) {
     return (
       <div
-        className={`inline-flex items-center gap-3 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border border-white/40 dark:border-slate-800 shadow-sm animate-pulse ${className}`}
+        className={`inline-flex items-center gap-3 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl bg-white border border-slate-200/80 ${className}`}
       >
-        <div className="w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-        <span className="w-px h-3 bg-slate-200 dark:bg-slate-700" />
-        <div className="w-10 h-3 rounded bg-slate-300 dark:bg-slate-700" />
-        <span className="w-px h-3 bg-slate-200 dark:bg-slate-700" />
-        <div className="w-10 h-3 rounded bg-slate-300 dark:bg-slate-700" />
-        <span className="w-px h-3 bg-slate-200 dark:bg-slate-700" />
-        <div className="w-12 h-3 rounded bg-slate-300 dark:bg-slate-700" />
+        <div className="w-2.5 h-2.5 rounded-full bg-slate-300" />
+        <span className="w-px h-3 bg-slate-200" />
+        <div className="w-10 h-3 rounded bg-slate-200" />
+        <span className="w-px h-3 bg-slate-200" />
+        <div className="w-10 h-3 rounded bg-slate-200" />
+        <span className="w-px h-3 bg-slate-200" />
+        <div className="w-12 h-3 rounded bg-slate-200" />
       </div>
     );
   }
@@ -83,35 +84,35 @@ export const MarineWeatherPill: React.FC<MarineWeatherPillProps> = ({ className 
 
   return (
     <div
-      className={`inline-flex items-center flex-wrap sm:flex-nowrap justify-center gap-2.5 sm:gap-3 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/90 dark:bg-slate-900/80 backdrop-blur-md border border-white/60 dark:border-slate-700/60 shadow-[0_4px_20px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(0,0,0,0.16)] text-xs sm:text-[13px] text-slate-800 dark:text-slate-100 transition-all duration-300 select-none cursor-default ${className}`}
+      className={`inline-flex items-center flex-wrap sm:flex-nowrap justify-center gap-2.5 sm:gap-3 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-white border border-slate-200/90 text-[13px] text-slate-800 transition-all select-none cursor-default ${className}`}
     >
-      {/* 1. Status Indicator Dot (Color pulse only, no text) */}
+      {/* 1. Status Indicator Dot */}
       <span
         title={statusLabel}
-        className={`w-2.5 h-2.5 rounded-full ${statusColor} animate-pulse shrink-0`}
+        className={`w-2.5 h-2.5 rounded-full ${statusColor} shrink-0`}
       />
 
-      <span className="w-px h-3 bg-slate-200 dark:bg-slate-700" />
+      <span className="w-px h-3 bg-slate-200" />
 
-      {/* 2. Temperature (Thermometer Icon) */}
-      <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-medium">
-        <span className="material-symbols-outlined text-[16px] text-amber-500">thermostat</span>
+      {/* 2. Temperature */}
+      <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+        <Thermometer className="w-3.5 h-3.5 text-amber-500 shrink-0" />
         <span>{temp}°C</span>
       </div>
 
-      <span className="w-px h-3 bg-slate-200 dark:bg-slate-700" />
+      <span className="w-px h-3 bg-slate-200" />
 
-      {/* 3. Wave Height (Waves Icon) */}
-      <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-medium">
-        <span className="material-symbols-outlined text-[16px] text-cyan-500">waves</span>
+      {/* 3. Wave Height */}
+      <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+        <Waves className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
         <span>{wave} m</span>
       </div>
 
-      <span className="w-px h-3 bg-slate-200 dark:bg-slate-700" />
+      <span className="w-px h-3 bg-slate-200" />
 
-      {/* 4. Wind Speed (Air Icon) */}
-      <div className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-medium">
-        <span className="material-symbols-outlined text-[16px] text-teal-500">air</span>
+      {/* 4. Wind Speed */}
+      <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+        <Wind className="w-3.5 h-3.5 text-teal-500 shrink-0" />
         <span>{wind} km/h</span>
       </div>
     </div>

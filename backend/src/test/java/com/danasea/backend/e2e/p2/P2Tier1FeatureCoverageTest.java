@@ -46,7 +46,7 @@ public class P2Tier1FeatureCoverageTest extends BaseE2ETest {
     void testR1_SearchServices_ByDate() throws Exception {
         assumeParamSupported(CatalogController.class, "searchServices", "date");
 
-        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        LocalDate tomorrow = slotA1TomorrowMorning.getDate();
         mockMvc.perform(get("/api/services")
                         .param("date", tomorrow.toString())
                         .accept(MediaType.APPLICATION_JSON))

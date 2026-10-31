@@ -13,6 +13,9 @@ import type {
   PaymentResponse,
   OrderReceiptResponse,
   QrCodeResponse,
+  RescheduleOptionsSummaryResponse,
+  ConfirmRescheduleRequest,
+  SubOrderRescheduleResponse,
 } from '../types/order';
 
 export const orderService = {
@@ -153,5 +156,38 @@ export const orderService = {
     const response = await apiClient.post<QrCodeResponse>(`/bookings/${identifier}/qr-code`);
     return response.data;
   },
-};
+  /**
+   * Get reschedule options and pending vendor proposal
+   * GET /api/sub-orders/{id}/reschedule-options
+   */
+  async getRescheduleOptions(subOrderId: string): Promise<RescheduleOptionsSummaryResponse> {
+    const response = await apiClient.get<RescheduleOptionsSummaryResponse>(
+      `/sub-orders/${subOrderId}/reschedule-options`
+    );
+    return response.data;
+  },
 
+  /**
+   * Confirm sub-order reschedule (Customer accepts proposal or picks new slot)
+   * POST /api/sub-orders/{id}/reschedule
+   */
+  async confirmReschedule(
+    subOrderId: string,
+    req: ConfirmRescheduleRequest,
+    idempotencyKey?: string
+  ): Promise<SubOrderRescheduleResponse> {
+    const key =
+      idempotencyKey ||
+      `reschedule-${subOrderId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const response = await apiClient.post<SubOrderRescheduleResponse>(
+      `/sub-orders/${subOrderId}/reschedule`,
+      req,
+      {
+        headers: {
+          'Idempotency-Key': key,
+        },
+      }
+    );
+    return response.data;
+  },
+};

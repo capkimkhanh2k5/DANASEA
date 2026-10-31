@@ -3,9 +3,10 @@ export type Language = 'vi' | 'en';
 export const TRANSLATIONS = {
   vi: {
     nav: {
+      home: 'Trang chủ',
       explore: 'Khám phá',
-      experiences: 'Gói trải nghiệm',
-      destinations: 'Điểm đến',
+      experiences: 'Trải nghiệm',
+      destinations: 'Khám phá',
       signIn: 'Đăng nhập',
       aiPlanner: 'Lên lịch cùng AI',
       wishlist: 'Yêu thích',
@@ -67,7 +68,7 @@ export const TRANSLATIONS = {
     sections: {
       popular: 'Được ưa chuộng nhất',
       viewAll: 'Xem tất cả',
-      perGuest: '/ khách',
+      perGuest: 'khách',
       reviews: 'đánh giá',
       hours: 'giờ',
       duration: 'Thời lượng',
@@ -125,9 +126,10 @@ export const TRANSLATIONS = {
   },
   en: {
     nav: {
+      home: 'Home',
       explore: 'Explore',
       experiences: 'Experiences',
-      destinations: 'Destinations',
+      destinations: 'Explore',
       signIn: 'Sign In',
       aiPlanner: 'AI Planner',
       wishlist: 'Wishlist',
@@ -189,7 +191,7 @@ export const TRANSLATIONS = {
     sections: {
       popular: 'Most Popular',
       viewAll: 'View all',
-      perGuest: '/ guest',
+      perGuest: 'guest',
       reviews: 'reviews',
       hours: 'hours',
       duration: 'Duration',

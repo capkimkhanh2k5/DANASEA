@@ -37,7 +37,7 @@ public class P2Tier3CrossFeatureCombinationTest extends BaseE2ETest {
         assumeParamSupported(CatalogController.class, "searchServices", "minRating");
         assumeParamSupported(CatalogController.class, "searchServices", "sortBy");
 
-        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        LocalDate tomorrow = slotA1TomorrowMorning.getDate();
         MvcResult result = mockMvc.perform(get("/api/services")
                         .param("date", tomorrow.toString())
                         .param("guests", "6")
