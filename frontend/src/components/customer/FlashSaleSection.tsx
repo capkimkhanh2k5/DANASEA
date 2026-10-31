@@ -71,11 +71,6 @@ export function FlashSaleSection({ experiences = FLASH_SALE_EXPERIENCES }: Flash
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             {t.flashSale.title}
           </h2>
-          <p className="text-base text-slate-600 mt-2 font-medium">
-            {language === 'en'
-              ? "Limited-time special rates for today's departures"
-              : 'Ưu đãi giờ vàng giới hạn cho các khung giờ trải nghiệm trong ngày'}
-          </p>
         </div>
 
         {/* Countdown Clock */}

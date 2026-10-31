@@ -1,33 +1,6 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
-import { useLoadingStore } from '../store/useLoadingStore';
 import { useLanguageStore } from '../store/useLanguageStore';
-
-// Smart Latency Threshold: Only trigger full-screen wave if request takes > 600ms
-let activeRequestsCount = 0;
-let latencyTimer: ReturnType<typeof setTimeout> | null = null;
-
-const startLoadingCountdown = (skipLoader?: boolean) => {
-  if (skipLoader) return;
-  activeRequestsCount++;
-  if (activeRequestsCount === 1) {
-    latencyTimer = setTimeout(() => {
-      useLoadingStore.getState().showLoader('Đang đồng bộ dữ liệu...', 'Hệ thống đang kết nối máy chủ DANASEA', 4000);
-    }, 600);
-  }
-};
-
-const stopLoading = (skipLoader?: boolean) => {
-  if (skipLoader) return;
-  activeRequestsCount = Math.max(0, activeRequestsCount - 1);
-  if (activeRequestsCount === 0) {
-    if (latencyTimer) {
-      clearTimeout(latencyTimer);
-      latencyTimer = null;
-    }
-    useLoadingStore.getState().hideLoader();
-  }
-};
 
 export const apiClient = axios.create({
   baseURL: '/api',
@@ -58,10 +31,6 @@ apiClient.interceptors.request.use(
       console.warn(`[DEV Demo] Mutation blocked for ${method} ${config.url}`);
       return Promise.reject(new Error('Thao tác quản trị bị khóa trong chế độ xem trước (DEV Demo)'));
     }
-
-    const skipLoader = config.headers?.['X-Skip-Loader'] === 'true' || Boolean(config.url?.includes('/weather'));
-    startLoadingCountdown(skipLoader);
-
     // Structured Debug Logging
     const url = `${config.baseURL || ''}${config.url || ''}`;
     console.groupCollapsed(`%c[API Request] ${method} ${url}`, 'color: #0284c7; font-weight: bold;');
@@ -86,8 +55,6 @@ apiClient.interceptors.request.use(
 // Response Interceptor: Log Result & Handle Common Status Codes
 apiClient.interceptors.response.use(
   (response) => {
-    const skipLoader = response.config.headers?.['X-Skip-Loader'] === 'true' || Boolean(response.config.url?.includes('/weather'));
-    stopLoading(skipLoader);
     const url = response.config.url;
     const status = response.status;
     console.groupCollapsed(`%c[API Response] ${status} ${url}`, 'color: #16a34a; font-weight: bold;');
@@ -98,8 +65,6 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
-    const skipLoader = error.config?.headers?.['X-Skip-Loader'] === 'true' || Boolean(error.config?.url?.includes('/weather'));
-    stopLoading(skipLoader);
     const status = error.response?.status;
     const url = error.config?.url;
     const responseData = error.response?.data;

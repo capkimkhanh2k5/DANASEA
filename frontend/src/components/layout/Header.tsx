@@ -12,7 +12,6 @@ import {
   User,
   CheckCheck,
   Clock,
-  Menu,
   Globe,
   LogOut,
   CalendarCheck,
@@ -242,7 +241,7 @@ export function Header() {
             type="button"
             onClick={handleToggleAccountMenu}
             aria-expanded={showAccountMenu}
-            aria-label="Tài khoản và điều hướng cá nhân"
+            aria-label="Khách hàng và điều hướng cá nhân"
             className={`flex items-center gap-2.5 px-3 py-1.5 rounded-2xl border transition-all cursor-pointer relative ${
               isTransparent
                 ? showAccountMenu
@@ -253,7 +252,6 @@ export function Header() {
                 : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90 shadow-xs"
             }`}
           >
-            <Menu className="w-4 h-4 text-inherit shrink-0" />
             
             {isAuthenticated && user ? (
               <div className="flex items-center gap-2">
@@ -267,7 +265,7 @@ export function Header() {
                   )}
                 </div>
                 <span className="text-xs font-bold max-w-[110px] truncate hidden md:inline-block">
-                  {user.fullName || "Tài khoản"}
+                  {user.fullName || (language === 'en' ? 'Customer' : 'Khách hàng')}
                 </span>
               </div>
             ) : (
@@ -276,17 +274,9 @@ export function Header() {
                   <User className="w-4 h-4 text-slate-600" />
                 </div>
                 <span className="text-xs font-bold hidden sm:inline-block">
-                  {language === 'en' ? 'Account' : 'Tài khoản'}
+                  {language === 'en' ? 'Customer' : 'Khách hàng'}
                 </span>
               </div>
-            )}
-
-            {/* Subtle Notification / Activity Indicator Dot */}
-            {(unreadNotifs > 0 || cartItemCount > 0 || wishlistCount > 0) && (
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-600 ring-2 ring-white"></span>
-              </span>
             )}
           </button>
 

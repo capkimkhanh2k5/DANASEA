@@ -227,11 +227,6 @@ export const GuestGalleryMarquee: React.FC = () => {
         <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
           {language === 'en' ? 'Authentic Guest Memories' : 'Khoảnh Khắc Cùng Du Khách'}
         </h2>
-        <p className="text-base text-slate-600 mt-2 font-medium">
-          {language === 'en'
-            ? 'Real moments captured by travelers across Da Nang coastal bays'
-            : 'Những trải nghiệm biển thực tế từ cộng đồng du khách khắp mọi miền'}
-        </p>
       </div>
 
       {/* Infinite Dual Marquee Track */}
