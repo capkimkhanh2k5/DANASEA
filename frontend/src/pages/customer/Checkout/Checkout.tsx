@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useCartStore } from "../../../store/useCartStore";
 import { useAuthStore } from "../../../store/useAuthStore";
-import { useLoadingStore } from "../../../store/useLoadingStore";
 import { bookingService } from "../../../services/bookingService";
 import { orderService } from "../../../services/orderService";
 import { paymentService } from "../../../services/paymentService";
@@ -24,7 +23,6 @@ export function Checkout() {
   const navigate = useNavigate();
   const { items, getTotalPrice } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
-  const { triggerDemoLoading } = useLoadingStore();
 
   // Booking Hold State
   const [bookingHold, setBookingHold] = useState<BookingHoldResponse | null>(null);
@@ -221,7 +219,6 @@ export function Checkout() {
 
     if (isAuthenticated) {
       try {
-        triggerDemoLoading(3000, "Đang xử lý đơn hàng & kết nối cổng thanh toán...", "Hệ thống đang bảo lưu mã vé và khởi tạo giao dịch an toàn");
 
         let activeHold = bookingHold;
         if (!activeHold?.bookingId) {

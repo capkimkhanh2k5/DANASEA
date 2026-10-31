@@ -1,15 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { User, Ship, ShieldAlert, ArrowLeftRight, X, ChevronUp, LogOut, Waves } from 'lucide-react';
+import { User, Ship, ShieldAlert, ArrowLeftRight, X, ChevronUp, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useLoadingStore } from '../../store/useLoadingStore';
 import { authService } from '../../services/authService';
 import type { Role } from '../../types';
 
 export function DevRoleSwitcher() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, switchRole, logout } = useAuthStore();
-  const { triggerDemoLoading } = useLoadingStore();
   const navigate = useNavigate();
   const location = useLocation();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -70,9 +68,6 @@ export function DevRoleSwitcher() {
   };
 
   const handleSelectRole = async (key: 'customer' | 'vendor' | 'admin', path: string) => {
-    const targetName = key === 'admin' ? 'Cổng Quản Trị Viên' : key === 'vendor' ? 'Cổng Đối Tác Vendor' : 'Cổng Trải Nghiệm Du Khách';
-    triggerDemoLoading(850, `Đang kết nối ${targetName}...`, 'Tải dữ liệu phân hệ và cấu hình quyền hạn');
-
     const creds = {
       customer: { email: 'customer@danasea.vn', password: 'password123' },
       vendor: { email: 'vendor@danasea.vn', password: 'password123' },
@@ -267,19 +262,6 @@ export function DevRoleSwitcher() {
               </div>
             </button>
           </div>
-
-          {/* Test Loading Animation Action */}
-          <button
-            type="button"
-            onClick={() => {
-              triggerDemoLoading(3000, "Đang kết nối sóng biển DANASEA...", "Chuẩn bị hải trình và cập nhật dữ liệu trải nghiệm");
-              setIsOpen(false);
-            }}
-            className="w-full py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-700 flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer"
-          >
-            <Waves className="w-4 h-4 text-sky-600 shrink-0" />
-            <span>Xem thử hiệu ứng Sóng nước (Liquid Wave Loader)</span>
-          </button>
 
           {/* Footer Actions */}
           <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-xs">
