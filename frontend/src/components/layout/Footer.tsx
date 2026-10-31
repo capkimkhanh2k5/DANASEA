@@ -3,7 +3,7 @@ import { PhoneCall, ShieldCheck, Mail, LifeBuoy, Award } from 'lucide-react';
 
 export function Footer() {
   return (
-    <footer className="w-full bg-[#031d44] text-slate-300 border-t border-sky-950 relative z-10 selection:bg-sky-500 selection:text-white" data-ui="footer">
+    <footer className="w-full bg-[#031d44] text-white border-t border-sky-950 relative z-10 selection:bg-sky-500 selection:text-white" data-ui="footer">
       <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16">
         
         {/* Main Footer Grid: 3 Clean Columns (0 Duplicate Categories) */}
@@ -20,21 +20,21 @@ export function Footer() {
             </div>
 
             {/* Micro Tagline */}
-            <p className="text-slate-300/80 text-xs sm:text-sm leading-relaxed max-w-md">
+            <p className="text-white text-xs sm:text-sm leading-relaxed max-w-md font-normal">
               Hệ thống đặt trước trải nghiệm biển chất lượng cao tại Đà Nẵng. Cam kết an toàn hàng hải tuyệt đối với hướng dẫn viên 1:1 và trang thiết bị cứu sinh chuẩn SOLAS.
             </p>
 
             {/* Trust & Certification Badges */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-slate-200 text-xs font-medium">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-white text-xs font-normal">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Bảo hiểm Bảo Việt 100M</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-slate-200 text-xs font-medium">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-white text-xs font-normal">
                 <LifeBuoy className="w-3.5 h-3.5 text-sky-400" />
                 <span>Chuẩn cứu sinh SOLAS</span>
               </div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-slate-200 text-xs font-medium">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-white text-xs font-normal">
                 <Award className="w-3.5 h-3.5 text-amber-400" />
                 <span>Hiệp hội Du lịch ĐN</span>
               </div>
@@ -42,7 +42,7 @@ export function Footer() {
 
             {/* Đối tác thanh toán (Payment Partners Grid như Traveloka) */}
             <div className="mt-1">
-              <p className="text-xs font-bold text-slate-300 mb-2.5">
+              <p className="text-xs font-normal text-white mb-2.5">
                 Đối tác thanh toán an toàn
               </p>
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-w-sm">
@@ -129,23 +129,23 @@ export function Footer() {
             <h3 className="font-bold text-sm text-white tracking-tight">
               Hỗ trợ &amp; Pháp lý
             </h3>
-            <ul className="flex flex-col gap-2.5 text-xs text-slate-300/80 list-none p-0 m-0">
-              <li className="hover:text-white transition-colors cursor-pointer">
+            <ul className="flex flex-col gap-2.5 text-xs text-white list-none p-0 m-0 font-normal">
+              <li className="hover:text-sky-200 transition-colors cursor-pointer">
                 Cách đặt tour &amp; quét mã QR
               </li>
-              <li className="hover:text-white transition-colors cursor-pointer">
+              <li className="hover:text-sky-200 transition-colors cursor-pointer">
                 Chính sách hoàn tiền khi thời tiết xấu
               </li>
-              <li className="hover:text-white transition-colors cursor-pointer">
+              <li className="hover:text-sky-200 transition-colors cursor-pointer">
                 Quy chuẩn an toàn hàng hải &amp; cứu sinh
               </li>
-              <li className="hover:text-white transition-colors cursor-pointer">
+              <li className="hover:text-sky-200 transition-colors cursor-pointer">
                 Cam kết bảo tồn san hô Sơn Trà
               </li>
-              <li className="hover:text-white transition-colors cursor-pointer">
+              <li className="hover:text-sky-200 transition-colors cursor-pointer">
                 Tuyển dụng HDV bản địa 1:1
               </li>
-              <li className="hover:text-white transition-colors cursor-pointer">
+              <li className="hover:text-sky-200 transition-colors cursor-pointer">
                 Về chúng tôi &amp; Giấy phép lữ hành
               </li>
             </ul>
@@ -157,13 +157,13 @@ export function Footer() {
               <h3 className="font-bold text-sm text-white tracking-tight mb-3">
                 Kênh kết nối
               </h3>
-              <div className="flex flex-col gap-2.5 text-xs text-slate-300/80">
+              <div className="flex flex-col gap-2.5 text-xs text-white font-normal">
                 {/* Facebook Authentic SVG Logo */}
                 <a
                   href="https://facebook.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 hover:text-white transition-colors group"
+                  className="flex items-center gap-2.5 hover:text-sky-200 transition-colors group"
                 >
                   <div className="w-6 h-6 rounded-md bg-[#1877F2] flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
                     <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
@@ -178,7 +178,7 @@ export function Footer() {
                   href="https://instagram.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 hover:text-white transition-colors group"
+                  className="flex items-center gap-2.5 hover:text-sky-200 transition-colors group"
                 >
                   <div className="w-6 h-6 rounded-md bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
                     <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
@@ -193,7 +193,7 @@ export function Footer() {
                   href="https://tiktok.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2.5 hover:text-white transition-colors group"
+                  className="flex items-center gap-2.5 hover:text-sky-200 transition-colors group"
                 >
                   <div className="w-6 h-6 rounded-md bg-black flex items-center justify-center shrink-0 shadow-xs border border-white/20 group-hover:scale-105 transition-transform">
                     <svg className="w-3.5 h-3.5 fill-white" viewBox="0 0 24 24">
@@ -207,14 +207,14 @@ export function Footer() {
 
             {/* Hotline & Email Cứu hộ bờ biển */}
             <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
-              <span className="text-xs font-bold text-slate-300">
+              <span className="text-xs font-normal text-white">
                 Hotline khẩn cấp &amp; Cứu hộ biển
               </span>
               <a href="tel:19008468" className="flex items-center gap-2 text-sky-400 hover:text-sky-300 font-bold text-sm transition-colors">
                 <PhoneCall className="w-4 h-4 text-sky-400" />
                 <span>1900 8468 (24/7)</span>
               </a>
-              <div className="flex items-center gap-2 text-xs text-slate-300/80">
+              <div className="flex items-center gap-2 text-xs text-white font-normal">
                 <Mail className="w-3.5 h-3.5 text-sky-300" />
                 <span>hotro@danasea.vn</span>
               </div>
@@ -224,9 +224,9 @@ export function Footer() {
         </div>
 
         {/* Chân trang bản quyền (Bottom Bar) */}
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/90 font-normal">
           <p>© 2026 DANASEA Marine Experiences. Bảo lưu mọi quyền.</p>
-          <div className="flex items-center gap-3 text-xs text-slate-400">
+          <div className="flex items-center gap-3 text-xs text-white/90 font-normal">
             <Link to="/terms" className="hover:text-white transition-colors">Điều khoản</Link>
             <span>•</span>
             <Link to="/privacy" className="hover:text-white transition-colors">Bảo mật</Link>
