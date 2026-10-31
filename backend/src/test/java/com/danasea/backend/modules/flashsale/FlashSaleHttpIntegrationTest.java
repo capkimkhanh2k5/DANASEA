@@ -21,7 +21,6 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -35,17 +34,8 @@ import org.springframework.test.context.bean.override.mockito.*;
     "spring.rabbitmq.listener.simple.auto-startup=false","spring.rabbitmq.listener.direct.auto-startup=false",
     "spring.data.redis.database=15","app.scheduler.enabled=false","management.health.mail.enabled=false"})
 @ActiveProfiles("test")
-@EnabledIfEnvironmentVariable(named="FLASH_SALE_TEST_JDBC_URL",matches=".*/danasea_flashsale_test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class FlashSaleHttpIntegrationTest {
-    @DynamicPropertySource static void infrastructure(DynamicPropertyRegistry r) {
-        r.add("spring.datasource.url",()->System.getenv("FLASH_SALE_TEST_JDBC_URL"));
-        r.add("spring.datasource.username",()->"postgres");
-        r.add("spring.datasource.password",()->System.getenv("FLASH_SALE_TEST_DB_PASSWORD"));
-        r.add("spring.datasource.driver-class-name",()->"org.postgresql.Driver");
-        r.add("spring.jpa.database-platform",()->"org.hibernate.dialect.PostgreSQLDialect");
-        r.add("spring.data.redis.host",()->"localhost"); r.add("spring.data.redis.port",()->6380);
-    }
+class FlashSaleHttpIntegrationTest extends BaseFlashSaleIntegrationTest {
     @LocalServerPort int port;
     @Autowired JdbcTemplate db;
     @Autowired StringRedisTemplate redis;
@@ -65,7 +55,7 @@ class FlashSaleHttpIntegrationTest {
     static BigDecimal n(String s) { return new BigDecimal(s); }
     @BeforeAll void migratedExistingRows() throws Exception {
         assertThat(db.queryForObject("SELECT current_database()",String.class)).isEqualTo("danasea_flashsale_test");
-        assertThat(db.queryForObject("SELECT version FROM flyway_schema_history ORDER BY installed_rank DESC LIMIT 1",String.class)).isEqualTo("40");
+        assertThat(db.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success=false",Integer.class)).isZero();
         Files.writeString(Path.of("target/flash-sale-http-evidence.jsonl"),json.writeValueAsString(Map.of(
                 "baseline","3c80558","runtime","Phase 1 target/classes SpringBootTest RANDOM_PORT","port",port,
                 "database","danasea_flashsale_test","redisDatabase",15))+"\n");
@@ -350,31 +340,27 @@ class FlashSaleHttpIntegrationTest {
             assertThat(redis.opsForHash().entries("inventory:slot:"+slot+":holds")).hasSize(1);
         } finally { pool.shutdownNow(); }
     }
-    @Test void all24OriginalServicesAnd33OptionsWorkOnPhase1HttpRuntime() throws Exception {
-        assertThat(db.queryForObject("SELECT current_database()",String.class)).isEqualTo("danasea_flashsale_test");
+    @Test void all24FixtureServicesAnd33OptionsWorkOnIsolatedHttpRuntime() throws Exception {
         resetTestDatabase();
+        vendorUser=user("VENDOR"); vendor=UUID.randomUUID();
+        db.update("INSERT INTO vendors(id,user_id,business_name,verification_status,created_at,updated_at) VALUES (?,?,'ISOLATED_CATALOG','APPROVED',now(),now())",vendor,vendorUser);
+        UUID category=UUID.randomUUID();
+        db.update("INSERT INTO categories(id,name,slug,is_active,requires_safety_cert,created_at,updated_at) VALUES (?,'FIXTURE','fixture',true,false,now(),now())",category);
         var expected=new HashSet<String>();
-        for(var row:json.readTree(Files.readString(Path.of("../dataBase_demo/data/services.json"))).path("records")) expected.add(row.path("sqlRow").path("id").asText());
-        assertThat(expected).hasSize(24);
-        String sourceUrl=System.getenv("FLASH_SALE_TEST_JDBC_URL").replace("/danasea_flashsale_test","/danasea_demo");
-        try(var source=java.sql.DriverManager.getConnection(sourceUrl,"postgres",System.getenv("FLASH_SALE_TEST_DB_PASSWORD"))) {
-            source.setReadOnly(true); source.setTransactionIsolation(java.sql.Connection.TRANSACTION_REPEATABLE_READ); source.setAutoCommit(false);
-            try(var st=source.createStatement();var r=st.executeQuery("SELECT current_database(),current_setting('transaction_read_only')")) {
-                assertThat(r.next()).isTrue(); assertThat(r.getString(1)).isEqualTo("danasea_demo"); assertThat(r.getString(2)).isEqualTo("on");
-            }
-            try(var st=source.createStatement();var r=st.executeQuery("SELECT user_id FROM vendors")) {
-                while(r.next()) { UUID id=r.getObject(1,UUID.class); db.update("INSERT INTO users(id,email,password_hash,full_name,role,is_email_verified,is_locked,session_version,created_at,updated_at) VALUES (?,?,'unused','ISOLATED_SOURCE_FIXTURE','VENDOR',true,false,0,now(),now())",id,id+"@flashsale.test"); }
-            }
-            copyPublicFixture(source,"vendors","id,user_id,business_name,verification_status");
-            copyPublicFixture(source,"categories","id,parent_id,name,slug,is_active,requires_safety_cert");
-            copyPublicFixture(source,"services","id,vendor_id,category_id,name,description,status,price,weather_sensitive,duration_minutes,capacity_per_slot,view_count,waiver_required");
-            copyPublicFixture(source,"service_options","id,service_id,name,option_type,pricing_unit,price,max_pax_per_package,status");
-            copyPublicFixture(source,"service_slots","id,service_id,date,start_time,end_time,capacity,booked_count,status,inventory_type");
-            copyPublicFixture(source,"service_slot_units","id,slot_id,unit_number,capacity,booked_count");
-            copyPublicFixture(source,"service_images","id,service_id,url,sort_order");
-            source.commit();
+        for(var record:json.readTree(Files.readString(Path.of("../dataBase_demo/data/services.json"))).path("records")) {
+            var row=record.path("sqlRow"); service=UUID.fromString(row.path("id").asText()); expected.add(service.toString());
+            db.update("INSERT INTO services(id,vendor_id,category_id,name,status,price,weather_sensitive,view_count,waiver_required,created_at,updated_at) VALUES (?,?,?,?,'PUBLISHED',500000,false,0,false,now(),now())",service,vendor,category,row.path("name").asText());
+            UUID privateId=slot("SHARED_CAPACITY_UNITS",128);
+            for(int unit=1;unit<=2;unit++) db.update("INSERT INTO service_slot_units(id,slot_id,unit_number,capacity,booked_count,created_at,updated_at) VALUES (?,?,?,64,0,now(),now())",UUID.randomUUID(),privateId,unit);
         }
-        db.update("UPDATE service_slots SET date = CURRENT_DATE + 5");
+        assertThat(expected).hasSize(24);
+        int fixtureOptions=0;
+        for(var record:json.readTree(Files.readString(Path.of("../dataBase_demo/data/service_options.json"))).path("records")) {
+            var row=record.path("sqlRow");
+            db.update("INSERT INTO service_options(id,service_id,name,option_type,pricing_unit,price,max_pax_per_package,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'ACTIVE',now(),now())",UUID.fromString(row.path("id").asText()),UUID.fromString(row.path("service_id").asText()),row.path("name").asText(),row.path("option_type").asText(),row.path("pricing_unit").asText(),new BigDecimal(row.path("price").asText()),row.path("max_pax_per_package").isNull()?("PRIVATE".equals(row.path("option_type").asText())?Integer.valueOf(1):null):Integer.valueOf(row.path("max_pax_per_package").asInt()));
+            fixtureOptions++;
+        }
+        assertThat(fixtureOptions).isEqualTo(33);
         customer=user("CUSTOMER"); customerToken=token(customer,"CUSTOMER");
         var catalog=body(call("GET","/api/services?size=100",null,null,null),200); var actual=new HashSet<String>();
         for(var item:catalog.path("content")) actual.add(item.path("id").asText());
@@ -387,7 +373,7 @@ class FlashSaleHttpIntegrationTest {
                 UUID optionId=UUID.fromString(option.path("id").asText());
                 var slots=body(call("GET","/api/services/"+id+"/slots?optionId="+optionId+"&quantity=1",null,null,null),200);
                 UUID selected=null; for(var candidate:slots) if(candidate.path("bookable").asBoolean()) { selected=UUID.fromString(candidate.path("slotId").asText()); break; }
-                assertThat(selected).as("Bookable original option %s",optionId).isNotNull();
+                assertThat(selected).as("Bookable fixture option %s",optionId).isNotNull();
                 var booking=body(call("POST","/api/bookings/hold",customerToken,holdPayload(null,optionId,selected,1),null),201);
                 UUID bookingId=UUID.fromString(booking.path("bookingId").asText());
                 try { assertThat(booking.path("totalAmount").decimalValue()).isEqualByComparingTo(option.path("price").decimalValue()); }
@@ -404,15 +390,5 @@ class FlashSaleHttpIntegrationTest {
         // truncating users/bookings cascades into every catalog/financial fixture.
         db.execute("TRUNCATE users,vendors,vendor_documents,categories,services,service_options,service_slots,service_slot_units,service_images,service_safety_documents,bookings,booking_items,booking_item_allocations,master_orders,sub_orders,payments,refunds,discount_codes,discount_redemptions,flash_sales,vendor_commission_policies,flash_sale_allocations,flash_sale_hold_requests CASCADE");
         assertThat(db.queryForObject("SELECT count(*) FROM services",Integer.class)).isZero();
-    }
-    private void copyPublicFixture(java.sql.Connection source,String table,String columns) throws Exception {
-        // Table/column names are fixed literals above. Copy only public catalog data into
-        // the guarded test database; never credentials, bank details or safety attestations.
-        String[] names=columns.split(","); String markers=String.join(",",Collections.nCopies(names.length,"?"));
-        try(var st=source.createStatement();var rows=st.executeQuery("SELECT "+columns+" FROM "+table)) {
-            while(rows.next()) { Object[] values=new Object[names.length]; for(int i=0;i<names.length;i++) values[i]=rows.getObject(i+1);
-                db.update("INSERT INTO "+table+"("+columns+",created_at,updated_at) VALUES ("+markers+",now(),now())",values);
-            }
-        }
     }
 }

@@ -1,258 +1,501 @@
 import { useAuthStore } from "../../../store/useAuthStore";
-import { useWishlistStore } from "../../../store/useWishlistStore";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import {
+  User,
+  Receipt,
+  Heart,
+  ShieldCheck,
+  Check,
+  LogOut,
+  ChevronRight,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+
+type SettingsTab = "personal" | "security" | "orders" | "wishlist";
 
 export function Profile() {
   const navigate = useNavigate();
   const { user, logout } = useAuthStore();
-  const wishlistCount = useWishlistStore((state) => state.wishlistIds.length);
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>("personal");
+  const [editingField, setEditingField] = useState<"name" | "phone" | null>(null);
   const [showToast, setShowToast] = useState(false);
-  
+  const [toastMessage, setToastMessage] = useState("");
+
+  // Personal Info Form states
+  const [fullName, setFullName] = useState(user?.fullName || "Nguyễn Văn Khách");
+  const [phone, setPhone] = useState(user?.phone || "0905 000 003");
+  const [tempFullName, setTempFullName] = useState(fullName);
+  const [tempPhone, setTempPhone] = useState(phone);
+  const email = user?.email || "customer@danasea.vn";
+
+  // Security Form states
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPass, setShowCurrentPass] = useState(false);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
   if (!user) {
     return (
-      <main className="w-full pt-32 pb-20 bg-surface flex-1 flex flex-col items-center justify-center">
-        <h2 className="font-headline-md text-on-surface">Vui lòng đăng nhập</h2>
-        <button onClick={() => navigate('/auth')} className="mt-4 px-6 py-2 bg-primary text-on-primary rounded-full">Đến trang Đăng nhập</button>
+      <main className="w-full pt-28 pb-20 bg-slate-50 flex-1 flex flex-col items-center justify-center min-h-[calc(100vh-80px)]">
+        <div className="max-w-md w-full mx-auto p-8 rounded-2xl bg-white border border-slate-200/80 shadow-xs text-center flex flex-col items-center">
+          <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 flex items-center justify-center mb-4">
+            <User className="w-6 h-6" />
+          </div>
+          <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 mb-2">Vui lòng đăng nhập</h1>
+          <p className="text-[13px] text-slate-600 mb-6 leading-relaxed">
+            Đăng nhập vào tài khoản DANASEA để quản lý thông tin cá nhân và cài đặt bảo mật.
+          </p>
+          <button 
+            onClick={() => navigate('/auth')} 
+            className="w-full py-3 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-sm transition-colors cursor-pointer shadow-xs"
+          >
+            Đến trang Đăng nhập
+          </button>
+        </div>
       </main>
     );
   }
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveName = (e: React.FormEvent) => {
     e.preventDefault();
+    setFullName(tempFullName);
+    setEditingField(null);
+    setToastMessage("Đã cập nhật tên pháp lý thành công!");
     setShowToast(true);
-    setTimeout(() => {
-      setShowToast(false);
-    }, 3000);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const handleSavePhone = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPhone(tempPhone);
+    setEditingField(null);
+    setToastMessage("Đã cập nhật số điện thoại liên hệ!");
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      alert("Mật khẩu xác nhận không khớp!");
+      return;
+    }
+    setPasswordSuccess(true);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setTimeout(() => setPasswordSuccess(false), 4000);
   };
 
   return (
-    <main className="w-full pt-20 bg-surface flex-1">
-      <div className="flex flex-col w-full">
-        <div className="relative w-full overflow-hidden bg-surface py-8">
-          <div className="w-full max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-12">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Hồ sơ cá nhân</h1>
+    <main className="w-full pt-20 bg-slate-50 min-h-[calc(100vh-80px)] flex-1 pb-16">
+      <div className="w-full max-w-[1240px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        
+        {/* =========================================================================
+            2-COLUMN SPLIT SETTINGS ARCHITECTURE (Sidebar Left + Content Right)
+           ========================================================================= */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* =====================================================================
+              LEFT SIDEBAR: Settings & Privacy Navigation (~320px / 4 cols)
+             ===================================================================== */}
+          <aside className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 sm:p-5 lg:sticky lg:top-24 space-y-4">
+            
+            {/* Header / Identity Snippet */}
+            <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
+              <div className="relative w-12 h-12 rounded-full overflow-hidden bg-slate-100 border-2 border-white shadow-xs shrink-0">
+                <img
+                  alt={fullName}
+                  className="w-full h-full object-cover"
+                  src={user.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"}
+                />
+                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-bold text-slate-900 truncate">
+                  {fullName}
+                </h2>
+                <p className="text-xs text-slate-500 truncate">
+                  {email}
+                </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full">
-              {/* Left Sidebar */}
-              <aside className="lg:col-span-4 flex flex-col gap-6 w-full">
-                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                  <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
-                    <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0 bg-slate-100 shadow-inner">
-                      <img
-                        alt={user.fullName || "Tên người dùng"}
-                        className="w-full h-full object-cover"
-                        src={user.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"}
-                      />
-                      <span className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center text-white text-[10px] shadow-sm">
-                        <span className="material-symbols-outlined text-[12px]">check</span>
-                      </span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h2 className="font-bold text-base text-slate-900 truncate">{user.fullName || "Khách hàng"}</h2>
-                      <p className="text-xs text-slate-500 truncate">{user.email || "Chưa cập nhật email"}</p>
-                      <span className="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 text-xs font-semibold">
-                        Khách hàng
-                      </span>
-                    </div>
-                  </div>
-
-                  <nav aria-label="Menu tài khoản" className="flex flex-col gap-1.5 mt-6">
-                    <button
-                      onClick={() => navigate("/profile")}
-                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl bg-cyan-50 text-cyan-900 font-semibold text-sm transition-all"
-                      type="button"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-[20px] text-cyan-600">account_circle</span>
-                        <span>Thông tin cá nhân</span>
-                      </span>
-                      <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
-                    </button>
-
-                    <button
-                      onClick={() => navigate("/profile/orders")}
-                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 font-medium text-sm transition-all"
-                      type="button"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-[20px] text-slate-500">receipt_long</span>
-                        <span>Đơn hàng của tôi</span>
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">3 đơn</span>
-                    </button>
-
-                    <button
-                      onClick={() => navigate("/profile/wishlist")}
-                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 font-medium text-sm transition-all"
-                      type="button"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-[20px] text-slate-500">favorite</span>
-                        <span>Danh sách yêu thích</span>
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 text-xs font-semibold">{wishlistCount} tour</span>
-                    </button>
-
-                    <button
-                      onClick={() => navigate("/profile/ai-assistant")}
-                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 font-medium text-sm transition-all"
-                      type="button"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-[20px] text-slate-500">auto_awesome</span>
-                        <span>Trợ lý AI Lên lịch trình</span>
-                      </span>
-                      <span className="material-symbols-outlined text-[18px] text-slate-400">chevron_right</span>
-                    </button>
-
-                    <button
-                      onClick={() => navigate("/profile/change-password")}
-                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl hover:bg-slate-50 text-slate-700 font-medium text-sm transition-all"
-                      type="button"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-[20px] text-slate-500">lock_reset</span>
-                        <span>Đổi mật khẩu</span>
-                      </span>
-                      <span className="material-symbols-outlined text-[18px] text-slate-400">chevron_right</span>
-                    </button>
-
-                    <button
-                      onClick={() => { logout(); navigate("/auth"); }}
-                      className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl hover:bg-rose-50 text-rose-600 font-medium text-sm transition-all mt-2"
-                      type="button"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="material-symbols-outlined text-[20px]">logout</span>
-                        <span>Đăng xuất</span>
-                      </span>
-                    </button>
-                  </nav>
-                </div>
-              </aside>
-
-              {/* Main Profile Info Form */}
-              <section className="lg:col-span-8 flex flex-col gap-6 w-full">
-                <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm border border-slate-100 w-full">
-                  <div className="flex items-center justify-between pb-6 border-b border-slate-100 mb-6">
-                    <div>
-                      <h2 className="text-xl font-bold text-slate-900">Thông tin cá nhân</h2>
-                    </div>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      Đã xác minh
-                    </span>
-                  </div>
-
-                  <form className="flex flex-col gap-6" id="profileForm" onSubmit={handleSaveProfile}>
-                    {/* Avatar Upload Block */}
-                    <div className="flex flex-col sm:flex-row items-center gap-6 p-4 bg-slate-50 rounded-2xl">
-                      <div className="relative w-20 h-20 rounded-full overflow-hidden bg-slate-200 shadow-sm flex-shrink-0">
-                        <img
-                          alt={user.fullName || "Avatar"}
-                          className="w-full h-full object-cover"
-                          src={user.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"}
-                        />
-                      </div>
-                      <div className="flex flex-col items-center sm:items-start text-center sm:text-left gap-2">
-                        <span className="font-bold text-base text-slate-900">{user.fullName || "Khách hàng"}</span>
-                        <div className="flex items-center gap-2">
-                          <button className="px-4 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-100 transition-colors" type="button">
-                            Tải ảnh mới
-                          </button>
-                          <button className="px-4 py-1.5 rounded-xl text-slate-500 text-xs font-medium hover:text-rose-600 transition-colors" type="button">
-                            Gỡ bỏ
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Form Fields Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-700">Họ và tên</label>
-                        <div className="relative flex items-center">
-                          <span className="material-symbols-outlined absolute left-3.5 text-slate-400 text-[18px]">person</span>
-                          <input
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-cyan-500 focus:bg-white transition-all font-medium"
-                            type="text"
-                            defaultValue={user.fullName || "Khách hàng"}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-700">Vai trò</label>
-                        <div className="relative flex items-center">
-                          <span className="material-symbols-outlined absolute left-3.5 text-slate-400 text-[18px]">badge</span>
-                          <input
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-sm text-slate-600 outline-none cursor-not-allowed font-medium"
-                            readOnly
-                            type="text"
-                            defaultValue="Khách hàng"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-700">Địa chỉ Email</label>
-                        <div className="relative flex items-center">
-                          <span className="material-symbols-outlined absolute left-3.5 text-slate-400 text-[18px]">mail</span>
-                          <input
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-cyan-500 focus:bg-white transition-all font-medium"
-                            type="email"
-                            defaultValue={user.email || ""}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-700">Số điện thoại</label>
-                        <div className="relative flex items-center">
-                          <span className="material-symbols-outlined absolute left-3.5 text-slate-400 text-[18px]">phone_iphone</span>
-                          <input
-                            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-cyan-500 focus:bg-white transition-all font-medium"
-                            type="tel"
-                            defaultValue={user.phone || ""}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-center justify-end pt-4 border-t border-slate-100 gap-3">
-                      <button
-                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-semibold text-sm hover:bg-slate-200 transition-colors"
-                        type="reset"
-                      >
-                        Hủy
-                      </button>
-                      <button
-                        className="w-full sm:w-auto px-8 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm shadow-md transition-all"
-                        type="submit"
-                      >
-                        Lưu thay đổi
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </section>
+            {/* Sidebar Title */}
+            <div>
+              <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider px-2">
+                Cài đặt và quyền riêng tư
+              </h3>
             </div>
+
+            {/* Navigation Menu Items */}
+            <nav className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => { setActiveTab("personal"); setEditingField(null); }}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === "personal"
+                    ? "bg-[#0284c7] text-white shadow-xs"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <User className={`w-4 h-4 ${activeTab === "personal" ? "text-white" : "text-slate-500"}`} />
+                  <span>Thông tin cá nhân</span>
+                </div>
+                <ChevronRight className={`w-4 h-4 ${activeTab === "personal" ? "text-white/80" : "text-slate-400"}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setActiveTab("security"); setEditingField(null); }}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === "security"
+                    ? "bg-[#0284c7] text-white shadow-xs"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className={`w-4 h-4 ${activeTab === "security" ? "text-white" : "text-slate-500"}`} />
+                  <span>Đăng nhập &amp; Bảo mật</span>
+                </div>
+                <ChevronRight className={`w-4 h-4 ${activeTab === "security" ? "text-white/80" : "text-slate-400"}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate("/profile/orders")}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <Receipt className="w-4 h-4 text-slate-500" />
+                  <span>Chuyến đi &amp; Vé QR</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate("/profile/wishlist")}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <Heart className="w-4 h-4 text-slate-500" />
+                  <span>Tour đã lưu</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              </button>
+
+              <div className="pt-2 border-t border-slate-100 mt-2">
+                <button
+                  type="button"
+                  onClick={() => { logout(); navigate("/auth"); }}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4 text-rose-500" />
+                  <span>Đăng xuất tài khoản</span>
+                </button>
+              </div>
+            </nav>
+          </aside>
+
+          {/* =====================================================================
+              RIGHT CONTENT PANEL: Active Settings Rows & Forms (~8 cols)
+             ===================================================================== */}
+          <div className="lg:col-span-8 space-y-6">
+            
+            {/* TAB 1: THÔNG TIN CÁ NHÂN (Row-based Settings List) */}
+            {activeTab === "personal" && (
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 sm:p-8 space-y-6">
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                    Thông tin cá nhân
+                  </h1>
+                </div>
+
+                {/* Settings Rows */}
+                <div className="divide-y divide-slate-100">
+                  
+                  {/* Row 1: Tên pháp lý */}
+                  <div className="py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-0.5 flex-1">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          Tên pháp lý
+                        </span>
+                        {editingField === "name" ? (
+                          <form onSubmit={handleSaveName} className="pt-2 space-y-3">
+                            <input
+                              type="text"
+                              value={tempFullName}
+                              onChange={(e) => setTempFullName(e.target.value)}
+                              className="w-full max-w-md h-10 px-3.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 outline-none focus:border-[#0284c7]"
+                              required
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="submit"
+                                className="px-4 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold cursor-pointer shadow-xs"
+                              >
+                                Lưu thay đổi
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingField(null)}
+                                className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <p className="text-sm sm:text-base font-semibold text-slate-900">
+                            {fullName}
+                          </p>
+                        )}
+                      </div>
+
+                      {editingField !== "name" && (
+                        <button
+                          type="button"
+                          onClick={() => { setTempFullName(fullName); setEditingField("name"); }}
+                          className="text-xs font-bold text-[#0284c7] hover:underline cursor-pointer shrink-0"
+                        >
+                          Chỉnh sửa
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 2: Địa chỉ Email */}
+                  <div className="py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          Địa chỉ Email
+                        </span>
+                        <p className="text-sm sm:text-base font-semibold text-slate-900">
+                          {email}
+                        </p>
+                      </div>
+                      <span className="text-xs font-semibold text-slate-400 shrink-0">
+                        Cố định
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Số điện thoại */}
+                  <div className="py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-0.5 flex-1">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          Số điện thoại liên lạc
+                        </span>
+                        {editingField === "phone" ? (
+                          <form onSubmit={handleSavePhone} className="pt-2 space-y-3">
+                            <input
+                              type="tel"
+                              value={tempPhone}
+                              onChange={(e) => setTempPhone(e.target.value)}
+                              className="w-full max-w-md h-10 px-3.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-900 outline-none focus:border-[#0284c7]"
+                              required
+                            />
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="submit"
+                                className="px-4 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold cursor-pointer shadow-xs"
+                              >
+                                Lưu thay đổi
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingField(null)}
+                                className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
+                              >
+                                Hủy
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <p className="text-sm sm:text-base font-semibold text-slate-900">
+                            {phone}
+                          </p>
+                        )}
+                      </div>
+
+                      {editingField !== "phone" && (
+                        <button
+                          type="button"
+                          onClick={() => { setTempPhone(phone); setEditingField("phone"); }}
+                          className="text-xs font-bold text-[#0284c7] hover:underline cursor-pointer shrink-0"
+                        >
+                          Chỉnh sửa
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 4: CCCD & Bảo hiểm biển */}
+                  <div className="py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          Xác minh danh tính &amp; Bảo hiểm du lịch biển
+                        </span>
+                        <div className="flex items-center gap-2 pt-0.5">
+                          <span className="text-sm sm:text-base font-semibold text-slate-900">
+                            Đã xác minh đầy đủ
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200">
+                            Hạn mức 100 triệu
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-600 shrink-0">
+                        Đạt chuẩn
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Row 5: Hạng thành viên */}
+                  <div className="py-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          Hạng thành viên
+                        </span>
+                        <p className="text-sm sm:text-base font-semibold text-slate-900">
+                          Hạng Bạc
+                        </p>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 shrink-0">
+                        Đang hoạt động
+                      </span>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: ĐĂNG NHẬP & BẢO MẬT */}
+            {activeTab === "security" && (
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 sm:p-8 space-y-6">
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                    Đăng nhập &amp; Bảo mật
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                    Cập nhật mật khẩu định kỳ và kiểm tra các phiên đăng nhập để bảo vệ an toàn cho tài khoản.
+                  </p>
+                </div>
+
+                {passwordSuccess && (
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-semibold flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    <span>Mật khẩu tài khoản đã được cập nhật thành công!</span>
+                  </div>
+                )}
+
+                <form onSubmit={handlePasswordSubmit} className="space-y-4 max-w-lg">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">Mật khẩu hiện tại</label>
+                    <div className="relative flex items-center">
+                      <input
+                        type={showCurrentPass ? "text" : "password"}
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Nhập mật khẩu hiện tại"
+                        className="w-full h-10 px-3.5 pr-10 rounded-xl border border-slate-200 text-sm outline-none focus:border-[#0284c7]"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPass(!showCurrentPass)}
+                        className="absolute right-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showCurrentPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">Mật khẩu mới</label>
+                    <div className="relative flex items-center">
+                      <input
+                        type={showNewPass ? "text" : "password"}
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Tối thiểu 8 ký tự"
+                        className="w-full h-10 px-3.5 pr-10 rounded-xl border border-slate-200 text-sm outline-none focus:border-[#0284c7]"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewPass(!showNewPass)}
+                        className="absolute right-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-700">Xác nhận mật khẩu mới</label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Nhập lại mật khẩu mới"
+                      className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-[#0284c7]"
+                      required
+                    />
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
+                    >
+                      Cập nhật mật khẩu
+                    </button>
+                  </div>
+                </form>
+
+                {/* Device History Card */}
+                <div className="pt-6 border-t border-slate-100 space-y-3">
+                  <h3 className="text-sm font-bold text-slate-900">Thiết bị đang đăng nhập</h3>
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-semibold text-slate-900">Trình duyệt Web hiện tại (Windows · Chrome)</p>
+                      <p className="text-slate-500 mt-0.5">Đà Nẵng, Việt Nam · Hoạt động ngay bây giờ</p>
+                    </div>
+                    <span className="text-[11px] font-bold text-emerald-600">Phiên này</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
           </div>
+
         </div>
 
-        {showToast && (
-          <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-900 text-white shadow-2xl animate-in slide-in-from-bottom-5">
-            <span className="text-emerald-400 font-bold">✓</span>
-            <span className="text-sm font-semibold">Đã lưu thông tin hồ sơ thành công!</span>
-          </div>
-        )}
       </div>
+
+      {/* Floating Success Toast */}
+      {showToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-slate-900 text-white shadow-lg animate-in slide-in-from-bottom-5">
+          <Check className="w-4 h-4 text-emerald-400" />
+          <span className="text-[13px] font-medium">{toastMessage}</span>
+        </div>
+      )}
     </main>
   );
 }
+
 export default Profile;

@@ -30,6 +30,12 @@ def require(ok, message):
         raise ValueError(message)
 
 
+def validate_identity(identity, database):
+    require(identity['database'] == database and identity['schema'] == 'public' and
+            identity['failed'] == 0 and identity['flyway'] in ('24', '37', '41', '42'),
+            'Database/schema/Flyway mismatch; no migration fallback')
+
+
 def load(name):
     return json.loads((ROOT / name).read_text(encoding='utf8'))
 
@@ -251,8 +257,7 @@ def apply(args, records, rows, password):
             "(SELECT table_schema FROM information_schema.tables WHERE table_schema='public' AND table_name='users'),"
             "'flyway',(SELECT version FROM public.flyway_schema_history ORDER BY installed_rank DESC LIMIT 1),"
             "'failed',(SELECT count(*) FROM public.flyway_schema_history WHERE NOT success))")
-        require(identity['database']==args.database and identity['schema']=='public' and
-                identity['failed']==0 and identity['flyway'] in ('24','37'), 'Database/schema/Flyway mismatch; no migration fallback')
+        validate_identity(identity, args.database)
         columns=session.query("SELECT json_agg(x) FROM (SELECT table_name,column_name,is_nullable,"
             "column_default,is_generated,character_maximum_length,data_type FROM information_schema.columns "
             "WHERE table_schema='public') x")

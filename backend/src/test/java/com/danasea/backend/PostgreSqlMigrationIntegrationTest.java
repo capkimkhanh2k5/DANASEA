@@ -24,6 +24,34 @@ import java.util.Objects;
 @Testcontainers(disabledWithoutDocker = true)
 class PostgreSqlMigrationIntegrationTest {
 
+    @Test
+    void commissionDefaultsToTenPercentWithoutReplacingAnExistingRate() throws Exception {
+        String url = "jdbc:postgresql://" + POSTGRES.getHost() + ":"
+                + POSTGRES.getFirstMappedPort() + "/migration_test";
+        waitForPostgres(url, "migration_user", "migration_password");
+        for (boolean existing : new boolean[] {false, true}) {
+            String schema = existing ? "commission_existing" : "commission_missing";
+            Flyway.configure().dataSource(url, "migration_user", "migration_password")
+                    .schemas(schema).defaultSchema(schema).target("42").load().migrate();
+            try (var connection = DriverManager.getConnection(url, "migration_user", "migration_password");
+                    var statement = connection.createStatement()) {
+                if (existing) {
+                    statement.executeUpdate("INSERT INTO " + schema
+                            + ".system_configs(id,key,value,created_at,updated_at) VALUES "
+                            + "(gen_random_uuid(),'PLATFORM_COMMISSION_RATE','12.5',now(),now())");
+                }
+                Flyway.configure().dataSource(url, "migration_user", "migration_password")
+                        .schemas(schema).defaultSchema(schema).load().migrate();
+                try (var result = statement.executeQuery("SELECT value FROM " + schema
+                        + ".system_configs WHERE key='PLATFORM_COMMISSION_RATE'")) {
+                    assertTrue(result.next(), "Missing commission must be initialized during migration");
+                    assertEquals(existing ? "12.5" : "10", result.getString(1));
+                    assertTrue(!result.next(), "There must be only one commission policy");
+                }
+            }
+        }
+    }
+
     @Container
     static final GenericContainer<?> POSTGRES =
             new GenericContainer<>(DockerImageName.parse("postgres:16-alpine"))

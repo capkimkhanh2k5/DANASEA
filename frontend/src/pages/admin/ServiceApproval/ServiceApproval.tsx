@@ -1,473 +1,620 @@
-import React, { useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { MOCK_ADMIN_SERVICES } from '../../../data/adminMockData';
-import type { ServiceStatus } from '../../../types';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { FileSearch, Filter, Search } from 'lucide-react';
+import { MOCK_ADMIN_SERVICES, MOCK_ADMIN_CATEGORIES, MOCK_ADMIN_VENDORS } from '../../../data/adminMockData';
+import { adminServiceApprovalService, getAdminServiceError } from '../../../services/adminServiceApprovalService';
+import { adminVendorService } from '../../../services/adminVendorService';
+import { adminCategoryService } from '../../../services/adminCategoryService';
+import type { AdminServiceResult } from '../../../types/adminServiceApproval';
+import { AdminState } from '../../../components/admin/AdminUI';
+import { AdminButton, AdminFilterTabs, AdminNotice, AdminPagination } from '../../../components/admin/AdminWorkspace';
+import { AdminDialog } from '../../../components/admin/AdminDialog';
+import {
+  applyServiceDecision,
+  filterServices,
+  type ServiceDecisionKind,
+  type ServiceRecord,
+  type ServiceReviewState,
+} from './serviceApprovalModel';
+import { ServiceDetail, ServiceStatusBadge } from './ServiceDetail';
+import './ServiceApproval.css';
 
-type ServiceExtended = typeof MOCK_ADMIN_SERVICES[0];
+function mapResultToRecord(
+  s: AdminServiceResult,
+  vendorMap?: Map<string, string>,
+  categoryMap?: Map<string, string>
+): ServiceRecord {
+  const thumb = (s.images && s.images[0]?.url) || '';
+  const vendorName =
+    vendorMap?.get(s.vendorId) ||
+    MOCK_ADMIN_VENDORS.find(v => v.id === s.vendorId)?.businessName ||
+    (s.vendorId ? `Đối tác ${s.vendorId.substring(0, 8)}` : 'Chưa liên kết đối tác');
+
+  const categoryName =
+    categoryMap?.get(s.categoryId) ||
+    MOCK_ADMIN_CATEGORIES.find(c => c.id === s.categoryId)?.name ||
+    'Hoạt động biển';
+
+  return {
+    id: s.id,
+    vendorId: s.vendorId,
+    vendorName,
+    categoryId: s.categoryId,
+    categoryName,
+    name: s.name,
+    nameEn: s.nameEn || '',
+    slug: s.slug || '',
+    description: s.description || '',
+    price: s.price,
+    basePrice: s.price,
+    durationMinutes: s.durationMinutes || 60,
+    locationName: s.locationName || s.address || 'Đà Nẵng',
+    address: s.address || '',
+    status: (s.status === 'PUBLISHED' ? 'ACTIVE' : s.status) as unknown as ServiceRecord['status'],
+    rejectionReason: s.rejectionReason || '',
+    waiverContent: s.waiverContent || '',
+    weatherSensitive: Boolean(s.weatherSensitive),
+    minWindKmh: s.minWindKmh || 0,
+    maxWaveM: s.maxWaveM || 0,
+    avgRating: s.avgRating || 5.0,
+    ratingCount: s.ratingCount || 0,
+    viewCount: s.viewCount || 0,
+    thumbnailUrl: thumb,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+  };
+}
 
 export function ServiceApproval() {
-  const [services, setServices] = useState<ServiceExtended[]>(MOCK_ADMIN_SERVICES);
-  const [selectedServiceId, setSelectedServiceId] = useState<string>(MOCK_ADMIN_SERVICES[0]?.id || '');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [adminNote, setAdminNote] = useState<string>("Tuyến dịch vụ biển nằm trong vùng đệm kiểm soát, đã hoàn tất kiểm định trang bị cứu hộ.");
-  
-  // Modals & Toast
-  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  const location = useLocation();
+  const demo = import.meta.env.DEV && new URLSearchParams(location.search).get('demo') === '1';
+
+  const [review, setReview] = useState<ServiceReviewState>(() => ({
+    services: demo ? MOCK_ADMIN_SERVICES : [],
+    timeline: [],
+  }));
+  const [loading, setLoading] = useState(() => !demo);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string>('');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  // Decision Modals & Review State
+  const [decisionKind, setDecisionKind] = useState<ServiceDecisionKind>('approve');
+  const [decisionOpen, setDecisionOpen] = useState(false);
+  const [adminNote, setAdminNote] = useState('Đã rà soát thông tin khai báo và điều kiện vận hành biển.');
   const [rejectReason, setRejectReason] = useState('');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  useEffect(() => {
+    if (demo) return;
+
+    let isMounted = true;
+    const controller = new AbortController();
+
+    Promise.allSettled([
+      adminServiceApprovalService.getAdminServices(),
+      adminVendorService.getVendors({ page: 0, size: 100 }),
+      adminCategoryService.getCategories(controller.signal),
+    ])
+      .then(([servicesRes, vendorsRes, categoriesRes]) => {
+        if (!isMounted) return;
+
+        if (servicesRes.status === 'rejected') {
+          const msg = getAdminServiceError(servicesRes.reason, 'Không thể tải danh sách dịch vụ từ máy chủ.');
+          setErrorMessage(msg);
+          setLoading(false);
+          return;
+        }
+
+        const vendorMap = new Map<string, string>();
+        if (vendorsRes.status === 'fulfilled' && vendorsRes.value?.content) {
+          vendorsRes.value.content.forEach(v => {
+            if (v.id && v.businessName) {
+              vendorMap.set(v.id, v.businessName);
+            }
+          });
+        }
+
+        const categoryMap = new Map<string, string>();
+        if (categoriesRes.status === 'fulfilled' && Array.isArray(categoriesRes.value)) {
+          categoriesRes.value.forEach(c => {
+            if (c.id && c.name) {
+              categoryMap.set(c.id, c.name);
+            }
+          });
+        }
+
+        const mapped = servicesRes.value.map(s => mapResultToRecord(s, vendorMap, categoryMap));
+        setReview({ services: mapped, timeline: [] });
+        setLoading(false);
+      })
+      .catch(err => {
+        if (!isMounted) return;
+        const msg = getAdminServiceError(err, 'Lỗi không xác định khi tải dữ liệu dịch vụ.');
+        setErrorMessage(msg);
+        setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [demo]);
+
+  const visibleServices = review.services;
+  const selected = visibleServices.find(service => service.id === selectedId);
+
+  const filtered = useMemo(
+    () => filterServices(visibleServices, search, status, categoryFilter),
+    [visibleServices, search, status, categoryFilter]
+  );
+
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedServices = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, activePage]);
+
+  const countByStatus = (statusValue: string) =>
+    visibleServices.filter(s => s.status === statusValue).length;
+
+  const resetFilters = () => {
+    setSearch('');
+    setStatus('all');
+    setCategoryFilter('all');
+    setCurrentPage(1);
   };
 
-  const filteredServices = useMemo(() => {
-    return services.filter(s => {
-      const matchStatus = statusFilter === 'all' || s.status === statusFilter;
-      const matchCategory = categoryFilter === 'all' || s.categoryId === categoryFilter;
-      return matchStatus && matchCategory;
-    });
-  }, [services, statusFilter, categoryFilter]);
-
-  const selectedService = services.find(s => s.id === selectedServiceId) || services[0];
-
-  const handleApprove = () => {
-    if (!selectedService) return;
-    setServices(prev =>
-      prev.map(s =>
-        s.id === selectedService.id
-          ? { ...s, status: 'ACTIVE' as ServiceStatus, rejectionReason: '' }
-          : s
-      )
-    );
-    setIsApproveModalOpen(false);
-    showToast(`Đã phê duyệt xuất bản tour "${selectedService.name}" thành công! Dịch vụ hiện đã mở bán công khai.`);
+  const openServiceDrawer = (service: ServiceRecord) => {
+    setSelectedId(service.id);
+    setRejectReason(service.rejectionReason || '');
+    setNotice(null);
+    setDrawerOpen(true);
   };
 
-  const handlePause = () => {
-    if (!selectedService) return;
-    setServices(prev =>
-      prev.map(s =>
-        s.id === selectedService.id
-          ? { ...s, status: 'PAUSED' as ServiceStatus }
-          : s
-      )
-    );
-    showToast(`Đã tạm dừng mở bán tour "${selectedService.name}".`);
+  const initiateDecision = (kind: ServiceDecisionKind) => {
+    setDecisionKind(kind);
+    if (kind === 'reject') {
+      setRejectReason(selected?.rejectionReason || '');
+    }
+    setDecisionOpen(true);
   };
 
-  const handleReject = () => {
-    if (!selectedService) return;
-    setServices(prev =>
-      prev.map(s =>
-        s.id === selectedService.id
-          ? { ...s, status: 'REJECTED' as ServiceStatus, rejectionReason: rejectReason }
-          : s
-      )
-    );
-    setIsRejectModalOpen(false);
-    showToast(`Đã từ chối duyệt tour "${selectedService.name}".`);
-  };
+  const confirmDecision = async () => {
+    if (!selected || !decisionOpen) return;
 
-  // Metrics
-  const totalCount = services.length;
-  const activeCount = services.filter(s => s.status === 'ACTIVE').length;
-  const pendingCount = services.filter(s => s.status === 'PENDING_APPROVAL').length;
-  const rejectedCount = services.filter(s => s.status === 'REJECTED').length;
+    if (demo) {
+      const action = {
+        serviceId: selected.id,
+        kind: decisionKind,
+        reason: decisionKind === 'reject' ? rejectReason : '',
+        note: adminNote,
+        at: new Date().toISOString(),
+      };
+
+      setReview(prev => applyServiceDecision(prev, action, demo));
+      setDecisionOpen(false);
+
+      const message =
+        decisionKind === 'approve'
+          ? `Đã phê duyệt xuất bản tour "${selected.name}" trong bản demo. Dịch vụ chuyển sang ACTIVE.`
+          : decisionKind === 'pause'
+          ? `Đã tạm ngưng mở bán tour "${selected.name}" trong bản demo.`
+          : `Đã ghi nhận từ chối tour "${selected.name}" trong bản demo.`;
+
+      setNotice(message);
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      if (decisionKind === 'approve') {
+        const result = await adminServiceApprovalService.approveService(selected.id);
+        const nextStatus = (result.status === 'PUBLISHED' ? 'ACTIVE' : result.status) as unknown as ServiceRecord['status'];
+        setReview(prev => ({
+          ...prev,
+          services: prev.services.map(s => s.id === selected.id ? { ...s, status: nextStatus } : s)
+        }));
+        setNotice(`Đã phê duyệt xuất bản tour "${selected.name}".`);
+      } else if (decisionKind === 'reject') {
+        await adminServiceApprovalService.rejectService(selected.id, rejectReason);
+        setReview(prev => ({
+          ...prev,
+          services: prev.services.map(s => s.id === selected.id ? { ...s, status: 'REJECTED' as unknown as ServiceRecord['status'], rejectionReason: rejectReason } : s)
+        }));
+        setNotice(`Đã từ chối duyệt tour "${selected.name}".`);
+      }
+      setDecisionOpen(false);
+    } catch (err) {
+      const msg = getAdminServiceError(err, 'Lỗi khi cập nhật trạng thái dịch vụ.');
+      setNotice(msg);
+      setDecisionOpen(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <main className="w-full pt-16 bg-surface px-space-xl pb-space-2xl min-h-screen">
-      <div className="flex flex-col w-full animate-fade-in-up">
-        {/* Toast */}
-        {toastMessage && (
-          <div className="fixed top-20 right-8 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-primary text-on-primary shadow-xl animate-fade-in-up">
-            <span className="material-symbols-outlined text-[20px]">check_circle</span>
-            <span className="font-label-md text-label-md font-semibold">{toastMessage}</span>
-          </div>
-        )}
+    <div className="admin-workspace-page admin-services">
+      {/* 4. Main Service List & Workspace */}
+      <section className="admin-services-list" aria-labelledby="services-list-title">
+        <div className="admin-services-list-heading">
+          <h2 id="services-list-title">Danh sách dịch vụ trải nghiệm biển</h2>
+          <span>
+            {filtered.length} / {visibleServices.length} dịch vụ
+          </span>
+        </div>
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-slate-200">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">
-              Kiểm duyệt Dịch vụ
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 text-xs font-medium">
-            <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-600">
-              Tổng: <strong>{totalCount}</strong>
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-primary/10 text-primary border border-primary/20">
-              Đang mở bán: <strong>{activeCount}</strong>
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
-              Chờ duyệt: <strong>{pendingCount}</strong>
-            </span>
+        {/* Status Filter Tabs */}
+        <AdminFilterTabs
+          label="Lọc trạng thái dịch vụ"
+          value={status}
+          onChange={val => {
+            setStatus(val);
+            setCurrentPage(1);
+          }}
+          items={[
+            { value: 'all', label: 'Tất cả', count: visibleServices.length },
+            { value: 'PENDING_APPROVAL', label: 'Chờ duyệt', count: countByStatus('PENDING_APPROVAL') },
+            { value: 'ACTIVE', label: 'Đang mở bán', count: countByStatus('ACTIVE') },
+            { value: 'PAUSED', label: 'Tạm ngưng', count: countByStatus('PAUSED') },
+            { value: 'REJECTED', label: 'Bị từ chối', count: countByStatus('REJECTED') },
+          ]}
+        />
+
+        {/* Search & Category Filter Toolbar */}
+        <div className="admin-workspace-toolbar">
+          <label className="admin-search-field">
+            <Search size={18} aria-hidden="true" />
+            <input
+              type="search"
+              value={search}
+              onChange={e => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Tìm dịch vụ theo tên, mã tour hoặc đối tác"
+              placeholder="Tìm theo tên tour, mã tour hoặc tên đối tác..."
+            />
+          </label>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <label className="admin-field admin-services-category-filter">
+              <Filter size={16} aria-hidden="true" />
+              <span>Danh mục</span>
+              <select
+                value={categoryFilter}
+                onChange={e => {
+                  setCategoryFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                aria-label="Lọc theo danh mục biển"
+              >
+                <option value="all">Tất cả danh mục biển</option>
+                {MOCK_ADMIN_CATEGORIES.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {(search || status !== 'all' || categoryFilter !== 'all') && (
+              <AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>
+            )}
           </div>
         </div>
 
-        {/* Filter Section */}
-        <section className="mb-space-lg rounded-xl bg-white p-space-md shadow-xs border border-slate-200">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-space-md">
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
-              <button 
-                onClick={() => setStatusFilter('all')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs transition-all shrink-0 ${statusFilter === 'all' ? 'bg-primary text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'}`}
-              >
-                Tất cả ({totalCount})
-              </button>
-              <button 
-                onClick={() => setStatusFilter('PENDING_APPROVAL')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs transition-all shrink-0 ${statusFilter === 'PENDING_APPROVAL' ? 'bg-primary text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'}`}
-              >
-                Chờ duyệt ({pendingCount})
-              </button>
-              <button 
-                onClick={() => setStatusFilter('ACTIVE')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs transition-all shrink-0 ${statusFilter === 'ACTIVE' ? 'bg-primary text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'}`}
-              >
-                Đang mở bán ({activeCount})
-              </button>
-              <button 
-                onClick={() => setStatusFilter('REJECTED')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs transition-all shrink-0 ${statusFilter === 'REJECTED' ? 'bg-primary text-white font-bold shadow-xs' : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'}`}
-              >
-                Bị từ chối ({rejectedCount})
-              </button>
-            </div>
+        {/* Loading & Error States */}
+        {loading && (
+          <AdminState
+            kind="empty"
+            compact
+            title="Đang tải danh sách dịch vụ..."
+            description="Vui lòng đợi trong giây lát khi hệ thống kết nối máy chủ."
+          />
+        )}
+        {errorMessage && !loading && (
+          <AdminState
+            kind="error"
+            compact
+            title="Không thể tải dịch vụ"
+            description={errorMessage}
+          />
+        )}
 
-            <div className="flex items-center gap-2 shrink-0">
-              <select 
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="h-9 px-3 rounded-lg bg-slate-50 text-slate-700 text-xs focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer border border-slate-200"
-              >
-                <option value="all">Tất cả danh mục biển</option>
-                <option value="cat-1">Chèo SUP &amp; Kayak</option>
-                <option value="cat-2">Cano &amp; Dù bay</option>
-                <option value="cat-3">Lặn ngắm san hô</option>
-                <option value="cat-4">Mô tô nước (Jetski)</option>
-                <option value="cat-5">Du thuyền hoàng hôn</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-        {/* Dual Workspace: Review Queue & Verification Panel */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
-          {/* Left Column (5 Cols): Review Queue Console */}
-          <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Hàng Đợi Thẩm Định</span>
-              <span className="text-xs text-slate-500 font-medium">{filteredServices.length} tour</span>
-            </div>
-
-            <div className="divide-y divide-slate-200 max-h-[820px] overflow-y-auto">
-              {filteredServices.map(service => {
-                const isSelected = service.id === selectedService?.id;
+        {/* Data Table */}
+        {!loading && !errorMessage && (
+        <div className="admin-services-table-scroll" role="region" aria-label="Bảng dịch vụ biển" tabIndex={0}>
+          <table className="admin-workspace-table admin-services-table">
+            <caption className="sr-only">Danh sách dịch vụ trải nghiệm biển; chọn Thẩm định để xem chi tiết</caption>
+            <thead>
+              <tr>
+                <th scope="col">Dịch vụ & Trải nghiệm</th>
+                <th scope="col">Đơn vị vận hành</th>
+                <th scope="col">Đơn giá niêm yết</th>
+                <th scope="col">Ngưỡng vận hành khai báo</th>
+                <th scope="col">Trạng thái</th>
+                <th scope="col">
+                  <span className="sr-only">Thao tác</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedServices.map(service => {
+                const isSelected = service.id === selectedId;
+                const price = service.price ?? service.basePrice ?? 0;
                 return (
-                  <div 
-                    key={service.id}
-                    onClick={() => setSelectedServiceId(service.id)}
-                    className={`p-3.5 transition-colors cursor-pointer flex gap-3 ${
-                      isSelected ? 'bg-primary/5 border-l-4 border-l-primary' : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <img 
-                      src={service.thumbnailUrl} 
-                      alt={service.name}
-                      className="w-16 h-16 rounded-lg object-cover shrink-0 border border-slate-200"
-                    />
-                    <div className="flex flex-col justify-between flex-1 min-w-0">
-                      <div>
-                        <div className="flex items-center justify-between gap-1 mb-0.5">
-                          <span className="text-[11px] font-bold text-primary truncate uppercase">{service.vendorName}</span>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                            service.status === 'ACTIVE'
-                              ? 'bg-primary/10 text-primary border border-primary/20'
-                              : service.status === 'PENDING_APPROVAL'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                              : 'bg-red-50 text-red-700 border border-red-200'
-                          }`}>
-                            {service.status === 'ACTIVE' ? 'Đã duyệt' : service.status === 'PENDING_APPROVAL' ? 'Chờ duyệt' : 'Từ chối'}
+                  <tr key={service.id} data-selected={isSelected}>
+                    <td>
+                      <div className="admin-services-identity">
+                        {service.thumbnailUrl && (
+                          <img
+                            src={service.thumbnailUrl}
+                            alt=""
+                            width="52"
+                            height="52"
+                            className="admin-services-thumb"
+                          />
+                        )}
+                        <div>
+                          <strong>{service.name}</strong>
+                          <span>
+                            {service.locationName} • {service.durationMinutes} phút
                           </span>
                         </div>
-                        <h4 className="text-xs font-bold text-slate-800 leading-snug truncate">
-                          {service.name}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 truncate">
-                          {service.locationName} • {service.durationMinutes} phút
-                        </p>
                       </div>
-
-                      <div className="flex items-center justify-between pt-1 text-xs">
-                        <span className="font-bold text-primary">
-                          {(service.price ?? service.basePrice ?? 0).toLocaleString('vi-VN')} đ
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-mono">#{service.id}</span>
+                    </td>
+                    <td>
+                      <div className="admin-services-vendor-cell">
+                        <strong>{service.vendorName || 'Chưa liên kết'}</strong>
                       </div>
-                    </div>
-                  </div>
+                    </td>
+                    <td>
+                      <div className="admin-services-price-cell">
+                        <strong>{price.toLocaleString('vi-VN')} ₫</strong>
+                        <small>Tối đa {service.capacityPerSlot} khách/ca</small>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="admin-services-safety-cell-table">
+                        <strong>Sóng ≤ {service.maxWaveM}m</strong>
+                        <span>Gió ≤ {service.minWindKmh} km/h</span>
+                      </div>
+                    </td>
+                    <td>
+                      <ServiceStatusBadge status={service.status} />
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="admin-action-icon-btn"
+                        aria-label={`Thẩm định hồ sơ ${service.name}`}
+                        title="Thẩm định hồ sơ"
+                        aria-haspopup="dialog"
+                        aria-expanded={drawerOpen && isSelected}
+                        onClick={() => openServiceDrawer(service)}
+                      >
+                        <FileSearch size={17} aria-hidden="true" />
+                      </button>
+                    </td>
+                  </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+        )}
+
+        {!loading && !errorMessage && filtered.length > 0 && (
+          <AdminPagination
+            currentPage={activePage}
+            totalPages={totalPages}
+            totalRecords={filtered.length}
+            pageSize={PAGE_SIZE}
+            recordLabel="dịch vụ"
+            onPageChange={setCurrentPage}
+          />
+        )}
+
+        {/* Empty State */}
+        {!loading && !errorMessage && filtered.length === 0 && (
+          <AdminState
+            kind="empty"
+            compact
+            title="Không tìm thấy dịch vụ phù hợp"
+            description="Hãy thử thay đổi từ khóa tìm kiếm, chọn danh mục khác hoặc đặt lại bộ lọc."
+            action={<AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>}
+          />
+        )}
+
+        <div className="admin-services-list-footer">
+          Hiển thị {filtered.length} dịch vụ {demo ? 'biển mẫu · Chi tiết mở trong ngăn bên riêng, giữ nguyên vị trí danh sách.' : 'từ hệ thống cơ sở dữ liệu DANASEA.'}
+        </div>
+      </section>
+
+      {/* Floating Notice when drawer is closed */}
+      {!drawerOpen && <AdminNotice message={notice} onDismiss={() => setNotice(null)} />}
+
+      {/* 5. Service Detail Drawer */}
+      <AdminDialog
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        variant="drawer"
+        title={selected?.name || 'Chi tiết dịch vụ'}
+        description="Hồ sơ trải nghiệm biển · Rà soát điều kiện vận hành khai báo"
+        footer={
+          selected && (
+            <div className="admin-services-drawer-footer">
+              <p>
+                {demo
+                  ? 'Thao tác demo chỉ lưu trong phiên này. Tải lại trang sẽ khôi phục dữ liệu mẫu ban đầu.'
+                  : 'Bật thao tác demo để thử nghiệm phê duyệt. Bản xem trước hiện tại chỉ cho phép xem thông tin.'}
+              </p>
+              <div className="admin-services-drawer-buttons">
+                {selected.status === 'ACTIVE' ? (
+                  <>
+                    <AdminButton
+                      disabled={!demo}
+                      variant="secondary"
+                      onClick={() => initiateDecision('pause')}
+                    >
+                      Tạm ngưng mở bán
+                    </AdminButton>
+                    <AdminButton
+                      disabled={!demo}
+                      variant="primary"
+                      onClick={() => initiateDecision('approve')}
+                    >
+                      Cập nhật phê duyệt
+                    </AdminButton>
+                  </>
+                ) : selected.status === 'PAUSED' ? (
+                  <>
+                    <AdminButton
+                      disabled={!demo}
+                      variant="primary"
+                      onClick={() => initiateDecision('approve')}
+                    >
+                      Kích hoạt mở bán lại
+                    </AdminButton>
+                  </>
+                ) : (
+                  <>
+                    <AdminButton
+                      disabled={!demo}
+                      variant="danger"
+                      onClick={() => initiateDecision('reject')}
+                    >
+                      Từ chối duyệt
+                    </AdminButton>
+                    <AdminButton
+                      disabled={!demo}
+                      variant="primary"
+                      onClick={() => initiateDecision('approve')}
+                    >
+                      Phê duyệt & Xuất bản
+                    </AdminButton>
+                  </>
+                )}
+              </div>
+            </div>
+          )
+        }
+      >
+        {selected && (
+          <>
+            <ServiceDetail
+              key={selected.id}
+              service={selected}
+              timeline={demo ? review.timeline.filter(e => e.serviceId === selected.id) : []}
+              demo={demo}
+              adminNote={adminNote}
+              onAdminNoteChange={setAdminNote}
+            />
+            {drawerOpen && <AdminNotice message={notice} onDismiss={() => setNotice(null)} />}
+          </>
+        )}
+      </AdminDialog>
+
+      {/* 6. Decision Confirmation Modal */}
+      <AdminDialog
+        open={decisionOpen}
+        onClose={() => setDecisionOpen(false)}
+        variant="modal"
+        title={
+          decisionKind === 'approve'
+            ? 'Xác nhận Phê duyệt & Xuất bản Tour'
+            : decisionKind === 'pause'
+            ? 'Xác nhận Tạm ngưng mở bán'
+            : 'Xác nhận Từ chối Thẩm định'
+        }
+        description={demo ? "Chỉ cập nhật dữ liệu mẫu trong phiên xem thử demo; không gửi thông báo hay ảnh hưởng CSDL thật." : "Thao tác sẽ cập nhật trực tiếp trạng thái dịch vụ trên hệ thống."}
+        footer={
+          <>
+            <AdminButton disabled={isSubmitting} onClick={() => setDecisionOpen(false)}>Quay lại</AdminButton>
+            <AdminButton
+              variant={decisionKind === 'reject' ? 'danger' : 'primary'}
+              disabled={isSubmitting || !selected}
+              onClick={confirmDecision}
+            >
+              {isSubmitting
+                ? 'Đang xử lý...'
+                : decisionKind === 'approve'
+                ? 'Xác nhận xuất bản (ACTIVE)'
+                : decisionKind === 'pause'
+                ? 'Xác nhận tạm ngưng (PAUSED)'
+                : 'Xác nhận từ chối (REJECTED)'}
+            </AdminButton>
+          </>
+        }
+      >
+        <div className="admin-services-confirm-dialog">
+          <div className="admin-services-recap-box">
+            <div className="admin-services-recap-row">
+              <span>Tên dịch vụ:</span>
+              <strong>{selected?.name}</strong>
+            </div>
+            <div className="admin-services-recap-row">
+              <span>Đơn vị vận hành:</span>
+              <strong>{selected?.vendorName}</strong>
+            </div>
+            <div className="admin-services-recap-row">
+              <span>Đơn giá:</span>
+              <strong>
+                {(selected?.price ?? selected?.basePrice ?? 0).toLocaleString('vi-VN')} ₫ / khách
+              </strong>
+            </div>
+            <div className="admin-services-recap-row">
+              <span>Ngưỡng sóng / gió khai báo:</span>
+              <strong>
+                Sóng ≤ {selected?.maxWaveM}m · Gió ≤ {selected?.minWindKmh} km/h
+              </strong>
             </div>
           </div>
 
-          {/* Right Column (7 Cols) */}
-          {selectedService && (
-            <div className="lg:col-span-7 flex flex-col gap-space-lg">
-              <div className="rounded-xl bg-white p-space-lg shadow-xs border border-slate-200">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-space-md pb-space-md border-b border-slate-200">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-label-sm text-xs uppercase font-bold">
-                        Mã Tour: #{selectedService.id}
-                      </span>
-                      <span className="px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface font-label-sm text-xs font-semibold">
-                        {selectedService.categoryName}
-                      </span>
-                    </div>
-                    <h2 className="font-headline-lg text-headline-lg text-on-surface tracking-tight font-black">
-                      {selectedService.name}
-                    </h2>
-                    <p className="font-body-md text-sm text-on-surface-variant italic mt-0.5">
-                      {selectedService.nameEn}
-                    </p>
-                  </div>
+          {decisionKind === 'approve' && (
+            <p>
+              Khi xác nhận, dịch vụ này sẽ chuyển sang trạng thái <strong>ACTIVE (Đang mở bán)</strong> và hiển thị trên cổng đặt vé cho du khách.
+            </p>
+          )}
 
-                  <div className="rounded-2xl bg-surface-container-low p-space-md text-right shrink-0">
-                    <span className="font-label-sm text-on-surface-variant block text-xs font-medium">Đơn giá niêm yết</span>
-                    <div className="flex items-baseline justify-end gap-1 mt-0.5">
-                      <span className="font-headline-xl text-headline-xl text-primary font-black">
-                        {(selectedService.price ?? selectedService.basePrice ?? 0).toLocaleString('vi-VN')}
-                      </span>
-                      <span className="font-label-lg text-primary font-bold">VNĐ</span>
-                    </div>
-                    <span className="font-body-sm text-xs text-on-surface-variant block">/ 01 khách</span>
-                  </div>
-                </div>
+          {decisionKind === 'pause' && (
+            <p>
+              Dịch vụ sẽ chuyển sang trạng thái <strong>PAUSED (Tạm ngưng)</strong>. Các ca đặt mới sẽ bị tạm ngưng cho đến khi điều kiện biển an toàn trở lại.
+            </p>
+          )}
 
-                {/* Service Specs */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-space-md rounded-2xl bg-surface-container-low my-space-md">
-                  <div>
-                    <span className="text-xs text-outline block">Đơn vị vận hành</span>
-                    <span className="font-label-md text-xs font-bold text-on-surface">{selectedService.vendorName}</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-outline block">Thời lượng tour</span>
-                    <span className="font-label-md text-xs font-bold text-on-surface">{selectedService.durationMinutes} phút</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-outline block">Định mức phục vụ</span>
-                    <span className="font-label-md text-xs font-bold text-on-surface">Tối đa {selectedService.capacityPerSlot} khách/ca</span>
-                  </div>
-                  <div>
-                    <span className="text-xs text-outline block">Tọa độ GPS</span>
-                    <span className="font-mono text-xs font-bold text-primary">{selectedService.latitude}° N, {selectedService.longitude}° E</span>
-                  </div>
-                </div>
-
-                {/* Safety Evaluation (safety_rule_evaluations) */}
-                <div className="p-space-md rounded-2xl bg-surface-container mb-space-md">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-primary"></span>
-                      <span className="font-headline-sm text-sm text-on-surface font-bold">Đánh giá An toàn Biển</span>
-                    </div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-label-sm text-xs font-semibold">
-                      Đạt chuẩn an toàn
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="p-2.5 rounded-xl bg-surface-container-lowest">
-                      <span className="text-outline block">Sóng tối đa cho phép:</span>
-                      <span className="font-bold text-on-surface">≤ {selectedService.maxWaveM} mét (Hiện tại: 0.5m)</span>
-                    </div>
-                    <div className="p-2.5 rounded-xl bg-surface-container-lowest">
-                      <span className="text-outline block">Vận tốc gió gián đoạn:</span>
-                      <span className="font-bold text-on-surface">≥ {selectedService.minWindKmh} km/h (Hiện tại: 12 km/h)</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Waiver Form */}
-                <div className="mb-space-md">
-                  <span className="font-label-md text-on-surface font-semibold block mb-1">
-                    Cam kết Miễn trừ Trách nhiệm (waiver_content)
-                  </span>
-                  <div className="p-3 rounded-xl bg-surface-container-low text-xs text-on-surface-variant border-l-2 border-primary leading-relaxed">
-                    {selectedService.waiverContent}
-                  </div>
-                </div>
-
-                {/* Decision Actions */}
-                <div className="p-space-md bg-surface-container-low rounded-2xl flex flex-col gap-3">
-                  <label className="font-label-md text-xs text-on-surface font-semibold">Ghi chú thẩm định của Quản trị viên:</label>
-                  <textarea 
-                    value={adminNote}
-                    onChange={(e) => setAdminNote(e.target.value)}
-                    className="w-full p-2.5 rounded-xl bg-surface-container-lowest text-on-surface font-body-sm text-xs focus:outline-none focus:ring-1 focus:ring-primary border border-outline-variant/30 resize-none" 
-                    rows={2}
-                  />
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-                    <div>
-                      {selectedService.status === 'ACTIVE' ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/15 text-primary text-xs font-bold">
-                          <span className="material-symbols-outlined text-[16px]">verified</span>
-                          <span>Đang mở bán công khai (ACTIVE)</span>
-                        </span>
-                      ) : selectedService.status === 'REJECTED' ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary/15 text-secondary text-xs font-bold">
-                          <span className="material-symbols-outlined text-[16px]">block</span>
-                          <span>Đã từ chối thẩm định</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary-container/25 text-on-secondary-container text-xs font-bold animate-pulse">
-                          <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-                          <span>Hồ sơ đang chờ phê duyệt</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {selectedService.status === 'ACTIVE' ? (
-                        <button 
-                          onClick={handlePause}
-                          className="px-4 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">pause_circle</span>
-                          <span>Tạm ngưng mở bán</span>
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => setIsRejectModalOpen(true)}
-                          className="px-4 py-2.5 rounded-xl bg-secondary-container/20 text-secondary hover:bg-secondary-container font-label-md text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
-                        >
-                          <span className="material-symbols-outlined text-[16px]">close</span>
-                          <span>Từ chối duyệt (REJECT)</span>
-                        </button>
-                      )}
-
-                      <button 
-                        onClick={() => setIsApproveModalOpen(true)}
-                        className={`px-5 py-2.5 rounded-xl font-label-md text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
-                          selectedService.status === 'ACTIVE'
-                            ? 'bg-surface-container text-primary hover:bg-primary/10 border border-primary/30'
-                            : 'bg-primary text-on-primary hover:bg-primary-container'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[16px]">done_all</span>
-                        <span>{selectedService.status === 'ACTIVE' ? 'Cập nhật phê duyệt lại' : 'Phê duyệt xuất bản (PUBLISH)'}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          {decisionKind === 'reject' && (
+            <div>
+              <label className="admin-field">
+                <span>
+                  Lý do từ chối <small>(phản hồi cho đối tác)</small>
+                </span>
+                <textarea
+                  value={rejectReason}
+                  onChange={e => setRejectReason(e.target.value)}
+                  rows={3}
+                  placeholder="VD: Cần bổ sung phương án bảo hộ hoặc điều chỉnh thông số vận hành..."
+                />
+              </label>
             </div>
           )}
-        </section>
-      </div>
 
-      {/* APPROVE MODAL (PORTAL TO BODY TO ENSURE PERFECT CENTER ALIGNMENT) */}
-      {isApproveModalOpen && selectedService && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-          <div className="bg-surface-container-lowest rounded-2xl p-space-xl max-w-lg w-full shadow-2xl border border-outline-variant flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[28px]">verified</span>
-              </div>
-              <div>
-                <h3 className="font-headline-md text-headline-md font-bold text-on-surface">Xác nhận Phê duyệt &amp; Xuất bản Tour</h3>
-              </div>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-surface-container-low flex flex-col gap-2 border border-outline-variant/20">
-              <div className="flex justify-between items-start">
-                <span className="text-xs text-outline">Tên dịch vụ:</span>
-                <span className="text-xs font-bold text-on-surface text-right max-w-xs">{selectedService.name}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-outline">Đơn vị vận hành:</span>
-                <span className="text-xs font-bold text-primary">{selectedService.vendorName}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-outline">Đơn giá niêm yết:</span>
-                <span className="text-xs font-black text-on-surface">{(selectedService.price ?? selectedService.basePrice ?? 0).toLocaleString('vi-VN')} đ / khách</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-outline">Điều kiện thời tiết:</span>
-                <span className="text-xs font-semibold text-primary">Sóng ≤ {selectedService.maxWaveM}m • Gió ≥ {selectedService.minWindKmh}km/h</span>
-              </div>
-            </div>
-
-            <div className="text-xs text-on-surface-variant bg-surface-container-low/40 p-3 rounded-xl border border-outline-variant/10 leading-relaxed">
-              <strong>Lưu ý:</strong> Khi bạn xác nhận phê duyệt, tour này sẽ được chuyển ngay sang trạng thái <strong className="text-primary font-mono">ACTIVE</strong> và hiển thị công khai trên Cổng đặt vé cho du khách bắt đầu đặt chỗ.
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button 
-                onClick={() => setIsApproveModalOpen(false)}
-                className="px-4 py-2.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-xs font-semibold transition-colors"
-              >
-                Hủy bỏ
-              </button>
-              <button 
-                onClick={handleApprove}
-                className="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-xs font-bold hover:bg-primary-container transition-colors shadow-sm flex items-center gap-1.5"
-              >
-                <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                <span>Xác nhận Xuất bản (PUBLISH)</span>
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-
-      {/* REJECT MODAL (PORTAL TO BODY TO ENSURE PERFECT CENTER ALIGNMENT) */}
-      {isRejectModalOpen && selectedService && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-          <div className="bg-surface-container-lowest rounded-2xl p-space-xl max-w-md w-full shadow-2xl border border-outline-variant flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-secondary-container/20 text-secondary flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-[28px]">warning</span>
-              </div>
-              <div>
-                <h3 className="font-headline-md text-headline-md font-bold text-on-surface">Từ chối Thẩm định Tour</h3>
-                <span className="text-xs text-outline">Gửi lý do phản hồi cho đối tác</span>
-              </div>
-            </div>
-
-            <p className="font-body-md text-xs text-on-surface-variant">
-              Nhập lý do chưa đảm bảo an toàn hải đồ để thông báo tới đơn vị <strong>{selectedService.vendorName}</strong>:
-            </p>
-            <textarea 
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="VD: Cự ly hải trình vượt quá phao an toàn 350m, hoặc thiếu chứng chỉ cứu sinh..."
-              className="w-full h-24 p-3 rounded-xl bg-surface-container-low text-xs text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary border border-outline-variant/30 resize-none"
-            />
-            <div className="flex justify-end gap-2 pt-1">
-              <button 
-                onClick={() => setIsRejectModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-semibold transition-colors"
-              >
-                Hủy
-              </button>
-              <button 
-                onClick={handleReject}
-                className="px-5 py-2 rounded-xl bg-secondary text-on-secondary text-xs font-bold hover:bg-secondary-container transition-colors shadow-sm"
-              >
-                Xác nhận từ chối
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </main>
+          <p className="admin-detail-note">
+            Thao tác mô phỏng an toàn, không thực hiện thay đổi dữ liệu trên máy chủ hoặc dịch vụ thanh toán.
+          </p>
+        </div>
+      </AdminDialog>
+    </div>
   );
 }
 

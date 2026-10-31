@@ -1,267 +1,532 @@
 import React, { useState } from 'react';
-import { MOCK_ADMIN_CONFIGS } from '../../../data/adminMockData';
-import type { SystemConfig } from '../../../types';
+import { useLocation } from 'react-router-dom';
+import {
+  Check,
+  Copy,
+  Pencil,
+  PhoneCall,
+  RotateCcw,
+  Wallet,
+  Waves,
+  Wind,
+  X,
+} from 'lucide-react';
+import { AdminState } from '../../../components/admin/AdminUI';
+import { AdminButton, AdminNotice } from '../../../components/admin/AdminWorkspace';
+import { AdminDialog } from '../../../components/admin/AdminDialog';
+import {
+  DEFAULT_SETTINGS,
+  validateCommissionRate,
+  validateHotline,
+} from './settingsModel';
+import './Settings.css';
 
 export function Settings() {
-  const [configs, setConfigs] = useState<SystemConfig[]>(MOCK_ADMIN_CONFIGS);
+  const location = useLocation();
+  const demo = import.meta.env.DEV && new URLSearchParams(location.search).get('demo') === '1';
 
-  // Form states mapping to system_configs table
-  const [commissionRate, setCommissionRate] = useState<string>(
-    configs.find(c => c.key === 'PLATFORM_COMMISSION_RATE')?.value || '10'
-  );
-  const [payoutCycle, setPayoutCycle] = useState<string>(
-    configs.find(c => c.key === 'AUTO_PAYOUT_CYCLE_DAYS')?.value || '15'
-  );
-  const [maxSafeWave, setMaxSafeWave] = useState<string>(
-    configs.find(c => c.key === 'WEATHER_MAX_SAFE_WAVE_M')?.value || '1.5'
-  );
-  const [maxSafeWind, setMaxSafeWind] = useState<string>(
-    configs.find(c => c.key === 'WEATHER_MAX_SAFE_WIND_KMH')?.value || '25'
-  );
-  const [emergencyHotline, setEmergencyHotline] = useState<string>(
-    configs.find(c => c.key === 'EMERGENCY_PORT_HOTLINE')?.value || '1900 8989'
-  );
+  // Core values state
+  const [commissionRate, setCommissionRate] = useState<string>(DEFAULT_SETTINGS.commissionRate);
+  const [emergencyHotline, setEmergencyHotline] = useState<string>(DEFAULT_SETTINGS.emergencyHotline);
 
-  // Toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  // Edit mode state for Commission
+  const [isEditingCommission, setIsEditingCommission] = useState(false);
+  const [draftCommission, setDraftCommission] = useState(commissionRate);
+  const [commissionError, setCommissionError] = useState<string | null>(null);
+  const [isSavingCommission, setIsSavingCommission] = useState(false);
+
+  // Edit mode state for Hotline
+  const [isEditingHotline, setIsEditingHotline] = useState(false);
+  const [draftHotline, setDraftHotline] = useState(emergencyHotline);
+  const [hotlineError, setHotlineError] = useState<string | null>(null);
+  const [isSavingHotline, setIsSavingHotline] = useState(false);
+
+  // Copy feedback state
+  const [hasCopiedHotline, setHasCopiedHotline] = useState(false);
+
+  // UI state
+  const [notice, setNotice] = useState<string | null>(null);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [previewState, setPreviewState] = useState<'normal' | 'loading' | 'error' | 'empty'>('normal');
+
+  // --- Handlers for Commission Rate Edit ---
+  const handleStartEditCommission = () => {
+    setDraftCommission(commissionRate);
+    setCommissionError(null);
+    setIsEditingCommission(true);
   };
 
-  const handleSaveAll = () => {
-    setConfigs(prev =>
-      prev.map(c => {
-        if (c.key === 'PLATFORM_COMMISSION_RATE') return { ...c, value: commissionRate, updatedBy: 'Vũ Hải Đăng' };
-        if (c.key === 'AUTO_PAYOUT_CYCLE_DAYS') return { ...c, value: payoutCycle, updatedBy: 'Vũ Hải Đăng' };
-        if (c.key === 'WEATHER_MAX_SAFE_WAVE_M') return { ...c, value: maxSafeWave, updatedBy: 'Vũ Hải Đăng' };
-        if (c.key === 'WEATHER_MAX_SAFE_WIND_KMH') return { ...c, value: maxSafeWind, updatedBy: 'Vũ Hải Đăng' };
-        if (c.key === 'EMERGENCY_PORT_HOTLINE') return { ...c, value: emergencyHotline, updatedBy: 'Vũ Hải Đăng' };
-        return c;
-      })
-    );
-    showToast("Đã lưu các tham số hệ thống và đồng bộ vào AuditLog!");
+  const handleCommissionChange = (val: string) => {
+    setDraftCommission(val);
+    const err = validateCommissionRate(val);
+    setCommissionError(err);
   };
 
-  const handleResetDefaults = () => {
-    setCommissionRate('10');
-    setPayoutCycle('15');
-    setMaxSafeWave('1.5');
-    setMaxSafeWind('25');
-    setEmergencyHotline('1900 8989');
-    showToast("Đã khôi phục các tham số mặc định của Cảng vụ.");
+  const handleSaveCommission = () => {
+    const err = validateCommissionRate(draftCommission);
+    if (err) {
+      setCommissionError(err);
+      return;
+    }
+
+    setIsSavingCommission(true);
+    setTimeout(() => {
+      setCommissionRate(draftCommission.trim());
+      setIsEditingCommission(false);
+      setIsSavingCommission(false);
+      setNotice(`Đã cập nhật hoa hồng mặc định của sàn thành ${draftCommission.trim()}%.`);
+    }, 300);
+  };
+
+  const handleCancelCommission = () => {
+    setDraftCommission(commissionRate);
+    setCommissionError(null);
+    setIsEditingCommission(false);
+  };
+
+  const handleKeyDownCommission = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveCommission();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelCommission();
+    }
+  };
+
+  // --- Handlers for Hotline Edit ---
+  const handleStartEditHotline = () => {
+    setDraftHotline(emergencyHotline);
+    setHotlineError(null);
+    setIsEditingHotline(true);
+  };
+
+  const handleHotlineChange = (val: string) => {
+    setDraftHotline(val);
+    const err = validateHotline(val);
+    setHotlineError(err);
+  };
+
+  const handleSaveHotline = () => {
+    const err = validateHotline(draftHotline);
+    if (err) {
+      setHotlineError(err);
+      return;
+    }
+
+    setIsSavingHotline(true);
+    setTimeout(() => {
+      setEmergencyHotline(draftHotline.trim());
+      setIsEditingHotline(false);
+      setIsSavingHotline(false);
+      setNotice(`Đã cập nhật số điện thoại liên hệ thành ${draftHotline.trim()}.`);
+    }, 300);
+  };
+
+  const handleCancelHotline = () => {
+    setDraftHotline(emergencyHotline);
+    setHotlineError(null);
+    setIsEditingHotline(false);
+  };
+
+  const handleKeyDownHotline = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveHotline();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelHotline();
+    }
+  };
+
+  // --- Handler for Copy Hotline ---
+  const handleCopyHotline = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(emergencyHotline);
+      } else if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = emergencyHotline;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+    } catch {
+      // Best-effort copy
+    }
+
+    setHasCopiedHotline(true);
+    setNotice(`Đã sao chép số điện thoại Ban Quản lý Bán đảo Sơn Trà: ${emergencyHotline}`);
+    setTimeout(() => setHasCopiedHotline(false), 2000);
+  };
+
+  // --- Handler for Reset Defaults ---
+  const isAnyModified =
+    commissionRate !== DEFAULT_SETTINGS.commissionRate ||
+    emergencyHotline !== DEFAULT_SETTINGS.emergencyHotline;
+
+  const handleConfirmReset = () => {
+    setCommissionRate(DEFAULT_SETTINGS.commissionRate);
+    setEmergencyHotline(DEFAULT_SETTINGS.emergencyHotline);
+    setIsEditingCommission(false);
+    setIsEditingHotline(false);
+    setCommissionError(null);
+    setHotlineError(null);
+    setIsResetDialogOpen(false);
+    setNotice('Đã khôi phục các tham số cấu hình về giá trị mặc định.');
   };
 
   return (
-    <main className="w-full pt-16 bg-surface px-6 md:px-8 pb-12 min-h-screen">
-      <div className="flex flex-col w-full animate-fade-in-up">
-        {/* Toast */}
-        {toastMessage && (
-          <div className="fixed top-20 right-8 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-primary text-white shadow-xl animate-fade-in-up">
-            <span className="material-symbols-outlined text-[20px]">check_circle</span>
-            <span className="text-sm font-semibold">{toastMessage}</span>
+    <main className="admin-workspace-page admin-settings-page" aria-label="Trang cấu hình hệ thống">
+      {/* Settings Toolbar */}
+      <div className="admin-settings-toolbar">
+        {demo && (
+          <div className="admin-settings-preview-ctrl">
+            <label htmlFor="settings-preview-select">Trạng thái xem thử:</label>
+            <select
+              id="settings-preview-select"
+              aria-label="Mô phỏng trạng thái trang"
+              value={previewState}
+              onChange={e => setPreviewState(e.target.value as 'normal' | 'loading' | 'error' | 'empty')}
+              className="admin-settings-preview-select"
+            >
+              <option value="normal">Bình thường</option>
+              <option value="loading">Đang tải</option>
+              <option value="error">Lỗi kết nối</option>
+              <option value="empty">Dữ liệu trống</option>
+            </select>
           </div>
         )}
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-slate-200">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
-              Cài đặt Hệ thống
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handleResetDefaults}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium border border-slate-200 transition-colors shadow-xs"
-            >
-              <span className="material-symbols-outlined text-[18px]">restart_alt</span>
-              <span>Khôi phục mặc định</span>
-            </button>
-            <button 
-              onClick={handleSaveAll}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-container transition-colors shadow-xs"
-            >
-              <span className="material-symbols-outlined text-[18px]">save</span>
-              <span>Lưu Cài đặt</span>
-            </button>
-          </div>
-        </div>
+        {isAnyModified && (
+          <AdminButton
+            variant="secondary"
+            onClick={() => setIsResetDialogOpen(true)}
+            aria-label="Khôi phục mặc định"
+          >
+            <RotateCcw size={14} aria-hidden="true" />
+            Khôi phục mặc định
+          </AdminButton>
+        )}
+      </div>
 
-        {/* System & Telemetry Banner */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 mt-0.5">
-              <span className="material-symbols-outlined text-[20px]">verified_user</span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2 font-bold text-sm text-slate-900">
-                <span>Kiểm soát Bất biến &amp; Nhật ký Kiểm toán</span>
-                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono text-[10px]">audit_logs</span>
+      {/* Preview States Switcher */}
+      {previewState === 'loading' ? (
+        <AdminState kind="loading" title="Đang tải dữ liệu cấu hình hệ thống…" />
+      ) : previewState === 'error' ? (
+        <AdminState
+          kind="error"
+          title="Không thể tải bảng tham số cấu hình"
+          description="Đã xảy ra lỗi khi đồng bộ cấu hình từ hệ thống. Vui lòng thử lại sau."
+          action={
+            <AdminButton variant="secondary" onClick={() => setPreviewState('normal')}>
+              Thử tải lại
+            </AdminButton>
+          }
+        />
+      ) : previewState === 'empty' ? (
+        <AdminState
+          kind="empty"
+          title="Chưa có tham số cấu hình nào"
+          description="Bảng cấu hình hệ thống hiện đang trống hoặc chưa được khởi tạo."
+          action={
+            <AdminButton variant="primary" onClick={handleConfirmReset}>
+              Khởi tạo tham số mặc định
+            </AdminButton>
+          }
+        />
+      ) : (
+        <div className="admin-settings-container">
+          {/* HÀNG 1 — GRID 2 CỘT: TÀI CHÍNH & LIÊN HỆ HỖ TRỢ */}
+          <div className="admin-settings-grid-row">
+            {/* KHU VỰC A — TÀI CHÍNH */}
+            <section
+              className={`admin-settings-card ${isEditingCommission ? 'admin-settings-card--editing' : ''}`}
+              aria-labelledby="heading-finance-card"
+            >
+              <div className="admin-card-header-row">
+                <div className="admin-card-category" id="heading-finance-card">
+                  <span className="admin-card-category-icon" aria-hidden="true">
+                    <Wallet size={16} />
+                  </span>
+                  <span>Tài chính</span>
+                </div>
+
+                {!isEditingCommission ? (
+                  <button
+                    type="button"
+                    className="admin-card-action-btn"
+                    onClick={handleStartEditCommission}
+                    aria-label="Chỉnh sửa hoa hồng mặc định của sàn"
+                  >
+                    <Pencil size={12} aria-hidden="true" />
+                    <span>Chỉnh sửa</span>
+                  </button>
+                ) : (
+                  <span className="admin-card-status-badge">Đang chỉnh sửa</span>
+                )}
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Mọi thay đổi tham số được ghi vết tự động. Không làm thay đổi tỷ lệ hoa hồng lịch sử của các đơn đã chốt.
+
+              <div className="admin-card-body">
+                <span className="admin-setting-label">Hoa hồng mặc định của sàn</span>
+
+                {!isEditingCommission ? (
+                  <div className="admin-setting-value-wrap">
+                    <span className="admin-setting-value-number">{commissionRate}</span>
+                    <span className="admin-setting-value-unit">%</span>
+                  </div>
+                ) : (
+                  <div className="admin-setting-edit-box">
+                    <div className="admin-setting-edit-inputs">
+                      <div className="admin-setting-input-field-wrap">
+                        <input
+                          id="commission-rate-input"
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          max="100"
+                          value={draftCommission}
+                          onChange={e => handleCommissionChange(e.target.value)}
+                          onKeyDown={handleKeyDownCommission}
+                          autoFocus
+                          className="admin-setting-edit-input"
+                          aria-label="Tỷ lệ hoa hồng mặc định"
+                          aria-invalid={Boolean(commissionError)}
+                        />
+                        <span className="admin-setting-edit-suffix" aria-hidden="true">%</span>
+                      </div>
+
+                      <div className="admin-setting-edit-buttons">
+                        <button
+                          type="button"
+                          className="admin-setting-btn-save"
+                          onClick={handleSaveCommission}
+                          disabled={isSavingCommission || Boolean(commissionError)}
+                          aria-label="Lưu tỷ lệ hoa hồng"
+                        >
+                          <Check size={14} aria-hidden="true" />
+                          <span>{isSavingCommission ? 'Đang lưu…' : 'Lưu'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-setting-btn-cancel"
+                          onClick={handleCancelCommission}
+                          disabled={isSavingCommission}
+                          aria-label="Hủy chỉnh sửa hoa hồng"
+                        >
+                          <X size={14} aria-hidden="true" />
+                          <span>Hủy</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {commissionError && (
+                      <p className="admin-setting-error-msg" role="alert">
+                        {commissionError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <p className="admin-setting-description">Áp dụng trên giá trị dịch vụ con.</p>
+              </div>
+            </section>
+
+            {/* KHU VỰC B — LIÊN HỆ HỖ TRỢ */}
+            <section
+              className={`admin-settings-card ${isEditingHotline ? 'admin-settings-card--editing' : ''}`}
+              aria-labelledby="heading-support-card"
+            >
+              <div className="admin-card-header-row">
+                <div className="admin-card-category" id="heading-support-card">
+                  <span className="admin-card-category-icon" aria-hidden="true">
+                    <PhoneCall size={16} />
+                  </span>
+                  <span>Liên hệ hỗ trợ</span>
+                </div>
+
+                {!isEditingHotline ? (
+                  <button
+                    type="button"
+                    className="admin-card-action-btn"
+                    onClick={handleStartEditHotline}
+                    aria-label="Chỉnh sửa số điện thoại liên hệ Ban Quản lý Bán đảo Sơn Trà"
+                  >
+                    <Pencil size={12} aria-hidden="true" />
+                    <span>Chỉnh sửa</span>
+                  </button>
+                ) : (
+                  <span className="admin-card-status-badge">Đang chỉnh sửa</span>
+                )}
+              </div>
+
+              <div className="admin-card-body">
+                <span className="admin-setting-label">Ban Quản lý Bán đảo Sơn Trà</span>
+
+                {!isEditingHotline ? (
+                  <div className="admin-setting-value-wrap">
+                    <span className="admin-setting-value-number admin-setting-value-number--phone">
+                      {emergencyHotline}
+                    </span>
+                    <button
+                      type="button"
+                      className={`admin-mini-copy-btn ${hasCopiedHotline ? 'admin-mini-copy-btn--copied' : ''}`}
+                      onClick={handleCopyHotline}
+                      title={hasCopiedHotline ? 'Đã sao chép' : 'Sao chép số điện thoại'}
+                      aria-label="Sao chép số điện thoại"
+                    >
+                      {hasCopiedHotline ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="admin-setting-edit-box">
+                    <div className="admin-setting-edit-inputs">
+                      <div className="admin-setting-input-field-wrap">
+                        <input
+                          id="hotline-input"
+                          type="text"
+                          value={draftHotline}
+                          onChange={e => handleHotlineChange(e.target.value)}
+                          onKeyDown={handleKeyDownHotline}
+                          autoFocus
+                          className="admin-setting-edit-input admin-setting-edit-input--phone"
+                          aria-label="Số điện thoại liên hệ"
+                          aria-invalid={Boolean(hotlineError)}
+                        />
+                      </div>
+
+                      <div className="admin-setting-edit-buttons">
+                        <button
+                          type="button"
+                          className="admin-setting-btn-save"
+                          onClick={handleSaveHotline}
+                          disabled={isSavingHotline || Boolean(hotlineError)}
+                          aria-label="Lưu số điện thoại"
+                        >
+                          <Check size={14} aria-hidden="true" />
+                          <span>{isSavingHotline ? 'Đang lưu…' : 'Lưu'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-setting-btn-cancel"
+                          onClick={handleCancelHotline}
+                          disabled={isSavingHotline}
+                          aria-label="Hủy chỉnh sửa số điện thoại"
+                        >
+                          <X size={14} aria-hidden="true" />
+                          <span>Hủy</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {hotlineError && (
+                      <p className="admin-setting-error-msg" role="alert">
+                        {hotlineError}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <p className="admin-setting-description">Thông tin liên hệ tham khảo.</p>
+              </div>
+            </section>
+          </div>
+
+          {/* KHU VỰC C — NGƯỠNG THAM CHIẾU AN TOÀN BIỂN */}
+          <div className="admin-safety-group" role="region" aria-labelledby="heading-safety-group">
+            {/* HÀNG 2 — TIÊU ĐỀ NHÓM & DÒNG MÔ TẢ DÙNG CHUNG */}
+            <div className="admin-safety-group-header">
+              <h2 id="heading-safety-group" className="admin-safety-group-title">
+                Ngưỡng tham chiếu an toàn biển
+              </h2>
+              <p className="admin-safety-group-desc">
+                Thông số tham khảo phục vụ vận hành, không phải tiêu chuẩn pháp lý nhà nước.
               </p>
             </div>
-          </div>
 
-          <div className="flex items-center gap-4 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs shrink-0">
-            <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-              <span className="material-symbols-outlined text-primary text-[16px]">routine</span>
-              <span>Bộ đệm thời tiết:</span>
-            </div>
-            <div className="flex items-center gap-3 font-semibold text-slate-900">
-              <span>Sóng: <strong className="text-primary">0.5m</strong></span>
-              <span>Gió: <strong className="text-primary">12km/h</strong></span>
-              <span>Mưa: <strong className="text-primary">0mm</strong></span>
-            </div>
-          </div>
-        </div>
-
-        {/* Configuration Form Sections (Vertical Document Layout) */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-xs divide-y divide-slate-200">
-          {/* Section 1: Vận hành & Giao dịch */}
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                <span className="material-symbols-outlined text-[18px]">payments</span>
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Vận hành &amp; Giao dịch Sàn</h2>
-                <p className="text-xs text-slate-500">Tham số tài chính, trích xuất hoa hồng và chu kỳ kế toán</p>
-              </div>
-            </div>
-
-            <div className="space-y-6 divide-y divide-slate-200">
-              {/* Row 1: Commission Rate */}
-              <div className="pt-4 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="max-w-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">Tỷ lệ hoa hồng mặc định sàn</span>
-                    <code className="font-mono text-[11px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">PLATFORM_COMMISSION_RATE</code>
+            {/* HÀNG 3 — GRID 2 CỘT: CHIỀU CAO SÓNG & TỐC ĐỘ GIÓ GIẬT */}
+            <div className="admin-settings-grid-row">
+              {/* Card 1 — Chiều cao sóng */}
+              <section className="admin-settings-card" aria-labelledby="heading-wave-card">
+                <div className="admin-card-header-row">
+                  <div className="admin-card-category" id="heading-wave-card">
+                    <span className="admin-card-category-icon" aria-hidden="true">
+                      <Waves size={16} />
+                    </span>
+                    <span>Chiều cao sóng</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Khấu trừ tự động vào ví bảo chứng của đối tác trên mỗi dịch vụ con (SubOrder) hoàn tất.
-                  </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <input 
-                    type="number"
-                    step="0.5"
-                    value={commissionRate}
-                    onChange={(e) => setCommissionRate(e.target.value)}
-                    className="w-24 h-9 px-3 rounded-lg bg-slate-50 text-right font-bold text-sm text-primary border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <span className="text-xs font-bold text-slate-400">%</span>
-                </div>
-              </div>
 
-              {/* Row 2: Auto Payout Cycle */}
-              <div className="pt-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="max-w-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">Chu kỳ rút tiền đối tác</span>
-                    <code className="font-mono text-[11px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">AUTO_PAYOUT_CYCLE_DAYS</code>
+                <div className="admin-card-body">
+                  <span className="admin-setting-label">Chiều cao sóng</span>
+
+                  <div className="admin-setting-value-wrap">
+                    <span className="admin-setting-value-number">{DEFAULT_SETTINGS.maxSafeWave}</span>
+                    <span className="admin-setting-value-unit">m</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Thời hạn chốt sổ quyết toán settlement và cho phép nhà cung cấp tạo lệnh giải ngân định kỳ.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <input 
-                    type="number"
-                    value={payoutCycle}
-                    onChange={(e) => setPayoutCycle(e.target.value)}
-                    className="w-24 h-9 px-3 rounded-lg bg-slate-50 text-right font-bold text-sm text-slate-900 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                  <span className="text-xs font-bold text-slate-400">ngày</span>
-                </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Section 2: An toàn Hàng hải */}
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600">
-                <span className="material-symbols-outlined text-[18px]">waves</span>
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Định Mức An Toàn Hàng Hải</h2>
-                <p className="text-xs text-slate-500">Ngưỡng thời tiết tự động kích hoạt cảnh báo Cờ Vàng hoặc Cấm Biển xuất bến</p>
-              </div>
-            </div>
+                  <p className="admin-setting-description">Ngưỡng tham chiếu vận hành</p>
+                </div>
+              </section>
 
-            <div className="space-y-6 divide-y divide-slate-200">
-              {/* Row 3: Max Safe Wave */}
-              <div className="pt-4 first:pt-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="max-w-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">Ngưỡng sóng tối đa cho phép</span>
-                    <code className="font-mono text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">WEATHER_MAX_SAFE_WAVE_M</code>
+              {/* Card 2 — Tốc độ gió giật */}
+              <section className="admin-settings-card" aria-labelledby="heading-wind-card">
+                <div className="admin-card-header-row">
+                  <div className="admin-card-category" id="heading-wind-card">
+                    <span className="admin-card-category-icon" aria-hidden="true">
+                      <Wind size={16} />
+                    </span>
+                    <span>Tốc độ gió giật</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Nếu sóng biển thực đo vượt ngưỡng này, hệ thống tự động cảnh báo cấm xuất bến tour SUP và cano.
-                  </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <input 
-                    type="number"
-                    step="0.1"
-                    value={maxSafeWave}
-                    onChange={(e) => setMaxSafeWave(e.target.value)}
-                    className="w-24 h-9 px-3 rounded-lg bg-slate-50 text-right font-bold text-sm text-amber-700 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                  <span className="text-xs font-bold text-slate-400">mét (m)</span>
-                </div>
-              </div>
 
-              {/* Row 4: Max Safe Wind */}
-              <div className="pt-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="max-w-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">Ngưỡng gió giật tối đa</span>
-                    <code className="font-mono text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">WEATHER_MAX_SAFE_WIND_KMH</code>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Kích hoạt thông báo cảnh báo Cờ Vàng tới tất cả thuyền trưởng khi gió giật chạm ngưỡng.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <input 
-                    type="number"
-                    value={maxSafeWind}
-                    onChange={(e) => setMaxSafeWind(e.target.value)}
-                    className="w-24 h-9 px-3 rounded-lg bg-slate-50 text-right font-bold text-sm text-amber-700 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                  <span className="text-xs font-bold text-slate-400">km/h</span>
-                </div>
-              </div>
+                <div className="admin-card-body">
+                  <span className="admin-setting-label">Tốc độ gió giật</span>
 
-              {/* Row 5: Emergency Hotline */}
-              <div className="pt-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="max-w-xl">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-900">Đường dây nóng cứu hộ Cảng vụ</span>
-                    <code className="font-mono text-[11px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">EMERGENCY_PORT_HOTLINE</code>
+                  <div className="admin-setting-value-wrap">
+                    <span className="admin-setting-value-number">{DEFAULT_SETTINGS.maxSafeWind}</span>
+                    <span className="admin-setting-value-unit">km/h</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                    Số điện thoại trực ban cứu hộ hiển thị khẩn cấp trên ứng dụng của tài xế cano và hướng dẫn viên.
-                  </p>
+
+                  <p className="admin-setting-description">Ngưỡng tham chiếu cảnh báo</p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <input 
-                    type="text"
-                    value={emergencyHotline}
-                    onChange={(e) => setEmergencyHotline(e.target.value)}
-                    className="w-36 h-9 px-3 rounded-lg bg-slate-50 text-center font-bold text-sm text-primary border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
+              </section>
             </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Confirmation Dialog for Reset Defaults */}
+      <AdminDialog
+        open={isResetDialogOpen}
+        title="Xác nhận khôi phục cấu hình mặc định"
+        description="Thao tác này sẽ đặt lại tỷ lệ hoa hồng (10%) và số điện thoại liên hệ (0236 3920 477) về giá trị mặc định ban đầu."
+        onClose={() => setIsResetDialogOpen(false)}
+        footer={
+          <>
+            <AdminButton variant="secondary" onClick={() => setIsResetDialogOpen(false)}>
+              Hủy bỏ
+            </AdminButton>
+            <AdminButton variant="danger" onClick={handleConfirmReset}>
+              Xác nhận khôi phục
+            </AdminButton>
+          </>
+        }
+      >
+        <p style={{ fontSize: 13, color: 'var(--admin-secondary, #525252)', margin: 0 }}>
+          Các tham số sẽ được khôi phục về giá trị mặc định:
+        </p>
+        <ul style={{ margin: '8px 0 0 18px', padding: 0, fontSize: 13, color: 'var(--admin-secondary, #525252)' }}>
+          <li>Hoa hồng mặc định của sàn: <strong>10%</strong></li>
+          <li>Số điện thoại liên hệ BQL: <strong>0236 3920 477</strong></li>
+        </ul>
+      </AdminDialog>
+
+      {/* Toast Notification */}
+      <AdminNotice message={notice} onDismiss={() => setNotice(null)} />
     </main>
   );
 }

@@ -1,10 +1,21 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useCartStore } from "../../../store/useCartStore";
-import { FEATURED_SERVICES, MOCK_IMAGES, MOCK_SLOTS } from "../../../mockData";
+import {
+  ShoppingCart,
+  Trash2,
+  Plus,
+  Minus,
+  Clock,
+  MapPin,
+  ShieldCheck,
+  ChevronRight,
+  ArrowRight,
+  BadgeCheck,
+} from "lucide-react";
 
 export function Cart() {
   const navigate = useNavigate();
-  const { items, removeItem, getTotalPrice } = useCartStore();
+  const { items, removeItem, updateQuantity, getTotalPrice } = useCartStore();
 
   const handleCheckout = () => {
     if (items.length > 0) {
@@ -13,218 +24,299 @@ export function Cart() {
   };
 
   return (
-    <main className="w-full pt-20 bg-surface flex-1"><div className="flex flex-col w-full">
-      <section className="max-w-[1280px] w-full mx-auto px-margin-mobile md:px-margin-desktop py-space-xl">
-        {/* Breadcrumb & Booking Stepper */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-space-lg mb-space-2xl">
-          <div className="flex flex-col gap-space-2xs">
-            <div className="flex items-center gap-2 text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
-              <Link className="hover:text-primary transition-colors" to="/">Trang chủ</Link>
-              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="text-secondary font-bold">Giỏ hàng của bạn</span>
-            </div>
-            <div className="flex items-baseline gap-space-sm">
-              <h1 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">Hành Trình Của Bạn</h1>
-              <span className="px-space-sm py-0.5 rounded-full bg-secondary/10 text-secondary font-label-sm text-label-sm font-bold">{items.length} trải nghiệm đã chọn</span>
-            </div>
-          </div>
-          {/* Stepper Pills */}
-          <div className="flex items-center gap-space-xs bg-surface-container-low p-1.5 rounded-full shadow-sm overflow-x-auto">
-            <div className="flex items-center gap-2 px-space-md py-1.5 rounded-full bg-secondary text-on-secondary font-label-md text-label-md shadow-sm whitespace-nowrap">
-              <span className="w-5 h-5 rounded-full bg-on-secondary/20 flex items-center justify-center text-[11px] font-bold">1</span>
-              <span className="">Giỏ trải nghiệm</span>
-            </div>
-            <div className="w-6 h-0.5 bg-surface-container-high rounded-full"></div>
-            <div className="flex items-center gap-2 px-space-md py-1.5 rounded-full text-on-surface-variant font-label-md text-label-md opacity-60 whitespace-nowrap">
-              <span className="w-5 h-5 rounded-full bg-surface-container-highest flex items-center justify-center text-[11px] font-bold">2</span>
-              <span className="">Thông tin & Thanh toán</span>
-            </div>
-            <div className="w-6 h-0.5 bg-surface-container-high rounded-full"></div>
-            <div className="flex items-center gap-2 px-space-md py-1.5 rounded-full text-on-surface-variant font-label-md text-label-md opacity-60 whitespace-nowrap">
-              <span className="w-5 h-5 rounded-full bg-surface-container-highest flex items-center justify-center text-[11px] font-bold">3</span>
-              <span className="">Vé điện tử QR</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
-          {/* Left Column: Experiences List */}
-          <div className="lg:col-span-8 flex flex-col gap-space-lg">
-{items.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 bg-surface-container-lowest rounded-lg">
-                <span className="material-symbols-outlined text-[64px] text-outline mb-4">shopping_cart</span>
-                <h2 className="font-headline-sm">Giỏ hàng của bạn đang trống</h2>
-                <p className="text-on-surface-variant mb-6">Hãy thêm trải nghiệm để bắt đầu hành trình của bạn.</p>
-                <Link to="/search" className="px-6 py-2 bg-primary text-on-primary rounded-full hover:bg-primary-container transition-colors">
-                  Khám phá trải nghiệm
-                </Link>
-              </div>
-            ) : (
-              items.map(item => {
-                const service = FEATURED_SERVICES.find(s => s.id === item.serviceId);
-                const slot = MOCK_SLOTS.find(s => s.id === item.slotId);
-                const image = MOCK_IMAGES.find(i => i.serviceId === item.serviceId && i.isPrimary)?.imageUrl || "https://via.placeholder.com/400";
-                
-                if (!service) return null;
-
-                return (
-                  <article key={item.id} className="p-space-lg rounded-lg bg-surface-container-lowest shadow-sm hover:shadow-md transition-shadow relative overflow-hidden flex flex-col md:flex-row gap-space-lg">
-                    <div className="w-full md:w-56 h-44 rounded-DEFAULT overflow-hidden flex-shrink-0 relative">
-                      <img className="w-full h-full object-cover" alt={service.name} src={image}/>
-                      <span className="absolute bottom-2 left-2 px-space-xs py-0.5 rounded-full bg-surface-container-lowest/90 backdrop-blur text-on-surface font-label-sm text-[11px] font-semibold">
-                        {service.locationName}
-                      </span>
-                    </div>
-                    <div className="flex-1 flex flex-col justify-between gap-space-sm min-w-0">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between gap-space-sm">
-                          <div className="flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-[16px] text-secondary">verified</span>
-                            <span className="font-label-sm text-label-sm text-on-surface-variant font-semibold">Danang Ocean Club</span>
-                            <span className="w-1 h-1 rounded-full bg-surface-dim"></span>
-                            <span className="text-secondary font-label-sm text-label-sm font-bold">4.9 ★</span>
-                          </div>
-                          <button onClick={() => removeItem(item.id)} aria-label="Xoá mục trải nghiệm" className="text-on-surface-variant hover:text-primary transition-colors p-1" type="button">
-                            <span className="material-symbols-outlined text-[20px]">delete</span>
-                          </button>
-                        </div>
-                        <h2 className="font-headline-sm text-headline-sm text-on-surface tracking-tight leading-snug">
-                          {service.name}
-                        </h2>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-space-md gap-y-1.5 py-space-xs font-body-sm text-body-sm text-on-surface-variant">
-                        <div className="flex items-center gap-2 truncate"><span className="material-symbols-outlined text-[18px] text-secondary">schedule</span><span className="">{slot?.startTime.slice(0,5)} - {slot?.endTime.slice(0,5)}, {item.selectedDate}</span></div>
-                        <div className="flex items-center gap-2 truncate"><span className="material-symbols-outlined text-[18px] text-secondary">location_on</span><span className="">{service.locationName}</span></div>
-                        <div className="flex items-center gap-2"><span className="material-symbols-outlined text-[18px] text-secondary">group</span><span className="">{item.quantity} khách ({item.unitPrice.toLocaleString('vi-VN')}đ/người)</span></div>
-                        <div className="flex items-center gap-2 text-on-surface-variant"><span className="material-symbols-outlined text-[18px] text-secondary">check_circle</span><span className="">Đã bao gồm trang bị và HDV</span></div>
-                      </div>
-                      
-                      <div className="pt-space-xs flex items-center justify-between gap-space-sm flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <span className="px-space-xs py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-label-sm text-[11px] font-bold">
-                            Chắc chắn có chỗ
-                          </span>
-                          <Link to={`/tour/${service.id}`} className="font-label-sm text-label-sm text-secondary hover:underline font-semibold flex items-center gap-0.5">
-                            <span className="material-symbols-outlined text-[14px]">tune</span> Xem chi tiết
-                          </Link>
-                        </div>
-                        <div className="flex items-baseline gap-1 text-right"><span className="font-headline-sm text-headline-sm text-primary font-bold">{(item.quantity * item.unitPrice).toLocaleString('vi-VN')}đ</span></div>
-                      </div>
-                    </div>
-                  </article>
-                )
-              })
-            )}
-
-            {/* Upsell & Cross-sell Section */}
-            <div className="mt-space-lg flex flex-col gap-space-md">
-              <div className="flex items-baseline justify-between">
-                <h2 className="font-headline-sm text-headline-sm text-on-surface">Gợi ý tiện ích biển bổ sung</h2>
-                <span className="font-label-sm text-label-sm text-secondary font-bold">Ưu đãi giảm 15% kèm giỏ</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
-                <div className="p-space-md rounded-lg bg-surface-container-low flex items-center gap-space-md hover:bg-surface-container transition-colors">
-                  <div className="w-20 h-20 rounded-DEFAULT overflow-hidden flex-shrink-0">
-                    <img className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA4AMOKaaKBGjcISuAt-XoZ69bw4Ew8cOvMFOZWZiJmWtD3lMDWdWdsMCXDYim138aPB_K0YtIt4neMWClVMAUCJ96u2FQNzmHzH87RUZeBkmgQ-1NyRFOd4m5CoZFEcYCTZw6IMJcOkE08WZJR6v2CAqYwEFVD9u83nG0WVzYlXMbDGq-9Rmaam7pEGi_JURvMBnCUsjcApmlWd3Hxgzgr8VtyDySBMJFW1QlDs6HSINlKJYjo7zPasg"/>
-                  </div>
-                  <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
-                    <div>
-                      <h3 className="font-label-lg text-label-lg text-on-surface truncate">Thuê máy quay GoPro Hero 11</h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant">Kèm phao nổi & thẻ 64GB</p>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 pt-1">
-                      <span className="font-label-lg text-label-lg text-secondary font-bold">150.000đ<span className="font-body-sm text-body-sm text-on-surface-variant font-normal">/ngày</span></span>
-                      <button className="px-space-sm py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm hover:bg-secondary-fixed-dim transition-colors flex items-center gap-1" type="button">
-                        <span className="material-symbols-outlined text-[14px]">add</span> Thêm
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="p-space-md rounded-lg bg-surface-container-low flex items-center gap-space-md hover:bg-surface-container transition-colors">
-                  <div className="w-20 h-20 rounded-DEFAULT overflow-hidden flex-shrink-0">
-                    <img className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAfWUW3Hh31WzoPA-Ojkb6aUebp-mM7tEo4pz2N0htIIzxEJ5IOmPvCU7QgD2Nqp5bYk_pcSGQVFoJxDYiXIPDDQvtdq9fKjbUwnxn9PXaaJbjYqX4JyYS5K2xcxgOV3vYVMhQhilqeGanR8EZwBQxQukU0W-MwF5SHTdZLz7Uu0c7lH04dE7kauPd_ofeNpDcg61Ddj0wRdGT_MYtg7GP22iXKcqFA-EfvTjHF3Cpwsi6oZV7nDMXPIw"/>
-                  </div>
-                  <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
-                    <div>
-                      <h3 className="font-label-lg text-label-lg text-on-surface truncate">Xe đón khách sạn ra bến cano</h3>
-                      <p className="font-body-sm text-body-sm text-on-surface-variant">Đón trả tận nơi tại Sơn Trà</p>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 pt-1">
-                      <span className="font-label-lg text-label-lg text-secondary font-bold">80.000đ<span className="font-body-sm text-body-sm text-on-surface-variant font-normal">/chuyến</span></span>
-                      <button className="px-space-sm py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm hover:bg-secondary-fixed-dim transition-colors flex items-center gap-1" type="button">
-                        <span className="material-symbols-outlined text-[14px]">add</span> Thêm
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Sticky Order Summary */}
-          <aside className="lg:col-span-4 flex flex-col gap-space-md lg:sticky lg:top-28">
-            <div className="p-space-md rounded-lg bg-primary/10 flex items-center gap-space-sm">
-              <span className="material-symbols-outlined text-primary text-[24px] flex-shrink-0 animate-spin" style={{ animationDuration: "4s" }}>timelapse</span>
-              <div className="flex-1">
-                <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Thời gian giữ chỗ ưu tiên</p>
-                <p className="font-label-lg text-label-lg text-primary font-bold flex items-center gap-1"><span className="">14:30</span></p>
-                <p className="font-body-sm text-body-sm text-on-primary-fixed-variant mt-0.5">Vui lòng chuyển sang bước thanh toán trước khi slot được giải phóng.</p>
-              </div>
-            </div>
-
-            <div className="p-space-lg rounded-lg bg-surface-container-lowest shadow-md flex flex-col gap-space-md">
-              <h2 className="font-headline-sm text-headline-sm text-on-surface pb-space-xs">Tóm tắt đơn hàng</h2>
-              <div className="flex flex-col gap-space-xs font-body-md text-body-md text-on-surface-variant">
-                <div className="flex items-center justify-between"><span className="">Tạm tính ({items.length} trải nghiệm)</span><span className="font-semibold text-on-surface">{getTotalPrice().toLocaleString('vi-VN')}đ</span></div>
-                <div className="flex items-center justify-between text-secondary"><span className="flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">local_offer</span>Voucher (Nếu có)</span><span className="font-bold">0đ</span></div>
-                <div className="flex items-center justify-between pt-1"><span className="">Phí nền tảng DANASEA</span><span className="font-semibold text-secondary">0đ</span></div>
-              </div>
-              
-              <div className="pt-space-md flex items-end justify-between gap-space-sm">
-                <div>
-                  <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-bold">Tổng thanh toán</p>
-                  <p className="font-body-sm text-body-sm text-on-surface-variant">Đã bao gồm thuế & phí</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-headline-lg text-headline-lg text-primary font-bold leading-none">{getTotalPrice().toLocaleString('vi-VN')}đ</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-space-xs bg-surface-container-low p-1 rounded-full mt-2">
-                <span className="material-symbols-outlined text-outline pl-3 text-[18px]">redeem</span>
-                <input className="bg-transparent border-none outline-none font-body-sm text-body-sm flex-1 min-w-0 placeholder-on-surface-variant/50" placeholder="Mã giảm giá (ví dụ: SEA10)" type="text"/>
-                <button className="px-4 py-1.5 rounded-full bg-secondary text-on-secondary font-label-sm text-label-sm hover:scale-105 transition-transform" type="button">Áp dụng</button>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-space-xs">
-              <button 
-                onClick={handleCheckout} 
-                disabled={items.length === 0}
-                className={`w-full py-4 rounded-full font-label-lg text-label-lg flex items-center justify-center gap-2 shadow-sm transition-transform ${items.length > 0 ? 'bg-primary text-on-primary hover:scale-[1.02] active:scale-[0.98]' : 'bg-surface-variant text-on-surface-variant cursor-not-allowed opacity-50'}`} 
-                type="button"
+    <main className="w-full pt-20 bg-white min-h-[calc(100vh-80px)] flex-1">
+      <div className="flex flex-col w-full">
+        {/* Sub-Header Progress Stepper Bar - Airbnb Clean Architecture */}
+        <section className="w-full bg-slate-50 border-b border-slate-200/80">
+          <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            {/* Breadcrumb Navigation */}
+            <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
+              <span 
+                className="hover:text-slate-900 cursor-pointer transition-colors" 
+                onClick={() => navigate('/')}
               >
-                <span className="material-symbols-outlined text-[20px]">credit_card</span>
-                <span>Tiến hành thanh toán</span>
-              </button>
-              <p className="text-center font-body-sm text-on-surface-variant text-[11px] mt-1 flex items-center justify-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">lock</span>
-                Thanh toán bảo mật SSL 256-bit
-              </p>
+                DANASEA
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-slate-900 font-semibold">Giỏ hàng trải nghiệm</span>
             </div>
-            
-            <div className="mt-space-sm bg-surface-container-low p-space-md rounded-lg flex flex-col gap-2">
-              <h3 className="font-label-md text-label-md text-on-surface">Chính sách hủy linh hoạt</h3>
-              <ul className="font-body-sm text-body-sm text-on-surface-variant flex flex-col gap-1 list-disc pl-4">
-                <li>Miễn phí hủy trước 48h khởi hành.</li>
-                <li>Hoàn 100% nếu điều kiện biển không an toàn (có xác nhận từ cảng vụ).</li>
-              </ul>
+
+            {/* Stepper Component - Architectural Geometry */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+              {/* Step 1: Active in Cart */}
+              <div className="flex items-center gap-3 rounded-xl bg-white border border-slate-300 p-3">
+                <span className="text-sm font-bold text-slate-900">01.</span>
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-500 font-medium">Bước 1</p>
+                  <p className="text-sm font-bold text-slate-900 truncate">Giỏ hàng</p>
+                </div>
+              </div>
+
+              {/* Step 2: Next */}
+              <div className="flex items-center gap-3 rounded-xl bg-slate-100/70 border border-slate-200/70 p-3">
+                <span className="text-sm font-semibold text-slate-600">02.</span>
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-600 font-medium">Bước 2</p>
+                  <p className="text-sm font-medium text-slate-700 truncate">Thông tin &amp; Thanh toán</p>
+                </div>
+              </div>
+
+              {/* Step 3: Final */}
+              <div className="flex items-center gap-3 rounded-xl bg-slate-100/70 border border-slate-200/70 p-3">
+                <span className="text-sm font-semibold text-slate-600">03.</span>
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-600 font-medium">Bước 3</p>
+                  <p className="text-sm font-medium text-slate-700 truncate">Nhận vé điện tử QR</p>
+                </div>
+              </div>
             </div>
-          </aside>
-        </div>
-      </section>
-    </div></main>
+          </div>
+        </section>
+
+        {/* Main Content Layout - Airbnb 1280px Grid */}
+        <section className="max-w-[1280px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left Column: Experiences List */}
+            <div className="lg:col-span-8 flex flex-col gap-6">
+              <div className="border-b border-slate-200/80 pb-4">
+                <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight">
+                  Giỏ hàng của bạn
+                </h1>
+                <p className="text-sm text-slate-600 mt-1">
+                  {items.length} trải nghiệm đã sẵn sàng để giữ chỗ
+                </p>
+              </div>
+
+              {items.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-slate-200/80 shadow-xs text-center px-4">
+                  <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 flex items-center justify-center mb-4">
+                    <ShoppingCart className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-900 mb-1">Giỏ hàng của bạn đang trống</h2>
+                  <p className="text-slate-600 text-sm max-w-md mb-6 leading-relaxed">
+                    Khám phá các tour cano lặn biển, chèo SUP bình minh hoặc dù bay tại Đà Nẵng để thêm vào giỏ hàng.
+                  </p>
+                  <Link 
+                    to="/" 
+                    className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium text-sm shadow-xs transition-colors inline-flex items-center gap-2"
+                  >
+                    <span>Khám phá trải nghiệm</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              ) : (
+                items.map((item) => {
+                  const title = item.serviceName || 'Trải nghiệm biển Đà Nẵng';
+                  const image = item.thumbnailUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800';
+                  const location = item.locationName || 'Đà Nẵng';
+                  const vendor = item.vendorName || 'DANASEA Official Partner';
+                  const dateStr = item.selectedDate || item.date || 'Hôm nay';
+                  const timeStr = item.timeSlot || 'Khung giờ linh hoạt';
+
+                  return (
+                    <article 
+                      key={item.id} 
+                      className="p-5 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow relative overflow-hidden flex flex-col sm:flex-row gap-5 border border-slate-200/80"
+                    >
+                      {/* Photo Thumbnail */}
+                      <div className="w-full sm:w-48 h-36 rounded-xl overflow-hidden shrink-0 relative bg-slate-100">
+                        <img className="w-full h-full object-cover" alt={title} src={image} />
+                      </div>
+
+                      {/* Content Details */}
+                      <div className="flex-1 flex flex-col justify-between gap-3 min-w-0">
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 text-xs text-slate-600 truncate">
+                              <BadgeCheck className="w-4 h-4 text-sky-600 shrink-0" />
+                              <span className="font-semibold text-slate-800 truncate">{vendor}</span>
+                            </div>
+                            <button 
+                              onClick={() => removeItem(item.id)} 
+                              aria-label="Xoá mục trải nghiệm" 
+                              title="Xoá khỏi giỏ"
+                              className="text-slate-400 hover:text-rose-600 transition-colors p-1 cursor-pointer" 
+                              type="button"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                          
+                          <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-snug line-clamp-2">
+                            {title}
+                          </h2>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-600">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">{timeStr}, {dateStr}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 truncate">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span className="truncate">{location}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Footer Controls: Quantity & Price */}
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-3">
+                            {/* Quantity Controls - Airbnb Circular Steppers */}
+                            <div className="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                disabled={item.quantity <= 1}
+                                className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+                              <span className="px-3 text-xs font-bold text-slate-900 tabular-nums">{item.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            
+                            <Link 
+                              to={`/experience/${item.serviceId}`} 
+                              className="text-xs text-slate-600 hover:text-slate-900 hover:underline font-medium"
+                            >
+                              Xem lại chi tiết
+                            </Link>
+                          </div>
+
+                          <div className="flex items-baseline gap-1 text-right">
+                            <span className="text-base sm:text-lg text-slate-900 font-bold tabular-nums">
+                              {(item.quantity * item.unitPrice).toLocaleString('vi-VN')}₫
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+
+              {/* Cross-sell Addons Section */}
+              <div className="mt-4 flex flex-col gap-3">
+                <div className="flex items-baseline justify-between">
+                  <h3 className="text-sm font-bold text-slate-900">Tiện ích biển đề xuất</h3>
+                  <span className="text-xs text-slate-500 font-medium">Bổ sung vào chuyến đi</span>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 flex items-center gap-3 hover:bg-slate-100/60 transition-colors">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-slate-200">
+                      <img 
+                        className="w-full h-full object-cover" 
+                        alt="GoPro Hero 11" 
+                        src="https://images.unsplash.com/photo-1565849904461-04a58ad377e0?w=300"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900 truncate">Máy quay GoPro Hero 11</h4>
+                        <p className="text-[11px] text-slate-500">Kèm phao nổi &amp; thẻ nhớ 64GB</p>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <span className="text-xs font-bold text-slate-900">150.000₫/ngày</span>
+                        <button className="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-xs hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer" type="button">
+                          <Plus className="w-3 h-3" /> Thêm
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/80 flex items-center gap-3 hover:bg-slate-100/60 transition-colors">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 bg-slate-200">
+                      <img 
+                        className="w-full h-full object-cover" 
+                        alt="Shuttle Bus" 
+                        src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=300"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900 truncate">Xe đón khách sạn ra bến</h4>
+                        <p className="text-[11px] text-slate-500">Đón trả tận nơi tại Sơn Trà</p>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <span className="text-xs font-bold text-slate-900">80.000₫/lượt</span>
+                        <button className="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-xs hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer" type="button">
+                          <Plus className="w-3 h-3" /> Thêm
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: Sticky Order Summary - Airbnb Reservation Card Style */}
+            <aside className="lg:col-span-4 flex flex-col gap-4 lg:sticky lg:top-24">
+              <div className="p-6 rounded-2xl bg-white shadow-xs border border-slate-200/80 flex flex-col gap-4">
+                <h2 className="text-lg font-bold text-slate-900 pb-3 border-b border-slate-100">
+                  Tóm tắt đơn hàng
+                </h2>
+                
+                <div className="flex flex-col gap-2.5 text-sm text-slate-600">
+                  <div className="flex items-center justify-between">
+                    <span>Tạm tính ({items.length} trải nghiệm)</span>
+                    <span className="font-semibold text-slate-900 tabular-nums">
+                      {getTotalPrice().toLocaleString('vi-VN')}₫
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-emerald-700 font-medium">
+                    <span>Phí dịch vụ DANASEA</span>
+                    <span>Miễn phí</span>
+                  </div>
+                </div>
+                
+                <div className="pt-4 flex items-end justify-between gap-2 border-t border-slate-100">
+                  <div>
+                    <p className="text-xs text-slate-700 font-semibold">Tổng thanh toán</p>
+                    <p className="text-xs text-slate-500">Đã gồm thuế &amp; bảo hiểm biển</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl text-slate-900 font-extrabold tabular-nums leading-none">
+                      {getTotalPrice().toLocaleString('vi-VN')}₫
+                    </p>
+                  </div>
+                </div>
+
+                {/* Safety & Cancellation Notice */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5 mt-1">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="flex-1 text-xs">
+                    <p className="font-bold text-slate-900">Bảo vệ đặt chỗ 100%</p>
+                    <p className="text-slate-600 mt-0.5 leading-relaxed">
+                      Cam kết hoàn tiền 100% khi thời tiết biển không đảm bảo an toàn.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Primary CTA - Ocean Blue DANASEA Button */}
+                <button 
+                  onClick={handleCheckout} 
+                  disabled={items.length === 0}
+                  className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center transition-colors cursor-pointer ${
+                    items.length > 0 
+                      ? 'bg-[#0284c7] hover:bg-[#0369a1] text-white active:scale-95 shadow-xs' 
+                      : 'bg-slate-100 text-slate-600 border border-slate-300 cursor-not-allowed'
+                  }`} 
+                  type="button"
+                >
+                  Tiến hành thanh toán
+                </button>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </main>
   );
 }

@@ -2,13 +2,16 @@ package com.danasea.backend.modules.ai;
 
 import com.danasea.backend.modules.ai.application.ports.LlmClientPort;
 import com.danasea.backend.modules.ai.application.ports.ModerationPort;
+import com.danasea.backend.modules.ai.application.ports.AiExecutionBudget;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutor;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutionContext;
 import com.danasea.backend.modules.ai.application.usecases.ChatUseCase;
 import com.danasea.backend.modules.ai.domain.models.AiMessageRole;
+import com.danasea.backend.modules.ai.domain.models.AiMessage;
 import com.danasea.backend.modules.ai.domain.models.LlmResponse;
 import com.danasea.backend.modules.ai.domain.models.ToolCall;
 import com.danasea.backend.modules.ai.domain.services.ChatHistoryService;
+import com.danasea.backend.modules.ai.infrastructure.persistence.entities.AiMessageJpaEntity;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,7 +22,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Optional;
 import java.util.UUID;
+import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -89,6 +95,60 @@ public class AssistantChatUseCaseTest {
     // =========================================================================
     // TIER 1: FEATURE COVERAGE (>=5 test cases across R2 & R6 core tools)
     // =========================================================================
+
+    @Test
+    void moderationAndChatShareTwoMinuteBudgetEvenWithoutHttpFilter() {
+        when(moderationPort.isSafe(any())).thenAnswer(invocation -> {
+            assertFalse(AiExecutionBudget.hasTimeFor(Duration.ofSeconds(121)));
+            return true;
+        });
+        when(chatHistoryService.getRecentMessages(conversationId, 20)).thenReturn(List.of());
+        when(llmClientPort.generateResponse(any())).thenAnswer(invocation -> {
+            assertTrue(AiExecutionBudget.hasTimeFor(Duration.ofSeconds(119)));
+            assertFalse(AiExecutionBudget.hasTimeFor(Duration.ofSeconds(121)));
+            var response = new LlmResponse(); response.setContent("OK"); return response;
+        });
+        assertEquals("OK", chatUseCase.processMessage(conversationId, "Xin chào").getContent());
+        assertTrue(AiExecutionBudget.hasTimeFor(Duration.ofSeconds(121)));
+    }
+
+    @Test
+    void sendsRecentConversationChronologicallyWithSavedTravelContext() {
+        AiMessageJpaEntity earlier = new AiMessageJpaEntity();
+        earlier.setConversationId(conversationId);
+        earlier.setRole(AiMessageRole.USER);
+        earlier.setContent("Tôi thích chèo SUP.");
+        AiMessageJpaEntity previousReply = new AiMessageJpaEntity();
+        previousReply.setConversationId(conversationId);
+        previousReply.setRole(AiMessageRole.ASSISTANT);
+        previousReply.setContent("Tôi đã ghi nhận.");
+        AiMessageJpaEntity current = new AiMessageJpaEntity();
+        current.setConversationId(conversationId);
+        current.setRole(AiMessageRole.USER);
+        current.setContent("Tìm hoạt động phù hợp cho tôi.");
+        when(chatHistoryService.getRecentMessages(conversationId, 20))
+                .thenReturn(List.of(current, previousReply, earlier));
+        when(chatHistoryService.getStructuredContext(conversationId))
+                .thenReturn(Optional.of("{\"criteria\":{\"query\":\"SUP\",\"participants\":2}}"));
+        List<AiMessage> sent = new ArrayList<>();
+        when(llmClientPort.generateResponse(any(), eq(SupportedLanguage.VI))).thenAnswer(invocation -> {
+            sent.addAll(invocation.getArgument(0));
+            LlmResponse response = new LlmResponse();
+            response.setContent("Tôi sẽ tìm hoạt động chèo SUP.");
+            return response;
+        });
+
+        chatUseCase.processMessage(conversationId, current.getContent(), SupportedLanguage.VI);
+
+        assertEquals(4, sent.size());
+        assertEquals(List.of("Tôi thích chèo SUP.", "Tôi đã ghi nhận.", "Tìm hoạt động phù hợp cho tôi."),
+                sent.subList(0, 3).stream().map(AiMessage::getContent).toList());
+        assertEquals(AiMessageRole.ASSISTANT, sent.get(1).getRole());
+        assertTrue(sent.subList(0, 3).stream().allMatch(message -> conversationId.equals(message.getConversationId())));
+        assertTrue(sent.get(3).getContent().contains("\"participants\":2"));
+        assertTrue(sent.get(3).getContent().contains("\"query\":\"SUP\""));
+        verify(chatHistoryService).appendMessage(conversationId, AiMessageRole.USER, current.getContent(), null);
+    }
 
     @Test
     @DisplayName("i18n: conversation locale is propagated to the LLM and tool execution context")

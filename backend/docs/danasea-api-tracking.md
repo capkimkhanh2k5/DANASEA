@@ -193,6 +193,7 @@
 - [x] POST /api/vendor/services/{serviceId}/images
 - [x] DELETE /api/vendor/services/{serviceId}/images/{imageId}
 - [x] PATCH /api/vendor/services/{serviceId}/images/reorder
+- [x] GET /api/vendor/services/{serviceId}/safety-documents
 - [x] POST /api/vendor/services/{serviceId}/safety-documents
 - [x] GET /api/admin/services/{serviceId}/safety-documents
 - [x] PATCH /api/admin/services/{serviceId}/safety-documents/{docId}/approve

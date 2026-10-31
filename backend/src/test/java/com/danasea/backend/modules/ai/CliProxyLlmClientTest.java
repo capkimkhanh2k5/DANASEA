@@ -124,7 +124,7 @@ public class CliProxyLlmClientTest {
     }
 
     @Test
-    @DisplayName("Primary model times out (15s) -> Falls back to secondary model")
+    @DisplayName("Primary transport times out early -> Falls back to secondary model")
     void testPrimaryModel_Timeout_FallsBackToSecondaryModel() {
         ResourceAccessException timeoutEx = new ResourceAccessException("Read timed out after 15000ms");
 

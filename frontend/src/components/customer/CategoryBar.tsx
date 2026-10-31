@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Waves, Anchor, Ship, Zap, LifeBuoy, Sunset } from 'lucide-react';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { categoryService } from '../../services/categoryService';
 import type { CategoryDto } from '../../types/category';
@@ -8,14 +9,24 @@ interface CategoryBarProps {
   className?: string;
 }
 
-// Icon mapping fallback for Material Symbols
-const ICON_MAP: Record<string, string> = {
-  'cheo-sup-kayak': 'surfing',
-  'lan-ngam-san-ho': 'scuba_diving',
-  'cano-du-bay': 'speed',
-  'mo-to-nuoc-jetski': 'waves',
-  'truot-phao-chuoi': 'sports_kabaddi',
-  'du-thuyen-ngam-hoang-hon': 'sailing',
+// Icon mapping fallback for Lucide icons
+const renderCategoryIcon = (slug: string) => {
+  switch (slug) {
+    case 'cheo-sup-kayak':
+      return <Waves className="w-4 h-4 text-cyan-600 shrink-0" />;
+    case 'lan-ngam-san-ho':
+      return <Anchor className="w-4 h-4 text-cyan-600 shrink-0" />;
+    case 'cano-du-bay':
+      return <Ship className="w-4 h-4 text-cyan-600 shrink-0" />;
+    case 'mo-to-nuoc-jetski':
+      return <Zap className="w-4 h-4 text-cyan-600 shrink-0" />;
+    case 'truot-phao-chuoi':
+      return <LifeBuoy className="w-4 h-4 text-cyan-600 shrink-0" />;
+    case 'du-thuyen-ngam-hoang-hon':
+      return <Sunset className="w-4 h-4 text-cyan-600 shrink-0" />;
+    default:
+      return <Waves className="w-4 h-4 text-cyan-600 shrink-0" />;
+  }
 };
 
 export const CategoryBar: React.FC<CategoryBarProps> = ({ className = '' }) => {
@@ -48,7 +59,7 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({ className = '' }) => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [language]);
 
   const handleCategoryClick = (slug: string) => {
     navigate(`/search?category=${encodeURIComponent(slug)}`);
@@ -57,14 +68,14 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({ className = '' }) => {
   // Skeleton loading state
   if (isLoading) {
     return (
-      <div className={`flex items-center justify-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar py-2 ${className}`}>
+      <div data-ui="category-bar" className={`flex items-center justify-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar py-2 ${className}`}>
         {Array.from({ length: 6 }).map((_, idx) => (
           <div
             key={`cat-skel-${idx}`}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-white/60 dark:bg-slate-800/60 border border-slate-200/50 animate-pulse shrink-0"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200/80 animate-pulse shrink-0"
           >
-            <div className="w-4 h-4 rounded-full bg-slate-300 dark:bg-slate-700" />
-            <div className="w-16 sm:w-20 h-3.5 rounded bg-slate-300 dark:bg-slate-700" />
+            <div className="w-4 h-4 rounded-md bg-slate-200" />
+            <div className="w-16 sm:w-20 h-3.5 rounded bg-slate-200" />
           </div>
         ))}
       </div>
@@ -76,9 +87,8 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({ className = '' }) => {
   }
 
   return (
-    <div className={`flex items-center justify-start sm:justify-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar py-2 px-2 select-none ${className}`}>
+    <div data-ui="category-bar" className={`flex items-center justify-start sm:justify-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar py-2 px-2 select-none ${className}`}>
       {categories.map((cat) => {
-        const iconName = cat.iconUrl || ICON_MAP[cat.slug] || 'waves';
         const label = language === 'en' ? (cat.nameEn || cat.name) : cat.name;
 
         return (
@@ -86,11 +96,9 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({ className = '' }) => {
             key={cat.id}
             type="button"
             onClick={() => handleCategoryClick(cat.slug)}
-            className="group flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-full bg-white/90 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-700 shadow-xs hover:shadow-md hover:border-cyan-500 hover:text-cyan-700 dark:hover:text-cyan-400 hover:scale-[1.02] active:scale-95 transition-all text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-200 shrink-0 cursor-pointer"
+            className="group flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-white border border-slate-200/90 hover:border-cyan-500 hover:text-cyan-700 hover:-translate-y-0.5 active:translate-y-0 transition-all text-[13px] sm:text-sm font-medium text-slate-800 shrink-0 cursor-pointer"
           >
-            <span className="material-symbols-outlined text-[18px] text-cyan-600 dark:text-cyan-400 group-hover:rotate-6 transition-transform">
-              {iconName}
-            </span>
+            {renderCategoryIcon(cat.slug)}
             <span className="whitespace-nowrap">{label}</span>
           </button>
         );
@@ -98,3 +106,4 @@ export const CategoryBar: React.FC<CategoryBarProps> = ({ className = '' }) => {
     </div>
   );
 };
+export default CategoryBar;

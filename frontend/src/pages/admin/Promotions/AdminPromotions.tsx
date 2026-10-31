@@ -1,431 +1,795 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
+import {
+  Plus,
+  Search,
+  Tag,
+  Percent,
+  Banknote,
+  Calendar,
+  Pause,
+  Pencil,
+  Play,
+} from 'lucide-react';
 import { MOCK_ADMIN_PROMOTIONS } from '../../../data/adminMockData';
+import { adminDiscountCodeService, getAdminDiscountError } from '../../../services/adminDiscountCodeService';
 import type { DiscountCode, DiscountType } from '../../../types';
+import {
+  AdminBadge,
+  AdminState,
+} from '../../../components/admin/AdminUI';
+import {
+  AdminFilterTabs,
+  AdminButton,
+  AdminNotice,
+  AdminPagination,
+} from '../../../components/admin/AdminWorkspace';
+import { AdminDialog } from '../../../components/admin/AdminDialog';
+import {
+  filterPromotions,
+  validatePromotionForm,
+  savePromotion,
+  togglePromotionActive,
+  isPromotionExpired,
+  isPromotionDepleted,
+  getVietnamTodayString,
+  getLastDayOfMonth,
+  computeNextValidToOnStartChange,
+  type PromotionStatusFilter,
+  type PromotionTypeFilter,
+  type PromotionFormData,
+} from './promotionsModel';
+import './AdminPromotions.css';
 
 export function AdminPromotions() {
-  const [promotions, setPromotions] = useState<DiscountCode[]>(MOCK_ADMIN_PROMOTIONS);
-  const [selectedPromo, setSelectedPromo] = useState<DiscountCode | null>(MOCK_ADMIN_PROMOTIONS[0] || null);
+  const location = useLocation();
+  const demo = import.meta.env.DEV && new URLSearchParams(location.search).get('demo') === '1';
+
+  // Data & Selection State
+  const [promotions, setPromotions] = useState<DiscountCode[]>(() => demo ? MOCK_ADMIN_PROMOTIONS : []);
+  const [loading, setLoading] = useState(() => !demo);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<PromotionStatusFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<PromotionTypeFilter>('all');
+
+  // Drawer & Modal State
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [editingPromo, setEditingPromo] = useState<DiscountCode | null>(null);
+  const [pendingTogglePromo, setPendingTogglePromo] = useState<DiscountCode | null>(null);
 
   // Form State
-  const [formCode, setFormCode] = useState(MOCK_ADMIN_PROMOTIONS[0]?.code || '');
-  const [formType, setFormType] = useState<DiscountType>(MOCK_ADMIN_PROMOTIONS[0]?.discountType || 'FIXED');
-  const [formValue, setFormValue] = useState<number>(MOCK_ADMIN_PROMOTIONS[0]?.discountValue || 50000);
-  const [formMaxUses, setFormMaxUses] = useState<number>(MOCK_ADMIN_PROMOTIONS[0]?.maxUses || 1000);
-  const [formValidFrom, setFormValidFrom] = useState<string>(MOCK_ADMIN_PROMOTIONS[0]?.validFrom?.slice(0, 10) || '2024-10-01');
-  const [formValidTo, setFormValidTo] = useState<string>(MOCK_ADMIN_PROMOTIONS[0]?.validTo?.slice(0, 10) || '2024-10-31');
-  const [formIsActive, setFormIsActive] = useState<boolean>(MOCK_ADMIN_PROMOTIONS[0]?.isActive ?? true);
+  const [formData, setFormData] = useState<PromotionFormData>({
+    code: '',
+    discountType: 'FIXED',
+    discountValue: 50000,
+    maxUses: 500,
+    validFrom: new Date().toISOString().slice(0, 10),
+    validTo: '2026-12-31',
+    isActive: true,
+  });
+  const [formError, setFormError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  // Toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  useEffect(() => {
+    if (demo) return;
+
+    let isMounted = true;
+    adminDiscountCodeService.getDiscountCodes({ page: 0, size: 50 })
+      .then(res => {
+        if (!isMounted) return;
+        const mapped: DiscountCode[] = (res.content || []).map(d => ({
+          id: d.id,
+          code: d.code,
+          scope: 'GLOBAL',
+          vendorId: d.vendorId || '',
+          discountType: d.discountType,
+          discountValue: d.discountValue,
+          maxUses: d.maxUses || 0,
+          usedCount: d.usedCount || 0,
+          validFrom: d.validFrom || '',
+          validTo: d.validTo || '',
+          isActive: d.isActive,
+          createdAt: d.createdAt,
+          updatedAt: d.updatedAt,
+        }));
+        setPromotions(mapped);
+        setLoading(false);
+      })
+      .catch(err => {
+        if (!isMounted) return;
+        const info = getAdminDiscountError(err);
+        setErrorMessage(info.message);
+        setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [demo]);
+
+  const showNotice = (text: string) => {
+    setNotice(text);
   };
 
-  const handleSelectPromo = (promo: DiscountCode) => {
-    setSelectedPromo(promo);
-    setFormCode(promo.code);
-    setFormType(promo.discountType);
-    setFormValue(promo.discountValue);
-    setFormMaxUses(promo.maxUses);
-    setFormValidFrom(promo.validFrom?.slice(0, 10) || '');
-    setFormValidTo(promo.validTo?.slice(0, 10) || '');
-    setFormIsActive(promo.isActive);
+  // Metrics Calculation
+  const metrics = useMemo(() => {
+    const total = promotions.length;
+    let active = 0;
+    let inactive = 0;
+    let expired = 0;
+    let depleted = 0;
+
+    promotions.forEach(p => {
+      const isExp = isPromotionExpired(p);
+      const isDep = isPromotionDepleted(p);
+      if (isExp) {
+        expired++;
+      }
+      if (isDep) {
+        depleted++;
+      }
+      if (p.isActive && !isExp && !isDep) {
+        active++;
+      } else if (!p.isActive && !isExp && !isDep) {
+        inactive++;
+      }
+    });
+
+    return { total, active, inactive, expired, depleted };
+  }, [promotions]);
+
+  // Filtered List
+  const filteredPromotions = useMemo(() => {
+    return filterPromotions(promotions, searchQuery, statusFilter, typeFilter);
+  }, [promotions, searchQuery, statusFilter, typeFilter]);
+
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(filteredPromotions.length / PAGE_SIZE) || 1;
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedPromotions = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filteredPromotions.slice(start, start + PAGE_SIZE);
+  }, [filteredPromotions, activePage]);
+
+  // Drawer Handlers
+  const handleOpenCreateDrawer = () => {
+    const today = getVietnamTodayString();
+    const endOfMonth = getLastDayOfMonth(today);
+    setEditingPromo(null);
+    setFormData({
+      code: '',
+      discountType: 'FIXED',
+      discountValue: 50000,
+      maxUses: 500,
+      validFrom: today,
+      validTo: endOfMonth,
+      isActive: true,
+    });
+    setFormError(null);
+    setIsDrawerOpen(true);
   };
 
-  const handleResetForNew = () => {
-    setSelectedPromo(null);
-    setFormCode('');
-    setFormType('FIXED');
-    setFormValue(50000);
-    setFormMaxUses(500);
-    setFormValidFrom(new Date().toISOString().slice(0, 10));
-    setFormValidTo('2024-12-31');
-    setFormIsActive(true);
+  const handleValidFromChange = (newVal: string) => {
+    setFormData(prev => ({
+      ...prev,
+      validFrom: newVal,
+      validTo: computeNextValidToOnStartChange(newVal, prev.validTo),
+    }));
+  };
+
+  const handleOpenEditDrawer = (promo: DiscountCode) => {
+    setEditingPromo(promo);
+    setFormData({
+      code: promo.code,
+      discountType: promo.discountType,
+      discountValue: promo.discountValue,
+      maxUses: promo.maxUses,
+      validFrom: promo.validFrom?.slice(0, 10) || '',
+      validTo: promo.validTo?.slice(0, 10) || '',
+      isActive: promo.isActive,
+    });
+    setFormError(null);
+    setIsDrawerOpen(true);
   };
 
   const handleTypeChange = (newType: DiscountType) => {
-    if (newType === formType) return;
-    setFormType(newType);
+    if (newType === formData.discountType) return;
+    let newValue = formData.discountValue;
     if (newType === 'PERCENTAGE') {
-      // If switching from cash (e.g. 50000, 5000) to percentage, adapt to a sensible % (15%)
-      if (formValue > 100) {
-        setFormValue(15);
-      }
+      if (newValue > 100) newValue = 15;
     } else {
-      // If switching from percentage (<= 100) to cash, adapt to a sensible cash amount (50.000 VNĐ)
-      if (formValue <= 100) {
-        setFormValue(50000);
-      }
+      if (newValue <= 100) newValue = 50000;
     }
+    setFormData(prev => ({
+      ...prev,
+      discountType: newType,
+      discountValue: newValue,
+    }));
   };
 
-  const handleSavePromo = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formCode) {
-      alert("Vui lòng nhập mã ưu đãi!");
+  const handleSavePromotion = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const validation = validatePromotionForm(formData);
+    if (!validation.valid) {
+      setFormError(validation.error || 'Dữ liệu không hợp lệ');
       return;
     }
 
-    if (formType === 'PERCENTAGE' && (Number(formValue) < 1 || Number(formValue) > 100)) {
-      alert("Mức giảm theo phần trăm phải nằm trong khoảng từ 1% đến 100%!");
-      return;
-    }
-
-    if (formType === 'FIXED' && Number(formValue) < 1000) {
-      alert("Mức giảm cố định tối thiểu là 1.000 VNĐ!");
-      return;
-    }
-
-    if (selectedPromo) {
-      setPromotions(prev =>
-        prev.map(p =>
-          p.id === selectedPromo.id
-            ? {
-                ...p,
-                code: formCode.toUpperCase(),
-                discountType: formType,
-                discountValue: Number(formValue),
-                maxUses: Number(formMaxUses),
-                validFrom: new Date(formValidFrom).toISOString(),
-                validTo: new Date(formValidTo).toISOString(),
-                isActive: formIsActive,
-                updatedAt: new Date().toISOString()
-              }
-            : p
-        )
+    if (demo) {
+      const { updatedList, savedItem } = savePromotion(
+        promotions,
+        formData,
+        editingPromo ? editingPromo.id : null,
+        demo
       );
-      showToast(`Đã lưu cấu hình mã ưu đãi ${formCode.toUpperCase()}!`);
-    } else {
-      const newPromo: DiscountCode = {
-        id: `promo-${Date.now()}`,
-        code: formCode.toUpperCase(),
-        scope: 'GLOBAL',
-        vendorId: '',
-        discountType: formType,
-        discountValue: Number(formValue),
-        maxUses: Number(formMaxUses),
-        usedCount: 0,
-        validFrom: new Date(formValidFrom).toISOString(),
-        validTo: new Date(formValidTo).toISOString(),
-        isActive: formIsActive,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      setPromotions(prev => [newPromo, ...prev]);
-      setSelectedPromo(newPromo);
-      showToast(`Đã tạo mới mã ưu đãi toàn sàn ${newPromo.code}!`);
+
+      setPromotions(updatedList);
+      setIsDrawerOpen(false);
+      showNotice(
+        editingPromo
+          ? `Đã cập nhật mã ưu đãi ${savedItem?.code}`
+          : `Đã tạo thành công mã ưu đãi toàn sàn ${savedItem?.code}`
+      );
+      return;
+    }
+
+    try {
+      if (editingPromo) {
+        const updated = await adminDiscountCodeService.updateDiscountCode(editingPromo.id, {
+          discountValue: formData.discountValue,
+          maxUses: formData.maxUses,
+          validFrom: `${formData.validFrom}T00:00:00Z`,
+          validTo: `${formData.validTo}T23:59:59Z`,
+          isActive: formData.isActive,
+        });
+        setPromotions(prev => prev.map(p => p.id === updated.id ? {
+          ...p,
+          discountValue: updated.discountValue,
+          maxUses: updated.maxUses || 0,
+          validFrom: updated.validFrom || '',
+          validTo: updated.validTo || '',
+          isActive: updated.isActive,
+        } : p));
+        setIsDrawerOpen(false);
+        showNotice(`Đã cập nhật mã ưu đãi ${updated.code}`);
+      } else {
+        const created = await adminDiscountCodeService.createDiscountCode({
+          code: formData.code.toUpperCase().trim(),
+          discountType: formData.discountType,
+          discountValue: formData.discountValue,
+          maxUses: formData.maxUses,
+          validFrom: `${formData.validFrom}T00:00:00Z`,
+          validTo: `${formData.validTo}T23:59:59Z`,
+          scope: 'PLATFORM',
+        });
+        const newPromo: DiscountCode = {
+          id: created.id,
+          code: created.code,
+          scope: 'GLOBAL',
+          vendorId: created.vendorId || '',
+          discountType: created.discountType,
+          discountValue: created.discountValue,
+          maxUses: created.maxUses || 0,
+          usedCount: created.usedCount || 0,
+          validFrom: created.validFrom || '',
+          validTo: created.validTo || '',
+          isActive: created.isActive,
+          createdAt: created.createdAt,
+          updatedAt: created.updatedAt,
+        };
+        setPromotions(prev => [newPromo, ...prev]);
+        setIsDrawerOpen(false);
+        showNotice(`Đã tạo thành công mã ưu đãi toàn sàn ${created.code}`);
+      }
+    } catch (err) {
+      const info = getAdminDiscountError(err, true);
+      setFormError(info.message);
     }
   };
 
-  const handleToggleActiveQuick = () => {
-    if (!selectedPromo) return;
-    const nextState = !selectedPromo.isActive;
-    setPromotions(prev =>
-      prev.map(p => (p.id === selectedPromo.id ? { ...p, isActive: nextState } : p))
-    );
-    setFormIsActive(nextState);
-    showToast(`Đã ${nextState ? 'kích hoạt' : 'tạm tắt'} mã ${selectedPromo.code}.`);
+  // Toggle Status
+  const handleRequestToggle = (promo: DiscountCode) => {
+    setPendingTogglePromo(promo);
+  };
+
+  const handleConfirmToggle = async () => {
+    if (!pendingTogglePromo) return;
+
+    if (demo) {
+      const { updatedList, targetPromo, nextState } = togglePromotionActive(
+        promotions,
+        pendingTogglePromo.id,
+        demo
+      );
+
+      setPromotions(updatedList);
+      setPendingTogglePromo(null);
+      showNotice(
+        `Đã ${nextState ? 'kích hoạt' : 'tạm dừng'} mã ưu đãi ${targetPromo?.code}`
+      );
+      return;
+    }
+
+    try {
+      const nextActive = !pendingTogglePromo.isActive;
+      await adminDiscountCodeService.updateDiscountCode(pendingTogglePromo.id, {
+        isActive: nextActive,
+      });
+      setPromotions(prev => prev.map(p => p.id === pendingTogglePromo.id ? { ...p, isActive: nextActive } : p));
+      setPendingTogglePromo(null);
+      showNotice(`Đã ${nextActive ? 'kích hoạt' : 'tạm dừng'} mã ưu đãi ${pendingTogglePromo.code}`);
+    } catch (err) {
+      const info = getAdminDiscountError(err, true);
+      showNotice(`Lỗi: ${info.message}`);
+      setPendingTogglePromo(null);
+    }
   };
 
   return (
-    <main className="w-full pt-16 bg-surface px-space-xl pb-space-2xl min-h-screen">
-      <div className="flex flex-col w-full animate-fade-in-up">
-        {/* Toast */}
-        {toastMessage && (
-          <div className="fixed top-20 right-8 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-primary text-on-primary shadow-xl animate-fade-in-up">
-            <span className="material-symbols-outlined text-[20px]">check_circle</span>
-            <span className="font-label-md text-label-md font-semibold">{toastMessage}</span>
+    <div className="admin-promotions">
+      {/* Filter Tabs */}
+      <AdminFilterTabs
+        label="Lọc trạng thái mã khuyến mãi"
+        value={statusFilter}
+        onChange={(val) => {
+          setStatusFilter(val as PromotionStatusFilter);
+          setCurrentPage(1);
+        }}
+        items={[
+          { value: 'all', label: 'Tất cả chương trình', count: metrics.total },
+          { value: 'active', label: 'Đang áp dụng', count: metrics.active },
+          { value: 'inactive', label: 'Tạm dừng', count: metrics.inactive },
+          { value: 'expired', label: 'Đã hết hạn', count: metrics.expired },
+          { value: 'depleted', label: 'Hết lượt', count: metrics.depleted },
+        ]}
+      />
+
+      {/* Controls Toolbar */}
+      <div className="admin-promotions__controls">
+        <div className="admin-promotions__search-box">
+          <Search size={18} className="admin-promotions__search-icon" aria-hidden="true" />
+          <input
+            type="text"
+            className="admin-promotions__search-input"
+            placeholder="Tìm theo mã voucher (VD: DANASEA50)..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
+            aria-label="Tìm theo mã voucher"
+          />
+        </div>
+
+        <div className="admin-promotions__filters">
+          <select
+            className="admin-promotions__select"
+            value={typeFilter}
+            onChange={(e) => {
+              setTypeFilter(e.target.value as PromotionTypeFilter);
+              setCurrentPage(1);
+            }}
+            aria-label="Lọc theo loại hình chiết khấu"
+          >
+            <option value="all">Tất cả loại ưu đãi</option>
+            <option value="FIXED">Giảm tiền mặt (VNĐ)</option>
+            <option value="PERCENTAGE">Giảm theo tỷ lệ (%)</option>
+          </select>
+          <AdminButton
+            variant="primary"
+            onClick={handleOpenCreateDrawer}
+          >
+            <Plus size={16} aria-hidden="true" />
+            Tạo mã ưu đãi mới
+          </AdminButton>
+        </div>
+      </div>
+
+      {/* Main Promotions Table */}
+      <div key={statusFilter} className="admin-promotions__card admin-tab-pane">
+        {loading ? (
+          <div style={{ padding: '40px 20px' }}>
+            <AdminState
+              kind="empty"
+              title="Đang tải danh sách khuyến mãi..."
+              description="Vui lòng đợi trong giây lát khi hệ thống kết nối máy chủ."
+            />
+          </div>
+        ) : errorMessage ? (
+          <div style={{ padding: '40px 20px' }}>
+            <AdminState
+              kind="error"
+              title="Không thể tải khuyến mãi"
+              description={errorMessage}
+            />
+          </div>
+        ) : filteredPromotions.length === 0 ? (
+          <div style={{ padding: '40px 20px' }}>
+            <AdminState
+              kind="empty"
+              title="Không tìm thấy mã khuyến mãi nào"
+              description={promotions.length === 0 ? "Hiện tại chưa có mã ưu đãi nào được kích hoạt trên sàn DANASEA." : "Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc trạng thái để xem các chương trình khác."}
+              action={
+                <AdminButton
+                  onClick={() => {
+                    setSearchQuery('');
+                    setStatusFilter('all');
+                    setTypeFilter('all');
+                  }}
+                >
+                  Xóa bộ lọc
+                </AdminButton>
+              }
+            />
+          </div>
+        ) : (
+          <div className="admin-promotions__table-container">
+            <table className="admin-promotions__table">
+              <thead>
+                <tr>
+                  <th>Mã ưu đãi & Phạm vi</th>
+                  <th>Mức giảm</th>
+                  <th>Tiến độ sử dụng</th>
+                  <th>Thời hạn áp dụng</th>
+                  <th>Trạng thái</th>
+                  <th style={{ textAlign: 'center', width: '96px' }}>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedPromotions.map((promo) => {
+                  const isExpired = isPromotionExpired(promo);
+                  const isDepleted = isPromotionDepleted(promo);
+                  const isConcluded = isExpired || isDepleted;
+                  const progressPct = Math.min(
+                    100,
+                    Math.round((promo.usedCount / (promo.maxUses || 1)) * 100)
+                  );
+
+                  return (
+                    <tr key={promo.id} className="admin-promotions__row">
+                      {/* Code & Scope */}
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <span className="admin-promotions__code-chip">
+                            <Tag size={14} aria-hidden="true" />
+                            {promo.code}
+                          </span>
+                          <span className="admin-promotions__scope-tag">
+                            {promo.scope === 'GLOBAL' ? 'Toàn bộ dịch vụ biển' : 'Theo đối tác'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Discount Amount */}
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span className="admin-promotions__discount-val">
+                            {promo.discountType === 'FIXED'
+                              ? `${promo.discountValue.toLocaleString('vi-VN')} đ`
+                              : `${promo.discountValue}%`}
+                          </span>
+                          <span className="admin-promotions__discount-type">
+                            {promo.discountType === 'FIXED' ? 'Khấu trừ trực tiếp' : 'Chiết khấu đơn hàng'}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Usage Progress */}
+                      <td>
+                        <div className="admin-promotions__usage">
+                          <div className="admin-promotions__usage-text">
+                            <span>
+                              {promo.usedCount} / {promo.maxUses} lượt
+                            </span>
+                            <span>{progressPct}%</span>
+                          </div>
+                          <div className="admin-promotions__progress-bar">
+                            <div
+                              className={`admin-promotions__progress-fill ${
+                                isDepleted ? 'admin-promotions__progress-fill--depleted' : ''
+                              }`}
+                              style={{ width: `${progressPct}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Date Range */}
+                      <td>
+                        <div className="admin-promotions__date-range">
+                          <Calendar size={15} style={{ color: 'var(--admin-muted, #737373)' }} aria-hidden="true" />
+                          <span className="admin-promotions__date">
+                            {promo.validFrom?.slice(0, 10)} → {promo.validTo?.slice(0, 10)}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Status Badge */}
+                      <td>
+                        {isConcluded ? (
+                          <AdminBadge tone="neutral">
+                            {isDepleted ? 'HẾT LƯỢT' : 'HẾT HẠN'}
+                          </AdminBadge>
+                        ) : promo.isActive ? (
+                          <AdminBadge tone="teal">ĐANG ÁP DỤNG</AdminBadge>
+                        ) : (
+                          <AdminBadge tone="amber">TẠM DỪNG</AdminBadge>
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ textAlign: 'center' }}>
+                        <div className="admin-promotions__actions">
+                          <button
+                            type="button"
+                            className="admin-action-icon-btn"
+                            aria-label={`Chỉnh sửa mã ưu đãi ${promo.code}`}
+                            title="Chỉnh sửa mã ưu đãi"
+                            onClick={() => handleOpenEditDrawer(promo)}
+                          >
+                            <Pencil size={15} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            className={`admin-action-icon-btn ${promo.isActive ? 'admin-action-icon-btn--danger' : ''}`}
+                            aria-label={promo.isActive ? `Tạm tắt mã ưu đãi ${promo.code}` : `Kích hoạt mã ưu đãi ${promo.code}`}
+                            title={promo.isActive ? 'Tạm tắt mã ưu đãi' : 'Kích hoạt lại mã ưu đãi'}
+                            onClick={() => handleRequestToggle(promo)}
+                          >
+                            {promo.isActive ? (
+                              <Pause size={15} aria-hidden="true" />
+                            ) : (
+                              <Play size={15} aria-hidden="true" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-slate-200">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">
-              Quản lý Khuyến mãi Toàn sàn
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-600 text-xs font-medium">
-              Tổng: <strong>{promotions.length}</strong> mã
-            </span>
-            <button 
-              onClick={handleResetForNew}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-container transition-colors shadow-xs"
-            >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              <span>Tạo Mã Toàn Sàn</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Main 2-Column Split */}
-        <div className="grid grid-cols-12 gap-space-lg items-start">
-          {/* Left Column: Promotions Ledger Table (7 cols) */}
-          <div className="col-span-12 lg:col-span-7 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Sổ Cái Voucher Toàn Sàn</span>
-              <span className="text-xs text-slate-500 font-medium">{promotions.length} mã khả dụng</span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-700 font-semibold text-[11px] uppercase">
-                    <th className="py-2.5 px-3 border-r border-slate-200">Mã voucher</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200">Mức giảm</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200">Tiến độ sử dụng</th>
-                    <th className="py-2.5 px-3 border-r border-slate-200">Thời hạn</th>
-                    <th className="py-2.5 px-3 text-center">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 text-slate-700">
-                  {promotions.map(promo => {
-                    const isSelected = promo.id === selectedPromo?.id;
-                    const progressPct = Math.min(100, Math.round((promo.usedCount / (promo.maxUses || 1)) * 100));
-
-                    return (
-                      <tr
-                        key={promo.id}
-                        onClick={() => handleSelectPromo(promo)}
-                        className={`cursor-pointer transition-colors ${
-                          isSelected
-                            ? 'bg-primary/5 border-l-4 border-l-primary font-medium text-slate-900'
-                            : 'hover:bg-slate-50 text-slate-600'
-                        }`}
-                      >
-                        <td className="py-3 px-3 border-r border-slate-200">
-                          <span className="font-mono text-xs font-bold text-primary px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20">
-                            {promo.code}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 font-semibold text-slate-800 border-r border-slate-200">
-                          {promo.discountType === 'FIXED'
-                            ? `${promo.discountValue.toLocaleString('vi-VN')} đ`
-                            : `${promo.discountValue}%`}
-                        </td>
-                        <td className="py-3 px-3 min-w-[120px] border-r border-slate-200">
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
-                            <span>{promo.usedCount}/{promo.maxUses}</span>
-                            <span className="font-semibold text-slate-700">{progressPct}%</span>
-                          </div>
-                          <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
-                            <div className="h-full bg-primary rounded-full" style={{ width: `${progressPct}%` }}></div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-3 text-slate-500 text-[11px] whitespace-nowrap border-r border-slate-200">
-                          {promo.validFrom?.slice(0, 10)} → {promo.validTo?.slice(0, 10)}
-                        </td>
-                        <td className="py-3 px-3 text-center whitespace-nowrap">
-                          <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                            promo.isActive ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-slate-100 text-slate-500 border border-slate-200'
-                          }`}>
-                            {promo.isActive ? 'ĐANG CHẠY' : 'TẠM TẮT'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Right Column: Editor Form (5 cols) */}
-          <div className="col-span-12 lg:col-span-5 flex flex-col gap-space-lg sticky top-20">
-            <div className="bg-white rounded-xl shadow-xs p-space-xl flex flex-col gap-4 border border-slate-200">
-              <div className="flex items-start justify-between pb-3 border-b border-slate-200">
-                <div>
-                  <span className="font-label-sm text-xs font-medium text-primary">Cấu hình chiến dịch</span>
-                  <h3 className="font-headline-sm font-black text-on-surface mt-0.5">
-                    {selectedPromo ? `Sửa mã: ${selectedPromo.code}` : 'Tạo mới Voucher'}
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleResetForNew}
-                  className="px-2.5 py-1 rounded-lg bg-surface-container text-xs font-semibold text-on-surface"
-                >
-                  Tạo mới
-                </button>
-              </div>
-
-              <form onSubmit={handleSavePromo} className="flex flex-col gap-3.5">
-                <div>
-                  <label className="block text-xs font-bold text-on-surface mb-1">MÃ ƯU ĐÃI (CODE) *</label>
-                  <input 
-                    value={formCode}
-                    onChange={(e) => setFormCode(e.target.value.toUpperCase())}
-                    required
-                    placeholder="VD: DANASEA50"
-                    className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low font-mono font-black text-base text-on-surface uppercase focus:outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-on-surface mb-1">LOẠI CHIẾT KHẤU *</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleTypeChange('FIXED')}
-                      className={`h-10 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        formType === 'FIXED' ? 'bg-primary text-on-primary shadow-xs' : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">payments</span>
-                      <span>Cố định (VNĐ)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleTypeChange('PERCENTAGE')}
-                      className={`h-10 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        formType === 'PERCENTAGE' ? 'bg-primary text-on-primary shadow-xs' : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">percent</span>
-                      <span>Phần trăm (%)</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-bold text-on-surface">
-                      GIÁ TRỊ GIẢM ({formType === 'FIXED' ? 'VNĐ' : '%'}) *
-                    </label>
-                    <span className="text-[11px] text-outline font-semibold">
-                      {formType === 'PERCENTAGE' ? 'Tối đa 100%' : 'Tối thiểu 1.000 đ'}
-                    </span>
-                  </div>
-
-                  <div className="relative">
-                    <input 
-                      type="number"
-                      value={formValue}
-                      onChange={(e) => {
-                        let val = Number(e.target.value);
-                        if (formType === 'PERCENTAGE' && val > 100) {
-                          val = 100;
-                        }
-                        setFormValue(val);
-                      }}
-                      required
-                      min={1}
-                      max={formType === 'PERCENTAGE' ? 100 : undefined}
-                      step={formType === 'PERCENTAGE' ? 1 : 1000}
-                      className="w-full h-11 pl-3.5 pr-14 rounded-xl bg-surface-container-low font-bold text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                    />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-black text-primary pointer-events-none">
-                      {formType === 'FIXED' ? 'VNĐ' : '%'}
-                    </span>
-                  </div>
-
-                  {/* Quick Preset Chips */}
-                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                    <span className="text-[10px] text-outline uppercase font-bold mr-0.5">Chọn nhanh:</span>
-                    {formType === 'PERCENTAGE' ? (
-                      [5, 10, 15, 20, 30, 50].map(pct => (
-                        <button
-                          key={pct}
-                          type="button"
-                          onClick={() => setFormValue(pct)}
-                          className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-colors ${
-                            formValue === pct
-                              ? 'bg-primary text-on-primary shadow-xs'
-                              : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
-                          }`}
-                        >
-                          {pct}%
-                        </button>
-                      ))
-                    ) : (
-                      [20000, 50000, 100000, 200000, 500000].map(amt => (
-                        <button
-                          key={amt}
-                          type="button"
-                          onClick={() => setFormValue(amt)}
-                          className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-colors ${
-                            formValue === amt
-                              ? 'bg-primary text-on-primary shadow-xs'
-                              : 'bg-surface-container text-on-surface hover:bg-surface-container-high'
-                          }`}
-                        >
-                          {(amt / 1000).toLocaleString('vi-VN')}k
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-on-surface mb-1">GIỚI HẠN SỐ LƯỢT DÙNG *</label>
-                  <input 
-                    type="number"
-                    value={formMaxUses}
-                    onChange={(e) => setFormMaxUses(Number(e.target.value))}
-                    required
-                    min={1}
-                    className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low font-bold text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-bold text-on-surface mb-1">TỪ NGÀY</label>
-                    <input 
-                      type="date"
-                      value={formValidFrom}
-                      onChange={(e) => setFormValidFrom(e.target.value)}
-                      className="w-full h-10 px-2.5 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-on-surface mb-1">ĐẾN NGÀY</label>
-                    <input 
-                      type="date"
-                      value={formValidTo}
-                      onChange={(e) => setFormValidTo(e.target.value)}
-                      className="w-full h-10 px-2.5 rounded-xl bg-surface-container-low text-xs text-on-surface border border-outline-variant/30"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low">
-                  <span className="text-xs font-bold text-on-surface">Kích hoạt chiến dịch (is_active)</span>
-                  <input 
-                    type="checkbox"
-                    checked={formIsActive}
-                    onChange={(e) => setFormIsActive(e.target.checked)}
-                    className="w-4 h-4 accent-primary cursor-pointer"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2 pt-2">
-                  <button 
-                    type="submit"
-                    className="w-full h-11 rounded-xl bg-primary text-on-primary font-bold text-sm hover:bg-primary-container transition-all flex items-center justify-center gap-1.5 shadow-sm"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">save</span>
-                    <span>{selectedPromo ? 'Lưu Cấu Hình' : 'Tạo Chiến Dịch'}</span>
-                  </button>
-
-                  {selectedPromo && (
-                    <button 
-                      type="button"
-                      onClick={handleToggleActiveQuick}
-                      className="w-full h-10 rounded-xl bg-surface-container hover:bg-surface-container-high text-xs font-bold text-on-surface transition-colors"
-                    >
-                      {selectedPromo.isActive ? 'Tạm tắt mã' : 'Bật lại mã'}
-                    </button>
-                  )}
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+        {!loading && !errorMessage && filteredPromotions.length > 0 && (
+          <AdminPagination
+            currentPage={activePage}
+            totalPages={totalPages}
+            totalRecords={filteredPromotions.length}
+            pageSize={PAGE_SIZE}
+            recordLabel="mã ưu đãi"
+            onPageChange={setCurrentPage}
+          />
+        )}
       </div>
-    </main>
+
+      {/* Floating Notice */}
+      {!isDrawerOpen && <AdminNotice message={notice} onDismiss={() => setNotice(null)} />}
+
+      {/* Create / Edit Drawer */}
+      <AdminDialog
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        variant="drawer"
+        title={editingPromo ? `Chỉnh sửa mã ưu đãi: ${editingPromo.code}` : 'Tạo mới Mã khuyến mãi Toàn sàn'}
+        description="Cấu hình chiết khấu, hạn mức và thời gian triển khai áp dụng cho khách hàng."
+        footer={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, width: '100%' }}>
+            <AdminButton onClick={() => setIsDrawerOpen(false)}>Hủy</AdminButton>
+            <AdminButton variant="primary" onClick={() => handleSavePromotion()}>
+              {editingPromo ? 'Lưu cấu hình mã' : 'Kích hoạt mã ưu đãi'}
+            </AdminButton>
+          </div>
+        }
+      >
+        <form onSubmit={handleSavePromotion} className="admin-promotions__form">
+          {formError && (
+            <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#991b1b', fontSize: 13, fontWeight: 500 }}>
+              {formError}
+            </div>
+          )}
+
+          {/* Promotion Code */}
+          <div className="admin-promotions__form-group">
+            <label className="admin-promotions__form-label">
+              MÃ ƯU ĐÃI (PROMO CODE) *
+              <span className="admin-promotions__form-hint">Chữ hoa & số, không dấu cách</span>
+            </label>
+            <input
+              type="text"
+              className="admin-promotions__input admin-promotions__input--mono"
+              placeholder="VD: DANASEA50, BIENXANH15"
+              value={formData.code}
+              onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+              required
+            />
+          </div>
+
+          {/* Discount Type */}
+          <div className="admin-promotions__form-group">
+            <label className="admin-promotions__form-label">LOẠI HÌNH CHIẾT KHẤU *</label>
+            <div className="admin-promotions__type-buttons">
+              <button
+                type="button"
+                className={`admin-promotions__type-btn ${
+                  formData.discountType === 'FIXED' ? 'admin-promotions__type-btn--active' : ''
+                }`}
+                onClick={() => handleTypeChange('FIXED')}
+              >
+                <Banknote size={16} />
+                Cố định (VNĐ)
+              </button>
+              <button
+                type="button"
+                className={`admin-promotions__type-btn ${
+                  formData.discountType === 'PERCENTAGE' ? 'admin-promotions__type-btn--active' : ''
+                }`}
+                onClick={() => handleTypeChange('PERCENTAGE')}
+              >
+                <Percent size={16} />
+                Phần trăm (%)
+              </button>
+            </div>
+          </div>
+
+          {/* Discount Value with Quick Presets */}
+          <div className="admin-promotions__form-group">
+            <label className="admin-promotions__form-label">
+              MỨC GIẢM ({formData.discountType === 'FIXED' ? 'VNĐ' : '%'}) *
+              <span className="admin-promotions__form-hint">
+                {formData.discountType === 'PERCENTAGE' ? 'Khoảng từ 1% - 100%' : 'Tối thiểu 1.000 VNĐ'}
+              </span>
+            </label>
+            <input
+              type="number"
+              className="admin-promotions__input"
+              value={formData.discountValue}
+              onChange={(e) => {
+                let val = Number(e.target.value);
+                if (formData.discountType === 'PERCENTAGE' && val > 100) val = 100;
+                setFormData(prev => ({ ...prev, discountValue: val }));
+              }}
+              min={1}
+              max={formData.discountType === 'PERCENTAGE' ? 100 : undefined}
+              step={formData.discountType === 'PERCENTAGE' ? 1 : 1000}
+              required
+            />
+
+            {/* Quick Presets */}
+            <div className="admin-promotions__presets">
+              <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)', fontWeight: 600 }}>Chọn nhanh:</span>
+              {formData.discountType === 'PERCENTAGE'
+                ? [5, 10, 15, 20, 30, 50].map((pct) => (
+                    <button
+                      key={pct}
+                      type="button"
+                      className={`admin-promotions__preset-btn ${
+                        formData.discountValue === pct ? 'admin-promotions__preset-btn--active' : ''
+                      }`}
+                      onClick={() => setFormData(prev => ({ ...prev, discountValue: pct }))}
+                    >
+                      {pct}%
+                    </button>
+                  ))
+                : [20000, 50000, 100000, 200000, 500000].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      className={`admin-promotions__preset-btn ${
+                        formData.discountValue === amt ? 'admin-promotions__preset-btn--active' : ''
+                      }`}
+                      onClick={() => setFormData(prev => ({ ...prev, discountValue: amt }))}
+                    >
+                      {(amt / 1000).toLocaleString('vi-VN')}k
+                    </button>
+                  ))}
+            </div>
+          </div>
+
+          {/* Max Uses */}
+          <div className="admin-promotions__form-group">
+            <label className="admin-promotions__form-label">
+              GIỚI HẠN SỐ LƯỢT ÁP DỤNG *
+              <span className="admin-promotions__form-hint">Tối thiểu 1 lượt</span>
+            </label>
+            <input
+              type="number"
+              className="admin-promotions__input"
+              value={formData.maxUses}
+              onChange={(e) => setFormData(prev => ({ ...prev, maxUses: Number(e.target.value) }))}
+              min={1}
+              required
+            />
+          </div>
+
+          {/* Date Range */}
+          <div className="admin-promotions__form-group">
+            <label className="admin-promotions__form-label">THỜI GIAN HIỆU LỰC</label>
+            <div className="admin-promotions__date-grid">
+              <div>
+                <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)', display: 'block', marginBottom: 4 }}>
+                  Từ ngày
+                </span>
+                <input
+                  type="date"
+                  className="admin-promotions__input"
+                  value={formData.validFrom}
+                  onChange={(e) => handleValidFromChange(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)', display: 'block', marginBottom: 4 }}>
+                  Đến ngày (tối thiểu {formData.validFrom ? getLastDayOfMonth(formData.validFrom) : 'cuối tháng'})
+                </span>
+                <input
+                  type="date"
+                  className="admin-promotions__input"
+                  value={formData.validTo}
+                  min={formData.validFrom ? getLastDayOfMonth(formData.validFrom) : undefined}
+                  onChange={(e) => setFormData(prev => ({ ...prev, validTo: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Toggle Active */}
+          <div className="admin-promotions__toggle-card">
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--admin-ink, #171717)' }}>
+                Kích hoạt ngay chương trình
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--admin-muted, #737373)' }}>
+                Cho phép khách hàng nhập và sử dụng mã ngay tại giỏ hàng
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              className="admin-promotions__checkbox"
+              checked={formData.isActive}
+              onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+            />
+          </div>
+        </form>
+      </AdminDialog>
+
+      {/* Toggle Status Confirmation Modal */}
+      <AdminDialog
+        open={Boolean(pendingTogglePromo)}
+        onClose={() => setPendingTogglePromo(null)}
+        variant="modal"
+        title={pendingTogglePromo?.isActive ? 'Tạm dừng mã khuyến mãi?' : 'Kích hoạt lại mã khuyến mãi?'}
+        footer={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10, width: '100%' }}>
+            <AdminButton onClick={() => setPendingTogglePromo(null)}>Hủy bỏ</AdminButton>
+            <AdminButton
+              variant={pendingTogglePromo?.isActive ? 'danger' : 'primary'}
+              onClick={handleConfirmToggle}
+            >
+              {pendingTogglePromo?.isActive ? 'Xác nhận tạm dừng' : 'Kích hoạt lại'}
+            </AdminButton>
+          </div>
+        }
+      >
+        <div style={{ fontSize: 14, color: 'var(--admin-body, #262626)', lineHeight: 1.6, padding: '8px 0' }}>
+          {pendingTogglePromo?.isActive ? (
+            <>
+              Bạn có chắc chắn muốn tạm dừng mã ưu đãi <strong>{pendingTogglePromo?.code}</strong>? Sau khi tạm dừng, khách hàng sẽ không thể áp dụng mã này khi đặt dịch vụ.
+            </>
+          ) : (
+            <>
+              Bạn có muốn kích hoạt lại mã ưu đãi <strong>{pendingTogglePromo?.code}</strong>? Khách hàng sẽ có thể tiếp tục áp dụng mã này nếu vẫn còn trong thời hạn hiệu lực.
+            </>
+          )}
+        </div>
+      </AdminDialog>
+    </div>
   );
 }
 

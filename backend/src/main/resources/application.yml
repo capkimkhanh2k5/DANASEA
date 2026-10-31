@@ -167,5 +167,9 @@ ai:
     enabled: ${AI_CLIPROXY_ENABLED:true}
     base-url: ${AI_CLIPROXY_BASE_URL:http://localhost:8318/v1}
     api-key: ${AI_CLIPROXY_API_KEY:sk-cliproxy-pbl6-local-key}
-    model: ${AI_CLIPROXY_MODEL:gemini-3.5-flash}
-    fallback-model: ${AI_CLIPROXY_FALLBACK_MODEL:openai/gpt-oss-120b}
+    model: ${AI_CLIPROXY_MODEL:gemini-3.5-flash-lite}
+    fallback-model: ${AI_CLIPROXY_FALLBACK_MODEL:gpt-oss-120b-medium}
+    max-output-tokens: ${AI_CLIPROXY_MAX_OUTPUT_TOKENS:65536}
+    max-input-tokens: ${AI_CLIPROXY_MAX_INPUT_TOKENS:1048576}
+    fallback-context-tokens: ${AI_CLIPROXY_FALLBACK_CONTEXT_TOKENS:131072}
+    input-safety-tokens: ${AI_CLIPROXY_INPUT_SAFETY_TOKENS:8192}

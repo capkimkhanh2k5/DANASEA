@@ -1,50 +1,152 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import {
+  Anchor,
+  Compass,
+  FolderKanban,
+  Pencil,
+  Plus,
+  Search,
+  ShieldCheck,
+  Ship,
+  Sun,
+  Trash2,
+  Waves,
+  Wind,
+} from 'lucide-react';
 import { MOCK_ADMIN_CATEGORIES } from '../../../data/adminMockData';
+import { adminCategoryService, getAdminCategoryError } from '../../../services/adminCategoryService';
 import type { Category } from '../../../types';
+import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
+import {
+  AdminButton,
+  AdminFilterTabs,
+  AdminNotice,
+  AdminPagination,
+} from '../../../components/admin/AdminWorkspace';
+import { AdminDialog } from '../../../components/admin/AdminDialog';
+import {
+  deleteCategory,
+  filterCategories,
+  saveCategory,
+  slugifyCategory,
+  toggleCategoryStatus,
+  validateCategoryForm,
+  type CategoryCertFilter,
+  type CategoryFormData,
+  type CategoryStatusFilter,
+} from './categoriesModel';
+import './Categories.css';
+
+const ICON_PRESETS: { key: string; label: string; icon: React.ComponentType<{ size?: number }> }[] = [
+  { key: 'surfing', label: 'Lướt sóng / SUP', icon: Waves },
+  { key: 'speed', label: 'Cano / Tốc độ', icon: Ship },
+  { key: 'scuba_diving', label: 'Lặn biển', icon: Anchor },
+  { key: 'kayaking', label: 'Kayak', icon: Wind },
+  { key: 'sailing', label: 'Du thuyền', icon: Compass },
+  { key: 'waves', label: 'Vui chơi biển', icon: Sun },
+];
+
+function getCategoryIcon(key: string) {
+  const preset = ICON_PRESETS.find(p => p.key === key);
+  return preset ? preset.icon : FolderKanban;
+}
 
 export function Categories() {
-  const [categories, setCategories] = useState<Category[]>(MOCK_ADMIN_CATEGORIES);
+  const location = useLocation();
+  const demo = import.meta.env.DEV && new URLSearchParams(location.search).get('demo') === '1';
+
+  const [categories, setCategories] = useState<Category[]>(() => demo ? MOCK_ADMIN_CATEGORIES : []);
+  const [loading, setLoading] = useState(() => !demo);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Selected category for editing (or null for creating new)
-  const [editingCategory, setEditingCategory] = useState<Category | null>(MOCK_ADMIN_CATEGORIES[0] || null);
+  const [statusFilter, setStatusFilter] = useState<CategoryStatusFilter>('all');
+  const [certFilter, setCertFilter] = useState<CategoryCertFilter>('all');
 
-  // Form State
-  const [formName, setFormName] = useState(MOCK_ADMIN_CATEGORIES[0]?.name || '');
-  const [formNameEn, setFormNameEn] = useState(MOCK_ADMIN_CATEGORIES[0]?.nameEn || '');
-  const [formSlug, setFormSlug] = useState(MOCK_ADMIN_CATEGORIES[0]?.slug || '');
-  const [formParentId, setFormParentId] = useState(MOCK_ADMIN_CATEGORIES[0]?.parentId || '');
-  const [formIcon, setFormIcon] = useState(MOCK_ADMIN_CATEGORIES[0]?.iconUrl || 'surfing');
-  const [formIsActive, setFormIsActive] = useState(MOCK_ADMIN_CATEGORIES[0]?.isActive ?? true);
-  const [formRequiresCert, setFormRequiresCert] = useState(MOCK_ADMIN_CATEGORIES[0]?.requiresSafetyCert ?? true);
+  // Drawer Form State
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [formName, setFormName] = useState('');
+  const [formNameEn, setFormNameEn] = useState('');
+  const [formSlug, setFormSlug] = useState('');
+  const [formParentId, setFormParentId] = useState('');
+  const [formIcon, setFormIcon] = useState('surfing');
+  const [formIsActive, setFormIsActive] = useState(true);
+  const [formRequiresCert, setFormRequiresCert] = useState(true);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [_isSubmitting, setIsSubmitting] = useState(false);
 
-  // Toast
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+  // Delete Modal State
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  // Notice
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (demo) return;
+
+    let isMounted = true;
+    const controller = new AbortController();
+
+    adminCategoryService.getCategories(controller.signal)
+      .then(dtos => {
+        if (!isMounted) return;
+        const mapped: Category[] = dtos.map(c => ({
+          id: c.id,
+          name: c.name,
+          nameEn: c.nameEn || '',
+          slug: c.slug,
+          parentId: c.parentId || '',
+          iconUrl: c.iconUrl || 'surfing',
+          isActive: c.isActive,
+          requiresSafetyCert: true,
+        }));
+        setCategories(mapped);
+        setLoading(false);
+      })
+      .catch(err => {
+        if (!isMounted) return;
+        const info = getAdminCategoryError(err);
+        setErrorMessage(info.message);
+        setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [demo]);
+
+  const visibleCategories = categories;
+
+  const filtered = useMemo(
+    () => filterCategories(visibleCategories, searchQuery, statusFilter, certFilter),
+    [visibleCategories, searchQuery, statusFilter, certFilter]
+  );
+
+  const activeCount = visibleCategories.filter(c => c.isActive).length;
+  const inactiveCount = visibleCategories.filter(c => !c.isActive).length;
+  const certRequiredCount = visibleCategories.filter(c => c.requiresSafetyCert).length;
+
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const resetFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setCertFilter('all');
+    setCurrentPage(1);
   };
 
-  const filteredCategories = useMemo(() => {
-    return categories.filter(c =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.nameEn.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [categories, searchQuery]);
+  const paginatedCategories = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, activePage]);
 
-  const handleSelectForEdit = (cat: Category) => {
-    setEditingCategory(cat);
-    setFormName(cat.name);
-    setFormNameEn(cat.nameEn);
-    setFormSlug(cat.slug);
-    setFormParentId(cat.parentId || '');
-    setFormIcon(cat.iconUrl || 'surfing');
-    setFormIsActive(cat.isActive);
-    setFormRequiresCert(cat.requiresSafetyCert);
-  };
-
-  const handleResetToCreate = () => {
+  const openCreateDrawer = () => {
     setEditingCategory(null);
     setFormName('');
     setFormNameEn('');
@@ -53,359 +155,491 @@ export function Categories() {
     setFormIcon('surfing');
     setFormIsActive(true);
     setFormRequiresCert(true);
+    setFormError(null);
+    setIsDrawerOpen(true);
   };
 
-  const handleAutoSlug = (name: string) => {
+  const openEditDrawer = (category: Category) => {
+    setEditingCategory(category);
+    setFormName(category.name);
+    setFormNameEn(category.nameEn);
+    setFormSlug(category.slug);
+    setFormParentId(category.parentId || '');
+    setFormIcon(category.iconUrl || 'surfing');
+    setFormIsActive(category.isActive);
+    setFormRequiresCert(category.requiresSafetyCert);
+    setFormError(null);
+    setIsDrawerOpen(true);
+  };
+
+  const handleNameChange = (name: string) => {
     setFormName(name);
     if (!editingCategory) {
-      const slug = name
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/[đĐ]/g, "d")
-        .replace(/[^a-z0-9\s-]/g, "")
-        .trim()
-        .replace(/\s+/g, "-");
-      setFormSlug(slug);
+      setFormSlug(slugifyCategory(name));
     }
   };
 
-  const handleSaveCategory = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName || !formSlug) {
-      alert("Vui lòng nhập tên danh mục và slug!");
+
+    const data: CategoryFormData = {
+      name: formName,
+      nameEn: formNameEn,
+      slug: formSlug,
+      parentId: formParentId,
+      iconUrl: formIcon,
+      isActive: formIsActive,
+      requiresSafetyCert: formRequiresCert,
+    };
+
+    const validation = validateCategoryForm(data);
+    if (!validation.valid) {
+      setFormError(validation.error || 'Dữ liệu không hợp lệ');
       return;
     }
 
-    if (editingCategory) {
-      // Update
-      setCategories(prev =>
-        prev.map(c =>
-          c.id === editingCategory.id
-            ? {
-                ...c,
-                name: formName,
-                nameEn: formNameEn,
-                slug: formSlug,
-                parentId: formParentId,
-                iconUrl: formIcon,
-                isActive: formIsActive,
-                requiresSafetyCert: formRequiresCert,
-                updatedAt: new Date().toISOString()
-              }
-            : c
-        )
-      );
-      showToast(`Đã cập nhật danh mục "${formName}" thành công!`);
-    } else {
-      // Create new
-      const newCat: Category = {
-        id: `cat-${Date.now()}`,
-        name: formName,
-        nameEn: formNameEn,
-        slug: formSlug,
-        parentId: formParentId,
-        iconUrl: formIcon,
-        isActive: formIsActive,
-        requiresSafetyCert: formRequiresCert,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      setCategories(prev => [...prev, newCat]);
-      setEditingCategory(newCat);
-      showToast(`Đã tạo mới danh mục "${newCat.name}" thành công!`);
-    }
-  };
+    if (demo) {
+      const { updatedList, savedItem } = saveCategory(categories, data, editingCategory?.id || null, demo);
+      setCategories(updatedList);
+      setIsDrawerOpen(false);
 
-  const handleToggleActive = (id: string, current: boolean, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCategories(prev =>
-      prev.map(c => (c.id === id ? { ...c, isActive: !current } : c))
-    );
-    showToast(`Đã ${!current ? 'kích hoạt' : 'tạm ẩn'} danh mục.`);
-  };
-
-  const handleDelete = (id: string, name: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (confirm(`Bạn có chắc chắn muốn xóa danh mục "${name}"?`)) {
-      setCategories(prev => prev.filter(c => c.id !== id));
-      if (editingCategory?.id === id) {
-        handleResetToCreate();
+      if (savedItem) {
+        setNotice(
+          editingCategory
+            ? `Đã cập nhật danh mục "${savedItem.name}" thành công trong bản demo.`
+            : `Đã tạo mới danh mục "${savedItem.name}" thành công trong bản demo.`
+        );
       }
-      showToast(`Đã xóa danh mục "${name}".`);
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      if (editingCategory) {
+        const updated = await adminCategoryService.updateCategory(editingCategory.id, {
+          name: formName.trim(),
+          nameEn: formNameEn.trim() || undefined,
+          slug: formSlug.trim(),
+          iconUrl: formIcon,
+          isActive: formIsActive,
+        });
+        setCategories(prev => prev.map(c => c.id === updated.id ? {
+          ...c,
+          name: updated.name,
+          nameEn: updated.nameEn || '',
+          slug: updated.slug,
+          iconUrl: updated.iconUrl || 'surfing',
+          isActive: updated.isActive,
+        } : c));
+        setNotice(`Đã cập nhật danh mục "${updated.name}".`);
+      } else {
+        const created = await adminCategoryService.createCategory({
+          name: formName.trim(),
+          nameEn: formNameEn.trim() || undefined,
+          slug: formSlug.trim(),
+          parentId: formParentId || undefined,
+          iconUrl: formIcon,
+        });
+        const newCat: Category = {
+          id: created.id,
+          name: created.name,
+          nameEn: created.nameEn || '',
+          slug: created.slug,
+          parentId: created.parentId || '',
+          iconUrl: created.iconUrl || 'surfing',
+          isActive: created.isActive,
+          requiresSafetyCert: true,
+        };
+        setCategories(prev => [newCat, ...prev]);
+        setNotice(`Đã tạo mới danh mục "${created.name}".`);
+      }
+      setIsDrawerOpen(false);
+    } catch (err) {
+      const info = getAdminCategoryError(err, true);
+      setFormError(info.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const totalCount = categories.length;
-  const activeCount = categories.filter(c => c.isActive).length;
+  const handleToggle = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const target = categories.find(c => c.id === id);
+    if (!target) return;
+
+    if (demo) {
+      setCategories(prev => toggleCategoryStatus(prev, id, demo));
+      setNotice(`Đã chuyển trạng thái danh mục "${target.name}" sang ${!target.isActive ? 'Hiển thị' : 'Tạm ẩn'}.`);
+      return;
+    }
+
+    try {
+      if (target.isActive) {
+        await adminCategoryService.deactivateCategory(id);
+      } else {
+        await adminCategoryService.updateCategory(id, { isActive: true });
+      }
+      const nextActive = !target.isActive;
+      setCategories(prev => prev.map(c => c.id === id ? { ...c, isActive: nextActive } : c));
+      setNotice(`Đã chuyển trạng thái danh mục "${target.name}" sang ${nextActive ? 'Hiển thị' : 'Tạm ẩn'}.`);
+    } catch (err) {
+      const info = getAdminCategoryError(err, true);
+      setNotice(`Lỗi: ${info.message}`);
+    }
+  };
+
+  const promptDelete = (category: Category, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDeleteTarget(category);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!demo || !deleteTarget) return;
+
+    setCategories(prev => deleteCategory(prev, deleteTarget.id, demo));
+    setIsDeleteModalOpen(false);
+    setNotice(`Đã xóa danh mục "${deleteTarget.name}" khỏi danh sách demo.`);
+    setDeleteTarget(null);
+  };
 
   return (
-    <main className="w-full pt-16 bg-surface px-space-xl pb-space-2xl min-h-screen">
-      <div className="flex flex-col w-full animate-fade-in-up">
-        {/* Toast */}
-        {toastMessage && (
-          <div className="fixed top-20 right-8 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-primary text-on-primary shadow-xl animate-fade-in-up">
-            <span className="material-symbols-outlined text-[20px]">check_circle</span>
-            <span className="font-label-md text-label-md font-semibold">{toastMessage}</span>
-          </div>
-        )}
-
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 mb-4 border-b border-slate-200">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">
-              Quản lý Danh mục
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-600 text-xs font-medium">
-              Tổng: <strong>{totalCount}</strong> ({activeCount} kích hoạt)
+    <div className="admin-workspace-page admin-categories">
+      {/* 4. Category Table Workspace */}
+      <section className="admin-categories-list" aria-labelledby="categories-list-title">
+        <div className="admin-categories-list-heading">
+          <h2 id="categories-list-title">Danh sách phân loại trải nghiệm</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span>
+              {filtered.length} / {visibleCategories.length} danh mục
             </span>
-            <button 
-              onClick={handleResetToCreate}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-container transition-colors shadow-xs"
-            >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              <span>Tạo Danh mục Mới</span>
-            </button>
+            <AdminButton variant="primary" onClick={openCreateDrawer}>
+              <Plus size={16} aria-hidden="true" /> Thêm danh mục
+            </AdminButton>
           </div>
         </div>
 
-        {/* Main 2-Column Workspace */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
-          {/* LEFT COLUMN (Span 7): Category List */}
-          <div className="lg:col-span-7 flex flex-col gap-space-md">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-space-sm p-space-md bg-white rounded-xl shadow-xs border border-slate-200">
-              <div className="relative flex-1">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[20px]">filter_list</span>
-                <input 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full h-10 pl-10 pr-space-md rounded-lg bg-slate-50 text-slate-800 font-body-md text-body-md placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary border border-slate-200" 
-                  placeholder="Lọc theo tên phân loại hoặc slug..." 
-                  type="text"
-                />
-              </div>
-            </div>
+        {/* Filter Tabs */}
+        <AdminFilterTabs
+          label="Lọc trạng thái danh mục"
+          value={certFilter === 'required' ? 'cert_required' : statusFilter}
+          onChange={val => {
+            setCurrentPage(1);
+            if (val === 'cert_required') {
+              setCertFilter('required');
+              setStatusFilter('all');
+            } else {
+              setCertFilter('all');
+              setStatusFilter(val as CategoryStatusFilter);
+            }
+          }}
+          items={[
+            { value: 'all', label: 'Tất cả', count: visibleCategories.length },
+            { value: 'active', label: 'Đang hiển thị', count: activeCount },
+            { value: 'inactive', label: 'Tạm ẩn', count: inactiveCount },
+            { value: 'cert_required', label: 'Yêu cầu chứng chỉ', count: certRequiredCount },
+          ]}
+        />
 
-            {/* List Table */}
-            <div className="bg-white rounded-xl shadow-xs overflow-hidden border border-slate-200">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-700 text-xs font-semibold border-b border-slate-200">
-                      <th className="py-3 px-4 border-r border-slate-200 whitespace-nowrap">Biểu tượng &amp; Tên danh mục</th>
-                      <th className="py-3 px-3 border-r border-slate-200 whitespace-nowrap">Slug (URL)</th>
-                      <th className="py-3 px-3 border-r border-slate-200 whitespace-nowrap text-center">Chứng chỉ</th>
-                      <th className="py-3 px-3 border-r border-slate-200 whitespace-nowrap text-center">Hiển thị</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 text-xs text-slate-700">
-                    {filteredCategories.map(cat => {
-                      const isSelected = cat.id === editingCategory?.id;
-                      return (
-                        <tr 
-                          key={cat.id}
-                          onClick={() => handleSelectForEdit(cat)}
-                          className={`cursor-pointer transition-colors ${
-                            isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-slate-50'
-                          }`}
-                        >
-                          <td className="py-3.5 px-4 border-r border-slate-200">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold">
-                                <span className="material-symbols-outlined text-[20px]">{cat.iconUrl || 'surfing'}</span>
-                              </div>
-                              <div>
-                                <span className="font-bold text-slate-800 block">{cat.name}</span>
-                                <span className="text-[11px] text-slate-400 italic">{cat.nameEn}</span>
-                              </div>
-                            </div>
-                          </td>
+        {/* Search Toolbar */}
+        <div className="admin-workspace-toolbar">
+          <label className="admin-search-field">
+            <Search size={18} aria-hidden="true" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={e => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Tìm theo tên danh mục hoặc slug URL"
+              placeholder="Tìm theo tên danh mục hoặc slug..."
+            />
+          </label>
+          {(searchQuery || statusFilter !== 'all' || certFilter !== 'all') && (
+            <AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>
+          )}
+        </div>
 
-                          <td className="py-3.5 px-3 font-mono text-xs text-slate-500 border-r border-slate-200 whitespace-nowrap">
-                            /{cat.slug}
-                          </td>
+        {/* Loading & Error States */}
+        {loading && (
+          <AdminState
+            kind="empty"
+            compact
+            title="Đang tải danh mục trải nghiệm..."
+            description="Vui lòng đợi trong giây lát khi hệ thống kết nối máy chủ."
+          />
+        )}
+        {errorMessage && !loading && (
+          <AdminState
+            kind="error"
+            compact
+            title="Không thể tải danh mục"
+            description={errorMessage}
+          />
+        )}
 
-                          <td className="py-3.5 px-3 text-center border-r border-slate-200 whitespace-nowrap">
-                            {cat.requiresSafetyCert ? (
-                              <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-bold">
-                                Bắt buộc
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 text-[11px]">
-                                Không
-                              </span>
-                            )}
-                          </td>
-
-                          <td className="py-3.5 px-3 text-center border-r border-slate-200 whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={(e) => handleToggleActive(cat.id, cat.isActive, e)}
-                              className={`w-9 h-5 rounded-full transition-colors relative inline-flex items-center p-0.5 ${
-                                cat.isActive ? 'bg-primary' : 'bg-slate-300'
-                              }`}
-                            >
-                              <span className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                                cat.isActive ? 'translate-x-4' : 'translate-x-0'
-                              }`} />
-                            </button>
-                          </td>
-
-                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); handleSelectForEdit(cat); }}
-                                className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors"
-                                title="Chỉnh sửa"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">edit</span>
-                              </button>
-                              <button 
-                                onClick={(e) => handleDelete(cat.id, cat.name, e)}
-                                className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors"
-                                title="Xóa danh mục"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">delete</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN (Span 5): Editor Form */}
-          <div className="lg:col-span-5 flex flex-col gap-space-md">
-            <div className="bg-surface-container-lowest rounded-2xl shadow-sm p-space-xl flex flex-col border border-outline-variant/20">
-              <div className="flex items-center justify-between pb-space-md mb-space-md border-b border-outline-variant/20">
-                <div className="flex items-center gap-space-sm">
-                  <div className="w-10 h-10 rounded-xl bg-primary text-on-primary flex items-center justify-center shadow-sm">
-                    <span className="material-symbols-outlined text-[24px]">{formIcon}</span>
-                  </div>
-                  <div>
-                    <span className="font-label-sm text-label-sm text-primary font-medium">
-                      {editingCategory ? 'Chỉnh sửa danh mục' : 'Thêm mới danh mục'}
-                    </span>
-                    <h2 className="font-headline-md font-bold text-on-surface truncate">
-                      {editingCategory ? editingCategory.name : 'Tạo mới'}
-                    </h2>
-                  </div>
-                </div>
-                <button 
-                  onClick={handleResetToCreate}
-                  className="px-2.5 py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface-variant text-xs font-semibold"
-                >
-                  Tạo mới
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveCategory} className="flex flex-col gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-on-surface mb-1">Tên danh mục (Tiếng Việt) *</label>
-                  <input 
-                    value={formName}
-                    onChange={(e) => handleAutoSlug(e.target.value)}
-                    required
-                    placeholder="VD: Lặn ngắm san hô"
-                    className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low text-on-surface font-body-md text-sm focus:outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-on-surface mb-1">Tên tiếng Anh (name_en) *</label>
-                  <input 
-                    value={formNameEn}
-                    onChange={(e) => setFormNameEn(e.target.value)}
-                    required
-                    placeholder="VD: Scuba Diving & Snorkeling"
-                    className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low text-on-surface font-body-md text-sm focus:outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-on-surface mb-1">Mã định danh URL (slug) *</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-outline font-mono text-xs">danasea.vn/</span>
-                    <input 
-                      value={formSlug}
-                      onChange={(e) => setFormSlug(e.target.value)}
-                      required
-                      className="w-full h-11 pl-24 pr-3.5 rounded-xl bg-surface-container-low text-on-surface font-mono text-xs focus:outline-none focus:ring-2 focus:ring-primary border border-outline-variant/30"
-                    />
-                  </div>
-                </div>
-
-                {/* Icon Selector */}
-                <div>
-                  <label className="block text-xs font-bold text-on-surface mb-1">Biểu tượng (Icon)</label>
-                  <div className="grid grid-cols-6 gap-2">
-                    {['surfing', 'speed', 'scuba_diving', 'kayaking', 'sailing', 'waves'].map(icon => (
+        {/* Data Table */}
+        {!loading && !errorMessage && (
+        <div className="admin-categories-table-scroll" role="region" aria-label="Bảng danh mục" tabIndex={0}>
+          <table className="admin-workspace-table admin-categories-table">
+            <caption className="sr-only">Danh mục trải nghiệm du lịch biển</caption>
+            <thead>
+              <tr>
+                <th scope="col">Biểu tượng & Tên danh mục</th>
+                <th scope="col">Đường dẫn (Slug URL)</th>
+                <th scope="col">Chứng chỉ an toàn</th>
+                <th scope="col">Hiển thị</th>
+                <th scope="col">
+                  <span className="sr-only">Thao tác</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginatedCategories.map(cat => {
+                const IconComponent = getCategoryIcon(cat.iconUrl);
+                return (
+                  <tr key={cat.id}>
+                    <td>
+                      <div className="admin-categories-identity">
+                        <div className="admin-categories-icon-badge" aria-hidden="true">
+                          <IconComponent size={22} />
+                        </div>
+                        <div>
+                          <strong>{cat.name}</strong>
+                          <span>{cat.nameEn}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="admin-categories-slug-chip">/{cat.slug}</span>
+                    </td>
+                    <td>
+                      {cat.requiresSafetyCert ? (
+                        <AdminBadge tone="amber">
+                          <ShieldCheck size={12} aria-hidden="true" /> Bắt buộc khai báo
+                        </AdminBadge>
+                      ) : (
+                        <AdminBadge tone="neutral">Tùy chọn</AdminBadge>
+                      )}
+                    </td>
+                    <td>
                       <button
-                        key={icon}
                         type="button"
-                        onClick={() => setFormIcon(icon)}
-                        className={`h-10 rounded-xl flex items-center justify-center transition-all ${
-                          formIcon === icon
-                            ? 'bg-primary text-on-primary shadow-xs'
-                            : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
-                        }`}
+                        onClick={e => handleToggle(cat.id, e)}
+                        className="admin-categories-toggle-btn"
+                        data-active={cat.isActive}
+                        aria-label={`Chuyển trạng thái hiển thị cho ${cat.name}`}
                       >
-                        <span className="material-symbols-outlined text-[20px]">{icon}</span>
+                        <span className="admin-categories-toggle-dot" aria-hidden="true" />
+                        <span>{cat.isActive ? 'Đang hiển thị' : 'Tạm ẩn'}</span>
                       </button>
-                    ))}
-                  </div>
-                </div>
+                    </td>
+                    <td>
+                      <div className="admin-categories-actions-group">
+                        <button
+                          type="button"
+                          className="admin-action-icon-btn"
+                          aria-label={`Chỉnh sửa ${cat.name}`}
+                          title="Chỉnh sửa danh mục"
+                          onClick={() => openEditDrawer(cat)}
+                        >
+                          <Pencil size={16} aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-action-icon-btn admin-action-icon-btn--danger"
+                          aria-label={`Xóa danh mục ${cat.name}`}
+                          title="Xóa danh mục"
+                          onClick={e => promptDelete(cat, e)}
+                        >
+                          <Trash2 size={16} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        )}
 
-                {/* Requirements & Status Toggles */}
-                <div className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low">
-                  <span className="text-xs font-bold text-on-surface">Yêu cầu chứng chỉ an toàn (requires_safety_cert)</span>
-                  <input 
-                    type="checkbox"
-                    checked={formRequiresCert}
-                    onChange={(e) => setFormRequiresCert(e.target.checked)}
-                    className="w-4 h-4 accent-primary rounded cursor-pointer"
-                  />
-                </div>
+        {!loading && !errorMessage && filtered.length > 0 && (
+          <AdminPagination
+            currentPage={activePage}
+            totalPages={totalPages}
+            totalRecords={filtered.length}
+            pageSize={PAGE_SIZE}
+            recordLabel="danh mục"
+            onPageChange={setCurrentPage}
+          />
+        )}
 
-                <div className="flex items-center justify-between p-3 rounded-xl bg-surface-container-low">
-                  <span className="text-xs font-bold text-on-surface">Kích hoạt hiển thị (is_active)</span>
-                  <input 
-                    type="checkbox"
-                    checked={formIsActive}
-                    onChange={(e) => setFormIsActive(e.target.checked)}
-                    className="w-4 h-4 accent-primary rounded cursor-pointer"
-                  />
-                </div>
+        {/* Empty State */}
+        {!loading && !errorMessage && filtered.length === 0 && (
+          <AdminState
+            kind="empty"
+            compact
+            title="Không tìm thấy danh mục phù hợp"
+            description="Hãy thử từ khóa tìm kiếm khác hoặc xóa bộ lọc để xem toàn bộ danh sách."
+            action={<AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>}
+          />
+        )}
 
-                <div className="flex items-center gap-2 pt-2">
-                  <button 
-                    type="submit"
-                    className="flex-1 h-11 rounded-xl bg-primary text-on-primary font-bold text-sm shadow-sm hover:bg-primary-container transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">save</span>
-                    <span>{editingCategory ? 'Lưu thay đổi' : 'Tạo danh mục'}</span>
-                  </button>
-                  <button 
-                    type="button"
-                    onClick={handleResetToCreate}
-                    className="h-11 px-4 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-semibold text-sm"
-                  >
-                    Hủy
-                  </button>
-                </div>
-              </form>
-            </div>
+        <div className="admin-categories-list-footer">
+          Hiển thị {filtered.length} danh mục {demo ? 'mẫu · Danh mục được gán trực tiếp vào các tour và trải nghiệm biển của Vendor.' : 'từ hệ thống cơ sở dữ liệu DANASEA.'}
+        </div>
+      </section>
+
+      {/* Floating Notice */}
+      {!isDrawerOpen && <AdminNotice message={notice} onDismiss={() => setNotice(null)} />}
+
+      {/* 5. Create / Edit Category Drawer */}
+      <AdminDialog
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        variant="drawer"
+        title={editingCategory ? `Chỉnh sửa: ${editingCategory.name}` : 'Thêm mới danh mục trải nghiệm'}
+        description="Cấu hình thông tin danh mục dịch vụ biển · Dữ liệu dùng thử trong phiên"
+        footer={
+          <div className="admin-categories-drawer-footer">
+            <AdminButton onClick={() => setIsDrawerOpen(false)}>Hủy</AdminButton>
+            <AdminButton variant="primary" onClick={handleSave}>
+              {editingCategory ? 'Lưu thay đổi' : 'Tạo danh mục mới'}
+            </AdminButton>
           </div>
-        </section>
-      </div>
-    </main>
+        }
+      >
+        <form onSubmit={handleSave} className="admin-categories-form">
+          {formError && <div className="admin-categories-form-error">{formError}</div>}
+
+          <div className="admin-categories-form-row">
+            <label className="admin-field">
+              <span>Tên danh mục (Tiếng Việt) *</span>
+              <input
+                type="text"
+                value={formName}
+                onChange={e => handleNameChange(e.target.value)}
+                placeholder="VD: Chèo SUP & Kayak"
+                required
+              />
+            </label>
+
+            <label className="admin-field">
+              <span>Tên tiếng Anh (name_en) *</span>
+              <input
+                type="text"
+                value={formNameEn}
+                onChange={e => setFormNameEn(e.target.value)}
+                placeholder="VD: Stand-Up Paddleboarding & Kayak"
+                required
+              />
+            </label>
+          </div>
+
+          <div className="admin-categories-form-row">
+            <label className="admin-field">
+              <span>Mã định danh URL (slug) *</span>
+              <input
+                type="text"
+                value={formSlug}
+                onChange={e => setFormSlug(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                placeholder="VD: cheo-sup-kayak"
+                required
+              />
+              <small>Đường dẫn hiển thị: danasea.vn/{formSlug || 'ten-danh-muc'}</small>
+            </label>
+
+            <label className="admin-field">
+              <span>Danh mục cha (tùy chọn)</span>
+              <select value={formParentId} onChange={e => setFormParentId(e.target.value)}>
+                <option value="">Không có danh mục cha (Cấp 1)</option>
+                {categories
+                  .filter(c => !editingCategory || c.id !== editingCategory.id)
+                  .map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="admin-field">
+            <span>Biểu tượng hiển thị</span>
+            <div className="admin-categories-icon-picker">
+              {ICON_PRESETS.map(preset => {
+                const Icon = preset.icon;
+                const isSelected = formIcon === preset.key;
+                return (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    className="admin-categories-icon-opt"
+                    data-selected={isSelected}
+                    onClick={() => setFormIcon(preset.key)}
+                    title={preset.label}
+                  >
+                    <Icon size={20} />
+                  </button>
+                );
+              })}
+            </div>
+          </label>
+
+          <div className="admin-categories-toggle-row">
+            <span>
+              <strong>Yêu cầu chứng chỉ an toàn (khai báo)</strong>
+              <small>Vendor phải nộp giấy tờ liên quan khi tạo dịch vụ trong danh mục này</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={formRequiresCert}
+              onChange={e => setFormRequiresCert(e.target.checked)}
+            />
+          </div>
+
+          <div className="admin-categories-toggle-row">
+            <span>
+              <strong>Kích hoạt hiển thị</strong>
+              <small>Cho phép du khách tìm kiếm và đặt dịch vụ thuộc nhóm này</small>
+            </span>
+            <input
+              type="checkbox"
+              checked={formIsActive}
+              onChange={e => setFormIsActive(e.target.checked)}
+            />
+          </div>
+        </form>
+      </AdminDialog>
+
+      {/* 6. Delete Confirmation Modal */}
+      <AdminDialog
+        open={isDeleteModalOpen && demo}
+        onClose={() => setIsDeleteModalOpen(false)}
+        variant="modal"
+        title="Xác nhận xóa danh mục"
+        description="Thao tác này chỉ xóa dữ liệu trong phiên xem thử demo"
+        footer={
+          <>
+            <AdminButton onClick={() => setIsDeleteModalOpen(false)}>Quay lại</AdminButton>
+            <AdminButton variant="danger" onClick={confirmDelete}>
+              Xác nhận xóa
+            </AdminButton>
+          </>
+        }
+      >
+        <div className="admin-categories-delete-dialog">
+          <p>
+            Bạn có chắc chắn muốn xóa danh mục <strong>"{deleteTarget?.name}"</strong> không?
+          </p>
+          <p className="admin-detail-note">
+            Các dịch vụ thuộc danh mục này trong bản demo sẽ bị mất liên kết phân loại. Thao tác không ảnh hưởng cơ sở dữ liệu thật.
+          </p>
+        </div>
+      </AdminDialog>
+    </div>
   );
 }
 

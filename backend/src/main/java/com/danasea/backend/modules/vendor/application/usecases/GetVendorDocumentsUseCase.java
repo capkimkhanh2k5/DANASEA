@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.danasea.backend.modules.vendor.application.ports.DocumentStoragePort;
 import com.danasea.backend.modules.vendor.domain.exceptions.VendorNotFoundException;
 import com.danasea.backend.modules.vendor.domain.models.VendorDocument;
 import com.danasea.backend.modules.vendor.infrastructure.mappers.VendorDocumentMapper;
@@ -22,6 +23,7 @@ public class GetVendorDocumentsUseCase {
     private final JpaVendorRepository jpaVendorRepository;
     private final JpaVendorDocumentRepository jpaVendorDocumentRepository;
     private final VendorDocumentMapper vendorDocumentMapper;
+    private final DocumentStoragePort documentStoragePort;
 
     @Transactional(readOnly = true)
     public List<VendorDocument> execute(UUID userId) {
@@ -30,7 +32,13 @@ public class GetVendorDocumentsUseCase {
 
         return jpaVendorDocumentRepository.findByVendorId(vendor.getId())
                 .stream()
-                .map(vendorDocumentMapper::toDomain)
+                .map(entity -> {
+                    VendorDocument doc = vendorDocumentMapper.toDomain(entity);
+                    if (doc != null && doc.getFileUrl() != null) {
+                        doc.setFileUrl(documentStoragePort.generateDeliveryUrl(doc.getFileUrl()));
+                    }
+                    return doc;
+                })
                 .toList();
     }
 }
