@@ -39,19 +39,35 @@ class CatalogRepository {
     return result;
   }
 
+  Future<List<FlashSaleModel>> flashSales() async {
+    try {
+      final json = await session.requestJson('/api/flash-sales/active');
+      if (json is! List) return [];
+      return json
+          .whereType<Map<String, dynamic>>()
+          .map((m) => FlashSaleModel.fromJson(m))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<CatalogPage> search({
     String? keyword,
     String? categoryId,
     int? maxPrice,
     int page = 0,
+    int size = 20,
+    String? sortBy,
   }) async {
     final query = <String, String>{
       'page': '$page',
-      'size': '20',
+      'size': '$size',
       if (keyword != null && keyword.trim().isNotEmpty)
         'keyword': keyword.trim(),
       'categoryId': ?categoryId,
       if (maxPrice != null) 'maxPrice': '$maxPrice',
+      if (sortBy != null && sortBy.trim().isNotEmpty) 'sortBy': sortBy.trim(),
     };
     final path = Uri(path: '/api/services', queryParameters: query).toString();
     final json = await session.request(path);

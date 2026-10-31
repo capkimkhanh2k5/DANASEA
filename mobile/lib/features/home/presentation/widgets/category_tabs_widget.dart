@@ -1,6 +1,6 @@
-import '../../../../core/models/danasea_models.dart';
-import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:mobile/core/l10n/app_localizations.dart';
+import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -24,8 +24,57 @@ class CategoryTabsWidget extends StatefulWidget {
 class _CategoryTabsWidgetState extends State<CategoryTabsWidget> {
   int _selectedIndex = 0;
 
+  static const List<Map<String, dynamic>> _defaultCategories = [
+    {'name': 'Chèo SUP', 'icon': Icons.surfing},
+    {'name': 'Cano lướt sóng', 'icon': Icons.speed},
+    {'name': 'Lặn san hô', 'icon': Icons.scuba_diving},
+    {'name': 'Chèo kayak', 'icon': Icons.kayaking},
+    {'name': 'Tour biển đảo', 'icon': Icons.sailing},
+  ];
+
+  IconData _iconForCategory(String nameOrSlug, int index) {
+    final lower = nameOrSlug.toLowerCase();
+    if (lower.contains('sup') || lower.contains('surf')) {
+      return Icons.surfing;
+    }
+    if (lower.contains('cano') ||
+        lower.contains('jetski') ||
+        lower.contains('moto') ||
+        lower.contains('speed')) {
+      return Icons.speed;
+    }
+    if (lower.contains('lặn') ||
+        lower.contains('lan') ||
+        lower.contains('dive') ||
+        lower.contains('snorkel')) {
+      return Icons.scuba_diving;
+    }
+    if (lower.contains('kayak')) {
+      return Icons.kayaking;
+    }
+    if (lower.contains('tour') ||
+        lower.contains('đảo') ||
+        lower.contains('dao') ||
+        lower.contains('sail')) {
+      return Icons.sailing;
+    }
+    const fallbackIcons = [
+      Icons.surfing,
+      Icons.speed,
+      Icons.scuba_diving,
+      Icons.kayaking,
+      Icons.sailing,
+    ];
+    return fallbackIcons[index % fallbackIcons.length];
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasApiCategories = widget.categories.isNotEmpty;
+    final itemCount = hasApiCategories
+        ? widget.categories.length
+        : _defaultCategories.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -49,7 +98,7 @@ class _CategoryTabsWidgetState extends State<CategoryTabsWidget> {
               ),
               const SizedBox(width: 8),
               InkWell(
-                onTap: widget.onShowAll,
+                onTap: widget.onShowAll ?? () {},
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
@@ -77,11 +126,24 @@ class _CategoryTabsWidgetState extends State<CategoryTabsWidget> {
               horizontal: AppShapes.gutterMobile,
             ),
             scrollDirection: Axis.horizontal,
-            itemCount: widget.categories.length,
+            itemCount: itemCount,
             separatorBuilder: (context, index) => const SizedBox(width: 8),
             itemBuilder: (context, index) {
               final isSelected = _selectedIndex == index;
-              final item = widget.categories[index];
+              final String label;
+              final IconData icon;
+              if (hasApiCategories) {
+                final cat = widget.categories[index];
+                label =
+                    AppLanguage.instance.code == 'en' && cat.nameEn.isNotEmpty
+                    ? cat.nameEn
+                    : cat.name;
+                icon = _iconForCategory('${cat.slug} ${cat.name}', index);
+              } else {
+                final item = _defaultCategories[index];
+                label = item['name'] as String;
+                icon = item['icon'] as IconData;
+              }
 
               return InkWell(
                 onTap: () {
@@ -116,7 +178,7 @@ class _CategoryTabsWidgetState extends State<CategoryTabsWidget> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Icons.explore_outlined,
+                        icon,
                         size: 18,
                         color: isSelected
                             ? AppColors.onSecondary
@@ -124,10 +186,7 @@ class _CategoryTabsWidgetState extends State<CategoryTabsWidget> {
                       ),
                       const SizedBox(width: 8),
                       LocalizedText(
-                        AppLanguage.instance.code == 'en' &&
-                                item.nameEn.isNotEmpty
-                            ? item.nameEn
-                            : item.name,
+                        label,
                         style: AppTypography.labelMd(
                           color: isSelected
                               ? AppColors.onSecondary

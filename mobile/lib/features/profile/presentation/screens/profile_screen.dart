@@ -1,6 +1,6 @@
-import '../../../../core/auth/auth_session.dart';
-import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:mobile/core/l10n/app_localizations.dart';
+import '../../../../core/auth/auth_session.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -115,7 +115,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final hasAvatar = avatar != null && avatar.isNotEmpty;
     final name = user['fullName']?.toString() ?? '';
     final email = user['email']?.toString() ?? '';
-    final verified = user['isEmailVerified'] == true;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -123,6 +122,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         automaticallyImplyLeading: false,
+        centerTitle: true,
         title: LocalizedText(
           'Tài khoản',
           style: AppTypography.headlineSm(color: AppColors.onSurface),
@@ -141,221 +141,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: const LocalizedText('Thử lại'),
               ),
             ],
-            // USER PROFILE CARD
-            Container(
-              padding: const EdgeInsets.all(AppShapes.spaceMd),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: AppShapes.radiusDefault,
-                boxShadow: AppShapes.shadowLevel1,
-                border: Border.all(color: AppColors.borderSubtle),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      // Avatar with verified badge
-                      Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 32,
-                            backgroundColor: AppColors.secondaryContainer,
-                            backgroundImage: hasAvatar
-                                ? NetworkImage(avatar)
-                                : null,
-                            child: !hasAvatar
-                                ? Text(
-                                    name.isNotEmpty
-                                        ? name.characters.first
-                                        : '?',
-                                    style: const TextStyle(fontSize: 24),
-                                  )
-                                : null,
-                          ),
-                          if (verified)
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.secondary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.check,
-                                  size: 14,
-                                  color: Colors.white,
-                                ),
+            // USER PROFILE CARD (Phần phía trên gọn gàng như Image 2)
+            InkWell(
+              onTap: _editProfile,
+              borderRadius: AppShapes.radiusDefault,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLowest,
+                  borderRadius: AppShapes.radiusDefault,
+                  boxShadow: AppShapes.shadowLevel1,
+                  border: Border.all(color: AppColors.borderSubtle),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: AppColors.secondaryContainer,
+                      backgroundImage: hasAvatar ? NetworkImage(avatar) : null,
+                      child: !hasAvatar
+                          ? Text(
+                              name.isNotEmpty ? name.characters.first : '?',
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.secondary,
                               ),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name.isNotEmpty ? name : 'Người dùng',
+                            style: AppTypography.headlineSm(
+                              color: AppColors.onSurface,
+                            ).copyWith(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
                             ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            email,
+                            style: AppTypography.bodySm(
+                              color: AppColors.onSurfaceVariant,
+                            ).copyWith(fontSize: 13),
+                          ),
                         ],
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name.isNotEmpty ? name : email,
-                              style: AppTypography.headlineSm(
-                                color: AppColors.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              email,
-                              style: AppTypography.bodySm(
-                                color: AppColors.onSurfaceVariant,
-                              ),
-                            ),
-                            LocalizedText(
-                              '',
-                              style: AppTypography.labelSm(
-                                color: AppColors.secondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.edit_outlined,
-                          color: AppColors.secondary,
-                        ),
-                        onPressed: _loading || _error != null
-                            ? null
-                            : _editProfile,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.secondaryContainer.withValues(
-                              alpha: 0.4,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.verified,
-                                size: 14,
-                                color: AppColors.secondary,
-                              ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: LocalizedText(
-                                  verified
-                                      ? 'Email đã xác minh'
-                                      : 'Email chưa xác minh',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTypography.labelSm(
-                                    color: AppColors.secondary,
-                                    fontWeight: FontWeight.w700,
-                                  ).copyWith(fontSize: 11),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton.icon(
-                        onPressed: _loading || _error != null
-                            ? null
-                            : _editProfile,
-                        icon: const Icon(
-                          Icons.arrow_forward,
-                          size: 14,
-                          color: AppColors.secondary,
-                        ),
-                        label: LocalizedText(
-                          'Hồ sơ chi tiết',
-                          style: AppTypography.labelSm(
-                            color: AppColors.secondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // LIVE COAST WEATHER PULSE
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: AppShapes.radiusDefault,
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: const BoxDecoration(
-                      color: AppColors.secondaryFixed,
-                      shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.water_drop,
-                      size: 18,
-                      color: AppColors.onSecondaryFixed,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        LocalizedText(
-                          'Biển Mỹ Khê • Hôm nay',
-                          style: AppTypography.labelSm(
-                            color: AppColors.secondary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        LocalizedText(
-                          'Gió 12 km/h • Sóng 0.4m • Nước 26°C',
-                          style: AppTypography.bodySm(
-                            color: AppColors.onSurfaceVariant,
-                          ).copyWith(fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: LocalizedText(
-                      'Rất tốt',
-                      style: AppTypography.labelSm(
-                        color: AppColors.secondary,
-                        fontWeight: FontWeight.w700,
-                      ).copyWith(fontSize: 10),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 20),
@@ -378,9 +218,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 children: [
                   _buildMenuTile(
-                    icon: Icons.lock_reset,
+                    icon: Icons.lock_outline_rounded,
                     title: 'Đổi mật khẩu',
-                    subtitle: 'Cập nhật mã bảo mật & xác thực',
                     onTap: () {
                       Navigator.push(
                         context,
@@ -393,42 +232,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const Divider(height: 1),
                   Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
+                      horizontal: 16,
                       vertical: 10,
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        const Icon(
+                          Icons.language_rounded,
+                          size: 21,
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 14),
                         Expanded(
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.translate,
-                                size: 20,
-                                color: AppColors.secondary,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    LocalizedText(
-                                      'Ngôn ngữ ứng dụng',
-                                      style: AppTypography.labelMd(
-                                        color: AppColors.onSurface,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    LocalizedText(
-                                      'Tiếng Việt / English',
-                                      style: AppTypography.bodySm(
-                                        color: AppColors.onSurfaceVariant,
-                                      ).copyWith(fontSize: 11),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          child: LocalizedText(
+                            'Ngôn ngữ ứng dụng',
+                            style: AppTypography.labelMd(
+                              color: AppColors.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ).copyWith(fontSize: 14.5),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -470,9 +291,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 children: [
                   _buildMenuTile(
-                    icon: Icons.chat_bubble_outline,
+                    icon: Icons.chat_bubble_outline_rounded,
                     title: 'Tin nhắn với nhà cung cấp',
-                    subtitle: 'Trò chuyện hỗ trợ thợ lặn, cano, SUP',
                     onTap: () {
                       Navigator.push(
                         context,
@@ -484,9 +304,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const Divider(height: 1),
                   _buildMenuTile(
-                    icon: Icons.notifications_outlined,
+                    icon: Icons.notifications_none_rounded,
                     title: 'Thông báo đơn & thời tiết',
-                    subtitle: 'Cập nhật vé QR, trạm sóng và hoàn tiền',
                     onTap: () {
                       Navigator.push(
                         context,
@@ -498,9 +317,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const Divider(height: 1),
                   _buildMenuTile(
-                    icon: Icons.report_problem_outlined,
+                    icon: Icons.shield_outlined,
                     title: 'Khiếu nại của tôi',
-                    subtitle: 'Theo dõi xử lý tranh chấp đơn hàng',
                     onTap: () {
                       Navigator.push(
                         context,
@@ -512,9 +330,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const Divider(height: 1),
                   _buildMenuTile(
-                    icon: Icons.price_check,
+                    icon: Icons.account_balance_wallet_outlined,
                     title: 'Theo dõi hoàn tiền',
-                    subtitle: 'Tiến trình chuyển tiền về tài khoản',
                     onTap: () {
                       Navigator.push(
                         context,
@@ -526,9 +343,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const Divider(height: 1),
                   _buildMenuTile(
-                    icon: Icons.auto_awesome,
+                    icon: Icons.auto_awesome_outlined,
                     title: 'Trợ lý AI DanaSea',
-                    subtitle: 'Tư vấn hành trình & gợi ý theo sóng biển',
                     onTap: () {
                       Navigator.push(
                         context,
@@ -538,34 +354,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
                     },
                   ),
+                  const Divider(height: 1),
+                  // Dòng đăng xuất tài khoản ở cuối danh sách, bên phải có icon màu
+                  _buildMenuTile(
+                    icon: Icons.logout_rounded,
+                    title: 'Đăng xuất tài khoản',
+                    iconColor: AppColors.primary,
+                    titleColor: AppColors.primary,
+                    trailing: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.logout_rounded,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    onTap: _showLogoutDialog,
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-
-            // LOGOUT BUTTON
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                ),
-                icon: const Icon(Icons.logout, color: AppColors.primary),
-                label: LocalizedText(
-                  'Đăng xuất tài khoản',
-                  style: AppTypography.labelMd(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                onPressed: _showLogoutDialog,
-              ),
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -575,38 +388,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildMenuTile({
     required IconData icon,
     required String title,
-    required String subtitle,
     required VoidCallback onTap,
+    Color? iconColor,
+    Color? titleColor,
+    Widget? trailing,
   }) {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: AppColors.secondary),
-            const SizedBox(width: 12),
+            Icon(
+              icon,
+              size: 21,
+              color: iconColor ?? AppColors.onSurfaceVariant,
+            ),
+            const SizedBox(width: 14),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  LocalizedText(
-                    title,
-                    style: AppTypography.labelMd(
-                      color: AppColors.onSurface,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  LocalizedText(
-                    subtitle,
-                    style: AppTypography.bodySm(
-                      color: AppColors.onSurfaceVariant,
-                    ).copyWith(fontSize: 11),
-                  ),
-                ],
+              child: LocalizedText(
+                title,
+                style: AppTypography.labelMd(
+                  color: titleColor ?? AppColors.onSurface,
+                  fontWeight: FontWeight.w600,
+                ).copyWith(fontSize: 14.5),
               ),
             ),
-            const Icon(Icons.chevron_right, size: 18, color: AppColors.outline),
+            trailing ??
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: AppColors.outline,
+                ),
           ],
         ),
       ),

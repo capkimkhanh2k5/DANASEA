@@ -1,8 +1,7 @@
-import 'package:mobile/core/l10n/app_localizations.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_typography.dart';
 
 class AppBottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -18,54 +17,62 @@ class AppBottomNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface.withValues(alpha: 0.90),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 12,
-                offset: const Offset(0, -2),
-              ),
-            ],
-            border: Border(
-              top: BorderSide(
-                color: AppColors.borderSubtle.withValues(alpha: 0.6),
-                width: 0.5,
-              ),
-            ),
-          ),
-          padding: EdgeInsets.only(bottom: bottomInset),
-          child: SizedBox(
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        bottom: bottomInset > 0 ? bottomInset + 10 : 18,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(36),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
             height: 64,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.12),
+                  Colors.white.withValues(alpha: 0.04),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(36),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.45),
+                width: 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildNavItem(
                   index: 0,
                   icon: Icons.surfing,
-                  label: 'Khám phá',
                 ),
                 _buildNavItem(
                   index: 1,
                   icon: Icons.favorite_border,
                   activeIcon: Icons.favorite,
-                  label: 'Yêu thích',
                 ),
                 _buildNavItem(
                   index: 2,
                   icon: Icons.receipt_long_outlined,
                   activeIcon: Icons.receipt_long,
-                  label: 'Đơn hàng',
                 ),
                 _buildNavItem(
                   index: 3,
                   icon: Icons.account_circle_outlined,
                   activeIcon: Icons.account_circle,
-                  label: 'Tài khoản',
                 ),
               ],
             ),
@@ -79,37 +86,60 @@ class AppBottomNavBar extends StatelessWidget {
     required int index,
     required IconData icon,
     IconData? activeIcon,
-    required String label,
   }) {
     final isSelected = currentIndex == index;
-    final color = isSelected ? AppColors.primary : AppColors.onSurfaceVariant;
 
     return Expanded(
-      child: InkWell(
-        onTap: () => onTap(index),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
+      child: Center(
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap(index);
+          },
+          borderRadius: BorderRadius.circular(24),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOutCubic,
+            height: 48,
+            width: 64,
+            decoration: BoxDecoration(
+              gradient: isSelected
+                  ? LinearGradient(
+                      colors: [
+                        const Color(0xFF95F1FF).withValues(alpha: 0.22),
+                        const Color(0xFF006874).withValues(alpha: 0.08),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
+              color: isSelected ? null : Colors.transparent,
+              borderRadius: BorderRadius.circular(24),
+              border: isSelected
+                  ? Border.all(
+                      color: Colors.white.withValues(alpha: 0.50),
+                      width: 0.8,
+                    )
+                  : null,
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: AppColors.secondary.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Center(
+              child: Icon(
                 isSelected && activeIcon != null ? activeIcon : icon,
-                color: color,
-                size: 24,
+                color: isSelected
+                    ? AppColors.secondary
+                    : Colors.black,
+                size: isSelected ? 26 : 24,
               ),
-              const SizedBox(height: 3),
-              LocalizedText(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.labelSm(
-                  color: color,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

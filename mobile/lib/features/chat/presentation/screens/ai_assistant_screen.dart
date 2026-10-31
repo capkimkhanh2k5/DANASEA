@@ -119,24 +119,27 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         ];
       });
       _scrollToBottom();
-    } on AuthFailure catch (e) {
+    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: LocalizedText(e.message),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: LocalizedText(
-            'Không thể kết nối trợ lý AI lúc này. Vui lòng thử lại.',
+      final fallbackText = (e is AuthFailure &&
+              e.message.isNotEmpty &&
+              e.message != 'Đã xảy ra lỗi không mong muốn.' &&
+              e.message != 'Không thể thực hiện yêu cầu. Vui lòng thử lại.')
+          ? e.message
+          : 'Hệ thống trợ lý AI đang tạm thời gián đoạn kết nối máy chủ (cầu nối AI chưa được bật). Bạn vui lòng thử lại sau giây lát hoặc xem các tour đề xuất trên trang chủ nhé!';
+
+      setState(() {
+        _messages = [
+          ..._messages,
+          AiMessageModel(
+            id: 'ai-bot-err-${DateTime.now().millisecondsSinceEpoch}',
+            role: AiRole.assistant,
+            content: fallbackText,
+            createdAt: DateTime.now(),
           ),
-          backgroundColor: AppColors.error,
-        ),
-      );
+        ];
+      });
+      _scrollToBottom();
     } finally {
       if (mounted) setState(() => _isSending = false);
     }

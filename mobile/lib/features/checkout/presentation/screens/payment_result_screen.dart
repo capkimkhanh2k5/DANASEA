@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/order_repository.dart';
 import '../../../../core/data/payment_repository.dart';
@@ -34,7 +36,9 @@ class PaymentResultScreen extends StatefulWidget {
   State<PaymentResultScreen> createState() => _PaymentResultScreenState();
 }
 
-class _PaymentResultScreenState extends State<PaymentResultScreen> {
+class _PaymentResultScreenState extends State<PaymentResultScreen>
+    with WidgetsBindingObserver {
+  Timer? _pollingTimer;
   final PaymentRepository _paymentRepository = PaymentRepository();
   final OrderRepository _orderRepository = OrderRepository();
   late final TextEditingController _paypalOrderController;
@@ -95,6 +99,7 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _order = widget.masterOrder;
     _payment = widget.initialPayment;
     _captureIdempotencyKey = PaymentRepository.generateIdempotencyKey('cap');
@@ -102,20 +107,44 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
       text: widget.initialPayment?.providerOrderId ?? '',
     );
     _refreshPaymentState();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted) return;
+      if (_isConfirmedSuccess) {
+        _pollingTimer?.cancel();
+        return;
+      }
+      _refreshPaymentState(isSilent: true);
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshPaymentState();
+    }
   }
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _paypalOrderController.dispose();
     super.dispose();
   }
 
-  Future<void> _refreshPaymentState() async {
+  Future<void> _refreshPaymentState({bool isSilent = false}) async {
     if (_loadingStatus) return;
-    setState(() {
-      _loadingStatus = true;
-      _error = null;
-    });
+    if (!isSilent) {
+      setState(() {
+        _loadingStatus = true;
+        _error = null;
+      });
+    }
     try {
       final pid = _effectivePaymentId;
       OrderPaymentRecord? detail;
@@ -141,18 +170,21 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
           _paypalOrderController.text = resolvedPayment.providerOrderId!;
         }
       });
+      if (_isConfirmedSuccess) {
+        _pollingTimer?.cancel();
+      }
     } on AuthFailure catch (e) {
-      if (mounted) {
+      if (mounted && !isSilent) {
         setState(() => _error = e.message);
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && !isSilent) {
         setState(
           () => _error = 'Không tải được trạng thái thanh toán. Vui lòng thử lại.',
         );
       }
     } finally {
-      if (mounted) {
+      if (mounted && !isSilent) {
         setState(() => _loadingStatus = false);
       }
     }
@@ -267,6 +299,43 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
     }
   }
 
+  Future<void> _openPaymentUrl() async {
+    final urlStr = _paymentUrl;
+    if (urlStr == null || urlStr.isEmpty) return;
+    try {
+      final uri = Uri.parse(urlStr);
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched) {
+        Clipboard.setData(ClipboardData(text: urlStr));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: LocalizedText(
+                'Không thể tự mở trình duyệt. Đã sao chép liên kết!',
+              ),
+              backgroundColor: AppColors.secondary,
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      Clipboard.setData(ClipboardData(text: urlStr));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText(
+              'Đã sao chép liên kết thanh toán vào bộ nhớ tạm!',
+            ),
+            backgroundColor: AppColors.secondary,
+          ),
+        );
+      }
+    }
+  }
+
   String _formatPrice(num price) {
     final str = price.round().toString();
     final buffer = StringBuffer();
@@ -322,7 +391,7 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
         elevation: 0,
         automaticallyImplyLeading: false,
         title: LocalizedText(
-          'Kết quả thanh toán',
+          _isPending ? 'Chờ thanh toán' : 'Kết quả thanh toán',
           style: AppTypography.headlineSm(color: AppColors.onSurface),
         ),
         centerTitle: true,
@@ -504,56 +573,112 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainerLowest,
                   borderRadius: AppShapes.radiusDefault,
-                  border: Border.all(color: AppColors.borderSubtle),
+                  border: Border.all(
+                    color: AppColors.secondary.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(
-                          Icons.link,
-                          size: 18,
-                          color: AppColors.secondary,
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE0F2F1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.account_balance,
+                            size: 20,
+                            color: AppColors.secondary,
+                          ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: LocalizedText(
-                            'Liên kết thanh toán từ cổng ${_getProviderName(_effectiveProvider)}',
-                            style: AppTypography.labelMd(
-                              color: AppColors.onSurface,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Cổng thanh toán ${_getProviderName(_effectiveProvider)} đã sẵn sàng',
+                                style: AppTypography.labelMd(
+                                  color: AppColors.onSurface,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Nhấn để mở trình duyệt hoàn tất thanh toán hoặc sao chép liên kết.',
+                                style: AppTypography.bodySm(
+                                  color: AppColors.onSurfaceVariant,
+                                ).copyWith(fontSize: 11),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    SelectableText(
-                      _paymentUrl!,
-                      maxLines: 3,
-                      style: AppTypography.bodySm(
-                        color: AppColors.onSurfaceVariant,
-                      ).copyWith(fontSize: 11),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
-                      child: OutlinedButton.icon(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: _openPaymentUrl,
+                        icon: const Icon(
+                          Icons.open_in_browser_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Mở trang thanh toán ngay',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: TextButton.icon(
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: _paymentUrl!));
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: LocalizedText(
-                                'Đã sao chép liên kết thanh toán!',
+                                'Đã sao chép liên kết! Bạn có thể dán vào trình duyệt để thanh toán.',
                               ),
                               backgroundColor: AppColors.secondary,
                             ),
                           );
                         },
-                        icon: const Icon(Icons.copy, size: 16),
-                        label: const LocalizedText(
+                        icon: const Icon(
+                          Icons.copy_rounded,
+                          size: 14,
+                          color: AppColors.secondary,
+                        ),
+                        label: const Text(
                           'Sao chép liên kết thanh toán',
+                          style: TextStyle(
+                            color: AppColors.secondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -614,7 +739,6 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                           : 'Xác nhận thanh toán PayPal',
                       variant: AppButtonVariant.primary,
                       width: double.infinity,
-                      isLoading: _capturingPayPal,
                       onPressed: (_capturingPayPal || _captureUncertain)
                           ? null
                           : _capturePayPal,
@@ -665,7 +789,6 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                 variant: AppButtonVariant.primary,
                 leadingIcon: Icons.sync,
                 width: double.infinity,
-                isLoading: _loadingStatus,
                 onPressed: _loadingStatus ? null : _refreshPaymentState,
               ),
               const SizedBox(height: 12),
@@ -698,7 +821,6 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                 variant: AppButtonVariant.secondary,
                 leadingIcon: Icons.receipt_long,
                 width: double.infinity,
-                isLoading: _downloadingReceipt,
                 onPressed: _downloadingReceipt ? null : _downloadReceiptPdf,
               ),
               const SizedBox(height: 12),

@@ -1,5 +1,5 @@
-import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:mobile/core/l10n/app_localizations.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
@@ -15,9 +15,10 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
+  late TextEditingController _phoneController;
+  late TextEditingController _emailController;
   bool _saving = false;
   String? _error;
-  late TextEditingController _emailController;
 
   @override
   void initState() {
@@ -25,6 +26,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final user = AuthSession.instance.profile ?? <String, dynamic>{};
     _nameController = TextEditingController(
       text: user['fullName']?.toString() ?? '',
+    );
+    _phoneController = TextEditingController(
+      text: user['phone']?.toString() ?? '0905 123 456',
     );
     _emailController = TextEditingController(
       text: user['email']?.toString() ?? '',
@@ -34,6 +38,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
     super.dispose();
   }
@@ -89,14 +94,36 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         padding: const EdgeInsets.all(AppShapes.gutterMobile),
         child: Column(
           children: [
+            // AVATAR WITH CAMERA OVERLAY
             Center(
-              child: CircleAvatar(
-                radius: 46,
-                backgroundColor: AppColors.secondaryContainer,
-                backgroundImage: hasAvatar ? NetworkImage(avatar) : null,
-                child: hasAvatar
-                    ? null
-                    : const Icon(Icons.person_outline, size: 40),
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 46,
+                    backgroundColor: AppColors.secondaryContainer,
+                    backgroundImage: hasAvatar ? NetworkImage(avatar) : null,
+                    child: hasAvatar
+                        ? null
+                        : const Icon(Icons.person_outline, size: 40),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.camera_alt,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 24),
@@ -109,10 +136,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             const SizedBox(height: 16),
             _buildFieldGroup(
-              label: 'Email',
+              label: 'Số điện thoại',
+              controller: _phoneController,
+              icon: Icons.phone_outlined,
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16),
+            _buildFieldGroup(
+              label: 'Email (Đã xác minh)',
               controller: _emailController,
               icon: Icons.mail_outline,
               readOnly: true,
+              trailing: const Icon(
+                Icons.check_circle,
+                color: AppColors.secondary,
+                size: 20,
+              ),
             ),
             const SizedBox(height: 32),
 
@@ -125,6 +164,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
             if (_saving) const LinearProgressIndicator(),
+
             // SAVE BUTTON
             AppPillButton(
               label: 'Lưu thay đổi',

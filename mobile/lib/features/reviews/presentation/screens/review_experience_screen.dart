@@ -542,7 +542,6 @@ class _ReviewExperienceScreenState extends State<ReviewExperienceScreen> {
                               : 'Gửi đánh giá trải nghiệm'),
                     variant: AppButtonVariant.primary,
                     width: double.infinity,
-                    isLoading: _submitting,
                     onPressed: _submitting ? null : _submitReview,
                   ),
                 ],

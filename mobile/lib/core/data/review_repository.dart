@@ -44,17 +44,19 @@ class ReviewRepository {
   final AuthSession session;
 
   static ReviewModel reviewFromJson(Map<String, dynamic> json) {
-    if (json['id'] is! String ||
-        json['subOrderId'] is! String ||
-        json['rating'] is! num ||
-        json['comment'] is! String) {
+    final id = json['id']?.toString() ?? '';
+    if (id.isEmpty) {
       throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
     }
     final rawImages = json['images'] as List? ?? const [];
     final customerName = (json['customerName']?.toString() ?? '').trim();
+    final ratingNum = json['rating'] as num? ?? 5;
+    final comment = json['comment']?.toString() ?? '';
+    final subOrderId = json['subOrderId']?.toString() ?? '';
+
     return ReviewModel(
-      id: json['id'] as String,
-      subOrderId: json['subOrderId'] as String,
+      id: id,
+      subOrderId: subOrderId,
       customerId: json['customerId']?.toString() ?? '',
       customerName: customerName.isNotEmpty
           ? customerName
@@ -62,8 +64,8 @@ class ReviewRepository {
       customerAvatar: json['customerAvatar']?.toString(),
       vendorId: json['vendorId']?.toString() ?? '',
       serviceId: json['serviceId']?.toString() ?? '',
-      rating: (json['rating'] as num).toInt().clamp(1, 5),
-      comment: json['comment'] as String,
+      rating: ratingNum.toInt().clamp(1, 5),
+      comment: comment,
       images: rawImages
           .map((e) => e?.toString() ?? '')
           .where((s) => s.isNotEmpty)

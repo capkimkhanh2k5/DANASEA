@@ -11,12 +11,14 @@ class BookingSlotSheet extends StatefulWidget {
   final List<ServiceSlotModel> availableSlots;
   final Function(ServiceSlotModel slot, int guestCount, bool isInstantCheckout)
       onConfirm;
+  final bool isEditMode;
 
   const BookingSlotSheet({
     super.key,
     required this.service,
     required this.availableSlots,
     required this.onConfirm,
+    this.isEditMode = false,
   });
 
   @override
@@ -448,26 +450,28 @@ class _BookingSlotSheetState extends State<BookingSlotSheet> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(
-                      child: AppPillButton(
-                        label: 'Thêm vào giỏ',
-                        variant: AppButtonVariant.secondary,
-                        leadingIcon: Icons.shopping_bag_outlined,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          widget.onConfirm(_selectedSlot, _guestCount, false);
-                        },
+                    if (!widget.isEditMode) ...[
+                      Expanded(
+                        child: AppPillButton(
+                          label: 'Thêm vào giỏ',
+                          variant: AppButtonVariant.secondary,
+                          leadingIcon: Icons.shopping_bag_outlined,
+                          onPressed: () {
+                            Navigator.pop(context);
+                            widget.onConfirm(_selectedSlot, _guestCount, false);
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
+                      const SizedBox(width: 10),
+                    ],
                     Expanded(
                       child: AppPillButton(
-                        label: 'Đặt ngay',
+                        label: widget.isEditMode ? 'Cập nhật' : 'Đặt ngay',
                         variant: AppButtonVariant.primary,
-                        trailingIcon: Icons.arrow_forward,
+                        trailingIcon: widget.isEditMode ? Icons.check : Icons.arrow_forward,
                         onPressed: () {
                           Navigator.pop(context);
-                          widget.onConfirm(_selectedSlot, _guestCount, true);
+                          widget.onConfirm(_selectedSlot, _guestCount, !widget.isEditMode);
                         },
                       ),
                     ),

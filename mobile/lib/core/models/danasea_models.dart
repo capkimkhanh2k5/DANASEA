@@ -633,3 +633,63 @@ class AiMessageModel {
     required this.createdAt,
   });
 }
+
+class FlashSaleModel {
+  final String flashSaleId;
+  final String serviceId;
+  final String? serviceOptionId;
+  final String serviceName;
+  final String serviceImage;
+  final double originalPrice;
+  final double salePrice;
+  final double actualDiscountAmount;
+  final double actualDiscountPercent;
+  final DateTime startsAt;
+  final DateTime endsAt;
+  final int remainingQuota;
+  final String availability;
+  final String currency;
+
+  const FlashSaleModel({
+    required this.flashSaleId,
+    required this.serviceId,
+    this.serviceOptionId,
+    required this.serviceName,
+    required this.serviceImage,
+    required this.originalPrice,
+    required this.salePrice,
+    required this.actualDiscountAmount,
+    required this.actualDiscountPercent,
+    required this.startsAt,
+    required this.endsAt,
+    required this.remainingQuota,
+    required this.availability,
+    required this.currency,
+  });
+
+  factory FlashSaleModel.fromJson(Map<String, dynamic> json) {
+    return FlashSaleModel(
+      flashSaleId: json['flashSaleId']?.toString() ?? '',
+      serviceId: json['serviceId']?.toString() ?? '',
+      serviceOptionId: json['serviceOptionId']?.toString(),
+      serviceName: json['serviceName']?.toString() ?? '',
+      serviceImage: json['serviceImage']?.toString() ?? '',
+      originalPrice: (json['originalPrice'] as num?)?.toDouble() ?? 0.0,
+      salePrice: (json['salePrice'] as num?)?.toDouble() ?? 0.0,
+      actualDiscountAmount:
+          (json['actualDiscountAmount'] as num?)?.toDouble() ?? 0.0,
+      actualDiscountPercent:
+          (json['actualDiscountPercent'] as num?)?.toDouble() ?? 0.0,
+      startsAt:
+          DateTime.tryParse(json['startsAt']?.toString() ?? '') ??
+          DateTime.now(),
+      endsAt:
+          DateTime.tryParse(json['endsAt']?.toString() ?? '') ??
+          DateTime.now().add(const Duration(hours: 4)),
+      remainingQuota: (json['remainingQuota'] as num?)?.toInt() ?? 0,
+      availability: json['availability']?.toString() ?? 'AVAILABLE',
+      currency: json['currency']?.toString() ?? 'VND',
+    );
+  }
+}
+

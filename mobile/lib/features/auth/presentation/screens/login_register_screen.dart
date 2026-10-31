@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../home/presentation/screens/home_screen.dart';
 import 'forgot_password_screen.dart';
+import '../../../../shared/widgets/danasea_logo.dart';
 
 class LoginRegisterScreen extends StatefulWidget {
   final bool initialIsLogin;
@@ -400,13 +401,10 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen>
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
-                                    Icons.waves_rounded,
-                                    key: ValueKey('login-brand-symbol'),
-                                    color: Colors.white,
-                                    size: 32,
+                                  const DanaSeaLogo(
+                                    size: 64,
                                   ),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 12),
                                   Text(
                                     'DANASEA',
                                     key: const ValueKey('intro-wordmark'),
@@ -497,6 +495,7 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen>
       TextField(
         controller: controller,
         cursorColor: AppColors.secondary,
+        onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
         obscureText: password && _obscurePassword,
         keyboardType: keyboard,
         autofillHints: autofill == null ? null : [autofill],
