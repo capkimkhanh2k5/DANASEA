@@ -1,4 +1,5 @@
 import type { Service, User, ServiceSlot, ServiceImage, MasterOrder, SubOrder, Dispute } from './types';
+import { MOCK_ADMIN_MASTER_ORDERS, MOCK_ADMIN_SUB_ORDERS } from './data/adminMockData';
 
 export const CATEGORIES = [
   { id: 'cat-1', name: 'Chèo SUP', icon: 'surfing' },
@@ -109,101 +110,9 @@ export const MOCK_TEST_ACCOUNTS: Record<'customer' | 'vendor' | 'admin', User> =
 
 export const CURRENT_USER: User = MOCK_TEST_ACCOUNTS.customer;
 
-export const MOCK_MASTER_ORDERS: MasterOrder[] = [
-  {
-    id: "master-1",
-    createdAt: "2024-10-27T08:00:00Z",
-    updatedAt: "2024-10-27T08:00:00Z",
-    customerId: "user-test-01",
-    status: 'CONFIRMED', // Assuming ACTIVE means PAID/Confirmed for this mock
-    totalAmount: 1030000,
-    discountAmount: 0,
-    discountCodeId: ""
-  },
-  {
-    id: "master-2",
-    createdAt: "2024-09-15T09:30:00Z",
-    updatedAt: "2024-09-15T09:30:00Z",
-    customerId: "user-test-01",
-    status: 'CONFIRMED', // COMPLETED equivalent
-    totalAmount: 520000,
-    discountAmount: 0,
-    discountCodeId: ""
-  },
-  {
-    id: "master-3",
-    createdAt: "2024-08-10T14:20:00Z",
-    updatedAt: "2024-08-10T14:20:00Z",
-    customerId: "user-test-01",
-    status: 'CANCELLED', // CANCELLED equivalent
-    totalAmount: 450000,
-    discountAmount: 0,
-    discountCodeId: ""
-  }
-];
+export const MOCK_MASTER_ORDERS: MasterOrder[] = MOCK_ADMIN_MASTER_ORDERS;
 
-export const MOCK_SUB_ORDERS: SubOrder[] = [
-  {
-    id: "sub-1",
-    createdAt: "2024-10-27T08:00:00Z",
-    updatedAt: "2024-10-27T08:00:00Z",
-    masterOrderId: "master-1",
-    vendorId: "vendor-1",
-    serviceId: "tour-1",
-    slotId: "slot-1",
-    quantity: 2,
-    unitPrice: 280000,
-    subtotalAmount: 560000,
-    commissionRate: 10,
-    commissionAmount: 56000,
-    vendorPayoutAmount: 504000,
-    status: 'CONFIRMED',
-    waiverAccepted: true,
-    waiverAcceptedAt: "2024-10-27T08:00:00Z",
-    qrSecret: "SECRET_QR_1",
-    checkedInAt: ""
-  },
-  {
-    id: "sub-2",
-    createdAt: "2024-10-27T08:00:00Z",
-    updatedAt: "2024-10-27T08:00:00Z",
-    masterOrderId: "master-1",
-    vendorId: "vendor-1",
-    serviceId: "tour-3",
-    slotId: "slot-6",
-    quantity: 1,
-    unitPrice: 470000,
-    subtotalAmount: 470000,
-    commissionRate: 10,
-    commissionAmount: 47000,
-    vendorPayoutAmount: 423000,
-    status: 'CONFIRMED',
-    waiverAccepted: true,
-    waiverAcceptedAt: "2024-10-27T08:00:00Z",
-    qrSecret: "SECRET_QR_2",
-    checkedInAt: ""
-  },
-  {
-    id: "sub-3",
-    createdAt: "2024-09-15T09:30:00Z",
-    updatedAt: "2024-09-15T09:30:00Z",
-    masterOrderId: "master-2",
-    vendorId: "vendor-1",
-    serviceId: "tour-3",
-    slotId: "slot-6",
-    quantity: 1,
-    unitPrice: 520000,
-    subtotalAmount: 520000,
-    commissionRate: 10,
-    commissionAmount: 52000,
-    vendorPayoutAmount: 468000,
-    status: 'COMPLETED', // Completed or inactive
-    waiverAccepted: true,
-    waiverAcceptedAt: "2024-09-15T09:30:00Z",
-    qrSecret: "SECRET_QR_3",
-    checkedInAt: "2024-09-16T07:30:00Z"
-  }
-];
+export const MOCK_SUB_ORDERS: SubOrder[] = MOCK_ADMIN_SUB_ORDERS;
 
 export const MOCK_DISPUTES: Array<Omit<Dispute, 'resolvedBy' | 'resolvedAt' | 'createdAt'> & { createdAt: string; resolvedBy: string | null; resolvedAt: string | null }> = [
   {

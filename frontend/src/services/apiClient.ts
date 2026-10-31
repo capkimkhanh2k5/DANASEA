@@ -42,8 +42,9 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = useAuthStore.getState().accessToken;
+    const isMockToken = token?.startsWith('mock_jwt_token_');
 
-    if (token && config.headers) {
+    if (token && !isMockToken && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
@@ -52,12 +53,17 @@ apiClient.interceptors.request.use(
       config.headers['Accept-Language'] = currentLang;
     }
 
+    const method = (config.method || 'GET').toUpperCase();
+    if (isMockToken && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && config.url?.startsWith('/admin/')) {
+      console.warn(`[DEV Demo] Mutation blocked for ${method} ${config.url}`);
+      return Promise.reject(new Error('Thao tác quản trị bị khóa trong chế độ xem trước (DEV Demo)'));
+    }
+
     const skipLoader = config.headers?.['X-Skip-Loader'] === 'true' || Boolean(config.url?.includes('/weather'));
     startLoadingCountdown(skipLoader);
 
     // Structured Debug Logging
     const url = `${config.baseURL || ''}${config.url || ''}`;
-    const method = (config.method || 'GET').toUpperCase();
     console.groupCollapsed(`%c[API Request] ${method} ${url}`, 'color: #0284c7; font-weight: bold;');
     console.log('Timestamp:', new Date().toISOString());
     console.log('Headers:', config.headers);
@@ -103,8 +109,10 @@ apiClient.interceptors.response.use(
     console.error('Response Data:', responseData);
     console.groupEnd();
 
-    // Handle token expiration or unauthorized access (exclude all /auth/ routes)
-    if (status === 401 && !url?.includes('/auth/')) {
+    // Handle token expiration or unauthorized access (exclude all /auth/ routes and DEV mock sessions)
+    const currentToken = useAuthStore.getState().accessToken;
+    const isMock = currentToken?.startsWith('mock_jwt_token_');
+    if (status === 401 && !url?.includes('/auth/') && !isMock) {
       console.warn('[API Auth] Session expired or unauthorized (401). Clearing credentials...');
       useAuthStore.getState().logout();
       if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/vendor') || window.location.pathname.startsWith('/admin'))) {

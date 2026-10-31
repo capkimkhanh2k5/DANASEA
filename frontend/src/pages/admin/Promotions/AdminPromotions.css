@@ -1,0 +1,466 @@
+/* ==========================================================================
+   DANASEA Coastal Enterprise SaaS — Promotions Management Styles (F4)
+   ========================================================================== */
+
+.admin-promotions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--adm-space-5, 20px);
+  width: 100%;
+  max-width: 1700px;
+  margin: 0 auto;
+  padding: 10px 24px 32px;
+  box-sizing: border-box;
+}
+
+/* --- Metrics Grid --- */
+.admin-promotions__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--adm-space-4, 16px);
+}
+
+.admin-promotions__metric-card {
+  background: var(--adm-color-surface, #ffffff);
+  border: 1px solid var(--adm-color-border, #e2e8f0);
+  border-radius: var(--adm-radius-lg, 12px);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .admin-promotions__metric-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  }
+}
+
+.admin-promotions__metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-promotions__metric-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-secondary, #525252);
+}
+
+.admin-promotions__metric-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.admin-promotions__metric-icon--primary {
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.admin-promotions__metric-icon--info {
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.admin-promotions__metric-icon--warning {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.admin-promotions__metric-icon--danger {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.admin-promotions__metric-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--admin-ink, #171717);
+  line-height: 1.2;
+}
+
+.admin-promotions__metric-desc {
+  font-size: 12px;
+  color: var(--admin-secondary, #525252);
+}
+
+/* --- Controls Toolbar --- */
+.admin-promotions__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--adm-color-surface, #ffffff);
+  border: 1px solid var(--adm-color-border, #e2e8f0);
+  border-radius: var(--adm-radius-lg, 12px);
+  padding: 12px 16px;
+}
+
+.admin-promotions__search-box {
+  position: relative;
+  flex: 1 1 280px;
+  max-width: 400px;
+}
+
+.admin-promotions__search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--admin-muted, #737373);
+  font-size: 18px;
+  pointer-events: none;
+}
+
+.admin-promotions__search-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px 0 38px;
+  border: 1px solid var(--adm-color-border, #e2e8f0);
+  border-radius: var(--adm-radius-md, 8px);
+  font-size: 13px;
+  color: var(--admin-ink, #171717);
+  background: #f8fafc;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.admin-promotions__search-input:focus {
+  border-color: var(--admin-primary, #0B5D6F);
+  background: #ffffff;
+}
+
+.admin-promotions__filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-promotions__select {
+  height: 38px;
+  padding: 0 32px 0 12px;
+  border: 1px solid var(--adm-color-border, #e2e8f0);
+  border-radius: var(--adm-radius-md, 8px);
+  font-size: 13px;
+  color: var(--admin-ink, #171717);
+  background: #f8fafc;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+}
+
+.admin-promotions__select:focus {
+  border-color: var(--admin-primary, #0B5D6F);
+  background-color: #ffffff;
+}
+
+/* --- Table Styles --- */
+.admin-promotions__card {
+  background: var(--adm-color-surface, #ffffff);
+  border: 1px solid var(--adm-color-border, #e2e8f0);
+  border-radius: var(--adm-radius-lg, 12px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.admin-promotions__table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.admin-promotions__table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.admin-promotions__table th:first-child { width: 22%; }
+.admin-promotions__table th:nth-child(2) { width: 18%; }
+.admin-promotions__table th:nth-child(3) { width: 20%; }
+.admin-promotions__table th:nth-child(4) { width: 18%; }
+.admin-promotions__table th:nth-child(5) { width: 130px; }
+.admin-promotions__table th:last-child,
+.admin-promotions__table td:last-child {
+  width: 96px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.admin-promotions__table th {
+  padding: 12px 16px;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-secondary, #525252);
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.admin-promotions__table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.admin-promotions__row:hover td {
+  background-color: #f8fafc;
+}
+
+.admin-promotions__code-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--admin-primary, #0B5D6F);
+  background: var(--admin-tint, #e8f3f5);
+  border: 1px solid #c2e0e5;
+  padding: 4px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.03em;
+}
+
+.admin-promotions__scope-tag {
+  font-size: 12px;
+  color: var(--admin-secondary, #525252);
+  font-weight: 500;
+}
+
+.admin-promotions__discount-val {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--admin-ink, #171717);
+}
+
+.admin-promotions__discount-type {
+  font-size: 12px;
+  color: var(--admin-secondary, #525252);
+}
+
+/* Usage Progress */
+.admin-promotions__usage {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.admin-promotions__usage-text {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--admin-body, #262626);
+}
+
+.admin-promotions__progress-bar {
+  width: 100%;
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.admin-promotions__progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--admin-primary, #0B5D6F);
+  transition: width 0.3s ease;
+}
+
+.admin-promotions__progress-fill--depleted {
+  background: #ef4444;
+}
+
+/* Dates */
+.admin-promotions__date {
+  font-size: 12px;
+  color: var(--admin-secondary, #525252);
+  white-space: nowrap;
+}
+
+.admin-promotions__date-range {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--admin-body, #262626);
+}
+
+/* Actions */
+.admin-promotions__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+}
+
+/* --- Drawer / Form Elements --- */
+.admin-promotions__form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 0 20px;
+}
+
+.admin-promotions__form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-promotions__form-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-body, #262626);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-promotions__form-hint {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--admin-secondary, #525252);
+  text-transform: none;
+}
+
+.admin-promotions__input {
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--admin-ink, #171717);
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.15s ease;
+  box-sizing: border-box;
+}
+
+.admin-promotions__input:focus {
+  border-color: var(--admin-primary, #0B5D6F);
+  box-shadow: 0 0 0 3px rgba(11, 93, 111, 0.12);
+}
+
+.admin-promotions__input--mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: 14px;
+}
+
+.admin-promotions__type-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.admin-promotions__type-btn {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: var(--admin-body, #262626);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.admin-promotions__type-btn--active {
+  background: var(--admin-primary, #0B5D6F);
+  color: #ffffff;
+  border-color: var(--admin-primary, #0B5D6F);
+  box-shadow: 0 2px 4px rgba(11, 93, 111, 0.25);
+}
+
+.admin-promotions__presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.admin-promotions__preset-btn {
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  color: var(--admin-secondary, #525252);
+  cursor: pointer;
+  transition: background-color 100ms ease, border-color 100ms ease, color 100ms ease;
+}
+
+.admin-promotions__preset-btn:hover {
+  background: #e2e8f0;
+  color: var(--admin-ink, #171717);
+}
+
+.admin-promotions__preset-btn--active {
+  background: var(--admin-primary, #0B5D6F);
+  color: #ffffff;
+  border-color: var(--admin-primary, #0B5D6F);
+}
+
+.admin-promotions__date-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.admin-promotions__toggle-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.admin-promotions__checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--admin-primary, #0B5D6F);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-promotions__metric-card,
+  .admin-promotions__type-btn,
+  .admin-promotions__preset-btn {
+    transition: none !important;
+  }
+}

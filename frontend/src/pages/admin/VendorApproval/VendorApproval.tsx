@@ -1,1067 +1,285 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { Eye, Search, SlidersHorizontal } from 'lucide-react';
+import { MOCK_ADMIN_VENDORS } from '../../../data/adminMockData';
 import { adminVendorService, getAdminVendorError } from '../../../services/adminVendorService';
-import { useAuthStore } from '../../../store/useAuthStore';
-import type {
-  AdminVendorResponse,
-  VendorDocumentResponse,
-} from '../../../types/adminVendor';
+import type { AdminVendorResponse } from '../../../types/adminVendor';
+import type { BadgeTier } from '../../../types';
+import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
+import { AdminButton, AdminFilterTabs, AdminNotice, AdminPagination } from '../../../components/admin/AdminWorkspace';
+import { AdminDialog } from '../../../components/admin/AdminDialog';
+import { applyVendorDecision, filterVendors, formatTaxCode, type VendorRecord, type VendorReviewState } from './vendorApprovalModel';
+import { VendorProfile, VendorStatus } from './VendorProfile';
+import './VendorApproval.css';
+
+const tiers: BadgeTier[] = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM'];
+
+function mapVendorResponseToRecord(v: AdminVendorResponse): VendorRecord {
+  const isTest = !v.taxCode || v.taxCode.startsWith('TEST-DS-') || v.taxCode.startsWith('TEST-');
+  return {
+    id: v.id,
+    userId: v.userId,
+    businessName: v.businessName,
+    taxCode: isTest ? '' : v.taxCode,
+    email: '',
+    phone: '',
+    address: v.address || 'Đà Nẵng',
+    avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(v.businessName)}&background=00646F&color=fff`,
+    ratingAvg: v.ratingAvg || 5.0,
+    ratingCount: v.ratingCount || 0,
+    verificationStatus: (v.verificationStatus === 'APPROVED' ? 'VERIFIED' : v.verificationStatus) as unknown as VendorRecord['verificationStatus'],
+    badgeTier: (v.badgeTier === 'NONE' || !v.badgeTier ? 'BRONZE' : v.badgeTier) as BadgeTier,
+    bankName: v.bankName || '',
+    bankAccountNumber: v.bankAccountNumber || '',
+    bankAccountHolder: v.bankAccountHolder || '',
+    verifiedBy: v.verifiedBy || '',
+    verifiedAt: v.verifiedAt || '',
+    createdAt: v.createdAt,
+    updatedAt: v.updatedAt,
+  };
+}
 
 export function VendorApproval() {
-  const accessToken = useAuthStore(state => state.accessToken);
-  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
-  const userRole = useAuthStore(state => state.user?.role);
-  const canAccess = isAuthenticated && !!accessToken && userRole === 'ADMIN';
+  const location = useLocation();
+  const demo = import.meta.env.DEV && new URLSearchParams(location.search).get('demo') === '1';
+  const [review, setReview] = useState<VendorReviewState>(() => ({ vendors: demo ? MOCK_ADMIN_VENDORS : [], timeline: [] }));
+  const [loading, setLoading] = useState(() => !demo);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState('');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('all');
+  const [tierFilter, setTierFilter] = useState('all');
+  const [tier, setTier] = useState<BadgeTier>('PLATINUM');
+  const [decision, setDecision] = useState<'approve' | 'reject'>('approve');
+  const [decisionOpen, setDecisionOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [documentName, setDocumentName] = useState('');
+  const [documentOpen, setDocumentOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  // Data state
-  const [vendors, setVendors] = useState<AdminVendorResponse[]>([]);
-  const [selectedVendorId, setSelectedVendorId] = useState<string>('');
-  const [selectedVendorDetail, setSelectedVendorDetail] = useState<AdminVendorResponse | null>(null);
-
-  // Loading & error state
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDetailLoading, setIsDetailLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [isMutating, setIsMutating] = useState(false);
-
-  // Filter state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [badgeFilter, setBadgeFilter] = useState<string>('all');
-
-  // Modal state
-  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-  const [docPreviewUrl, setDocPreviewUrl] = useState<{ name: string; url: string } | null>(null);
-
-  // Reject single document modal
-  const [docRejectTarget, setDocRejectTarget] = useState<VendorDocumentResponse | null>(null);
-  const [docRejectReason, setDocRejectReason] = useState('');
-
-  // Toast notification
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
-
-  // Mutex lock for safe actions
-  const mutationLockRef = useRef<symbol | null>(null);
-
-  // Initial load without cascading synchronous render
   useEffect(() => {
-    let active = true;
-    if (!canAccess) return;
+    if (demo) return;
 
-    void (async () => {
-      try {
-        const data = await adminVendorService.getVendors({ size: 100 });
-        if (!active) return;
-        const items = data.content || [];
-        setVendors(items);
-        if (items.length > 0) {
-          setSelectedVendorId(prev => (items.some(v => v.id === prev) ? prev : items[0].id));
-        }
-      } catch (err) {
-        if (active) {
-          setError(getAdminVendorError(err, 'Không thể tải danh sách đối tác từ máy chủ'));
-        }
-      }
-    })();
+    let isMounted = true;
+    adminVendorService.getVendors({ page: 0, size: 50 })
+      .then(res => {
+        if (!isMounted) return;
+        const mapped = (res.content || []).map(mapVendorResponseToRecord);
+        setReview({ vendors: mapped, timeline: [] });
+        setLoading(false);
+      })
+      .catch(err => {
+        if (!isMounted) return;
+        const msg = getAdminVendorError(err, 'Không thể tải danh sách đối tác.');
+        setErrorMessage(msg);
+        setLoading(false);
+      });
 
     return () => {
-      active = false;
+      isMounted = false;
     };
-  }, [canAccess]);
+  }, [demo]);
 
-  // Load single vendor detail asynchronously when selected
-  useEffect(() => {
-    let active = true;
-    if (!selectedVendorId || !canAccess) return;
+  const visibleVendors = review.vendors;
+  const selected = visibleVendors.find(vendor => vendor.id === selectedId);
+  const filtered = useMemo(() => filterVendors(visibleVendors, search, status, tierFilter), [visibleVendors, search, status, tierFilter]);
+  const count = (value: string) => visibleVendors.filter(vendor => vendor.verificationStatus === value).length;
+  const PAGE_SIZE = 8;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+  const activePage = Math.min(Math.max(1, currentPage), totalPages);
 
-    void (async () => {
-      try {
-        setIsDetailLoading(true);
-        const detail = await adminVendorService.getVendor(selectedVendorId);
-        if (active) {
-          setSelectedVendorDetail(detail);
-        }
-      } catch (err) {
-        if (active) {
-          setActionError(getAdminVendorError(err, 'Không thể tải chi tiết đối tác'));
-        }
-      } finally {
-        if (active) setIsDetailLoading(false);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [selectedVendorId, canAccess]);
-
-  // Manual refresh handler
-  const handleRefresh = async () => {
-    if (!canAccess || isLoading) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await adminVendorService.getVendors({ size: 100 });
-      const items = data.content || [];
-      setVendors(items);
-      if (items.length > 0) {
-        setSelectedVendorId(prev => (items.some(v => v.id === prev) ? prev : items[0].id));
-      }
-    } catch (err) {
-      setError(getAdminVendorError(err, 'Không thể tải danh sách đối tác từ máy chủ'));
-    } finally {
-      setIsLoading(false);
-    }
+  const resetFilters = () => {
+    setSearch('');
+    setStatus('all');
+    setTierFilter('all');
+    setCurrentPage(1);
   };
 
-  // Filtered vendors in memory
-  const filteredVendors = useMemo(() => {
-    return vendors.filter(v => {
-      const matchSearch =
-        v.businessName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        v.taxCode.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchStatus =
-        statusFilter === 'all' || v.verificationStatus === statusFilter;
-
-      const matchBadge =
-        badgeFilter === 'all' || v.badgeTier === badgeFilter;
-
-      return matchSearch && matchStatus && matchBadge;
-    });
-  }, [vendors, searchQuery, statusFilter, badgeFilter]);
-
-  const selectedVendor =
-    (selectedVendorDetail && selectedVendorDetail.id === selectedVendorId)
-      ? selectedVendorDetail
-      : vendors.find(v => v.id === selectedVendorId) || null;
-
-  // Finding 3 fix: match ApproveVendorUseCase requiring both BUSINESS_LICENSE and SAFETY_CERT in APPROVED status
-  const documentCheck = useMemo(() => {
-    const docs = selectedVendor?.documents || [];
-    const hasLicense = docs.some(d => d.docType === 'BUSINESS_LICENSE' && d.status === 'APPROVED');
-    const hasSafety = docs.some(d => d.docType === 'SAFETY_CERT' && d.status === 'APPROVED');
-    const pendingDocs = docs.filter(d => d.status === 'PENDING');
-    return {
-      allApproved: hasLicense && hasSafety,
-      hasLicense,
-      hasSafety,
-      pendingCount: pendingDocs.length,
-      totalCount: docs.length,
-    };
-  }, [selectedVendor]);
-
-  // Finding 1 fix: preserve existing documents and refresh via GET to prevent document wipeout
-  const handleApprove = async () => {
-    if (!selectedVendor) return;
-
-    const lock = Symbol('approve-vendor');
-    mutationLockRef.current = lock;
-    setIsMutating(true);
-    setActionError(null);
-
-    try {
-      const updated = await adminVendorService.approveVendor(selectedVendor.id);
-      if (mutationLockRef.current === lock) {
-        setVendors(prev => prev.map(v => (v.id === updated.id ? updated : v)));
-        setSelectedVendorDetail(prev => (prev?.id === updated.id ? { ...updated, documents: prev.documents } : prev));
-        setIsApproveModalOpen(false);
-        showToast(`Đã phê duyệt đối tác ${updated.businessName} thành công!`);
-
-        // Refresh detail via GET to synchronize authoritative state without document loss
-        try {
-          const refreshed = await adminVendorService.getVendor(updated.id);
-          if (mutationLockRef.current === lock) {
-            setSelectedVendorDetail(prev => (prev?.id === refreshed.id ? refreshed : prev));
-          }
-        } catch (refreshErr) {
-          if (mutationLockRef.current === lock) {
-            setActionError(getAdminVendorError(refreshErr, 'Thao tác thành công nhưng không thể đồng bộ lại chứng từ mới nhất'));
-          }
-        }
-      }
-    } catch (err) {
-      if (mutationLockRef.current === lock) {
-        setActionError(getAdminVendorError(err, 'Phê duyệt đối tác thất bại'));
-      }
-    } finally {
-      if (mutationLockRef.current === lock) {
-        mutationLockRef.current = null;
-        setIsMutating(false);
-      }
-    }
+  const paginatedVendors = useMemo(() => {
+    const start = (activePage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, activePage]);
+  const openProfile = (vendor: VendorRecord) => {
+    setSelectedId(vendor.id);
+    setTier(vendor.badgeTier);
+    setNote('');
+    setNotice(null);
+    setDrawerOpen(true);
   };
-
-  // Finding 1 fix: preserve existing documents and refresh via GET on reject
-  const handleReject = async () => {
-    if (!selectedVendor || !rejectReason.trim()) {
-      setActionError('Vui lòng nhập lý do từ chối hồ sơ đối tác');
+  const confirmDecision = async () => {
+    if (!selected || !decisionOpen) return;
+    if (demo) {
+      const action = { vendorId: selected.id, kind: decision, tier, note, at: new Date().toISOString() };
+      setReview(previous => applyVendorDecision(previous, action, demo));
+      setDecisionOpen(false);
+      setNote('');
+      setNotice(`Đã ${decision === 'approve' ? `cập nhật phê duyệt và hạng ${tier}` : 'ghi nhận từ chối'} cho ${selected.businessName} trong bản demo.`);
       return;
     }
 
-    const lock = Symbol('reject-vendor');
-    mutationLockRef.current = lock;
-    setIsMutating(true);
-    setActionError(null);
-
     try {
-      const updated = await adminVendorService.rejectVendor(selectedVendor.id, rejectReason.trim());
-      if (mutationLockRef.current === lock) {
-        setVendors(prev => prev.map(v => (v.id === updated.id ? updated : v)));
-        setSelectedVendorDetail(prev => (prev?.id === updated.id ? { ...updated, documents: prev.documents } : prev));
-        setIsRejectModalOpen(false);
-        setRejectReason('');
-        showToast(`Đã từ chối duyệt hồ sơ ${updated.businessName}.`);
-
-        // Refresh detail via GET to synchronize authoritative state
-        try {
-          const refreshed = await adminVendorService.getVendor(updated.id);
-          if (mutationLockRef.current === lock) {
-            setSelectedVendorDetail(prev => (prev?.id === refreshed.id ? refreshed : prev));
-          }
-        } catch (refreshErr) {
-          if (mutationLockRef.current === lock) {
-            setActionError(getAdminVendorError(refreshErr, 'Thao tác thành công nhưng không thể đồng bộ lại chứng từ mới nhất'));
-          }
-        }
+      setIsSubmitting(true);
+      if (decision === 'approve') {
+        await adminVendorService.approveVendor(selected.id);
+        setReview(prev => ({
+          ...prev,
+          vendors: prev.vendors.map(v => v.id === selected.id ? { ...v, verificationStatus: 'VERIFIED' as unknown as VendorRecord['verificationStatus'], badgeTier: tier } : v)
+        }));
+        setNotice(`Đã phê duyệt đối tác "${selected.businessName}".`);
+      } else {
+        await adminVendorService.rejectVendor(selected.id, note || 'Không đạt điều kiện xét duyệt');
+        setReview(prev => ({
+          ...prev,
+          vendors: prev.vendors.map(v => v.id === selected.id ? { ...v, verificationStatus: 'REJECTED' as unknown as VendorRecord['verificationStatus'] } : v)
+        }));
+        setNotice(`Đã từ chối duyệt đối tác "${selected.businessName}".`);
       }
+      setDecisionOpen(false);
+      setNote('');
     } catch (err) {
-      if (mutationLockRef.current === lock) {
-        setActionError(getAdminVendorError(err, 'Từ chối đối tác thất bại'));
-      }
+      const msg = getAdminVendorError(err, 'Lỗi khi cập nhật trạng thái đối tác.');
+      setNotice(msg);
+      setDecisionOpen(false);
     } finally {
-      if (mutationLockRef.current === lock) {
-        mutationLockRef.current = null;
-        setIsMutating(false);
-      }
+      setIsSubmitting(false);
     }
   };
 
-  // Approve single document
-  const handleApproveDocument = async (doc: VendorDocumentResponse) => {
-    if (!selectedVendor) return;
-
-    const lock = Symbol('approve-doc');
-    mutationLockRef.current = lock;
-    setIsMutating(true);
-    setActionError(null);
-
-    try {
-      const updatedDoc = await adminVendorService.approveVendorDocument(selectedVendor.id, doc.id);
-      if (mutationLockRef.current === lock) {
-        setSelectedVendorDetail(prev => {
-          if (!prev) return null;
-          const nextDocs = (prev.documents || []).map(d => (d.id === updatedDoc.id ? updatedDoc : d));
-          return { ...prev, documents: nextDocs };
-        });
-        showToast(`Đã duyệt tài liệu ${doc.docType === 'BUSINESS_LICENSE' ? 'Giấy phép kinh doanh' : 'Chứng nhận an toàn'}!`);
-      }
-    } catch (err) {
-      if (mutationLockRef.current === lock) {
-        setActionError(getAdminVendorError(err, 'Không thể duyệt chứng từ này'));
-      }
-    } finally {
-      if (mutationLockRef.current === lock) {
-        mutationLockRef.current = null;
-        setIsMutating(false);
-      }
-    }
-  };
-
-  // Reject single document
-  const handleRejectDocument = async () => {
-    if (!selectedVendor || !docRejectTarget || !docRejectReason.trim()) {
-      setActionError('Vui lòng nhập lý do từ chối tài liệu');
-      return;
-    }
-
-    const lock = Symbol('reject-doc');
-    mutationLockRef.current = lock;
-    setIsMutating(true);
-    setActionError(null);
-
-    try {
-      const updatedDoc = await adminVendorService.rejectVendorDocument(
-        selectedVendor.id,
-        docRejectTarget.id,
-        docRejectReason.trim()
-      );
-      if (mutationLockRef.current === lock) {
-        setSelectedVendorDetail(prev => {
-          if (!prev) return null;
-          const nextDocs = (prev.documents || []).map(d => (d.id === updatedDoc.id ? updatedDoc : d));
-          return { ...prev, documents: nextDocs };
-        });
-        setDocRejectTarget(null);
-        setDocRejectReason('');
-        showToast('Đã từ chối chứng từ đính kèm.');
-      }
-    } catch (err) {
-      if (mutationLockRef.current === lock) {
-        setActionError(getAdminVendorError(err, 'Không thể từ chối chứng từ này'));
-      }
-    } finally {
-      if (mutationLockRef.current === lock) {
-        mutationLockRef.current = null;
-        setIsMutating(false);
-      }
-    }
-  };
-
-  // Metrics
-  const totalCount = vendors.length;
-  const verifiedCount = vendors.filter(v => v.verificationStatus === 'APPROVED').length;
-  const pendingCount = vendors.filter(v => v.verificationStatus === 'PENDING').length;
-  const rejectedCount = vendors.filter(v => v.verificationStatus === 'REJECTED').length;
-
-  if (!canAccess) {
-    return (
-      <main className="w-full pt-16 bg-surface px-space-xl pb-space-2xl min-h-screen">
-        <div className="max-w-xl mx-auto mt-12 p-space-xl rounded-2xl bg-white border border-slate-200 text-center shadow-xs">
-          <span className="material-symbols-outlined text-[48px] text-amber-500 mb-2">lock</span>
-          <h2 className="text-lg font-bold text-slate-800">Yêu cầu quyền Quản trị viên</h2>
-          <p className="text-xs text-slate-500 mt-1">
-            Vui lòng đăng nhập với tài khoản có quyền ADMIN để quản lý và thẩm định hồ sơ đối tác.
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  return (
-    <main className="w-full pt-16 bg-surface px-space-xl pb-space-2xl min-h-screen">
-      <div className="flex flex-col w-full gap-space-xl animate-fade-in-up">
-        {/* Toast notification */}
-        {toastMessage && (
-          <div className="fixed top-20 right-8 z-50 flex items-center gap-3 px-4 py-3 rounded-xl bg-primary text-on-primary shadow-xl animate-fade-in-up">
-            <span className="material-symbols-outlined text-[20px]">check_circle</span>
-            <span className="font-label-md text-label-md font-semibold">{toastMessage}</span>
-          </div>
-        )}
-
-        {/* Global action error alert */}
-        {actionError && (
-          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center justify-between shadow-xs">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px]">error</span>
-              <span className="font-semibold">{actionError}</span>
-            </div>
-            <button
-              onClick={() => setActionError(null)}
-              className="text-red-500 hover:text-red-700"
-            >
-              <span className="material-symbols-outlined text-[16px]">close</span>
-            </button>
-          </div>
-        )}
-
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">
-              Phê duyệt Đối tác
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 text-xs font-medium">
-            <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-600">
-              Tổng: <strong>{totalCount}</strong>
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-primary/10 text-primary border border-primary/20">
-              Hoạt động: <strong>{verifiedCount}</strong>
-            </span>
-            <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
-              Chờ duyệt: <strong>{pendingCount}</strong>
-            </span>
-            {rejectedCount > 0 && (
-              <span className="px-2.5 py-1 rounded-md bg-red-50 text-red-700 border border-red-200">
-                Từ chối: <strong>{rejectedCount}</strong>
-              </span>
-            )}
-            <button
-              onClick={handleRefresh}
-              disabled={isLoading}
-              className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-1 disabled:opacity-50"
-              title="Tải lại danh sách"
-            >
-              <span className={`material-symbols-outlined text-[14px] ${isLoading ? 'animate-spin' : ''}`}>
-                refresh
-              </span>
-              <span>Làm mới</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Main workspace: 65% list / 35% drawer */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
-          {/* Left panel: table */}
-          <div className="lg:col-span-8 flex flex-col gap-space-md min-w-0">
-            {/* Filter bar */}
-            <div className="p-space-md rounded-xl bg-white shadow-xs flex flex-col md:flex-row items-center justify-between gap-space-sm border border-slate-200">
-              <div className="relative w-full md:w-80">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">
-                  search
-                </span>
-                <input
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full h-10 pl-9 pr-space-md rounded-lg bg-slate-50 text-slate-800 font-body-md text-body-md placeholder:text-slate-400 focus:outline-none focus:bg-white focus:ring-1 focus:ring-primary transition-colors border border-slate-200"
-                  placeholder="Tìm theo tên đơn vị, MST..."
-                  type="text"
-                />
-              </div>
-
-              {/* Status & badge tabs */}
-              <div className="flex items-center gap-space-xs w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-                <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200">
-                  <button
-                    onClick={() => setStatusFilter('all')}
-                    className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
-                      statusFilter === 'all'
-                        ? 'bg-primary text-white font-bold shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Tất cả
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter('PENDING')}
-                    className={`px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all ${
-                      statusFilter === 'PENDING'
-                        ? 'bg-primary text-white font-bold shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>Chờ duyệt</span>
-                    {pendingCount > 0 && (
-                      <span
-                        className={`px-1.5 py-0.2 rounded-full font-bold text-[10px] ${
-                          statusFilter === 'PENDING' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {pendingCount}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter('APPROVED')}
-                    className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
-                      statusFilter === 'APPROVED'
-                        ? 'bg-primary text-white font-bold shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Đã duyệt
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter('REJECTED')}
-                    className={`px-3 py-1.5 rounded-lg text-xs transition-all ${
-                      statusFilter === 'REJECTED'
-                        ? 'bg-primary text-white font-bold shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Từ chối
-                  </button>
-                </div>
-
-                {/* Badge dropdown */}
-                <select
-                  value={badgeFilter}
-                  onChange={e => setBadgeFilter(e.target.value)}
-                  className="h-9 px-3 rounded-lg bg-slate-50 text-slate-700 text-xs focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer border border-slate-200"
-                >
-                  <option value="all">Huy hiệu: Tất cả</option>
-                  <option value="BRONZE">Đồng (BRONZE)</option>
-                  <option value="SILVER">Bạc (SILVER)</option>
-                  <option value="GOLD">Vàng (GOLD)</option>
-                  <option value="PLATINUM">Bạch kim (PLATINUM)</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Error message */}
-            {error && (
-              <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center justify-between">
-                <span>{error}</span>
-                <button onClick={handleRefresh} className="font-bold underline">Thử lại</button>
-              </div>
-            )}
-
-            {/* Partner table card */}
-            <div className="rounded-xl bg-white shadow-xs overflow-hidden flex flex-col border border-slate-200">
-              <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left border-collapse min-w-[620px]">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-700 text-xs font-semibold border-b border-slate-200">
-                      <th className="py-3 px-4 whitespace-nowrap border-r border-slate-200">Đơn vị &amp; Đại diện</th>
-                      <th className="py-3 px-4 whitespace-nowrap border-r border-slate-200">Mã số thuế</th>
-                      <th className="py-3 px-4 whitespace-nowrap border-r border-slate-200">Bến bãi &amp; Đánh giá</th>
-                      <th className="py-3 px-4 whitespace-nowrap border-r border-slate-200">Trạng thái</th>
-                      <th className="py-3 px-4 whitespace-nowrap border-r border-slate-200">Huy hiệu</th>
-                      <th className="py-3 px-4 text-center whitespace-nowrap">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 text-xs text-slate-700">
-                    {filteredVendors.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-400">
-                          <span className="material-symbols-outlined text-[32px] text-slate-300 mb-1">
-                            folder_off
-                          </span>
-                          <p className="text-xs">Không tìm thấy hồ sơ đối tác nào phù hợp</p>
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredVendors.map(vendor => {
-                        const isSelected = vendor.id === selectedVendor?.id;
-                        return (
-                          <tr
-                            key={vendor.id}
-                            onClick={() => setSelectedVendorId(vendor.id)}
-                            className={`cursor-pointer transition-colors ${
-                              isSelected ? 'bg-primary/5 hover:bg-primary/10' : 'hover:bg-slate-50'
-                            }`}
-                          >
-                            <td className="py-3.5 px-4 border-r border-slate-200">
-                              <div className="flex items-center gap-space-sm">
-                                <div className="w-10 h-10 rounded-xl bg-slate-100 text-primary border border-slate-200 flex items-center justify-center font-bold text-sm shrink-0">
-                                  {vendor.businessName.charAt(0).toUpperCase()}
-                                </div>
-                                <div className="flex flex-col min-w-0 max-w-[190px]">
-                                  <span className="font-bold text-slate-800 truncate" title={vendor.businessName}>
-                                    {vendor.businessName}
-                                  </span>
-                                  <span className="text-[11px] text-slate-500 truncate" title={vendor.bankAccountHolder}>
-                                    Đại diện: {vendor.bankAccountHolder || 'Chưa cập nhật'}
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="py-3.5 px-4 whitespace-nowrap border-r border-slate-200">
-                              <span className="font-mono text-slate-800 font-semibold block">{vendor.taxCode}</span>
-                              <div className="text-[11px] text-slate-500 font-normal truncate max-w-[130px]" title={vendor.bankName}>
-                                {vendor.bankName}
-                              </div>
-                            </td>
-
-                            <td className="py-3.5 px-4 border-r border-slate-200">
-                              <div className="flex flex-col min-w-0 max-w-[170px]">
-                                <span className="text-xs text-slate-800 font-semibold truncate" title={vendor.address}>
-                                  {vendor.address}
-                                </span>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                  <span className="flex items-center gap-0.5 text-[11px] text-amber-600 font-bold">
-                                    <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>
-                                      star
-                                    </span>
-                                    {vendor.ratingAvg ?? 0}
-                                  </span>
-                                  <span className="text-[11px] text-slate-500">({vendor.ratingCount ?? 0} đ/g)</span>
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="py-3.5 px-4 whitespace-nowrap border-r border-slate-200">
-                              <span
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
-                                  vendor.verificationStatus === 'APPROVED'
-                                    ? 'bg-primary/10 text-primary border border-primary/20'
-                                    : vendor.verificationStatus === 'PENDING'
-                                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                    : 'bg-red-50 text-red-700 border border-red-200'
-                                }`}
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                                {vendor.verificationStatus === 'APPROVED'
-                                  ? 'Đã duyệt'
-                                  : vendor.verificationStatus === 'PENDING'
-                                  ? 'Chờ duyệt'
-                                  : 'Từ chối'}
-                              </span>
-                            </td>
-
-                            <td className="py-3.5 px-4 whitespace-nowrap border-r border-slate-200">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-bold border border-slate-200">
-                                <span className="material-symbols-outlined text-[13px] text-amber-600">military_tech</span>
-                                {vendor.badgeTier || 'BRONZE'}
-                              </span>
-                            </td>
-
-                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                              <div className="flex items-center justify-center">
-                                <button
-                                  onClick={e => {
-                                    e.stopPropagation();
-                                    setSelectedVendorId(vendor.id);
-                                  }}
-                                  className={`w-8 h-8 rounded-lg inline-flex items-center justify-center transition-all ${
-                                    isSelected
-                                      ? 'bg-primary text-white shadow-xs'
-                                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-                                  }`}
-                                  title="Xem chi tiết"
-                                >
-                                  <span className="material-symbols-outlined text-[18px]">visibility</span>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Right panel: drawer */}
-          {selectedVendor && (
-            <div className="lg:col-span-4 flex flex-col gap-space-md sticky top-20">
-              <div className="p-space-lg rounded-xl bg-white shadow-xs flex flex-col gap-space-lg border border-slate-200">
-                {/* Drawer header */}
-                <div className="flex flex-col gap-space-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[12px] font-bold">
-                      MÃ: #{selectedVendor.id.slice(0, 8)}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-label-sm text-xs font-bold ${
-                        selectedVendor.verificationStatus === 'APPROVED'
-                          ? 'bg-primary/10 text-primary border border-primary/20'
-                          : selectedVendor.verificationStatus === 'PENDING'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : 'bg-red-50 text-red-700 border border-red-200'
-                      }`}
-                    >
-                      {selectedVendor.verificationStatus === 'APPROVED'
-                        ? 'ĐÃ PHÊ DUYỆT'
-                        : selectedVendor.verificationStatus === 'PENDING'
-                        ? 'CHỜ THẨM ĐỊNH'
-                        : 'TỪ CHỐI'}
-                    </span>
-                  </div>
-
-                  <div className="mt-2">
-                    <h2 className="text-lg text-slate-800 font-bold">{selectedVendor.businessName}</h2>
-                    <div className="flex items-center gap-1.5 text-slate-500 font-body-sm text-xs mt-0.5">
-                      <span className="material-symbols-outlined text-[16px] text-primary">location_on</span>
-                      <span>{selectedVendor.address}</span>
-                    </div>
-                  </div>
-
-                  <div className="p-space-sm rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 mt-1">
-                    Người duyệt:{' '}
-                    <strong className="text-slate-800">
-                      {selectedVendor.verifiedBy || (selectedVendor.verificationStatus === 'APPROVED' ? 'Hệ thống Admin' : 'Đang chờ thẩm định')}
-                    </strong>
-                    {selectedVendor.verifiedAt && (
-                      <span className="block text-[11px] text-slate-400 mt-0.5">
-                        Ngày: {new Date(selectedVendor.verifiedAt).toLocaleDateString('vi-VN')}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Section: legal & financial */}
-                <div className="flex flex-col gap-space-sm">
-                  <span className="text-xs text-slate-800 font-semibold flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[16px] text-primary">account_balance</span>
-                    Thông tin pháp lý &amp; Tài khoản thụ hưởng
-                  </span>
-                  <div className="p-space-md rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-2">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500">Mã số thuế doanh nghiệp:</span>
-                      <span className="font-mono font-bold text-slate-800">{selectedVendor.taxCode}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500">Ngân hàng thanh toán:</span>
-                      <span className="font-semibold text-slate-800">{selectedVendor.bankName}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500">Số tài khoản thụ hưởng:</span>
-                      <span className="font-mono font-bold text-primary text-sm">{selectedVendor.bankAccountNumber}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200">
-                      <span className="text-slate-500">Chủ tài khoản:</span>
-                      <span className="font-bold text-slate-800 text-right uppercase">{selectedVendor.bankAccountHolder}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section: attached documents */}
-                <div className="flex flex-col gap-space-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-800 font-semibold flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[16px] text-primary">folder_open</span>
-                      Hồ sơ đính kèm ({selectedVendor.documents?.length || 0})
-                    </span>
-                    {isDetailLoading && (
-                      <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[12px] animate-spin">progress_activity</span>
-                        Đang tải...
-                      </span>
-                    )}
-                  </div>
-
-                  {isDetailLoading && !selectedVendor.documents ? (
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
-                      <span className="material-symbols-outlined text-[16px] animate-spin text-primary">progress_activity</span>
-                      Đang tải danh sách tài liệu...
-                    </div>
-                  ) : !selectedVendor.documents ? (
-                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-center text-xs text-amber-700">
-                      Chưa thể đồng bộ hồ sơ chứng từ của đối tác. Vui lòng thử lại.
-                    </div>
-                  ) : selectedVendor.documents.length === 0 ? (
-                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center text-xs text-slate-500">
-                      Chưa có tài liệu đính kèm nào được tải lên
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {selectedVendor.documents.map(doc => {
-                        const isDocApproved = doc.status === 'APPROVED';
-                        const isDocRejected = doc.status === 'REJECTED';
-                        const docLabel =
-                          doc.docType === 'BUSINESS_LICENSE'
-                            ? 'Giấy phép kinh doanh'
-                            : doc.docType === 'SAFETY_CERT'
-                            ? 'Chứng chỉ an toàn biển'
-                            : doc.docType;
-
-                        return (
-                          <div
-                            key={doc.id}
-                            className="p-space-sm rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-2"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div
-                                onClick={() => setDocPreviewUrl({ name: docLabel, url: doc.fileUrl })}
-                                className="flex items-center gap-2.5 min-w-0 cursor-pointer hover:text-primary transition-colors flex-1"
-                              >
-                                <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-primary flex items-center justify-center shrink-0 shadow-xs">
-                                  <span className="material-symbols-outlined text-[18px]">
-                                    {doc.docType === 'SAFETY_CERT' ? 'verified' : 'picture_as_pdf'}
-                                  </span>
-                                </div>
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-xs text-slate-800 truncate font-semibold">{docLabel}</span>
-                                  <span className="text-[10px] text-slate-500 truncate">Mã: #{doc.id.slice(0, 8)}</span>
-                                </div>
-                              </div>
-
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
-                                  isDocApproved
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                    : isDocRejected
-                                    ? 'bg-red-50 text-red-700 border border-red-200'
-                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                }`}
-                              >
-                                {isDocApproved ? 'Đã duyệt' : isDocRejected ? 'Từ chối' : 'Chờ duyệt'}
-                              </span>
-                            </div>
-
-                            {/* Document action buttons */}
-                            {!isDocApproved && selectedVendor.verificationStatus !== 'APPROVED' && (
-                              <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-slate-200/60">
-                                <button
-                                  type="button"
-                                  disabled={isMutating}
-                                  onClick={() => handleApproveDocument(doc)}
-                                  className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-colors disabled:opacity-50"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">check</span>
-                                  <span>Duyệt tệp</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isMutating}
-                                  onClick={() => {
-                                    setDocRejectTarget(doc);
-                                    setDocRejectReason('');
-                                  }}
-                                  className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[11px] font-semibold flex items-center gap-1 transition-colors disabled:opacity-50"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">close</span>
-                                  <span>Từ chối</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Badge display */}
-                <div className="flex flex-col gap-space-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-800 font-semibold flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[16px] text-primary">military_tech</span>
-                      Huy hiệu sàn hiện tại
-                    </span>
-                    <span className="px-2 py-0.5 rounded-lg bg-primary/10 text-primary font-bold text-xs">
-                      {selectedVendor.badgeTier || 'BRONZE'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 italic">
-                    * Huy hiệu do hệ thống tự động xếp hạng dựa trên tiêu chí đánh giá và số lượng dịch vụ.
-                  </p>
-                </div>
-
-                {/* Mandatory document check warning matching ApproveVendorUseCase */}
-                {selectedVendor.verificationStatus === 'PENDING' && !documentCheck.allApproved && (
-                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
-                    <span className="material-symbols-outlined text-[18px] text-amber-600 shrink-0 mt-0.5">
-                      info
-                    </span>
-                    <div className="leading-relaxed">
-                      <strong>Lưu ý nghiệp vụ:</strong> Cần duyệt đầy đủ Giấy phép kinh doanh &amp; Chứng nhận an toàn ở trên trước khi bấm phê duyệt đối tác.
-                    </div>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="flex flex-col gap-2 pt-2 border-t border-slate-200">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setIsApproveModalOpen(true)}
-                      disabled={isMutating || selectedVendor.verificationStatus === 'APPROVED'}
-                      className={`flex-1 py-2.5 px-space-md rounded-xl font-semibold transition-colors shadow-xs flex items-center justify-center gap-2 text-xs ${
-                        selectedVendor.verificationStatus === 'APPROVED'
-                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                          : 'bg-primary text-white hover:bg-primary-container'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">verified</span>
-                      <span>
-                        {selectedVendor.verificationStatus === 'APPROVED' ? 'Đã phê duyệt' : 'Phê duyệt đối tác'}
-                      </span>
-                    </button>
-                    {selectedVendor.verificationStatus !== 'REJECTED' && (
-                      <button
-                        onClick={() => setIsRejectModalOpen(true)}
-                        disabled={isMutating}
-                        className="py-2.5 px-space-md rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 transition-colors flex items-center justify-center gap-1.5 font-semibold text-xs disabled:opacity-50"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">block</span>
-                        <span>Từ chối</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+  return <div className="admin-workspace-page admin-vendors">
+    <section className="admin-vendors-list" aria-labelledby="vendor-list-title">
+      <div className="admin-vendors-list-heading">
+        <h2 id="vendor-list-title">Danh sách đối tác</h2>
+        <span>{filtered.length} / {visibleVendors.length} hồ sơ</span>
+      </div>
+      <AdminFilterTabs label="Lọc trạng thái hồ sơ" value={status} onChange={val => { setStatus(val); setCurrentPage(1); }} items={[
+        { value: 'all', label: 'Tất cả', count: visibleVendors.length },
+        { value: 'PENDING', label: 'Chờ duyệt', count: count('PENDING') },
+        { value: 'VERIFIED', label: 'Đã duyệt', count: count('VERIFIED') },
+        { value: 'REJECTED', label: 'Từ chối', count: count('REJECTED') },
+      ]} />
+      <div className="admin-workspace-toolbar">
+        <label className="admin-search-field">
+          <Search size={18} aria-hidden="true" />
+          <input type="search" value={search} onChange={event => { setSearch(event.target.value); setCurrentPage(1); }}
+            aria-label="Tìm đối tác theo tên hoặc mã số thuế" placeholder="Tìm tên đối tác hoặc mã số thuế…" />
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <label className="admin-field admin-vendors-tier-filter">
+            <SlidersHorizontal size={16} aria-hidden="true" />
+            <span>Huy hiệu</span>
+            <select value={tierFilter} onChange={event => { setTierFilter(event.target.value); setCurrentPage(1); }}>
+              <option value="all">Tất cả hạng</option>
+              {tiers.map(value => <option key={value}>{value}</option>)}
+            </select>
+          </label>
+          {(search || status !== 'all' || tierFilter !== 'all') && <AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>}
         </div>
       </div>
 
-      {/* Approve vendor modal */}
-      {isApproveModalOpen && selectedVendor && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-          <div className="bg-surface-container-lowest rounded-2xl p-space-xl max-w-md w-full shadow-2xl border border-outline-variant flex flex-col gap-4">
-            <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-              <span className="material-symbols-outlined text-[28px]">fact_check</span>
-            </div>
-            <div>
-              <h3 className="font-headline-md text-headline-md text-on-surface font-bold">
-                Xác nhận phê duyệt đối tác
-              </h3>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-                Bạn đang phê duyệt hồ sơ đối tác <strong>{selectedVendor.businessName}</strong>. Sau khi duyệt, tài khoản đối tác sẽ được cấp quyền hoạt động trên sàn DANASEA.
-              </p>
-            </div>
+      {loading && (
+        <AdminState kind="empty" compact title="Đang tải danh sách đối tác..." description="Vui lòng đợi trong giây lát khi hệ thống kết nối máy chủ." />
+      )}
+      {errorMessage && !loading && (
+        <AdminState kind="error" compact title="Không thể tải đối tác" description={errorMessage} />
+      )}
 
-            {/* Finding 3 check in modal */}
-            {!documentCheck.allApproved && (
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
-                Cảnh báo: Chưa duyệt đủ chứng từ bắt buộc (Giấy phép kinh doanh &amp; Chứng nhận an toàn). Nếu tiếp tục, máy chủ sẽ từ chối phê duyệt đối tác.
-              </div>
+      {!loading && !errorMessage && (
+      <div key={status} className="admin-vendors-table-scroll admin-tab-pane" role="region" aria-label="Bảng đối tác" tabIndex={0}>
+        <table className="admin-workspace-table admin-vendors-table"><caption className="sr-only">Hồ sơ đối tác; chọn Xem hồ sơ để mở chi tiết</caption><thead><tr>
+          <th scope="col">Đối tác</th><th scope="col">Mã số thuế</th><th scope="col">Khu vực & đánh giá</th><th scope="col">Trạng thái</th><th scope="col">Huy hiệu</th><th scope="col"><span className="sr-only">Thao tác</span></th>
+        </tr></thead><tbody>{paginatedVendors.map(vendor => <tr key={vendor.id} data-selected={vendor.id === selectedId}>
+          <td><div className="admin-vendors-identity"><img src={vendor.avatarUrl} alt="" width="38" height="38" /><div><strong>{vendor.businessName}</strong>
+            <span>{vendor.bankAccountHolder || vendor.email || 'Chưa cập nhật đại diện'}</span></div></div></td>
+          <td>
+            {formatTaxCode(vendor.taxCode) === 'Chưa cập nhật' ? (
+              <span style={{ fontStyle: 'italic', color: '#64748b' }}>Chưa cập nhật</span>
+            ) : (
+              <span className="admin-vendors-mono">{vendor.taxCode}</span>
             )}
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                onClick={() => setIsApproveModalOpen(false)}
-                disabled={isMutating}
-                className="px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md font-semibold transition-colors disabled:opacity-50"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                onClick={handleApprove}
-                disabled={isMutating}
-                className="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-label-md font-bold hover:bg-primary-container transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {isMutating && (
-                  <span className="material-symbols-outlined text-[16px] animate-spin">
-                    progress_activity
-                  </span>
-                )}
-                <span>Xác nhận phê duyệt</span>
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
+            <small>{vendor.bankName || 'Chưa cập nhật ngân hàng'}</small>
+          </td>
+          <td className="admin-vendors-area"><span>{vendor.address}</span><small>{vendor.ratingAvg} / 5 · {vendor.ratingCount} đánh giá</small></td>
+          <td><VendorStatus status={vendor.verificationStatus} /></td><td><AdminBadge tone="neutral">{vendor.badgeTier}</AdminBadge></td>
+          <td>
+            <button
+              type="button"
+              className="admin-action-icon-btn"
+              aria-label={`Xem hồ sơ ${vendor.businessName}`}
+              title="Xem hồ sơ"
+              aria-haspopup="dialog"
+              aria-expanded={drawerOpen && vendor.id === selectedId}
+              onClick={() => openProfile(vendor)}
+            >
+              <Eye size={17} aria-hidden="true" />
+            </button>
+          </td>
+        </tr>)}</tbody></table>
+      </div>
       )}
-
-      {/* Reject vendor modal */}
-      {isRejectModalOpen && selectedVendor && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-          <div className="bg-surface-container-lowest rounded-2xl p-space-xl max-w-md w-full shadow-2xl border border-outline-variant flex flex-col gap-4">
-            <div className="w-12 h-12 rounded-full bg-secondary-container/20 text-secondary flex items-center justify-center">
-              <span className="material-symbols-outlined text-[28px]">warning</span>
-            </div>
-            <div>
-              <h3 className="font-headline-md text-headline-md text-on-surface font-bold">
-                Từ chối thẩm định hồ sơ đối tác
-              </h3>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-1">
-                Nhập lý do chưa đạt chuẩn để lưu lại và phản hồi cho đối tác <strong>{selectedVendor.businessName}</strong>:
-              </p>
-            </div>
-            <textarea
-              value={rejectReason}
-              onChange={e => setRejectReason(e.target.value)}
-              className="w-full h-24 p-3 rounded-xl bg-surface text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-secondary border border-outline-variant/30 resize-none"
-              placeholder="VD: Chứng chỉ cứu hộ mặt nước PADI Rescue đã hết hạn, hoặc mã số thuế chưa khớp với đăng ký kinh doanh..."
-            />
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button
-                onClick={() => setIsRejectModalOpen(false)}
-                disabled={isMutating}
-                className="px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md font-semibold transition-colors disabled:opacity-50"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleReject}
-                disabled={isMutating || !rejectReason.trim()}
-                className="px-5 py-2.5 rounded-xl bg-secondary text-on-secondary font-label-md font-bold hover:bg-secondary-container transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {isMutating && (
-                  <span className="material-symbols-outlined text-[16px] animate-spin">
-                    progress_activity
-                  </span>
-                )}
-                <span>Xác nhận từ chối</span>
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
+      {!loading && !errorMessage && filtered.length > 0 && (
+        <AdminPagination
+          currentPage={activePage}
+          totalPages={totalPages}
+          totalRecords={filtered.length}
+          pageSize={PAGE_SIZE}
+          recordLabel="đối tác"
+          onPageChange={setCurrentPage}
+        />
       )}
-
-      {/* Reject single document modal */}
-      {docRejectTarget && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-          <div className="bg-surface-container-lowest rounded-2xl p-space-xl max-w-md w-full shadow-2xl border border-outline-variant flex flex-col gap-4">
-            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
-              <span className="material-symbols-outlined text-[28px]">rule_folder</span>
-            </div>
-            <div>
-              <h3 className="font-headline-md text-headline-md text-on-surface font-bold">
-                Từ chối tệp chứng từ
-              </h3>
-              <p className="font-body-md text-body-md text-on-surface-variant mt-1 text-xs">
-                Nhập lý do không đạt chuẩn cho tệp{' '}
-                <strong>{docRejectTarget.docType === 'BUSINESS_LICENSE' ? 'Giấy phép kinh doanh' : 'Chứng nhận an toàn'}</strong>:
-              </p>
-            </div>
-            <textarea
-              value={docRejectReason}
-              onChange={e => setDocRejectReason(e.target.value)}
-              className="w-full h-24 p-3 rounded-xl bg-surface text-on-surface font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-secondary border border-outline-variant/30 resize-none text-xs"
-              placeholder="VD: Bản scan mờ, thiếu dấu mộc hoặc đã quá hạn hiệu lực..."
-            />
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <button
-                onClick={() => {
-                  setDocRejectTarget(null);
-                  setDocRejectReason('');
-                }}
-                disabled={isMutating}
-                className="px-4 py-2 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold transition-colors disabled:opacity-50"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleRejectDocument}
-                disabled={isMutating || !docRejectReason.trim()}
-                className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {isMutating && (
-                  <span className="material-symbols-outlined text-[14px] animate-spin">
-                    progress_activity
-                  </span>
-                )}
-                <span>Từ chối tệp</span>
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
+      {!loading && !errorMessage && filtered.length === 0 && (
+        <AdminState
+          kind="empty"
+          compact
+          title={
+            search || status !== 'all' || tierFilter !== 'all'
+              ? 'Không tìm thấy hồ sơ đối tác phù hợp'
+              : 'Hiện không có hồ sơ đối tác cần xử lý'
+          }
+          description={
+            search || status !== 'all' || tierFilter !== 'all'
+              ? 'Không có kết quả khớp với từ khóa tìm kiếm hoặc điều kiện lọc hiện tại. Hãy thử điều chỉnh hoặc xóa bộ lọc.'
+              : 'Tất cả hồ sơ đăng ký đối tác đã được thẩm định hoặc chưa có hồ sơ mới gửi yêu cầu.'
+          }
+          action={
+            (search || status !== 'all' || tierFilter !== 'all') ? (
+              <AdminButton onClick={resetFilters}>Xóa bộ lọc</AdminButton>
+            ) : undefined
+          }
+        />
       )}
+      <div className="admin-vendors-list-footer">Hiển thị {filtered.length} hồ sơ {demo ? 'mẫu' : 'từ hệ thống DANASEA'} · Chi tiết mở trong ngăn riêng, giữ nguyên danh sách và bộ lọc.</div>
+    </section>
+    {!drawerOpen && <AdminNotice message={notice} onDismiss={() => setNotice(null)} />}
 
-      {/* Document preview modal */}
-      {docPreviewUrl && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-          <div className="bg-surface-container-lowest rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-outline-variant flex flex-col gap-4">
-            <div className="flex items-center justify-between border-b border-outline-variant/30 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-[24px]">description</span>
-                <span className="font-bold text-on-surface text-base">{docPreviewUrl.name}</span>
-              </div>
-              <button
-                onClick={() => setDocPreviewUrl(null)}
-                className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-outline hover:text-on-surface transition-colors"
-              >
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            </div>
-            <div className="h-72 rounded-xl bg-surface-container-low flex flex-col items-center justify-center p-6 text-center border border-dashed border-outline-variant">
-              <span className="material-symbols-outlined text-primary text-[48px] mb-2">verified</span>
-              <span className="font-bold text-on-surface text-sm">{docPreviewUrl.name}</span>
-              <p className="text-xs text-outline max-w-md mt-1 font-mono break-all">
-                Đường dẫn tệp: {docPreviewUrl.url || 'Chưa có URL lưu trữ trực tiếp'}
-              </p>
-              {docPreviewUrl.url && (
-                <a
-                  href={docPreviewUrl.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold inline-flex items-center gap-1 hover:bg-primary-container"
-                >
-                  <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                  <span>Mở trong tab mới</span>
-                </a>
-              )}
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setDocPreviewUrl(null)}
-                className="px-4 py-2 rounded-xl bg-primary text-on-primary font-bold text-sm hover:bg-primary-container transition-colors"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </main>
-  );
+    <AdminDialog open={drawerOpen} onClose={() => setDrawerOpen(false)} variant="drawer" title={selected?.businessName || 'Hồ sơ đối tác'} description="Hồ sơ đối tác · Rà soát tính hợp lệ và chứng từ"
+      footer={selected && <div className="admin-drawer-actions admin-vendors-actions"><p>{demo ? 'Thao tác demo chỉ lưu trong phiên này. Tải lại trang sẽ khôi phục dữ liệu mẫu.' : 'Quyết định phê duyệt sẽ cập nhật trạng thái hoạt động thực của đối tác.'}</p>
+        <div><AdminButton disabled={isSubmitting} variant="danger" onClick={() => { setNote(''); setDecision('reject'); setDecisionOpen(true); }}>Từ chối</AdminButton>
+          <AdminButton disabled={isSubmitting} variant="primary" onClick={() => { setNote(''); setDecision('approve'); setDecisionOpen(true); }}>{selected.verificationStatus === 'VERIFIED' ? 'Cập nhật phê duyệt' : 'Phê duyệt đối tác'}</AdminButton></div></div>}>
+      {selected && <><VendorProfile key={selected.id} vendor={selected} timeline={demo ? review.timeline.filter(event => event.vendorId === selected.id) : []} tier={tier} onTierChange={setTier} demo={demo}
+        onPreview={name => { setDocumentName(name); setDocumentOpen(true); }} />
+        {drawerOpen && <AdminNotice message={notice} onDismiss={() => setNotice(null)} />}</>}
+    </AdminDialog>
+
+    <AdminDialog open={decisionOpen} onClose={() => setDecisionOpen(false)} title={decision === 'reject' ? 'Xác nhận từ chối' : 'Xác nhận phê duyệt'}
+      description={demo ? 'Chỉ thay đổi dữ liệu mẫu trong phiên hiện tại; không gửi quyết định đến đối tác.' : 'Thao tác sẽ gửi thông báo và cập nhật quyền bán dịch vụ của đối tác.'}
+      footer={<><AdminButton onClick={() => setDecisionOpen(false)}>Quay lại hồ sơ</AdminButton><AdminButton variant={decision === 'reject' ? 'danger' : 'primary'} disabled={isSubmitting || !selected} onClick={confirmDecision}>
+        {isSubmitting ? 'Đang xử lý...' : decision === 'reject' ? 'Xác nhận từ chối' : 'Xác nhận phê duyệt'}</AdminButton></>}>
+      <div className="admin-vendors-confirm"><p><strong>{selected?.businessName}</strong></p>
+        <p>{decision === 'reject' ? 'Trạng thái sẽ chuyển thành Từ chối; huy hiệu hiện tại được giữ nguyên.' : `Trạng thái sẽ chuyển thành Đã duyệt, huy hiệu ${tier}.`}</p>
+        <label className="admin-field"><span>{decision === 'reject' ? 'Lý do từ chối' : 'Ghi chú quyết định'} <small>(tùy chọn)</small></span>
+          <textarea value={note} onChange={event => setNote(event.target.value)} rows={4} placeholder="Ghi chú thẩm định…" /></label>
+        <p className="admin-detail-note">Xác minh đầy đủ giấy phép kinh doanh và chứng nhận an toàn trước khi duyệt.</p></div>
+    </AdminDialog>
+
+    <AdminDialog open={documentOpen} onClose={() => setDocumentOpen(false)} title="Xem trước tài liệu mẫu" description={documentName}
+      footer={<AdminButton onClick={() => setDocumentOpen(false)}>Đóng bản xem trước</AdminButton>}>
+      <div className="admin-vendors-document-preview"><span className="material-symbols-outlined" aria-hidden="true">description</span><h3>Khung xem trước minh họa</h3>
+        <p>{documentName}</p><p>Đây là tên tệp cố định trong giao diện mẫu. Không có nội dung PDF được tải từ hồ sơ đối tác và chưa có xác minh tính xác thực, chữ ký số hay hiệu lực chứng nhận.</p></div>
+    </AdminDialog>
+  </div>;
 }
 
 export default VendorApproval;
