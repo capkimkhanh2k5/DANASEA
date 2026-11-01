@@ -112,6 +112,13 @@ class CatalogControllerTest {
     }
 
     @Test
+    void getServiceDetail_WhenMalformedUuid_ShouldReturn400() throws Exception {
+        mockMvc.perform(get("/api/services/not-a-valid-uuid")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void getServiceDetail_BySlug_ShouldReturn200() throws Exception {
         String slug = "tour-lan-bien-ngam-san-ho";
         ServiceDetailResult result = ServiceDetailResult.builder()
@@ -122,7 +129,7 @@ class CatalogControllerTest {
 
         when(getServiceDetailUseCase.executeByIdOrSlug(eq(slug), any(), any())).thenReturn(result);
 
-        mockMvc.perform(get("/api/v1/catalog/" + slug))
+        mockMvc.perform(get("/api/v1/catalog/by-slug/" + slug))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.slug").value(slug))
                 .andExpect(jsonPath("$.name").value("Tour Lặn Biển Ngắm San Hô"));

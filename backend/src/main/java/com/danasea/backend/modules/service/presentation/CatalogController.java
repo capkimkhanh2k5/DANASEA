@@ -208,25 +208,30 @@ public class CatalogController {
         }
     }
 
-    @GetMapping("/{idOrSlug}")
+    @GetMapping("/{id}")
     public ResponseEntity<ServiceDetailResponse> getServiceDetail(
-            @PathVariable("idOrSlug") String idOrSlug,
+            @PathVariable("id") UUID id,
             @RequestHeader(value = "X-Session-Id", required = false) String sessionId
     ) {
         UUID userId = SecurityUtils.getCurrentUserId().orElse(null);
-        UUID parsedUuid = null;
-        try {
-            parsedUuid = UUID.fromString(idOrSlug);
-        } catch (IllegalArgumentException ignored) {
-        }
+        ServiceDetailResult result = getServiceDetailUseCase.execute(id, userId, sessionId);
+        return ResponseEntity.ok(toServiceDetailResponse(result));
+    }
 
-        final ServiceDetailResult result = parsedUuid != null
-                ? getServiceDetailUseCase.execute(parsedUuid, userId, sessionId)
-                : getServiceDetailUseCase.executeByIdOrSlug(idOrSlug, userId, sessionId);
+    @GetMapping("/by-slug/{slug}")
+    public ResponseEntity<ServiceDetailResponse> getServiceDetailBySlug(
+            @PathVariable("slug") String slug,
+            @RequestHeader(value = "X-Session-Id", required = false) String sessionId
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId().orElse(null);
+        ServiceDetailResult result = getServiceDetailUseCase.executeByIdOrSlug(slug, userId, sessionId);
+        return ResponseEntity.ok(toServiceDetailResponse(result));
+    }
 
+    private ServiceDetailResponse toServiceDetailResponse(ServiceDetailResult result) {
         final UUID serviceId = result.getId();
 
-        ServiceDetailResponse response = ServiceDetailResponse.builder()
+        return ServiceDetailResponse.builder()
                 .flashSales(flashSale != null ? flashSale.active().stream().filter(o -> o.serviceId().equals(serviceId)).toList() : java.util.List.of())
                 .id(result.getId())
                 .name(result.getName())
@@ -261,8 +266,6 @@ public class CatalogController {
                 .safetyRules(result.getSafetyRules())
                 .slots(result.getSlots())
                 .build();
-
-        return ResponseEntity.ok(response);
     }
 
     private void validateSearchParameters(

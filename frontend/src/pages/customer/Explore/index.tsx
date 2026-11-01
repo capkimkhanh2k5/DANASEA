@@ -364,7 +364,7 @@ export function Explore() {
       price: matchedService ? formatPrice(matchedService.price, spot.price) : spot.price,
       rating: matchedService ? formatRating(matchedService.averageRating, spot.rating) : spot.rating,
       reviewCount: matchedService?.reviewCount || spot.reviewCount,
-      link: matchedService ? `/experience/${matchedService.id}` : `/search?category=${spot.searchFilter}`,
+      link: matchedService ? getTourUrl(matchedService) : `/search?category=${spot.searchFilter}`,
     };
   });
 
@@ -418,7 +418,7 @@ export function Explore() {
             price: formatPrice(s.price, fallback.price),
             imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallback.imageUrl),
             searchFilter: fallback.searchFilter,
-            link: `/experience/${s.id}`,
+            link: getTourUrl(s),
           };
         })
     : TOP_VISITED_EXPERIENCES;
