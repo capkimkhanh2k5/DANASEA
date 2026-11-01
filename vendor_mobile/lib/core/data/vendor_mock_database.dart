@@ -1,3 +1,5 @@
+import '../auth/auth_session.dart';
+import 'vendor_mock_repositories.dart';
 // Centralized In-Memory Mock Database for DANASEA Vendor App
 // Implements ChangeNotifier so any updates to services, slots, sub-orders,
 // reviews, vouchers, or settlements reactively update across all screens.
@@ -903,7 +905,36 @@ class VendorMockDatabase extends ChangeNotifier {
     notifyStoreChanged();
   }
 
+
+  bool isSyncing = false;
+  DateTime? lastSyncedAt;
+
+  Future<void> syncWithApi() async {
+    if (isSyncing) return;
+    isSyncing = true;
+    try {
+      if (AuthSession.instance.isAuthenticated) {
+        await Future.wait([
+          VendorProfileRepository().getVendorProfile().catchError((_) => currentVendor),
+          VendorServiceRepository().getServices().catchError((_) => services),
+          VendorOrderRepository().getSubOrders().catchError((_) => subOrders),
+          VendorReviewRepository().getReviews().catchError((_) => reviews),
+          VendorVoucherRepository().getVouchers().catchError((_) => vouchers),
+          VendorSettlementRepository().getSettlements().catchError((_) => settlements),
+          VendorDisputeRepository().getDisputes().catchError((_) => disputes),
+          VendorChatRepository().getConversations().catchError((_) => conversations),
+          VendorNotificationRepository().getNotifications().catchError((_) => notifications),
+        ]);
+        lastSyncedAt = DateTime.now();
+        notifyStoreChanged();
+      }
+    } finally {
+      isSyncing = false;
+    }
+  }
+
   void notifyStoreChanged() {
+
     notifyListeners();
   }
 }

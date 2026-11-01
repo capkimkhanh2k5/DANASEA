@@ -1,3 +1,4 @@
+import '../../../../core/data/vendor_mock_repositories.dart';
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -34,6 +35,7 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
   void initState() {
     super.initState();
     _db.addListener(_onDbChanged);
+    VendorServiceRepository().getServices();
   }
 
   @override

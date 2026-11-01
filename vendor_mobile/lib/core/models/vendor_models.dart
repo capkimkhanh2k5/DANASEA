@@ -1145,6 +1145,7 @@ class DisputeModel {
 
   DisputeModel copyWith({
     List<String>? vendorAttachments,
+    DisputeStatus? status,
   }) {
     return DisputeModel(
       id: id,
@@ -1154,7 +1155,7 @@ class DisputeModel {
       serviceName: serviceName,
       category: category,
       description: description,
-      status: status,
+      status: status ?? this.status,
       resolutionNote: resolutionNote,
       resolvedBy: resolvedBy,
       resolvedAt: resolvedAt,
