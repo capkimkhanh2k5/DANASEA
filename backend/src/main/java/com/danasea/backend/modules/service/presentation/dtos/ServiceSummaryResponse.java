@@ -11,6 +11,7 @@ public class ServiceSummaryResponse {
     private java.util.List<com.danasea.backend.modules.flashsale.application.FlashSaleService.PublicOffer> flashSales;
     private UUID id;
     private String name;
+    private String slug;
     private String shortDescription;
     private BigDecimal price;
     private BigDecimal promotionalPrice;

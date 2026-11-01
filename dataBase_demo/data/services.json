@@ -5,7 +5,7 @@
       "sqlRow": {
         "id": "088d874c-a61e-5b58-a7a9-497f32a56901",
         "name": "Mô tô nước – Danabeach",
-        "slug": null,
+        "slug": "mo-to-nuoc-danabeach",
         "price": "650000.00",
         "status": "PENDING_REVIEW",
         "address": "51 Võ Nguyên Giáp, Đà Nẵng",
@@ -36,7 +36,7 @@
       "sqlRow": {
         "id": "160e67fc-f236-5871-9971-5555cf855d02",
         "name": "Thuê ván SUP – Surf Shack",
-        "slug": null,
+        "slug": "thue-van-sup-surf-shack",
         "price": "140000.00",
         "status": "DRAFT",
         "address": null,
@@ -67,7 +67,7 @@
       "sqlRow": {
         "id": "1dd26db5-f863-5b03-b562-ac46f43df9d2",
         "name": "Lớp học lướt sóng Mỹ Khê – DNOA",
-        "slug": null,
+        "slug": "lop-hoc-luot-song-my-khe-dnoa",
         "price": "1100000.00",
         "status": "DRAFT",
         "address": null,
@@ -98,7 +98,7 @@
       "sqlRow": {
         "id": "2cdfabcf-13a2-550a-8f9e-283aad7053c9",
         "name": "Mô tô nước – Kajin Vina",
-        "slug": null,
+        "slug": "mo-to-nuoc-kajin-vina",
         "price": "650000.00",
         "status": "DRAFT",
         "address": "Bãi biển Mỹ Khê, Đà Nẵng",
@@ -129,7 +129,7 @@
       "sqlRow": {
         "id": "3758c297-54ff-5887-89bd-62220227570b",
         "name": "Dù bay trên biển – Danabeach",
-        "slug": null,
+        "slug": "du-bay-tren-bien-danabeach",
         "price": "650000.00",
         "status": "DRAFT",
         "address": "51 Võ Nguyên Giáp, Đà Nẵng",
@@ -160,7 +160,7 @@
       "sqlRow": {
         "id": "4190046d-112a-5b93-beb2-bcc8b1cd16d4",
         "name": "Dù bay trên biển – Kajin Vina",
-        "slug": null,
+        "slug": "du-bay-tren-bien-kajin-vina",
         "price": "650000.00",
         "status": "DRAFT",
         "address": null,
@@ -191,7 +191,7 @@
       "sqlRow": {
         "id": "4b79c4cd-a138-59ca-83c3-d396c1208ac4",
         "name": "Thuê ván lướt sóng – Surf Shack",
-        "slug": null,
+        "slug": "thue-van-luot-song-surf-shack",
         "price": "110000.00",
         "status": "DRAFT",
         "address": null,
@@ -222,7 +222,7 @@
       "sqlRow": {
         "id": "508d4dad-4227-527b-9df3-8416dd870c04",
         "name": "Thuê ván lướt sóng – DNOA",
-        "slug": null,
+        "slug": "thue-van-luot-song-dnoa",
         "price": "120000.00",
         "status": "DRAFT",
         "address": null,
@@ -253,7 +253,7 @@
       "sqlRow": {
         "id": "5536f743-3b6d-518e-af2b-05634a218195",
         "name": "Câu cá chuyên nghiệp Sơn Trà – DaNaFi",
-        "slug": null,
+        "slug": "cau-ca-chuyen-nghiep-son-tra-danafi",
         "price": "750000.00",
         "status": "DRAFT",
         "address": null,
@@ -284,7 +284,7 @@
       "sqlRow": {
         "id": "57c22a43-22fd-57da-894c-257ade02450d",
         "name": "Lặn ngắm san hô Sơn Trà – Loca Travel",
-        "slug": null,
+        "slug": "lan-ngam-san-ho-son-tra-loca-travel",
         "price": "450000.00",
         "status": "DRAFT",
         "address": "Bãi Cát Vàng, Phía Bắc Bán Đảo Sơn Trà, Đà Nẵng",
@@ -315,7 +315,7 @@
       "sqlRow": {
         "id": "5943ecd7-6480-5b4a-b42b-43abc0988776",
         "name": "Học lướt sóng – Surf Shack",
-        "slug": null,
+        "slug": "hoc-luot-song-surf-shack",
         "price": "800000.00",
         "status": "DRAFT",
         "address": "Đường Võ Nguyên Giáp, Phước Mỹ, Sơn Trà, Đà Nẵng",
@@ -346,7 +346,7 @@
       "sqlRow": {
         "id": "6d4249fe-a82b-5537-a712-818b23c177d2",
         "name": "Kayak kết hợp trải nghiệm biển – DNOA",
-        "slug": null,
+        "slug": "kayak-ket-hop-trai-nghiem-bien-dnoa",
         "price": "850000.00",
         "status": "DRAFT",
         "address": "Bãi Rạng, Đường Hoàng Sa, Phường Thọ Quang, Sơn Trà, Đà Nẵng",
@@ -377,7 +377,7 @@
       "sqlRow": {
         "id": "83ee83c5-c08b-5f6e-924e-db3ceaacd364",
         "name": "Phao chuối – Danabeach",
-        "slug": null,
+        "slug": "phao-chuoi-danabeach",
         "price": "1000000.00",
         "status": "DRAFT",
         "address": "51 Võ Nguyên Giáp, Đà Nẵng",
@@ -408,7 +408,7 @@
       "sqlRow": {
         "id": "88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08",
         "name": "Câu cá biển bằng cano riêng – D2Tour",
-        "slug": null,
+        "slug": "cau-ca-bien-bang-cano-rieng-d2tour",
         "price": "8000000.00",
         "status": "DRAFT",
         "address": "Khởi hành từ Bến thuyền Thọ Quang, Đà Nẵng",
@@ -439,7 +439,7 @@
       "sqlRow": {
         "id": "9b3444ce-b7c7-5f40-9f14-2c1ca4258dea",
         "name": "Câu mực đêm – Khuê Nguyễn",
-        "slug": null,
+        "slug": "cau-muc-dem-khue-nguyen",
         "price": "350000.00",
         "status": "DRAFT",
         "address": "Cảng cá Thọ Quang, phường Thọ Quang, Sơn Trà, Đà Nẵng",
@@ -470,7 +470,7 @@
       "sqlRow": {
         "id": "9b575c51-196b-56eb-940e-aaf2f61c966f",
         "name": "Học kayak và trò chơi Splash & Dash – DNOA",
-        "slug": null,
+        "slug": "hoc-kayak-va-tro-choi-splash-dash-dnoa",
         "price": "550000.00",
         "status": "DRAFT",
         "address": null,
@@ -501,7 +501,7 @@
       "sqlRow": {
         "id": "9f4eb04d-9ec6-5295-8de6-475b728e5cfc",
         "name": "Surf tour tìm điểm sóng – Surf Shack",
-        "slug": null,
+        "slug": "surf-tour-tim-diem-song-surf-shack",
         "price": "400000.00",
         "status": "DRAFT",
         "address": null,
@@ -532,7 +532,7 @@
       "sqlRow": {
         "id": "a6f4ab9c-4794-542b-a443-e3013e6bbe47",
         "name": "Câu cá biển Sơn Trà – DaNaFi",
-        "slug": null,
+        "slug": "cau-ca-bien-son-tra-danafi",
         "price": "650000.00",
         "status": "DRAFT",
         "address": "Vùng biển bán đảo Sơn Trà, Sơn Trà, Đà Nẵng",
@@ -563,7 +563,7 @@
       "sqlRow": {
         "id": "bf8626cd-2271-59ab-9273-4fdd10eb451e",
         "name": "Thuê kayak đơn hoặc đôi – DNOA",
-        "slug": null,
+        "slug": "thue-kayak-don-hoac-doi-dnoa",
         "price": "150000.00",
         "status": "DRAFT",
         "address": null,
@@ -594,7 +594,7 @@
       "sqlRow": {
         "id": "c4c56ae2-5f9b-555c-81f1-f0d4c8dd7c1b",
         "name": "Dù bay trên biển – DNOA",
-        "slug": null,
+        "slug": "du-bay-tren-bien-dnoa",
         "price": "650000.00",
         "status": "DRAFT",
         "address": "Mỹ Khê; điểm hẹn cạnh Beach Bar Da Nang",
@@ -625,7 +625,7 @@
       "sqlRow": {
         "id": "cd0c7a8d-b0b8-579a-968c-a1783174a0fc",
         "name": "Chèo SUP Mân Thái – Go N Chill",
-        "slug": null,
+        "slug": "cheo-sup-man-thai-go-n-chill",
         "price": "150000.00",
         "status": "DRAFT",
         "address": "Đường Hoàng Sa, Phường Mân Thái, Quận Sơn Trà, Đà Nẵng",
@@ -656,7 +656,7 @@
       "sqlRow": {
         "id": "d51355fc-bf7e-5366-b199-6272efe7f52b",
         "name": "Lặn ngắm san hô Bãi Nam – Loca Travel",
-        "slug": null,
+        "slug": "lan-ngam-san-ho-bai-nam-loca-travel",
         "price": "350000.00",
         "status": "DRAFT",
         "address": "Bãi Nam, Đường Hoàng Sa, Phường Thọ Quang, Sơn Trà, Đà Nẵng",
@@ -687,7 +687,7 @@
       "sqlRow": {
         "id": "dab42f5f-e61d-5ebf-811d-34ab8d293143",
         "name": "Câu mực đêm có bữa tối – DaNaFi",
-        "slug": null,
+        "slug": "cau-muc-dem-co-bua-toi-danafi",
         "price": "550000.00",
         "status": "DRAFT",
         "address": null,
@@ -718,7 +718,7 @@
       "sqlRow": {
         "id": "fd6fced2-812e-56ce-817f-80bb3d0841e9",
         "name": "Phao chuối – Kajin Vina",
-        "slug": null,
+        "slug": "phao-chuoi-kajin-vina",
         "price": "1000000.00",
         "status": "DRAFT",
         "address": null,

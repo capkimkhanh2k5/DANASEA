@@ -208,9 +208,15 @@
 ### Public Catalog + Wishlist + Recently Viewed — API
 - [x] GET /api/services
 - [x] GET /api/services/{id} (trả chi tiết dịch vụ kèm danh sách options để khách chọn)
+- [x] GET /api/services/by-slug/{slug} (trả chi tiết dịch vụ theo SEO slug hoặc UUID)
+- [x] GET /api/services/og/{idOrSlug} (trả HTML OpenGraph/JSON-LD prerender cho social & search bots)
+- [x] GET /api/services/sitemap.xml (trả XML sitemap động cho các dịch vụ PUBLISHED)
 - [x] GET /api/services/{id}/slots?optionId=&from=&to=&quantity=&allowSplit= (Khách xem ca khả dụng theo lựa chọn đặt)
 - [x] GET /api/v1/catalog (alias của GET /api/services)
 - [x] GET /api/v1/catalog/{id} (alias của GET /api/services/{id})
+- [x] GET /api/v1/catalog/by-slug/{slug} (alias của GET /api/services/by-slug/{slug})
+- [x] GET /api/v1/catalog/og/{idOrSlug} (alias của GET /api/services/og/{idOrSlug})
+- [x] GET /api/v1/catalog/sitemap.xml (alias của GET /api/services/sitemap.xml)
 - [x] POST /api/wishlists/{serviceId}
 - [x] DELETE /api/wishlists/{serviceId}
 - [x] GET /api/wishlists

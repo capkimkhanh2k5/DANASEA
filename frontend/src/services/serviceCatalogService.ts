@@ -42,11 +42,15 @@ export const serviceCatalogService = {
   },
 
   /**
-   * Fetch public service detail by ID from Backend
+   * Fetch public service detail by ID or SEO Slug from Backend
    * Follows EPIC-03 Discovery R2 specification
    */
-  async getServiceDetail(id: string): Promise<ServiceDetailDto> {
-    const response = await apiClient.get<ServiceDetailDto>(`/services/${encodeURIComponent(id)}`);
+  async getServiceDetail(idOrSlug: string): Promise<ServiceDetailDto> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrSlug);
+    const endpoint = isUuid
+      ? `/services/${encodeURIComponent(idOrSlug)}`
+      : `/services/by-slug/${encodeURIComponent(idOrSlug)}`;
+    const response = await apiClient.get<ServiceDetailDto>(endpoint);
     return response.data;
   },
 };
