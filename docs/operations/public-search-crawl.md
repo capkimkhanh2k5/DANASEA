@@ -47,18 +47,16 @@ Public HTTPS verification passed:
 
 ## Test boundary
 
-The four focused regression tests pass and were first observed failing against the old policy (14 failing subcases/assertions). Python lint and `git diff --check` pass.
+Final verification on 2026-11-01:
 
-The complete scripts suite ran 118 tests and ended with 11 errors and 10 skips because the local Docker daemon is stopped. These container bootstrap/installer tests could not run:
+- `RUN_DEMO_DATABASE_TESTS=1 python -m unittest discover -s scripts/tests -v`: **118 passed, 0 skipped**, including real disposable PostgreSQL/Flyway acceptance and Docker bootstrap/installer tests. The local Docker daemon was started before this final run.
+- The four focused crawl regression tests are included in that suite. They were first observed failing against the original policy (14 failing subcases/assertions).
+- Ruff checks for scripts and worker build/entrypoint tooling pass with the CI rule selection `E4,E7,E9,F,I`.
+- `bash -n` passes for deployment and bootstrap entrypoints; `git diff --check` passes.
+- Frontend lint and production build pass; built `dist/robots.txt` matches source byte for byte.
+- Fresh public HTTP checks confirm the deployed robots policy, 19/19 sitemap URLs returning 200, protected APIs returning 401, and healthy read-only Nginx with a passing configuration check.
 
-- `DemoBootstrapTest.test_bootstrap_installs_private_state_and_is_idempotent_without_changing_release_trust`
-- `DemoBootstrapTest.test_bootstrap_rejects_unsafe_policy_key_rotation_trust_overwrite_and_wrapper_symlink` (six scenario errors)
-- `InstallerTest.test_failed_legacy_adoption_preserves_existing_deploy_entrypoint`
-- `InstallerTest.test_invalid_configuration_preserves_existing_deploy_entrypoint_and_helpers`
-- `InstallerTest.test_root_cannot_be_the_deployment_account`
-- `InstallerTest.test_successful_install_adopts_legacy_release_and_serves_restricted_status`
-
-Running the suite excluding those two Docker-dependent classes produced 112 tests: 102 passed and 10 skipped. The 10 skips require explicitly enabled disposable PostgreSQL acceptance. Do not report this as a green complete suite or full CI. Backend application code was not changed and a new full Maven run was not performed.
+These are local and live-server results, not a claim that GitHub CI/CD or the full backend Maven suite ran. No backend application code changed.
 
 ## Google acceptance
 

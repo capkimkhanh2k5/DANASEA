@@ -37,7 +37,7 @@
 - RED: 4 tests, 14 expected failing subcases/assertions against the original policy.
 - GREEN: 4 focused tests passed; production candidate and installed Nginx config validated.
 - Independent scoped review: no material findings.
-- Complete scripts suite: 118 tests, 11 Docker-related errors, 10 skips; non-container selection 112 tests, 102 passed, 10 skips.
-- Public HTTPS smoke and first Google Live Test passed; first tour indexing request accepted.
+- Final complete scripts suite with Docker and RUN_DEMO_DATABASE_TESTS=1: 118 passed, 0 skipped. Initial Docker-unavailable limits were resolved by starting the local daemon.
+- Public HTTPS smoke and first Google Live Test passed; first tour indexing request accepted. Fresh server checks before push confirm the policy, 19/19 HTTP 200 sitemap URLs, protected API 401 responses and healthy read-only Nginx.
 - Additional tour Google Live Test passed at 19:32; final evidence is recorded in the operations document.
 - Ruling: use a Nginx geo literal for the reloadable policy because return strings interpret robots dollar end anchors as variables. Actual Nginx and byte-for-byte HTTP checks confirm literal output.
