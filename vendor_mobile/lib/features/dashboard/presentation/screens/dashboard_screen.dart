@@ -12,6 +12,11 @@ import '../../../settlements/presentation/screens/settlement_revenue_screen.dart
 import '../../../profile/presentation/screens/business_profile_screen.dart';
 import '../../../orders/presentation/screens/order_list_screen.dart';
 import '../../../slots/presentation/screens/slot_calendar_screen.dart';
+import '../../../disputes/presentation/screens/dispute_management_screen.dart';
+import '../../../reviews/presentation/screens/review_feedback_screen.dart';
+import '../../../vouchers/presentation/screens/voucher_management_screen.dart';
+import '../../../../core/models/vendor_models.dart';
+
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onNavigateTab;
@@ -44,11 +49,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _db.addListener(_onDbChanged);
   }
 
+  int _actionPageIndex = 0;
+  final PageController _actionPageController = PageController();
+
   @override
   void dispose() {
+    _actionPageController.dispose();
     _db.removeListener(_onDbChanged);
     super.dispose();
   }
+
+  void _openDisputes() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DisputeManagementScreen()));
+  }
+
+  void _openReviews() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReviewFeedbackScreen()));
+  }
+
+  void _openVouchers() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VoucherManagementScreen()));
+  }
+
+  void _openServices() {
+    if (widget.onNavigateTab != null) {
+      widget.onNavigateTab!(1);
+    }
+  }
+
 
   void _onDbChanged() {
     if (mounted) setState(() {});
@@ -120,6 +148,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final todayOrders = subOrders.length;
     final checkedInOrders = subOrders.where((o) => o.checkedInAt != null).length;
     final unreadNotifs = _db.notifications.where((n) => !n.isRead).length;
+    final confirmedCount = subOrders.where((o) => o.status == SubOrderStatus.confirmed).length;
+    final cancelledCount = subOrders.where((o) => o.status == SubOrderStatus.cancelled).length;
+    final disputeCount = _db.disputes.length;
+    final reviewCount = _db.reviews.length;
 
     // Next tour calculation
     final nextSlot = slots.isNotEmpty ? slots.first : null;
@@ -138,7 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            setState(() {});
+            await _db.syncWithApi();
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -315,50 +347,173 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Quick Shortcuts Bento Grid
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildBentoShortcut(
-                        icon: Icons.qr_code_scanner,
-                        label: 'Quét vé QR',
-                        color: AppColors.primary,
-                        bgColor: AppColors.primary.withOpacity(0.1),
-                        onTap: _openQrScan,
+                // Shopee-style Unified Hub (Order Status Counters + Action Buttons)
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: AppShapes.shadowSm,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                  child: Column(
+                    children: [
+                      // 1. Shopee 4-column Order Status Counters
+                      Row(
+                        children: [
+                          _buildShopeeMetricItem(
+                            count: confirmedCount > 0 ? confirmedCount.toString() : '0',
+                            label: 'Chờ check-in',
+                            highlightColor: confirmedCount > 0 ? AppColors.primary : AppColors.onSurface,
+                            onTap: _openOrders,
+                          ),
+                          _buildShopeeMetricItem(
+                            count: cancelledCount.toString(),
+                            label: 'Đơn hủy',
+                            highlightColor: AppColors.onSurface,
+                            onTap: _openOrders,
+                          ),
+                          _buildShopeeMetricItem(
+                            count: disputeCount.toString(),
+                            label: 'Khiếu nại/Hoàn',
+                            highlightColor: AppColors.onSurface,
+                            onTap: _openDisputes,
+                          ),
+                          _buildShopeeMetricItem(
+                            count: reviewCount > 0 ? reviewCount.toString() : '0',
+                            label: 'Đánh giá',
+                            highlightColor: reviewCount > 0 ? AppColors.primary : AppColors.onSurface,
+                            onTap: _openReviews,
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildBentoShortcut(
-                        icon: Icons.chat_bubble_outline,
-                        label: 'Tin nhắn',
-                        color: AppColors.secondary,
-                        bgColor: AppColors.secondary.withOpacity(0.1),
-                        badgeCount: 2,
-                        onTap: _openChat,
+                      const SizedBox(height: 12),
+                      Divider(height: 1, thickness: 0.8, color: AppColors.outlineVariant.withOpacity(0.35)),
+                      const SizedBox(height: 12),
+
+                      // 2. Shopee Action Buttons Carousel (2 pages x 5 items)
+                      SizedBox(
+                        height: 82,
+                        child: PageView(
+                          controller: _actionPageController,
+                          onPageChanged: (idx) => setState(() => _actionPageIndex = idx),
+                          children: [
+                            // Page 1: 5 Core daily actions
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildShopeeActionButton(
+                                  icon: Icons.inventory_2_outlined,
+                                  label: 'Dịch vụ',
+                                  bgColor: AppColors.secondary.withOpacity(0.12),
+                                  color: AppColors.secondary,
+                                  onTap: _openServices,
+                                ),
+                                _buildShopeeActionButton(
+                                  icon: Icons.receipt_long_outlined,
+                                  label: 'Đơn hàng',
+                                  bgColor: AppColors.primary.withOpacity(0.12),
+                                  color: AppColors.primary,
+                                  onTap: _openOrders,
+                                ),
+                                _buildShopeeActionButton(
+                                  icon: Icons.qr_code_scanner_rounded,
+                                  label: 'Quét vé QR',
+                                  bgColor: const Color(0xFFE8F5E9),
+                                  color: const Color(0xFF2E7D32),
+                                  onTap: _openQrScan,
+                                ),
+                                _buildShopeeActionButton(
+                                  icon: Icons.account_balance_wallet_outlined,
+                                  label: 'Tài chính',
+                                  bgColor: const Color(0xFFFFF8E1),
+                                  color: const Color(0xFFF57F17),
+                                  onTap: _openSettlements,
+                                ),
+                                _buildShopeeActionButton(
+                                  icon: Icons.shield_outlined,
+                                  label: 'Cảng vụ',
+                                  bgColor: AppColors.errorContainer,
+                                  color: AppColors.error,
+                                  onTap: _openNotifications,
+                                ),
+                              ],
+                            ),
+                            // Page 2: 5 Management & Promotion actions
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildShopeeActionButton(
+                                  icon: Icons.chat_bubble_outline_rounded,
+                                  label: 'Tin nhắn',
+                                  bgColor: const Color(0xFFE1F5FE),
+                                  color: const Color(0xFF0288D1),
+                                  badgeCount: 2,
+                                  onTap: _openChat,
+                                ),
+                                _buildShopeeActionButton(
+                                  icon: Icons.calendar_month_outlined,
+                                  label: 'Lịch chạy',
+                                  bgColor: const Color(0xFFEDE7F6),
+                                  color: const Color(0xFF7E57C2),
+                                  onTap: _openSlots,
+                                ),
+                                _buildShopeeActionButton(
+                                  icon: Icons.confirmation_number_outlined,
+                                  label: 'Khuyến mãi',
+                                  bgColor: const Color(0xFFFFF3E0),
+                                  color: const Color(0xFFE65100),
+                                  onTap: _openVouchers,
+                                ),
+                                _buildShopeeActionButton(
+                                  icon: Icons.rate_review_outlined,
+                                  label: 'Đánh giá',
+                                  bgColor: const Color(0xFFFFFDE7),
+                                  color: const Color(0xFFFBC02D),
+                                  onTap: _openReviews,
+                                ),
+                                _buildShopeeActionButton(
+                                  icon: Icons.storefront_outlined,
+                                  label: 'Hồ sơ',
+                                  bgColor: const Color(0xFFECEFF1),
+                                  color: const Color(0xFF546E7A),
+                                  onTap: _openProfile,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildBentoShortcut(
-                        icon: Icons.account_balance_wallet_outlined,
-                        label: 'Đối soát',
-                        color: AppColors.tertiary,
-                        bgColor: AppColors.tertiaryFixed,
-                        onTap: _openSettlements,
+                      const SizedBox(height: 6),
+
+                      // 3. Shopee Page Indicator Dots [ = - ]
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: _actionPageIndex == 0 ? 14 : 5,
+                            height: 3.5,
+                            decoration: BoxDecoration(
+                              color: _actionPageIndex == 0 ? AppColors.primary : AppColors.outlineVariant.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: _actionPageIndex == 1 ? 14 : 5,
+                            height: 3.5,
+                            decoration: BoxDecoration(
+                              color: _actionPageIndex == 1 ? AppColors.primary : AppColors.outlineVariant.withOpacity(0.6),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildBentoShortcut(
-                        icon: Icons.warning_amber_rounded,
-                        label: 'Cảng vụ',
-                        color: AppColors.error,
-                        bgColor: AppColors.errorContainer,
-                        onTap: _openNotifications,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 20),
 
@@ -853,7 +1008,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildBentoShortcut({
+  Widget _buildShopeeMetricItem({
+    required String count,
+    required String label,
+    required Color highlightColor,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                count,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: highlightColor,
+                ),
+              ),
+              const SizedBox(height: 4),
+              LocalizedText(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShopeeActionButton({
     required IconData icon,
     required String label,
     required Color color,
@@ -864,37 +1061,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: AppShapes.shadowSm,
-        ),
+      child: SizedBox(
+        width: 62,
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
                     color: bgColor,
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(icon, color: color, size: 20),
+                  child: Icon(icon, color: color, size: 22),
                 ),
                 if (badgeCount != null && badgeCount > 0)
                   Positioned(
-                    top: -2,
-                    right: -2,
+                    top: -3,
+                    right: -3,
                     child: Container(
-                      width: 10,
-                      height: 10,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
                         color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : badgeCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ),
@@ -903,8 +1105,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 6),
             LocalizedText(
               label,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.onSurface),
-              maxLines: 1,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppColors.onSurface,
+                height: 1.15,
+              ),
+              maxLines: 2,
+              textAlign: TextAlign.center,
               overflow: TextOverflow.ellipsis,
             ),
           ],
@@ -912,6 +1120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
+
 
   Widget _buildChartBar(String day, double height, bool isPeak, {bool isProjected = false}) {
     return Flexible(

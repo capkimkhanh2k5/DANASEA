@@ -15,21 +15,35 @@ class AuthFailure implements Exception {
 
 class AuthSession {
   static final instance = AuthSession();
+
+  static String normalizeBaseUrl(String? custom) {
+    var raw = (custom ??
+            const String.fromEnvironment(
+              'API_BASE_URL',
+              defaultValue: 'http://127.0.0.1:8080',
+            ))
+        .trim();
+    while (raw.endsWith('/')) {
+      raw = raw.substring(0, raw.length - 1);
+    }
+    if (!kIsWeb && Platform.isAndroid && raw.contains('//localhost')) {
+      raw = raw.replaceFirst('//localhost', '//127.0.0.1');
+    }
+    return raw;
+  }
+
   final FlutterSecureStorage storage;
   final HttpClient client;
   final String baseUrl;
+
   AuthSession({
     FlutterSecureStorage? storage,
     HttpClient? client,
     String? baseUrl,
-  }) : storage = storage ?? const FlutterSecureStorage(),
-       client = client ?? HttpClient(),
-       baseUrl =
-           baseUrl ??
-           const String.fromEnvironment(
-             'API_BASE_URL',
-             defaultValue: 'http://127.0.0.1:8080',
-           );
+  })  : storage = storage ?? const FlutterSecureStorage(),
+        client = client ?? HttpClient(),
+        baseUrl = normalizeBaseUrl(baseUrl);
+
   String? _access, _refresh;
   String? pendingName;
   String? pendingEmail;
@@ -39,16 +53,43 @@ class AuthSession {
   Future<void>? _refreshing;
   String get _key => 'auth.session.$baseUrl';
 
+  String? get accessToken => _access;
+  bool get isAuthenticated => _access != null && !pendingVerification;
+
   Future<Map<String, dynamic>> request(
     String path, {
     String method = 'GET',
     Map<String, dynamic>? data,
+    Map<String, String>? headers,
+    bool retry = true,
+    bool authenticated = true,
+  }) async {
+    final body = await requestJson(
+      path,
+      method: method,
+      data: data,
+      headers: headers,
+      retry: retry,
+      authenticated: authenticated,
+    );
+    if (body is! Map<String, dynamic>) {
+      throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+    }
+    return body;
+  }
+
+  Future<dynamic> requestJson(
+    String path, {
+    String method = 'GET',
+    dynamic data,
+    Map<String, String>? headers,
     bool retry = true,
     bool authenticated = true,
   }) async {
     final uri = Uri.parse('$baseUrl$path');
-    if (kReleaseMode && uri.scheme != 'https')
+    if (kReleaseMode && uri.scheme != 'https') {
       throw AuthFailure('Backend phải dùng HTTPS.');
+    }
     try {
       final req = await client
           .openUrl(method, uri)
@@ -56,41 +97,63 @@ class AuthSession {
       req.followRedirects = false;
       req.headers.contentType = ContentType.json;
       req.headers.set('Accept-Language', AppLanguage.instance.code);
-      if (authenticated && _access != null)
+      if (authenticated && _access != null) {
         req.headers.set('Authorization', 'Bearer $_access');
+      }
+      if (headers != null) {
+        headers.forEach(req.headers.set);
+      }
       if (_refresh != null &&
           (path == '/api/auth/refresh' || path == '/api/auth/logout')) {
         req.cookies.add(Cookie('refresh_token', _refresh!));
       }
-      if (data != null) req.write(jsonEncode(data));
+      if (data != null) {
+        req.write(jsonEncode(data));
+      }
       final response = await req.close().timeout(const Duration(seconds: 20));
       final text = await utf8.decoder
           .bind(response)
           .join()
           .timeout(const Duration(seconds: 20));
-      Map<String, dynamic> body = {};
+      dynamic body;
       try {
-        if (text.isNotEmpty) body = jsonDecode(text) as Map<String, dynamic>;
-      } catch (_) {}
+        body = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
+      } catch (_) {
+        if (response.statusCode < 300) {
+          throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+        }
+      }
       if (response.statusCode == 401 &&
+          authenticated &&
+          _access != null &&
           retry &&
           !pendingVerification &&
           !path.startsWith('/api/auth/')) {
         await refresh();
-        return request(path, method: method, data: data, retry: false);
+        return requestJson(
+          path,
+          method: method,
+          data: data,
+          headers: headers,
+          retry: false,
+          authenticated: authenticated,
+        );
       }
       if (response.statusCode >= 300) {
         throw AuthFailure(
-          body['message']?.toString() ??
+          (body is Map ? body['message']?.toString() : null) ??
               'Không thể thực hiện yêu cầu. Vui lòng thử lại.',
           response.statusCode,
         );
       }
       for (final cookie in response.cookies) {
-        if (cookie.name == 'refresh_token' && cookie.value.isNotEmpty)
+        if (cookie.name == 'refresh_token' && cookie.value.isNotEmpty) {
           _refresh = cookie.value;
+        }
       }
-      if (body['accessToken'] is String) _access = body['accessToken'];
+      if (body is Map<String, dynamic> && body['accessToken'] is String) {
+        _access = body['accessToken'] as String;
+      }
       return body;
     } on SocketException {
       throw AuthFailure(
@@ -113,6 +176,7 @@ class AuthSession {
             'email': pendingEmail,
           }),
         );
+
   Future<bool> restore() async {
     final raw = await storage.read(key: _key);
     if (raw == null) return false;
@@ -138,8 +202,9 @@ class AuthSession {
   }
 
   Future<void> loginWithGoogle(String idToken) async {
-    if (idToken.trim().isEmpty)
+    if (idToken.trim().isEmpty) {
       throw AuthFailure('Thiếu thông tin xác thực Google.');
+    }
     await clear();
     try {
       await request(
@@ -164,8 +229,9 @@ class AuthSession {
       data: {'email': email.trim(), 'password': password},
     );
     pendingVerification = false;
-    if (pendingEmail?.toLowerCase() != email.trim().toLowerCase())
+    if (pendingEmail?.toLowerCase() != email.trim().toLowerCase()) {
       pendingName = null;
+    }
     pendingEmail = null;
     await _save();
     await loadProfile();
@@ -209,12 +275,13 @@ class AuthSession {
   }
 
   Future<void> verify(String code) async {
-    if (pendingVerification)
+    if (pendingVerification) {
       await request(
         '/api/auth/otp/verify',
         method: 'POST',
         data: {'code': code.trim()},
       );
+    }
     pendingVerification = false;
     await _save();
     await loadProfile();
@@ -235,6 +302,7 @@ class AuthSession {
 
   Future<void> refresh() =>
       _refreshing ??= _doRefresh().whenComplete(() => _refreshing = null);
+
   Future<void> _doRefresh() async {
     if (_refresh == null) throw AuthFailure('Phiên đăng nhập đã hết hạn.', 401);
     await request('/api/auth/refresh', method: 'POST', retry: false);

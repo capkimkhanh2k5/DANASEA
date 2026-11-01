@@ -247,9 +247,6 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
                       _googleBusy ? 'Đang đăng nhập...' : 'Tiếp tục với Google',
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  // Security note footer
-                  _buildSecurityFooter(),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -542,10 +539,8 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
             VendorTextField(
               label: 'Email tài khoản đối tác',
               controller: _loginEmailController,
-              hint: 'vendor@danasea.vn',
               prefixIcon: Icons.mail_outline_rounded,
               keyboardType: TextInputType.emailAddress,
-              isRequired: true,
               validator: (v) {
                 if (v == null || v.trim().isEmpty)
                   return 'Vui lòng nhập email.';
@@ -557,10 +552,8 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
             VendorTextField(
               label: 'Mật khẩu quản trị',
               controller: _loginPasswordController,
-              hint: 'Nhập mật khẩu',
               prefixIcon: Icons.key_rounded,
               obscureText: _hideLoginPassword,
-              isRequired: true,
               suffixIcon: IconButton(
                 icon: Icon(
                   _hideLoginPassword
@@ -655,50 +648,11 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
               'Gia nhập Mạng lưới Đối tác',
               style: AppTypography.headlineSm(color: AppColors.onSurface),
             ),
-            const SizedBox(height: 4),
-            LocalizedText(
-              'Mở rộng kinh doanh tour ca nô, lướt sóng, lặn ngắm san hô & thuyền buồm.',
-              style: AppTypography.bodySm(color: AppColors.tertiary),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: AppColors.secondaryContainer,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.verified_rounded,
-                      size: 16,
-                      color: AppColors.secondary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: LocalizedText(
-                      'Hồ sơ đối tác cần được quản trị viên xét duyệt trước khi hoạt động.',
-                      style: AppTypography.bodySm(color: AppColors.tertiary),
-                    ),
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 16),
             VendorTextField(
               label: 'Họ và tên người đại diện',
               controller: _regNameController,
-              hint: 'Nguyễn Văn A',
               prefixIcon: Icons.badge_outlined,
-              isRequired: true,
               validator: (v) => (v == null || v.trim().isEmpty)
                   ? 'Vui lòng nhập họ tên.'
                   : null,
@@ -707,10 +661,8 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
             VendorTextField(
               label: 'Email doanh nghiệp / Hộ kinh doanh',
               controller: _regEmailController,
-              hint: 'contact@expedition-danang.com',
               prefixIcon: Icons.corporate_fare_rounded,
               keyboardType: TextInputType.emailAddress,
-              isRequired: true,
               validator: (v) {
                 if (v == null || v.trim().isEmpty)
                   return 'Vui lòng nhập email.';
@@ -722,10 +674,8 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
             VendorTextField(
               label: 'Mật khẩu',
               controller: _regPasswordController,
-              hint: 'Tối thiểu 8 ký tự',
               prefixIcon: Icons.lock_outline_rounded,
               obscureText: _hideRegPassword,
-              isRequired: true,
               suffixIcon: IconButton(
                 icon: Icon(
                   _hideRegPassword
@@ -747,10 +697,8 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
             VendorTextField(
               label: 'Xác nhận mật khẩu',
               controller: _regConfirmPasswordController,
-              hint: 'Nhập lại mật khẩu',
               prefixIcon: Icons.check_circle_outline_rounded,
               obscureText: _hideRegConfirmPassword,
-              isRequired: true,
               suffixIcon: IconButton(
                 icon: Icon(
                   _hideRegConfirmPassword
@@ -808,81 +756,5 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
     );
   }
 
-  Widget _buildSecurityFooter() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.security_rounded,
-                color: AppColors.secondary,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: LocalizedText(
-                  'Hệ thống bảo mật đối tác DANASEA',
-                  style: AppTypography.labelLg(color: AppColors.secondary),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          LocalizedText(
-            'Nền tảng xác thực chuyên dụng được mã hóa đầu cuối, tuân thủ an toàn dữ liệu hàng hải và quản lý thông tin đối soát theo từng kỳ.',
-            style: AppTypography.bodySm(color: AppColors.tertiary),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.support_agent_rounded,
-                    size: 18,
-                    color: AppColors.secondary,
-                  ),
-                  const SizedBox(width: 6),
-                  LocalizedText(
-                    'Hotline: 1900 8899',
-                    style: AppTypography.labelMd(color: AppColors.onSurface),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.secondaryContainer,
-                  borderRadius: BorderRadius.circular(9999),
-                ),
-                child: LocalizedText(
-                  'Trợ giúp 24/7',
-                  style: AppTypography.labelSm(
-                    color: AppColors.onSecondaryContainer,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+
 }

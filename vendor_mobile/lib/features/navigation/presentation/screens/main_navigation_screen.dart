@@ -58,6 +58,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _db.addListener(_onDbChanged);
+    _db.syncWithApi();
   }
 
   @override
