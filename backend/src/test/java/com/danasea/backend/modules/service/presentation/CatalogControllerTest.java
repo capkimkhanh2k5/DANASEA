@@ -184,4 +184,23 @@ class CatalogControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("DANASEA - Da Nang Marine Experiences")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Redirecting to ")));
     }
+
+    @Test
+    void getOpenGraphPreview_ShouldIgnoreUntrustedHostHeader() throws Exception {
+        String slug = "tour-lan-bien";
+        ServiceDetailResult result = ServiceDetailResult.builder()
+                .id(UUID.randomUUID())
+                .name("Tour Lặn Biển")
+                .slug(slug)
+                .build();
+
+        when(getServiceDetailUseCase.readOnlySnapshotByIdOrSlug(eq(slug))).thenReturn(result);
+
+        mockMvc.perform(get("/api/v1/catalog/og/" + slug)
+                .header("X-Forwarded-Host", "evil-attacker.example.com")
+                .header("X-Forwarded-Proto", "https"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("https://danasea.tailfc3563.ts.net/tour/" + slug)))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("evil-attacker.example.com"))));
+    }
 }
