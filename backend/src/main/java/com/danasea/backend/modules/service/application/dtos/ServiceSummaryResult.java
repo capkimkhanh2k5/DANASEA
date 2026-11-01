@@ -10,6 +10,7 @@ import lombok.Data;
 public class ServiceSummaryResult {
     private UUID id;
     private String name;
+    private String slug;
     private String shortDescription;
     private BigDecimal price;
     private BigDecimal promotionalPrice;

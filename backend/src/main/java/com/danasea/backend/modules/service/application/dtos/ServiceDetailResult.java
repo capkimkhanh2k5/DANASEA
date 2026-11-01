@@ -18,6 +18,7 @@ import lombok.NoArgsConstructor;
 public class ServiceDetailResult {
     private UUID id;
     private String name;
+    private String slug;
     private String description;
     private BigDecimal price;
     private BigDecimal promotionalPrice;

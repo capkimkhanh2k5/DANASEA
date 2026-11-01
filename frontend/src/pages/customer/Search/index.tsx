@@ -19,18 +19,22 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { useWishlistStore } from '../../../store/useWishlistStore';
+import { useLanguageStore } from '../../../store/useLanguageStore';
 
 import { serviceCatalogService, type ServiceQueryParams } from '../../../services/serviceCatalogService';
 import { categoryService } from '../../../services/categoryService';
 import type { CategoryDto } from '../../../types/category';
 import { FEATURED_SERVICES, CATEGORIES, MOCK_IMAGES } from '../../../mockData';
 import { getCardThumbnailUrl, FALLBACK_CARD_IMAGE } from '../../../utils/imageOptimizer';
+import { SEOHead } from '../../../components/common/SEOHead';
+import { getTourUrl } from '../../../utils/seo';
 
 // Normalized experience item interface for Traveloka-style display
 interface DisplayExperience {
   id: string;
   name: string;
   nameEn?: string;
+  slug?: string;
   description: string;
   price: number;
   promotionalPrice?: number | null;
@@ -54,6 +58,7 @@ export function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { toggleWishlist, isInWishlist } = useWishlistStore();
+  const { language } = useLanguageStore();
 
   const categoryParam = searchParams.get('category');
   const keywordParam = searchParams.get('q') || '';
@@ -160,6 +165,7 @@ export function Search() {
               return {
                 id: item.id,
                 name: item.name,
+                slug: item.slug,
                 description: item.shortDescription || 'Trải nghiệm thể thao biển chuẩn an toàn hàng hải tại vịnh Đà Nẵng, trang bị áo phao SOLAS và hướng dẫn viên 1:1.',
                 price: item.price,
                 promotionalPrice: item.promotionalPrice,
@@ -199,6 +205,7 @@ export function Search() {
               return {
                 id: item.id,
                 name: item.name,
+                slug: item.slug,
                 description: item.description || 'Trải nghiệm thể thao biển cao cấp tại Đà Nẵng với trang thiết bị cứu sinh tiêu chuẩn.',
                 price: item.basePrice,
                 promotionalPrice: idx % 3 === 0 ? item.basePrice * 1.15 : null,
@@ -445,6 +452,27 @@ export function Search() {
           MAIN 2-COLUMN TRAVELOKA SEARCH LAYOUT (Sidebar Filters + Results)
          ========================================================================= */}
       <main className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-44">
+        <SEOHead
+          title={
+            language === 'en'
+              ? keyword
+                ? `Search: "${keyword}"`
+                : categoryParam
+                  ? `Category: ${categoryParam}`
+                  : 'Search Marine Tours & Ocean Experiences'
+              : keyword
+                ? `Tìm kiếm: "${keyword}"`
+                : categoryParam
+                  ? `Dịch vụ: ${categoryParam}`
+                  : 'Tìm Kiếm Tour & Trải Nghiệm Biển'
+          }
+          description={
+            language === 'en'
+              ? 'Search and book water sports, SUP paddleboarding, coral snorkeling, and speedboats in Da Nang at the best prices on DANASEA.'
+              : 'Tìm kiếm và đặt tour thể thao biển, chèo SUP, lặn ngắm san hô, cano lướt sóng tại Đà Nẵng với giá tốt nhất trên DANASEA.'
+          }
+          canonicalUrl="/search"
+        />
         
         {/* Mobile Filter Toggle Button */}
         <div className="lg:hidden mb-4 flex justify-end">
@@ -780,7 +808,7 @@ export function Search() {
                     <article
                       key={service.id}
                       data-ui="traveloka-experience-card"
-                      onClick={() => navigate(`/tour/${service.id}`)}
+                      onClick={() => navigate(getTourUrl(service))}
                       className="group bg-white rounded-2xl border border-slate-200/90 hover:border-sky-400 hover:shadow-lg transition-all duration-200 flex flex-col sm:flex-row overflow-hidden cursor-pointer animate-fadeInUp"
                     >
                       {/* Left: Image Box (~280px) */}

@@ -22,17 +22,23 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       setAuth: (user, token) => {
-        console.log('[useAuthStore] Setting authenticated user:', user.email, 'Role:', user.role);
+        if (import.meta.env.DEV) {
+          console.log('[useAuthStore] Setting authenticated user:', user.email, 'Role:', user.role);
+        }
         set({ user, accessToken: token, isAuthenticated: true });
       },
 
       setPendingToken: (token) => {
-        console.log('[useAuthStore] Setting temporary registration token (unauthenticated) for OTP flow');
+        if (import.meta.env.DEV) {
+          console.log('[useAuthStore] Setting temporary registration token (unauthenticated) for OTP flow');
+        }
         set({ user: null, accessToken: token, isAuthenticated: false });
       },
 
       login: (userData, token) => {
-        console.log('[useAuthStore] login() invoked for:', userData.email);
+        if (import.meta.env.DEV) {
+          console.log('[useAuthStore] login() invoked for:', userData.email);
+        }
         set({
           user: userData,
           accessToken: token || null,
@@ -41,12 +47,17 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        console.log('[useAuthStore] logout() invoked. Clearing state.');
+        if (import.meta.env.DEV) {
+          console.log('[useAuthStore] logout() invoked. Clearing state.');
+        }
         set({ user: null, accessToken: null, isAuthenticated: false });
       },
 
       switchRole: (roleKey) => {
         const targetUser = MOCK_TEST_ACCOUNTS[roleKey];
+        if (!import.meta.env.DEV) {
+          return targetUser;
+        }
         console.log('[useAuthStore] switchRole() to:', roleKey);
         set({ user: targetUser, accessToken: `mock_jwt_token_${roleKey}`, isAuthenticated: true });
         return targetUser;
