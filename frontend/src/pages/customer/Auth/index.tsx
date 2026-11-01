@@ -516,7 +516,15 @@ export function Auth() {
           <div className="w-full max-w-md bg-white/95 backdrop-blur-2xl rounded-2xl shadow-xl border border-white/40 p-5 sm:p-6 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <img alt="DANASEA" className="h-8 w-8 object-contain shrink-0" src="/images/danasea-logo.png" />
+                <img
+                  alt="DANASEA"
+                  width={32}
+                  height={32}
+                  fetchPriority="high"
+                  decoding="async"
+                  className="h-8 w-8 object-contain shrink-0"
+                  src="/images/danasea-logo-sm.png"
+                />
                 <span className="text-lg font-black tracking-tight text-slate-900">
                   DANASEA
                 </span>

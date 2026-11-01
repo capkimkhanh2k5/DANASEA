@@ -152,8 +152,11 @@ public class CatalogController {
         if (serviceRepositoryPort != null) {
             List<Service> services = serviceRepositoryPort.findByStatus(ServiceStatus.PUBLISHED);
             for (Service svc : services) {
-                String slugOrId = (svc.getSlug() != null && !svc.getSlug().isBlank()) ? svc.getSlug() : svc.getId().toString();
-                String lastmod = svc.getUpdatedAt() != null ? svc.getUpdatedAt().toLocalDate().toString() : LocalDate.now().toString();
+                String rawSlugOrId = (svc.getSlug() != null && !svc.getSlug().isBlank()) ? svc.getSlug() : svc.getId().toString();
+                String slugOrId = HtmlUtils.htmlEscape(rawSlugOrId);
+                String lastmod = HtmlUtils.htmlEscape(
+                        svc.getUpdatedAt() != null ? svc.getUpdatedAt().toLocalDate().toString() : LocalDate.now().toString()
+                );
                 sb.append("  <url>\n");
                 sb.append("    <loc>").append(baseUrl).append("/tour/").append(slugOrId).append("</loc>\n");
                 sb.append("    <lastmod>").append(lastmod).append("</lastmod>\n");
@@ -199,14 +202,16 @@ public class CatalogController {
                 descText = descText.substring(0, 197) + "...";
             }
             String desc = HtmlUtils.htmlEscape(descText);
-            String imageUrl = (result.getImageUrls() != null && !result.getImageUrls().isEmpty())
+            String rawImageUrl = (result.getImageUrls() != null && !result.getImageUrls().isEmpty())
                     ? result.getImageUrls().get(0)
                     : baseUrl + "/logo192.png";
-            String targetSlug = result.getSlug() != null && !result.getSlug().isBlank()
+            String imageUrl = HtmlUtils.htmlEscape(rawImageUrl);
+            String rawTargetSlug = result.getSlug() != null && !result.getSlug().isBlank()
                     ? result.getSlug()
                     : result.getId().toString();
-            String canonicalUrl = baseUrl + "/tour/" + targetSlug;
-            String price = result.getPrice() != null ? result.getPrice().toPlainString() : "0";
+            String targetSlug = HtmlUtils.htmlEscape(rawTargetSlug);
+            String canonicalUrl = HtmlUtils.htmlEscape(baseUrl + "/tour/" + rawTargetSlug);
+            String price = HtmlUtils.htmlEscape(result.getPrice() != null ? result.getPrice().toPlainString() : "0");
 
             String html = String.format("""
                 <!DOCTYPE html>
@@ -236,7 +241,6 @@ public class CatalogController {
 
                     <!-- Automatic redirect for human visitors -->
                     <meta http-equiv="refresh" content="0; url=/tour/%s">
-                    <script>window.location.replace("/tour/%s");</script>
                 </head>
                 <body>
                     <p>%s<a href="/tour/%s">%s</a>...</p>
@@ -247,7 +251,7 @@ public class CatalogController {
                 title, desc, canonicalUrl,
                 ogLocale, title, desc, imageUrl, canonicalUrl, price,
                 title, desc, imageUrl,
-                targetSlug, targetSlug, redirectLabel, targetSlug, title
+                targetSlug, redirectLabel, targetSlug, title
             );
             return ResponseEntity.ok(html);
         } catch (Exception ex) {
@@ -275,14 +279,16 @@ public class CatalogController {
     }
 
     private String resolvePublicBaseUrl(HttpServletRequest request) {
+        List<String> trustedOrigins = getTrustedPublicOrigins();
         if (request != null) {
             String forwardedHost = request.getHeader("X-Forwarded-Host");
             if (forwardedHost != null && !forwardedHost.isBlank()) {
                 String host = forwardedHost.split(",")[0].trim();
-                if (!isLocalOrInternalHost(host)) {
-                    String proto = request.getHeader("X-Forwarded-Proto");
-                    String scheme = (proto != null && !proto.isBlank()) ? proto.split(",")[0].trim() : "https";
-                    return stripTrailingSlash(scheme + "://" + host);
+                String proto = request.getHeader("X-Forwarded-Proto");
+                String scheme = (proto != null && !proto.isBlank()) ? proto.split(",")[0].trim() : "https";
+                String candidate = stripTrailingSlash(scheme + "://" + host);
+                if (trustedOrigins.contains(candidate)) {
+                    return candidate;
                 }
             }
             String serverName = request.getServerName();
@@ -290,18 +296,25 @@ public class CatalogController {
                 String scheme = request.getScheme() != null ? request.getScheme() : "https";
                 int port = request.getServerPort();
                 boolean standardPort = port <= 0 || port == 80 || port == 443;
-                return stripTrailingSlash(scheme + "://" + serverName + (standardPort ? "" : ":" + port));
+                String candidate = stripTrailingSlash(scheme + "://" + serverName + (standardPort ? "" : ":" + port));
+                if (trustedOrigins.contains(candidate)) {
+                    return candidate;
+                }
             }
         }
-        if (allowedOriginsConfig != null && !allowedOriginsConfig.isBlank()) {
-            return Arrays.stream(allowedOriginsConfig.split(","))
-                    .map(String::trim)
-                    .filter(origin -> !origin.isEmpty() && !isLocalOrInternalHost(origin))
-                    .map(this::stripTrailingSlash)
-                    .findFirst()
-                    .orElse(DEFAULT_PUBLIC_ORIGIN);
+        return trustedOrigins.isEmpty() ? DEFAULT_PUBLIC_ORIGIN : trustedOrigins.get(0);
+    }
+
+    private List<String> getTrustedPublicOrigins() {
+        if (allowedOriginsConfig == null || allowedOriginsConfig.isBlank()) {
+            return List.of(DEFAULT_PUBLIC_ORIGIN);
         }
-        return DEFAULT_PUBLIC_ORIGIN;
+        List<String> configured = Arrays.stream(allowedOriginsConfig.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty() && !isLocalOrInternalHost(origin))
+                .map(this::stripTrailingSlash)
+                .toList();
+        return configured.isEmpty() ? List.of(DEFAULT_PUBLIC_ORIGIN) : configured;
     }
 
     private boolean isLocalOrInternalHost(String hostOrOrigin) {
