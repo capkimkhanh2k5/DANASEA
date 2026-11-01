@@ -10,16 +10,11 @@ import {
   Compass,
   ArrowRight,
   ArrowLeft,
+  ShoppingCart,
+  CheckCircle2,
 } from "lucide-react";
-import { FEATURED_SERVICES, MOCK_IMAGES } from "../../../mockData";
-import {
-  FLASH_SALE_EXPERIENCES,
-  SUP_KAYAK_EXPERIENCES,
-  DIVING_EXPERIENCES,
-  THRILL_EXPERIENCES,
-  COMBO_SUNSET_EXPERIENCES,
-} from "../../../data/customerHomeData";
 import { useWishlistStore } from "../../../store/useWishlistStore";
+import { useCartStore } from "../../../store/useCartStore";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import type { ServiceSummaryDto } from "../../../types/service";
@@ -80,6 +75,8 @@ function matchesCategory(itemCategory: string | undefined, categoryId: string): 
 export function Wishlist() {
   const navigate = useNavigate();
   const { wishlistIds, serverItems, removeFromWishlist, fetchWishlistFromServer } = useWishlistStore();
+  const { addItem } = useCartStore();
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const { isAuthenticated } = useAuthStore();
   const [catalogServices, setCatalogServices] = useState<ServiceSummaryDto[]>([]);
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(true);
@@ -164,7 +161,7 @@ export function Wishlist() {
           price: p,
           originalPrice: Math.round(p * 1.15),
           imageUrl: s.primaryImageUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80',
-          rating: s.averageRating && s.averageRating > 0 ? Number(s.averageRating.toFixed(1)) : 4.9,
+          rating: s.averageRating && s.averageRating > 0 ? Number(s.averageRating.toFixed(1)) : 0,
         });
       }
     });
@@ -181,97 +178,7 @@ export function Wishlist() {
           price: 0,
           originalPrice: 0,
           imageUrl: si.primaryImageUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=800&q=80',
-          rating: 4.9,
-        });
-      }
-    });
-
-    // 1. From FEATURED_SERVICES
-    FEATURED_SERVICES.forEach(s => {
-      if (!seenIds.has(s.id)) {
-        seenIds.add(s.id);
-        const img = MOCK_IMAGES.find(i => i.serviceId === s.id && i.isPrimary)?.imageUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80';
-        const p = s.basePrice || s.price || 0;
-        items.push({
-          id: s.id,
-          name: s.name,
-          categoryId: s.categoryId,
-          category: s.categoryId === 'cat-1' ? 'Chèo SUP' : s.categoryId === 'cat-2' ? 'Cano lướt sóng' : 'Lặn san hô',
-          locationName: s.locationName || 'Đà Nẵng',
-          price: p,
-          originalPrice: Math.round(p * 1.2),
-          imageUrl: img,
-          rating: 4.9,
-        });
-      }
-    });
-
-    // 2. From customer home data carousels
-    const homeSets = [
-      ...(FLASH_SALE_EXPERIENCES || []).map(f => ({
-        id: f.id,
-        name: f.title,
-        category: f.category,
-        locationName: f.location,
-        price: f.salePrice || f.originalPrice,
-        originalPrice: f.originalPrice,
-        imageUrl: f.imageUrl,
-        rating: f.rating || 4.9,
-      })),
-      ...(SUP_KAYAK_EXPERIENCES || []).map(a => ({
-        id: a.id,
-        name: a.title,
-        category: a.category,
-        locationName: a.location,
-        price: a.price,
-        originalPrice: Math.round(a.price * 1.2),
-        imageUrl: a.imageUrl,
-        rating: a.rating || 4.9,
-      })),
-      ...(DIVING_EXPERIENCES || []).map(a => ({
-        id: a.id,
-        name: a.title,
-        category: a.category,
-        locationName: a.location,
-        price: a.price,
-        originalPrice: Math.round(a.price * 1.2),
-        imageUrl: a.imageUrl,
-        rating: a.rating || 4.9,
-      })),
-      ...(THRILL_EXPERIENCES || []).map(a => ({
-        id: a.id,
-        name: a.title,
-        category: a.category,
-        locationName: a.location,
-        price: a.price,
-        originalPrice: Math.round(a.price * 1.2),
-        imageUrl: a.imageUrl,
-        rating: a.rating || 4.9,
-      })),
-      ...(COMBO_SUNSET_EXPERIENCES || []).map(a => ({
-        id: a.id,
-        name: a.title,
-        category: a.category,
-        locationName: a.location,
-        price: a.price,
-        originalPrice: Math.round(a.price * 1.2),
-        imageUrl: a.imageUrl,
-        rating: a.rating || 4.9,
-      })),
-    ];
-
-    homeSets.forEach(h => {
-      if (!seenIds.has(h.id)) {
-        seenIds.add(h.id);
-        items.push({
-          id: h.id,
-          name: h.name,
-          category: h.category,
-          locationName: h.locationName,
-          price: h.price,
-          originalPrice: h.originalPrice,
-          imageUrl: h.imageUrl,
-          rating: h.rating,
+          rating: 0,
         });
       }
     });
@@ -283,6 +190,26 @@ export function Wishlist() {
   const wishlist = useMemo(() => {
     return allAvailableServices.filter(item => wishlistIds.includes(item.id));
   }, [allAvailableServices, wishlistIds]);
+
+  const handleAddAllToCart = useCallback(() => {
+    let count = 0;
+    wishlist.forEach((item) => {
+      addItem({
+        serviceId: item.id,
+        slotId: '00000000-0000-0000-0000-000000000001',
+        quantity: 1,
+        unitPrice: item.price || 350000,
+        serviceName: item.name,
+        thumbnailUrl: item.imageUrl,
+        date: new Date().toISOString().split('T')[0],
+        timeSlot: '08:00 - 10:00',
+        locationName: item.locationName,
+      });
+      count++;
+    });
+    setToastMessage(`Đã thêm ${count} trải nghiệm vào giỏ hàng thành công!`);
+    setTimeout(() => setToastMessage(null), 3000);
+  }, [wishlist, addItem]);
 
   const handleRemove = (e: React.MouseEvent, item: WishlistItem) => {
     e.stopPropagation();
@@ -320,7 +247,7 @@ export function Wishlist() {
               <span className="text-slate-900 font-semibold">Danh sách tour đã lưu</span>
             </div>
 
-            <div className="flex items-baseline justify-between border-b border-slate-200/80 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
               <div>
                 <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight">
                   Danh sách yêu thích
@@ -329,6 +256,20 @@ export function Wishlist() {
                   {wishlist.length} trải nghiệm đã lưu vào bộ sưu tập
                 </p>
               </div>
+
+              {wishlist.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleAddAllToCart}
+                  className="px-4 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-xs self-start sm:self-auto"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>Thêm tất cả vào giỏ hàng</span>
+                  <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-white font-mono text-[11px] font-bold">
+                    {wishlist.length}
+                  </span>
+                </button>
+              )}
             </div>
 
             {/* Quick Category Strip - Airbnb clean line style */}
@@ -470,7 +411,7 @@ export function Wishlist() {
                             </span>
                           )}
                           <div className="flex items-baseline gap-1">
-                            <span className="text-base font-bold text-slate-900 tabular-nums">
+                            <span className="text-base font-bold text-[#991b1b] tabular-nums">
                               {servicePrice.toLocaleString('vi-VN')}₫
                             </span>
                             <span className="text-xs text-slate-500 font-normal">
@@ -515,6 +456,13 @@ export function Wishlist() {
           )}
         </section>
       </div>
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-sm border border-slate-700 animate-in fade-in duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </main>
   );
 }
