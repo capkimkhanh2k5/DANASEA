@@ -17,7 +17,11 @@ import {
   AlertCircle,
   ArrowLeft,
   Loader2,
+  Tag,
+  X,
 } from "lucide-react";
+
+const VALID_UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function Checkout() {
   const navigate = useNavigate();
@@ -46,30 +50,19 @@ export function Checkout() {
   const [discountPreview, setDiscountPreview] = useState<DiscountPreviewResponse | null>(null);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [promoError, setPromoError] = useState<string>("");
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [isApplyingPromo, setIsApplyingPromo] = useState<boolean>(false);
 
   // Payment processing state
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  // Seed demo item if opened directly with empty cart
+  // Redirect to cart if empty
   useEffect(() => {
     if (items.length === 0 && !isProcessingPayment) {
-      useCartStore.getState().addItem({
-        serviceId: 'tour-1',
-        slotId: 'slot-tour-1-today-1400',
-        serviceName: 'Tour lặn ngắm san hô Bán đảo Sơn Trà',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
-        date: new Date().toISOString().split('T')[0],
-        timeSlot: '14:00 - 16:30',
-        selectedDate: new Date().toISOString().split('T')[0],
-        locationName: 'Bán đảo Sơn Trà, Đà Nẵng',
-        vendorName: 'DANASEA Marine Partner',
-        quantity: 2,
-        unitPrice: 550000,
-      });
+      navigate('/cart');
     }
-  }, [items.length, isProcessingPayment]);
+  }, [items.length, isProcessingPayment, navigate]);
 
   // Update editable defaults only when the authenticated user object changes.
   const [previousUser, setPreviousUser] = useState(user);
@@ -86,8 +79,6 @@ export function Checkout() {
     if (items.length === 0 || holdRequestedRef.current) return;
     holdRequestedRef.current = true;
 
-    // Check if slot IDs look like real UUIDs
-    const validUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const holdItems = items.map((i) => ({
       slotId: i.slotId,
       quantity: i.quantity,
@@ -96,9 +87,16 @@ export function Checkout() {
       allowSplit: false,
     }));
 
-    const allUuids = holdItems.every((item) => validUuidRegex.test(item.slotId));
+    const allUuids = holdItems.every((item) => VALID_UUID_REGEX.test(item.slotId));
 
-    if (allUuids && isAuthenticated) {
+    if (!allUuids) {
+      console.warn('[Checkout] Phát hiện item mock cũ trong giỏ hàng, tự động làm mới giỏ hàng.');
+      useCartStore.getState().clearCart();
+      navigate('/cart');
+      return;
+    }
+
+    if (isAuthenticated) {
       bookingService
         .holdBooking({ items: holdItems })
         .then((res) => {
@@ -115,7 +113,7 @@ export function Checkout() {
           console.warn('[Checkout] Không thể giữ chỗ qua API, dùng chế độ giữ chỗ cục bộ:', err);
         });
     }
-  }, [items, isAuthenticated]);
+  }, [items, isAuthenticated, navigate]);
 
   // 15-minute countdown timer
   useEffect(() => {
@@ -222,6 +220,13 @@ export function Checkout() {
 
         let activeHold = bookingHold;
         if (!activeHold?.bookingId) {
+          const invalidItem = items.find((i) => !VALID_UUID_REGEX.test(i.slotId) || !VALID_UUID_REGEX.test(i.serviceId));
+          if (invalidItem) {
+            useCartStore.getState().clearCart();
+            setPaymentError('Giỏ hàng chứa dịch vụ từ phiên bản cũ (ID không hợp lệ). Hệ thống đã làm mới giỏ hàng, vui lòng chọn lại tour từ trang chủ.');
+            setIsProcessingPayment(false);
+            return;
+          }
           const holdItems = items.map((i) => ({
             slotId: i.slotId,
             quantity: i.quantity,
@@ -306,7 +311,8 @@ export function Checkout() {
           
           // Save order snapshot for Step 3 (PaymentResult) when returning from VNPay gateway
           const orderSnapshot = {
-            orderCode: `DNS-${sessionCode}`,
+            orderId: orderRes.id,
+            orderCode: `#ORD-${orderRes.id.slice(0, 8).toUpperCase()}`,
             customerName: fullName.trim() || "Khách Hàng DANASEA",
             customerPhone: phone.trim() || "0912 345 678",
             customerEmail: email.trim() || "khachhang@danasea.vn",
@@ -646,7 +652,16 @@ export function Checkout() {
                 
                 {/* Promo Code Input */}
                 <div className="pt-3 border-t border-slate-100">
-                  <label className="text-xs font-semibold text-slate-700 block mb-1.5">Mã ưu đãi chuyến đi</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-700">Mã ưu đãi chuyến đi</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsVoucherModalOpen(true)}
+                      className="text-xs text-[#0284c7] hover:text-[#0369a1] font-semibold underline underline-offset-4 cursor-pointer transition-colors"
+                    >
+                      Xem mã ưu đãi
+                    </button>
+                  </div>
                   {appliedPromoCode ? (
                     <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
@@ -713,7 +728,7 @@ export function Checkout() {
                       <span className="text-xs text-slate-700 font-semibold">Tổng thanh toán:</span>
                       <p className="text-xs text-slate-500">Đã gồm thuế &amp; bảo hiểm</p>
                     </div>
-                    <span className="text-2xl sm:text-3xl leading-tight text-slate-900 font-extrabold tracking-tight tabular-nums">
+                    <span className="text-2xl sm:text-3xl leading-tight text-[#991b1b] font-extrabold tracking-tight tabular-nums">
                       {finalTotal.toLocaleString('vi-VN')}₫
                     </span>
                   </div>
@@ -754,6 +769,88 @@ export function Checkout() {
           </div>
         </div>
       </div>
+      {/* Voucher Selection Modal */}
+      {isVoucherModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Tag className="w-5 h-5 text-[#0284c7]" />
+                <h3 className="text-base font-bold text-slate-900">Mã ưu đãi DANASEA khả dụng</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsVoucherModalOpen(false)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3 max-h-[60vh] overflow-y-auto">
+              {[
+                {
+                  code: 'DANASEA10',
+                  title: 'Giảm 10% Cho Toàn Bộ Đơn Tour Biển',
+                  desc: 'Áp dụng cho mọi hoạt động lặn ngắm san hô, cano cao tốc và chèo SUP tại vịnh Đà Nẵng.',
+                  discount: 'Giảm 10%',
+                },
+                {
+                  code: 'HE2024',
+                  title: 'Ưu Đãi Hè Sôi Động',
+                  desc: 'Giảm 10% tổng đơn đặt chỗ trực tuyến qua cổng thanh toán VNPay và thẻ ngân hàng.',
+                  discount: 'Giảm 10%',
+                },
+                {
+                  code: 'BIENXANH',
+                  title: 'Khám Phá Biển Xanh',
+                  desc: 'Giảm trực tiếp 50.000 đ cho mỗi vé trải nghiệm biển có giá từ 200.000 đ.',
+                  discount: 'Giảm 50.000 đ',
+                },
+              ].map((voucher) => (
+                <div
+                  key={voucher.code}
+                  className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-sky-50/50 hover:border-sky-300 transition-all flex items-center justify-between gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 font-mono font-bold text-xs">
+                        {voucher.code}
+                      </span>
+                      <span className="text-xs font-bold text-[#991b1b]">
+                        {voucher.discount}
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-900 truncate">{voucher.title}</h4>
+                    <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{voucher.desc}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromoInput(voucher.code);
+                      setIsVoucherModalOpen(false);
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors shadow-xs"
+                  >
+                    Áp dụng
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsVoucherModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

@@ -1,6 +1,7 @@
 import { useCartStore } from "../../../store/useCartStore";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { paymentService } from "../../../services/paymentService";
 import {
   CheckCircle2,
   Download,
@@ -121,6 +122,35 @@ export function PaymentResult() {
     };
     return fallbackOrder;
   });
+
+  const [_isVerifying, setIsVerifying] = useState(false);
+  const [_verificationError, setVerificationError] = useState<string | null>(null);
+  const hasSyncedVNPay = useRef(false);
+
+  // Synchronize payment callback with Backend when returned from VNPay
+  useEffect(() => {
+    const txnRef = searchParams.get('vnp_TxnRef');
+    const secureHash = searchParams.get('vnp_SecureHash');
+
+    if (txnRef && secureHash && !hasSyncedVNPay.current) {
+      hasSyncedVNPay.current = true;
+      setIsVerifying(true);
+      const paramsObj = Object.fromEntries(searchParams.entries());
+
+      paymentService.processVNPayCallback(paramsObj)
+        .then((res) => {
+          setIsVerifying(false);
+          if (res.RspCode !== '00' && res.RspCode !== '02') {
+            setVerificationError(res.Message || 'Cổng thanh toán phản hồi lỗi xác thực.');
+          }
+        })
+        .catch((err) => {
+          setIsVerifying(false);
+          console.error('[PaymentResult] Lỗi đồng bộ VNPay callback:', err);
+          setVerificationError('Không thể kết nối đến máy chủ để cập nhật trạng thái thanh toán.');
+        });
+    }
+  }, [searchParams]);
 
   // Only clear cart when payment is confirmed SUCCESSFUL
   useEffect(() => {
