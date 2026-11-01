@@ -149,7 +149,7 @@ export function AdminLayout() {
               title="Mở rộng thanh bên"
             >
               <span className="admin-brand-mark">
-                <img src="/images/danasea-logo.png" alt="DANASEA Logo" className="admin-brand-logo" />
+                <img src="/images/danasea-logo-sm.png" width={32} height={32} decoding="async" alt="DANASEA Logo" className="admin-brand-logo" />
               </span>
             </button>
           ) : (
@@ -158,7 +158,7 @@ export function AdminLayout() {
               <div className="admin-brand-container">
                 <div className="admin-brand admin-brand--static" aria-label="DANASEA Admin — Hệ thống quản trị">
                   <span className="admin-brand-mark">
-                    <img src="/images/danasea-logo.png" alt="DANASEA Logo" className="admin-brand-logo" />
+                    <img src="/images/danasea-logo-sm.png" width={32} height={32} decoding="async" alt="DANASEA Logo" className="admin-brand-logo" />
                   </span>
                   <span className="admin-brand-copy">
                     <strong>DANASEA</strong>
