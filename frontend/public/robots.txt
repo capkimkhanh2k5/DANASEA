@@ -13,4 +13,4 @@ Disallow: /payment/
 Disallow: /auth
 Disallow: /api/
 
-Sitemap: https://danasea.vn/sitemap.xml
+Sitemap: https://danasea.tailfc3563.ts.net/sitemap.xml

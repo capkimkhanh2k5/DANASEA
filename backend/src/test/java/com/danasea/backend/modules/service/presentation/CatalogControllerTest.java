@@ -141,11 +141,11 @@ class CatalogControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_XML))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("<urlset")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("https://danasea.vn/")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("https://danasea.tailfc3563.ts.net/")));
     }
 
     @Test
-    void getOpenGraphPreview_ShouldReturnHtml() throws Exception {
+    void getOpenGraphPreview_ShouldReturnHtmlInVietnameseByDefault() throws Exception {
         String slug = "tour-lan-bien";
         ServiceDetailResult result = ServiceDetailResult.builder()
                 .id(UUID.randomUUID())
@@ -159,7 +159,29 @@ class CatalogControllerTest {
         mockMvc.perform(get("/api/v1/catalog/og/" + slug))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<html lang=\"vi\">")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("og:title")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString(slug)));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Đang chuyển hướng đến ")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("https://danasea.tailfc3563.ts.net/tour/" + slug)));
+    }
+
+    @Test
+    void getOpenGraphPreview_ShouldReturnHtmlInEnglishWhenRequested() throws Exception {
+        String slug = "tour-lan-bien";
+        ServiceDetailResult result = ServiceDetailResult.builder()
+                .id(UUID.randomUUID())
+                .name("Coral Diving Tour")
+                .slug(slug)
+                .build();
+
+        when(getServiceDetailUseCase.readOnlySnapshotByIdOrSlug(eq(slug))).thenReturn(result);
+
+        mockMvc.perform(get("/api/v1/catalog/og/" + slug)
+                .header("Accept-Language", "en-US,en;q=0.9"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<html lang=\"en\">")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("DANASEA - Da Nang Marine Experiences")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Redirecting to ")));
     }
 }

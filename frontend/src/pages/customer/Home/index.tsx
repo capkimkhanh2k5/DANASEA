@@ -468,7 +468,6 @@ export function Home() {
             : 'Khám phá và đặt vé các hoạt động thể thao biển, lặn ngắm san hô Sơn Trà, chèo SUP Mỹ Khê, cano dù bay tại Đà Nẵng cùng DANASEA. An toàn, uy tín và giá tốt nhất.'
         }
         canonicalUrl="/"
-        ogImage="https://danasea.vn/logo192.png"
         ogType="website"
       />
       {/* =========================================================================

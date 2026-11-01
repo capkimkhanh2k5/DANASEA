@@ -25,6 +25,7 @@ import { useLanguageStore } from '../../../store/useLanguageStore';
 import { serviceCatalogService } from '../../../services/serviceCatalogService';
 import { reviewService, type ReviewResponse } from '../../../services/reviewService';
 import { SEOHead } from '../../../components/common/SEOHead';
+import { getSiteOrigin } from '../../../utils/seo';
 import type { ServiceDetailDto, ServiceOptionDto, StructuredSlotDto } from '../../../types/service';
 import { FEATURED_SERVICES, MOCK_SLOTS, MOCK_IMAGES } from '../../../mockData';
 
@@ -322,9 +323,10 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
   // Schema.org JSON-LD Structured Data
   const jsonLd = useMemo(() => {
     if (!service) return undefined;
-    const primaryImg = service.imageUrls?.[0] || 'https://danasea.vn/logo192.png';
+    const siteOrigin = getSiteOrigin();
+    const primaryImg = service.imageUrls?.[0] || `${siteOrigin}/logo192.png`;
     const tourSlug = service.slug || service.id;
-    const tourUrl = `https://danasea.vn/tour/${encodeURIComponent(tourSlug)}`;
+    const tourUrl = `${siteOrigin}/tour/${encodeURIComponent(tourSlug)}`;
 
     return [
       {
@@ -364,7 +366,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
         provider: {
           '@type': 'Organization',
           name: service.businessName || 'DANASEA',
-          url: 'https://danasea.vn',
+          url: siteOrigin,
         },
       },
       {
@@ -374,14 +376,14 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
           {
             '@type': 'ListItem',
             position: 1,
-            name: 'Trang chủ',
-            item: 'https://danasea.vn/',
+            name: language === 'en' ? 'Home' : 'Trang chủ',
+            item: `${siteOrigin}/`,
           },
           {
             '@type': 'ListItem',
             position: 2,
-            name: 'Khám phá',
-            item: 'https://danasea.vn/explore',
+            name: language === 'en' ? 'Explore' : 'Khám phá',
+            item: `${siteOrigin}/explore`,
           },
           {
             '@type': 'ListItem',
@@ -392,7 +394,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
         ],
       },
     ];
-  }, [service]);
+  }, [service, language]);
 
   // Derived selected option
   const selectedOption: ServiceOptionDto | undefined = useMemo(() => {
@@ -639,7 +641,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
   if (loadError || !service) {
     return (
       <main className="w-full pt-32 pb-20 bg-slate-50 flex-1 flex flex-col items-center justify-center min-h-[70vh]">
-        <SEOHead title="Không tìm thấy trải nghiệm" noIndex />
+        <SEOHead title={language === 'en' ? 'Experience Not Found' : 'Không tìm thấy trải nghiệm'} noIndex />
         <div className="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 mb-4">
           <SearchX className="w-8 h-8 text-sky-600" />
         </div>
