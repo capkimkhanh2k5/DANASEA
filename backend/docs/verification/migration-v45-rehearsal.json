@@ -1,0 +1,24 @@
+{
+  "schema": "rehearsal_v44",
+  "actual_migration_seconds": 0.072,
+  "baseline_preserved": true,
+  "max_migration_seconds_budget": 60.0,
+  "rows": 10000,
+  "numeric_scale": 10,
+  "postgres_version": "PostgreSQL 16.15 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+  "max_lock_seconds_budget": 5.0,
+  "backup_hash": "6f702ed7824bdcfc1144db6bbe501fe5d1bd3b595c6083f9a4fa49b3811f19d8",
+  "actual_lock_seconds": 0.031,
+  "high_precision_verified": true,
+  "numeric_precision": 46,
+  "restore_verified": true,
+  "passed": true,
+  "provenance": {
+    "runner": "scripts/rehearse_migration.py",
+    "backend_revision": "29cd865211422c5e0cbd735f42d0e9a63a12a5a5",
+    "executed_at": "2026-11-02T10:36:19.873797+00:00",
+    "budget_rows": 10000,
+    "budget_max_lock_seconds": 5.0,
+    "budget_max_migration_seconds": 60.0
+  }
+}
