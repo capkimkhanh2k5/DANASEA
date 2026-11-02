@@ -10,6 +10,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -24,6 +25,7 @@ public class RedisConfirmationCardStore implements ConfirmationCardStorePort {
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
     private record CachedValue(String value, Instant expiresAt) { }
     private final Map<String, CachedValue> inMemoryFallback = new ConcurrentHashMap<>();
     private static final String KEY_PREFIX = "ai:confirmation:";
@@ -35,8 +37,17 @@ public class RedisConfirmationCardStore implements ConfirmationCardStorePort {
             @Autowired(required = false) StringRedisTemplate redisTemplate,
             ObjectMapper objectMapper
     ) {
+        this(redisTemplate, objectMapper, Clock.systemUTC());
+    }
+
+    RedisConfirmationCardStore(
+            StringRedisTemplate redisTemplate,
+            ObjectMapper objectMapper,
+            Clock clock
+    ) {
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
+        this.clock = clock != null ? clock : Clock.systemUTC();
     }
 
     @Override
@@ -51,7 +62,7 @@ public class RedisConfirmationCardStore implements ConfirmationCardStorePort {
                 removeExpired();
                 if (inMemoryFallback.size() >= 10000 && !inMemoryFallback.containsKey(key))
                     throw new IllegalStateException("Confirmation cache is full");
-                inMemoryFallback.put(key, new CachedValue(json, Instant.now().plus(ttl)));
+                inMemoryFallback.put(key, new CachedValue(json, Instant.now(clock).plus(ttl)));
             }
         } catch (Exception e) {
             log.error("Failed to save confirmation card", e);
@@ -68,7 +79,7 @@ public class RedisConfirmationCardStore implements ConfirmationCardStorePort {
                 json = redisTemplate.opsForValue().get(key);
             } else {
                 CachedValue cached = inMemoryFallback.get(key);
-                if (cached != null && cached.expiresAt().isAfter(Instant.now())) json = cached.value();
+                if (cached != null && cached.expiresAt().isAfter(Instant.now(clock))) json = cached.value();
                 else { inMemoryFallback.remove(key); json = null; }
             }
             if (json != null) {
@@ -96,7 +107,7 @@ public class RedisConfirmationCardStore implements ConfirmationCardStorePort {
         String token = UUID.randomUUID().toString();
         if (redisTemplate == null) {
             removeExpired();
-            return inMemoryFallback.putIfAbsent(key, new CachedValue(token, Instant.now().plus(ttl))) == null
+            return inMemoryFallback.putIfAbsent(key, new CachedValue(token, Instant.now(clock).plus(ttl))) == null
                     ? Optional.of(token) : Optional.empty();
         }
         try {
@@ -128,7 +139,7 @@ public class RedisConfirmationCardStore implements ConfirmationCardStorePort {
         }
     }
     private void removeExpired() {
-        Instant now = Instant.now();
+        Instant now = Instant.now(clock);
         inMemoryFallback.entrySet().removeIf(entry -> !entry.getValue().expiresAt().isAfter(now));
     }
 
