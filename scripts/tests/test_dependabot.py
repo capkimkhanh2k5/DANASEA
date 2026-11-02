@@ -100,3 +100,13 @@ class DependabotConfigTest(unittest.TestCase):
         quality = workflow['jobs']['quality']
         self.assertNotIn('needs', quality)
         self.assertTrue(any('scripts/check_dependabot.py' in step.get('run', '') for step in quality['steps']))
+
+    def test_worker_python_minor_upgrade_requires_a_coordinated_runtime_migration(self):
+        root = Path(__file__).resolve().parents[2]
+        dockerfile = (root / 'ai-decision/Dockerfile').read_text()
+        self.assertRegex(dockerfile, r'FROM python:3\.11-slim@sha256:')
+        config = load_config((root / '.github/dependabot.yml').read_text())
+        docker = next(update for update in config['updates'] if update['package-ecosystem'] == 'docker')
+        rule = next((rule for rule in docker['ignore'] if rule['dependency-name'] == 'python'), None)
+        self.assertIsNotNone(rule, 'Dependabot must keep the validated Python minor baseline')
+        self.assertIn('>=3.12', rule.get('versions', []))
