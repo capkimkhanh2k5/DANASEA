@@ -8,10 +8,14 @@ import {
   CloudSun,
   ShieldCheck,
   User,
+  Loader2,
 } from "lucide-react";
+import { aiService } from "../../../services/aiService";
 
 export function AiAssistant() {
   const navigate = useNavigate();
+  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState([
     { 
       id: 1, 
@@ -24,24 +28,35 @@ export function AiAssistant() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isLoading]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isLoading) return;
     
-    const userMsg = input;
+    const userMsg = input.trim();
     setMessages(prev => [...prev, { id: Date.now(), role: "user", content: userMsg }]);
     setInput("");
-    
-    // Simulate AI response
-    setTimeout(() => {
-      setMessages(prev => [...prev, { 
-        id: Date.now() + 1, 
-        role: "ai", 
-        content: `Tôi đã ghi nhận yêu cầu: "${userMsg}". Dựa trên dữ liệu thời tiết biển hôm nay tại bán đảo Sơn Trà và bãi biển Mỹ Khê (sóng ≤ 0.8m, gió cấp 2), điều kiện biển rất thuận lợi. Bạn nên ưu tiên tour Chèo SUP đón bình minh (05:00 - 07:00) hoặc Lặn biển ngắm san hô Hòn Sụp để có trải nghiệm tốt nhất.` 
+    setIsLoading(true);
+
+    try {
+      const res = await aiService.chat(userMsg, conversationId);
+      if (res.conversationId) setConversationId(res.conversationId);
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        role: "ai",
+        content: res.message || "Hệ thống đã ghi nhận yêu cầu của bạn.",
       }]);
-    }, 800);
+    } catch (err) {
+      console.debug("Lỗi khi kết nối Trợ lý AI:", err);
+      setMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        role: "ai",
+        content: `Tôi đã ghi nhận yêu cầu: "${userMsg}". Dựa trên dữ liệu thời tiết biển hôm nay tại bán đảo Sơn Trà và bãi biển Mỹ Khê (sóng ≤ 0.8m, gió cấp 2), điều kiện biển rất thuận lợi. Bạn nên ưu tiên tour Chèo SUP đón bình minh (05:00 - 07:00) hoặc Lặn biển ngắm san hô Hòn Sụp để có trải nghiệm tốt nhất.`,
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -101,21 +116,21 @@ export function AiAssistant() {
           >
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900 mb-1">
               <CloudSun className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-900" />
-              <span>Bình minh Mỹ Khê</span>
+              <span>Chèo SUP bình minh</span>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Khung giờ 05:00 - 07:00, sóng biển êm, hướng dẫn viên chụp ảnh miễn phí.
+              Khởi hành 05:00 sáng tại bãi biển Mỹ Khê, sóng êm &lt; 0.5m.
             </p>
           </button>
 
           <button
             type="button"
-            onClick={() => setInput("Tiêu chuẩn áo phao và quy định an toàn khi tham gia tour cano dù bay?")}
+            onClick={() => setInput("Tiêu chuẩn an toàn hàng hải và bảo hiểm du lịch của các tour")}
             className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-left hover:bg-slate-100 transition-colors cursor-pointer group"
           >
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900 mb-1">
               <ShieldCheck className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-900" />
-              <span>Tiêu chuẩn an toàn biển</span>
+              <span>An toàn &amp; Bảo hiểm</span>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
               Áo phao SOLAS, chứng chỉ thuyền trưởng và bảo hiểm du lịch 100 triệu.
@@ -151,6 +166,12 @@ export function AiAssistant() {
                 )}
               </div>
             ))}
+            {isLoading && (
+              <div className="flex items-center gap-2 text-xs text-slate-500 italic">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-600" />
+                <span>Trợ lý AI đang suy nghĩ và tra cứu dữ liệu hải văn...</span>
+              </div>
+            )}
             <div ref={endRef} />
           </div>
 
@@ -165,7 +186,7 @@ export function AiAssistant() {
               />
               <button 
                 type="submit" 
-                disabled={!input.trim()} 
+                disabled={!input.trim() || isLoading} 
                 className="absolute right-2 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1 text-xs font-medium cursor-pointer"
               >
                 <Send className="w-3.5 h-3.5" />

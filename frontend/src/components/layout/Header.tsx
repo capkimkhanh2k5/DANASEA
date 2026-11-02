@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useCartStore } from "../../store/useCartStore";
 import { useWishlistStore } from "../../store/useWishlistStore";
@@ -17,8 +17,39 @@ import {
   CalendarCheck,
   ChevronRight,
   ChevronLeft,
+  Ticket,
+  CreditCard,
+  Anchor,
+  Tag,
+  ShieldCheck,
 } from "lucide-react";
 import type { NotificationResponse } from "../../types/notification";
+
+const getNotificationMeta = (type?: string | null, title?: string | null, relatedEntityType?: string | null) => {
+  const t = (type || '').toUpperCase();
+  const h = (title || '').toUpperCase();
+  const r = (relatedEntityType || '').toUpperCase();
+
+  if (t.includes('ORDER') || t.includes('BOOK') || t.includes('TICKET') || r === 'ORDER' || r === 'SUB_ORDER') {
+    return { icon: <Ticket className="w-4 h-4 text-sky-600" />, bg: 'bg-sky-50' };
+  }
+  if (t.includes('PAY') || t.includes('REFUND') || t.includes('MONEY') || h.includes('HOÀN TIỀN') || h.includes('THANH TOÁN')) {
+    return { icon: <CreditCard className="w-4 h-4 text-emerald-600" />, bg: 'bg-emerald-50' };
+  }
+  if (t.includes('PORT') || t.includes('HARBOR') || t.includes('WEATHER') || h.includes('CẢNG') || h.includes('SÓNG')) {
+    return { icon: <Anchor className="w-4 h-4 text-cyan-600" />, bg: 'bg-cyan-50' };
+  }
+  if (t.includes('VOUCHER') || t.includes('PROMO') || h.includes('ƯU ĐÃI') || h.includes('GIẢM')) {
+    return { icon: <Tag className="w-4 h-4 text-amber-600" />, bg: 'bg-amber-50' };
+  }
+  if (t.includes('SECURITY') || t.includes('SAFETY') || t.includes('ACCOUNT') || h.includes('BẢO MẬT')) {
+    return { icon: <ShieldCheck className="w-4 h-4 text-indigo-600" />, bg: 'bg-indigo-50' };
+  }
+  if (t.includes('RESCHEDULE') || h.includes('ĐỔI CA')) {
+    return { icon: <CalendarCheck className="w-4 h-4 text-amber-600" />, bg: 'bg-amber-50' };
+  }
+  return { icon: <Ticket className="w-4 h-4 text-slate-600" />, bg: 'bg-slate-100' };
+};
 
 export function Header() {
   const location = useLocation();
@@ -35,7 +66,9 @@ export function Header() {
 
   // Unified Account Menu & Slide-down Pop-up State
   const [showAccountMenu, setShowAccountMenu] = useState(false);
-  const [accountMenuView, setAccountMenuView] = useState<'menu' | 'notifications'>('menu');
+  const navigate = useNavigate();
+  const [accountMenuView, setAccountMenuView] = useState<'menu' | 'notifications' | 'detail'>('menu');
+  const [selectedNotif, setSelectedNotif] = useState<NotificationResponse | null>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
   // Close account menu on outside click
@@ -133,6 +166,8 @@ export function Header() {
   };
 
   const handleNotificationClick = async (notif: NotificationResponse) => {
+    setSelectedNotif(notif);
+    setAccountMenuView('detail');
     if (!notif.isRead) {
       try {
         await notificationService.markAsRead(notif.id);
@@ -151,12 +186,17 @@ export function Header() {
     const fetchUnread = async () => {
       await Promise.resolve();
       if (ignore) return;
-      if (!isAuthenticated) {
+      const { isAuthenticated: authStatus, accessToken } = useAuthStore.getState();
+      if (!authStatus || !accessToken) {
         setUnreadNotifs(0);
         return;
       }
-      const count = await notificationService.getUnreadCount();
-      if (!ignore) setUnreadNotifs(count);
+      try {
+        const count = await notificationService.getUnreadCount();
+        if (!ignore) setUnreadNotifs(count);
+      } catch {
+        if (!ignore) setUnreadNotifs(0);
+      }
     };
     fetchUnread();
     const interval = setInterval(fetchUnread, 15000);
@@ -170,7 +210,8 @@ export function Header() {
 
   const isHomePage = location.pathname === "/";
   const isExplorePage = location.pathname === "/explore";
-  const hasHeroMedia = isHomePage || isExplorePage;
+  const isAuthPage = location.pathname === "/auth" || location.pathname.startsWith("/auth/");
+  const hasHeroMedia = isHomePage || isExplorePage || isAuthPage;
   const [isScrolled, setIsScrolled] = useState(() => window.scrollY > 40);
 
   useEffect(() => {
@@ -288,9 +329,9 @@ export function Header() {
             )}
           </button>
 
-          {/* Slide-Down Pop-up Menu */}
+          {/* Slide-Down Pop-up Menu (Ultra-compact, content-fitted geometry) */}
           {showAccountMenu && (
-            <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200/90 z-50 overflow-hidden text-left animate-in fade-in slide-in-from-top-2 duration-200 text-slate-900">
+            <div className={`absolute right-0 top-full mt-2 ${accountMenuView === 'notifications' ? 'w-80' : 'w-[208px]'} bg-white rounded-xl shadow-xl border border-slate-200/90 z-50 overflow-hidden text-left animate-in fade-in slide-in-from-top-1.5 duration-150 text-slate-900`}>
               {accountMenuView === 'menu' ? (
                 <div className="divide-y divide-slate-100">
                   {/* User Profile Header or Guest Greeting */}
@@ -298,39 +339,39 @@ export function Header() {
                     <Link
                       to="/profile"
                       onClick={() => setShowAccountMenu(false)}
-                      className="p-3.5 flex items-center justify-between hover:bg-slate-50/80 transition-colors group cursor-pointer"
+                      className="px-3 py-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors group cursor-pointer"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-full overflow-hidden ring-1 ring-slate-200 shrink-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-full overflow-hidden ring-1 ring-slate-200 shrink-0">
                           {user.avatarUrl ? (
                             <img src={user.avatarUrl} alt={user.fullName || "User"} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="w-full h-full bg-slate-800 text-white flex items-center justify-center font-bold text-sm">
-                              {user.fullName ? user.fullName.charAt(0).toUpperCase() : <User className="w-4 h-4 text-white" />}
+                            <div className="w-full h-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs">
+                              {user.fullName ? user.fullName.charAt(0).toUpperCase() : <User className="w-3.5 h-3.5 text-white" />}
                             </div>
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-bold text-slate-900 truncate group-hover:text-sky-600 transition-colors">
+                          <p className="text-xs font-bold text-slate-900 truncate group-hover:text-sky-700 transition-colors">
                             {user.fullName || "Khách hàng"}
                           </p>
-                          <p className="text-xs text-slate-500 truncate">
-                            {user.email || user.phone || "Thành viên DANASEA"}
+                          <p className="text-[11px] text-slate-400 truncate">
+                            {user.email || user.phone || "Thành viên"}
                           </p>
                         </div>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-colors shrink-0" />
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 transition-colors shrink-0" />
                     </Link>
                   ) : (
-                    <div className="p-4 bg-slate-50/50">
-                      <p className="text-sm font-bold text-slate-900">
+                    <div className="p-3 bg-slate-50/50">
+                      <p className="text-xs font-bold text-slate-900">
                         {language === 'en' ? 'Welcome to DANASEA' : 'Chào mừng bạn đến với DANASEA'}
                       </p>
-                      <div className="mt-3">
+                      <div className="mt-2">
                         <Link
                           to="/auth"
                           onClick={() => setShowAccountMenu(false)}
-                          className="block w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs text-center transition-colors shadow-xs"
+                          className="block w-full py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs text-center transition-colors shadow-xs"
                         >
                           {language === 'en' ? 'Sign In / Register' : 'Đăng nhập / Đăng ký'}
                         </Link>
@@ -338,26 +379,26 @@ export function Header() {
                     </div>
                   )}
 
-                  {/* Core Navigation Items (Disciplined Monochrome & Zero Subtitle Bloat) */}
-                  <div className="p-1.5 space-y-0.5">
+                  {/* Core Navigation Items (Compact 34px-36px Rows) */}
+                  <div className="p-1 space-y-0.5">
                     {/* Yêu thích */}
                     <Link
                       to="/profile/wishlist"
                       onClick={() => setShowAccountMenu(false)}
-                      className="flex items-center justify-between px-3.5 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-slate-700 hover:text-slate-900 group cursor-pointer"
+                      className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-slate-700 hover:text-slate-900 group cursor-pointer"
                     >
-                      <div className="flex items-center gap-3">
-                        <Heart className="w-4 h-4 text-slate-500 group-hover:text-slate-900 transition-colors shrink-0" />
-                        <span className="text-xs font-semibold">
+                      <div className="flex items-center gap-2">
+                        <Heart className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-900 transition-colors shrink-0" />
+                        <span className="text-xs font-medium">
                           {language === 'en' ? 'Wishlist' : 'Yêu thích'}
                         </span>
                       </div>
                       {wishlistCount > 0 ? (
-                        <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center tabular-nums">
+                        <span className="min-w-[18px] h-4.5 px-1.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center justify-center tabular-nums">
                           {wishlistCount}
                         </span>
                       ) : (
-                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500" />
+                        <ChevronRight className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
                       )}
                     </Link>
 
@@ -365,66 +406,66 @@ export function Header() {
                     <Link
                       to="/cart"
                       onClick={() => setShowAccountMenu(false)}
-                      className="flex items-center justify-between px-3.5 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-slate-700 hover:text-slate-900 group cursor-pointer"
+                      className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-slate-700 hover:text-slate-900 group cursor-pointer"
                     >
-                      <div className="flex items-center gap-3">
-                        <ShoppingCart className="w-4 h-4 text-slate-500 group-hover:text-slate-900 transition-colors shrink-0" />
-                        <span className="text-xs font-semibold">
+                      <div className="flex items-center gap-2">
+                        <ShoppingCart className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-900 transition-colors shrink-0" />
+                        <span className="text-xs font-medium">
                           {language === 'en' ? 'Cart' : 'Giỏ hàng'}
                         </span>
                       </div>
                       {cartItemCount > 0 ? (
-                        <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center tabular-nums">
+                        <span className="min-w-[18px] h-4.5 px-1.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center justify-center tabular-nums">
                           {cartItemCount}
                         </span>
                       ) : (
-                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500" />
+                        <ChevronRight className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
                       )}
                     </Link>
 
                     {/* Vé đã đặt */}
                     <Link
-                      to="/profile"
+                      to="/profile/orders"
                       onClick={() => setShowAccountMenu(false)}
-                      className="flex items-center justify-between px-3.5 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-slate-700 hover:text-slate-900 group cursor-pointer"
+                      className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-slate-700 hover:text-slate-900 group cursor-pointer"
                     >
-                      <div className="flex items-center gap-3">
-                        <CalendarCheck className="w-4 h-4 text-slate-500 group-hover:text-slate-900 transition-colors shrink-0" />
-                        <span className="text-xs font-semibold">
+                      <div className="flex items-center gap-2">
+                        <CalendarCheck className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-900 transition-colors shrink-0" />
+                        <span className="text-xs font-medium">
                           {language === 'en' ? 'My Bookings' : 'Vé đã đặt'}
                         </span>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500" />
+                      <ChevronRight className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
                     </Link>
 
                     {/* Thông báo */}
                     <button
                       type="button"
                       onClick={handleOpenNotifications}
-                      className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl hover:bg-slate-50 transition-colors text-slate-700 hover:text-slate-900 group cursor-pointer text-left"
+                      className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-slate-50 transition-colors text-slate-700 hover:text-slate-900 group cursor-pointer text-left"
                     >
-                      <div className="flex items-center gap-3">
-                        <Bell className="w-4 h-4 text-slate-500 group-hover:text-slate-900 transition-colors shrink-0" />
-                        <span className="text-xs font-semibold">
+                      <div className="flex items-center gap-2">
+                        <Bell className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-900 transition-colors shrink-0" />
+                        <span className="text-xs font-medium">
                           {language === 'en' ? 'Notifications' : 'Thông báo'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1">
                         {unreadNotifs > 0 && (
-                          <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center tabular-nums">
+                          <span className="min-w-[18px] h-4.5 px-1.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px] flex items-center justify-center tabular-nums">
                             {unreadNotifs > 9 ? "9+" : unreadNotifs}
                           </span>
                         )}
-                        <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-500" />
+                        <ChevronRight className="w-3 h-3 text-slate-300 group-hover:text-slate-500" />
                       </div>
                     </button>
                   </div>
 
                   {/* Language Switcher Row */}
-                  <div className="px-4 py-2.5 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <Globe className="w-4 h-4" />
-                      <span className="text-xs font-semibold">
+                  <div className="px-2.5 py-1.5 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-slate-600">
+                      <Globe className="w-3.5 h-3.5 text-slate-500" />
+                      <span className="text-xs font-medium">
                         {language === 'en' ? 'Language' : 'Ngôn ngữ'}
                       </span>
                     </div>
@@ -432,7 +473,7 @@ export function Header() {
                       <button
                         type="button"
                         onClick={() => setLanguage('vi')}
-                        className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
                           language === 'vi'
                             ? 'bg-white text-slate-900 shadow-xs'
                             : 'text-slate-500 hover:text-slate-800'
@@ -443,7 +484,7 @@ export function Header() {
                       <button
                         type="button"
                         onClick={() => setLanguage('en')}
-                        className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                        className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
                           language === 'en'
                             ? 'bg-white text-slate-900 shadow-xs'
                             : 'text-slate-500 hover:text-slate-800'
@@ -456,22 +497,22 @@ export function Header() {
 
                   {/* Logout Row if Authenticated */}
                   {isAuthenticated && (
-                    <div className="p-1.5">
+                    <div className="p-1">
                       <button
                         type="button"
                         onClick={() => {
                           logout();
                           setShowAccountMenu(false);
                         }}
-                        className="w-full flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-slate-600 hover:text-rose-600 hover:bg-rose-50/60 transition-colors text-xs font-semibold cursor-pointer"
+                        className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50/60 transition-colors text-xs font-medium cursor-pointer"
                       >
-                        <LogOut className="w-4 h-4 shrink-0" />
+                        <LogOut className="w-3.5 h-3.5 shrink-0" />
                         <span>{language === 'en' ? 'Sign Out' : 'Đăng xuất'}</span>
                       </button>
                     </div>
                   )}
                 </div>
-              ) : (
+              ) : accountMenuView === 'notifications' ? (
                 /* Sub-view: Notifications List */
                 <div>
                   <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
@@ -519,9 +560,14 @@ export function Header() {
                             !n.isRead ? "bg-slate-50/70" : ""
                           }`}
                         >
-                          <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">
-                            <Bell className="w-4 h-4 text-slate-600" />
-                          </div>
+                          {(() => {
+                            const meta = getNotificationMeta(n.type, n.title, n.relatedEntityType);
+                            return (
+                              <div className={`w-8 h-8 rounded-xl ${meta.bg} flex items-center justify-center shrink-0 mt-0.5 shadow-2xs`}>
+                                {meta.icon}
+                              </div>
+                            );
+                          })()}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-1">
                               <p className="text-xs font-bold text-slate-900 truncate">
@@ -548,7 +594,74 @@ export function Header() {
                     )}
                   </div>
                 </div>
-              )}
+              ) : selectedNotif ? (
+                /* Sub-view: Notification Detail */
+                <div>
+                  <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+                    <button
+                      type="button"
+                      onClick={() => setAccountMenuView('notifications')}
+                      className="flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-slate-900 cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>{language === 'en' ? 'Back' : 'Quay lại'}</span>
+                    </button>
+                    <span className="text-[11px] font-medium text-slate-500">
+                      {language === 'en' ? 'Notification Details' : 'Chi tiết thông báo'}
+                    </span>
+                    <div className="w-8" />
+                  </div>
+
+                  <div className="p-4 space-y-3.5 max-h-[380px] overflow-y-auto">
+                    <div className="flex items-start gap-3">
+                      {(() => {
+                        const meta = getNotificationMeta(selectedNotif.type, selectedNotif.title, selectedNotif.relatedEntityType);
+                        return (
+                          <div className={`w-9 h-9 rounded-xl ${meta.bg} flex items-center justify-center shrink-0 shadow-2xs`}>
+                            {meta.icon}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-bold text-slate-900 leading-snug">
+                          {selectedNotif.title}
+                        </h4>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{new Date(selectedNotif.createdAt).toLocaleString('vi-VN')}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 leading-relaxed whitespace-pre-line select-text">
+                      {selectedNotif.body}
+                    </div>
+
+                    {(selectedNotif.relatedEntityType === 'ORDER' ||
+                      selectedNotif.relatedEntityType === 'SUB_ORDER' ||
+                      selectedNotif.type?.includes('ORDER') ||
+                      selectedNotif.type?.includes('REFUND') ||
+                      selectedNotif.type?.includes('RESCHEDULE')) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          setAccountMenuView('menu');
+                          const targetUrl =
+                            selectedNotif.relatedEntityType === 'SUB_ORDER' && selectedNotif.relatedEntityId
+                              ? `/profile/orders?rescheduleSubOrderId=${selectedNotif.relatedEntityId}`
+                              : '/profile/orders';
+                          navigate(targetUrl);
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <span>{language === 'en' ? 'View My Orders & Tickets' : 'Xem vé & Đơn hàng liên quan'}</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
         </div>
