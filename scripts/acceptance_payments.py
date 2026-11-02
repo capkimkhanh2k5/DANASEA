@@ -187,12 +187,15 @@ def send_http_request(url: str, method: str = "GET", headers: dict = None, body:
                 response_data = json.loads(raw_data.decode("utf-8"))
     except urllib.error.HTTPError as e:
         status = e.code
-        raw_data = e.read()
-        if raw_data:
-            try:
-                response_data = json.loads(raw_data.decode("utf-8"))
-            except Exception:
-                response_data = {"error": raw_data.decode("utf-8", errors="replace")}
+        try:
+            raw_data = e.read()
+            if raw_data:
+                try:
+                    response_data = json.loads(raw_data.decode("utf-8"))
+                except Exception:
+                    response_data = {"error": raw_data.decode("utf-8", errors="replace")}
+        except Exception:
+            response_data = {"error": str(e)}
     except Exception as e:
         duration = time.monotonic() - start_time
         raise AcceptanceError(f"Network request to {url} failed: {e}") from e

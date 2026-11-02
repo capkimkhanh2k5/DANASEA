@@ -243,10 +243,12 @@ class PaymentAcceptanceTest(unittest.TestCase):
     def test_missing_payment_id_or_http_failure_raises_acceptance_error(self):
         class FailHandler(BaseHTTPRequestHandler):
             def do_POST(self):
+                body = b'{"error": "Internal Server Error"}'
                 self.send_response(500)
                 self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
-                self.wfile.write(b'{"error": "Internal Server Error"}')
+                self.wfile.write(body)
 
             def log_message(self, *args):
                 pass
