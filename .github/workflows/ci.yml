@@ -117,6 +117,9 @@ jobs:
           bash -n scripts/deploy.sh scripts/install-production-controls.sh scripts/install-demo-data-controls.sh
           "$RUNNER_TEMP/quality-venv/bin/python" -B -m unittest discover -s demo_data_handoff/tests -v
           "$RUNNER_TEMP/quality-venv/bin/python" -m unittest discover -s scripts/tests -v
+      - name: Resolve backend metadata before dependency scanning
+        working-directory: backend
+        run: ./mvnw -B dependency:resolve
       - name: Scan dependencies and committed secrets
         run: |
           mkdir -p security-reports "$RUNNER_TEMP/worker-dependencies"

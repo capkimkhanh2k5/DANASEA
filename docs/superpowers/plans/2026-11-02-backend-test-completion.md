@@ -37,6 +37,7 @@
 - [x] Dependabot #166: commit `dbdd3194115bfce6d78551da8bd8db7b3e9c4c2b`; giữ Python 3.11 và ignore Python >=3.12. CI run `41399994135` đã success khi chốt trạng thái này.
 - [x] Dependabot #170: commit `26a57e1a34b6bcd8f555d147d2600d8a285a50e4`; installer Torch CPU đọc từ lock + libquadmath0. CI run `41400219626` đã success.
 - [x] #165, #167, #168, #169 đã có commit trên nhánh bot và CI success; không tạo commit rỗng hoặc chép lại thay đổi của bot.
+- [x] Khi công bố audit, source scan gặp Maven Central HTTP429 lúc Trivy resolve BOM. Pipeline bổ sung `./mvnw -B dependency:resolve` trước scan; regression kiểm tra thứ tự và giữ failure khi warmup lỗi. Giữ nguyên scanner vuln/secret, severity HIGH/CRITICAL và exit-code=1; không skip scan hoặc xóa POM khỏi phạm vi.
 - [ ] Đối chiếu CI của **head mới nhất** trên PR audit sau khi plan được push. Không lấy CI của các PR Dependabot làm bằng chứng cho audit.
 - [ ] Người triển khai review/merge audit và các PR dependency cần dùng. Merge từng PR làm thay đổi base; refresh/rebase và đọc CI mới của PR tiếp theo. Push nhánh feature không đồng nghĩa merge hoặc deployment.
 - [ ] Trước khi bắt đầu từng subplan: `git fetch origin`, tạo nhánh từ main đã chứa các prerequisite. Không tự merge main hoặc dispatch CD production trong bước chốt commit/plan này.

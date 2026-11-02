@@ -37,5 +37,54 @@ class BackendWorkflowTest(unittest.TestCase):
         self.assertEqual(log, 'build output\n')
 
 
+class SecurityScanMetadataWorkflowTest(unittest.TestCase):
+    def run_scan(self, resolve_exit=0):
+        steps = yaml.safe_load(WORKFLOW.read_text())['jobs']['quality']['steps']
+        selected = [step for step in steps if step.get('name') in (
+            'Resolve backend metadata before dependency scanning', 'Scan dependencies and committed secrets')]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'backend').mkdir()
+            (root / 'ai-decision/config').mkdir(parents=True)
+            (root / 'ai-decision/config/requirements.lock.txt').write_text('torch==2.14.1\n')
+            binary = root / 'bin'
+            binary.mkdir()
+            wrapper = root / 'backend/mvnw'
+            wrapper.write_text('#!/bin/sh\ncase "$*" in *dependency:resolve*) ;; *) exit 19;; esac\n'
+                               f'exit_code={resolve_exit}\n'
+                               'test "$exit_code" -eq 0 || exit "$exit_code"\n'
+                               'touch "$METADATA_READY_FILE"\n')
+            wrapper.chmod(0o755)
+            trivy = binary / 'trivy'
+            trivy.write_text('#!/bin/sh\ntest -f "$METADATA_READY_FILE" || exit 42\n'
+                             'printf "%s\\n" "$*" >> "$TRIVY_CALLS_FILE"\n')
+            trivy.chmod(0o755)
+            env = {**os.environ, 'PATH': str(binary) + os.pathsep + os.defpath,
+                   'RUNNER_TEMP': directory, 'METADATA_READY_FILE': str(root / 'metadata-ready'),
+                   'TRIVY_CALLS_FILE': str(root / 'trivy-calls')}
+            for step in selected:
+                result = subprocess.run(['bash', '-e', '-c', step['run']],
+                                        cwd=root / step.get('working-directory', ''), env=env,
+                                        capture_output=True, text=True, check=False)
+                if result.returncode:
+                    break
+            calls = (root / 'trivy-calls').read_text().splitlines() if (root / 'trivy-calls').exists() else []
+            return result, calls
+
+    def test_maven_metadata_is_resolved_before_both_security_scans(self):
+        result, calls = self.run_scan()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(calls), 2)
+        self.assertIn('--scanners vuln,secret', calls[1])
+        for command in calls:
+            self.assertIn('--severity HIGH,CRITICAL', command)
+            self.assertIn('--exit-code 1', command)
+
+    def test_metadata_resolution_failure_blocks_scanning_without_hiding_failure(self):
+        result, calls = self.run_scan(resolve_exit=23)
+        self.assertEqual(result.returncode, 23, result.stderr)
+        self.assertEqual(calls, [])
+
+
 if __name__ == '__main__':
     unittest.main()
