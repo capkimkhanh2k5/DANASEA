@@ -33,15 +33,15 @@ public class FetchWeatherJob {
     public void fetchAndCacheWeatherInfo() {
         log.info("Starting scheduled job: fetching weather and marine data for Man Thai Beach");
 
-        CompletableFuture<WeatherInfoDto.WeatherData> weatherFuture = CompletableFuture
-                .supplyAsync(() -> weatherProviderPort.getWeatherByCoordinates(LATITUDE, LONGITUDE));
-
-        CompletableFuture<WeatherInfoDto.MarineData> marineFuture = CompletableFuture
-                .supplyAsync(() -> weatherProviderPort.getMarineByCoordinates(LATITUDE, LONGITUDE));
-
-        CompletableFuture.allOf(weatherFuture, marineFuture).join();
-
         try {
+            CompletableFuture<WeatherInfoDto.WeatherData> weatherFuture = CompletableFuture
+                    .supplyAsync(() -> weatherProviderPort.getWeatherByCoordinates(LATITUDE, LONGITUDE));
+
+            CompletableFuture<WeatherInfoDto.MarineData> marineFuture = CompletableFuture
+                    .supplyAsync(() -> weatherProviderPort.getMarineByCoordinates(LATITUDE, LONGITUDE));
+
+            CompletableFuture.allOf(weatherFuture, marineFuture).join();
+
             WeatherInfoDto.WeatherData weatherData = weatherFuture.get();
             WeatherInfoDto.MarineData marineData = marineFuture.get();
 
@@ -54,10 +54,11 @@ public class FetchWeatherJob {
 
             String rawPayload = objectMapper.writeValueAsString(dto);
 
+            OffsetDateTime fetchedAt = OffsetDateTime.now();
             WeatherCache cache = new WeatherCache();
             cache.setLocationKey(LOCATION_KEY);
-            cache.setFetchedAt(OffsetDateTime.now());
-            cache.setExpiresAt(OffsetDateTime.now().plusMinutes(30));
+            cache.setFetchedAt(fetchedAt);
+            cache.setExpiresAt(fetchedAt.plusMinutes(30));
             cache.setRawPayload(rawPayload);
 
             // Set additional fields if needed for direct access

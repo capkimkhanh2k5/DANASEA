@@ -189,6 +189,12 @@
         "BRANCH": 0.80
       }
     },
+    "com/danasea/backend/modules/weather/infrastructure/jobs/FetchWeatherJob": {
+      "minimum_ratios": {
+        "LINE": 0.90,
+        "BRANCH": 1.0
+      }
+    },
     "com/danasea/backend/modules/ai/infrastructure/redis/RedisConfirmationCardStore": {
       "minimum_ratios": {
         "LINE": 0.98,
