@@ -106,6 +106,21 @@ export const authService = {
   },
 
   /**
+   * Update current authenticated user\'s profile (fullName, avatarUrl, locale)
+   */
+  async updateProfile(payload: { fullName?: string; avatarUrl?: string; locale?: string }): Promise<UserProfileResponse> {
+    const response = await apiClient.patch<UserProfileResponse>('/users/me', payload);
+    return response.data;
+  },
+
+  /**
+   * Change password for current authenticated user
+   */
+  async changePassword(payload: { currentPassword: string; newPassword: string }): Promise<void> {
+    await apiClient.post('/users/me/change-password', payload);
+  },
+
+  /**
    * Request password reset OTP code
    */
   async forgotPassword(email: string): Promise<{ message: string }> {

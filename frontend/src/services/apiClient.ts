@@ -52,6 +52,13 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Module augmentation for silent requests
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    silent?: boolean;
+  }
+}
+
 // Response Interceptor: Log Result & Handle Common Status Codes
 apiClient.interceptors.response.use(
   (response) => {
@@ -65,23 +72,37 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
+    // Gracefully ignore intentional request cancellations (AbortController / React mount)
+    if (axios.isCancel(error) || error.name === 'CanceledError' || error.message === 'canceled') {
+      return Promise.reject(error);
+    }
+
     const status = error.response?.status;
     const url = error.config?.url;
     const responseData = error.response?.data;
+    const isSilent = (error.config as unknown as { silent?: boolean })?.silent;
 
-    console.group(`%c[API Error] ${status || 'NETWORK_ERROR'} ${url || ''}`, 'color: #dc2626; font-weight: bold;');
-    console.error('Error Message:', error.message);
-    console.error('Response Data:', responseData);
-    console.groupEnd();
+    if (!isSilent) {
+      console.group(`%c[API Error] ${status || 'NETWORK_ERROR'} ${url || ''}`, 'color: #dc2626; font-weight: bold;');
+      console.error('Error Message:', error.message);
+      console.error('Response Data:', responseData);
+      console.groupEnd();
+    }
 
     // Handle token expiration or unauthorized access (exclude all /auth/ routes and DEV mock sessions)
     const currentToken = useAuthStore.getState().accessToken;
     const isMock = currentToken?.startsWith('mock_jwt_token_');
-    if (status === 401 && !url?.includes('/auth/') && !isMock) {
+    if (status === 401 && !url?.includes('/auth/') && currentToken && !isMock) {
       console.warn('[API Auth] Session expired or unauthorized (401). Clearing credentials...');
       useAuthStore.getState().logout();
-      if (typeof window !== 'undefined' && (window.location.pathname.startsWith('/vendor') || window.location.pathname.startsWith('/admin'))) {
-        window.location.href = '/auth';
+      if (typeof window !== 'undefined') {
+        if (
+          window.location.pathname.startsWith('/vendor') ||
+          window.location.pathname.startsWith('/admin') ||
+          window.location.pathname.startsWith('/profile')
+        ) {
+          window.location.href = '/auth';
+        }
       }
     }
 

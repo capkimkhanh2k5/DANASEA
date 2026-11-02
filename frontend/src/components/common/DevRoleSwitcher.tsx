@@ -69,9 +69,9 @@ export function DevRoleSwitcher() {
 
   const handleSelectRole = async (key: 'customer' | 'vendor' | 'admin', path: string) => {
     const creds = {
-      customer: { email: 'customer@danasea.vn', password: 'password123' },
-      vendor: { email: 'vendor@danasea.vn', password: 'password123' },
-      admin: { email: 'admin@danasea.vn', password: 'password123' },
+      customer: { email: 'customer_1@danasea.test', password: 'password123' },
+      vendor: { email: 'vender_1@danasea.test', password: 'password123' },
+      admin: { email: 'admin_demo@danasea.test', password: 'password123' },
     }[key];
 
     try {
@@ -80,7 +80,7 @@ export function DevRoleSwitcher() {
         {
           id: res.userId,
           email: res.email,
-          fullName: res.role === 'ADMIN' ? 'Quản Trị Viên Danasea' : res.role === 'VENDOR' ? 'Công Ty Biển Xanh Danasea' : 'Nguyễn Văn Khách',
+          fullName: res.role === 'ADMIN' ? 'DANASEA DEMO Admin' : res.role === 'VENDOR' ? 'Danabeach Club' : 'Customer Number 1',
           role: res.role,
           avatarUrl: '',
           isEmailVerified: true,
