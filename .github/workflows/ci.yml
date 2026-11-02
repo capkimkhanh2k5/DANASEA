@@ -56,9 +56,8 @@ jobs:
           python-version: '3.11'
           cache: pip
           cache-dependency-path: ai-decision/config/requirements.lock.txt
-      - run: |
-          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1
-          python -m pip install -r ai-decision/config/requirements.lock.txt
+      - name: Install locked CPU worker dependencies
+        run: python ai-decision/scripts/install_dependencies.py ai-decision/config/requirements.lock.txt
       - name: Worker boundary tests
         working-directory: ai-decision
         run: python -m unittest discover -s tests -p test_service.py -v
@@ -144,7 +143,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/quality-venv"
           "$RUNNER_TEMP/quality-venv/bin/pip" install ruff==0.16.10 PyYAML==6.0.3 bcrypt==4.3.0
           "$RUNNER_TEMP/quality-venv/bin/python" scripts/check_dependabot.py
-          "$RUNNER_TEMP/quality-venv/bin/ruff" check --isolated --select E4,E7,E9,F,I scripts ai-decision/scripts/build_runtime.py ai-decision/scripts/container_entrypoint.py
+          "$RUNNER_TEMP/quality-venv/bin/ruff" check --isolated --select E4,E7,E9,F,I scripts ai-decision/scripts/build_runtime.py ai-decision/scripts/container_entrypoint.py ai-decision/scripts/install_dependencies.py
       - name: Validate workflows and deploy entrypoints
         env:
           RUN_DEMO_DATABASE_TESTS: '1'
