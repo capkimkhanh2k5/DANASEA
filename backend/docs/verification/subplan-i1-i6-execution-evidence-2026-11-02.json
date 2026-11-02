@@ -1,0 +1,137 @@
+{
+  "audit_subplan": "P0 - Subplan 1: Test Isolation & Business Coverage (I1-I6)",
+  "date": "2026-11-02",
+  "branch": "code/infra-test-isolation-i1",
+  "environment": {
+    "java": "OpenJDK 21 (Temurin)",
+    "os": "macOS aarch64",
+    "spring_boot": "4.1.2",
+    "jacoco": "0.8.12"
+  },
+  "executions": {
+    "run_1_utc": {
+      "command": "./mvnw -B clean verify",
+      "exit_code": 0,
+      "duration": "03:27",
+      "surefire": {
+        "total": 2980,
+        "passed": 2977,
+        "skipped": 3,
+        "failures": 0,
+        "errors": 0,
+        "source_suites": 344
+      },
+      "coverage": {
+        "line": { "covered": 17533, "total": 21016, "ratio": 0.834269 },
+        "branch": { "covered": 7190, "total": 11265, "ratio": 0.638260 },
+        "method": { "covered": 3239, "total": 4116, "ratio": 0.786929 },
+        "instruction": { "covered": 90606, "total": 110381, "ratio": 0.820848 },
+        "class": { "covered": 989, "total": 1051, "ratio": 0.941009 }
+      }
+    },
+    "run_2_tz_pacific_kiritimati_random": {
+      "command": "TZ=Pacific/Kiritimati ./mvnw -B clean verify -Dsurefire.runOrder=random -Dsurefire.runOrder.random.seed=20261102",
+      "exit_code": 0,
+      "duration": "03:29",
+      "surefire": {
+        "total": 2980,
+        "passed": 2977,
+        "skipped": 3,
+        "failures": 0,
+        "errors": 0,
+        "source_suites": 344
+      },
+      "coverage": {
+        "line": { "covered": 17533, "total": 21016, "ratio": 0.834269 },
+        "branch": { "covered": 7190, "total": 11265, "ratio": 0.638260 },
+        "method": { "covered": 3239, "total": 4116, "ratio": 0.786929 },
+        "instruction": { "covered": 90606, "total": 110381, "ratio": 0.820848 },
+        "class": { "covered": 989, "total": 1051, "ratio": 0.941009 }
+      }
+    }
+  },
+  "guards": {
+    "check_test_reports": {
+      "command": "python3 scripts/check_test_reports.py backend/target/surefire-reports --policy .ci/test-policy.json --test-source backend/src/test/java",
+      "exit_code": 0,
+      "result": { "executed": 2977, "allowed_skipped": 3, "required_suites": 35, "source_suites": 344 }
+    },
+    "check_coverage": {
+      "command": "python3 scripts/check_coverage.py backend/target/site/jacoco/jacoco.xml --policy .ci/coverage-policy.json",
+      "exit_code": 0,
+      "result": { "passed": true, "errors": [] }
+    }
+  },
+  "ratcheted_classes": {
+    "com/danasea/backend/modules/service/application/usecases/UpdateServiceOptionUseCase": {
+      "line_covered": 38,
+      "line_total": 38,
+      "line_floor": 1.0,
+      "branch_covered": 20,
+      "branch_total": 20,
+      "branch_floor": 1.0
+    },
+    "com/danasea/backend/modules/order/application/usecases/VendorDiscountCodeUseCase": {
+      "line_covered": 77,
+      "line_total": 77,
+      "line_floor": 1.0,
+      "branch_covered": 40,
+      "branch_total": 48,
+      "branch_floor": 0.83
+    },
+    "com/danasea/backend/modules/order/application/usecases/AdminDiscountCodeUseCase": {
+      "line_covered": 80,
+      "line_total": 80,
+      "line_floor": 1.0,
+      "branch_covered": 47,
+      "branch_total": 50,
+      "branch_floor": 0.94
+    },
+    "com/danasea/backend/modules/weather/infrastructure/jobs/FetchWeatherJob": {
+      "line_covered": 35,
+      "line_total": 38,
+      "line_floor": 0.92,
+      "branch_covered": 10,
+      "branch_total": 10,
+      "branch_floor": 1.0
+    },
+    "com/danasea/backend/modules/ai/infrastructure/redis/RedisConfirmationCardStore": {
+      "line_covered": 68,
+      "line_total": 68,
+      "line_floor": 1.0,
+      "branch_covered": 33,
+      "branch_total": 34,
+      "branch_floor": 0.97
+    }
+  },
+  "caller_traces_compatibility_code": [
+    {
+      "class": "com.danasea.backend.modules.settlement.infrastructure.adapters.SettlementRepositoryAdapter",
+      "interface": "com.danasea.backend.modules.settlement.domain.ports.SettlementRepositoryPort",
+      "callers": ["SettlementRepositoryAdapter.java"],
+      "action": "PRESERVED",
+      "rationale": "Hexagonal repository adapter for settlement domain port. Preserved for port-adapter architectural contract."
+    },
+    {
+      "class": "com.danasea.backend.modules.ai.infrastructure.persistence.PostgresServiceSearchAdapter",
+      "interface": "com.danasea.backend.modules.ai.application.ports.ServiceSearchPort",
+      "callers": ["SearchServiceTool.java"],
+      "action": "PRESERVED",
+      "rationale": "Concrete search adapter implementing ServiceSearchPort used by AI agent search tools."
+    },
+    {
+      "class": "com.danasea.backend.security.authorization.application.usecases.AuthorizationActionUseCase",
+      "interface": "None",
+      "callers": ["AuthorizationBeans.java"],
+      "action": "PRESERVED",
+      "rationale": "Configured bean in authorization subsystem for granular action checks; retained for security subsystem completeness."
+    },
+    {
+      "class": "com.danasea.backend.modules.order.domain.services.RefundPolicyEngine",
+      "interface": "Compatibility overloads",
+      "callers": ["Legacy unit tests"],
+      "action": "PRESERVED",
+      "rationale": "Backward compatibility method overloads for policy evaluation without mutating contract."
+    }
+  ]
+}

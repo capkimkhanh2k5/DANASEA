@@ -179,26 +179,26 @@
     },
     "com/danasea/backend/modules/order/application/usecases/AdminDiscountCodeUseCase": {
       "minimum_ratios": {
-        "LINE": 0.98,
-        "BRANCH": 0.90
+        "LINE": 1.0,
+        "BRANCH": 0.94
       }
     },
     "com/danasea/backend/modules/order/application/usecases/VendorDiscountCodeUseCase": {
       "minimum_ratios": {
-        "LINE": 0.98,
-        "BRANCH": 0.80
+        "LINE": 1.0,
+        "BRANCH": 0.83
       }
     },
     "com/danasea/backend/modules/weather/infrastructure/jobs/FetchWeatherJob": {
       "minimum_ratios": {
-        "LINE": 0.90,
+        "LINE": 0.92,
         "BRANCH": 1.0
       }
     },
     "com/danasea/backend/modules/ai/infrastructure/redis/RedisConfirmationCardStore": {
       "minimum_ratios": {
-        "LINE": 0.98,
-        "BRANCH": 0.87
+        "LINE": 1.0,
+        "BRANCH": 0.97
       }
     }
   }

@@ -75,3 +75,47 @@ Coverage còn thiếu ở các adapter/persistence/mapper, nhánh lỗi provider
 Profile test còn exclusion auto-config theo package Boot cũ; một số context có thể thử Rabbit localhost. Không mô tả toàn suite chạy offline. Không chứng minh mọi seed/ngày/tải/concurrency hoặc provider thật đều ổn định, không có full mutation score. [Bốn mutation tài chính có chủ đích](verification/test-mutation-proof-2026-11-02.json) đều bị test bắt (HMAC, capture amount, capture currency, refund currency); chỉ là bằng chứng assertion có tác dụng trên bốn lỗi đó.
 
 Đây là snapshot kiểm chứng local trước khi công bố nhánh. Trạng thái GitHub mới nhất được đối chiếu qua run gắn với head SHA của PR `code/ci-backend-stability-audit-20261101`; snapshot local không tự biến thành bằng chứng remote CI. Chưa triển khai production.
+
+---
+
+## Cập nhật Subplan 1: Test Isolation và Business Coverage (I1–I6) — 02/11/2026
+
+Triển khai hoàn tất nhánh `code/infra-test-isolation-i1`, kế thừa commit audit `4e03b8e` và scan fix `6033c853`. Chi tiết execution evidence lưu tại [subplan-i1-i6-execution-evidence-2026-11-02.json](verification/subplan-i1-i6-execution-evidence-2026-11-02.json).
+
+### Tóm tắt các hạng mục hoàn thành (I1–I5)
+
+1. **I1 (Hạ tầng Testcontainers - Redis & RabbitMQ):** Tạo `AbstractExternalInfrastructureIntegrationTest` và contract test `ExternalInfrastructureOwnershipIntegrationTest`, `FullContextInfrastructureContractTest`. Chuẩn hóa 11 full-context integration suites và `BaseSecurityIntegrationTest` để sở hữu container qua base class, loại bỏ hoàn toàn việc context Spring vô tình kết nối sang Redis/RabbitMQ localhost của máy vận hành.
+2. **I2 (PATCH Option Semantics & Ownership):** Bổ sung `UpdateServiceOptionUseCaseTest` (15 testcases, 100% line, 100% branch) và `ServiceOptionUpdateIntegrationTest` (10 testcases) kiểm chứng chặt chẽ: vendor không sở hữu service bị từ chối 403, option sai service trả về 400, validate price <= 0 trả về 400, semantics partial patch bảo toàn các trường omitted, và maxPax bounds.
+3. **I3 (Discount Admin/Vendor & Tenant Boundary):** Tạo `VendorDiscountCodeUseCaseTest` (22 testcases), `AdminDiscountCodeUseCaseTest` (21 testcases) và `DiscountCodeManagementIntegrationTest` (5 testcases). Xác thực transaction rollback khi PATCH discount không hợp lệ, tenant boundary giữa các vendor, filter admin (bao gồm boolean false) và ownership của service options.
+4. **I4 (FetchWeatherJob Failure, Null & Cache TTL):** Tái hiện lỗi escaping exception khi scheduled job gặp provider lỗi, chuyển `.join()` vào phạm vi xử lý try/catch có kiểm soát trong `FetchWeatherJob.java`. Bổ sung `FetchWeatherJobTest` (8 testcases) chứng minh: TTL chính xác 30 phút từ fetchedAt duy nhất, CountDownLatch kiểm chứng hai request độc lập, dữ liệu thiếu/null không bị biến thành thời tiết an toàn giả mạo, serialization failure và cache save failure không gây loop vô hạn.
+5. **I5 (Redis Confirmation Card Fallback Expiry & Cap):** Cung cấp `Clock` injection cho `RedisConfirmationCardStore` và `MutableClock` test utility. Bổ sung test kiểm chứng xác định: pending card hết hạn đúng phút 15, confirmed card hết hạn đúng ngày 1, capacity cap 10.000 từ chối key mới nhưng cho phép overwrite key cũ và tự giải phóng sau expiry. Nâng coverage store lên 100% line (68/68), 97.06% branch (33/34).
+
+### Kết quả kiểm chứng hai lượt Full Verify (I6)
+
+- **Lượt 1 (UTC):** `./mvnw -B clean verify` hoàn thành trong **3 phút 27 giây**.
+  - Surefire: **2.980 testcases (2.977 passed, 3 skipped hợp lệ, 0 failures, 0 errors)** trên 344 suites.
+  - JaCoCo: LINE **83,43%** (17.533/21.016, floor 82%), BRANCH **63,83%** (7.190/11.265, floor 62%), METHOD **78,69%** (3.239/4.116, floor 78%).
+- **Lượt 2 (TZ=Pacific/Kiritimati, random seed 20261102):** Hoàn thành trong **3 phút 29 giây**.
+  - Surefire: **2.980 testcases (2.977 passed, 3 skipped, 0 failures, 0 errors)** trên 344 suites.
+  - JaCoCo: LINE **83,43%**, BRANCH **63,83%**, METHOD **78,69%** — bảo đảm tính tất định 100% qua múi giờ cực đoan và thứ tự ngẫu nhiên.
+- **Guards:**
+  - `check_test_reports.py`: Exit 0 (`{"executed": 2977, "allowed_skipped": 3, "required_suites": 35, "source_suites": 344}`).
+  - `check_coverage.py`: Exit 0 (`passed: true`, `errors: []`).
+
+### Ratchet Class Coverage Floors
+
+Đã nâng floor trong `.ci/coverage-policy.json` theo kết quả thực tế thấp hơn của hai full run:
+- `UpdateServiceOptionUseCase`: LINE 1.0 (38/38), BRANCH 1.0 (20/20)
+- `VendorDiscountCodeUseCase`: LINE 1.0 (77/77), BRANCH 0.83 (40/48)
+- `AdminDiscountCodeUseCase`: LINE 1.0 (80/80), BRANCH 0.94 (47/50)
+- `FetchWeatherJob`: LINE 0.92 (35/38), BRANCH 1.0 (10/10)
+- `RedisConfirmationCardStore`: LINE 1.0 (68/68), BRANCH 0.97 (33/34)
+- Giữ nguyên các global floor: LINE 82%, BRANCH 62%, METHOD 78%; covered LINE >= 17.300, BRANCH >= 7.050.
+
+### Trace Caller cho Code Compatibility / Dead Code
+
+- `SettlementRepositoryAdapter`: Triển khai `SettlementRepositoryPort`. Giữ lại để đảm bảo tính toàn vẹn kiến trúc cổng - bộ điều hợp (hexagonal port-adapter); không xóa khi chưa có quyết định thay thế kiến trúc settlement.
+- `PostgresServiceSearchAdapter`: Triển khai `ServiceSearchPort`. Được gọi bởi `SearchServiceTool` trong module AI cho việc tìm kiếm dịch vụ; giữ nguyên.
+- `AuthorizationActionUseCase`: Khai báo bean trong `AuthorizationBeans`. Giữ nguyên để phục vụ các chính sách phân quyền chi tiết của subsystem authorization.
+- `RefundPolicyEngine compatibility overloads`: Giữ lại để bảo đảm tính tương thích ngược cho các unit test hiện có mà không làm sai lệch hợp đồng tính toán refund.
+
