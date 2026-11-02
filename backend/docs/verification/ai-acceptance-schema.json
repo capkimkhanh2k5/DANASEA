@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AiAcceptanceEvidence",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "phase",
+    "backend_revision",
+    "route",
+    "technical_pass",
+    "business_evaluation",
+    "executed_cases",
+    "case_outcomes",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["java-worker-acceptance", "proxy-live-acceptance"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "backend_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$"
+    },
+    "model_revision": {
+      "type": ["string", "null"]
+    },
+    "requested_model": {
+      "type": ["string", "null"]
+    },
+    "actual_provider": {
+      "type": ["string", "null"]
+    },
+    "route": {
+      "type": "string",
+      "enum": ["direct", "fallback", "unknown"]
+    },
+    "technical_pass": {
+      "type": "boolean"
+    },
+    "business_evaluation": {
+      "type": "object",
+      "required": ["suggestion_only", "constraint_preservation", "policy_boundary_respected"],
+      "properties": {
+        "suggestion_only": { "type": "boolean" },
+        "constraint_preservation": { "type": "boolean" },
+        "policy_boundary_respected": { "type": "boolean" }
+      }
+    },
+    "executed_cases": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "case_outcomes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["case_name", "status"],
+        "properties": {
+          "case_name": { "type": "string" },
+          "status": { "type": "string", "enum": ["PASSED", "FAILED"] },
+          "latency_ms": { "type": ["number", "null"] }
+        }
+      }
+    },
+    "timing_seconds": {
+      "type": ["number", "null"]
+    },
+    "token_provenance": {
+      "type": ["object", "null"],
+      "properties": {
+        "prompt_tokens": { "type": ["integer", "null"] },
+        "completion_tokens": { "type": ["integer", "null"] },
+        "total_tokens": { "type": ["integer", "null"] },
+        "cost_usd": { "type": ["number", "null"] }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["PASSED", "FAILED"]
+    }
+  }
+}
