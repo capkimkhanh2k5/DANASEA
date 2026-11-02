@@ -1,0 +1,109 @@
+name: Payment Sandbox Acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: 'Target payment provider'
+        required: true
+        type: choice
+        options:
+          - paypal
+          - vnpay
+      command:
+        description: 'Acceptance lifecycle action'
+        required: true
+        type: choice
+        options:
+          - preflight
+          - create-intent
+          - capture
+          - verify
+          - refund
+      base_url:
+        description: 'Target sandbox backend HTTPS base URL'
+        required: true
+        type: string
+        default: 'https://sandbox.danasea.com'
+      order_id:
+        description: 'Target order UUID (required for create-intent)'
+        required: false
+        type: string
+      deployment_manifest:
+        description: 'Path to verified sandbox deployment manifest'
+        required: true
+        type: string
+        default: 'release/sandbox-manifest.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: payments-sandbox-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    name: Sandbox Acceptance (${{ inputs.provider }} - ${{ inputs.command }})
+    runs-on: ubuntu-latest
+    environment: payments-sandbox
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+
+      - name: Prepare customer token
+        env:
+          CUSTOMER_TOKEN: ${{ secrets.PAYMENT_SANDBOX_CUSTOMER_TOKEN }}
+        run: |
+          mkdir -p "${{ runner.temp }}/acceptance-auth" "${{ runner.temp }}/evidence"
+          if [ -z "$CUSTOMER_TOKEN" ]; then
+            echo "::error::Missing mandatory secret PAYMENT_SANDBOX_CUSTOMER_TOKEN"
+            exit 1
+          fi
+          echo -n "$CUSTOMER_TOKEN" > "${{ runner.temp }}/acceptance-auth/token.txt"
+          chmod 600 "${{ runner.temp }}/acceptance-auth/token.txt"
+
+      - name: Mandatory Preflight Check
+        run: |
+          python3 scripts/acceptance_payments.py preflight \
+            --provider "${{ inputs.provider }}" \
+            --base-url "${{ inputs.base_url }}" \
+            --token-file "${{ runner.temp }}/acceptance-auth/token.txt" \
+            --session "${{ runner.temp }}/session.json" \
+            --evidence-dir "${{ runner.temp }}/evidence" \
+            --deployment-manifest "${{ inputs.deployment_manifest }}"
+
+      - name: Execute Payment Acceptance Phase
+        if: inputs.command != 'preflight'
+        run: |
+          EXTRA_ARGS=""
+          if [ "${{ inputs.command }}" = "create-intent" ]; then
+            if [ -z "${{ inputs.order_id }}" ]; then
+              echo "::error::order_id is required for create-intent"
+              exit 1
+            fi
+            EXTRA_ARGS="--order-id ${{ inputs.order_id }}"
+          fi
+
+          python3 scripts/acceptance_payments.py "${{ inputs.command }}" \
+            --provider "${{ inputs.provider }}" \
+            --base-url "${{ inputs.base_url }}" \
+            --token-file "${{ runner.temp }}/acceptance-auth/token.txt" \
+            --session "${{ runner.temp }}/session.json" \
+            --evidence-dir "${{ runner.temp }}/evidence" \
+            --deployment-manifest "${{ inputs.deployment_manifest }}" \
+            $EXTRA_ARGS
+
+      - name: Upload Acceptance Evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: payment-acceptance-evidence-${{ inputs.provider }}-${{ inputs.command }}
+          path: ${{ runner.temp }}/evidence/
+          retention-days: 14
