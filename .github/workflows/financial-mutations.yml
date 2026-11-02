@@ -1,0 +1,53 @@
+name: Financial Mutation Proofs
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'backend/src/main/java/com/danasea/backend/modules/order/**'
+      - 'backend/src/test/java/com/danasea/backend/modules/order/**'
+      - 'scripts/verify_financial_mutations.py'
+      - '.github/workflows/financial-mutations.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: financial-mutations-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mutations:
+    name: Verify Financial Mutation Proofs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Java 21
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+
+      - name: Compile backend test classes
+        working-directory: backend
+        run: ./mvnw -B test-compile
+
+      - name: Execute Targeted Financial Mutation Proofs
+        run: python3 scripts/verify_financial_mutations.py --backend-dir backend --output backend/docs/verification/test-mutation-proof-2026-11-02.json
+
+      - name: Upload Mutation Proof Evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: financial-mutation-proof-evidence
+          path: backend/docs/verification/test-mutation-proof-2026-11-02.json
+          retention-days: 14
