@@ -1,0 +1,8 @@
+{
+  "required_classes": [
+    "com.danasea.backend.modules.ai.QuyetDecisionAdapterTest"
+  ],
+  "allowed_skipped_classes": [],
+  "allowed_skipped_tests": [],
+  "reason": "Real local Quyet worker acceptance requires exact execution of all adapter testcases with zero skips."
+}
