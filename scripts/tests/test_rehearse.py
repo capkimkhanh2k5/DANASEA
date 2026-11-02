@@ -45,6 +45,36 @@ class RehearsalTest(unittest.TestCase):
         self.assertNotIn('ports', isolated['services']['postgres'])
         self.assertEqual(isolated['services']['frontend']['ports'], ['127.0.0.1::8080'])
         self.assertNotIn('ports', isolated['services']['cli-proxy-api'])
+        self.assertEqual(isolated['services']['backend']['environment']['APP_SCHEDULER_ENABLED'], 'false')
+        self.assertEqual(isolated['services']['quyet']['environment']['QUYET_CPU_THREADS'], '2')
+
+    def test_business_probe_rejects_missing_or_deviated_coordinates(self):
+        spec = importlib.util.spec_from_file_location('rehearse', SCRIPTS / 'rehearse.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        with patch.object(module, 'execute') as mock_exec, \
+             patch.object(module, 'http_json') as mock_http:
+            mock_exec.return_value = b''
+            # Case 1: missing coordinates
+            mock_http.side_effect = [
+                {}, # register
+                {'accessToken': 'token123'}, # login
+                {'id': 'svc1', 'name': 'REHEARSAL'} # service detail missing lat/lon
+            ]
+            with self.assertRaises(ValueError) as ctx:
+                module.business_probe('http://127.0.0.1:8080', 'test-postgres')
+            self.assertIn('missing coordinate fields', str(ctx.exception))
+
+            # Case 2: coordinates deviated
+            mock_http.side_effect = [
+                {}, # register
+                {'accessToken': 'token123'}, # login
+                {'id': 'svc1', 'name': 'REHEARSAL', 'latitude': 10.0, 'longitude': 100.0} # deviated
+            ]
+            with self.assertRaises(ValueError) as ctx:
+                module.business_probe('http://127.0.0.1:8080', 'test-postgres')
+            self.assertIn('coordinate readback mismatch', str(ctx.exception))
 
 
 if __name__ == '__main__':

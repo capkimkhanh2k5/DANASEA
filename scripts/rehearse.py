@@ -98,13 +98,20 @@ INSERT INTO system_configs(id,key,value,description,created_at,updated_at) VALUE
 INSERT INTO users(id,email,password_hash,full_name,role,is_email_verified,is_locked,session_version,created_at,updated_at)
 VALUES ('{vendor_user}','{vendor_user}@example.invalid','unused','REHEARSAL','VENDOR',true,false,0,now(),now());
 INSERT INTO vendors(id,user_id,business_name,verification_status,created_at,updated_at) VALUES ('{vendor}','{vendor_user}','REHEARSAL','APPROVED',now(),now());
-INSERT INTO categories(id,name,slug,is_active,requires_safety_cert,created_at,updated_at) VALUES ('{category}','REHEARSAL','rehearsal',true,false,now(),now());
-INSERT INTO services(id,vendor_id,category_id,name,status,price,weather_sensitive,view_count,waiver_required,created_at,updated_at) VALUES ('{service}','{vendor}','{category}','REHEARSAL','PUBLISHED',500000,false,0,false,now(),now());
+INSERT INTO categories(id,name,slug,is_active,requires_safety_cert,created_at,updated_at) VALUES ('{category}','REHEARSAL','rehearsal-{secrets.token_hex(4)}',true,false,now(),now());
+INSERT INTO services(id,vendor_id,category_id,name,slug,status,price,weather_sensitive,view_count,waiver_required,latitude,longitude,created_at,updated_at) VALUES ('{service}','{vendor}','{category}','REHEARSAL','rehearsal-svc-{secrets.token_hex(4)}','PUBLISHED',500000,false,0,false,16.0543219876,108.2412345678,now(),now());
 INSERT INTO service_options(id,service_id,name,option_type,pricing_unit,price,status,created_at,updated_at) VALUES ('{option}','{service}','REHEARSAL','SHARED','PER_PERSON',500000,'ACTIVE',now(),now());
 INSERT INTO service_slots(id,service_id,date,start_time,end_time,capacity,booked_count,status,inventory_type,created_at,updated_at) VALUES ('{slot}','{service}',CURRENT_DATE+5,'09:00','10:00',10,0,'OPEN','PERSON_LIMIT',now(),now());
 """
     execute(['docker', 'exec', '-i', postgres, 'sh', '-ec', 'psql -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1'], input=sql.encode())
     token = http_json(origin + '/api/auth/login', {'email': email, 'password': password})['accessToken']
+    service_detail = http_json(origin + '/api/services/' + service)
+    if not service_detail or 'latitude' not in service_detail or 'longitude' not in service_detail:
+        raise ValueError('Rehearsal service detail missing coordinate fields')
+    lat = float(service_detail['latitude'])
+    lon = float(service_detail['longitude'])
+    if abs(lat - 16.0543219876) > 1e-8 or abs(lon - 108.2412345678) > 1e-8:
+        raise ValueError(f'Rehearsal coordinate readback mismatch: lat={lat}, lon={lon}')
     hold = http_json(origin + '/api/bookings/hold', {'items': [{'slotId': slot, 'optionId': option, 'quantity': 1}]}, token, (201,))
     if float(hold['totalAmount']) != 500000:
         raise ValueError('Booking price changed during rehearsal')
@@ -176,6 +183,10 @@ def rehearse(root, model_dir, images, baseline, output):
                 '''psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT marker FROM danasea_release_probe WHERE id=1"'''])
             if marker.strip() != b'preserve':
                 raise ValueError('Upgrade lost existing database data')
+            prec_check = execute(['docker', 'exec', postgres, 'sh', '-ec',
+                '''psql -At -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT count(*) FROM information_schema.columns WHERE table_name='services' AND column_name IN ('latitude', 'longitude') AND numeric_precision=46 AND numeric_scale=10"'''])
+            if prec_check.strip() != b'2':
+                raise ValueError('V45 precision invariant not satisfied in rehearsal database')
             compose('up', '-d', '--wait', '--wait-timeout', '300', 'backend', 'frontend')
             address = compose('port', 'frontend', '8080').decode().strip()
             origin = 'http://' + address
@@ -189,7 +200,8 @@ def rehearse(root, model_dir, images, baseline, output):
             business_probe(origin, postgres)
             result = {'passed': True, 'images': images, 'baseline_sha': baseline['sha'] if baseline else '',
                       'restore_verified': True, 'existing_data_preserved': True, 'booking_order_verified': True,
-                      'worker_inference_verified': True, 'provider_scope': 'real provider acceptance runs after production deployment',
+                      'worker_inference_verified': True, 'v45_coordinate_precision_verified': True,
+                      'provider_scope': 'real provider acceptance runs after production deployment',
                       'seconds': round(time.monotonic() - started, 2)}
             release.atomic_write(output, json.dumps(result, sort_keys=True) + '\n')
             print(json.dumps(result))

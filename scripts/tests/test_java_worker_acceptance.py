@@ -42,8 +42,9 @@ class JavaWorkerAcceptanceTest(unittest.TestCase):
     def test_occupied_port_is_rejected_before_starting_child(self):
         # Bind a listening socket to simulate occupied port
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind(("127.0.0.1", 0))
-            s.listen(1)
+            s.listen(10)
             port = s.getsockname()[1]
             self.assertTrue(self.module.is_port_in_use(port))
 

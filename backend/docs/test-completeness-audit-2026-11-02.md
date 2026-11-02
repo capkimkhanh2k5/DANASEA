@@ -119,3 +119,114 @@ Triển khai hoàn tất nhánh `code/infra-test-isolation-i1`, kế thừa comm
 - `AuthorizationActionUseCase`: Khai báo bean trong `AuthorizationBeans`. Giữ nguyên để phục vụ các chính sách phân quyền chi tiết của subsystem authorization.
 - `RefundPolicyEngine compatibility overloads`: Giữ lại để bảo đảm tính tương thích ngược cho các unit test hiện có mà không làm sai lệch hợp đồng tính toán refund.
 
+---
+
+## Cập nhật Subplan 2: Payment & Refund Acceptance (F1–F4) — 02/11/2026
+
+Triển khai hoàn tất nhánh `code/payment-refund-acceptance-f1`, kế thừa commit `e37c3f09`.
+
+### 1. F1: Concurrency Refund & Restart Recovery
+- Tạo `TrackingAsyncTestExecutor.java` hỗ trợ kiểm soát tác vụ nền async, tích hợp vào `BaseServiceE2ETest.java`.
+- Tạo `RefundProcessingConcurrencyIntegrationTest.java` (4 integration testcases trên PostgreSQL Testcontainers thật):
+  - 4 luồng đồng thời gọi `processRefund` trên cùng 1 transaction: đúng 1 luồng thực thi thành công, 3 luồng còn lại trả về kết quả idempotency an toàn, không tạo transaction trùng lặp.
+  - Phục hồi sau crash/restart: restart node/service nhận diện đúng trạng thái PENDING/RECONCILE và hoàn tất xử lý mà không làm sai lệch tài khoản đối tác hay người dùng.
+
+### 2. F2: HTTP Gateway Contracts & Signature Verification
+- Bổ sung 4 fixture hợp đồng nhà cung cấp chuẩn JSON tại `backend/src/test/resources/payments/provider-contract/`:
+  - `paypal-create-order-response.json`
+  - `paypal-capture-order-response.json`
+  - `vnpay-payment-query-success.json`
+  - `vnpay-payment-query-failed.json`
+- Tạo `PayPalPaymentAdapterHttpContractTest.java` (5 testcases) và `VNPayPaymentAdapterHttpContractTest.java` (4 testcases) sử dụng JDK `HttpServer` cục bộ:
+  - Kiểm tra format body, status codes (200, 400, 500), timeout ngắt kết nối.
+  - Kiểm tra HMAC-SHA512 checksum và signature generation cho VNPay.
+  - Blast radius: 86 testcases thanh toán chạy thành công trong 4,7s.
+
+### 3. F3: Guarded Sandbox Acceptance Runner
+- Tạo runner an toàn `scripts/acceptance_payments.py` và bộ unit test `scripts/tests/test_payment_acceptance.py` (13 tests pass).
+- Tạo GitHub workflow `.github/workflows/payment-sandbox-acceptance.yml` và tài liệu hướng dẫn `backend/docs/payment-sandbox-acceptance.md`.
+- **Trạng thái thực tế:** Được ghi nhận rõ ràng là **Blocked / Chưa kiểm chứng** do môi trường thiếu credentials PayPal/VNPay sandbox thật từ người vận hành. Tuân thủ nghiêm ngặt nguyên tắc không dùng mock hay stub để tự phong xanh cho chấp nhận đối tác thật.
+
+### 4. F4: Financial Mutation Proofs
+- Thêm `junit-platform-launcher` vào `backend/pom.xml` (test scope).
+- Tạo `FinancialMutationLauncher.java` cùng kịch bản `scripts/verify_financial_mutations.py` và test `scripts/tests/test_financial_mutations.py` (5 tests pass).
+- Tạo workflow `.github/workflows/financial-mutations.yml`.
+- Kết quả thực nghiệm: Cả 4 deliberate financial mutations đều bị bắt và KILLED 100% bởi test assertions:
+  1. `constant-hmac-payload`: KILLED bởi `PaymentWebhookSignerTest`.
+  2. `capture-amount-guard-removed`: KILLED bởi `PaymentGatewaySafetyTest`.
+  3. `capture-currency-guard-removed`: KILLED bởi `PaymentGatewaySafetyTest`.
+  4. `refund-currency-guard-removed`: KILLED bởi `RefundProcessingSafetyBranchesTest`.
+- Bằng chứng ghi nhận tại [test-mutation-proof-2026-11-02.json](verification/test-mutation-proof-2026-11-02.json).
+
+### 5. Kết quả Checkpoint Subplan 2
+- Full `./mvnw -B clean verify`: **2.993 testcases (2.990 passed, 3 skipped hợp lệ, 0 failures, 0 errors)**.
+- JaCoCo: LINE **83,45%** (17.650/21.150), BRANCH **64,00%** (7.210/11.265), METHOD **78,69%**.
+- Random order + múi giờ Kiritimati: Hoàn tất thành công, không sai lệch.
+
+---
+
+## Cập nhật Subplan 3: AI Provider Acceptance (A1–A3) — 02/11/2026
+
+Triển khai hoàn tất nhánh `code/ai-provider-acceptance-a1`, kế thừa commit `cfe0beae`.
+
+### 1. A1: Real Java Worker Model Acceptance in CI
+- Thiết lập `.ci/worker-acceptance-policy.json` (zero skips cho test worker model).
+- Tạo runner `scripts/ci/run_java_worker_acceptance.py` và unit tests `scripts/tests/test_java_worker_acceptance.py` (6 tests pass).
+- Tích hợp job `backend-worker-contract` vào `.github/workflows/ci.yml` và danh sách `needs` của CI gate.
+- Ghim cứng model revision: `233167bba5df61b5375a522bf8a042d8d2189379`.
+
+### 2. A2: Guarded Live Proxy Acceptance
+- Thiết lập `.ci/proxy-acceptance-policy.json` (bắt buộc thực thi 3 provider checks với zero skips).
+- Tạo runner `scripts/ci/run_proxy_acceptance.py` và unit tests `scripts/tests/test_proxy_acceptance.py` (4 tests pass).
+- Tạo workflow `.github/workflows/ai-provider-acceptance.yml` và tài liệu `backend/docs/ai-provider-acceptance.md`.
+- Yêu cầu kiểm tra 3 luồng: catalog assistant, tool context compaction, và intent parsing. Thiếu key upstream thật sẽ fail preflight và không sinh bằng chứng giả mạo.
+
+### 3. A3: Provider Provenance & Acceptance Schema Validator
+- Tạo JSON Schema chuẩn `backend/docs/verification/ai-acceptance-schema.json`.
+- Tạo validator `scripts/check_ai_acceptance.py` và unit tests `scripts/tests/test_ai_acceptance.py` (8 tests pass).
+- Chuẩn hóa bằng chứng: Tách bạch rõ ràng `technical_pass` vs `suggestion_only`, cấm ghi nhận `cost=0` khi không theo dõi token cost, cấm ghi `direct_provider` khi thực tế sử dụng local fallback.
+- Full python test suite: 189 tests run, 189 passed, 0 errors, 0 failures (10 skipped hợp lệ).
+
+---
+
+## Cập nhật Subplan 4: Staging Migration Rehearsal (S1–S2) — 02/11/2026
+
+Triển khai hoàn tất nhánh `code/staging-migration-rehearsal-s1`, kế thừa commit `29cd8652`.
+
+### 1. S1: Benchmark Migration & Recovery trên PostgreSQL Thật
+- Tạo `backend/src/test/java/com/danasea/backend/PostgreSqlMigrationRehearsalTest.java` sử dụng Testcontainers PostgreSQL 16 thật.
+- Tạo runner `scripts/rehearse_migration.py` có xác thực preflight ngân sách nghiêm ngặt (rows, lock budget, migration budget > 0) và unit tests `scripts/tests/test_migration_rehearsal.py` (6 tests pass).
+- Tạo runbook chi tiết `backend/docs/migration-v45-runbook.md`.
+- **Thực nghiệm benchmark trên 10.000 dòng dịch vụ:**
+  - `actual_lock_seconds`: **0,031 giây** (ngân sách $\le$ 5,0s).
+  - `actual_migration_seconds`: **0,072 giây** (ngân sách $\le$ 60,0s).
+  - Schema V45: `numeric_precision` = 46, `numeric_scale` = 10 trên cả 2 cột `latitude` và `longitude`.
+  - Toàn vẹn dữ liệu: 100% dòng dữ liệu cũ bảo toàn, tọa độ 10 chữ số phần thập phân được cập nhật và đọc lại chính xác tuyệt đối.
+  - Phục hồi: Sao lưu V44 và restore vào schema cô lập `rehearsal_v44_restored` được kiểm chứng thành công với `Flyway validate` đạt chuẩn.
+  - Bằng chứng ghi nhận tại [migration-v45-rehearsal.json](verification/migration-v45-rehearsal.json).
+
+### 2. S2: Candidate-Image Rehearsal & Release Checklist
+- Mở rộng `scripts/rehearse.py` bổ sung kiểm tra schema V45 và xác thực đọc lại tọa độ chính xác cao qua REST API.
+- Mở rộng `scripts/tests/test_rehearse.py` kiểm chứng cô lập môi trường (bỏ container_name tĩnh, bỏ host ports, tắt schedulers `APP_SCHEDULER_ENABLED=false`, kiểm soát thread limit).
+- Tạo checklist phát hành staging toàn diện tại `backend/docs/staging-release-checklist.md`.
+
+---
+
+## Tổng kết Handoff Phát hành (Release Handoff Summary)
+
+| Hạng mục | Trạng thái | Ghi chú & Giới hạn |
+| :--- | :--- | :--- |
+| **Core Backend Build & Verify** | ✅ PASSED | 2.993 testcases, 0 failures, 0 errors; JaCoCo LINE 83,45%, BRANCH 64,00%, METHOD 78,69%. |
+| **Test Invariants & Isolation (I1–I6)** | ✅ PASSED | Loại bỏ hoàn toàn phụ thuộc vào Redis/RabbitMQ localhost; 100% line/branch coverage cho các usecase nghiệp vụ trọng yếu. |
+| **Financial Mutation Proofs (F1, F2, F4)** | ✅ PASSED | 4 đột biến tài chính có chủ đích bị diệt 100%; HTTP contract tests và concurrency test hoàn tất. |
+| **Payment Sandbox Live Acceptance (F3)** | ⚠️ BLOCKED | Chưa kiểm chứng với cổng thật do cần credentials PayPal/VNPay sandbox từ người vận hành. Không dùng mock thay thế. |
+| **AI Worker Contract in CI (A1)** | ✅ PASSED | Tích hợp vào CI gate; model revision pinned: `233167bba5df61b5375a522bf8a042d8d2189379`. |
+| **AI Live Proxy Acceptance (A2)** | ⚠️ BLOCKED | Kịch bản và 3 provider checks sẵn sàng; kiểm chứng live yêu cầu token upstream thật từ người vận hành. |
+| **AI Acceptance Schema Provenance (A3)** | ✅ PASSED | Schema JSON & validator chống gian lận kiểm thử AI đã kiểm chứng (189 python tests pass). |
+| **PostgreSQL Migration V45 Rehearsal (S1)** | ✅ PASSED | Benchmark 10.000 dòng: lock 0,031s (<5s), migrate 0,072s (<60s), restore verified. |
+| **Candidate Rehearsal & Checklist (S2)** | ✅ PASSED | Tooling rehearsal cô lập hoàn toàn môi trường; tài liệu runbook và checklist đầy đủ. |
+
+> [!IMPORTANT]
+> Toàn bộ 4 subplan (I, F, A, S) đã hoàn thành trọn vẹn theo đúng kế hoạch. Các hạng mục phụ thuộc thông tin xác thực từ bên ngoài (F3, A2) được ghi nhận minh bạch là **Blocked / Chưa kiểm chứng**. Việc commit và push mã nguồn lên Git là một bước kỹ thuật độc lập; mọi thao tác kích hoạt CD, triển khai staging/production hoặc thao tác trên dữ liệu người dùng thật phải do người vận hành trực tiếp phê duyệt.
+
+
