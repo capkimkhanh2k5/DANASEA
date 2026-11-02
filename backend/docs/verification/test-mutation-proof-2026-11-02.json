@@ -1,0 +1,89 @@
+{
+  "method": "Four deliberate source mutations compiled and executed entirely under /tmp; workspace production files were unchanged. All selected tests passed first on unmodified classes. This is targeted proof, not a full mutation score.",
+  "results": [
+    {
+      "mutation": "constant-hmac-payload",
+      "production_source": "backend/src/main/java/com/danasea/backend/modules/order/application/PaymentWebhookSigner.java",
+      "source_sha256": "4eb8279e770784a23440cfe13540208f5a1e452793cf87d21f7d79b61e1713ae",
+      "test_class": "com.danasea.backend.modules.order.application.PaymentWebhookSignerTest",
+      "baseline": {
+        "found": 13,
+        "passed": 13,
+        "failed": 0,
+        "skipped": 0,
+        "aborted": 0
+      },
+      "mutant": {
+        "found": 13,
+        "passed": 10,
+        "failed": 3,
+        "skipped": 0,
+        "aborted": 0
+      },
+      "killed": true
+    },
+    {
+      "mutation": "capture-amount-guard-removed",
+      "production_source": "backend/src/main/java/com/danasea/backend/modules/order/application/OrderPaymentService.java",
+      "source_sha256": "e0dd2bb544623036e87dfe8213e6f0419d882a24dfacb1c3ee95196a3d63f8ef",
+      "test_class": "com.danasea.backend.modules.order.application.PaymentGatewaySafetyTest",
+      "baseline": {
+        "found": 28,
+        "passed": 28,
+        "failed": 0,
+        "skipped": 0,
+        "aborted": 0
+      },
+      "mutant": {
+        "found": 28,
+        "passed": 26,
+        "failed": 2,
+        "skipped": 0,
+        "aborted": 0
+      },
+      "killed": true
+    },
+    {
+      "mutation": "capture-currency-guard-removed",
+      "production_source": "backend/src/main/java/com/danasea/backend/modules/order/application/OrderPaymentService.java",
+      "source_sha256": "e0dd2bb544623036e87dfe8213e6f0419d882a24dfacb1c3ee95196a3d63f8ef",
+      "test_class": "com.danasea.backend.modules.order.application.PaymentGatewaySafetyTest",
+      "baseline": {
+        "found": 28,
+        "passed": 28,
+        "failed": 0,
+        "skipped": 0,
+        "aborted": 0
+      },
+      "mutant": {
+        "found": 28,
+        "passed": 26,
+        "failed": 2,
+        "skipped": 0,
+        "aborted": 0
+      },
+      "killed": true
+    },
+    {
+      "mutation": "refund-currency-guard-removed",
+      "production_source": "backend/src/main/java/com/danasea/backend/modules/order/application/RefundProcessingService.java",
+      "source_sha256": "388f3aa238dac62be12546572556706be8914d515f1269db584afd2770814ab5",
+      "test_class": "com.danasea.backend.modules.order.application.RefundProcessingSafetyBranchesTest",
+      "baseline": {
+        "found": 17,
+        "passed": 17,
+        "failed": 0,
+        "skipped": 0,
+        "aborted": 0
+      },
+      "mutant": {
+        "found": 17,
+        "passed": 16,
+        "failed": 1,
+        "skipped": 0,
+        "aborted": 0
+      },
+      "killed": true
+    }
+  ]
+}

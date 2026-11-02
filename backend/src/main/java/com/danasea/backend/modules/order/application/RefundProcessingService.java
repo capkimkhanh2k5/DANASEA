@@ -43,6 +43,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 public class RefundProcessingService {
     public static final int MAX_RETRIES = 3;
     private static final String AWAITING = "GATEWAY_TIMEOUT_AWAITING_VERIFICATION";
+    private enum Preparation { CREATE, RECONCILE, BLOCKED }
 
     private ApplicationEventPublisher eventPublisher;
 
@@ -91,10 +92,10 @@ public class RefundProcessingService {
         if (transaction == null) {
             throw new IllegalStateException("Transactional refund processor is not configured.");
         }
-        boolean fresh = Boolean.TRUE.equals(transaction.execute(tx -> {
+        Preparation preparation = transaction.execute(tx -> {
             RefundJpaEntity refund = refundRepository.findByIdForUpdate(refundId).orElse(null);
             if (refund == null || refund.getStatus() != RefundStatus.PENDING) {
-                return false;
+                return Preparation.RECONCILE;
             }
             try {
                 RefundContext context = lockContext(refund);
@@ -105,17 +106,21 @@ public class RefundProcessingService {
                         refund.setGatewayRequestedAt(OffsetDateTime.now());
                         refundRepository.saveAndFlush(refund);
                     }
-                    return false;
+                    return Preparation.RECONCILE;
                 }
                 refund.setGatewayRequestedAt(OffsetDateTime.now());
                 refund.setLastError(AWAITING);
                 refundRepository.saveAndFlush(refund);
-                return true;
+                return Preparation.CREATE;
             } catch (IllegalArgumentException | IllegalStateException ex) {
                 configurationError(refund, ex.getMessage());
-                return false;
+                return Preparation.BLOCKED;
             }
-        }));
+        });
+        if (preparation == null || preparation == Preparation.BLOCKED) {
+            return false;
+        }
+        boolean fresh = preparation == Preparation.CREATE;
         return Boolean.TRUE.equals(transaction.execute(tx -> {
             RefundJpaEntity refund = refundRepository.findByIdForUpdate(refundId).orElse(null);
             if (refund == null) {
@@ -124,8 +129,14 @@ public class RefundProcessingService {
             if (refund.getStatus() != RefundStatus.PENDING) {
                 return refund.getStatus() == RefundStatus.PROCESSED;
             }
-            RefundContext context = lockContext(refund);
             if (refund.getGatewayRequestId() == null || refund.getProviderAmount() == null) {
+                return false;
+            }
+            RefundContext context;
+            try {
+                context = lockContext(refund);
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                configurationError(refund, ex.getMessage());
                 return false;
             }
             GatewayRefundRequest request = toGatewayRequest(refund, context.payment());

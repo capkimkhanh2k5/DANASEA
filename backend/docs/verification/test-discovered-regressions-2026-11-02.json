@@ -1,0 +1,43 @@
+{
+  "method": "Real JUnit standalone compilation/execution against preserved old production source before applying minimal fixes, then new source; no skip. Source remains subject to subsequent full Maven verification. Slot/option selection includes 42 cases of which two fail on old slot source.",
+  "results": [
+    {
+      "production_source": "backend/src/main/java/com/danasea/backend/modules/order/application/api/AiPolicyReader.java",
+      "before_sha256": "fe0225ea05518a5e67893c6e477167f4966b4b9e03a7b8b305ce81e4951a1c83",
+      "after_sha256": "d5d798683d8f30e33fcfd35a8a5c1e263fff0df02b5ad9ddb5925425f8d17ff9",
+      "red": {
+        "found": 8,
+        "passed": 0,
+        "failed": 8,
+        "skipped": 0,
+        "aborted": 0
+      },
+      "green": {
+        "found": 8,
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0,
+        "aborted": 0
+      }
+    },
+    {
+      "production_source": "backend/src/main/java/com/danasea/backend/modules/service/application/usecases/CreateServiceSlotUseCase.java",
+      "before_sha256": "1ebdaf2389bf1365e3742a753217876aef0d75b8b0e0eb131d38d4b33545385b",
+      "after_sha256": "181ad1c04ac058f31b4a64045f79dfd874a40a32fbfd9d2d571bbb31b222dd5e",
+      "red": {
+        "found": 42,
+        "passed": 40,
+        "failed": 2,
+        "skipped": 0,
+        "aborted": 0
+      },
+      "green": {
+        "found": 42,
+        "passed": 42,
+        "failed": 0,
+        "skipped": 0,
+        "aborted": 0
+      }
+    }
+  ]
+}

@@ -26,14 +26,24 @@ jobs:
           distribution: temurin
           cache: maven
       - name: Build and run all mandatory integration tests
-        run: ./mvnw -B clean verify
+        shell: bash
+        run: ./mvnw -B clean verify 2>&1 | tee "$RUNNER_TEMP/backend-verify.log"
       - name: Reject unexpected skips and missing critical suites
-        run: python3 ../scripts/check_test_reports.py target/surefire-reports --policy ../.ci/test-policy.json
+        if: always()
+        run: python3 ../scripts/check_test_reports.py target/surefire-reports --policy ../.ci/test-policy.json --test-source src/test/java
+      - name: Reject missing or regressed coverage
+        if: always()
+        run: python3 ../scripts/check_coverage.py target/site/jacoco/jacoco.xml --policy ../.ci/coverage-policy.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: backend-test-reports
-          path: backend/target/surefire-reports/
+          path: |
+            backend/target/surefire-reports/
+            backend/target/test-artifacts/
+            backend/target/site/jacoco/
+            backend/target/jacoco.exec
+            ${{ runner.temp }}/backend-verify.log
           retention-days: 14
   worker:
     name: Quyet worker and pinned CPU inference

@@ -38,8 +38,10 @@ public class ServiceJpaEntity extends BaseJpaEntity {
 
     private String address;
 
+    @Column(precision = 46, scale = 10)
     private BigDecimal latitude;
 
+    @Column(precision = 46, scale = 10)
     private BigDecimal longitude;
 
     @Enumerated(EnumType.STRING)

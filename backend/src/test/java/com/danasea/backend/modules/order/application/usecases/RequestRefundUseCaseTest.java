@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.danasea.backend.modules.order.application.dtos.OrderRefundResult;
@@ -15,6 +15,7 @@ import com.danasea.backend.modules.order.domain.exceptions.UnauthorizedOrderAcce
 import com.danasea.backend.modules.order.domain.models.MasterOrder;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
 import com.danasea.backend.modules.order.domain.models.RefundReason;
+import com.danasea.backend.modules.order.domain.models.RefundStatus;
 import com.danasea.backend.modules.order.domain.models.SubOrder;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.domain.ports.MasterOrderRepositoryPort;
@@ -51,6 +52,7 @@ class RequestRefundUseCaseTest {
 
     private final RefundPolicyEngine refundPolicyEngine = new RefundPolicyEngine();
     private RequestRefundUseCase useCase;
+    private JpaRefundRepository refunds;
 
     private final UUID customerId = UUID.randomUUID();
     private final UUID orderId = UUID.randomUUID();
@@ -58,7 +60,7 @@ class RequestRefundUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        var refunds = mock(JpaRefundRepository.class);
+        refunds = mock(JpaRefundRepository.class);
         org.mockito.Mockito.lenient().when(refunds.save(any())).thenAnswer(inv -> {
             RefundJpaEntity refund = inv.getArgument(0); refund.setId(UUID.randomUUID()); return refund;
         });
@@ -98,7 +100,15 @@ class RequestRefundUseCaseTest {
         assertThat(results).hasSize(1);
         assertThat(results.get(0).amount()).isEqualByComparingTo("100.00");
         assertThat(results.get(0).refundPercentage()).isEqualByComparingTo("100.0");
-        verify(paymentGatewayPort, never()).requestRefund(any(), any());
+        assertThat(results.get(0).status()).isEqualTo(RefundStatus.PENDING);
+        var persisted = org.mockito.ArgumentCaptor.forClass(RefundJpaEntity.class);
+        verify(refunds).save(persisted.capture());
+        assertThat(persisted.getValue().getSubOrderId()).isEqualTo(subOrderId);
+        assertThat(persisted.getValue().getRequestedBy()).isEqualTo(customerId);
+        assertThat(persisted.getValue().getIdempotencyKey()).isEqualTo("idem-ref-1");
+        assertThat(persisted.getValue().getStatus()).isEqualTo(RefundStatus.PENDING);
+        assertThat(persisted.getValue().getAmount()).isEqualByComparingTo("100.00");
+        verifyNoInteractions(paymentGatewayPort);
     }
 
     @Test

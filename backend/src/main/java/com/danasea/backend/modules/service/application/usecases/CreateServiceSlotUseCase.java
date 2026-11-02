@@ -75,6 +75,9 @@ public class CreateServiceSlotUseCase {
             Set<Integer> unitNumbers = new HashSet<>();
             int sum = 0;
             for (CreateSlotUnitRequest uReq : request.units()) {
+                if (uReq == null) {
+                    throw new IllegalArgumentException("Unit cannot be null");
+                }
                 if (uReq.unitNumber() == null || uReq.unitNumber() <= 0) {
                     throw new IllegalArgumentException("Unit number must be greater than 0");
                 }
@@ -84,7 +87,11 @@ public class CreateServiceSlotUseCase {
                 if (uReq.capacity() == null || uReq.capacity() <= 0) {
                     throw new IllegalArgumentException("Each unit capacity must be greater than 0");
                 }
-                sum = Math.addExact(sum, uReq.capacity());
+                try {
+                    sum = Math.addExact(sum, uReq.capacity());
+                } catch (ArithmeticException exception) {
+                    throw new IllegalArgumentException("Total unit capacity exceeds the supported integer capacity", exception);
+                }
                 units.add(ServiceSlotUnit.builder()
                         .id(UUID.randomUUID())
                         .slotId(slotId)
