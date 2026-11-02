@@ -171,6 +171,12 @@
         "BRANCH": 1.0
       }
     },
+    "com/danasea/backend/modules/service/application/usecases/UpdateServiceOptionUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
     "com/danasea/backend/modules/ai/infrastructure/redis/RedisConfirmationCardStore": {
       "minimum_ratios": {
         "LINE": 0.98,
