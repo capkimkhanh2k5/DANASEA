@@ -25,6 +25,10 @@ updates:
   - dependency-name: '*'
     update-types:
     - version-update:semver-major
+  # Worker assembly and its locked wheels are validated against Python 3.11.
+  - dependency-name: python
+    versions:
+    - ">=3.12"
   - dependency-name: maven
   directories:
   - /backend
