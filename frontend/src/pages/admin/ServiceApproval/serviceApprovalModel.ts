@@ -38,7 +38,13 @@ export function filterServices(
       (service.vendorName && service.vendorName.toLocaleLowerCase('vi').includes(search)) ||
       (service.locationName && service.locationName.toLocaleLowerCase('vi').includes(search));
 
-    const matchesStatus = status === 'all' || service.status === status;
+    const matchesStatus =
+      status === 'all' ||
+      service.status === status ||
+      (status === 'PENDING_APPROVAL' && ((service.status as string) === 'PENDING_REVIEW' || service.status === 'PENDING_APPROVAL')) ||
+      (status === 'PENDING_REVIEW' && ((service.status as string) === 'PENDING_REVIEW' || service.status === 'PENDING_APPROVAL')) ||
+      (status === 'ACTIVE' && ((service.status as string) === 'PUBLISHED' || service.status === 'ACTIVE'));
+
     const matchesCategory = categoryId === 'all' || service.categoryId === categoryId;
 
     return matchesSearch && matchesStatus && matchesCategory;

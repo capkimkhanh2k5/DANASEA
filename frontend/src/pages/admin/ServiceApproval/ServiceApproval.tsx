@@ -50,7 +50,7 @@ function mapResultToRecord(
     durationMinutes: s.durationMinutes || 60,
     locationName: s.locationName || s.address || 'Đà Nẵng',
     address: s.address || '',
-    status: (s.status === 'PUBLISHED' ? 'ACTIVE' : s.status) as unknown as ServiceRecord['status'],
+    status: (s.status === 'PUBLISHED' ? 'ACTIVE' : s.status === 'PENDING_REVIEW' ? 'PENDING_APPROVAL' : s.status) as unknown as ServiceRecord['status'],
     rejectionReason: s.rejectionReason || '',
     waiverContent: s.waiverContent || '',
     weatherSensitive: Boolean(s.weatherSensitive),
@@ -128,7 +128,17 @@ export function ServiceApproval() {
           });
         }
 
-        const mapped = servicesRes.value.map(s => mapResultToRecord(s, vendorMap, categoryMap));
+        const mapped = servicesRes.value
+          .map(s => mapResultToRecord(s, vendorMap, categoryMap))
+          .sort((a, b) => {
+            const isPendingA = a.status === 'PENDING_APPROVAL' || (a.status as string) === 'PENDING_REVIEW';
+            const isPendingB = b.status === 'PENDING_APPROVAL' || (b.status as string) === 'PENDING_REVIEW';
+            if (isPendingA && !isPendingB) return -1;
+            if (!isPendingA && isPendingB) return 1;
+            const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+            const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+            return timeB - timeA;
+          });
         setReview({ services: mapped, timeline: [] });
         setLoading(false);
       })
@@ -164,7 +174,11 @@ export function ServiceApproval() {
   }, [filtered, activePage]);
 
   const countByStatus = (statusValue: string) =>
-    visibleServices.filter(s => s.status === statusValue).length;
+    visibleServices.filter(s =>
+      s.status === statusValue ||
+      (statusValue === 'PENDING_APPROVAL' && ((s.status as string) === 'PENDING_REVIEW' || s.status === 'PENDING_APPROVAL')) ||
+      (statusValue === 'ACTIVE' && ((s.status as string) === 'PUBLISHED' || s.status === 'ACTIVE'))
+    ).length;
 
   const resetFilters = () => {
     setSearch('');
@@ -457,47 +471,58 @@ export function ServiceApproval() {
               <p>
                 {demo
                   ? 'Thao tác demo chỉ lưu trong phiên này. Tải lại trang sẽ khôi phục dữ liệu mẫu ban đầu.'
-                  : 'Bật thao tác demo để thử nghiệm phê duyệt. Bản xem trước hiện tại chỉ cho phép xem thông tin.'}
+                  : 'Phê duyệt sẽ xuất bản dịch vụ lên cổng khách hàng. Từ chối sẽ gửi phản hồi lý do cho đối tác.'}
               </p>
               <div className="admin-services-drawer-buttons">
                 {selected.status === 'ACTIVE' ? (
-                  <>
-                    <AdminButton
-                      disabled={!demo}
-                      variant="secondary"
-                      onClick={() => initiateDecision('pause')}
-                    >
-                      Tạm ngưng mở bán
-                    </AdminButton>
-                    <AdminButton
-                      disabled={!demo}
-                      variant="primary"
-                      onClick={() => initiateDecision('approve')}
-                    >
-                      Cập nhật phê duyệt
-                    </AdminButton>
-                  </>
+                  demo ? (
+                    <>
+                      <AdminButton
+                        disabled={isSubmitting}
+                        variant="secondary"
+                        onClick={() => initiateDecision('pause')}
+                      >
+                        Tạm ngưng mở bán (demo)
+                      </AdminButton>
+                      <AdminButton
+                        disabled={isSubmitting}
+                        variant="primary"
+                        onClick={() => initiateDecision('approve')}
+                      >
+                        Cập nhật phê duyệt (demo)
+                      </AdminButton>
+                    </>
+                  ) : (
+                    <span className="text-sm font-semibold text-emerald-800 bg-emerald-50 px-3.5 py-2 rounded-xl border border-emerald-300 inline-flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Dịch vụ đã phê duyệt &amp; Đang mở bán
+                    </span>
+                  )
                 ) : selected.status === 'PAUSED' ? (
-                  <>
+                  demo ? (
                     <AdminButton
-                      disabled={!demo}
+                      disabled={isSubmitting}
                       variant="primary"
                       onClick={() => initiateDecision('approve')}
                     >
-                      Kích hoạt mở bán lại
+                      Kích hoạt mở bán lại (demo)
                     </AdminButton>
-                  </>
+                  ) : (
+                    <span className="text-sm font-semibold text-amber-800 bg-amber-50 px-3.5 py-2 rounded-xl border border-amber-300">
+                      Dịch vụ đang tạm ngưng mở bán
+                    </span>
+                  )
                 ) : (
                   <>
                     <AdminButton
-                      disabled={!demo}
+                      disabled={isSubmitting}
                       variant="danger"
                       onClick={() => initiateDecision('reject')}
                     >
                       Từ chối duyệt
                     </AdminButton>
                     <AdminButton
-                      disabled={!demo}
+                      disabled={isSubmitting}
                       variant="primary"
                       onClick={() => initiateDecision('approve')}
                     >
@@ -543,7 +568,7 @@ export function ServiceApproval() {
             <AdminButton disabled={isSubmitting} onClick={() => setDecisionOpen(false)}>Quay lại</AdminButton>
             <AdminButton
               variant={decisionKind === 'reject' ? 'danger' : 'primary'}
-              disabled={isSubmitting || !selected}
+              disabled={isSubmitting || !selected || (decisionKind === 'reject' && !rejectReason.trim())}
               onClick={confirmDecision}
             >
               {isSubmitting
@@ -610,7 +635,9 @@ export function ServiceApproval() {
           )}
 
           <p className="admin-detail-note">
-            Thao tác mô phỏng an toàn, không thực hiện thay đổi dữ liệu trên máy chủ hoặc dịch vụ thanh toán.
+            {demo
+              ? 'Thao tác mô phỏng an toàn, không thực hiện thay đổi dữ liệu trên máy chủ hoặc dịch vụ thanh toán.'
+              : 'Thao tác sẽ cập nhật trực tiếp trạng thái dịch vụ trong cơ sở dữ liệu hệ thống.'}
           </p>
         </div>
       </AdminDialog>
