@@ -87,8 +87,7 @@ jobs:
           cache: pip
           cache-dependency-path: ai-decision/config/requirements.lock.txt
       - run: |
-          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.1
-          python -m pip install -r ai-decision/config/requirements.lock.txt
+          python ai-decision/scripts/install_dependencies.py ai-decision/config/requirements.lock.txt
       - name: Fetch and verify pinned model
         run: python scripts/ci/download_model.py "$RUNNER_TEMP/quyet-model"
       - name: Run Java adapter to real worker acceptance

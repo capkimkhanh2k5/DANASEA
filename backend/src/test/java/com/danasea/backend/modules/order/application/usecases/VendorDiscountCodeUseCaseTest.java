@@ -441,6 +441,7 @@ class VendorDiscountCodeUseCaseTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Service ownership lookup is not configured.");
     }
+    @Test
     void updateVendorDiscountCodeMaxUsesBoundary() {
         DiscountCodeJpaEntity entity = createValidVendorEntity();
         entity.setUsedCount(3);

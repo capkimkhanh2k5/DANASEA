@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -62,6 +63,7 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
     @Autowired private JdbcTemplate jdbc;
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private TrackingAsyncTestExecutor testExecutor;
+    @Autowired private ApplicationEventPublisher publisher;
 
     @MockitoBean(name = "payPalPaymentAdapter")
     private PaymentGatewayPort gateway;
@@ -89,6 +91,7 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
             assertThat(requestStarted.await(10, TimeUnit.SECONDS)).isTrue();
             var worker2 = executor.submit(() -> worker.processRefund(fixture.refundId()));
 
+            awaitBlockedRefundLock();
             releaseGateway.countDown();
 
             boolean result1 = worker1.get(10, TimeUnit.SECONDS);
@@ -139,6 +142,7 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
             var webhookFuture = executor.submit(() -> worker.processPayPalNotification(
                     "EVENT-RACE-" + fixture.refundId(), "REFUND-RACE-01", operationId));
 
+            awaitBlockedRefundLock();
             releaseWorkerGateway.countDown();
 
             boolean workerResult = workerFuture.get(10, TimeUnit.SECONDS);
@@ -203,8 +207,11 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
                 new RefundResult(true, "REFUND-RECONCILED-" + fixture.refundId(), new BigDecimal("19.31"),
                         "Success", GatewayRefundStatus.COMPLETED, "USD"));
 
-        // Fresh worker run reconciles without calling requestRefund again
-        assertThat(worker.processRefund(fixture.refundId())).isTrue();
+        RefundProcessingService restarted = new RefundProcessingService(refunds, subs, orders, payments,
+                bookings, serviceSlots, gateway, transactionManager);
+        restarted.setEventPublisher(publisher);
+        assertThat(restarted).isNotSameAs(worker);
+        assertThat(restarted.processRefund(fixture.refundId())).isTrue();
 
         var processedRefund = refunds.findById(fixture.refundId()).orElseThrow();
         assertThat(processedRefund.getStatus()).isEqualTo(RefundStatus.PROCESSED);
@@ -216,7 +223,7 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
     }
 
     @Test
-    void unverifiableResultRemainsPendingWithoutMoneyEffects() {
+    void unverifiableResultRemainsPendingWithoutMoneyEffects() throws Exception {
         var fixture = createRefundFixture();
 
         // 1. Simulate initial request timeout to enter RECONCILE phase
@@ -273,11 +280,23 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
         var slot = serviceSlots.findById(fixture.slotId()).orElseThrow();
         assertThat(slot.getBookedCount()).isEqualTo(5);
 
+        testExecutor.awaitAll(Duration.ofSeconds(5));
         // Invariant: No REFUND_COMPLETED notification
         Long notifCount = jdbc.queryForObject(
                 "SELECT count(*) FROM notifications WHERE related_entity_id = ? AND type = 'REFUND_COMPLETED'",
                 Long.class, fixture.refundId());
         assertThat(notifCount).isZero();
+    }
+
+    private void awaitBlockedRefundLock() throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        do {
+            Integer blocked = jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() "
+                    + "AND wait_event_type='Lock' AND state='active' AND query ILIKE '%refunds%'", Integer.class);
+            if (blocked != null && blocked > 0) return;
+            Thread.sleep(10);
+        } while (System.nanoTime() < deadline);
+        throw new AssertionError("Competing refund transaction never reached the PostgreSQL row lock");
     }
 
     private record Fixture(

@@ -1,5 +1,7 @@
 # Staging Release & Migration Rehearsal Checklist
 
+> Code availability is not execution evidence. Current release state: F3/A2/S2 unverified until actual protected environment runs and their artifacts exist. See acceptance-repair-2026-11-03.md.
+
 ## 1. Định danh Bản phát hành (Release Identity & Manifest)
 - [ ] **Commit SHA Candidate:** Xác định chính xác 40-character Git SHA từ head của nhánh release.
 - [ ] **Release Manifest:** Cung cấp file manifest JSON chứa digest-pinned images (không dùng tag mutable `latest`):
@@ -20,8 +22,8 @@
 
 ## 3. Diễn tập Migration V45 & Benchmark Ngân sách Khóa (Migration Rehearsal)
 - [ ] **Ngân sách Downtime:** Đã được người vận hành xác nhận:
-  - Dataset tối thiểu: 10.000 dòng dữ liệu dịch vụ có đầy đủ FK.
-  - Trần thời gian giữ khóa `ACCESS EXCLUSIVE`: $\le$ 5,0 giây.
+  - Dataset: số liệu staging do người vận hành cung cấp; 10.000 dòng là fixture CI minh họa.
+  - Budget query blocking do người vận hành chấp nhận; 5 giây chỉ là ngưỡng fixture CI, không phải số đo chính xác thời gian giữ khóa.
   - Trần thời gian chạy migration: $\le$ 60,0 giây.
 - [ ] **Thực thi diễn tập:**
   ```bash
@@ -51,15 +53,15 @@
 - [ ] **AI Worker Decision:** Thực hiện kiểm tra quyết định (intent detection) với Quyet Small worker model thành công, không có cảnh báo vi phạm ngân sách.
 
 ## 6. Trạng thái Kiểm chứng & Biên giới Tài chính (Verification Status Handoff)
-- [x] **Subplan 1 (Test Isolation & Business Coverage):** Đã hoàn tất, 6 commit `071f3b0b` → `e37c3f09`.
-- [x] **Subplan 2 (Payment & Refund Acceptance):**
+- [ ] **Subplan 1 (Test Isolation & Business Coverage):** Đã hoàn tất, 6 commit `071f3b0b` → `e37c3f09`.
+- [ ] **Subplan 2 (Payment & Refund Acceptance):**
   - F1, F2, F4: Đã hoàn tất với integration tests, HTTP contracts và 4 đột biến tài chính bị diệt.
   - F3 (Sandbox Live Acceptance): **Chưa kiểm chứng / Blocked** do thiếu thông tin đăng nhập PayPal/VNPay sandbox thật từ người vận hành (không dùng mock để che giấu).
-- [x] **Subplan 3 (AI Provider Acceptance):**
+- [ ] **Subplan 3 (AI Provider Acceptance):**
   - A1: Đã tích hợp kiểm chứng worker model thật vào CI gate.
   - A2: Runner live proxy với 3 provider checks đã sẵn sàng.
-  - A3: Schema provenance và script `check_ai_acceptance.py` đã xác thực tính trung thực.
-- [x] **Subplan 4 (Staging Migration Rehearsal):**
+  - A3: Schema/validator cần artifact thật; policy chưa được đo giữ null, proxy upstream/route giữ unknown.
+- [ ] **Subplan 4 (Staging Migration Rehearsal):**
   - S1: Script `rehearse_migration.py` và test `PostgreSqlMigrationRehearsalTest` hoàn tất.
   - S2: Script `rehearse.py` đã bổ sung kiểm tra V45 và checklist release đã hoàn thiện.
 

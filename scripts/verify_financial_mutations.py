@@ -7,7 +7,6 @@ are strictly detected and killed by our test suites, without modifying the works
 import argparse
 import hashlib
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -63,6 +62,8 @@ def run_launcher(classpath: str, test_class: str, backend_dir: Path) -> dict:
     launcher_class = "com.danasea.backend.tools.FinancialMutationLauncher"
     cmd = ["java", "-cp", classpath, launcher_class, test_class]
     result = subprocess.run(cmd, cwd=str(backend_dir), capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError("JUnit launcher process failed: " + result.stderr[-1000:])
     stdout = result.stdout.strip()
     # Find JSON line in stdout
     for line in stdout.splitlines():
@@ -110,6 +111,8 @@ def execute_mutation_proof(mutation_spec: dict, backend_dir: Path, base_classpat
     baseline_result = run_launcher(base_classpath, test_class, backend_dir)
     baseline_clean = (
         baseline_result.get("found", 0) > 0
+        and baseline_result.get("passed") == baseline_result.get("found")
+        and baseline_result.get("containers_failed", 0) == 0
         and baseline_result.get("failed", 0) == 0
         and baseline_result.get("skipped", 0) == 0
         and baseline_result.get("aborted", 0) == 0
@@ -172,12 +175,14 @@ def execute_mutation_proof(mutation_spec: dict, backend_dir: Path, base_classpat
         # 6. Assess whether mutant was killed by assertion failure
         same_test_count = mutant_result.get("found") == baseline_result.get("found")
         has_failures = mutant_result.get("failed", 0) > 0
-        no_aborted_or_skipped = mutant_result.get("skipped", 0) == 0 and mutant_result.get("aborted", 0) == 0
+        no_aborted_or_skipped = (mutant_result.get("skipped", 0) == 0 and mutant_result.get("aborted", 0) == 0
+                                 and mutant_result.get("containers_failed", 0) == 0
+                                 and mutant_result.get("passed", 0) + mutant_result.get("failed", 0) == mutant_result.get("found"))
 
         # Check failure type to ensure it is an assertion failure
         failures = mutant_result.get("failures", [])
-        assertion_failures = [f for f in failures if "Assertion" in f.get("type", "") or "Exception" in f.get("type", "")]
-        has_assertion_failure = len(assertion_failures) > 0
+        assertion_failures = [f for f in failures if f.get("assertion") is True]
+        has_assertion_failure = len(assertion_failures) == mutant_result.get("failed", 0) and bool(assertion_failures)
 
         killed = same_test_count and has_failures and no_aborted_or_skipped and has_assertion_failure
 
@@ -204,6 +209,7 @@ def execute_mutation_proof(mutation_spec: dict, backend_dir: Path, base_classpat
             "baseline": clean_baseline,
             "mutant": clean_mutant,
             "killed": killed,
+            "failures": failures,
         }
 
 

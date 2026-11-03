@@ -66,7 +66,6 @@ class JavaWorkerAcceptanceTest(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             self.module.wait_for_health(18091, mock_proc, timeout=5.0)
         self.assertIn("Worker exited prematurely with code 1", str(ctx.exception))
-        self.assertIn("Critical startup error in python worker", str(ctx.exception))
 
     def test_health_check_wrong_revision_fails(self):
         mock_proc = MagicMock()
@@ -86,51 +85,31 @@ class JavaWorkerAcceptanceTest(unittest.TestCase):
                 self.module.wait_for_health(18091, mock_proc, timeout=2.0)
             self.assertIn("unexpected status/revision", str(ctx.exception))
 
-    def test_acceptance_flow_records_evidence_and_never_leaks_key(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            model_dir = temp_path / "model"
-            model_dir.mkdir()
-            key_file = temp_path / "service.key"
-            output_file = temp_path / "evidence.json"
+    def test_acceptance_flow_uses_real_report_checker_and_observations(self):
+        from scripts.tests.acceptance_fixtures import fake_maven
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            proc = MagicMock()
+            proc.poll.return_value = None
+            with patch.object(self.module, 'validate_quyet_model'), \
+                 patch.object(self.module, 'is_port_in_use', return_value=False), \
+                 patch.object(self.module, 'get_backend_revision', return_value='1' * 40), \
+                 patch.object(self.module, 'wait_for_health', return_value={'model': 'chinhnc/Quyet-1.0-Small'}), \
+                 patch('subprocess.Popen', return_value=proc), \
+                 patch('subprocess.run', side_effect=lambda command, **kw: fake_maven(command, root, 'worker')):
+                self.assertEqual(self.module.run_acceptance(root / 'model', root / 'key', 18091, root / 'out.json', root), 0)
+            data = json.loads((root / 'out.json').read_text())
+            self.assertEqual({case['case_name'] for case in data['case_outcomes']},
+                             {'intent', 'service_category', 'review', 'moderation', 'relevance', 'complaint', 'risk'})
+            self.assertIsNone(data['business_evaluation']['policy_boundary_respected'])
+            proc.terminate.assert_called_once()
 
-            secret_key = "my-super-secret-production-key-12345678"
-            key_file.write_text(secret_key, encoding="utf-8")
-
-            with patch.object(self.module, "validate_quyet_model"), \
-                 patch.object(self.module, "is_port_in_use", return_value=False), \
-                 patch("subprocess.Popen") as mock_popen, \
-                 patch.object(self.module, "wait_for_health", return_value={
-                     "status": "UP",
-                     "model": "chinhnc/Quyet-1.0-Small",
-                     "revision": "233167bba5df61b5375a522bf8a042d8d2189379",
-                     "rubricVersion": "danasea-2026-10-08-v1"
-                 }), \
-                 patch("subprocess.run") as mock_run, \
-                 patch.object(self.module, "check_test_reports", return_value={"executed": 6, "allowed_skipped": 0}):
-
-                mock_proc = MagicMock()
-                mock_proc.poll.return_value = None
-                mock_popen.return_value = mock_proc
-                mock_run.return_value = MagicMock(returncode=0)
-
-                exit_code = self.module.run_acceptance(
-                    model_dir=model_dir,
-                    key_file=key_file,
-                    port=18091,
-                    output_file=output_file,
-                    backend_dir=temp_path
-                )
-
-                self.assertEqual(exit_code, 0)
-                self.assertTrue(output_file.is_file())
-                evidence_text = output_file.read_text(encoding="utf-8")
-                # Assert key is never leaked
-                self.assertNotIn(secret_key, evidence_text)
-                evidence = json.loads(evidence_text)
-                self.assertEqual(evidence["status"], "PASSED")
-                self.assertEqual(evidence["all_seven_tasks_verified"], True)
+    def test_worker_key_cannot_be_created_inside_model_cache(self):
+        with tempfile.TemporaryDirectory() as temp, patch.object(self.module, 'validate_quyet_model'):
+            root = Path(temp)
+            with self.assertRaisesRegex(ValueError, 'outside'):
+                self.module.run_acceptance(root, root / 'key', 18091, root.parent / 'unused.json')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

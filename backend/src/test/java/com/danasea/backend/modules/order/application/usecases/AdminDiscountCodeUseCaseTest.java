@@ -407,6 +407,7 @@ class AdminDiscountCodeUseCaseTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Service ownership lookup is not configured.");
     }
+    @Test
     void updateDiscountCodeValidatesInvariants() {
         // Not found
         when(discountCodeRepository.findByIdForUpdate(discountId)).thenReturn(Optional.empty());

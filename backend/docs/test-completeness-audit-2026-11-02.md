@@ -1,5 +1,7 @@
 # Rà soát độ đầy đủ của test BE — 02/11/2026
 
+> Các cập nhật Gemini cuối tài liệu là lịch sử triển khai, không phải nghiệm thu release. Review độc lập phát hiện lỗi runner, testcase thiếu annotation và recovery chưa đủ. Xem [bản sửa và trạng thái kiểm chứng 03/11](acceptance-repair-2026-11-03.md) trước khi sử dụng các số liệu acceptance.
+
 ## Phạm vi và cách đọc kết quả
 
 Nhánh `code/ci-backend-stability-audit-20261101`, base main `0248965112fe6ed7b8a4e5fba2c27e26b2db2903`. Đây là phần tiếp theo của [điều tra lỗi CI](ci-test-audit-2026-11-01.md). Đối chiếu kiểm kê toàn bộ source test với Surefire, đo JaCoCo cho toàn bộ production code, rà sâu assertion và các nhánh tài chính, tenant/security, service/inventory, migration, async audit và chống xanh giả. Bổ sung test và sửa các lỗi được test tái hiện. Không dùng lượng test hoặc coverage để khẳng định mọi yêu cầu nghiệp vụ đều đã được kiểm chứng.
@@ -128,7 +130,7 @@ Triển khai hoàn tất nhánh `code/payment-refund-acceptance-f1`, kế thừa
 ### 1. F1: Concurrency Refund & Restart Recovery
 - Tạo `TrackingAsyncTestExecutor.java` hỗ trợ kiểm soát tác vụ nền async, tích hợp vào `BaseServiceE2ETest.java`.
 - Tạo `RefundProcessingConcurrencyIntegrationTest.java` (4 integration testcases trên PostgreSQL Testcontainers thật):
-  - 4 luồng đồng thời gọi `processRefund` trên cùng 1 transaction: đúng 1 luồng thực thi thành công, 3 luồng còn lại trả về kết quả idempotency an toàn, không tạo transaction trùng lặp.
+  - 2 luồng đồng thời gọi `processRefund` trên cùng 1 transaction: một request gateway và một trạng thái hoàn tất; luồng còn lại trả về kết quả idempotency an toàn, không tạo transaction trùng lặp.
   - Phục hồi sau crash/restart: restart node/service nhận diện đúng trạng thái PENDING/RECONCILE và hoàn tất xử lý mà không làm sai lệch tài khoản đối tác hay người dùng.
 
 ### 2. F2: HTTP Gateway Contracts & Signature Verification
@@ -220,13 +222,11 @@ Triển khai hoàn tất nhánh `code/staging-migration-rehearsal-s1`, kế th�
 | **Test Invariants & Isolation (I1–I6)** | ✅ PASSED | Loại bỏ hoàn toàn phụ thuộc vào Redis/RabbitMQ localhost; 100% line/branch coverage cho các usecase nghiệp vụ trọng yếu. |
 | **Financial Mutation Proofs (F1, F2, F4)** | ✅ PASSED | 4 đột biến tài chính có chủ đích bị diệt 100%; HTTP contract tests và concurrency test hoàn tất. |
 | **Payment Sandbox Live Acceptance (F3)** | ⚠️ BLOCKED | Chưa kiểm chứng với cổng thật do cần credentials PayPal/VNPay sandbox từ người vận hành. Không dùng mock thay thế. |
-| **AI Worker Contract in CI (A1)** | ✅ PASSED | Tích hợp vào CI gate; model revision pinned: `233167bba5df61b5375a522bf8a042d8d2189379`. |
+| **AI Worker Contract in CI (A1)** | Chờ exact-head CI | Tích hợp vào CI gate; model revision pinned: `233167bba5df61b5375a522bf8a042d8d2189379`. |
 | **AI Live Proxy Acceptance (A2)** | ⚠️ BLOCKED | Kịch bản và 3 provider checks sẵn sàng; kiểm chứng live yêu cầu token upstream thật từ người vận hành. |
 | **AI Acceptance Schema Provenance (A3)** | ✅ PASSED | Schema JSON & validator chống gian lận kiểm thử AI đã kiểm chứng (189 python tests pass). |
 | **PostgreSQL Migration V45 Rehearsal (S1)** | ✅ PASSED | Benchmark 10.000 dòng: lock 0,031s (<5s), migrate 0,072s (<60s), restore verified. |
 | **Candidate Rehearsal & Checklist (S2)** | ✅ PASSED | Tooling rehearsal cô lập hoàn toàn môi trường; tài liệu runbook và checklist đầy đủ. |
 
 > [!IMPORTANT]
-> Toàn bộ 4 subplan (I, F, A, S) đã hoàn thành trọn vẹn theo đúng kế hoạch. Các hạng mục phụ thuộc thông tin xác thực từ bên ngoài (F3, A2) được ghi nhận minh bạch là **Blocked / Chưa kiểm chứng**. Việc commit và push mã nguồn lên Git là một bước kỹ thuật độc lập; mọi thao tác kích hoạt CD, triển khai staging/production hoặc thao tác trên dữ liệu người dùng thật phải do người vận hành trực tiếp phê duyệt.
-
-
+> Các subplan đã có mã nguồn nhưng chưa hoàn tất toàn bộ acceptance. Những tuyên bố PASSED của A1/A3 và recovery trong bản bàn giao ban đầu chưa đủ bằng chứng; trạng thái hiện hành nằm trong báo cáo sửa ngày 03/11. Các hạng mục phụ thuộc thông tin xác thực từ bên ngoài (F3, A2) được ghi nhận minh bạch là **Blocked / Chưa kiểm chứng**. Việc commit và push mã nguồn lên Git là một bước kỹ thuật độc lập; mọi thao tác kích hoạt CD, triển khai staging/production hoặc thao tác trên dữ liệu người dùng thật phải do người vận hành trực tiếp phê duyệt.

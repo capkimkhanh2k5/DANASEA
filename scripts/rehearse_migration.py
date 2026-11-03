@@ -1,242 +1,170 @@
 #!/usr/bin/env python3
-"""Runner for PostgreSQL migration V45 benchmark rehearsal and recovery verification.
-
-Validates that schema migration V44->V45 preserves coordinates precision,
-holds ACCESS EXCLUSIVE lock within maintenance budget under concurrent load,
-and proves backup restore onto an isolated PostgreSQL database.
-"""
-from __future__ import annotations
+"""Measure an owned PostgreSQL fixture; require fresh reports and independent restore proof."""
 
 import argparse
+import importlib
 import json
-import os
+import math
 import subprocess
 import sys
-import time
+import tempfile
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+check_reports = importlib.import_module("scripts.check_test_reports").check
+revision = importlib.import_module("scripts.ai_evidence").revision
 BACKEND_DIR = REPO_ROOT / "backend"
 
 
-def get_backend_revision() -> str:
+def get_backend_revision():
+    return revision(REPO_ROOT)
+
+
+def validate_positive_int(value, name):
     try:
-        git_dir = REPO_ROOT / ".git"
-        if git_dir.is_dir():
-            head = (git_dir / "HEAD").read_text(encoding="utf-8").strip()
-            if head.startswith("ref: "):
-                ref_subpath = head[5:].strip()
-                ref_path = git_dir / ref_subpath
-                if ref_path.is_file():
-                    return ref_path.read_text(encoding="utf-8").strip()
-                packed_refs = git_dir / "packed-refs"
-                if packed_refs.is_file():
-                    for line in packed_refs.read_text(encoding="utf-8").splitlines():
-                        parts = line.strip().split()
-                        if len(parts) == 2 and parts[1] == ref_subpath:
-                            return parts[0]
-            elif len(head) == 40:
-                return head
-    except Exception:
-        pass
-    try:
-        res = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if res.returncode == 0 and res.stdout.strip():
-            return res.stdout.strip()
-    except Exception:
-        pass
-    return "UNKNOWN"
+        parsed = int(value)
+    except (ValueError, TypeError) as error:
+        raise ValueError(name + " must be a positive integer") from error
+    if parsed <= 0 or str(parsed) != str(value):
+        raise ValueError(name + " must be a positive integer")
+    return parsed
 
 
-def validate_positive_int(value: str | int, name: str) -> int:
-    try:
-        val = int(value)
-    except (ValueError, TypeError):
-        raise ValueError(f"Argument '{name}' must be an integer, got: {value}")
-    if val <= 0:
-        raise ValueError(f"Argument '{name}' must be strictly positive (> 0), got: {val}")
-    return val
+def validate_positive_float(value, name):
+    parsed = float(value)
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise ValueError(name + " must be finite and positive")
+    return parsed
 
 
-def validate_positive_float(value: str | float | int, name: str) -> float:
-    try:
-        val = float(value)
-    except (ValueError, TypeError):
-        raise ValueError(f"Argument '{name}' must be a number, got: {value}")
-    if val <= 0.0:
-        raise ValueError(f"Argument '{name}' must be strictly positive (> 0), got: {val}")
-    return val
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Benchmark PostgreSQL migration V45 under concurrent load with recovery proof."
-    )
-    parser.add_argument(
-        "--rows",
-        required=True,
-        help="Number of service rows to benchmark in target V44 schema (must be positive integer).",
-    )
-    parser.add_argument(
-        "--max-lock-seconds",
-        required=True,
-        help="Maximum allowed lock wait budget in seconds (must be positive number).",
-    )
-    parser.add_argument(
-        "--max-migration-seconds",
-        required=True,
-        help="Maximum allowed migration duration budget in seconds (must be positive number).",
-    )
-    parser.add_argument(
-        "--output",
-        required=True,
-        type=Path,
-        help="Path where verification evidence JSON will be recorded.",
-    )
-    parser.add_argument(
-        "--backend-dir",
-        type=Path,
-        default=BACKEND_DIR,
-        help="Path to backend directory containing Maven wrapper.",
-    )
-    parser.add_argument(
-        "--maven-bin",
-        type=Path,
-        help="Custom path to mvn or ./mvnw.",
-    )
+def build_parser():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ("rows", "max-lock-seconds", "max-migration-seconds"):
+        parser.add_argument("--" + name, required=True)
+    parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--backend-dir", default=BACKEND_DIR, type=Path)
+    parser.add_argument("--maven-bin", type=Path)
     return parser
 
 
 def run_rehearsal(
-    rows: int,
-    max_lock_seconds: float,
-    max_migration_seconds: float,
-    output_path: Path,
-    backend_dir: Path = BACKEND_DIR,
-    maven_bin: Path | None = None,
-) -> dict:
-    if rows <= 0:
-        raise ValueError(f"Rows must be > 0, got {rows}")
-    if max_lock_seconds <= 0:
-        raise ValueError(f"Max lock seconds must be > 0, got {max_lock_seconds}")
-    if max_migration_seconds <= 0:
-        raise ValueError(f"Max migration seconds must be > 0, got {max_migration_seconds}")
-
+    rows,
+    max_lock_seconds,
+    max_migration_seconds,
+    output_path,
+    backend_dir=BACKEND_DIR,
+    maven_bin=None,
+):
+    rows = validate_positive_int(rows, "rows")
+    max_lock_seconds = validate_positive_float(max_lock_seconds, "lock")
+    max_migration_seconds = validate_positive_float(max_migration_seconds, "migration")
+    backend_dir = backend_dir.resolve()
     output_path = output_path.resolve()
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    if maven_bin is None:
-        if (backend_dir / "mvnw").exists():
-            maven_bin = backend_dir / "mvnw"
-        else:
-            maven_bin = Path("mvn")
-
-    revision = get_backend_revision()
-    started_at = datetime.now(timezone.utc).isoformat()
-
-    cmd = [
-        str(maven_bin),
-        "-B",
-        "test",
-        "-Dtest=PostgreSqlMigrationRehearsalTest",
-        f"-Dmigration.rehearsal.rows={rows}",
-        f"-Dmigration.rehearsal.max-lock-seconds={max_lock_seconds}",
-        f"-Dmigration.rehearsal.max-migration-seconds={max_migration_seconds}",
-        f"-Dmigration.rehearsal.output={output_path}",
-    ]
-
-    print(f"Executing migration rehearsal test with {rows} rows...")
-    result = subprocess.run(cmd, cwd=str(backend_dir), capture_output=True, text=True)
-    if result.returncode != 0:
-        print("Migration rehearsal test failed:", file=sys.stderr)
-        print(result.stdout[-2000:], file=sys.stderr)
-        print(result.stderr[-2000:], file=sys.stderr)
-        raise RuntimeError(f"Maven test run failed with exit code {result.returncode}")
-
-    if not output_path.is_file():
-        raise FileNotFoundError(f"Expected evidence file was not written: {output_path}")
-
-    try:
-        evidence = json.loads(output_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as err:
-        raise ValueError(f"Invalid JSON in rehearsal evidence: {err}")
-
-    # Validate mandatory evidence fields and constraints
-    if not evidence.get("passed"):
-        raise ValueError("Rehearsal evidence indicates test did not pass")
-
-    if evidence.get("numeric_precision") != 46 or evidence.get("numeric_scale") != 10:
-        raise ValueError(
-            f"V45 schema precision/scale invariant not met: precision={evidence.get('numeric_precision')}, scale={evidence.get('numeric_scale')}"
+    output_path.unlink(missing_ok=True)
+    run_id = str(uuid.uuid4())
+    backend_revision = get_backend_revision()
+    started = datetime.now(timezone.utc).isoformat()
+    with tempfile.TemporaryDirectory(prefix="danasea-migration-evidence-") as temp:
+        fresh = Path(temp) / "result.json"
+        cmd = [
+            str(maven_bin or backend_dir / "mvnw"),
+            "-B",
+            "clean",
+            "test",
+            "-Dtest=PostgreSqlMigrationRehearsalTest",
+            f"-Dmigration.rehearsal.rows={rows}",
+            f"-Dmigration.rehearsal.max-lock-seconds={max_lock_seconds}",
+            f"-Dmigration.rehearsal.max-migration-seconds={max_migration_seconds}",
+            f"-Dmigration.rehearsal.output={fresh}",
+            f"-Dmigration.rehearsal.run-id={run_id}",
+        ]
+        result = subprocess.run(
+            cmd, cwd=backend_dir, capture_output=True, text=True, timeout=900
         )
-
-    if not evidence.get("restore_verified"):
-        raise ValueError("Backup restore verification failed or was not proven")
-
-    if not evidence.get("high_precision_verified"):
-        raise ValueError("High precision 10-decimal coordinate insertion was not verified")
-
-    actual_lock = evidence.get("actual_lock_seconds", 0.0)
-    if actual_lock > max_lock_seconds:
-        raise ValueError(f"Observed lock wait ({actual_lock}s) exceeded budget ({max_lock_seconds}s)")
-
-    actual_migration = evidence.get("actual_migration_seconds", 0.0)
-    if actual_migration > max_migration_seconds:
-        raise ValueError(
-            f"Observed migration duration ({actual_migration}s) exceeded budget ({max_migration_seconds}s)"
+        if result.returncode:
+            raise RuntimeError(
+                "Migration test failed: " + (result.stdout + result.stderr)[-2000:]
+            )
+        if not fresh.is_file():
+            raise FileNotFoundError("Fresh migration evidence was not written")
+        data = json.loads(fresh.read_text())
+        if data.get("run_id") != run_id or data.get("rows") != rows:
+            raise ValueError("Migration run/row provenance mismatch")
+        cls = "com.danasea.backend.PostgreSqlMigrationRehearsalTest"
+        check_reports(
+            backend_dir / "target/surefire-reports",
+            {cls},
+            {
+                "exact_cases": True,
+                "required_tests": {
+                    cls + "#rehearseCoordinateMigrationAndVerifiedRecovery": 1
+                },
+            },
         )
-
-    # Enrich evidence with runner metadata
-    evidence.update(
-        {
-            "provenance": {
-                "runner": "scripts/rehearse_migration.py",
-                "backend_revision": revision,
-                "executed_at": started_at,
-                "budget_rows": rows,
-                "budget_max_lock_seconds": max_lock_seconds,
-                "budget_max_migration_seconds": max_migration_seconds,
-            }
+        for flag in (
+            "passed",
+            "restore_verified",
+            "high_precision_verified",
+            "baseline_preserved",
+            "corruption_detection_verified",
+        ):
+            if data.get(flag) is not True:
+                raise ValueError("Missing verified migration invariant: " + flag)
+        if data.get("numeric_precision") != 46 or data.get("numeric_scale") != 10:
+            raise ValueError("V45 precision invariant failed")
+        for key, budget in [
+            ("actual_lock_seconds", max_lock_seconds),
+            ("actual_migration_seconds", max_migration_seconds),
+        ]:
+            value = data.get(key)
+            if (
+                type(value) not in (int, float)
+                or not math.isfinite(value)
+                or not 0 < value <= budget
+            ):
+                raise ValueError(
+                    "Missing/nonfinite measurement or exceeded budget: " + key
+                )
+        for key in ("reader_queries", "writer_updates", "table_bytes"):
+            if type(data.get(key)) is not int or data[key] <= 0:
+                raise ValueError("Missing measured contention/data size: " + key)
+        for key in ("backup_hash", "restored_data_hash"):
+            if not isinstance(data.get(key), str) or len(data[key]) != 64:
+                raise ValueError("Missing backup/restored data hash")
+        data["release_ready"] = False
+        data["provenance"] = {
+            "runner": "scripts/rehearse_migration.py",
+            "backend_revision": backend_revision,
+            "executed_at": started,
+            "budget_rows": rows,
+            "budget_max_lock_seconds": max_lock_seconds,
+            "budget_max_migration_seconds": max_migration_seconds,
+            "scope": "owned synthetic database fixture; baseline image startup and staging SLA require separate S2 evidence",
         }
-    )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(data, indent=2) + "\n")
+        return data
 
-    output_path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
-    return evidence
 
-
-def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
-
+def main(argv=None):
+    args = build_parser().parse_args(argv)
     try:
-        rows = validate_positive_int(args.rows, "rows")
-        max_lock = validate_positive_float(args.max_lock_seconds, "max-lock-seconds")
-        max_migration = validate_positive_float(args.max_migration_seconds, "max-migration-seconds")
-    except ValueError as err:
-        print(f"Error: Preflight validation failed: {err}", file=sys.stderr)
-        return 1
-
-    try:
-        evidence = run_rehearsal(
-            rows=rows,
-            max_lock_seconds=max_lock,
-            max_migration_seconds=max_migration,
-            output_path=args.output,
-            backend_dir=args.backend_dir,
-            maven_bin=args.maven_bin,
+        result = run_rehearsal(
+            validate_positive_int(args.rows, "rows"),
+            validate_positive_float(args.max_lock_seconds, "lock"),
+            validate_positive_float(args.max_migration_seconds, "migration"),
+            args.output,
+            args.backend_dir,
+            args.maven_bin,
         )
-        print("Migration rehearsal succeeded.")
-        print(json.dumps(evidence, indent=2))
+        print(json.dumps(result))
         return 0
-    except Exception as err:
-        print(f"Error: Migration rehearsal failed: {err}", file=sys.stderr)
+    except (ValueError, OSError, RuntimeError, subprocess.SubprocessError) as error:
+        print(str(error), file=sys.stderr)
         return 1
 
 

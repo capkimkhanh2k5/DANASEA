@@ -93,6 +93,9 @@ class QuyetDecisionAdapterTest {
                     "review", "Hướng dẫn tốt", "complaint", "Tour đổi giờ", "context", "Du lịch Đà Nẵng", "service", "Kayak", "risk_signals", List.of("FAILED_PAYMENTS")));
             assertThat(result.available()).as(task.name()).isTrue(); assertThat(result.revision()).isEqualTo(REVISION);
             assertThat(result.suggestionOnly()).isTrue();
+            com.danasea.backend.modules.ai.support.AiAcceptanceRecorder.write(task.wireName(), Map.of(
+                    "requested_model", result.model(), "model_revision", result.revision(),
+                    "latency_ms", result.latencyMs(), "suggestion_only", result.suggestionOnly()));
         }
     }
 }

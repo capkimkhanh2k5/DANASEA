@@ -13,32 +13,11 @@ class AiAcceptanceValidationTest(unittest.TestCase):
         spec.loader.exec_module(cls.module)
 
     def base_valid_evidence(self):
-        return {
-            "schema_version": 1,
-            "phase": "java-worker-acceptance",
-            "backend_revision": "4e03b8e6f3b73a598dc3042d9a3c8c351d50991a",
-            "model_revision": "233167bba5df61b5375a522bf8a042d8d2189379",
-            "requested_model": "chinhnc/Quyet-1.0-Small",
-            "actual_provider": "quyet-small-local",
-            "route": "direct",
-            "technical_pass": True,
-            "business_evaluation": {
-                "suggestion_only": True,
-                "constraint_preservation": True,
-                "policy_boundary_respected": True,
-            },
-            "executed_cases": 1,
-            "case_outcomes": [
-                {"case_name": "RISK", "status": "PASSED", "latency_ms": 12.5}
-            ],
-            "token_provenance": {
-                "prompt_tokens": None,
-                "completion_tokens": None,
-                "total_tokens": None,
-                "cost_usd": None,
-            },
-            "status": "PASSED",
-        }
+        from scripts.ai_evidence import WORKER_TASKS, evidence
+        return evidence('java-worker-acceptance', '4e03b8e6f3b73a598dc3042d9a3c8c351d50991a', [
+            {'case_name': name, 'status': 'PASSED', 'requested_model': 'chinhnc/Quyet-1.0-Small',
+             'model_revision': '233167bba5df61b5375a522bf8a042d8d2189379',
+             'suggestion_only': True, 'latency_ms': 12.5} for name in WORKER_TASKS], 1.0)
 
     def test_valid_evidence_passes(self):
         evidence = self.base_valid_evidence()
@@ -64,7 +43,7 @@ class AiAcceptanceValidationTest(unittest.TestCase):
         evidence["technical_pass"] = True
         with self.assertRaises(self.module.AiAcceptanceValidationError) as ctx:
             self.module.validate_ai_evidence(evidence)
-        self.assertIn("technical_pass is True, but case 'RISK' failed", str(ctx.exception))
+        self.assertIn("technical_pass is True, but case failed", str(ctx.exception))
 
     def test_fallback_misrepresented_as_direct_is_rejected(self):
         evidence = self.base_valid_evidence()
@@ -72,13 +51,13 @@ class AiAcceptanceValidationTest(unittest.TestCase):
         evidence["route"] = "direct"
         with self.assertRaises(self.module.AiAcceptanceValidationError) as ctx:
             self.module.validate_ai_evidence(evidence)
-        self.assertIn("fallback occurred, but route is labeled 'direct'", str(ctx.exception))
+        self.assertIn("fallback occurred, but route is labeled direct", str(ctx.exception))
 
     def test_untracked_cost_falsely_recorded_as_zero_is_rejected(self):
         evidence = self.base_valid_evidence()
         # total_tokens is null, but cost_usd is set to 0 instead of null
         evidence["token_provenance"] = {
-            "total_tokens": None,
+            "prompt_tokens": None, "completion_tokens": None, "total_tokens": None,
             "cost_usd": 0,
         }
         with self.assertRaises(self.module.AiAcceptanceValidationError) as ctx:
@@ -90,7 +69,7 @@ class AiAcceptanceValidationTest(unittest.TestCase):
         evidence["business_evaluation"]["suggestion_only"] = False
         with self.assertRaises(self.module.AiAcceptanceValidationError) as ctx:
             self.module.validate_ai_evidence(evidence)
-        self.assertIn("AI decisions must be suggestion-only", str(ctx.exception))
+        self.assertIn("suggestion_only", str(ctx.exception))
 
     def test_check_file_integration(self):
         with tempfile.NamedTemporaryFile("w+", encoding="utf-8") as f:
@@ -101,5 +80,33 @@ class AiAcceptanceValidationTest(unittest.TestCase):
             self.assertEqual(parsed["status"], "PASSED")
 
 
-if __name__ == "__main__":
+
+class AiEvidenceRegressionTest(unittest.TestCase):
+    base_valid_evidence = AiAcceptanceValidationTest.base_valid_evidence
+
+    @classmethod
+    def setUpClass(cls):
+        AiAcceptanceValidationTest.setUpClass.__func__(cls)
+
+    def test_failed_technical_result_cannot_be_passed(self):
+        data = self.base_valid_evidence()
+        data['technical_pass'] = False
+        data['case_outcomes'][0]['status'] = 'FAILED'
+        with self.assertRaises(self.module.AiAcceptanceValidationError):
+            self.module.validate_ai_evidence(data)
+
+    def test_non_200_response_cannot_be_success(self):
+        data = self.base_valid_evidence()
+        data['case_outcomes'][0]['http_status'] = 500
+        with self.assertRaises(self.module.AiAcceptanceValidationError):
+            self.module.validate_ai_evidence(data)
+
+    def test_missing_worker_revision_is_rejected(self):
+        data = self.base_valid_evidence()
+        data.pop('model_revision')
+        with self.assertRaises(self.module.AiAcceptanceValidationError):
+            self.module.validate_ai_evidence(data)
+
+
+if __name__ == '__main__':
     unittest.main()

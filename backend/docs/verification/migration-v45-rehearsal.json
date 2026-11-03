@@ -20,5 +20,8 @@
     "budget_rows": 10000,
     "budget_max_lock_seconds": 5.0,
     "budget_max_migration_seconds": 60.0
-  }
+  },
+  "verification_status": "superseded_by_independent_review",
+  "release_ready": false,
+  "limitation": "Historical fixture copied a table and did not prove independent backup restore or baseline application startup. See acceptance-repair-2026-11-03.md."
 }

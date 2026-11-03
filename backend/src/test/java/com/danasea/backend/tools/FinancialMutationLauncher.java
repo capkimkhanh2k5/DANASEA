@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.platform.engine.discovery.DiscoverySelectors;
+import org.junit.platform.engine.support.descriptor.MethodSource;
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
@@ -48,11 +49,17 @@ public class FinancialMutationLauncher {
                         ? exception.getMessage().replace("\"", "\\\"").replace("\n", " ")
                         : "";
                 String testName = failure.getTestIdentifier().getDisplayName().replace("\"", "\\\"");
-                failureDetails.add(String.format("{\"test\":\"%s\",\"type\":\"%s\",\"message\":\"%s\"}", testName, type, msg));
+                boolean assertion = exception instanceof AssertionError && failure.getTestIdentifier().isTest()
+                        && failure.getTestIdentifier().getSource().filter(MethodSource.class::isInstance)
+                        .map(MethodSource.class::cast).map(method -> java.util.Arrays.stream(exception.getStackTrace())
+                                .anyMatch(frame -> frame.getClassName().equals(method.getClassName())
+                                        && frame.getMethodName().equals(method.getMethodName()))).orElse(false);
+                failureDetails.add(String.format("{\"test\":\"%s\",\"type\":\"%s\",\"message\":\"%s\",\"assertion\":%s}", testName, type, msg, assertion));
             }
 
             StringBuilder json = new StringBuilder();
             json.append("{");
+            json.append("\"containers_failed\":").append(summary.getContainersFailedCount()).append(",");
             json.append("\"found\":").append(found).append(",");
             json.append("\"passed\":").append(succeeded).append(",");
             json.append("\"failed\":").append(failed).append(",");

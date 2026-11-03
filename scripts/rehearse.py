@@ -2,6 +2,7 @@
 """Rehearse candidate images against owned, disposable production-like infrastructure."""
 import argparse
 import copy
+import hashlib
 import json
 import os
 import re
@@ -16,6 +17,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from contextlib import contextmanager
+from decimal import Decimal
 from pathlib import Path
 
 import acceptance
@@ -83,7 +85,7 @@ def http_json(url, body=None, token=None, expected=(200,)):
         if response.status not in expected:
             raise ValueError('Rehearsal HTTP contract failed: ' + str(response.status) + ' ' + urllib.parse.urlsplit(url).path)
         data = response.read()
-        return json.loads(data) if data else None
+        return json.loads(data, parse_float=Decimal) if data else None
 
 
 def business_probe(origin, postgres):
@@ -108,9 +110,9 @@ INSERT INTO service_slots(id,service_id,date,start_time,end_time,capacity,booked
     service_detail = http_json(origin + '/api/services/' + service)
     if not service_detail or 'latitude' not in service_detail or 'longitude' not in service_detail:
         raise ValueError('Rehearsal service detail missing coordinate fields')
-    lat = float(service_detail['latitude'])
-    lon = float(service_detail['longitude'])
-    if abs(lat - 16.0543219876) > 1e-8 or abs(lon - 108.2412345678) > 1e-8:
+    lat = Decimal(str(service_detail['latitude']))
+    lon = Decimal(str(service_detail['longitude']))
+    if lat != Decimal('16.0543219876') or lon != Decimal('108.2412345678'):
         raise ValueError(f'Rehearsal coordinate readback mismatch: lat={lat}, lon={lon}')
     hold = http_json(origin + '/api/bookings/hold', {'items': [{'slotId': slot, 'optionId': option, 'quantity': 1}]}, token, (201,))
     if float(hold['totalAmount']) != 500000:
@@ -119,7 +121,48 @@ INSERT INTO service_slots(id,service_id,date,start_time,end_time,capacity,booked
     http_json(origin + '/api/orders/' + order['id'], token=token)
 
 
+def validate_images(images):
+    if set(images) != set(release.SERVICES) or any(not isinstance(image, str) or not re.fullmatch(
+            r'(?:[A-Za-z0-9_./:-]+@)?sha256:[0-9a-f]{64}', image) for image in images.values()):
+        raise ValueError('Rehearsal requires immutable image digests or content IDs')
+
+
+def assert_owned(project):
+    if not re.fullmatch(r'danasea_rehearse_[0-9a-f]{12}', project):
+        raise ValueError('Invalid rehearsal ownership identity')
+    for kind, listing in [('container', ['docker', 'ps', '-aq']), ('network', ['docker', 'network', 'ls', '-q']),
+                          ('volume', ['docker', 'volume', 'ls', '-q'])]:
+        ids = execute([*listing, '--filter', 'label=com.docker.compose.project=' + project]).decode().split()
+        if not ids:
+            continue
+        objects = json.loads(execute(['docker', kind, 'inspect', *ids]))
+        for obj in objects:
+            labels = obj.get('Config', {}).get('Labels', {}) if kind == 'container' else obj.get('Labels', {})
+            if labels.get('io.danasea.rehearsal') != project or labels.get('com.docker.compose.project') != project:
+                raise ValueError('Refusing destructive operation on resource without rehearsal ownership')
+
+
+def database_fingerprint(postgres, database):
+    def query(sql):
+        return execute(['docker', 'exec', postgres, 'sh', '-ec',
+                        'exec psql -At -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$1" -c "$2"',
+                        'sh', database, sql]).decode().strip()
+    tables = query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename").splitlines()
+    if not tables:
+        raise ValueError('Cannot fingerprint an empty application database')
+    digest = hashlib.sha256()
+    for table in tables:
+        quoted = '"' + table.replace('"', '""') + '"'
+        rows = query('SELECT row_to_json(t)::text FROM public.' + quoted + ' t ORDER BY row_to_json(t)::text')
+        digest.update(table.encode() + b'\0' + rows.encode() + b'\0')
+    return digest.hexdigest()
+
+
 def rehearse(root, model_dir, images, baseline, output):
+    validate_images(images)
+    if baseline:
+        validate_images(baseline['images'])
+    output.unlink(missing_ok=True)
     production.validate_quyet_model(str(model_dir.resolve()))
     project = 'danasea_rehearse_' + secrets.token_hex(6)
     started = time.monotonic()
@@ -148,6 +191,10 @@ def rehearse(root, model_dir, images, baseline, output):
         config = json.loads(execute(['docker', 'compose', '-p', project, '--project-directory', str(temporary), '--env-file', str(envfile),
                                      '-f', str(root / 'docker-compose.prod.yml'), 'config', '--format', 'json']))
         config = isolate(config)
+        for group in ('services', 'networks', 'volumes'):
+            for resource in config.get(group, {}).values():
+                resource.setdefault('labels', {})['io.danasea.rehearsal'] = project
+
         for name, image in images.items():
             config['services'][name]['image'] = image
         config['services']['migrate']['image'] = images['backend']
@@ -171,6 +218,7 @@ def rehearse(root, model_dir, images, baseline, output):
             execute(['docker', 'exec', '-i', postgres, 'sh', '-ec',
                      'psql -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1'],
                     input=b"CREATE TABLE danasea_release_probe(id integer PRIMARY KEY, marker text); INSERT INTO danasea_release_probe VALUES(1,'preserve');")
+            baseline_fingerprint = database_fingerprint(postgres, values['POSTGRES_DB'])
             archive = temporary / 'rehearsal.dump'
             with archive.open('wb') as target:
                 subprocess.run(['docker', 'exec', postgres, 'sh', '-ec',
@@ -194,14 +242,48 @@ def rehearse(root, model_dir, images, baseline, output):
             if not isinstance(catalog.get('content'), list):
                 raise TypeError('Invalid catalog contract')
             acceptance.request(origin + '/api/orders', expected=(401, 403))
-            values = acceptance.backend_environment(container('backend'))
-            acceptance.validate_decision(acceptance.internal_post(container('backend'), 'http://quyet:8091/v1/decisions',
-                values['AI_QUYET_API_KEY'], {'task': 'intent', 'state': {'message': 'Tìm dịch vụ chèo SUP'}}))
+            backend_env = acceptance.backend_environment(container('backend'))
+            worker_tasks = ('intent', 'service_category', 'review', 'moderation', 'relevance', 'complaint', 'risk')
+            for task in worker_tasks:
+                decision = acceptance.internal_post(container('backend'), 'http://quyet:8091/v1/decisions',
+                    backend_env['AI_QUYET_API_KEY'], {'task': task, 'state': {
+                        'message': 'Tìm dịch vụ chèo SUP', 'content': 'Tour kayak có hướng dẫn viên',
+                        'review': 'Hướng dẫn tốt', 'complaint': 'Tour đổi giờ', 'context': 'Du lịch Đà Nẵng',
+                        'service': 'Kayak', 'risk_signals': ['FAILED_PAYMENTS']}})
+                acceptance.validate_decision(decision)
+                if decision.get('task') != task or decision.get('revision') != '233167bba5df61b5375a522bf8a042d8d2189379':
+                    raise ValueError('Worker task/revision readback mismatch')
             business_probe(origin, postgres)
+            # Deliberately stop the candidate and prove recovery in a different owned database.
+            assert_owned(project)
+            compose('stop', 'backend', 'frontend')
+            restored_database = 'danasea_restore_' + secrets.token_hex(8)
+            execute(['docker', 'exec', postgres, 'sh', '-ec', 'createdb -U "$POSTGRES_USER" "$1"', 'sh', restored_database])
+            backup.restore(archive, postgres, restored_database)
+            if database_fingerprint(postgres, restored_database) != baseline_fingerprint:
+                raise ValueError('Restored database content differs from baseline snapshot')
+            restored_values = dict(values, POSTGRES_DB=restored_database)
+            production.initialize_database(temporary, restored_values, postgres)
+            recovery_images = baseline['images'] if baseline else images
+            for service in ('backend', 'frontend'):
+                config['services'][service]['image'] = recovery_images[service]
+            config['services']['backend']['environment']['SPRING_DATASOURCE_URL'] = 'jdbc:postgresql://postgres:5432/' + restored_database
+            config['services']['migrate']['image'] = recovery_images['backend']
+            config['services']['migrate']['environment']['FLYWAY_URL'] = 'jdbc:postgresql://postgres:5432/' + restored_database
+            compose_file.write_text(json.dumps(config))
+            compose('up', '-d', '--wait', '--wait-timeout', '300', 'backend', 'frontend')
+            restored_origin = 'http://' + compose('port', 'frontend', '8080').decode().strip()
+            recovered_catalog = http_json(restored_origin + '/api/services?size=1')
+            if not isinstance(recovered_catalog.get('content'), list):
+                raise ValueError('Recovery application failed catalog readback')
+            acceptance.request(restored_origin + '/api/orders', expected=(401, 403))
+
             result = {'passed': True, 'images': images, 'baseline_sha': baseline['sha'] if baseline else '',
                       'restore_verified': True, 'existing_data_preserved': True, 'booking_order_verified': True,
-                      'worker_inference_verified': True, 'v45_coordinate_precision_verified': True,
-                      'provider_scope': 'real provider acceptance runs after production deployment',
+                      'worker_inference_verified': True, 'worker_tasks_verified': list(worker_tasks), 'v45_coordinate_precision_verified': True,
+                      'baseline_application_started': bool(baseline), 'recovery_application_started': True,
+                      'baseline_data_hash': baseline_fingerprint, 'restored_data_hash': baseline_fingerprint,
+                      'provider_scope': 'live payment/provider acceptance remains a separate sandbox gate',
                       'seconds': round(time.monotonic() - started, 2)}
             release.atomic_write(output, json.dumps(result, sort_keys=True) + '\n')
             print(json.dumps(result))
@@ -213,6 +295,7 @@ def rehearse(root, model_dir, images, baseline, output):
             raise
         finally:
             # This project owns every removed resource; no fixed container/network names are used.
+            assert_owned(project)
             compose('down', '--volumes', '--remove-orphans')
 
 

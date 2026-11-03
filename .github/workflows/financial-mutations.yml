@@ -42,12 +42,12 @@ jobs:
         run: ./mvnw -B test-compile
 
       - name: Execute Targeted Financial Mutation Proofs
-        run: python3 scripts/verify_financial_mutations.py --backend-dir backend --output backend/docs/verification/test-mutation-proof-2026-11-02.json
+        run: python3 scripts/verify_financial_mutations.py --backend-dir backend --output ${{ runner.temp }}/financial-mutation-proof.json
 
       - name: Upload Mutation Proof Evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: financial-mutation-proof-evidence
-          path: backend/docs/verification/test-mutation-proof-2026-11-02.json
+          path: ${{ runner.temp }}/financial-mutation-proof.json
           retention-days: 14

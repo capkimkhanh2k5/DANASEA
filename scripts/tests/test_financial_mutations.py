@@ -1,8 +1,7 @@
 import importlib.util
-import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 
 class FinancialMutationsTest(unittest.TestCase):
@@ -90,7 +89,7 @@ class FinancialMutationsTest(unittest.TestCase):
             "failed": 3,
             "skipped": 0,
             "aborted": 0,
-            "failures": [{"test": "sign_ValidPayload", "type": "AssertionError", "message": "expected true but was false"}],
+            "failures": [{"test": "sign_ValidPayload", "type": "AssertionError", "assertion": True, "message": "expected true but was false"}] * 3,
         }
 
         with patch.object(self.module, "compile_mutant"):
@@ -100,5 +99,26 @@ class FinancialMutationsTest(unittest.TestCase):
                 self.assertEqual(outcome["mutant"]["failed"], 3)
 
 
-if __name__ == "__main__":
+
+class MutationClassificationRegressionTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        FinancialMutationsTest.setUpClass.__func__(cls)
+
+    def test_setup_exception_is_inconclusive(self):
+        baseline = {'found': 13, 'passed': 13, 'failed': 0, 'skipped': 0, 'aborted': 0, 'containers_failed': 0}
+        mutant = {'found': 13, 'passed': 12, 'failed': 1, 'skipped': 0, 'aborted': 0, 'containers_failed': 0,
+                  'failures': [{'type': 'NullPointerException', 'assertion': False}]}
+        with patch.object(self.module, 'compile_mutant'), patch.object(self.module, 'run_launcher', side_effect=[baseline, mutant]):
+            outcome = self.module.execute_mutation_proof(self.module.MUTATIONS[0], Path(__file__).resolve().parents[2] / 'backend', 'unused')
+        self.assertFalse(outcome['killed'])
+
+    def test_container_failure_cannot_be_clean_baseline(self):
+        baseline = {'found': 13, 'passed': 0, 'failed': 0, 'skipped': 0, 'aborted': 0, 'containers_failed': 1}
+        with patch.object(self.module, 'run_launcher', return_value=baseline):
+            outcome = self.module.execute_mutation_proof(self.module.MUTATIONS[0], Path(__file__).resolve().parents[2] / 'backend', 'unused')
+        self.assertIn('Baseline', outcome.get('error', ''))
+
+
+if __name__ == '__main__':
     unittest.main()

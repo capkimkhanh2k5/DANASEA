@@ -1,124 +1,188 @@
 #!/usr/bin/env python3
-"""Validate AI acceptance evidence against schema and semantic integrity rules.
-
-Ensures strict separation between technical transport success, routing provenance,
-and business evaluation (suggestion-only, constraint preservation, policy boundary).
-Rejects falsified direct routes, missing revisions, fake 0 costs, and unmeasured metrics.
-"""
-from __future__ import annotations
+"""Validate measured acceptance outcomes and distinguish unknown routing/business facts."""
 
 import argparse
 import json
+import math
 import re
 import sys
 from pathlib import Path
 
-COMMIT_SHA_PATTERN = re.compile(r"^[0-9a-f]{7,40}$", re.IGNORECASE)
-ALLOWED_ROUTES = ("direct", "fallback", "unknown")
-ALLOWED_PHASES = ("java-worker-acceptance", "proxy-live-acceptance")
+WORKER_REVISION = "233167bba5df61b5375a522bf8a042d8d2189379"
+WORKER_CASES = {
+    "intent",
+    "service_category",
+    "review",
+    "moderation",
+    "relevance",
+    "complaint",
+    "risk",
+}
+PROXY_CASES = {
+    "reasoning-gemini-3.5-flash-lite",
+    "reasoning-gpt-oss-120b-medium",
+    "compaction",
+}
 
 
-class AiAcceptanceValidationError(Exception):
-    """Validation failure in AI acceptance evidence."""
+class AiAcceptanceValidationError(ValueError):
+    """Acceptance evidence cannot establish its claim."""
 
 
-def validate_ai_evidence(data: dict) -> None:
-    if not isinstance(data, dict):
-        raise AiAcceptanceValidationError("Evidence root must be a JSON object")
+def require(condition, message):
+    if not condition:
+        raise AiAcceptanceValidationError(message)
 
-    if data.get("schema_version") != 1:
-        raise AiAcceptanceValidationError(f"Expected schema_version 1, got {data.get('schema_version')}")
 
+def validate_ai_evidence(data):
+    require(
+        isinstance(data, dict) and data.get("schema_version") == 1,
+        "Expected schema_version 1 object",
+    )
     phase = data.get("phase")
-    if phase not in ALLOWED_PHASES:
-        raise AiAcceptanceValidationError(f"Invalid phase '{phase}', expected one of: {ALLOWED_PHASES}")
-
-    backend_rev = data.get("backend_revision")
-    if not backend_rev or not isinstance(backend_rev, str) or not COMMIT_SHA_PATTERN.match(backend_rev):
-        raise AiAcceptanceValidationError(f"Missing or invalid backend_revision SHA: '{backend_rev}'")
-
+    require(
+        phase in ("java-worker-acceptance", "proxy-live-acceptance"), "Invalid phase"
+    )
+    require(
+        isinstance(data.get("backend_revision"), str)
+        and re.fullmatch("[0-9a-f]{40}", data["backend_revision"]),
+        "Missing or invalid backend_revision SHA",
+    )
     route = data.get("route")
-    if route not in ALLOWED_ROUTES:
-        raise AiAcceptanceValidationError(f"Invalid route '{route}', expected one of: {ALLOWED_ROUTES}")
-
-    # Check for falsified direct label when fallback occurred
-    if data.get("fallback_occurred") is True and route == "direct":
-        raise AiAcceptanceValidationError("Evidence indicates fallback occurred, but route is labeled 'direct'")
-
-    technical_pass = data.get("technical_pass")
-    if not isinstance(technical_pass, bool):
-        raise AiAcceptanceValidationError("Field 'technical_pass' must be a boolean")
-
-    business_eval = data.get("business_evaluation")
-    if not isinstance(business_eval, dict):
-        raise AiAcceptanceValidationError("Field 'business_evaluation' must be an object")
-
-    for req_flag in ("suggestion_only", "constraint_preservation", "policy_boundary_respected"):
-        if req_flag not in business_eval or not isinstance(business_eval[req_flag], bool):
-            raise AiAcceptanceValidationError(f"Missing or non-boolean business evaluation flag: '{req_flag}'")
-
-    # Suggestion-only is a mandatory safety rule for AI decisions
-    if not business_eval.get("suggestion_only"):
-        raise AiAcceptanceValidationError("AI decisions must be suggestion-only; cannot be authoritative")
-
-    executed_cases = data.get("executed_cases")
-    if not isinstance(executed_cases, int) or executed_cases <= 0:
-        raise AiAcceptanceValidationError(f"Invalid executed_cases count: {executed_cases}")
-
-    case_outcomes = data.get("case_outcomes")
-    if not isinstance(case_outcomes, list) or len(case_outcomes) != executed_cases:
-        raise AiAcceptanceValidationError(
-            f"case_outcomes count ({len(case_outcomes) if isinstance(case_outcomes, list) else 0}) "
-            f"does not match executed_cases ({executed_cases})"
+    require(route in ("direct", "fallback", "unknown"), "Invalid route")
+    require(
+        not (data.get("fallback_occurred") is True and route == "direct"),
+        "fallback occurred, but route is labeled direct",
+    )
+    technical = data.get("technical_pass")
+    require(type(technical) is bool, "technical_pass must be boolean")
+    require(data.get("status") in ("PASSED", "FAILED"), "Invalid status")
+    require(data["status"] != "PASSED" or technical, "PASSED requires technical_pass")
+    business = data.get("business_evaluation")
+    require(isinstance(business, dict), "business_evaluation must be object")
+    for flag in (
+        "suggestion_only",
+        "constraint_preservation",
+        "policy_boundary_respected",
+    ):
+        require(
+            flag in business
+            and (business[flag] is None or type(business[flag]) is bool),
+            "Invalid business evaluation: " + flag,
         )
-
-    for case in case_outcomes:
-        if not isinstance(case, dict) or not case.get("case_name") or case.get("status") not in ("PASSED", "FAILED"):
-            raise AiAcceptanceValidationError(f"Invalid case outcome record: {case}")
-        if technical_pass is True and case.get("status") != "PASSED":
-            raise AiAcceptanceValidationError(
-                f"technical_pass is True, but case '{case.get('case_name')}' failed"
+        require(
+            data["status"] != "PASSED" or business[flag] is not False,
+            "Business evaluation failed: " + flag,
+        )
+    require(
+        business["suggestion_only"] is not False, "AI decisions must be suggestion-only"
+    )
+    cases = data.get("case_outcomes")
+    count = data.get("executed_cases")
+    require(
+        type(count) is int
+        and count > 0
+        and isinstance(cases, list)
+        and len(cases) == count,
+        "case_outcomes does not match executed_cases",
+    )
+    expected = WORKER_CASES if phase == "java-worker-acceptance" else PROXY_CASES
+    require(all(isinstance(case, dict) for case in cases), "Invalid case object")
+    names = [case.get("case_name") for case in cases]
+    require(
+        len(set(names)) == len(names) and set(names) == expected,
+        "Missing, duplicate or unexpected acceptance case",
+    )
+    for case in cases:
+        require(case.get("status") in ("PASSED", "FAILED"), "Invalid case status")
+        require(
+            not technical or case["status"] == "PASSED",
+            "technical_pass is True, but case failed",
+        )
+        if case.get("http_status") is not None:
+            code = case["http_status"]
+            require(
+                type(code) is int and (case["status"] != "PASSED" or 200 <= code < 300),
+                "Non-success HTTP labeled PASSED",
             )
-
-    token_prov = data.get("token_provenance")
-    if token_prov is not None:
-        if not isinstance(token_prov, dict):
-            raise AiAcceptanceValidationError("token_provenance must be an object or null")
-        # Check rule: cost_usd cannot be artificially 0 if not tracked
-        cost = token_prov.get("cost_usd")
-        if cost == 0 and token_prov.get("total_tokens") is None:
-            raise AiAcceptanceValidationError(
-                "Cost cannot be 0 when token usage is not measured; must be null"
+        latency = case.get("latency_ms")
+        require(
+            type(latency) in (int, float) and math.isfinite(latency) and latency >= 0,
+            "Missing or invalid measured latency",
+        )
+        require(bool(case.get("requested_model")), "Missing requested model")
+        if phase == "java-worker-acceptance":
+            require(
+                case.get("model_revision") == WORKER_REVISION
+                and case.get("suggestion_only") is True,
+                "Worker revision or suggestion-only observation missing",
             )
+        elif case["case_name"] == "compaction":
+            require(
+                case.get("constraint_preservation") is True
+                and case.get("finish_reason") == "stop"
+                and type(case.get("prompt_tokens")) is int
+                and case["prompt_tokens"] > 0,
+                "Compaction constraint/finish/usage observation missing",
+            )
+        else:
+            require(
+                case.get("response_status") == "ANSWERED",
+                "Proxy did not report ANSWERED",
+            )
+    if phase == "java-worker-acceptance":
+        require(
+            data.get("model_revision") == WORKER_REVISION,
+            "Missing or invalid worker model_revision",
+        )
+        require(
+            route == "direct" and data.get("actual_provider") == "quyet-small-local",
+            "Invalid owned worker provenance",
+        )
+    else:
+        require(
+            route == "unknown" and data.get("actual_provider") is None,
+            "Proxy upstream routing is unmeasured; use unknown/null",
+        )
+    usage = data.get("token_provenance")
+    require(isinstance(usage, dict), "Missing token_provenance")
+    for key in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        require(
+            key in usage
+            and (usage[key] is None or type(usage[key]) is int and usage[key] >= 0),
+            "Invalid token measurement",
+        )
+    cost = usage.get("cost_usd")
+    require(
+        cost is None
+        or type(cost) in (int, float)
+        and math.isfinite(cost)
+        and cost >= 0,
+        "Invalid cost",
+    )
+    require(
+        not (cost == 0 and usage.get("total_tokens") is None),
+        "Cost cannot be 0 when token usage is not measured; must be null",
+    )
 
-    overall_status = data.get("status")
-    if overall_status not in ("PASSED", "FAILED"):
-        raise AiAcceptanceValidationError(f"Invalid overall status: '{overall_status}'")
 
-    if technical_pass is True and overall_status != "PASSED":
-        raise AiAcceptanceValidationError("Status must be 'PASSED' when technical_pass is True and all cases passed")
-
-
-def check_file(path: Path) -> dict:
-    if not path.is_file():
-        raise FileNotFoundError(f"Evidence file not found: {path}")
-    content = path.read_text(encoding="utf-8")
-    data = json.loads(content)
+def check_file(path):
+    data = json.loads(Path(path).read_text())
     validate_ai_evidence(data)
     return data
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="Check AI acceptance evidence against schema and safety rules.")
-    parser.add_argument("evidence", type=Path, help="Path to evidence JSON file")
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("evidence", type=Path)
     args = parser.parse_args()
-
     try:
-        data = check_file(args.evidence.resolve())
-        print(f"[OK] AI Acceptance Evidence valid: {data.get('phase')} ({data.get('status')})")
+        data = check_file(args.evidence)
+        require(data["status"] == "PASSED", "Acceptance did not pass")
+        print("AI acceptance evidence valid: " + data["phase"])
         return 0
-    except Exception as e:
-        sys.stderr.write(f"[ERROR] Invalid AI acceptance evidence: {e}\n")
+    except (ValueError, OSError) as error:
+        print(str(error), file=sys.stderr)
         return 1
 
 

@@ -1,7 +1,7 @@
 package com.danasea.backend;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,11 +25,14 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.TreeMap;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-@Testcontainers(disabledWithoutDocker = true)
+@Testcontainers
 class PostgreSqlMigrationRehearsalTest {
 
     @Container
@@ -83,7 +86,9 @@ class PostgreSqlMigrationRehearsalTest {
         }
 
         String schema = "rehearsal_v44";
-        String restoreSchema = "rehearsal_v44_restored";
+        String restoreDatabase = "rehearsal_v44_restored";
+        assertTrue(rows > 0 && Double.isFinite(maxLockSeconds) && maxLockSeconds > 0
+                && Double.isFinite(maxMigrationSeconds) && maxMigrationSeconds > 0);
 
         // Step 1: Migrate up to target 44
         Flyway flywayV44 = Flyway.configure()
@@ -134,247 +139,193 @@ class PostgreSqlMigrationRehearsalTest {
             }
         }
 
-        // Step 3: Compute baseline invariants and take backup snapshot
-        long baselineCount;
-        String backupHash;
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, "rehearsal_user", "rehearsal_password");
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("SET search_path TO " + schema);
 
-            try (ResultSet rs = stmt.executeQuery("SELECT count(*) FROM services")) {
+        Snapshot baseline;
+        String coordinateHash;
+        long tableBytes;
+        try (Connection conn = connect(jdbcUrl)) {
+            baseline = snapshot(conn, schema);
+            coordinateHash = coordinateHash(conn, schema);
+            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(
+                    "SELECT pg_total_relation_size('" + schema + ".services')")) {
                 assertTrue(rs.next());
-                baselineCount = rs.getLong(1);
-                assertEquals(rows, baselineCount);
-            }
-
-            // Create backup table for recovery proof
-            stmt.executeUpdate("CREATE TABLE services_backup AS SELECT * FROM services");
-
-            // Calculate SHA-256 fingerprint of baseline state
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            try (ResultSet rs = stmt.executeQuery("SELECT id, latitude, longitude FROM services ORDER BY id LIMIT 500")) {
-                while (rs.next()) {
-                    digest.update(rs.getString(1).getBytes(StandardCharsets.UTF_8));
-                    digest.update(rs.getString(2).getBytes(StandardCharsets.UTF_8));
-                    digest.update(rs.getString(3).getBytes(StandardCharsets.UTF_8));
-                }
-            }
-            byte[] hashBytes = digest.digest();
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hashBytes) {
-                sb.append(String.format("%02x", b));
-            }
-            backupHash = sb.toString();
-        }
-
-        // Step 4: Concurrent reader & writer threads during migration
-        AtomicBoolean running = new AtomicBoolean(true);
-        AtomicLong maxLockWaitNanos = new AtomicLong(0);
-        AtomicInteger readerQueries = new AtomicInteger(0);
-        AtomicInteger writerUpdates = new AtomicInteger(0);
-
-        Thread readerThread = new Thread(() -> {
-            try (Connection conn = DriverManager.getConnection(jdbcUrl, "rehearsal_user", "rehearsal_password");
-                 Statement stmt = conn.createStatement()) {
-                stmt.execute("SET search_path TO " + schema);
-                while (running.get()) {
-                    long t0 = System.nanoTime();
-                    try (ResultSet rs = stmt.executeQuery("SELECT count(*), max(latitude) FROM services WHERE id = '" + referenceServiceId + "'")) {
-                        if (rs.next()) {
-                            readerQueries.incrementAndGet();
-                        }
-                    }
-                    long wait = System.nanoTime() - t0;
-                    maxLockWaitNanos.updateAndGet(curr -> Math.max(curr, wait));
-                    Thread.sleep(5);
-                }
-            } catch (Exception ignored) {
-            }
-        });
-
-        Thread writerThread = new Thread(() -> {
-            try (Connection conn = DriverManager.getConnection(jdbcUrl, "rehearsal_user", "rehearsal_password");
-                 Statement stmt = conn.createStatement()) {
-                stmt.execute("SET search_path TO " + schema);
-                while (running.get()) {
-                    long t0 = System.nanoTime();
-                    int updated = stmt.executeUpdate("UPDATE services SET view_count = view_count + 1 WHERE id = '" + referenceServiceId + "'");
-                    if (updated > 0) {
-                        writerUpdates.incrementAndGet();
-                    }
-                    long wait = System.nanoTime() - t0;
-                    maxLockWaitNanos.updateAndGet(curr -> Math.max(curr, wait));
-                    Thread.sleep(10);
-                }
-            } catch (Exception ignored) {
-            }
-        });
-
-        readerThread.start();
-        writerThread.start();
-
-        // Step 5: Execute Migration V45 under concurrent contention
-        long migStart = System.nanoTime();
-        Flyway flywayV45 = Flyway.configure()
-                .dataSource(jdbcUrl, "rehearsal_user", "rehearsal_password")
-                .schemas(schema)
-                .defaultSchema(schema)
-                .locations("classpath:db/migration")
-                .target("45")
-                .load();
-        flywayV45.migrate();
-        long migEnd = System.nanoTime();
-
-        running.set(false);
-        readerThread.join(5000);
-        writerThread.join(5000);
-
-        double actualMigrationSeconds = (migEnd - migStart) / 1_000_000_000.0;
-        double actualLockSeconds = maxLockWaitNanos.get() / 1_000_000_000.0;
-
-        assertTrue(actualMigrationSeconds <= maxMigrationSeconds,
-                "Migration duration (" + actualMigrationSeconds + "s) exceeded budget (" + maxMigrationSeconds + "s)");
-        assertTrue(actualLockSeconds <= maxLockSeconds,
-                "Observed lock wait (" + actualLockSeconds + "s) exceeded budget (" + maxLockSeconds + "s)");
-
-        // Step 6: Verify V45 schema columns and precision/scale
-        int numPrecisionLat = 0;
-        int numScaleLat = 0;
-        int numPrecisionLon = 0;
-        int numScaleLon = 0;
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, "rehearsal_user", "rehearsal_password");
-             PreparedStatement ps = conn.prepareStatement(
-                     "SELECT column_name, numeric_precision, numeric_scale "
-                             + "FROM information_schema.columns "
-                             + "WHERE table_schema = ? AND table_name = 'services' AND column_name IN ('latitude', 'longitude')")) {
-            ps.setString(1, schema);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    String col = rs.getString("column_name");
-                    int prec = rs.getInt("numeric_precision");
-                    int sc = rs.getInt("numeric_scale");
-                    if ("latitude".equalsIgnoreCase(col)) {
-                        numPrecisionLat = prec;
-                        numScaleLat = sc;
-                    } else if ("longitude".equalsIgnoreCase(col)) {
-                        numPrecisionLon = prec;
-                        numScaleLon = sc;
-                    }
-                }
+                tableBytes = rs.getLong(1);
             }
         }
-        assertEquals(46, numPrecisionLat, "latitude numeric_precision must be 46");
-        assertEquals(10, numScaleLat, "latitude numeric_scale must be 10");
-        assertEquals(46, numPrecisionLon, "longitude numeric_precision must be 46");
-        assertEquals(10, numScaleLon, "longitude numeric_scale must be 10");
-
-        // Step 7: Verify baseline data preservation
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, "rehearsal_user", "rehearsal_password");
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("SET search_path TO " + schema);
-
-            try (ResultSet rs = stmt.executeQuery("SELECT count(*) FROM services")) {
-                assertTrue(rs.next());
-                assertEquals(baselineCount, rs.getLong(1), "Total row count must be preserved");
+        checkedExec("pg_dump", "-U", "rehearsal_user", "-d", "rehearsal_test", "-Fc",
+                "--no-owner", "--no-privileges", "-f", "/tmp/rehearsal.dump");
+        String backupHash = checkedExec("sha256sum", "/tmp/rehearsal.dump").split(" ")[0];
+        double actualMigrationSeconds;
+        double actualLockSeconds;
+        try (Connection blocker = connect(jdbcUrl); var executor = Executors.newFixedThreadPool(3)) {
+            blocker.setAutoCommit(false);
+            try (Statement stmt = blocker.createStatement()) {
+                stmt.execute("LOCK TABLE " + schema + ".services IN ACCESS SHARE MODE");
             }
-
-            try (ResultSet rs = stmt.executeQuery("SELECT latitude, longitude FROM services WHERE id = '" + referenceServiceId + "'")) {
+            long migrationStart = System.nanoTime();
+            var migration = executor.submit(() -> Flyway.configure()
+                    .dataSource(jdbcUrl, "rehearsal_user", "rehearsal_password").schemas(schema).defaultSchema(schema)
+                    .locations("classpath:db/migration").target("45")
+                    .initSql("SET lock_timeout = '" + (long)(maxLockSeconds * 1000) + "ms'; SET statement_timeout = '"
+                            + (long)(maxMigrationSeconds * 1000) + "ms'")
+                    .load().migrate());
+            awaitWaitingLocks(jdbcUrl, schema, 1);
+            CountDownLatch attempted = new CountDownLatch(2);
+            var reader = executor.submit(() -> blockedOperation(jdbcUrl,
+                    "SELECT count(*) FROM " + schema + ".services", attempted, false));
+            var writer = executor.submit(() -> blockedOperation(jdbcUrl,
+                    "UPDATE " + schema + ".services SET view_count=view_count+1 WHERE id='" + referenceServiceId + "'", attempted, true));
+            assertTrue(attempted.await(5, TimeUnit.SECONDS));
+            // Observe the migration, reader and writer blocked in PostgreSQL, not merely submitted futures.
+            awaitWaitingLocks(jdbcUrl, schema, 3);
+            blocker.commit();
+            migration.get((long)Math.ceil(maxMigrationSeconds) + 5, TimeUnit.SECONDS);
+            actualMigrationSeconds = (System.nanoTime() - migrationStart) / 1_000_000_000.0;
+            actualLockSeconds = Math.max(reader.get(10, TimeUnit.SECONDS), writer.get(10, TimeUnit.SECONDS));
+        }
+        assertTrue(actualMigrationSeconds <= maxMigrationSeconds, "Migration duration exceeded budget");
+        assertTrue(actualLockSeconds > 0 && actualLockSeconds <= maxLockSeconds, "Observed query blocking exceeded budget");
+        try (Connection conn = connect(jdbcUrl)) {
+            assertEquals(coordinateHash, coordinateHash(conn, schema), "Every existing coordinate must survive migration");
+            Map<String, Long> expectedCounts = new TreeMap<>(baseline.counts());
+            expectedCounts.compute("flyway_schema_history", (key, count) -> count + 1);
+            assertEquals(expectedCounts, snapshot(conn, schema).counts(), "Only the V45 history row may be added");
+            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(
+                    "SELECT count(*) FROM information_schema.columns WHERE table_schema='" + schema
+                            + "' AND table_name='services' AND column_name IN ('latitude','longitude')"
+                            + " AND numeric_precision=46 AND numeric_scale=10")) {
                 assertTrue(rs.next());
-                assertEquals(0, rs.getBigDecimal("latitude").compareTo(new BigDecimal("16.12")));
-                assertEquals(0, rs.getBigDecimal("longitude").compareTo(new BigDecimal("108.26")));
+                assertEquals(2, rs.getInt(1));
+            }
+            try (PreparedStatement update = conn.prepareStatement("UPDATE " + schema
+                    + ".services SET latitude=?,longitude=? WHERE id=?")) {
+                update.setBigDecimal(1, new BigDecimal("16.0543219876"));
+                update.setBigDecimal(2, new BigDecimal("108.2412345678"));
+                update.setObject(3, referenceServiceId);
+                assertEquals(1, update.executeUpdate());
+            }
+            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(
+                    "SELECT latitude,longitude FROM " + schema + ".services WHERE id='" + referenceServiceId + "'")) {
+                assertTrue(rs.next());
+                assertEquals(new BigDecimal("16.0543219876"), rs.getBigDecimal(1));
+                assertEquals(new BigDecimal("108.2412345678"), rs.getBigDecimal(2));
             }
         }
-
-        // Step 8: Verify insertion and readback of 10-decimal high precision coordinates
-        BigDecimal preciseLat = new BigDecimal("16.0543219876");
-        BigDecimal preciseLon = new BigDecimal("108.2412345678");
-        UUID preciseServiceId = UUID.randomUUID();
-
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, "rehearsal_user", "rehearsal_password");
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("SET search_path TO " + schema);
-
-            stmt.executeUpdate("INSERT INTO services(id, vendor_id, category_id, name, slug, status, price, weather_sensitive, view_count, waiver_required, latitude, longitude, created_at, updated_at) "
-                    + "VALUES ('" + preciseServiceId + "', '" + vendorId + "', '" + categoryId + "', 'Precise Service', 'precise-service', 'PUBLISHED', 350000, false, 0, false, "
-                    + preciseLat + ", " + preciseLon + ", now(), now())");
-
-            try (ResultSet rs = stmt.executeQuery("SELECT latitude, longitude FROM services WHERE id = '" + preciseServiceId + "'")) {
-                assertTrue(rs.next());
-                assertEquals(preciseLat, rs.getBigDecimal("latitude"));
-                assertEquals(preciseLon, rs.getBigDecimal("longitude"));
+        assertEquals(backupHash, checkedExec("sha256sum", "/tmp/rehearsal.dump").split(" ")[0]);
+        checkedExec("createdb", "-U", "rehearsal_user", restoreDatabase);
+        checkedExec("pg_restore", "-U", "rehearsal_user", "--no-owner", "--no-privileges", "--exit-on-error",
+                "-d", restoreDatabase, "/tmp/rehearsal.dump");
+        String restoreUrl = jdbcUrl.replace("/rehearsal_test", "/" + restoreDatabase);
+        Flyway restored = Flyway.configure().dataSource(restoreUrl, "rehearsal_user", "rehearsal_password")
+                .schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("44").load();
+        assertTrue(restored.validateWithResult().validationSuccessful);
+        try (Connection conn = connect(restoreUrl)) {
+            assertEquals(baseline, snapshot(conn, schema), "Restored full data/counts/Flyway history must match pre-migration database");
+            try (Statement stmt = conn.createStatement()) {
+                assertEquals(rows, stmt.executeUpdate("UPDATE " + schema + ".services SET price=1,name='CORRUPTED'"));
             }
+            assertThrows(AssertionError.class, () -> assertEquals(baseline, snapshot(conn, schema)),
+                    "Recovery checker must detect corruption even when counts and coordinates still match");
         }
-
-        // Step 9: Restore verification into separate isolated schema
-        Flyway flywayRestore = Flyway.configure()
-                .dataSource(jdbcUrl, "rehearsal_user", "rehearsal_password")
-                .schemas(restoreSchema)
-                .defaultSchema(restoreSchema)
-                .locations("classpath:db/migration")
-                .target("44")
-                .connectRetries(30)
-                .load();
-        flywayRestore.migrate();
-        assertTrue(flywayRestore.validateWithResult().validationSuccessful, "Restored schema V44 must pass Flyway validation");
-
-        // Copy baseline data from backup into restored schema
-        try (Connection conn = DriverManager.getConnection(jdbcUrl, "rehearsal_user", "rehearsal_password");
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("SET search_path TO " + restoreSchema);
-
-            stmt.executeUpdate("INSERT INTO users SELECT * FROM " + schema + ".users WHERE id = '" + vendorUserId + "' ON CONFLICT DO NOTHING");
-            stmt.executeUpdate("INSERT INTO vendors SELECT * FROM " + schema + ".vendors WHERE id = '" + vendorId + "' ON CONFLICT DO NOTHING");
-            stmt.executeUpdate("INSERT INTO categories SELECT * FROM " + schema + ".categories WHERE id = '" + categoryId + "' ON CONFLICT DO NOTHING");
-
-            java.util.List<String> insertCols = new java.util.ArrayList<>();
-            try (PreparedStatement psCols = conn.prepareStatement(
-                    "SELECT column_name FROM information_schema.columns WHERE table_schema = ? AND table_name = 'services' AND is_generated = 'NEVER' ORDER BY ordinal_position")) {
-                psCols.setString(1, restoreSchema);
-                try (ResultSet rsCols = psCols.executeQuery()) {
-                    while (rsCols.next()) {
-                        insertCols.add(rsCols.getString(1));
-                    }
-                }
-            }
-            String colList = String.join(", ", insertCols);
-            stmt.executeUpdate("INSERT INTO " + restoreSchema + ".services (" + colList + ") SELECT " + colList + " FROM " + schema + ".services_backup");
-
-            try (ResultSet rs = stmt.executeQuery("SELECT count(*) FROM services")) {
-                assertTrue(rs.next());
-                assertEquals(baselineCount, rs.getLong(1), "Restored schema must have identical row count");
-            }
-
-            try (ResultSet rs = stmt.executeQuery("SELECT latitude, longitude FROM services WHERE id = '" + referenceServiceId + "'")) {
-                assertTrue(rs.next());
-                assertEquals(0, rs.getBigDecimal("latitude").compareTo(new BigDecimal("16.12")));
-                assertEquals(0, rs.getBigDecimal("longitude").compareTo(new BigDecimal("108.26")));
-            }
-        }
-
-        // Step 10: Emit evidence JSON if output path requested
         if (outputPath != null && !outputPath.isBlank()) {
-            File outFile = new File(outputPath);
-            if (outFile.getParentFile() != null) {
-                outFile.getParentFile().mkdirs();
-            }
+            File out = new File(outputPath);
+            if (out.getParentFile() != null) out.getParentFile().mkdirs();
             Map<String, Object> evidence = new HashMap<>();
-            evidence.put("schema", schema);
+            evidence.put("run_id", System.getProperty("migration.rehearsal.run-id"));
             evidence.put("rows", rows);
             evidence.put("postgres_version", pgVersion);
-            evidence.put("actual_lock_seconds", Math.round(actualLockSeconds * 1000.0) / 1000.0);
-            evidence.put("actual_migration_seconds", Math.round(actualMigrationSeconds * 1000.0) / 1000.0);
-            evidence.put("max_lock_seconds_budget", maxLockSeconds);
-            evidence.put("max_migration_seconds_budget", maxMigrationSeconds);
-            evidence.put("numeric_precision", numPrecisionLat);
-            evidence.put("numeric_scale", numScaleLat);
+            evidence.put("table_bytes", tableBytes);
+            evidence.put("actual_lock_seconds", actualLockSeconds);
+            evidence.put("actual_migration_seconds", actualMigrationSeconds);
+            evidence.put("numeric_precision", 46);
+            evidence.put("numeric_scale", 10);
+            evidence.put("backup_hash", backupHash);
+            evidence.put("restored_data_hash", baseline.hash());
+            evidence.put("table_counts", baseline.counts());
             evidence.put("baseline_preserved", true);
             evidence.put("high_precision_verified", true);
             evidence.put("restore_verified", true);
-            evidence.put("backup_hash", backupHash);
+            evidence.put("corruption_detection_verified", true);
+            evidence.put("reader_queries", 1);
+            evidence.put("writer_updates", 1);
+            evidence.put("baseline_application_started", false);
+            evidence.put("release_ready", false);
             evidence.put("passed", true);
+            new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(out, evidence);
+        }
+    }
 
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.writerWithDefaultPrettyPrinter().writeValue(outFile, evidence);
+    private static Connection connect(String url) throws Exception {
+        return DriverManager.getConnection(url, "rehearsal_user", "rehearsal_password");
+    }
+
+    private static String checkedExec(String... command) throws Exception {
+        var result = POSTGRES.execInContainer(command);
+        assertEquals(0, result.getExitCode(), "Database backup/restore command failed: " + result.getStderr());
+        return result.getStdout().trim();
+    }
+
+    private record Snapshot(Map<String, Long> counts, String hash) { }
+
+    private static Snapshot snapshot(Connection conn, String schema) throws Exception {
+        Map<String, Long> counts = new TreeMap<>();
+        MessageDigest hash = MessageDigest.getInstance("SHA-256");
+        List<String> tables = new ArrayList<>();
+        try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(
+                "SELECT tablename FROM pg_tables WHERE schemaname='" + schema + "' ORDER BY tablename")) {
+            while (rs.next()) tables.add(rs.getString(1));
+        }
+        assertTrue(!tables.isEmpty());
+        for (String table : tables) {
+            long count = 0;
+            hash.update(table.getBytes(StandardCharsets.UTF_8));
+            try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(
+                    "SELECT to_jsonb(t)::text FROM " + schema + ".\"" + table + "\" t ORDER BY to_jsonb(t)::text")) {
+                while (rs.next()) {
+                    hash.update(rs.getString(1).getBytes(StandardCharsets.UTF_8));
+                    hash.update((byte)'\n');
+                    count++;
+                }
+            }
+            counts.put(table, count);
+        }
+        return new Snapshot(counts, java.util.HexFormat.of().formatHex(hash.digest()));
+    }
+
+    private static String coordinateHash(Connection conn, String schema) throws Exception {
+        MessageDigest hash = MessageDigest.getInstance("SHA-256");
+        try (Statement stmt = conn.createStatement(); ResultSet rs = stmt.executeQuery(
+                "SELECT id,trim_scale(latitude),trim_scale(longitude) FROM " + schema + ".services ORDER BY id")) {
+            while (rs.next()) {
+                for (int i = 1; i <= 3; i++) hash.update(String.valueOf(rs.getString(i)).getBytes(StandardCharsets.UTF_8));
+            }
+        }
+        return java.util.HexFormat.of().formatHex(hash.digest());
+    }
+
+    private static void awaitWaitingLocks(String url, String schema, int expected) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(4);
+        try (Connection conn = connect(url); Statement stmt = conn.createStatement()) {
+            do {
+                try (ResultSet rs = stmt.executeQuery("SELECT count(*) FROM pg_locks WHERE relation='" + schema
+                        + ".services'::regclass AND NOT granted")) {
+                    assertTrue(rs.next());
+                    if (rs.getInt(1) >= expected) return;
+                }
+                Thread.sleep(10);
+            } while (System.nanoTime() < deadline);
+        }
+        throw new AssertionError("Concurrent migration/reader/writer locks were not observed");
+    }
+
+    private static double blockedOperation(String url, String sql, CountDownLatch attempted, boolean update) throws Exception {
+        try (Connection conn = connect(url); Statement stmt = conn.createStatement()) {
+            stmt.setQueryTimeout(10);
+            attempted.countDown();
+            long start = System.nanoTime();
+            if (update) assertEquals(1, stmt.executeUpdate(sql));
+            else try (ResultSet rs = stmt.executeQuery(sql)) { assertTrue(rs.next()); }
+            return (System.nanoTime() - start) / 1_000_000_000.0;
         }
     }
 }

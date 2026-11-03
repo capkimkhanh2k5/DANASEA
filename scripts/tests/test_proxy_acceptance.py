@@ -1,9 +1,10 @@
 import importlib.util
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 
 class ProxyAcceptanceTest(unittest.TestCase):
@@ -40,55 +41,38 @@ class ProxyAcceptanceTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.module.validate_base_url("http://user:pass@proxy.internal:8080")
 
-        sanitized = self.module.validate_base_url("https://proxy.internal:8080/")
+        with patch.dict(os.environ, {"AI_PROXY_ALLOWED_HOSTS": "proxy.internal"}):
+            sanitized = self.module.validate_base_url("https://proxy.internal:8080/")
         self.assertEqual(sanitized, "https://proxy.internal:8080")
 
-    def test_fewer_than_three_executions_raises_runtime_error(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            key_file = temp_path / "proxy.key"
-            key_file.write_text("a" * 32, encoding="utf-8")
-            output_file = temp_path / "out.json"
+    def exercise(self, omit=None):
+        from scripts.tests.acceptance_fixtures import fake_maven
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'AI_PROXY_ALLOWED_HOSTS': 'proxy.internal'}):
+            root = Path(temp)
+            key = root / 'key'
+            key.write_text('a' * 32)
+            with patch.object(self.module, 'get_backend_revision', return_value='1' * 40), \
+                 patch('subprocess.run', side_effect=lambda command, **kw: fake_maven(command, root, 'proxy', omit)):
+                self.module.run_proxy_acceptance('https://proxy.internal', key, root / 'out.json', root)
+            return json.loads((root / 'out.json').read_text())
 
-            with patch("subprocess.run") as mock_run, \
-                 patch.object(self.module, "check_test_reports", return_value={"executed": 2, "allowed_skipped": 0}):
-                mock_run.return_value = MagicMock(returncode=0)
+    def test_missing_exact_case_is_rejected_by_real_checker(self):
+        identity = 'com.danasea.backend.modules.ai.infrastructure.cliproxy.ProxyLiveSmokeTest#realProxyCompactionKeepsOldNonSwimmingConstraintAndAnswersCurrentQuestion'
+        with self.assertRaisesRegex(ValueError, 'Required testcase'):
+            self.exercise(identity)
 
-                with self.assertRaises(RuntimeError) as ctx:
-                    self.module.run_proxy_acceptance(
-                        base_url="https://proxy.internal",
-                        key_file=key_file,
-                        output_file=output_file,
-                        backend_dir=temp_path
-                    )
-                self.assertIn("Expected at least 3 proxy test executions", str(ctx.exception))
+    def test_successful_run_uses_measured_cases_and_unknown_upstream(self):
+        data = self.exercise()
+        self.assertEqual(data['executed_cases'], 3)
+        self.assertEqual(data['route'], 'unknown')
+        self.assertIsNone(data['actual_provider'])
+        self.assertIsNone(data['token_provenance']['cost_usd'])
 
-    def test_successful_run_creates_evidence_without_key_leakage(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            key_file = temp_path / "proxy.key"
-            secret_key = "my-secret-cliproxy-key-12345678"
-            key_file.write_text(secret_key, encoding="utf-8")
-            output_file = temp_path / "evidence.json"
-
-            with patch("subprocess.run") as mock_run, \
-                 patch.object(self.module, "check_test_reports", return_value={"executed": 3, "allowed_skipped": 0}):
-                mock_run.return_value = MagicMock(returncode=0)
-
-                exit_code = self.module.run_proxy_acceptance(
-                    base_url="https://proxy.internal",
-                    key_file=key_file,
-                    output_file=output_file,
-                    backend_dir=temp_path
-                )
-                self.assertEqual(exit_code, 0)
-                self.assertTrue(output_file.is_file())
-                content = output_file.read_text(encoding="utf-8")
-                self.assertNotIn(secret_key, content)
-                data = json.loads(content)
-                self.assertEqual(data["total_executions"], 3)
-                self.assertEqual(data["status"], "PASSED")
+    def test_allowlist_blocks_arbitrary_target(self):
+        with patch.dict(os.environ, {'AI_PROXY_ALLOWED_HOSTS': 'proxy.internal'}):
+            with self.assertRaisesRegex(ValueError, 'allowlist'):
+                self.module.validate_base_url('https://attacker.invalid')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

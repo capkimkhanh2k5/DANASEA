@@ -1,530 +1,696 @@
 #!/usr/bin/env python3
-"""Guarded payment acceptance runner for PayPal and VNPay sandbox environments.
+"""Operate only on signed sandbox fixtures; preserve private sessions between phases."""
 
-Preflight gates ensure environment safety and sandbox host pinning before any network calls.
-Session files maintain owned IDs and execution provenance across lifecycle phases.
-Sensitive secrets and bearer tokens are strictly forbidden from evidence and session outputs.
-"""
 import argparse
+import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import time
-import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 SUPPORTED_PROVIDERS = ("paypal", "vnpay")
 PAYPAL_SANDBOX_HOST = "api-m.sandbox.paypal.com"
 VNPAY_SANDBOX_HOST = "sandbox.vnpayment.vn"
-COMMIT_SHA_PATTERN = re.compile(r"^[0-9a-f]{7,40}$", re.IGNORECASE)
 
 
-class AcceptanceError(Exception):
-    """Business or safety contract failure in payment acceptance."""
+class AcceptanceError(ValueError):
+    """Required sandbox identity or financial invariant is not established."""
 
 
-def atomic_write_json(path: Path, data: dict):
+def require(condition, message):
+    if not condition:
+        raise AcceptanceError(message)
+
+
+def atomic_write_json(path, data):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temp_path = tempfile.mkstemp(prefix=f".{path.name}-", dir=path.parent)
+    fd, temporary = tempfile.mkstemp(prefix="." + path.name, dir=path.parent)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-            f.write("\n")
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temp_path, path)
+        with os.fdopen(fd, "w") as output:
+            json.dump(data, output, indent=2)
+            output.flush()
+            os.fsync(output.fileno())
+        os.replace(temporary, path)
     finally:
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
+        Path(temporary).unlink(missing_ok=True)
 
 
-def sanitize_evidence(obj):
-    """Recursively strip sensitive authorization tokens or secrets from logs/evidence."""
-    if isinstance(obj, dict):
-        sanitized = {}
-        for k, v in obj.items():
-            lower_k = k.lower()
-            if any(secret_term in lower_k for secret_term in ("token", "secret", "password", "authorization", "key")):
-                sanitized[k] = "[REDACTED]"
-            else:
-                sanitized[k] = sanitize_evidence(v)
-        return sanitized
-    elif isinstance(obj, list):
-        return [sanitize_evidence(item) for item in obj]
-    return obj
+def sanitize_evidence(data):
+    if isinstance(data, dict):
+        return {
+            key: "[REDACTED]"
+            if any(
+                word in key.lower()
+                for word in (
+                    "token",
+                    "secret",
+                    "password",
+                    "authorization",
+                    "key",
+                    "url",
+                )
+            )
+            else sanitize_evidence(value)
+            for key, value in data.items()
+        }
+    if isinstance(data, list):
+        return [sanitize_evidence(value) for value in data]
+    return data
 
 
-def validate_deployment_manifest(manifest_path: Path, expected_provider: str) -> dict:
-    if not manifest_path.is_file():
-        raise AcceptanceError(f"Deployment manifest not found at: {manifest_path}")
+def validate_url(url):
+    parsed = urllib.parse.urlsplit(url)
+    require(
+        parsed.scheme in ("http", "https")
+        and parsed.hostname
+        and not parsed.username
+        and not parsed.password
+        and not parsed.query
+        and not parsed.fragment,
+        "Invalid backend base URL",
+    )
+    require(
+        parsed.scheme == "https" or parsed.hostname in ("127.0.0.1", "localhost"),
+        "Remote backend requires HTTPS",
+    )
+    return url.rstrip("/")
 
+
+def amount(value):
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise AcceptanceError(f"Deployment manifest is not valid JSON: {e}") from e
-
-    if not isinstance(manifest, dict):
-        raise AcceptanceError("Deployment manifest must be a JSON object")
-
-    env = manifest.get("environment")
-    if env != "sandbox":
-        raise AcceptanceError(f"Manifest environment must be 'sandbox', found: '{env}'")
-
-    revision = manifest.get("revision") or manifest.get("backend_revision") or manifest.get("sha")
-    if not revision or not isinstance(revision, str) or not COMMIT_SHA_PATTERN.match(revision):
-        raise AcceptanceError(f"Manifest has missing or invalid backend revision: '{revision}'")
-
-    gateways = manifest.get("gateways")
-    if not isinstance(gateways, dict):
-        raise AcceptanceError("Manifest is missing required 'gateways' configuration dictionary")
-
-    if expected_provider == "paypal":
-        paypal_config = gateways.get("paypal")
-        if not isinstance(paypal_config, dict):
-            raise AcceptanceError("Manifest missing 'gateways.paypal' configuration")
-        host = paypal_config.get("api_host")
-        if host != PAYPAL_SANDBOX_HOST:
-            raise AcceptanceError(
-                f"PayPal API host must be '{PAYPAL_SANDBOX_HOST}', found: '{host}'"
-            )
-
-    elif expected_provider == "vnpay":
-        vnpay_config = gateways.get("vnpay")
-        if not isinstance(vnpay_config, dict):
-            raise AcceptanceError("Manifest missing 'gateways.vnpay' configuration")
-        host = vnpay_config.get("host") or vnpay_config.get("pay_host")
-        if host != VNPAY_SANDBOX_HOST:
-            raise AcceptanceError(
-                f"VNPay host must be '{VNPAY_SANDBOX_HOST}', found: '{host}'"
-            )
-
-    return manifest
+        result = Decimal(str(value))
+    except (InvalidOperation, TypeError) as error:
+        raise AcceptanceError("Invalid monetary amount") from error
+    require(
+        result.is_finite() and result > 0, "Monetary amount must be finite and positive"
+    )
+    return result
 
 
-def read_customer_token(token_file: Path) -> str:
-    if not token_file.is_file():
-        raise AcceptanceError(f"Customer token file not found at: {token_file}")
-    token = token_file.read_text(encoding="utf-8").strip()
-    if not token:
-        raise AcceptanceError(f"Customer token file is empty: {token_file}")
-    if any(c in token for c in ("\r", "\n")):
-        raise AcceptanceError("Customer token contains invalid newline characters")
+def validate_deployment_manifest(path, provider):
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, ValueError) as error:
+        raise AcceptanceError("Deployment manifest not found or invalid") from error
+    require(
+        data.get("environment") == "sandbox", "Manifest environment must be 'sandbox'"
+    )
+    require(
+        isinstance(data.get("revision"), str)
+        and re.fullmatch("[0-9a-f]{40}", data["revision"]),
+        "Missing or invalid backend revision",
+    )
+    gateways = data.get("gateways", {})
+    if provider == "paypal":
+        require(
+            gateways.get(provider, {}).get("api_host") == PAYPAL_SANDBOX_HOST,
+            "PayPal host must be " + PAYPAL_SANDBOX_HOST,
+        )
+    else:
+        require(
+            gateways.get(provider, {}).get("host") == VNPAY_SANDBOX_HOST,
+            "VNPay host must be " + VNPAY_SANDBOX_HOST,
+        )
+    return data
+
+
+def verify_signed(path, signers, namespace):
+    require(
+        signers and Path(signers).is_file(), "Trusted sandbox signers file required"
+    )
+    signature = Path(str(path) + ".sig")
+    require(signature.is_file(), "Signed deployment/receipt attestation required")
+    result = subprocess.run(
+        [
+            "ssh-keygen",
+            "-Y",
+            "verify",
+            "-f",
+            str(signers),
+            "-I",
+            "sandbox-operator",
+            "-n",
+            namespace,
+            "-s",
+            str(signature),
+        ],
+        input=Path(path).read_bytes(),
+        capture_output=True,
+    )
+    require(result.returncode == 0, "Sandbox attestation signature verification failed")
+
+
+def read_customer_token(path):
+    try:
+        token = Path(path).read_text().strip()
+    except OSError as error:
+        raise AcceptanceError("Customer token file not found") from error
+    require(
+        token and "\n" not in token and "\r" not in token,
+        "Customer token is empty or invalid",
+    )
     return token
 
 
-def validate_session(session_path: Path, manifest: dict, expected_provider: str) -> dict:
-    if not session_path.is_file():
-        raise AcceptanceError(f"Session file not found at: {session_path}")
+def context(args):
+    manifest = validate_deployment_manifest(args.deployment_manifest, args.provider)
+    verify_signed(
+        args.deployment_manifest,
+        getattr(args, "signers", None),
+        "danasea-payment-sandbox",
+    )
+    base = validate_url(args.base_url)
+    require(
+        manifest.get("base_url") == base,
+        "Sandbox backend URL does not match signed deployment",
+    )
+    require(
+        manifest["revision"] == getattr(args, "expected_revision", None),
+        "Deployment revision mismatch",
+    )
     try:
-        session = json.loads(session_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise AcceptanceError(f"Session file is not valid JSON: {e}") from e
-
-    if not isinstance(session, dict):
-        raise AcceptanceError("Session must be a JSON object")
-
-    if session.get("schema_version") != SCHEMA_VERSION:
-        raise AcceptanceError(f"Session schema_version must be {SCHEMA_VERSION}")
-
-    if session.get("environment") != "sandbox":
-        raise AcceptanceError(f"Session environment must be 'sandbox', found: {session.get('environment')}")
-
-    if session.get("provider") != expected_provider:
-        raise AcceptanceError(
-            f"Session provider mismatch: expected '{expected_provider}', got '{session.get('provider')}'"
+        expires = datetime.fromisoformat(manifest["expires_at"])
+        attested = datetime.fromisoformat(manifest["attested_at"])
+        now = datetime.now(timezone.utc)
+        require(
+            attested.tzinfo
+            and expires.tzinfo
+            and attested <= now < expires
+            and (expires - attested).total_seconds() <= 3600,
+            "Sandbox deployment attestation expired/invalid",
         )
-
-    manifest_rev = manifest.get("revision") or manifest.get("backend_revision") or manifest.get("sha")
-    session_rev = session.get("backend_revision")
-    if session_rev != manifest_rev:
+    except (KeyError, ValueError, TypeError) as error:
         raise AcceptanceError(
-            f"Session backend revision '{session_rev}' does not match deployment manifest '{manifest_rev}'"
+            "Sandbox deployment attestation expired/invalid"
+        ) from error
+    fixture = manifest.get("fixture", {})
+    for key in ("order_id", "customer_id"):
+        require(bool(fixture.get(key)), "Signed owned fixture missing " + key)
+    amount(fixture.get("amount"))
+    amount(fixture.get("provider_amount"))
+    expected_refunds = fixture.get("refunds")
+    require(
+        isinstance(expected_refunds, list) and expected_refunds,
+        "Signed refund quote required",
+    )
+    require(
+        len({row.get("sub_order_id") for row in expected_refunds})
+        == len(expected_refunds),
+        "Duplicate refund quote",
+    )
+    for row in expected_refunds:
+        require(
+            row.get("sub_order_id")
+            and row.get("currency") == fixture.get("provider_currency"),
+            "Invalid refund quote identity/currency",
         )
+        amount(row.get("amount"))
+        amount(row.get("provider_amount"))
+    require(
+        sum(amount(row["amount"]) for row in expected_refunds)
+        <= amount(fixture["amount"]),
+        "Refund quote exceeds original payment",
+    )
 
-    for field in ("order_id", "payment_id"):
-        if not session.get(field):
-            raise AcceptanceError(f"Session missing mandatory owned ID field: '{field}'")
+    require(
+        fixture.get("provider_currency")
+        == ("USD" if args.provider == "paypal" else "VND"),
+        "Provider currency mismatch",
+    )
+    return manifest, read_customer_token(args.token_file), base
 
+
+def validate_session(path, manifest, provider):
+    try:
+        session = json.loads(Path(path).read_text())
+    except (OSError, ValueError) as error:
+        raise AcceptanceError("Session file not found or invalid") from error
+    require(
+        session.get("schema_version") == SCHEMA_VERSION
+        and session.get("environment") == "sandbox",
+        "Invalid session version/environment",
+    )
+    require(session.get("provider") == provider, "Session provider mismatch")
+    require(
+        session.get("backend_revision") == manifest["revision"],
+        "Session revision mismatch",
+    )
+    require(
+        session.get("base_url") == manifest["base_url"],
+        "Session belongs to another backend",
+    )
+    require(
+        session.get("order_id") == manifest["fixture"]["order_id"]
+        and session.get("customer_id") == manifest["fixture"]["customer_id"],
+        "Session fixture mismatch",
+    )
+    require(session.get("fixture") == manifest["fixture"], "Session quote mismatch")
     return session
 
 
-def validate_url(url_str: str) -> str:
-    parsed = urllib.parse.urlsplit(url_str)
-    if parsed.scheme not in ("https", "http") or not parsed.hostname:
-        raise AcceptanceError(f"Invalid base URL: {url_str}")
-    if parsed.username or parsed.password:
-        raise AcceptanceError("Base URL cannot contain embedded credentials")
-    return url_str.rstrip("/")
+def send_http_request(url, method="GET", headers=None, body=None):
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(
+            self, request, fp, code, message, response_headers, target
+        ):
+            raise AcceptanceError("Redirects are forbidden for sandbox credentials")
 
-
-def send_http_request(url: str, method: str = "GET", headers: dict = None, body: dict = None) -> tuple[int, dict, float]:
-    headers = headers or {}
-    encoded_body = None
+    request_headers = dict(headers or {})
+    payload = None
     if body is not None:
-        encoded_body = json.dumps(body).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-
-    req = urllib.request.Request(url, data=encoded_body, headers=headers, method=method)
-    start_time = time.monotonic()
-    status = 500
-    response_data = {}
+        payload = json.dumps(body).encode()
+        request_headers["Content-Type"] = "application/json"
+    started = time.monotonic()
+    request = urllib.request.Request(
+        url, data=payload, headers=request_headers, method=method
+    )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            status = resp.status
-            raw_data = resp.read()
-            if raw_data:
-                response_data = json.loads(raw_data.decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        status = e.code
-        try:
-            raw_data = e.read()
-            if raw_data:
-                try:
-                    response_data = json.loads(raw_data.decode("utf-8"))
-                except Exception:
-                    response_data = {"error": raw_data.decode("utf-8", errors="replace")}
-        except Exception:
-            response_data = {"error": str(e)}
-    except Exception as e:
-        duration = time.monotonic() - start_time
-        raise AcceptanceError(f"Network request to {url} failed: {e}") from e
-
-    duration = time.monotonic() - start_time
-    return status, response_data, duration
+        with urllib.request.build_opener(NoRedirect).open(
+            request, timeout=30
+        ) as response:
+            return (
+                response.status,
+                json.loads(response.read(), parse_float=Decimal),
+                time.monotonic() - started,
+            )
+    except Exception as error:
+        raise AcceptanceError(
+            "Sandbox HTTP request failed: " + urllib.parse.urlsplit(url).path
+        ) from error
 
 
-def run_preflight(args) -> int:
-    manifest = validate_deployment_manifest(Path(args.deployment_manifest), args.provider)
-    read_customer_token(Path(args.token_file))
-    base_url = validate_url(args.base_url)
+def request(base, token, path, body=None, key=None):
+    headers = {"Authorization": "Bearer " + token}
+    if key:
+        headers["Idempotency-Key"] = key
+    status, data, _ = send_http_request(
+        base + path, "POST" if body is not None else "GET", headers, body
+    )
+    require(
+        status in (200, 201, 202), "Sandbox request failed with HTTP " + str(status)
+    )
+    return data
 
-    if Path(args.session).is_file():
-        validate_session(Path(args.session), manifest, args.provider)
 
-    evidence = {
+def require_payment(data, session, terminal=True, allowed_statuses=("SUCCESS",)):
+    require(
+        isinstance(data, dict) and data.get("id") == session["payment_id"],
+        "Payment ID mismatch",
+    )
+    require(
+        data.get("masterOrderId") == session["order_id"]
+        and data.get("provider") == session["provider"].upper(),
+        "Payment order/provider mismatch",
+    )
+    require(
+        amount(data.get("amount")) == amount(session["fixture"]["amount"]),
+        "Payment amount mismatch",
+    )
+    if session.get("provider_order_id"):
+        require(
+            data.get("providerOrderId") == session["provider_order_id"],
+            "Provider order ID changed",
+        )
+    if terminal:
+        require(
+            data.get("status") in allowed_statuses
+            and data.get("providerTransactionId"),
+            "Payment is not verified SUCCESS; acceptance blocked",
+        )
+
+
+def save_evidence(args, session, phase, status, data):
+    # Deliberate allowlist: no raw API response, buyer approval URL or authorization in public evidence.
+    record = {
         "schema_version": SCHEMA_VERSION,
-        "phase": "preflight",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "phase": phase,
+        "status": status,
+        "run_id": session.get("run_id"),
+        "backend_revision": session["backend_revision"],
         "provider": args.provider,
         "environment": "sandbox",
-        "backend_revision": manifest.get("revision") or manifest.get("backend_revision") or manifest.get("sha"),
-        "base_url": base_url,
-        "preflight_status": "PASSED",
-        "checks": [
-            "token_file_valid",
-            "deployment_manifest_valid",
-            "sandbox_environment_verified",
-            f"{args.provider}_sandbox_host_pinned",
-        ],
+        "observations": data,
     }
-
-    evidence_dir = Path(args.evidence_dir)
-    evidence_dir.mkdir(parents=True, exist_ok=True)
-    evidence_file = evidence_dir / f"preflight-{args.provider}.json"
-    atomic_write_json(evidence_file, evidence)
-    print(f"[PREFLIGHT PASSED] Evidence written to {evidence_file}")
-    return 0
-
-
-def run_create_intent(args) -> int:
-    manifest = validate_deployment_manifest(Path(args.deployment_manifest), args.provider)
-    token = read_customer_token(Path(args.token_file))
-    base_url = validate_url(args.base_url)
-
-    if not getattr(args, "order_id", None):
-        raise AcceptanceError("--order-id is required for create-intent")
-
-    order_id = str(args.order_id)
-    idempotency_key = str(uuid.uuid4())
-    run_id = str(uuid.uuid4())
-
-    endpoint = f"{base_url}/api/payments/{order_id}/create-intent"
-    payload = {"provider": args.provider.upper()}
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Idempotency-Key": idempotency_key,
-    }
-
-    status, resp, duration = send_http_request(endpoint, method="POST", headers=headers, body=payload)
-    if status != 200:
-        raise AcceptanceError(f"create-intent failed with HTTP {status}: {resp}")
-
-    payment_id = resp.get("paymentId")
-    if not payment_id:
-        raise AcceptanceError("Backend did not return paymentId in create-intent response")
-
-    approval_url = resp.get("reference") or resp.get("paymentUrl") or ""
-
-    backend_revision = manifest.get("revision") or manifest.get("backend_revision") or manifest.get("sha")
-    session = {
-        "schema_version": SCHEMA_VERSION,
-        "environment": "sandbox",
-        "backend_revision": backend_revision,
-        "provider": args.provider,
-        "run_id": run_id,
-        "order_id": order_id,
-        "payment_id": str(payment_id),
-        "approval_url": approval_url,
-        "refund_id": None,
-        "operation_id": None,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-    session_path = Path(args.session)
-    atomic_write_json(session_path, session)
-
-    evidence = {
-        "schema_version": SCHEMA_VERSION,
-        "phase": "create-intent",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "run_id": run_id,
-        "request_outcome": {
-            "http_status": status,
-            "duration_seconds": round(duration, 3),
-            "response_summary": sanitize_evidence(resp),
-        },
-        "provider_verification": {
-            "approval_url_present": bool(approval_url),
-        },
-        "persisted_state_verification": {
-            "order_id": order_id,
-            "payment_id": str(payment_id),
-        },
-    }
-
-    evidence_dir = Path(args.evidence_dir)
-    evidence_dir.mkdir(parents=True, exist_ok=True)
-    evidence_file = evidence_dir / f"create-intent-{args.provider}-{run_id}.json"
-    atomic_write_json(evidence_file, evidence)
-
-    print(f"[INTENT CREATED] Payment ID: {payment_id}")
-    print(f"[ACTION REQUIRED] Buyer must approve sandbox transaction at: {approval_url}")
-    print(f"Session stored at: {session_path}")
-    return 0
-
-
-def run_capture(args) -> int:
-    manifest = validate_deployment_manifest(Path(args.deployment_manifest), args.provider)
-    token = read_customer_token(Path(args.token_file))
-    base_url = validate_url(args.base_url)
-    session = validate_session(Path(args.session), manifest, args.provider)
-
-    payment_id = session["payment_id"]
-    idempotency_key = str(uuid.uuid4())
-
-    if args.provider == "paypal":
-        paypal_order_id = session.get("approval_url", "").split("token=")[-1] or session.get("payment_id")
-        if getattr(args, "paypal_order_id", None):
-            paypal_order_id = args.paypal_order_id
-
-        endpoint = f"{base_url}/api/payments/paypal/capture"
-        payload = {
-            "paymentId": payment_id,
-            "paypalOrderId": paypal_order_id,
-        }
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Idempotency-Key": idempotency_key,
-        }
-        status, resp, duration = send_http_request(endpoint, method="POST", headers=headers, body=payload)
-    else:
-        # VNPay IPN or capture verification
-        endpoint = f"{base_url}/api/payments/detail/{payment_id}"
-        headers = {"Authorization": f"Bearer {token}"}
-        status, resp, duration = send_http_request(endpoint, method="GET", headers=headers)
-
-    if status != 200:
-        raise AcceptanceError(f"Capture/Verification failed with HTTP {status}: {resp}")
-
-    evidence = {
-        "schema_version": SCHEMA_VERSION,
-        "phase": "capture",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "run_id": session.get("run_id"),
-        "request_outcome": {
-            "http_status": status,
-            "duration_seconds": round(duration, 3),
-            "response_summary": sanitize_evidence(resp),
-        },
-        "provider_verification": {
-            "terminal_status_reached": resp.get("status") in ("SUCCESS", "COMPLETED"),
-        },
-        "persisted_state_verification": {
-            "payment_id": payment_id,
-            "recorded_amount": str(resp.get("amount")),
-            "recorded_status": resp.get("status"),
-        },
-    }
-
-    evidence_dir = Path(args.evidence_dir)
-    evidence_dir.mkdir(parents=True, exist_ok=True)
-    evidence_file = evidence_dir / f"capture-{args.provider}-{session.get('run_id')}.json"
-    atomic_write_json(evidence_file, evidence)
-    print(f"[CAPTURE/VERIFY RECORDED] Status: {resp.get('status')}")
-    return 0
-
-
-def run_verify(args) -> int:
-    manifest = validate_deployment_manifest(Path(args.deployment_manifest), args.provider)
-    token = read_customer_token(Path(args.token_file))
-    base_url = validate_url(args.base_url)
-    session = validate_session(Path(args.session), manifest, args.provider)
-
-    payment_id = session["payment_id"]
-    endpoint = f"{base_url}/api/payments/detail/{payment_id}"
-    headers = {"Authorization": f"Bearer {token}"}
-
-    status, resp, duration = send_http_request(endpoint, method="GET", headers=headers)
-    if status != 200:
-        raise AcceptanceError(f"Verify failed with HTTP {status}: {resp}")
-
-    evidence = {
-        "schema_version": SCHEMA_VERSION,
-        "phase": "verify",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "run_id": session.get("run_id"),
-        "request_outcome": {
-            "http_status": status,
-            "duration_seconds": round(duration, 3),
-            "response_summary": sanitize_evidence(resp),
-        },
-        "provider_verification": {
-            "status": resp.get("status"),
-            "provider": resp.get("provider"),
-        },
-        "persisted_state_verification": {
-            "payment_id": payment_id,
-            "order_id": resp.get("orderId"),
-            "amount": str(resp.get("amount")),
-            "currency": resp.get("currency"),
-        },
-    }
-
-    evidence_dir = Path(args.evidence_dir)
-    evidence_dir.mkdir(parents=True, exist_ok=True)
-    evidence_file = evidence_dir / f"verify-{args.provider}-{session.get('run_id')}.json"
-    atomic_write_json(evidence_file, evidence)
-    print(f"[VERIFY COMPLETED] Payment {payment_id} Status: {resp.get('status')}")
-    return 0
-
-
-def run_refund(args) -> int:
-    manifest = validate_deployment_manifest(Path(args.deployment_manifest), args.provider)
-    token = read_customer_token(Path(args.token_file))
-    base_url = validate_url(args.base_url)
-    session = validate_session(Path(args.session), manifest, args.provider)
-
-    order_id = session["order_id"]
-    idempotency_key = str(uuid.uuid4())
-    endpoint = f"{base_url}/api/orders/{order_id}/refund-request"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Idempotency-Key": idempotency_key,
-    }
-    payload = {"reason": "CUSTOMER_REQUEST"}
-
-    status, resp, duration = send_http_request(endpoint, method="POST", headers=headers, body=payload)
-    if status not in (200, 202):
-        raise AcceptanceError(f"Refund request failed with HTTP {status}: {resp}")
-
-    refund_id = None
-    if isinstance(resp, list) and len(resp) > 0:
-        refund_id = str(resp[0].get("refundId"))
-        session["refund_id"] = refund_id
-        atomic_write_json(Path(args.session), session)
-
-    evidence = {
-        "schema_version": SCHEMA_VERSION,
-        "phase": "refund",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "run_id": session.get("run_id"),
-        "request_outcome": {
-            "http_status": status,
-            "duration_seconds": round(duration, 3),
-            "response_summary": sanitize_evidence(resp),
-        },
-        "provider_verification": {
-            "refund_initiated": bool(refund_id),
-        },
-        "persisted_state_verification": {
-            "order_id": order_id,
-            "refund_id": refund_id,
-        },
-    }
-
-    evidence_dir = Path(args.evidence_dir)
-    evidence_dir.mkdir(parents=True, exist_ok=True)
-    evidence_file = evidence_dir / f"refund-{args.provider}-{session.get('run_id')}.json"
-    atomic_write_json(evidence_file, evidence)
-    print(f"[REFUND INITIATED] Refund ID: {refund_id}")
-    return 0
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Payment acceptance runner with sandbox preflight and safety guards.")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    common_parser = argparse.ArgumentParser(add_help=False)
-    common_parser.add_argument("--provider", choices=SUPPORTED_PROVIDERS, required=True, help="Target payment provider")
-    common_parser.add_argument("--base-url", required=True, help="Base backend URL")
-    common_parser.add_argument("--token-file", type=Path, required=True, help="Path to customer auth token file")
-    common_parser.add_argument("--session", type=Path, required=True, help="Path to session JSON file")
-    common_parser.add_argument("--evidence-dir", type=Path, required=True, help="Directory to store evidence JSON")
-    common_parser.add_argument(
-        "--deployment-manifest", type=Path, required=True, help="Path to deployment manifest JSON"
+    atomic_write_json(
+        Path(args.evidence_dir) / (phase + "-" + args.provider + ".json"), record
     )
 
-    subparsers.add_parser("preflight", parents=[common_parser], help="Run sandbox safety preflight")
 
-    intent_parser = subparsers.add_parser("create-intent", parents=[common_parser], help="Create payment intent")
-    intent_parser.add_argument("--order-id", required=True, help="Order ID to pay")
+def run_preflight(args):
+    manifest, _, _ = context(args)
+    if Path(args.session).exists():
+        validate_session(args.session, manifest, args.provider)
+    save_evidence(
+        args,
+        {"backend_revision": manifest["revision"]},
+        "preflight",
+        "PASSED",
+        {"trusted_deployment_attestation_verified": True},
+    )
+    return 0
 
-    capture_parser = subparsers.add_parser("capture", parents=[common_parser], help="Capture approved payment")
-    capture_parser.add_argument("--paypal-order-id", required=False, help="Explicit PayPal Order ID if available")
 
-    subparsers.add_parser("verify", parents=[common_parser], help="Verify backend and provider payment state")
+def run_create_intent(args):
+    manifest, token, base = context(args)
+    fixture = manifest["fixture"]
+    require(
+        getattr(args, "order_id", None) == fixture["order_id"],
+        "Order is not the signed owned sandbox fixture",
+    )
+    order = request(base, token, "/api/orders/" + fixture["order_id"])
+    require(
+        order.get("id") == fixture["order_id"]
+        and order.get("customerId") == fixture["customer_id"],
+        "Owned order readback mismatch",
+    )
+    require(
+        amount(order.get("totalAmount")) == amount(fixture["amount"]),
+        "Order amount mismatch",
+    )
+    if Path(args.session).exists():
+        session = validate_session(args.session, manifest, args.provider)
+    else:
+        session = {
+            "schema_version": SCHEMA_VERSION,
+            "environment": "sandbox",
+            "provider": args.provider,
+            "backend_revision": manifest["revision"],
+            "base_url": base,
+            "fixture": fixture,
+            "customer_id": fixture["customer_id"],
+            "order_id": fixture["order_id"],
+            "run_id": str(uuid.uuid4()),
+            "idempotency_keys": {
+                phase: str(uuid.uuid4())
+                for phase in ("create-intent", "capture", "refund")
+            },
+        }
+        atomic_write_json(args.session, session)
+    data = request(
+        base,
+        token,
+        "/api/payments/" + session["order_id"] + "/create-intent",
+        {"provider": args.provider.upper()},
+        session["idempotency_keys"]["create-intent"],
+    )
+    require(
+        data.get("orderId") == session["order_id"]
+        and data.get("provider") == args.provider.upper()
+        and data.get("paymentId"),
+        "Intent identity mismatch",
+    )
+    require(
+        amount(data.get("amount")) == amount(fixture["amount"]),
+        "Intent amount mismatch",
+    )
+    approval = data.get("paymentReference")
+    url = urllib.parse.urlsplit(approval or "")
+    require(
+        url.scheme == "https"
+        and url.hostname
+        == (
+            "www.sandbox.paypal.com"
+            if args.provider == "paypal"
+            else VNPAY_SANDBOX_HOST
+        ),
+        "Missing or non-sandbox approval URL",
+    )
+    if session.get("payment_id"):
+        require(
+            session["payment_id"] == data["paymentId"],
+            "Replay created a different payment",
+        )
+    session.update(payment_id=data["paymentId"], approval_url=approval)
+    detail = request(base, token, "/api/payments/detail/" + session["payment_id"])
+    require_payment(detail, session, False)
+    require(detail.get("providerOrderId"), "Missing persisted provider order ID")
+    session["provider_order_id"] = detail["providerOrderId"]
+    atomic_write_json(args.session, session)
+    save_evidence(
+        args,
+        session,
+        "create-intent",
+        "AWAITING_BUYER_APPROVAL",
+        {"payment_id": session["payment_id"]},
+    )
+    print(
+        "Buyer approval URL is in the private session. Complete sandbox approval before capture."
+    )
+    return 0
 
-    subparsers.add_parser("refund", parents=[common_parser], help="Initiate refund request for session")
 
+def run_capture(args):
+    manifest, token, base = context(args)
+    session = validate_session(args.session, manifest, args.provider)
+    require(
+        session.get("payment_id") and session.get("provider_order_id"),
+        "Session has no owned intent",
+    )
+    if args.provider == "paypal":
+        data = request(
+            base,
+            token,
+            "/api/payments/paypal/capture",
+            {
+                "paymentId": session["payment_id"],
+                "paypalOrderId": session["provider_order_id"],
+            },
+            session["idempotency_keys"]["capture"],
+        )
+        require_payment(data, session)
+    data = request(base, token, "/api/payments/detail/" + session["payment_id"])
+    require_payment(data, session)
+    session["capture_verified"] = True
+    session["provider_transaction_id"] = data["providerTransactionId"]
+    atomic_write_json(args.session, session)
+    save_evidence(
+        args,
+        session,
+        "capture",
+        "BACKEND_VERIFIED",
+        {"payment_id": session["payment_id"], "status": data["status"]},
+    )
+    return 0
+
+
+def run_refund(args):
+    manifest, token, base = context(args)
+    session = validate_session(args.session, manifest, args.provider)
+    require(session.get("capture_verified"), "Capture must be verified before refund")
+    require_payment(
+        request(base, token, "/api/payments/detail/" + session["payment_id"]),
+        session,
+        allowed_statuses=("SUCCESS", "REFUNDED"),
+    )
+    data = request(
+        base,
+        token,
+        "/api/orders/" + session["order_id"] + "/refund-request",
+        {"reason": "CUSTOMER_REQUEST"},
+        session["idempotency_keys"]["refund"],
+    )
+    require(isinstance(data, list) and data, "Refund response is empty")
+    ids = [entry.get("id") for entry in data]
+    require(all(ids) and len(ids) == len(set(ids)), "Missing or duplicate refund IDs")
+    if session.get("refund_ids"):
+        require(session["refund_ids"] == ids, "Replay created different refunds")
+    quotes = {row["sub_order_id"]: row for row in session["fixture"]["refunds"]}
+    require(len(data) == len(quotes), "Refund quote count mismatch")
+    for row in data:
+        quote = quotes.get(row.get("subOrderId"))
+        require(
+            quote and amount(row.get("amount")) == amount(quote["amount"]),
+            "Refund request amount/sub-order mismatch",
+        )
+    session["expected_refunds"] = {
+        row["id"]: {
+            "sub_order_id": row["subOrderId"],
+            "amount": str(amount(row["amount"])),
+        }
+        for row in data
+    }
+    session["refund_ids"] = ids
+    atomic_write_json(args.session, session)
+    save_evidence(
+        args,
+        session,
+        "refund",
+        "INITIATED",
+        {"refund_ids": ids, "provider_completion_verified": False},
+    )
+    return 0
+
+
+def run_verify(args):
+    manifest, token, base = context(args)
+    session = validate_session(args.session, manifest, args.provider)
+    payment = request(base, token, "/api/payments/detail/" + session["payment_id"])
+    require_payment(payment, session, allowed_statuses=("SUCCESS", "REFUNDED"))
+    receipt_path = getattr(args, "provider_receipt", None)
+    require(
+        receipt_path,
+        "Independent signed provider receipt required; live acceptance blocked",
+    )
+    verify_signed(receipt_path, args.signers, "danasea-payment-provider-receipt")
+    receipt = json.loads(Path(receipt_path).read_text())
+    for field, expected in [
+        ("environment", "sandbox"),
+        ("backend_revision", session["backend_revision"]),
+        ("run_id", session["run_id"]),
+        ("provider", args.provider),
+        ("order_id", session["order_id"]),
+        ("payment_id", session["payment_id"]),
+        ("provider_order_id", session["provider_order_id"]),
+        ("provider_transaction_id", session["provider_transaction_id"]),
+        ("currency", session["fixture"]["provider_currency"]),
+        ("status", "COMPLETED"),
+    ]:
+        require(receipt.get(field) == expected, "Provider receipt mismatch: " + field)
+    require(
+        amount(receipt.get("amount")) == amount(session["fixture"]["provider_amount"]),
+        "Provider receipt amount mismatch",
+    )
+    require(session.get("refund_ids"), "Full acceptance requires refund completion")
+    refunds = request(base, token, "/api/orders/" + session["order_id"] + "/refunds")
+    require(isinstance(refunds, list), "Invalid refund readback")
+    related = [
+        refund for refund in refunds if refund.get("paymentId") == session["payment_id"]
+    ]
+    require(
+        len(related) == len(session["refund_ids"])
+        and {row.get("id") for row in related} == set(session["refund_ids"]),
+        "Unexpected additional financial refund",
+    )
+
+    owned = [refund for refund in refunds if refund.get("id") in session["refund_ids"]]
+    require(
+        len(owned) == len(session["refund_ids"])
+        and len({r["id"] for r in owned}) == len(owned),
+        "Missing or duplicate persisted refunds",
+    )
+    expected = session.get("expected_refunds", {})
+    provider_refunds = receipt.get("refunds")
+    require(
+        isinstance(provider_refunds, list) and len(provider_refunds) == len(owned),
+        "Missing per-refund provider receipt",
+    )
+    by_provider_id = {row.get("provider_refund_id"): row for row in provider_refunds}
+    require(len(by_provider_id) == len(owned), "Duplicate provider refund receipts")
+    operations = set()
+    for refund in owned:
+        quote = expected.get(refund["id"])
+        require(
+            quote
+            and refund.get("subOrderId") == quote["sub_order_id"]
+            and amount(refund.get("amount")) == amount(quote["amount"]),
+            "Persisted refund amount/sub-order mismatch",
+        )
+        provider_row = by_provider_id.get(refund.get("providerRefundId"))
+        expected_quote = next(
+            row
+            for row in session["fixture"]["refunds"]
+            if row["sub_order_id"] == quote["sub_order_id"]
+        )
+        require(
+            provider_row
+            and provider_row.get("refund_id") == refund["id"]
+            and provider_row.get("status") == "COMPLETED"
+            and provider_row.get("currency") == expected_quote["currency"]
+            and amount(provider_row.get("amount"))
+            == amount(expected_quote["provider_amount"]),
+            "Provider refund monetary snapshot mismatch",
+        )
+        operation = provider_row.get("backend_operation_id")
+        require(
+            operation
+            and operation == provider_row.get("provider_operation_id")
+            and operation not in operations,
+            "Missing, duplicate or mismatched attested refund operation",
+        )
+        operations.add(operation)
+        require(
+            refund.get("paymentId") == session["payment_id"]
+            and refund.get("provider") == args.provider.upper()
+            and refund.get("status") == "PROCESSED"
+            and refund.get("providerRefundId"),
+            "Refund not verified PROCESSED",
+        )
+    refunded_amount = sum(amount(row["amount"]) for row in owned)
+    require(
+        refunded_amount <= amount(session["fixture"]["amount"]),
+        "Refund exceeds payment",
+    )
+    expected_status = (
+        "REFUNDED"
+        if refunded_amount == amount(session["fixture"]["amount"])
+        else "SUCCESS"
+    )
+    require(
+        payment["status"] == expected_status,
+        "Payment status disagrees with persisted refund total",
+    )
+    require(
+        set(receipt.get("provider_refund_ids", []))
+        == {r["providerRefundId"] for r in owned},
+        "Provider refund receipt mismatch",
+    )
+    save_evidence(
+        args,
+        session,
+        "verify",
+        "PASSED",
+        {
+            "payment_id": session["payment_id"],
+            "refund_ids": session["refund_ids"],
+            "provider_receipt_sha256": hashlib.sha256(
+                Path(receipt_path).read_bytes()
+            ).hexdigest(),
+            "backend_and_provider_completed": True,
+            "operation_identity_source": "independent signed operator attestation",
+        },
+    )
+    return 0
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "command", choices=("preflight", "create-intent", "capture", "verify", "refund")
+    )
+    parser.add_argument("--provider", choices=SUPPORTED_PROVIDERS, required=True)
+    for name in ("base-url", "expected-revision"):
+        parser.add_argument("--" + name, required=True)
+    for name in (
+        "token-file",
+        "session",
+        "evidence-dir",
+        "deployment-manifest",
+        "signers",
+    ):
+        parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--provider-receipt", type=Path)
+    parser.add_argument("--order-id")
     return parser
 
 
-def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
-
-    command_handlers = {
-        "preflight": run_preflight,
-        "create-intent": run_create_intent,
-        "capture": run_capture,
-        "verify": run_verify,
-        "refund": run_refund,
-    }
-
-    handler = command_handlers.get(args.command)
-    if not handler:
-        sys.stderr.write(f"Unknown command: {args.command}\n")
-        return 1
-
+def main():
+    args = build_parser().parse_args()
     try:
-        return handler(args)
-    except AcceptanceError as e:
-        sys.stderr.write(f"[ACCEPTANCE FAILURE] {e}\n")
+        return globals()["run_" + args.command.replace("-", "_")](args)
+    except (AcceptanceError, OSError, ValueError, KeyError, TypeError) as error:
+        print("Acceptance blocked/failed: " + str(error), file=sys.stderr)
         return 2
-    except Exception as e:
-        sys.stderr.write(f"[UNEXPECTED ERROR] {e}\n")
-        return 3
 
 
 if __name__ == "__main__":
