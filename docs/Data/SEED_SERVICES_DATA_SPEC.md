@@ -11,8 +11,8 @@
    - `vendor_id`: `22222222-2222-2222-2222-222222222221` (*Danasea Water Sports JSC* - đã được duyệt tại `V38`).
    - `category_id`: 6 UUID danh mục chính thức từ `a0000001-...-0001` đến `0006` (từ `V6`).
 3. **Cơ chế nạp & xóa 1 chạm độc lập (Zero Backend Pollution):**
-   - Nạp dữ liệu: `docs/seed_demo_services.sql`
-   - Xóa sạch 100% dữ liệu demo: `docs/cleanup_demo_services.sql`
+   - Nạp dữ liệu: `docs/Data/seed_demo_services.sql`
+   - Xóa sạch 100% dữ liệu demo: `docs/Data/cleanup_demo_services.sql`
    - Tuyệt đối không can thiệp vào thư mục Migration Flyway của Backend (`backend/src/main/resources/db/migration`).
 
 ---

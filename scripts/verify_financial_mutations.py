@@ -224,7 +224,7 @@ def main():
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("backend/docs/verification/test-mutation-proof-2026-11-02.json"),
+        default=Path("backend/target/financial-mutation-proof.json"),
         help="Path to output JSON verification evidence",
     )
     args = parser.parse_args()

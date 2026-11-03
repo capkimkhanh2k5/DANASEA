@@ -1,6 +1,6 @@
 # Staging Release & Migration Rehearsal Checklist
 
-> Code availability is not execution evidence. Current release state: F3/A2/S2 unverified until actual protected environment runs and their artifacts exist. See acceptance-repair-2026-11-03.md.
+> Code availability is not execution evidence. Current release state: F3/A2/S2 unverified until actual protected environment runs and their artifacts exist. See the migration and provider runbooks in this directory.
 
 ## 1. Định danh Bản phát hành (Release Identity & Manifest)
 - [ ] **Commit SHA Candidate:** Xác định chính xác 40-character Git SHA từ head của nhánh release.

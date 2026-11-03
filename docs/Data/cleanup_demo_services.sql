@@ -1,6 +1,6 @@
 -- DANASEA — SCRIPT XÓA DỮ LIỆU DEMO SERVICES
 -- Mục đích: Dọn sạch 100% dữ liệu tour demo mà không làm ảnh hưởng đến bất kỳ dữ liệu thật nào khác trong Database.
--- Chạy lệnh: docker exec -i pbl6-postgres-1 psql -U danasea_user -d danasea_db < docs/cleanup_demo_services.sql
+-- Chạy lệnh: docker exec -i pbl6-postgres-1 psql -U danasea_user -d danasea_db < docs/Data/cleanup_demo_services.sql
 
 BEGIN;
 
