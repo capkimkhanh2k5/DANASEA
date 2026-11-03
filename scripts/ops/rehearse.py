@@ -301,7 +301,7 @@ def rehearse(root, model_dir, images, baseline, output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument('--model-dir', required=True, type=Path)
     parser.add_argument('--manifest', type=Path)
     parser.add_argument('--baseline', type=Path)

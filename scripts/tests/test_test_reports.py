@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'check_test_reports.py'
+SCRIPT = Path(__file__).resolve().parents[1] / 'governance' / 'check_test_reports.py'
 
 
 class TestReportGateTest(unittest.TestCase):

@@ -55,7 +55,7 @@ if name == 'python3':
         print(root)
     elif args[0] == '-' and args[1] == os.environ['DEPLOY_POLICY']:
         print('capkimkhanh2k5/DANASEA\\nhttps://example.invalid\\n' + str(root / 'signers') + '\\n' + str(root / 'backup.json') + '\\n30\\n60')
-    elif args[0] == 'scripts/production.py':
+    elif args[0] in ('scripts/production.py', 'scripts/ops/production.py'):
         record(['preflight-modes', (root / 'frontend/nginx.prod.conf').stat().st_mode & 0o777, (root / '.env').stat().st_mode & 0o777])
         sys.exit(17 if os.environ['PREFLIGHT_FAILS'] == '1' else 0)
     elif args[0].endswith('/availability.py'):
@@ -88,6 +88,6 @@ if name == 'docker':
                             ('DEPLOY_FAILS', deploy_fails), ('ACCEPTANCE_FAILS', acceptance_fails),
                             ('BACKUP_FAILS', backup_fails), ('PREFLIGHT_FAILS', preflight_fails), ('MIGRATIONS_CHANGED', migrations_changed), ('AVAILABILITY_FAILS', availability_fails), ('AVAILABILITY_MISSING', availability_missing)]:
             environment[name] = '1' if value else '0'
-        result = subprocess.run(['bash', str(ROOT / 'scripts/deploy.sh')], env=environment, input=json.dumps(envelope), capture_output=True, text=True, check=False)
+        result = subprocess.run(['bash', str(ROOT / 'scripts/ops/deploy.sh')], env=environment, input=json.dumps(envelope), capture_output=True, text=True, check=False)
         calls = [json.loads(line) for line in log.read_text().splitlines()]
         return result, calls, (root / '.deploy-state').read_text().strip()

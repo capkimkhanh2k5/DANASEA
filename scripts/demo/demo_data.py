@@ -232,9 +232,13 @@ def main():
         if not re.fullmatch(r'[0-9a-f]{40}', args.sha):
             raise ValueError('Invalid invocation')
         tools = Path(__file__).resolve().parent
+        ops_dir = tools.parent / 'ops'
         trusted(tools)
-        for name in ('demo_data.py', 'demo_runtime.py', 'demo_request.py', 'backup.py', 'release.py'):
+        trusted(ops_dir)
+        for name in ('demo_data.py', 'demo_runtime.py', 'demo_request.py'):
             trusted(tools / name)
+        for name in ('backup.py', 'release.py'):
+            trusted(ops_dir / name)
         policy = json.loads(trusted(args.policy).read_text())
         signers = trusted(Path(policy.get('demo_signers', '/etc/danasea/demo-data-signers')))
         import demo_request

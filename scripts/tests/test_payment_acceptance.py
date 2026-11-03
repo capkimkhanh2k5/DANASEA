@@ -12,7 +12,7 @@ from unittest.mock import patch
 class PaymentAcceptanceTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        path = Path(__file__).resolve().parents[1] / "acceptance_payments.py"
+        path = Path(__file__).resolve().parents[1] / "qa" / "acceptance_payments.py"
         spec = importlib.util.spec_from_file_location("payment_runner", path)
         cls.module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.module)

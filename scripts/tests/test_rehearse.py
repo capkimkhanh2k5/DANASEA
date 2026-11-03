@@ -13,7 +13,7 @@ sys.path.insert(0, str(SCRIPTS))
 class RehearsalTest(unittest.TestCase):
     def test_rendering_does_not_inherit_production_configuration(self):
         spec = importlib.util.spec_from_file_location(
-            "rehearse", SCRIPTS / "rehearse.py"
+            "rehearse", SCRIPTS / "ops" / "rehearse.py"
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -36,7 +36,7 @@ class RehearsalTest(unittest.TestCase):
 
     def test_isolation_removes_production_names_subnets_and_host_bindings(self):
         spec = importlib.util.spec_from_file_location(
-            "rehearse", SCRIPTS / "rehearse.py"
+            "rehearse", SCRIPTS / "ops" / "rehearse.py"
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -92,7 +92,7 @@ class RehearsalTest(unittest.TestCase):
 
     def test_business_probe_rejects_missing_or_deviated_coordinates(self):
         spec = importlib.util.spec_from_file_location(
-            "rehearse", SCRIPTS / "rehearse.py"
+            "rehearse", SCRIPTS / "ops" / "rehearse.py"
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -133,7 +133,7 @@ class RehearsalTest(unittest.TestCase):
 class RehearsalOwnershipRegressionTest(unittest.TestCase):
     def module(self):
         spec = importlib.util.spec_from_file_location(
-            "rehearse", SCRIPTS / "rehearse.py"
+            "rehearse", SCRIPTS / "ops" / "rehearse.py"
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

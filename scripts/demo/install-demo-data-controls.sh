@@ -95,9 +95,22 @@ try:
     trusted(wrapper)
     trusted_parents(tools)
     trusted(tools, directory=True)
-    for name in scripts + ('deploy.sh',):
-        if not (source / name).is_file() or (source / name).is_symlink():
-            raise ValueError('Reviewed demo tools are incomplete')
+    def find_src(name):
+        candidates = [
+            source / name,
+            source / 'demo' / name,
+            source / 'ops' / name,
+            source / 'qa' / name,
+            source.parent / 'demo' / name,
+            source.parent / 'ops' / name,
+            source.parent / 'qa' / name,
+        ]
+        for c in candidates:
+            if c.is_file() and not c.is_symlink():
+                return c
+        raise ValueError('Reviewed demo tools are incomplete: ' + name)
+
+    resolved_src = {name: find_src(name) for name in scripts + ('deploy.sh',)}
     state = absolute(policy.get('demo_state_dir', '/var/lib/danasea/demo-data'))
     # Parent directories are root-owned; only the private leaf belongs to deploy.
     missing = []
@@ -119,9 +132,9 @@ try:
         os.chown(state, owner.pw_uid, owner.pw_gid)
     atomic(signers, content, 0o644)
     for name in scripts:
-        atomic(tools / name, (source / name).read_bytes())
+        atomic(tools / name, resolved_src[name].read_bytes())
     # The existing forced command remains active until every helper is installed.
-    atomic(wrapper, (source / 'deploy.sh').read_bytes())
+    atomic(wrapper, resolved_src['deploy.sh'].read_bytes())
 except (ValueError, OSError, KeyError, TypeError) as error:
     print('Demo bootstrap rejected: ' + str(error), file=sys.stderr)
     raise SystemExit(1)

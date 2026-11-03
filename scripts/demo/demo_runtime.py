@@ -13,6 +13,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+_ops_dir = str(Path(__file__).resolve().parents[1] / 'ops')
+if _ops_dir not in sys.path:
+    sys.path.insert(0, _ops_dir)
+
 import backup
 import release
 from demo_data import atomic_json, trusted

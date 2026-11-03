@@ -52,7 +52,7 @@ ssh = binary / 'ssh-keygen'
 ssh.write_text('#!/bin/sh\nexit 0\n')
 ssh.chmod(0o755)
 env = dict(os.environ, PATH=str(binary) + ':' + os.environ['PATH'])
-result = subprocess.run(['bash', '/source/install-demo-data-controls.sh', str(public)],
+result = subprocess.run(['bash', '/source/demo/install-demo-data-controls.sh', str(public)],
     capture_output=True, text=True, env=env)
 report = {'exit': result.returncode, 'stderr': result.stderr,
     'wrapper_preserved': wrapper.read_text() == old_wrapper,
@@ -67,7 +67,7 @@ if result.returncode == 0:
         'from pathlib import Path; list(Path("/var/lib/danasea/demo-data").iterdir())'], capture_output=True)
     report['private_access'] = access.returncode
     report['demo_trust'] = (etc / 'demo-data-signers').read_text()
-    again = subprocess.run(['bash', '/source/install-demo-data-controls.sh', str(public)], capture_output=True, env=env)
+    again = subprocess.run(['bash', '/source/demo/install-demo-data-controls.sh', str(public)], capture_output=True, env=env)
     report['repeat_exit'] = again.returncode
 print(json.dumps(report))
 '''
@@ -80,7 +80,7 @@ class DemoDispatchTest(unittest.TestCase):
             (tools / 'demo_data.py').write_text('import json, sys\nprint(json.dumps([sys.argv[1:], sys.stdin.read()]))\n')
             environment = dict(os.environ, TOOLS_DIR=str(tools), DEPLOY_POLICY='/etc/example.json',
                                SSH_ORIGINAL_COMMAND='demo-data ' + 'a' * 40)
-            result = subprocess.run(['bash', str(ROOT / 'scripts/deploy.sh')], input='private envelope\n',
+            result = subprocess.run(['bash', str(ROOT / 'scripts/ops/deploy.sh')], input='private envelope\n',
                                     text=True, capture_output=True, env=environment)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(json.loads(result.stdout), [['--sha', 'a' * 40, '--policy', '/etc/example.json'], 'private envelope\n'])
@@ -88,7 +88,7 @@ class DemoDispatchTest(unittest.TestCase):
     def test_demo_dispatch_rejects_extra_arguments_shell_metacharacters_and_invalid_sha(self):
         for command in ('demo-data ' + 'a' * 40 + ' extra', 'demo-data ' + 'a' * 40 + ';id',
                         'demo-data ../path', 'demo-data ' + 'A' * 40, 'demo-data  ' + 'a' * 40):
-            result = subprocess.run(['bash', str(ROOT / 'scripts/deploy.sh')],
+            result = subprocess.run(['bash', str(ROOT / 'scripts/ops/deploy.sh')],
                                     env=dict(os.environ, SSH_ORIGINAL_COMMAND=command), capture_output=True)
             self.assertEqual(result.returncode, 2)
 

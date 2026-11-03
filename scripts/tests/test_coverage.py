@@ -7,7 +7,7 @@ import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'check_coverage.py'
+SCRIPT = Path(__file__).resolve().parents[1] / 'qa' / 'check_coverage.py'
 CLASS = 'example/BusinessUseCase'
 
 

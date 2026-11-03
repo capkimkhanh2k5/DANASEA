@@ -22,7 +22,10 @@ source_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 install -o root -g root -m 755 -d /etc/danasea
 python3 - "$app_dir" "$origin" "$public_key" "$backup_dir" "$source_dir" <<'PY'
 import json, pathlib, re, sys
-sys.path.insert(0, sys.argv[5])
+src = pathlib.Path(sys.argv[5])
+for p in (src, src / 'qa', src.parent / 'qa', src / 'ops', src.parent / 'ops'):
+    if p.is_dir() and str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 from acceptance import validate_url
 app, origin, public_key, backup_dir = sys.argv[1:5]
 validate_url(origin)
@@ -45,9 +48,26 @@ for name, content in values.items():
     path.write_text(content)
     path.chmod(0o644)
 PY
+find_script() {
+  local name="$1"
+  if [[ -f "$source_dir/$name" ]]; then
+    printf '%s' "$source_dir/$name"
+  elif [[ -f "$source_dir/ops/$name" ]]; then
+    printf '%s' "$source_dir/ops/$name"
+  elif [[ -f "$source_dir/qa/$name" ]]; then
+    printf '%s' "$source_dir/qa/$name"
+  elif [[ -f "$source_dir/../ops/$name" ]]; then
+    printf '%s' "$source_dir/../ops/$name"
+  elif [[ -f "$source_dir/../qa/$name" ]]; then
+    printf '%s' "$source_dir/../qa/$name"
+  else
+    printf '%s' "$source_dir/$name"
+  fi
+}
+
 install -o root -g root -m 755 -d /usr/local/lib/danasea
 for script in release.py backup.py acceptance.py availability.py; do
-  install -o root -g root -m 755 "$source_dir/$script" "/usr/local/lib/danasea/$script"
+  install -o root -g root -m 755 "$(find_script "$script")" "/usr/local/lib/danasea/$script"
 done
 install -o "$user" -g "$(id -gn "$user")" -m 700 -d "$backup_dir"
 # Adopt only healthy, already deployed SHA-tagged images with known registry digests.
@@ -58,6 +78,6 @@ fi
 # Keep the existing forced command until policy validation and adoption succeed.
 wrapper_tmp="$(mktemp /usr/local/bin/.danasea-deploy.XXXXXX)"
 trap 'rm -f -- "$wrapper_tmp"' EXIT
-install -o root -g root -m 755 "$source_dir/deploy.sh" "$wrapper_tmp"
+install -o root -g root -m 755 "$(find_script "deploy.sh")" "$wrapper_tmp"
 mv -f -- "$wrapper_tmp" /usr/local/bin/danasea-deploy
 printf '%s\n' 'Installed root-owned release controls. Backups run only before deployment and retain at most seven archives; no backup schedule is installed.'

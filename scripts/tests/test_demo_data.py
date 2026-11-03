@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 def load():
-    path = Path(__file__).resolve().parents[1] / 'demo_data.py'
+    path = Path(__file__).resolve().parents[1] / 'demo' / 'demo_data.py'
     spec = importlib.util.spec_from_file_location('demo_data', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

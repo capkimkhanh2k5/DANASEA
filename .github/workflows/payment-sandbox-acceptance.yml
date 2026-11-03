@@ -70,7 +70,7 @@ jobs:
           path: ${{ runner.temp }}/encrypted
       - name: Restore encrypted session
         if: inputs.session_run_id != ''
-        run: python3 scripts/payment_session.py open --input "$RUNNER_TEMP/encrypted/session.enc" --output "$RUNNER_TEMP/private/session.json"
+        run: python3 scripts/qa/payment_session.py open --input "$RUNNER_TEMP/encrypted/session.enc" --output "$RUNNER_TEMP/private/session.json"
       - name: Preflight and lifecycle action
         env:
           EXPECTED_SHA: ${{ github.sha }}
@@ -80,18 +80,18 @@ jobs:
             --token-file "$RUNNER_TEMP/private/token" --signers "$RUNNER_TEMP/private/signers"
             --deployment-manifest "$RUNNER_TEMP/private/manifest.json"
             --session "$RUNNER_TEMP/private/session.json" --evidence-dir "$RUNNER_TEMP/evidence")
-          python3 scripts/acceptance_payments.py preflight "${args[@]}"
+          python3 scripts/qa/acceptance_payments.py preflight "${args[@]}"
           if [[ "$PHASE" == create-intent ]]; then
             args+=(--order-id "$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/private/manifest.json"))["fixture"]["order_id"])')")
           fi
           if [[ "$PHASE" == verify ]]; then args+=(--provider-receipt "$RUNNER_TEMP/private/receipt.json"); fi
-          if [[ "$PHASE" != preflight ]]; then python3 scripts/acceptance_payments.py "$PHASE" "${args[@]}"; fi
+          if [[ "$PHASE" != preflight ]]; then python3 scripts/qa/acceptance_payments.py "$PHASE" "${args[@]}"; fi
       - name: Encrypt resumable private session
         if: always()
         run: |
           if [[ -f "$RUNNER_TEMP/private/session.json" ]]; then
             mkdir -p "$RUNNER_TEMP/encrypted"
-            python3 scripts/payment_session.py seal --input "$RUNNER_TEMP/private/session.json" --output "$RUNNER_TEMP/encrypted/session.enc"
+            python3 scripts/qa/payment_session.py seal --input "$RUNNER_TEMP/private/session.json" --output "$RUNNER_TEMP/encrypted/session.enc"
           fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()

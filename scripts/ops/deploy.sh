@@ -11,6 +11,27 @@ STATE_FILE="$APP_DIR/.deploy-state"
 WAIT_TIMEOUT=300
 log() { printf '[%s] %s\n' "$(date '+%F %T')" "$*"; }
 
+tool_file() {
+  local name="$1"
+  if [[ -f "$TOOLS_DIR/$name" ]]; then
+    printf '%s' "$TOOLS_DIR/$name"
+  elif [[ -f "$TOOLS_DIR/ops/$name" ]]; then
+    printf '%s' "$TOOLS_DIR/ops/$name"
+  elif [[ -f "$TOOLS_DIR/qa/$name" ]]; then
+    printf '%s' "$TOOLS_DIR/qa/$name"
+  elif [[ -f "$TOOLS_DIR/demo/$name" ]]; then
+    printf '%s' "$TOOLS_DIR/demo/$name"
+  elif [[ -f "$TOOLS_DIR/../ops/$name" ]]; then
+    printf '%s' "$TOOLS_DIR/../ops/$name"
+  elif [[ -f "$TOOLS_DIR/../qa/$name" ]]; then
+    printf '%s' "$TOOLS_DIR/../qa/$name"
+  elif [[ -f "$TOOLS_DIR/../demo/$name" ]]; then
+    printf '%s' "$TOOLS_DIR/../demo/$name"
+  else
+    printf '%s' "$TOOLS_DIR/$name"
+  fi
+}
+
 resolve_app_dir() {
   if [[ -z "$APP_DIR" ]]; then
     APP_DIR="$(python3 - "$DEPLOY_POLICY" <<'PYCODE'
@@ -35,7 +56,10 @@ if [[ "${SSH_ORIGINAL_COMMAND:-$*}" == status ]]; then
   flock -s -w 60 9
   python3 - "$APP_DIR" "$TOOLS_DIR" <<'PYCODE'
 import pathlib, re, sys
-sys.path.insert(0, sys.argv[2])
+p = pathlib.Path(sys.argv[2])
+for sub in (p, p / 'ops', p.parent / 'ops'):
+    if sub.is_dir() and str(sub) not in sys.path:
+        sys.path.insert(0, str(sub))
 import release
 root = pathlib.Path(sys.argv[1])
 sha = (root / '.deploy-state').read_text().strip()
@@ -54,7 +78,7 @@ if [[ "${SSH_ORIGINAL_COMMAND:-$*}" != "${action:-} ${tag:-}" || ! "${action:-}"
   exit 2
 fi
 if [[ "$action" == demo-data ]]; then
-  exec python3 "$TOOLS_DIR/demo_data.py" --sha "$tag" --policy "$DEPLOY_POLICY"
+  exec python3 "$(tool_file demo_data.py)" --sha "$tag" --policy "$DEPLOY_POLICY"
 fi
 resolve_app_dir
 cd "$APP_DIR"
@@ -100,7 +124,7 @@ signers="${policy[2]}"
 backup_config="${policy[3]}"
 stability_seconds="${policy[4]}"
 max_outage_seconds="${policy[5]}"
-python3 "$TOOLS_DIR/release.py" verify --sha "$tag" --repository "$repository" \
+python3 "$(tool_file release.py)" verify --sha "$tag" --repository "$repository" \
   --action "$action" --signers "$signers" --output "$runtime_dir/release.json"
 
 prev_tag="$(cat "$STATE_FILE" 2>/dev/null || true)"
@@ -126,7 +150,7 @@ compose() {
   local release="$1"; shift
   local manifest="$APP_DIR/.releases/$release.json"
   [[ "$release" != "$tag" ]] || manifest="$runtime_dir/release.json"
-  python3 "$TOOLS_DIR/release.py" images "$manifest" > "$runtime_dir/images"
+  python3 "$(tool_file release.py)" images "$manifest" > "$runtime_dir/images"
   local backend_image='' frontend_image='' quyet_image='' key value
   while IFS='=' read -r key value; do
     case "$key" in
@@ -150,19 +174,19 @@ diagnostics() {
 log "Preparing $action ${tag:0:7} (previous: ${prev_tag:0:7})"
 git fetch --quiet origin main
 if [[ "$action" == deploy ]]; then
-  python3 "$TOOLS_DIR/release.py" history --root "$APP_DIR" --sha "$tag" --previous "$prev_tag"
+  python3 "$(tool_file release.py)" history --root "$APP_DIR" --sha "$tag" --previous "$prev_tag"
 else
   [[ -n "$prev_tag" && -f "$APP_DIR/.releases/$tag.json" ]] || { echo "Rollback requires a previously accepted digest release" >&2; exit 1; }
   git merge-base --is-ancestor "$tag" "$prev_tag"
-  python3 "$TOOLS_DIR/release.py" compatible --root "$APP_DIR" --sha "$tag" --previous "$prev_tag"
+  python3 "$(tool_file release.py)" compatible --root "$APP_DIR" --sha "$tag" --previous "$prev_tag"
 fi
 git checkout --quiet --force --detach "$tag"
 prepare_public_config
-python3 scripts/production.py check
+python3 scripts/ops/production.py check
 
 rollback_ready=false
 if [[ -n "$prev_tag" && -f "$APP_DIR/.releases/$prev_tag.json" ]] \
-  && python3 "$TOOLS_DIR/release.py" compatible --root "$APP_DIR" --sha "$tag" --previous "$prev_tag" \
+  && python3 "$(tool_file release.py)" compatible --root "$APP_DIR" --sha "$tag" --previous "$prev_tag" \
   && git show "$prev_tag:$COMPOSE_FILE" > "$runtime_dir/rollback-source.yml" \
   && IMAGE_TAG="$prev_tag" docker compose --project-directory "$APP_DIR" -f "$runtime_dir/rollback-source.yml" config --format json > "$runtime_dir/previous.json" \
   && compose "$tag" config --format json > "$runtime_dir/current.json"; then
@@ -192,14 +216,14 @@ rollback() {
   git checkout --quiet --force --detach "$prev_tag" || return 1
   prepare_public_config || return 1
   compose "$prev_tag" up -d --no-deps --wait --wait-timeout "$WAIT_TIMEOUT" quyet backend frontend || return 1
-  python3 "$TOOLS_DIR/acceptance.py" --url "$public_origin" --stability-seconds 30 || return 1
+  python3 "$(tool_file acceptance.py)" --url "$public_origin" --stability-seconds 30 || return 1
 }
 
 # The local dump must restore successfully into a disposable database before migration.
-python3 "$TOOLS_DIR/backup.py" --config "$backup_config"
+python3 "$(tool_file backup.py)" --config "$backup_config"
 compose "$tag" pull
 started=$SECONDS
-python3 "$TOOLS_DIR/availability.py" --url "$public_origin/api/services?size=1" \
+python3 "$(tool_file availability.py)" --url "$public_origin/api/services?size=1" \
   --stop-file "$runtime_dir/monitor.stop" --output "$runtime_dir/availability.json" \
   --max-outage-seconds "$max_outage_seconds" &
 monitor_pid=$!
@@ -211,7 +235,7 @@ if ! compose "$tag" up -d --wait --wait-timeout "$WAIT_TIMEOUT" postgres redis r
   || ! compose "$tag" up -d --no-deps --wait --wait-timeout "$WAIT_TIMEOUT" quyet \
   || ! compose "$tag" up -d --no-deps --wait --wait-timeout "$WAIT_TIMEOUT" backend \
   || ! compose "$tag" up -d --no-deps --wait --wait-timeout "$WAIT_TIMEOUT" frontend \
-  || ! python3 "$TOOLS_DIR/acceptance.py" --url "$public_origin" --stability-seconds "$stability_seconds"; then
+  || ! python3 "$(tool_file acceptance.py)" --url "$public_origin" --stability-seconds "$stability_seconds"; then
   failed=true
 fi
 touch "$runtime_dir/monitor.stop"
@@ -234,7 +258,7 @@ if [[ "$failed" == true ]]; then
   exit 1
 fi
 cp "$runtime_dir/availability.json" "$APP_DIR/.release-events/$tag.json"
-python3 "$TOOLS_DIR/release.py" publish "$runtime_dir/release.json" --root "$APP_DIR"
+python3 "$(tool_file release.py)" publish "$runtime_dir/release.json" --root "$APP_DIR"
 log "Release ${tag:0:7} accepted; deploy/verification elapsed $((SECONDS - started)) seconds"
 # Housekeeping cannot turn an accepted deployment into a failed release.
 docker image prune -af --filter "until=168h" > /dev/null || log "Image cleanup failed; release remains accepted"
