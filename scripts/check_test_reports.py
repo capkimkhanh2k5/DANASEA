@@ -29,6 +29,7 @@ def source_suites(directory):
 
 def check(directory, required, policy, test_source=None):
     found = set()
+    case_counts = {}
     executed = skipped = 0
     allowed_classes = set(policy.get('allowed_skipped_classes', []))
     allowed_tests = set(policy.get('allowed_skipped_tests', []))
@@ -62,6 +63,8 @@ def check(directory, required, policy, test_source=None):
                     raise ValueError('Unexpected skipped test: ' + classname + '#' + name)
             else:
                 executed += 1
+                identity = classname + '#' + name
+                case_counts[identity] = case_counts.get(identity, 0) + 1
                 found.add(classname)
                 # Surefire may use @DisplayName for nested testcase classnames.
                 found.add(suite.get('name', ''))
@@ -73,8 +76,15 @@ def check(directory, required, policy, test_source=None):
     missing |= (discovered & optional) - reported
     if not executed or missing:
         raise ValueError('Required test suite did not execute: ' + ', '.join(sorted(missing)))
-    print(json.dumps({'executed': executed, 'allowed_skipped': skipped, 'required_suites': len(required),
-                      'source_suites': len(discovered)}))
+    expected = policy.get('required_tests', {})
+    for identity, count in expected.items():
+        if type(count) is not int or count < 1 or case_counts.get(identity, 0) != count:
+            raise ValueError('Required testcase execution count mismatch: ' + identity)
+    if policy.get('exact_cases') and set(case_counts) != set(expected):
+        raise ValueError('Unexpected testcase in targeted acceptance report')
+    summary = {'executed': executed, 'allowed_skipped': skipped, 'required_suites': len(required),
+               'source_suites': len(discovered), 'case_counts': case_counts}
+    return summary
 
 
 def main():
@@ -86,7 +96,8 @@ def main():
     args = parser.parse_args()
     try:
         policy = json.loads(args.policy.read_text()) if args.policy else {}
-        check(args.directory, args.required + policy.get('required_classes', []), policy, args.test_source)
+        summary = check(args.directory, args.required + policy.get('required_classes', []), policy, args.test_source)
+        print(json.dumps({key: value for key, value in summary.items() if key != 'case_counts'}))
     except (ValueError, OSError, ET.ParseError) as error:
         print(str(error), file=sys.stderr)
         return 1

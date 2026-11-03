@@ -34,10 +34,12 @@ import com.danasea.backend.modules.dispute.infrastructure.persistence.entities.D
 import com.danasea.backend.modules.dispute.infrastructure.persistence.mappers.DisputeMapper;
 import com.danasea.backend.modules.dispute.infrastructure.persistence.repositories.JpaDisputeRepository;
 
+import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-public class Milestone1EmpiricalPersistenceChallengerTest {
+public class Milestone1EmpiricalPersistenceChallengerTest extends AbstractExternalInfrastructureIntegrationTest {
 
     @MockitoBean
     private io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager<byte[]> proxyManager;

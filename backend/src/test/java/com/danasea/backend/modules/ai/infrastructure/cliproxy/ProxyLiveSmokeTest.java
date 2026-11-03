@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.ArrayList;
 import java.util.Random;
@@ -70,6 +71,10 @@ class ProxyLiveSmokeTest {
                     .containsAnyOf("cannot", "can't", "not", "don't", "không");
             long reportedInput = responseTree.path("usage").path("prompt_tokens").asLong(-1);
             assertThat(reportedInput).isPositive().isLessThanOrEqualTo(24000);
+            com.danasea.backend.modules.ai.support.AiAcceptanceRecorder.write("compaction", Map.of(
+                    "requested_model", model, "http_status", 200, "finish_reason", "stop",
+                    "constraint_preservation", true, "prompt_tokens", reportedInput,
+                    "latency_ms", (System.nanoTime() - start) / 1_000_000.0));
             System.out.printf("Proxy live compaction model=%s removed=%d estimate=%d reportedInput=%d method=%s originalChars=%d compactedChars=%d seconds=%.2f%n", model,
                     prepared.removedMessages(), prepared.inputEstimate(), reportedInput, prepared.countingMethod(),
                     new ObjectMapper().writeValueAsString(request).length(), serialized.length(), (System.nanoTime() - start) / 1_000_000_000.0);
@@ -95,6 +100,9 @@ class ProxyLiveSmokeTest {
             assertThat(response.getResponseStatus()).isEqualTo("ANSWERED");
             String content = response.getContent().toLowerCase(Locale.ROOT).replaceAll("\\p{Zs}", " ");
             assertThat(content).containsAnyOf("da nang", "đà nẵng", "danang");
+            com.danasea.backend.modules.ai.support.AiAcceptanceRecorder.write("reasoning-" + model, Map.of(
+                    "requested_model", model, "response_status", response.getResponseStatus(),
+                    "latency_ms", (System.nanoTime() - start) / 1_000_000.0));
         }
         System.out.printf("Proxy live model=%s moderation=PASS response=PASS seconds=%.2f%n",
                 model, (System.nanoTime() - start) / 1_000_000_000.0);

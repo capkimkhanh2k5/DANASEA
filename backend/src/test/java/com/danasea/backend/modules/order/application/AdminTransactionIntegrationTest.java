@@ -63,19 +63,18 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaRefundRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 
+import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=validate"})
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class AdminTransactionIntegrationTest {
+class AdminTransactionIntegrationTest extends AbstractExternalInfrastructureIntegrationTest {
     @Container
     static final GenericContainer<?> POSTGRES = new GenericContainer<>(DockerImageName.parse("postgres:16-alpine"))
             .withEnv("POSTGRES_DB", "admin_transactions").withEnv("POSTGRES_USER", "test").withEnv("POSTGRES_PASSWORD", "test")
             .withExposedPorts(5432).waitingFor(Wait.forListeningPort());
-    @Container
-    static final GenericContainer<?> REDIS = new GenericContainer<>(DockerImageName.parse("redis:7.0-alpine"))
-            .withExposedPorts(6379).waitingFor(Wait.forListeningPort());
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
@@ -84,8 +83,6 @@ class AdminTransactionIntegrationTest {
         registry.add("spring.datasource.password", () -> "test");
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.PostgreSQLDialect");
-        registry.add("spring.data.redis.host", REDIS::getHost);
-        registry.add("spring.data.redis.port", REDIS::getFirstMappedPort);
     }
 
     private static String databaseUrl() {

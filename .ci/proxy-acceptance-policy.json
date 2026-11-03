@@ -1,0 +1,14 @@
+{
+  "required_classes": [
+    "com.danasea.backend.modules.ai.infrastructure.cliproxy.ProxyLiveSmokeTest"
+  ],
+  "allowed_skipped_classes": [],
+  "allowed_skipped_tests": [],
+  "reason": "Live CLIProxy acceptance requires exact execution of all three proxy live test executions with zero skips.",
+  "exact_cases": true,
+  "required_tests": {
+    "com.danasea.backend.modules.ai.infrastructure.cliproxy.ProxyLiveSmokeTest#realModelAcceptsHighReasoningAndMaximumOutputCeiling(String)[1]": 1,
+    "com.danasea.backend.modules.ai.infrastructure.cliproxy.ProxyLiveSmokeTest#realModelAcceptsHighReasoningAndMaximumOutputCeiling(String)[2]": 1,
+    "com.danasea.backend.modules.ai.infrastructure.cliproxy.ProxyLiveSmokeTest#realProxyCompactionKeepsOldNonSwimmingConstraintAndAnswersCurrentQuestion": 1
+  }
+}

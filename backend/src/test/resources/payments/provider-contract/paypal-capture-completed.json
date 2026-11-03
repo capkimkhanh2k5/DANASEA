@@ -1,0 +1,21 @@
+{
+  "id": "ORDER-ACCEPT-1",
+  "status": "COMPLETED",
+  "purchase_units": [
+    {
+      "reference_id": "ORDER-ACCEPT-1",
+      "payments": {
+        "captures": [
+          {
+            "id": "CAPTURE-ACCEPT-1",
+            "status": "COMPLETED",
+            "amount": {
+              "currency_code": "USD",
+              "value": "19.31"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

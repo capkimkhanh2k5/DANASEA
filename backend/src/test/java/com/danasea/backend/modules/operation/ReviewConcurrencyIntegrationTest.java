@@ -56,11 +56,13 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+
 @SpringBootTest
 @ActiveProfiles("test")
 @Testcontainers
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class ReviewConcurrencyIntegrationTest {
+class ReviewConcurrencyIntegrationTest extends AbstractExternalInfrastructureIntegrationTest {
     @Container
     static GenericContainer<?> postgres =
             new GenericContainer<>("postgres:16-alpine")

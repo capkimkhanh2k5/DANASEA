@@ -1,0 +1,71 @@
+name: AI Provider Acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      proxy_base_url:
+        description: 'CLIProxy service HTTPS base URL'
+        required: true
+        type: string
+        default: 'https://cliproxy.internal'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-provider-acceptance-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  proxy-acceptance:
+    name: CLIProxy Live Acceptance
+    runs-on: ubuntu-latest
+    environment: ai-provider-sandbox
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Java 21
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+
+      - name: Prepare proxy credentials
+        env:
+          PROXY_KEY: ${{ secrets.AI_PROXY_API_KEY }}
+        run: |
+          mkdir -p "${{ runner.temp }}/proxy-auth"
+          if [ -z "$PROXY_KEY" ]; then
+            echo "::error::Missing mandatory secret AI_PROXY_API_KEY in ai-provider-sandbox environment"
+            exit 1
+          fi
+          echo -n "$PROXY_KEY" > "${{ runner.temp }}/proxy-auth/proxy.key"
+          chmod 600 "${{ runner.temp }}/proxy-auth/proxy.key"
+
+      - name: Run CLIProxy Live Acceptance Runner
+        env:
+          PROXY_BASE_URL: ${{ inputs.proxy_base_url }}
+          AI_PROXY_ALLOWED_HOSTS: ${{ vars.AI_PROXY_ALLOWED_HOSTS }}
+        run: |
+          python3 scripts/ci/run_proxy_acceptance.py \
+            --base-url "$PROXY_BASE_URL" \
+            --key-file "${{ runner.temp }}/proxy-auth/proxy.key" \
+            --output "${{ runner.temp }}/proxy-acceptance.json"
+
+      - name: Upload Acceptance Evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ai-proxy-acceptance-evidence
+          path: |
+            backend/target/surefire-reports/
+            ${{ runner.temp }}/proxy-acceptance.json
+          retention-days: 14

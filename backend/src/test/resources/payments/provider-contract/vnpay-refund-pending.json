@@ -1,0 +1,16 @@
+{
+  "vnp_ResponseId": "RESP-ACCEPT-PENDING-1",
+  "vnp_Command": "refund",
+  "vnp_ResponseCode": "00",
+  "vnp_Message": "Refund pending",
+  "vnp_TmnCode": "TESTCODE",
+  "vnp_TxnRef": "ORDER-ACCEPT-1",
+  "vnp_Amount": "100000000",
+  "vnp_BankCode": "NCB",
+  "vnp_PayDate": "20261102120000",
+  "vnp_TransactionNo": "REFUND-PENDING-1",
+  "vnp_TransactionType": "02",
+  "vnp_TransactionStatus": "05",
+  "vnp_OrderInfo": "DANASea refund",
+  "vnp_SecureHash": "379867d4ee2fdf51a55fea9482085e3cc57e81a465a45890bb4ebfdc826cfadae2376e28be96a5dc0497a7ba7ba5332e2398c7f6adbf29f35ac4de57b33f6987"
+}

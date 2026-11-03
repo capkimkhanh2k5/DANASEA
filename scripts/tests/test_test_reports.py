@@ -140,5 +140,24 @@ class TestReportGateTest(unittest.TestCase):
         self.assertIn('Empty test report', result.stderr)
 
 
+
+class AcceptanceReportContractTest(unittest.TestCase):
+    def test_check_returns_summary_and_requires_exact_cases(self):
+        from scripts.check_test_reports import check
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'TEST-CriticalTest.xml'
+            path.write_text('<testsuite name="CriticalTest"><testcase classname="CriticalTest" name="ordinary"/></testsuite>')
+            policy = {'required_tests': {'CriticalTest#live': 1}, 'exact_cases': True}
+            with self.assertRaisesRegex(ValueError, 'Required testcase'):
+                check(Path(d), {'CriticalTest'}, policy)
+            path.write_text('<testsuite name="CriticalTest"><testcase classname="CriticalTest" name="live"/></testsuite>')
+            result = check(Path(d), {'CriticalTest'}, policy)
+            self.assertEqual(result['executed'], 1)
+            self.assertEqual(result['case_counts'], {'CriticalTest#live': 1})
+            path.write_text('<testsuite name="CriticalTest"><testcase classname="CriticalTest" name="live"/><testcase classname="CriticalTest" name="extra"/></testsuite>')
+            with self.assertRaisesRegex(ValueError, 'Unexpected testcase'):
+                check(Path(d), {'CriticalTest'}, policy)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -77,18 +77,18 @@ import io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.codec.ByteArrayCodec;
 
+import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+
 @SpringBootTest
 @ActiveProfiles("test")
 @Testcontainers(disabledWithoutDocker = true)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class PasswordResetSecurityIntegrationTest {
+class PasswordResetSecurityIntegrationTest extends AbstractExternalInfrastructureIntegrationTest {
 
     @Container
     static final GenericContainer<?> POSTGRES = new GenericContainer<>("postgres:16-alpine")
             .withEnv("POSTGRES_DB", "reset_test").withEnv("POSTGRES_USER", "test")
             .withEnv("POSTGRES_PASSWORD", "test").withExposedPorts(5432);
-    @Container
-    static final GenericContainer<?> REDIS = new GenericContainer<>("redis:7.0-alpine").withExposedPorts(6379);
 
     @DynamicPropertySource
     static void infrastructure(DynamicPropertyRegistry registry) {
@@ -106,7 +106,7 @@ class PasswordResetSecurityIntegrationTest {
     static class RedisConfiguration {
         @Bean
         LettuceConnectionFactory resetConnectionFactory() {
-            return new LettuceConnectionFactory(REDIS.getHost(), REDIS.getMappedPort(6379));
+            return new LettuceConnectionFactory(redis.getHost(), redis.getFirstMappedPort());
         }
 
         @Bean
@@ -402,7 +402,7 @@ class PasswordResetSecurityIntegrationTest {
 
     @Test
     void forgotPasswordIpLimitUsesRealRedisAndBlocksSixthRequest() throws Exception {
-        RedisClient client = RedisClient.create("redis://" + REDIS.getHost() + ":" + REDIS.getMappedPort(6379));
+        RedisClient client = RedisClient.create("redis://" + redis.getHost() + ":" + redis.getFirstMappedPort());
         try (var connection = client.connect(ByteArrayCodec.INSTANCE)) {
             var manager = LettuceBasedProxyManager.builderFor(connection)
                     .withExpirationStrategy(ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax(java.time.Duration.ofMinutes(1)))

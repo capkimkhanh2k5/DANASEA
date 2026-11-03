@@ -42,5 +42,9 @@
     "com.danasea.backend.modules.ai.infrastructure.cliproxy.ProxyLiveSmokeTest#realProxyCompactionKeepsOldNonSwimmingConstraintAndAnswersCurrentQuestion",
     "com.danasea.backend.modules.ai.QuyetDecisionAdapterTest#actualPinnedLocalWorkerExecutesAllSevenTasksThroughJavaAdapter"
   ],
-  "reason": "All business/unit/integration suites must execute. Only these exact three explicit external-provider/local-model acceptance cases may skip; worker inference has a separate required CI job. No legacy suite skip or class-wide whitelist remains."
+  "reason": "All business/unit/integration suites must execute. Only these exact three explicit external-provider/local-model acceptance cases may skip; worker inference has a separate required CI job. No legacy suite skip or class-wide whitelist remains.",
+  "required_tests": {
+    "com.danasea.backend.modules.order.application.usecases.AdminDiscountCodeUseCaseTest#updateDiscountCodeValidatesInvariants": 1,
+    "com.danasea.backend.modules.order.application.usecases.VendorDiscountCodeUseCaseTest#updateVendorDiscountCodeMaxUsesBoundary": 1
+  }
 }
