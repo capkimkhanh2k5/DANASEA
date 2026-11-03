@@ -364,6 +364,43 @@ class PaymentAcceptanceTest(unittest.TestCase):
         with self.assertRaises(self.module.AcceptanceError):
             self.module.run_verify(self.args)
 
+    def test_vnpay_roundtrip_binds_normalized_wire_operation(self):
+        self.args.provider = "vnpay"
+        fixture = self.manifest["fixture"]
+        fixture.update(provider_currency="VND", provider_amount="500000")
+        fixture["refunds"][0].update(currency="VND", provider_amount="500000")
+        self.sign(self.args.deployment_manifest, self.manifest)
+        self.payment.update(provider="VNPAY", providerOrderId="owned-payment")
+        self.intent.update(
+            provider="VNPAY",
+            paymentReference="https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_TxnRef=owned-payment",
+        )
+        self.refund["provider"] = "VNPAY"
+        receipt = self.complete()
+        receipt.update(currency="VND", amount="500000")
+        receipt["refunds"][0].update(
+            currency="VND",
+            amount="500000",
+            backend_operation_id="324e13a2-884c-4a30-b407-aeec27b1b1b0",
+            provider_operation_id="324e13a2884c4a30b407aeec27b1b1b0",
+        )
+        self.sign(
+            self.args.provider_receipt, receipt, "danasea-payment-provider-receipt"
+        )
+        self.assertEqual(self.module.run_verify(self.args), 0)
+        self.assertFalse(
+            any(
+                "/paypal/capture" in call.args[0]
+                for call in self.network.call_args_list
+            )
+        )
+
+    def test_capture_identity_cannot_change_between_phases(self):
+        self.complete()
+        self.payment["providerTransactionId"] = "FOREIGN-TRANSACTION"
+        with self.assertRaisesRegex(self.module.AcceptanceError, "transaction ID"):
+            self.module.run_verify(self.args)
+
     def test_nonfinite_money_and_remote_http_are_rejected(self):
         for value in ("NaN", "Infinity", "0", "-1"):
             with self.assertRaises(self.module.AcceptanceError):

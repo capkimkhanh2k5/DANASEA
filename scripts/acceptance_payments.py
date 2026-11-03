@@ -322,6 +322,11 @@ def require_payment(data, session, terminal=True, allowed_statuses=("SUCCESS",))
             data.get("providerOrderId") == session["provider_order_id"],
             "Provider order ID changed",
         )
+    if session.get("provider_transaction_id"):
+        require(
+            data.get("providerTransactionId") == session["provider_transaction_id"],
+            "Provider transaction ID changed after verified capture",
+        )
     if terminal:
         require(
             data.get("status") in allowed_statuses
@@ -613,12 +618,18 @@ def run_verify(args):
         )
         operation = provider_row.get("backend_operation_id")
         require(
-            operation
-            and operation == provider_row.get("provider_operation_id")
-            and operation not in operations,
-            "Missing, duplicate or mismatched attested refund operation",
+            isinstance(operation, str) and operation,
+            "Missing attested backend operation",
         )
-        operations.add(operation)
+        wire_operation = (
+            operation.replace("-", "") if args.provider == "vnpay" else operation
+        )
+        require(
+            wire_operation == provider_row.get("provider_operation_id")
+            and wire_operation not in operations,
+            "Duplicate or mismatched attested refund operation",
+        )
+        operations.add(wire_operation)
         require(
             refund.get("paymentId") == session["payment_id"]
             and refund.get("provider") == args.provider.upper()
