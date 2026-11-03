@@ -542,7 +542,7 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     }
 
 
-# Replacement accepts only the exact reviewed V1-V43 table/column/FK/trigger inventory.
+# Replacement accepts only the exact reviewed V1-V45 table/column/FK/trigger inventory.
 RESET_INVENTORY_SQL = """
 SELECT json_build_object(
  'schemas',(SELECT json_agg(nspname ORDER BY nspname) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),

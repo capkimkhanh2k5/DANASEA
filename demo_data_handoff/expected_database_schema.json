@@ -1,5 +1,5 @@
 {
-  "reviewedMigrations": "V1-V43",
+  "reviewedMigrations": "V1-V45",
   "classification": {
     "ai_assessment_cases": "replace",
     "ai_chat_requests": "replace",
@@ -3483,13 +3483,13 @@
           ],
           [
             "latitude",
-            "numeric(38,2)",
+            "numeric(46,10)",
             false,
             ""
           ],
           [
             "longitude",
-            "numeric(38,2)",
+            "numeric(46,10)",
             false,
             ""
           ],

@@ -19,7 +19,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.bind.annotation.RequestMethod;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -449,33 +448,19 @@ public class P2Tier1FeatureCoverageTest extends BaseE2ETest {
     @Test
     @DisplayName("R5.3 - Refund Completed Event: Triggers in-app notification for customer")
     void testR5_RefundCompletedEvent_TriggersCustomerNotification() throws Exception {
-        assumeClassPresent("com.danasea.backend.modules.order.domain.events.RefundCompletedEvent");
         assumeBean("refundNotificationEventListener");
+        var event = new RefundCompletedEvent(UUID.randomUUID(), paidSubOrder.getId(),
+                paidOrder.getId(), customerUser.getId(), new BigDecimal("100000.00"), RefundStatus.PROCESSED);
+        long initialNotifications = notificationRepository.findAll().stream()
+                .filter(n -> n.getUserId().equals(customerUser.getId()))
+                .count();
 
-        Class<?> refundEventClass = Class.forName("com.danasea.backend.modules.order.domain.events.RefundCompletedEvent");
-        Constructor<?> constructor = refundEventClass.getConstructors()[0];
+        applicationContext.publishEvent(event);
 
-        Object eventInstance = null;
-        if (constructor.getParameterCount() == 6) {
-            // record RefundCompletedEvent(UUID refundId, UUID subOrderId, UUID masterOrderId, UUID customerId, BigDecimal amount, RefundStatus status)
-            eventInstance = constructor.newInstance(UUID.randomUUID(), paidSubOrder.getId(), paidOrder.getId(), customerUser.getId(), new BigDecimal("100000.00"), RefundStatus.PROCESSED);
-        } else if (constructor.getParameterCount() == 4) {
-            eventInstance = constructor.newInstance(UUID.randomUUID(), paidOrder.getId(), customerUser.getId(), new BigDecimal("100000.00"));
-        }
-
-        if (eventInstance != null) {
-            long initialNotifications = notificationRepository.findAll().stream()
-                    .filter(n -> n.getUserId().equals(customerUser.getId()))
-                    .count();
-
-            applicationContext.publishEvent(eventInstance);
-
-            long countAfter = notificationRepository.findAll().stream()
-                    .filter(n -> n.getUserId().equals(customerUser.getId()))
-                    .count();
-
-            assertThat(countAfter).isGreaterThan(initialNotifications);
-        }
+        long countAfter = notificationRepository.findAll().stream()
+                .filter(n -> n.getUserId().equals(customerUser.getId()))
+                .count();
+        assertThat(countAfter).isGreaterThan(initialNotifications);
     }
 
     @Test
