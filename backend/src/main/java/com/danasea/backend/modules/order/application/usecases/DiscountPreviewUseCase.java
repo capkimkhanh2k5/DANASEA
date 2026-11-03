@@ -1,5 +1,7 @@
 package com.danasea.backend.modules.order.application.usecases;
 
+import com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort;
+import com.danasea.backend.modules.flashsale.domain.FlashSaleException;
 import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
 import com.danasea.backend.modules.order.domain.exceptions.UnauthorizedOrderAccessException;
 import com.danasea.backend.modules.order.domain.models.DiscountCode;
@@ -32,9 +34,9 @@ import java.util.UUID;
 
 @Service
 public class DiscountPreviewUseCase {
-    private com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale;
-    @org.springframework.beans.factory.annotation.Autowired
-    public void setFlashSale(com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
+    private FlashSaleBookingPort flashSale;
+    @Autowired
+    public void setFlashSale(FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
 
     private final BookingLookupPort bookingLookupPort;
     private LocalizedMessageService messages = LocalizedMessageService.standalone();
@@ -96,7 +98,7 @@ public class DiscountPreviewUseCase {
         }
 
         if(flashSale!=null && flashSale.hasAllocation(request.bookingId()))
-            throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("FLASH_SALE_VOUCHER_STACKING_NOT_ALLOWED");
+            throw new FlashSaleException("FLASH_SALE_VOUCHER_STACKING_NOT_ALLOWED");
 
         // 2. Tìm Discount Code
         String cleanCode = request.code().trim().toUpperCase(Locale.ROOT);
@@ -116,7 +118,7 @@ public class DiscountPreviewUseCase {
         for (BookingOrderView.BookingItemOrderView item : booking.items()) {
             BigDecimal rate = commissionPolicyPort != null ? commissionPolicyPort.getCommissionRate(item.vendorId()) : null;
             if (rate == null) {
-                throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("COMMISSION_POLICY_MISSING");
+                throw new FlashSaleException("COMMISSION_POLICY_MISSING");
             }
             BigDecimal subtotal = item.price().multiply(BigDecimal.valueOf(item.quantity()));
             candidateItems.add(new CandidateItem(

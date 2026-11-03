@@ -1,6 +1,7 @@
 package com.danasea.backend.modules.order.application;
 
 import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -27,7 +28,7 @@ public class PaymentWebhookSigner {
             Mac mac = Mac.getInstance(ALGORITHM);
             mac.init(new SecretKeySpec(secret, ALGORITHM));
             return HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException | java.security.InvalidKeyException ex) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException ex) {
             throw new IllegalStateException("Unable to initialize webhook signature verification.", ex);
         }
     }

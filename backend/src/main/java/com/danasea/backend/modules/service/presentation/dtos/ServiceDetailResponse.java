@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.service.presentation.dtos;
 
+import com.danasea.backend.modules.flashsale.application.FlashSaleService.PublicOffer;
 import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import java.math.BigDecimal;
 import java.util.List;
@@ -14,7 +15,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ServiceDetailResponse {
-    private java.util.List<com.danasea.backend.modules.flashsale.application.FlashSaleService.PublicOffer> flashSales;
+    private List<PublicOffer> flashSales;
     private UUID id;
     private String name;
     private String slug;

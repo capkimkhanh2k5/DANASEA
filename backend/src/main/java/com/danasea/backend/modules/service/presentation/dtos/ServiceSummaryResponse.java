@@ -1,6 +1,8 @@
 package com.danasea.backend.modules.service.presentation.dtos;
 
+import com.danasea.backend.modules.flashsale.application.FlashSaleService.PublicOffer;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.Data;
@@ -8,7 +10,7 @@ import lombok.Data;
 @Data
 @Builder
 public class ServiceSummaryResponse {
-    private java.util.List<com.danasea.backend.modules.flashsale.application.FlashSaleService.PublicOffer> flashSales;
+    private List<PublicOffer> flashSales;
     private UUID id;
     private String name;
     private String slug;

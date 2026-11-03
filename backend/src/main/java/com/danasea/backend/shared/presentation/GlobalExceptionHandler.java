@@ -1,6 +1,7 @@
 package com.danasea.backend.shared.presentation;
 
 import com.danasea.backend.modules.ai.domain.exceptions.AiConversationLocaleMismatchException;
+import com.danasea.backend.security.authentication.domain.exceptions.EmailNotVerifiedException;
 import com.danasea.backend.security.authentication.domain.exceptions.InvalidCredentialsException;
 import com.danasea.backend.security.authentication.infrastructure.security.CookieUtils;
 import com.danasea.backend.security.authorization.domain.exceptions.AccessDeniedException;
@@ -53,6 +54,11 @@ public class GlobalExceptionHandler {
             HttpServletResponse response) {
                 
         CookieUtils.clearRefreshTokenCookie(response);
+
+        if (exception instanceof EmailNotVerifiedException) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ErrorResponse("EMAIL_NOT_VERIFIED", messages.get("error.email_not_verified")));
+        }
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ErrorResponse("INVALID_CREDENTIALS", messages.get("error.invalid_credentials")));

@@ -16,6 +16,7 @@ import com.danasea.backend.modules.service.application.api.AiCatalogReadApi.Quer
 
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
+import java.sql.Connection;
 import java.time.LocalTime;
 
 @Component
@@ -31,7 +32,7 @@ public class AiCatalogCandidateReader implements AiCatalogCandidateReadApi {
 
     @Override
     public List<UUID> candidateIds(Query criteria, int offset, int batchSize) {
-        if (postgres == null) postgres = Boolean.TRUE.equals(jdbc.execute((java.sql.Connection connection) -> connection.getMetaData().getDatabaseProductName().contains("PostgreSQL")));
+        if (postgres == null) postgres = Boolean.TRUE.equals(jdbc.execute((Connection connection) -> connection.getMetaData().getDatabaseProductName().contains("PostgreSQL")));
         String text = postgres ? "translate(" + TEXT + ", '" + ACCENTS + "', '" + ASCII + "')" : TEXT;
         StringBuilder sql = new StringBuilder("select s.id from services s left join categories c on c.id=s.category_id where s.status='PUBLISHED'");
         Map<String, Object> params = new LinkedHashMap<>();

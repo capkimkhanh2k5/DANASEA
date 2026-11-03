@@ -31,9 +31,11 @@ spring:
       mail.smtp:
         auth: true
         starttls.enable: true
-        connectiontimeout: 5000
-        timeout: 5000
-        writetimeout: 5000
+        starttls.required: true
+        ssl.trust: smtp.gmail.com
+        connectiontimeout: 10000
+        timeout: 10000
+        writetimeout: 10000
   data:
     redis:
       host: ${SPRING_REDIS_HOST:localhost}
@@ -94,6 +96,8 @@ management:
       show-details: never
 
 app:
+  booking:
+    hold-duration: ${APP_BOOKING_HOLD_DURATION:5m}
   jwt:
     secret: ${APP_JWT_SECRET}
     access-token-minutes: ${APP_JWT_ACCESS_TOKEN_MINUTES:15}

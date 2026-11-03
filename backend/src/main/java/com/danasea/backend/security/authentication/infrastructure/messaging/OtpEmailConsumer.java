@@ -33,9 +33,13 @@ public class OtpEmailConsumer {
     @RabbitListener(queues = RabbitMQConfig.NOTIFICATION_OTP_EMAIL_QUEUE)
     public void handleOtpEmailRequestedEvent(OtpEmailRequestedEvent event) {
         log.info("Received OtpEmailRequestedEvent for email: {}. OTP code is: {}", event.email(), event.otpCode());
+        if (mailProperties == null || mailProperties.getUsername() == null || mailProperties.getUsername().isBlank()) {
+            log.error("Cannot send OTP email to {}: spring.mail.username is not configured", event.email());
+            throw new AmqpRejectAndDontRequeueException("spring.mail.username is not configured");
+        }
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailProperties.getUsername());
+            message.setFrom(mailProperties.getUsername().trim());
             message.setTo(event.email());
             SupportedLanguage language = SupportedLanguage.fromTag(event.locale()).orElse(SupportedLanguage.VI);
             message.setSubject(messages.get("email.otp.subject", language));

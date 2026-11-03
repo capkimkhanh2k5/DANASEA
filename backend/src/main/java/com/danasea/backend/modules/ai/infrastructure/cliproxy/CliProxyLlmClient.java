@@ -25,7 +25,10 @@ import org.springframework.web.client.RestClientResponseException;
 import java.time.Duration;
 import java.net.http.HttpClient;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Slf4j
@@ -178,10 +181,10 @@ public class CliProxyLlmClient implements LlmClientPort {
         List<Map<String, Object>> tools = (aiToolRegistry != null && aiToolRegistry.getToolDefinitions() != null)
                 ? aiToolRegistry.getToolDefinitions().stream()
                         .map(t -> {
-                            Map<String, Object> toolMap = new java.util.LinkedHashMap<>();
+                            Map<String, Object> toolMap = new LinkedHashMap<>();
                             toolMap.put("type", "function");
                             toolMap.put("function", t);
-                            return java.util.Collections.unmodifiableMap(toolMap);
+                            return Collections.unmodifiableMap(toolMap);
                         })
                         .toList()
                 : List.of();
@@ -198,7 +201,7 @@ public class CliProxyLlmClient implements LlmClientPort {
             prepared = contextWindow.prepare(request);
         } catch (CliProxyContextWindow.InputLimitException exception) {
             int recoveryOutput = Math.min(8192, Math.max(64, request.max_tokens() / 4));
-            if (!model.toLowerCase(java.util.Locale.ROOT).startsWith("gemini-") && recoveryOutput < request.max_tokens()) {
+            if (!model.toLowerCase(Locale.ROOT).startsWith("gemini-") && recoveryOutput < request.max_tokens()) {
                 var recovery = new CliProxyDto.ChatRequest(model, request.messages(), request.tools(), "high", recoveryOutput);
                 return callPreparedModel(contextWindow.prepare(recovery), model, language);
             }

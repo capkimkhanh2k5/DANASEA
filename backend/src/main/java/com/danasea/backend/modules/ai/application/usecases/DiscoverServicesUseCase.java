@@ -1,6 +1,9 @@
 package com.danasea.backend.modules.ai.application.usecases;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalTime;
 import java.time.Instant;
 import java.util.Set;
@@ -214,8 +217,8 @@ public class DiscoverServicesUseCase {
     }
 
     private String fingerprint(String value) {
-        try { return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8))); }
-        catch (java.security.NoSuchAlgorithmException exception) { throw new IllegalStateException("Criteria fingerprint is unavailable", exception); }
+        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
+        catch (NoSuchAlgorithmException exception) { throw new IllegalStateException("Criteria fingerprint is unavailable", exception); }
     }
 
     private String truncate(String text, int limit) { return text == null ? "" : text.substring(0, Math.min(limit, text.length())); }

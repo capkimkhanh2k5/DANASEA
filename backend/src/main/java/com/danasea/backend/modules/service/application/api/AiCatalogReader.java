@@ -22,6 +22,7 @@ import com.danasea.backend.shared.i18n.SupportedLanguage;
 import lombok.RequiredArgsConstructor;
 import java.time.LocalTime;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
@@ -48,7 +49,7 @@ public class AiCatalogReader implements AiCatalogReadApi {
         int rawOffset = query.offset();
         int inspected = 0;
         boolean exhausted = false;
-        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(8);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
         while (rawOffset < 10000 && selected.size() < limit && System.nanoTime() < deadline) {
             List<Service> batch;
             if (candidateReader != null) {
