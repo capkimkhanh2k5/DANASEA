@@ -343,10 +343,10 @@ export function AdminOrders() {
   const [notice, setNotice] = useState<string | null>(null);
   const [exportError, setExportError] = useState(false);
 
-  // Tra cứu User và Payment nhanh bằng Map
-  const customerMap = useMemo(() => new Map(MOCK_ADMIN_USERS.map(u => [u.id, u])), []);
-  const paymentMap = useMemo(() => new Map(MOCK_ADMIN_PAYMENTS.map(p => [p.masterOrderId, p])), []);
-  const refundMap = useMemo(() => new Map(MOCK_ADMIN_REFUNDS.map(r => [r.subOrderId, r])), []);
+  // Tra cứu User và Payment nhanh bằng Map (chỉ dùng trong chế độ demo, chế độ thật dùng dữ liệu API)
+  const customerMap = useMemo(() => (demo ? new Map(MOCK_ADMIN_USERS.map(u => [u.id, u])) : new Map()), [demo]);
+  const paymentMap = useMemo(() => (demo ? new Map(MOCK_ADMIN_PAYMENTS.map(p => [p.masterOrderId, p])) : new Map()), [demo]);
+  const refundMap = useMemo(() => (demo ? new Map(MOCK_ADMIN_REFUNDS.map(r => [r.subOrderId, r])) : new Map()), [demo]);
 
   useEffect(() => {
     if (demo) return;
