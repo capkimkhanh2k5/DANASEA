@@ -3,7 +3,7 @@
 -- Nạp đầy đủ 12 Danh mục, 12 Users, 9 Vendors (APPROVED),
 -- 24 Services (100% PUBLISHED), 33 Options, 72 Images (Cloudinary CDN),
 -- và Slots hoạt động thực tế cho Hôm nay, Ngày mai, Ngày kia.
--- Chạy lệnh: Get-Content docs/seed_database_demo.sql -Raw | docker exec -i pbl6-postgres-1 psql -U danasea_user -d danasea_db
+-- Chạy lệnh: Get-Content docs/Data/seed_database_demo.sql -Raw | docker exec -i pbl6-postgres-1 psql -U danasea_user -d danasea_db
 -- =========================================================================
 
 BEGIN;

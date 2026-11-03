@@ -1,6 +1,6 @@
 -- DANASEA — SCRIPT SEED DỮ LIỆU DEMO SERVICES (18 TRẢI NGHIỆM BIỂN CHUẨN ĐÀ NẴNG)
 -- Mục đích: Nạp dữ liệu mẫu phong phú cho 6 nhóm bộ môn thể thao biển Đà Nẵng
--- Cách chạy: scripts/seed_demo_services.bat HOẶC docker exec -i pbl6-postgres-1 psql -U danasea_user -d danasea_db < docs/seed_demo_services.sql
+-- Cách chạy: scripts/seed_demo_services.bat HOẶC docker exec -i pbl6-postgres-1 psql -U danasea_user -d danasea_db < docs/Data/seed_demo_services.sql
 
 BEGIN;
 SET client_encoding = 'UTF8';

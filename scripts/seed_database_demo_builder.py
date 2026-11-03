@@ -1,5 +1,5 @@
 """
-Script to build docs/seed_database_demo.sql from dataBase_demo JSON fixtures.
+Script to build docs/Data/seed_database_demo.sql from dataBase_demo JSON fixtures.
 Matches exact PostgreSQL schema from Flyway migrations.
 Configures all vendors to APPROVED and all services to PUBLISHED so that
 the entire DANASEA UI (Customer, Vendor, Admin) can immediately use the dataset.
@@ -10,7 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / 'dataBase_demo' / 'data'
-OUT_SQL = ROOT / 'docs' / 'seed_database_demo.sql'
+OUT_SQL = ROOT / 'docs' / 'Data' / 'seed_database_demo.sql'
 
 def escape_sql(val):
     if val is None:
@@ -33,7 +33,7 @@ def main():
         "-- Nạp đầy đủ 12 Danh mục, 12 Users, 9 Vendors (APPROVED),",
         "-- 24 Services (100% PUBLISHED), 33 Options, 72 Images (Cloudinary CDN),",
         "-- và Slots hoạt động thực tế cho Hôm nay, Ngày mai, Ngày kia.",
-        "-- Chạy lệnh: Get-Content docs/seed_database_demo.sql -Raw | docker exec -i pbl6-postgres-1 psql -U danasea_user -d danasea_db",
+        "-- Chạy lệnh: Get-Content docs/Data/seed_database_demo.sql -Raw | docker exec -i pbl6-postgres-1 psql -U danasea_user -d danasea_db",
         "-- =========================================================================",
         "",
         "BEGIN;",
