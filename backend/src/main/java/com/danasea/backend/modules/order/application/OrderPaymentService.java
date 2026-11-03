@@ -7,9 +7,11 @@ import com.danasea.backend.modules.booking.domain.exceptions.BookingHoldExpiredE
 import com.danasea.backend.modules.booking.domain.exceptions.BookingNotFoundException;
 import com.danasea.backend.modules.booking.domain.exceptions.InvalidBookingStateException;
 import com.danasea.backend.modules.booking.domain.models.BookingStatus;
+import com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort;
 import com.danasea.backend.modules.booking.infrastructure.persistence.entities.BookingItemJpaEntity;
 import com.danasea.backend.modules.booking.infrastructure.persistence.entities.BookingJpaEntity;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
+import com.danasea.backend.modules.flashsale.domain.FlashSaleException;
 import com.danasea.backend.modules.order.application.dtos.CreatePaymentIntentCommand;
 import com.danasea.backend.modules.order.application.services.DisruptionDecisionService;
 import com.danasea.backend.modules.order.application.services.WaiverAcceptanceGuard;
@@ -97,11 +99,11 @@ public class OrderPaymentService {
 
     private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[A-Za-z0-9._:-]{8,100}");
     private CommissionPolicyPort configuredCommission;
-    private com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale;
+    private FlashSaleBookingPort flashSale;
     @Autowired
     public void setConfiguredCommission(CommissionPolicyPort configuredCommission) { this.configuredCommission=configuredCommission; }
     @Autowired
-    public void setFlashSale(com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
+    public void setFlashSale(FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
 
     private DisruptionDecisionService disruptionDecisions;
 
@@ -305,7 +307,7 @@ public class OrderPaymentService {
         for (BookingItemJpaEntity item : booking.getItems()) {
             var promotion=flashSale!=null?flashSale.snapshot(item.getId()).orElse(null):null;
             BigDecimal rate=promotion!=null?promotion.commissionRate():configuredCommission!=null?configuredCommission.getCommissionRate(item.getVendorId()):null;
-            if(rate==null) throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("COMMISSION_POLICY_MISSING");
+            if(rate==null) throw new FlashSaleException("COMMISSION_POLICY_MISSING");
             BigDecimal subtotal = item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
             BigDecimal commission = subtotal.multiply(rate).setScale(2, RoundingMode.HALF_UP);
 

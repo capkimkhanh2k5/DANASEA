@@ -45,6 +45,40 @@ public class RegisterUseCase {
                 .toLowerCase(Locale.ROOT);
 
         if (userAccountPort.existsByEmail(normalizedEmail)) {
+            var existingOpt = userAccountPort.findByEmail(normalizedEmail);
+            if (existingOpt.isPresent() && !existingOpt.get().emailVerified()) {
+                Authentication existing = existingOpt.get();
+                String hashedPassword = passwordHasher.hash(password);
+                Authentication userToUpdate = new Authentication(
+                        existing.id(),
+                        normalizedEmail,
+                        hashedPassword,
+                        existing.role(),
+                        true,
+                        false,
+                        (language == null ? SupportedLanguage.DEFAULT : language).code(),
+                        existing.sessionVersion()
+                );
+                Authentication savedUser = userAccountPort.save(userToUpdate);
+                String accessToken = tokenProvider.generateAccessToken(savedUser);
+                String refreshToken = tokenProvider.generateRefreshToken(savedUser);
+
+                RefreshToken refreshTokenModel = RefreshToken.builder()
+                        .id(UUID.randomUUID())
+                        .userId(savedUser.id())
+                        .tokenHash(HashUtils.sha256(refreshToken))
+                        .familyId(UUID.randomUUID())
+                        .expiresAt(OffsetDateTime.now().plusDays(jwtProperties.refreshTokenDays()))
+                        .build();
+                accountInternalApi.saveRefreshToken(refreshTokenModel);
+
+                return new LoginResult(
+                        accessToken,
+                        refreshToken,
+                        savedUser.id(),
+                        savedUser.email(),
+                        savedUser.role());
+            }
             throw new EmailAlreadyUsedException();
         }
 

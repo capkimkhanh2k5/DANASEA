@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 
@@ -102,7 +103,7 @@ public class AIToolRegistry {
                 )
             )
         );
-        return java.util.stream.Stream.concat(legacy.stream(), CustomerFeatureToolDefinitions.definitions().stream())
+        return Stream.concat(legacy.stream(), CustomerFeatureToolDefinitions.definitions().stream())
                 .map(AIToolRegistry::canonicalizeMap)
                 .toList();
     }

@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -177,7 +178,7 @@ public class PlanItineraryUseCase {
         List<Path> frontier = new ArrayList<>();
         BigDecimal fixedCost = preserved.stream().map(Item::partyTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
         frontier.add(new Path(List.copyOf(preserved), fixedCost, 0));
-        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(8);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8);
         for (Choice choice : choices) {
             if (System.nanoTime() >= deadline) { unresolved.add("PLANNING_DEADLINE_PARTIAL_COVERAGE"); break; }
             List<Path> expanded = new ArrayList<>(frontier);

@@ -18,6 +18,7 @@ import com.danasea.backend.modules.audit.application.ports.AuditLogPort;
 import com.danasea.backend.security.authentication.application.ports.PasswordHasher;
 import com.danasea.backend.security.authentication.application.ports.TokenProvider;
 import com.danasea.backend.security.authentication.application.results.LoginResult;
+import com.danasea.backend.security.authentication.domain.exceptions.EmailNotVerifiedException;
 import com.danasea.backend.security.authentication.domain.exceptions.InvalidCredentialsException;
 import com.danasea.backend.security.authentication.domain.models.Authentication;
 import com.danasea.backend.security.authentication.infrastructure.security.JwtProperties;
@@ -98,6 +99,19 @@ class LoginUseCaseTest {
         when(accountInternalApi.findUserByEmailForUpdate("test@example.com")).thenReturn(Optional.of(toUser(user)));
 
         assertThrows(InvalidCredentialsException.class, () -> loginUseCase.execute("test@example.com", "password"));
+    }
+
+    @Test
+    void shouldThrowEmailNotVerifiedExceptionWhenCredentialsMatchButEmailNotVerified() {
+        Authentication user = new Authentication(UUID.randomUUID(), "test@example.com", "hash", "CUSTOMER", true, false);
+        when(accountInternalApi.findUserByEmailForUpdate("test@example.com")).thenReturn(Optional.of(toUser(user)));
+        when(passwordHasher.matches("correct-password", "hash")).thenReturn(true);
+        when(tokenProvider.generateAccessToken(any(Authentication.class))).thenReturn("pending-token");
+
+        EmailNotVerifiedException ex = assertThrows(EmailNotVerifiedException.class,
+                () -> loginUseCase.execute("test@example.com", "correct-password"));
+        assertEquals("test@example.com", ex.getEmail());
+        assertEquals("pending-token", ex.getAccessToken());
     }
     private User toUser(Authentication auth) {
         var user = new User();

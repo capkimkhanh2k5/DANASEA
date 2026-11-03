@@ -1,5 +1,7 @@
 package com.danasea.backend.modules.order.application.usecases;
 
+import com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort;
+import com.danasea.backend.modules.flashsale.domain.FlashSaleException;
 import com.danasea.backend.modules.order.application.dtos.CreateOrderCommand;
 import com.danasea.backend.modules.order.application.dtos.MasterOrderDetailResult;
 import com.danasea.backend.modules.order.domain.exceptions.BookingNotEligibleForOrderException;
@@ -48,9 +50,9 @@ import java.util.stream.Collectors;
 
 @Service
 public class CreateOrderUseCase {
-    private com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale;
+    private FlashSaleBookingPort flashSale;
     @Autowired
-    public void setFlashSale(com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
+    public void setFlashSale(FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
 
     private final MasterOrderRepositoryPort masterOrderRepository;
     private final SubOrderRepositoryPort subOrderRepository;
@@ -191,7 +193,7 @@ public class CreateOrderUseCase {
         }
 
         if(flashSale!=null && command.discountCode()!=null && !command.discountCode().isBlank() && flashSale.hasAllocation(command.bookingId()))
-            throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("FLASH_SALE_VOUCHER_STACKING_NOT_ALLOWED");
+            throw new FlashSaleException("FLASH_SALE_VOUCHER_STACKING_NOT_ALLOWED");
 
         // 8. Đánh giá Voucher / Discount Code (nếu có yêu cầu áp dụng)
         DiscountCodeJpaEntity appliedCodeEntity = null;
@@ -217,7 +219,7 @@ public class CreateOrderUseCase {
             for (BookingOrderView.BookingItemOrderView item : booking.items()) {
                 BigDecimal rate = commissionPolicyPort != null ? commissionPolicyPort.getCommissionRate(item.vendorId()) : null;
                 if (rate == null) {
-                    throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("COMMISSION_POLICY_MISSING");
+                    throw new FlashSaleException("COMMISSION_POLICY_MISSING");
                 }
                 BigDecimal subtotal = item.price().multiply(BigDecimal.valueOf(item.quantity()));
                 candidateItems.add(new CandidateItem(
@@ -277,7 +279,7 @@ public class CreateOrderUseCase {
             var promotion=flashSale!=null?flashSale.snapshot(item.bookingItemId()).orElse(null):null;
             BigDecimal rate = promotion!=null?promotion.commissionRate():commissionPolicyPort != null ? commissionPolicyPort.getCommissionRate(item.vendorId()) : null;
             if (rate == null) {
-                throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("COMMISSION_POLICY_MISSING");
+                throw new FlashSaleException("COMMISSION_POLICY_MISSING");
             }
             BigDecimal subtotal = item.price().multiply(BigDecimal.valueOf(item.quantity()));
 

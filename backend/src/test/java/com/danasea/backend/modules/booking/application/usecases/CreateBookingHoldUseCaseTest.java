@@ -118,7 +118,7 @@ class CreateBookingHoldUseCaseTest {
         assertThat(result.items()).hasSize(2);
         assertThat(result.holdExpiresAt()).isNotNull();
 
-        verify(inventoryLockPort).acquireHolds(eq(result.bookingId()), any(), eq(Duration.ofMinutes(15)));
+        verify(inventoryLockPort).acquireHolds(eq(result.bookingId()), any(), eq(Duration.ofMinutes(5)));
         verify(bookingRepository).save(any(Booking.class));
     }
 

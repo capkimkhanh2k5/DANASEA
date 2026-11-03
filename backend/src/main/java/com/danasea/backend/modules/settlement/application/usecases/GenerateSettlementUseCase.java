@@ -22,6 +22,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.entities.S
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.settlement.application.dtos.GenerateSettlementRequest;
 import com.danasea.backend.modules.settlement.application.dtos.SettlementResponse;
+import com.danasea.backend.modules.settlement.domain.exceptions.InvalidCommissionRateException;
 import com.danasea.backend.modules.settlement.domain.exceptions.InvalidSettlementPeriodException;
 import com.danasea.backend.modules.settlement.domain.exceptions.SettlementAlreadyFinalizedException;
 import com.danasea.backend.modules.settlement.domain.models.LineItemExclusionReason;
@@ -185,7 +186,7 @@ public class GenerateSettlementUseCase {
 
             BigDecimal subtotal = so.getSubtotalAmount() != null ? so.getSubtotalAmount() : BigDecimal.ZERO;
             BigDecimal rate = so.getCommissionRate();
-            if(rate==null) throw new com.danasea.backend.modules.settlement.domain.exceptions.InvalidCommissionRateException(
+            if(rate==null) throw new InvalidCommissionRateException(
                     "Commission snapshot missing for sub-order " + so.getId());
 
             SubOrderCalculationContext context = SubOrderCalculationContext.builder()
