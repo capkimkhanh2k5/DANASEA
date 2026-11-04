@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install root-owned with scripts/install-production-controls.sh. The CI key is a
+# Install root-owned with scripts/ops/install-production-controls.sh. The CI key is a
 # restricted forced command; its signed release envelope arrives on standard input.
 set -Eeuo pipefail
 umask 077
@@ -21,12 +21,6 @@ tool_file() {
     printf '%s' "$TOOLS_DIR/qa/$name"
   elif [[ -f "$TOOLS_DIR/demo/$name" ]]; then
     printf '%s' "$TOOLS_DIR/demo/$name"
-  elif [[ -f "$TOOLS_DIR/../ops/$name" ]]; then
-    printf '%s' "$TOOLS_DIR/../ops/$name"
-  elif [[ -f "$TOOLS_DIR/../qa/$name" ]]; then
-    printf '%s' "$TOOLS_DIR/../qa/$name"
-  elif [[ -f "$TOOLS_DIR/../demo/$name" ]]; then
-    printf '%s' "$TOOLS_DIR/../demo/$name"
   else
     printf '%s' "$TOOLS_DIR/$name"
   fi
@@ -54,12 +48,9 @@ if [[ "${SSH_ORIGINAL_COMMAND:-$*}" == status ]]; then
   cd "$APP_DIR"
   exec 9>"$APP_DIR/.deploy.lock"
   flock -s -w 60 9
-  python3 - "$APP_DIR" "$TOOLS_DIR" <<'PYCODE'
+  python3 - "$APP_DIR" "$(tool_file release.py)" <<'PYCODE'
 import pathlib, re, sys
-p = pathlib.Path(sys.argv[2])
-for sub in (p, p / 'ops', p.parent / 'ops'):
-    if sub.is_dir() and str(sub) not in sys.path:
-        sys.path.insert(0, str(sub))
+sys.path.insert(0, str(pathlib.Path(sys.argv[2]).parent))
 import release
 root = pathlib.Path(sys.argv[1])
 sha = (root / '.deploy-state').read_text().strip()
@@ -182,7 +173,12 @@ else
 fi
 git checkout --quiet --force --detach "$tag"
 prepare_public_config
-python3 scripts/ops/production.py check
+# Rollbacks can target a revision from before the script move.
+production_check=scripts/ops/production.py
+if [[ ! -f "$production_check" ]]; then
+  production_check=scripts/production.py
+fi
+python3 "$production_check" check
 
 rollback_ready=false
 if [[ -n "$prev_tag" && -f "$APP_DIR/.releases/$prev_tag.json" ]] \

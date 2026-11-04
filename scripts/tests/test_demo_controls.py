@@ -61,6 +61,20 @@ report = {'exit': result.returncode, 'stderr': result.stderr,
 if result.returncode == 0:
     report['installed'] = all((tools / name).is_file() and (tools / name).stat().st_uid == 0
         for name in ('demo_request.py', 'demo_data.py', 'demo_runtime.py', 'backup.py', 'release.py', 'acceptance.py'))
+    # Stop at the signature boundary, before any state or database operations.
+    probe = """
+import sys
+import demo_data
+import demo_request
+def signature_boundary(*args):
+    raise SystemExit(0)
+demo_request.verify = signature_boundary
+sys.argv = ['demo_data.py', '--sha', 'a' * 40, '--policy', '/etc/danasea/deploy.json']
+sys.exit(demo_data.main())
+"""
+    dispatch = subprocess.run(['runuser', '-u', 'nobody', '--', sys.executable, '-c', probe],
+        cwd=tools, input='', capture_output=True, text=True)
+    report['signature_boundary_exit'] = dispatch.returncode
     report['private_owner'] = private.stat().st_uid
     report['private_mode'] = private.stat().st_mode & 0o777
     access = subprocess.run(['runuser', '-u', 'nobody', '--', sys.executable, '-c',
@@ -104,6 +118,7 @@ class DemoBootstrapTest(unittest.TestCase):
         result = self.install('success')
         self.assertEqual(result['exit'], 0, result['stderr'])
         self.assertTrue(result['installed'])
+        self.assertEqual(result['signature_boundary_exit'], 0)
         self.assertTrue(result['release_unchanged'])
         self.assertIn('namespaces="danasea-demo-data"', result['demo_trust'])
         self.assertEqual(result['private_owner'], 65534)

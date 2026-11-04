@@ -27,7 +27,7 @@
   - Trần thời gian chạy migration: $\le$ 60,0 giây.
 - [ ] **Thực thi diễn tập:**
   ```bash
-  python3 scripts/rehearse_migration.py \
+  python3 scripts/ops/rehearse_migration.py \
     --rows 10000 \
     --max-lock-seconds 5 \
     --max-migration-seconds 60 \

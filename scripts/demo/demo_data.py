@@ -232,15 +232,20 @@ def main():
         if not re.fullmatch(r'[0-9a-f]{40}', args.sha):
             raise ValueError('Invalid invocation')
         tools = Path(__file__).resolve().parent
-        ops_dir = tools.parent / 'ops'
+        # Host installers keep the trusted tools together in a flat directory.
+        ops_dir = tools.parent / 'ops' if tools.name == 'demo' else tools
         trusted(tools)
-        trusted(ops_dir)
+        if ops_dir != tools:
+            trusted(ops_dir)
         for name in ('demo_data.py', 'demo_runtime.py', 'demo_request.py'):
             trusted(tools / name)
         for name in ('backup.py', 'release.py'):
             trusted(ops_dir / name)
         policy = json.loads(trusted(args.policy).read_text())
         signers = trusted(Path(policy.get('demo_signers', '/etc/danasea/demo-data-signers')))
+        sys.path.insert(0, str(ops_dir))
+        if ops_dir != tools:
+            sys.path.insert(0, str(tools))
         import demo_request
         from demo_runtime import Runtime
         envelope = sys.stdin.read(131073)

@@ -242,10 +242,12 @@ class DeploymentGuardTest(unittest.TestCase):
 
     def test_preflight_failure_never_starts_or_pulls_containers(self):
         from scripts.tests.deploy_fixture import simulate
-        result, calls, _ = simulate(preflight_fails=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertTrue(any(c[:2] == ['python3', 'scripts/ops/production.py'] for c in calls))
-        self.assertFalse(any(c[0] == 'docker' for c in calls))
+        for legacy, script in ((False, 'scripts/ops/production.py'), (True, 'scripts/production.py')):
+            with self.subTest(legacy_checkout=legacy):
+                result, calls, _ = simulate(preflight_fails=True, legacy_checkout=legacy)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(any(c[:2] == ['python3', script] for c in calls))
+                self.assertFalse(any(c[0] == 'docker' for c in calls))
 
     def test_forced_command_rejects_extra_arguments_before_git(self):
         result = subprocess.run(['bash', str(ROOT / 'scripts/ops/deploy.sh')], env={**os.environ, 'SSH_ORIGINAL_COMMAND': 'deploy ' + 'a' * 40 + ' extra'}, capture_output=True, text=True, check=False)

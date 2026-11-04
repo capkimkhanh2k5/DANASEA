@@ -1,5 +1,6 @@
 import importlib.util
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -11,6 +12,15 @@ sys.path.insert(0, str(SCRIPTS))
 
 
 class RehearsalTest(unittest.TestCase):
+    def test_cli_loads_dependencies_outside_the_repo(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run(
+                [sys.executable, "-E", str(SCRIPTS / "ops" / "rehearse.py"), "--help"],
+                cwd=directory, capture_output=True, text=True, check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--model-dir", result.stdout)
+
     def test_rendering_does_not_inherit_production_configuration(self):
         spec = importlib.util.spec_from_file_location(
             "rehearse", SCRIPTS / "ops" / "rehearse.py"

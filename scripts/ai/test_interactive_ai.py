@@ -2,22 +2,18 @@
 """
 Interactive AI Chat Client for DANASEA.
 Allows interactive conversation with the AI Travel Assistant via Backend API (/api/assistant/chat)
-or direct fallback to CLI Proxy (/v1/chat/completions).
+or directly to CLI Proxy in proxy mode (/v1/chat/completions).
 """
 
 from __future__ import annotations
 
 import argparse
-import base64
-import hashlib
-import hmac
 import json
 import os
 import sys
 import time
 import urllib.error
 import urllib.request
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -50,74 +46,29 @@ def load_env_file(path: Path) -> dict[str, str]:
     return env
 
 
-def generate_jwt_token(email: str, role: str, secret: str, expiry_minutes: int = 120) -> str:
-    """Generate a signed HMAC-SHA256 JWT matching DANASEA Backend's JwtTokenProvider."""
-    def b64_url_encode(data: dict[str, Any]) -> str:
-        serialized = json.dumps(data, separators=(",", ":")).encode("utf-8")
-        return base64.urlsafe_b64encode(serialized).rstrip(b"=").decode("utf-8")
-
-    now = int(time.time())
-    header = b64_url_encode({"alg": "HS256", "typ": "JWT"})
-    payload = b64_url_encode({
-        "sub": email,
-        "role": role,
-        "session_version": 0,
-        "iat": now,
-        "exp": now + (expiry_minutes * 60)
-    })
-    unsigned = f"{header}.{payload}"
-    signature = hmac.new(secret.encode("utf-8"), unsigned.encode("utf-8"), hashlib.sha256).digest()
-    sig_encoded = base64.urlsafe_b64encode(signature).rstrip(b"=").decode("utf-8")
-    return f"{unsigned}.{sig_encoded}"
-
-
 class DanaseaAiClient:
     def __init__(
         self,
         backend_url: str = "http://localhost:8080",
         proxy_url: str = "http://127.0.0.1:8318/v1",
         proxy_key: str = "",
-        jwt_secret: str = "",
+        access_token: str = "",
         user_email: str = "customer_1@danasea.test",
         mode: str = "backend"
     ):
         self.backend_url = backend_url.rstrip("/")
         self.proxy_url = proxy_url.rstrip("/")
         self.proxy_key = proxy_key
-        self.jwt_secret = jwt_secret
+        self.access_token = access_token
         self.user_email = user_email
         self.mode = mode
         self.conversation_id: str | None = None
         self.raw_proxy_history: list[dict[str, str]] = []
 
-    def check_health(self) -> dict[str, bool]:
-        """Check availability of Backend and CLI Proxy."""
-        status = {"backend": False, "proxy": False}
-        
-        # Check backend
-        try:
-            req = urllib.request.Request(f"{self.backend_url}/actuator/health", headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
-                if resp.status == 200:
-                    status["backend"] = True
-        except Exception:
-            status["backend"] = False
-
-        # Check proxy
-        try:
-            headers = {"Authorization": f"Bearer {self.proxy_key}"} if self.proxy_key else {}
-            req = urllib.request.Request(f"{self.proxy_url}/models", headers=headers)
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                if resp.status == 200:
-                    status["proxy"] = True
-        except Exception:
-            status["proxy"] = False
-
-        return status
-
     def chat_backend(self, message: str) -> dict[str, Any]:
         """Send message through DANASEA Backend API (/api/assistant/chat)."""
-        token = generate_jwt_token(self.user_email, "CUSTOMER", self.jwt_secret)
+        if not self.access_token:
+            return {"error": True, "detail": {"message": "Set DANASEA_ACCESS_TOKEN to a backend access token."}}
         payload: dict[str, Any] = {"message": message}
         if self.conversation_id:
             payload["conversationId"] = self.conversation_id
@@ -128,7 +79,7 @@ class DanaseaAiClient:
             data=body,
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {token}",
+                "Authorization": f"Bearer {self.access_token}",
                 "Accept-Language": "vi"
             },
             method="POST"
@@ -233,7 +184,6 @@ def display_backend_response(resp: dict[str, Any]) -> None:
     message = resp.get("message", "")
     cards = resp.get("cards", [])
     actions = resp.get("actions", [])
-    sources = resp.get("sources", [])
     resp_status = resp.get("responseStatus", "SUCCESS")
 
     print(f"\n{BOLD}{GREEN}🤖 DANASEA AI Assistant:{RESET}")
@@ -305,28 +255,19 @@ def main() -> None:
     proxy_url = proxy_url.replace("http://cli-proxy-api:8317", "http://127.0.0.1:8318")
     proxy_url = proxy_url.replace("http://host.docker.internal:8318", "http://127.0.0.1:8318")
     proxy_key = env.get("AI_CLIPROXY_API_KEY", "")
-    jwt_secret = env.get("APP_JWT_SECRET", "danasea7f3a91c8e42d6b1f0a5c9e83d71f4a2b6c8d90e12f45a7b3c6d8e91f20a4b")
+    access_token = os.environ.get("DANASEA_ACCESS_TOKEN", "")
 
     client = DanaseaAiClient(
         backend_url=backend_url,
         proxy_url=proxy_url,
         proxy_key=proxy_key,
-        jwt_secret=jwt_secret,
+        access_token=access_token,
         user_email=args.email,
         mode=args.mode
     )
 
-    # Health check
-    health = client.check_health()
-    if not health["backend"] and client.mode == "backend":
-        print(f"{YELLOW}⚠️ Cảnh báo: Không thể kết nối tới Backend tại {backend_url}.{RESET}")
-        if health["proxy"]:
-            print(f"{GREEN}✓ Tìm thấy CLI Proxy tại {proxy_url}. Tự động chuyển sang chế độ PROXY.{RESET}")
-            client.mode = "proxy"
-        else:
-            print(f"{RED}❌ Cả Backend và CLI Proxy đều chưa sẵn sàng. Hãy chạy: docker compose up -d backend cli-proxy-api{RESET}")
-            if not args.message:
-                sys.exit(1)
+    if client.mode == "backend" and not client.access_token:
+        parser.error("Set DANASEA_ACCESS_TOKEN to a backend access token.")
 
     # One-shot message mode
     if args.message:
@@ -337,6 +278,8 @@ def main() -> None:
         else:
             res = client.chat_proxy(args.message)
             print(f"\n{BOLD}{GREEN}🤖 AI Response:{RESET}\n{res.get('message', res)}")
+        if res.get("error"):
+            sys.exit(1)
         return
 
     # Interactive REPL Loop

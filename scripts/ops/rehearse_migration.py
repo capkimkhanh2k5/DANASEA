@@ -15,8 +15,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
-check_reports = importlib.import_module("scripts.check_test_reports").check
-revision = importlib.import_module("scripts.ai_evidence").revision
+check_reports = importlib.import_module("scripts.governance.check_test_reports").check
+revision = importlib.import_module("scripts.ai.ai_evidence").revision
 BACKEND_DIR = REPO_ROOT / "backend"
 
 
@@ -137,7 +137,7 @@ def run_rehearsal(
                 raise ValueError("Missing backup/restored data hash")
         data["release_ready"] = False
         data["provenance"] = {
-            "runner": "scripts/rehearse_migration.py",
+            "runner": "scripts/ops/rehearse_migration.py",
             "backend_revision": backend_revision,
             "executed_at": started,
             "budget_rows": rows,

@@ -11,12 +11,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def simulate(infrastructure_changed=False, previous_worker=True, deploy_fails=True,
-             acceptance_fails=False, backup_fails=False, preflight_fails=False, migrations_changed=False, app_dir_in_environment=True, availability_fails=False, availability_missing=False):
+             acceptance_fails=False, backup_fails=False, preflight_fails=False, migrations_changed=False, app_dir_in_environment=True, availability_fails=False, availability_missing=False, legacy_checkout=False):
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         binary = root / 'bin'
         binary.mkdir()
         (root / 'frontend').mkdir()
+        production_script = root / ('scripts/production.py' if legacy_checkout else 'scripts/ops/production.py')
+        production_script.parent.mkdir(parents=True)
+        production_script.touch()
         (root / '.releases').mkdir()
         (root / '.deploy-state').write_text('b' * 40)
         (root / '.env').write_text('fixture')

@@ -46,3 +46,5 @@ scripts/
 │
 └── tests/                             # 🧪 Thư mục chứa 224 unit tests tự động cho scripts
 ```
+
+Chế độ backend của `python3 scripts/manage.py ai:chat` dùng access token của tài khoản test. Đặt biến môi trường `DANASEA_ACCESS_TOKEN` trước khi chạy.

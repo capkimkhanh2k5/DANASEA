@@ -20,10 +20,9 @@ from contextlib import contextmanager
 from decimal import Decimal
 from pathlib import Path
 
-import acceptance
-import backup
-import production
-import release
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.ops import backup, production, release  # noqa: E402
+from scripts.qa import acceptance  # noqa: E402
 
 
 def isolate(config):

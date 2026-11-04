@@ -2,9 +2,8 @@
 """DANASEA Management CLI - Entrypoint for running system scripts."""
 from __future__ import annotations
 
-import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -14,13 +13,13 @@ COMMAND_MAP = {
     "ai:chat": SCRIPTS_DIR / "ai" / "test_interactive_ai.py",
     "ai:acceptance": SCRIPTS_DIR / "ai" / "check_ai_acceptance.py",
     "ai:evidence": SCRIPTS_DIR / "ai" / "ai_evidence.py",
-    
+
     # QA Group
     "qa:acceptance": SCRIPTS_DIR / "qa" / "acceptance.py",
     "qa:payments": SCRIPTS_DIR / "qa" / "acceptance_payments.py",
     "qa:coverage": SCRIPTS_DIR / "qa" / "check_coverage.py",
     "qa:financial": SCRIPTS_DIR / "qa" / "verify_financial_mutations.py",
-    
+
     # Ops Group
     "ops:availability": SCRIPTS_DIR / "ops" / "availability.py",
     "ops:backup": SCRIPTS_DIR / "ops" / "backup.py",
@@ -28,13 +27,13 @@ COMMAND_MAP = {
     "ops:production": SCRIPTS_DIR / "ops" / "production.py",
     "ops:rehearse": SCRIPTS_DIR / "ops" / "rehearse.py",
     "ops:release": SCRIPTS_DIR / "ops" / "release.py",
-    
+
     # Demo Group
     "demo:builder": SCRIPTS_DIR / "demo" / "seed_database_demo_builder.py",
     "demo:data": SCRIPTS_DIR / "demo" / "demo_data.py",
     "demo:report": SCRIPTS_DIR / "demo" / "demo_report.py",
     "demo:request": SCRIPTS_DIR / "demo" / "demo_request.py",
-    
+
     # Governance Group
     "gov:dependabot": SCRIPTS_DIR / "governance" / "check_dependabot.py",
     "gov:repo": SCRIPTS_DIR / "governance" / "check_repository_controls.py",
