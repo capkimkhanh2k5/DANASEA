@@ -4,7 +4,7 @@ A1 is a required independent CI job: install CPU Torch from the lock-driven inst
 
 Java tests write observations only after live assertions pass. Worker output records actual `DecisionTask.wireName`, model revision, latency and suggestion-only. Proxy output records the two reasoning cases and compaction, with measured timing and available finish/usage facts. Unmeasured owned-order policy evaluation is null. CLIProxy is a proxy, so upstream provider and route are null/unknown unless independently observed; an ANSWERED response alone does not establish provider attribution. Cost is null when not supplied.
 
-Run `scripts/check_ai_acceptance.py <artifact>` to validate semantic consistency, exact phase-specific cases, revision, failure status, latency, usage and provenance. The two runner unit suites exercise the real report checker and evidence validator, mocking only external process/model/provider boundaries.
+Run `scripts/ai/check_ai_acceptance.py <artifact>` to validate semantic consistency, exact phase-specific cases, revision, failure status, latency, usage and provenance. The two runner unit suites exercise the real report checker and evidence validator, mocking only external process/model/provider boundaries.
 
 A2 is manual and protected by environment `ai-provider-sandbox`. Set secret `AI_PROXY_API_KEY` and variable `AI_PROXY_ALLOWED_HOSTS` to a comma-separated explicit host allowlist. A dispatch URL outside that allowlist or a non-loopback HTTP target fails before Maven. Invocation:
 

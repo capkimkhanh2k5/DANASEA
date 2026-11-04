@@ -7,7 +7,7 @@ from unittest.mock import patch
 class FinancialMutationsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        script_path = Path(__file__).resolve().parents[1] / "verify_financial_mutations.py"
+        script_path = Path(__file__).resolve().parents[1] / "qa" / "verify_financial_mutations.py"
         spec = importlib.util.spec_from_file_location("verify_financial_mutations", script_path)
         cls.module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.module)

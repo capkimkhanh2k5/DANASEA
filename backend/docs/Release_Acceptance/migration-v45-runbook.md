@@ -7,7 +7,7 @@ V45 changes `services.latitude/longitude` from numeric(38,2) to numeric(46,10), 
 From repository root, run:
 
 ```sh
-python3 scripts/rehearse_migration.py --rows 10000 \
+python3 scripts/ops/rehearse_migration.py --rows 10000 \
   --max-lock-seconds 5 --max-migration-seconds 60 \
   --output /tmp/migration-candidate.json
 ```
@@ -24,7 +24,7 @@ Recovery uses pg_restore into another database owned by the same disposable Test
 
 ## Candidate-image/staging proof
 
-Use scripts/rehearse.py with a candidate manifest, baseline manifest, verified model directory and immutable image identities. The script labels run-owned resources, checks ownership before cleanup, upgrades the candidate, verifies all ten coordinate decimals and seven worker tasks, then restores into a separate owned database and starts the baseline application against it. A staging pass requires its actual artifact; source code or a unit test is not that artifact.
+Use scripts/ops/rehearse.py with a candidate manifest, baseline manifest, verified model directory and immutable image identities. The script labels run-owned resources, checks ownership before cleanup, upgrades the candidate, verifies all ten coordinate decimals and seven worker tasks, then restores into a separate owned database and starts the baseline application against it. A staging pass requires its actual artifact; source code or a unit test is not that artifact.
 
 Before any production rollout, retain a private restore-verified backup and the independently approved dataset/maintenance budget. Rehearsal archives and sessions may contain private data and must not be committed or publicly uploaded.
 

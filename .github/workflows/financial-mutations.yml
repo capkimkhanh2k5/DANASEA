@@ -6,7 +6,7 @@ on:
     paths:
       - 'backend/src/main/java/com/danasea/backend/modules/order/**'
       - 'backend/src/test/java/com/danasea/backend/modules/order/**'
-      - 'scripts/verify_financial_mutations.py'
+      - 'scripts/qa/verify_financial_mutations.py'
       - '.github/workflows/financial-mutations.yml'
 
 permissions:
@@ -42,7 +42,7 @@ jobs:
         run: ./mvnw -B test-compile
 
       - name: Execute Targeted Financial Mutation Proofs
-        run: python3 scripts/verify_financial_mutations.py --backend-dir backend --output ${{ runner.temp }}/financial-mutation-proof.json
+        run: python3 scripts/qa/verify_financial_mutations.py --backend-dir backend --output ${{ runner.temp }}/financial-mutation-proof.json
 
       - name: Upload Mutation Proof Evidence
         if: always()

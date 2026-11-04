@@ -20,10 +20,9 @@ from contextlib import contextmanager
 from decimal import Decimal
 from pathlib import Path
 
-import acceptance
-import backup
-import production
-import release
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.ops import backup, production, release  # noqa: E402
+from scripts.qa import acceptance  # noqa: E402
 
 
 def isolate(config):
@@ -301,7 +300,7 @@ def rehearse(root, model_dir, images, baseline, output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument('--model-dir', required=True, type=Path)
     parser.add_argument('--manifest', type=Path)
     parser.add_argument('--baseline', type=Path)

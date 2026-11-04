@@ -15,7 +15,7 @@ flow ready for demonstration.
    policy and restricted SSH wrapper) must already be installed. This demo
    bootstrap extends those controls and refuses mismatched keys or trust files.
    On the Linux server, review and run the root bootstrap from that deployed
-   checkout: `sudo bash scripts/install-demo-data-controls.sh /path/to/ci-public-key.pub`.
+   checkout: `sudo bash scripts/demo/install-demo-data-controls.sh /path/to/ci-public-key.pub`.
    Use the public key corresponding to the existing CI SSH private key. This
    installs a bounded `demo-data <sha>` command; normal CD alone cannot upgrade
    the root-owned SSH entrypoint. Do not replace the key with unrestricted SSH.
@@ -23,7 +23,7 @@ flow ready for demonstration.
    packages (Ubuntu/Debian: `sudo apt-get install python3-bcrypt`) and confirm
    `python3 -c 'import bcrypt'` succeeds for the deployment account.
    Ensure the production backend uses the distinct, non-superuser database
-   runtime role provisioned by `scripts/production.py init-db`. Application
+   runtime role provisioned by `scripts/ops/production.py init-db`. Application
    maintenance must be able to stop database writers before replacement.
 4. Set the GitHub environment `production` secret `DEMO_USER_PASSWORD` to a
    strong demo account password, at least 12 characters and at most 72 UTF-8

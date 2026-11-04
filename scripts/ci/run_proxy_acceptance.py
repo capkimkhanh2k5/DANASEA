@@ -23,10 +23,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-check_test_reports = importlib.import_module("scripts.check_test_reports").check
-support = importlib.import_module("scripts.ai_evidence")
+check_test_reports = importlib.import_module("scripts.governance.check_test_reports").check
+support = importlib.import_module("scripts.ai.ai_evidence")
 validate_ai_evidence = importlib.import_module(
-    "scripts.check_ai_acceptance"
+    "scripts.ai.check_ai_acceptance"
 ).validate_ai_evidence
 
 

@@ -111,7 +111,7 @@ jobs:
       - name: Check live branch and production restrictions
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/check_repository_controls.py --repository "$GITHUB_REPOSITORY"
+        run: python3 scripts/governance/check_repository_controls.py --repository "$GITHUB_REPOSITORY"
       - name: Validate release and connection configuration
         env:
           TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
@@ -161,15 +161,15 @@ jobs:
         run: |
           mkdir -p release
           if [[ "$RELEASE_ACTION" == deploy ]]; then
-            python3 scripts/release.py create --sha "$DEPLOY_SHA" --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --directory candidate --output release/candidate.json
+            python3 scripts/ops/release.py create --sha "$DEPLOY_SHA" --repository "$GITHUB_REPOSITORY" --run-id "$GITHUB_RUN_ID" --directory candidate --output release/candidate.json
           else
             cp candidate/release.json release/candidate.json
-            python3 scripts/release.py validate release/candidate.json --sha "$DEPLOY_SHA" --repository "$GITHUB_REPOSITORY" --action deploy > /dev/null
+            python3 scripts/ops/release.py validate release/candidate.json --sha "$DEPLOY_SHA" --repository "$GITHUB_REPOSITORY" --action deploy > /dev/null
           fi
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ConnectionAttempts=3 "$DEPLOY_USER@$DEPLOY_HOST" status > release/baseline.json
           python3 - <<'PY'
           import json, pathlib, sys
-          sys.path.insert(0, 'scripts')
+          sys.path.insert(0, 'scripts/ops')
           import release
           body = release.read('release/baseline.json')
           pathlib.Path('release/baseline.sha').write_text(body['sha'])
@@ -185,7 +185,7 @@ jobs:
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p release/security "$RUNNER_TEMP/quyet-model"
-          python3 scripts/release.py images release/candidate.json > release/images.env
+          python3 scripts/ops/release.py images release/candidate.json > release/images.env
           while IFS='=' read -r key image; do
             trivy image --image-src remote --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output "release/security/${key}.json" "$image"
             docker pull "$image"
@@ -194,7 +194,7 @@ jobs:
           docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e HF_HUB_OFFLINE=0 -e TRANSFORMERS_OFFLINE=0 -v "$RUNNER_TEMP/quyet-model:/models" "$worker_image" python -c "from huggingface_hub import snapshot_download; snapshot_download('chinhnc/Quyet-1.0-Small',revision='233167bba5df61b5375a522bf8a042d8d2189379',local_dir='/models')"
           chmod -R a+rX "$RUNNER_TEMP/quyet-model"
       - name: Rehearse upgrade, recovery and booking against disposable infrastructure
-        run: python3 scripts/rehearse.py --root "$RUNNER_TEMP/candidate-source" --manifest release/candidate.json --baseline release/baseline.json --model-dir "$RUNNER_TEMP/quyet-model" --output release/rehearsal.json
+        run: python3 scripts/ops/rehearse.py --root "$RUNNER_TEMP/candidate-source" --manifest release/candidate.json --baseline release/baseline.json --model-dir "$RUNNER_TEMP/quyet-model" --output release/rehearsal.json
       - name: Sign the rehearsed release and deploy its immutable images
         env:
           DEPLOY_USER: ${{ secrets.SERVER_USER }}
@@ -202,9 +202,9 @@ jobs:
           RELEASE_ACTION: ${{ github.event_name == 'workflow_dispatch' && 'rollback' || 'deploy' }}
         run: |
           baseline_sha=$(cat release/baseline.sha)
-          python3 scripts/release.py promote release/candidate.json --rehearsal release/rehearsal.json --baseline-sha "$baseline_sha" --action "$RELEASE_ACTION" --output release/release.json
+          python3 scripts/ops/release.py promote release/candidate.json --rehearsal release/rehearsal.json --baseline-sha "$baseline_sha" --action "$RELEASE_ACTION" --output release/release.json
           ssh-keygen -Y sign -f ~/.ssh/id_ed25519 -n danasea-release release/release.json
-          python3 scripts/release.py envelope release/release.json --signature release/release.json.sig > release/envelope.json
+          python3 scripts/ops/release.py envelope release/release.json --signature release/release.json.sig > release/envelope.json
           ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -o ConnectionAttempts=3 "$DEPLOY_USER@$DEPLOY_HOST" "$RELEASE_ACTION $DEPLOY_SHA" < release/envelope.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

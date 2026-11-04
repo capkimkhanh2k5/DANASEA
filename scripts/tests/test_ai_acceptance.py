@@ -7,7 +7,7 @@ from pathlib import Path
 class AiAcceptanceValidationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        script_path = Path(__file__).resolve().parents[1] / "check_ai_acceptance.py"
+        script_path = Path(__file__).resolve().parents[1] / "ai" / "check_ai_acceptance.py"
         spec = importlib.util.spec_from_file_location("check_ai_acceptance", script_path)
         cls.module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.module)
