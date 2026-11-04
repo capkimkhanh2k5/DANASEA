@@ -14,13 +14,26 @@ records. Migrating an existing database keeps the dates and IDs of existing
 departures and bookings. Recurring rules and equipment links start empty.
 The scheduler generates the rolling 90-day horizon after a vendor saves a rule.
 
-The reviewed `DB_Demo` fixture keeps the existing concrete departures and
-booking anchors (24 departures, including 3 historical booking anchors). The
-reviewed replacement requires Flyway V49 and clears application data, including operating rules,
-exceptions and physical equipment, so demo these workflows by creating new
-vendor configuration after the fixture import. A schema migration alone does
-not replace application data. The legacy generated SQL is for disposable local
-databases. It skips conflicting departures to avoid reopening or moving them.
+The reviewed `DB_Demo` replacement on Flyway V49 keeps the 24 concrete
+fixture departures, including 3 historical booking anchors. It also seeds
+active daily rules for the 16 published demo services and materializes future
+departures immediately through the 90th calendar day in Vietnam time. The
+backend scheduler extends that window over time. The 8 remaining services keep
+their review states and become eligible for a schedule only after publication
+and vendor configuration.
+
+Replacement creates a second synthetic time window after each original fixture
+slot (currently 10:00–11:00). The four published services with private packages
+and one shared snorkelling service each get two interchangeable demo units.
+This is synthetic inventory for demonstration. It does not assert that the
+physical assets or operating hours exist at a real vendor. The demo SUP option
+uses a one-person safety capacity per board. Verify the `demoOperatingSchedule`
+counts in the installer report. They are separate from the 270 canonical rows.
+
+Replacement clears the target's previous operating rules, exceptions and
+equipment before seeding the demo set. Normal migrations and non-replacement
+sync do not seed the rolling window. The legacy generated SQL only creates
+concrete slots for disposable local databases.
 
 The V45 → V49 rehearsal on disposable PostgreSQL preserved the existing values
 of 24 departures, 6 bookings, their order and payment records, and a legacy

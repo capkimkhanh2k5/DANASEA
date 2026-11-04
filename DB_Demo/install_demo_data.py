@@ -1,5 +1,5 @@
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 import argparse
 import copy
@@ -394,7 +394,6 @@ def preflight_audit(session, base_rows, trans_rows):
         rs = all_rows.get(table, [])
         if not rs:
             continue
-        expected = source(table, rs)
         id_list = ','.join(lit(r['id']) + '::uuid' for r in rs)
 
         existing_ids = session.query(f"SELECT coalesce(json_agg(id), '[]'::json) FROM public.{table} WHERE id IN ({id_list})")
@@ -628,6 +627,103 @@ def protected_references(reviewed):
     return refs + list(PROTECTED_LEGACY_REFERENCES)
 
 
+def seed_demo_operating_schedule(session, base_rows):
+    # Derive synthetic departures only for reviewed, published demo services.
+    # Keep all canonical slots (including historical booking anchors) untouched.
+    now = datetime.fromisoformat(session.query(
+        "SELECT to_json(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')"))
+    today = now.date()
+    horizon_days = 90
+    days = ('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY')
+    templates = {slot['service_id']: slot for slot in base_rows['service_slots']}
+    private_capacity = {}
+    published = {service['id'] for service in base_rows['services'] if service['status'] == 'PUBLISHED'}
+    for option in base_rows['service_options']:
+        service_id = option['service_id']
+        if service_id in published and option['status'] == 'ACTIVE' and option['option_type'] == 'PRIVATE':
+            capacity = option['max_pax_per_package']
+            require(isinstance(capacity, int) and capacity > 0, 'Published demo private option needs a capacity')
+            private_capacity[service_id] = max(private_capacity.get(service_id, 0), capacity)
+
+    schedules, slots, equipment, units = [], [], [], []
+    existing_departures = {(s['service_id'], s['date'], time.fromisoformat(s['start_time']))
+                           for s in base_rows['service_slots']}
+    for service in base_rows['services']:
+        service_id = service['id']
+        if service_id not in published:
+            continue
+        template = templates[service_id]
+        original_start = datetime.combine(today, time.fromisoformat(template['start_time']))
+        start = datetime.combine(today, time.fromisoformat(template['end_time']))
+        end = start + (start - original_start)
+        require(original_start < start < end and end.date() == today, 'Invalid demo departure template')
+
+        # Two interchangeable canoes on one shared snorkelling demo, plus two
+        # synthetic units per service that offers a private booking option.
+        snorkel_demo = service_id == '57c22a43-22fd-57da-894c-257ade02450d'
+        unit_capacity = 2 if snorkel_demo else private_capacity.get(service_id)
+        equipment_rule = []
+        if unit_capacity:
+            for number in (1, 2):
+                equipment_id = str(uuid.uuid5(uuid.UUID(service_id), f'demo-equipment:{number}'))
+                equipment.append({'id': equipment_id, 'vendor_id': service['vendor_id'],
+                                  'name': f'Demo {number} – {service["name"]}',
+                                  'compatibility_group': f'demo:{service_id}', 'capacity': unit_capacity})
+                equipment_rule.append({'unitNumber': number, 'capacity': unit_capacity,
+                                       'equipmentId': equipment_id})
+
+        inventory_type = 'SHARED_CAPACITY_UNITS' if equipment_rule else 'PERSON_LIMIT'
+        start_time, end_time = start.time().isoformat(), end.time().isoformat()
+        capacity = 2 * unit_capacity if equipment_rule else template['capacity']
+        rules = [{'dayOfWeek': day, 'startTime': start_time, 'endTime': end_time,
+                  'inventoryType': inventory_type, 'capacity': None if equipment_rule else capacity,
+                  'units': equipment_rule} for day in days]
+        schedules.append({'service_id': service_id, 'starts_on': today.isoformat(),
+                          'active': True, 'weekly_rules': rules})
+
+        for offset in range(horizon_days):
+            day = today + timedelta(days=offset)
+            if datetime.combine(day, start.time()) <= now:
+                continue
+            require((service_id, day.isoformat(), start.time()) not in existing_departures,
+                    'Demo schedule would overlap a canonical departure at the same start time')
+            slot_id = str(uuid.uuid5(uuid.UUID(service_id), f'demo-departure:{day}:{start_time}'))
+            slots.append({'id': slot_id, 'service_id': service_id, 'date': day.isoformat(),
+                          'start_time': start_time, 'end_time': end_time, 'capacity': capacity,
+                          'booked_count': 0, 'status': 'OPEN', 'inventory_type': inventory_type})
+            for rule in equipment_rule:
+                number = rule['unitNumber']
+                units.append({'id': str(uuid.uuid5(uuid.UUID(slot_id), f'demo-unit:{number}')),
+                              'slot_id': slot_id, 'unit_number': number, 'capacity': rule['capacity'],
+                              'booked_count': 0, 'equipment_id': rule['equipmentId']})
+
+    markers = [{'slot_id': slot['id']} for slot in slots]
+    for table, rows, timestamped in (
+            ('vendor_equipment', equipment, False),
+            ('service_operating_schedules', schedules, False),
+            ('service_slots', slots, True),
+            ('service_slot_units', units, True),
+            ('service_operating_schedule_slots', markers, False)):
+        if not rows:
+            continue
+        columns = ','.join(rows[0])
+        timestamps = ',created_at,updated_at' if timestamped else ''
+        clock = ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP' if timestamped else ''
+        inserted = session.query(f"""
+            WITH inserted AS (
+                INSERT INTO public.{table} ({columns}{timestamps})
+                SELECT {columns}{clock}
+                FROM jsonb_populate_recordset(NULL::public.{table}, {jlit(rows)})
+                RETURNING 1
+            ) SELECT to_json(count(*)) FROM inserted
+            """)
+        require(inserted == len(rows), f'Demo operating schedule insert incomplete: {table}')
+
+    return {'services': len(schedules), 'horizonDays': horizon_days,
+            'departures': len(slots), 'equipment': len(equipment), 'slotUnits': len(units),
+            'through': (today + timedelta(days=horizon_days - 1)).isoformat()}
+
+
 def execute_replace(session, base_rows, trans_rows, demo_password):
     reviewed = replacement_inventory(session)
     tables = list(reviewed['classification'])
@@ -695,6 +791,7 @@ def execute_replace(session, base_rows, trans_rows, demo_password):
     historical = {i['slot_id'] for i in trans_rows['booking_items']}
     today = datetime.now(timezone(timedelta(hours=7))).date().isoformat()
     require(all(s['date'] > today for s in base_rows['service_slots'] if s['id'] not in historical), 'Replacement requires future demo slots')
+    result['demoOperatingSchedule'] = seed_demo_operating_schedule(session, base_rows)
     after = protected_snapshot(session, snapshot_tables)
     require(before == after, 'Protected configuration fingerprint changed; replacement rolled back')
     session.send('SET CONSTRAINTS ALL IMMEDIATE')

@@ -126,7 +126,7 @@ INSERT INTO service_options (id, service_id, name, option_type, pricing_unit, pr
 ('8c1234ea-4a66-5297-9162-0ac9c8241e0a', '4190046d-112a-5b93-beb2-bcc8b1cd16d4', 'Bay đơn', 'PRIVATE', 'PER_PACKAGE', '650000.00', 1, NULL, 'ACTIVE', NOW(), NOW()),
 ('8c9b3d13-76f5-51e5-a640-48104413d399', '088d874c-a61e-5b58-a7a9-497f32a56901', 'Một xe – tối đa 2 khách', 'PRIVATE', 'PER_PACKAGE', '650000.00', 2, NULL, 'ACTIVE', NOW(), NOW()),
 ('9fa50461-6a11-5553-82e9-72bec31d153a', '4b79c4cd-a138-59ca-83c3-d396c1208ac4', 'Mold & Epoxy – 1 giờ', 'PRIVATE', 'PER_PACKAGE', '130000.00', NULL, NULL, 'ACTIVE', NOW(), NOW()),
-('a692c601-4e70-50b7-97fc-329302505875', '160e67fc-f236-5871-9971-5555cf855d02', 'SUP – 1 giờ', 'PRIVATE', 'PER_PACKAGE', '140000.00', NULL, NULL, 'ACTIVE', NOW(), NOW()),
+('a692c601-4e70-50b7-97fc-329302505875', '160e67fc-f236-5871-9971-5555cf855d02', 'SUP – 1 giờ', 'PRIVATE', 'PER_PACKAGE', '140000.00', 1, NULL, 'ACTIVE', NOW(), NOW()),
 ('ac6642a8-3fe5-58be-a12b-92396f5fa0db', 'd51355fc-bf7e-5366-b199-6272efe7f52b', 'Theo khách', 'SHARED', 'PER_PERSON', '350000.00', NULL, NULL, 'ACTIVE', NOW(), NOW()),
 ('ae3c385b-c09e-51f8-aca3-70ac78154a40', '4b79c4cd-a138-59ca-83c3-d396c1208ac4', 'Special – 1 giờ', 'PRIVATE', 'PER_PACKAGE', '170000.00', NULL, NULL, 'ACTIVE', NOW(), NOW()),
 ('cf0532f4-2a70-5a8f-ae98-ad1ca966ee31', '1dd26db5-f863-5b03-b562-ac46f43df9d2', 'Một người lớn – giá tham chiếu đơn', 'SHARED', 'PER_PERSON', '1100000.00', NULL, NULL, 'ACTIVE', NOW(), NOW()),

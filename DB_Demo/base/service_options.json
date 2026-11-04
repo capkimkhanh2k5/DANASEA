@@ -313,7 +313,7 @@
         "updated_at": "2026-10-15T09:06:26.816505+00:00",
         "option_type": "PRIVATE",
         "pricing_unit": "PER_PACKAGE",
-        "max_pax_per_package": null
+        "max_pax_per_package": 1
       }
     },
     {

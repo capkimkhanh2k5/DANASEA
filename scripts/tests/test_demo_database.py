@@ -77,6 +77,43 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         self.replace()
         self.assertEqual(13, self.sql("SELECT to_json(count(*)) FROM users"))
 
+    def test_01b_replacement_materializes_bookable_demo_horizon(self):
+        result = self.replace()
+        schedule = result['demoOperatingSchedule']
+        self.assertEqual(16, schedule['services'])
+        self.assertEqual(90, schedule['horizonDays'])
+        self.assertEqual(10, schedule['equipment'])
+        self.assertIn(schedule['departures'], (16 * 89, 16 * 90))
+        self.assertEqual(16, self.sql("""
+            SELECT to_json(count(DISTINCT s.service_id))
+            FROM service_operating_schedule_slots g JOIN service_slots s ON s.id = g.slot_id
+            WHERE s.date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')::date + 89
+              AND s.status = 'OPEN'
+        """))
+        self.assertEqual(0, self.sql("""
+            SELECT to_json(count(*)) FROM service_operating_schedules o JOIN services s ON s.id = o.service_id
+            WHERE s.status <> 'PUBLISHED' OR NOT o.active OR o.ends_on IS NOT NULL
+        """))
+        self.assertEqual(0, self.sql("""
+            SELECT to_json(count(*))
+            FROM service_options o JOIN service_operating_schedules p ON p.service_id = o.service_id
+            WHERE o.option_type = 'PRIVATE' AND o.status = 'ACTIVE' AND NOT EXISTS (
+                SELECT 1 FROM service_operating_schedule_slots g JOIN service_slots s ON s.id = g.slot_id
+                JOIN service_slot_units u ON u.slot_id = s.id
+                WHERE s.service_id = o.service_id AND s.status = 'OPEN'
+                  AND s.inventory_type = 'SHARED_CAPACITY_UNITS'
+                  AND u.equipment_id IS NOT NULL AND u.capacity >= o.max_pax_per_package
+            )
+        """))
+        base, transactions, _ = IMPORTER.load_fixtures()
+        historical = {item['slot_id'] for item in transactions['booking_items']}
+        original_dates = {row['id']: row['date'] for row in base['service_slots'] if row['id'] in historical}
+        actual_dates = self.sql("""
+            SELECT json_object_agg(s.id, s.date) FROM service_slots s
+            WHERE s.id IN (SELECT slot_id FROM booking_items)
+        """)
+        self.assertEqual(original_dates, actual_dates)
+
     def test_02_failed_import_and_dry_run_restore_old_data(self):
         self.sql("INSERT INTO users(id,created_at,updated_at,email,role) VALUES ('ffffffff-0000-0000-0000-000000000003',now(),now(),'rollback@local.test','CUSTOMER')")
         with self.assertRaises(ValueError):
