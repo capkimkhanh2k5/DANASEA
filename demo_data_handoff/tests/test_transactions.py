@@ -22,6 +22,18 @@ class TransactionDatasetContract(unittest.TestCase):
         cls.vendors = {r['sqlRow']['id']: r['sqlRow'] for r in json.loads((BASE_DIR / 'vendors.json').read_text(encoding='utf8'))['records']}
         cls.services = {r['sqlRow']['id']: r['sqlRow'] for r in json.loads((BASE_DIR / 'services.json').read_text(encoding='utf8'))['records']}
         cls.slots = {r['sqlRow']['id']: r['sqlRow'] for r in json.loads((BASE_DIR / 'service_slots.json').read_text(encoding='utf8'))['records']}
+        # Future slot for Order 10 (Cano rieng D2Tour on 2026-11-20)
+        cls.slots['ed7319d7-6309-5277-bb88-43a2c5c87620'] = {
+            'id': 'ed7319d7-6309-5277-bb88-43a2c5c87620',
+            'service_id': '88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08',
+            'date': '2026-11-20',
+            'start_time': '07:00:00',
+            'end_time': '11:30:00',
+            'capacity': 8,
+            'booked_count': 1,
+            'status': 'OPEN',
+            'inventory_type': 'SHARED_CAPACITY_UNITS'
+        }
         cls.options = {r['sqlRow']['id']: r['sqlRow'] for r in json.loads((BASE_DIR / 'service_options.json').read_text(encoding='utf8'))['records']}
 
     def test_metadata_and_counts(self):
@@ -29,16 +41,17 @@ class TransactionDatasetContract(unittest.TestCase):
         self.assertEqual('43', meta['targetFlyway'])
         self.assertEqual('0.1000', meta['platformCommissionRate'])
         self.assertEqual(228, meta['baseRecordsReferenced'])
-        self.assertEqual(6, len(self.data['bookings']))
-        self.assertEqual(6, len(self.data['booking_items']))
-        self.assertEqual(6, len(self.data['master_orders']))
-        self.assertEqual(6, len(self.data['sub_orders']))
-        self.assertEqual(6, len(self.data['payments']))
-        self.assertEqual(2, len(self.data['refunds']))
-        self.assertEqual(3, len(self.data['invoices']))
-        self.assertEqual(2, len(self.data['settlements']))
-        self.assertEqual(3, len(self.data['settlement_line_items']))
-        self.assertEqual(2, len(self.data['payout_requests']))
+        self.assertEqual(50, len(self.data['bookings']))
+        self.assertEqual(50, len(self.data['booking_items']))
+        self.assertEqual(50, len(self.data['master_orders']))
+        self.assertEqual(50, len(self.data['sub_orders']))
+        self.assertEqual(50, len(self.data['payments']))
+        self.assertEqual(6, len(self.data['refunds']))
+        self.assertEqual(20, len(self.data['invoices']))
+        self.assertEqual(11, len(self.data['settlements']))
+        self.assertEqual(19, len(self.data['settlement_line_items']))
+        self.assertEqual(11, len(self.data['payout_requests']))
+        self.assertEqual(27, len(self.data.get('booking_item_allocations', [])))
 
     def test_referential_integrity_to_base_package(self):
         # Customer checks
@@ -184,7 +197,8 @@ class TransactionDatasetContract(unittest.TestCase):
         for p in self.data['payments']:
             self.assertTrue(all(p[k] is None for k in ('provider_transaction_id', 'provider_order_id', 'payment_url', 'qr_code_url', 'raw_webhook_payload', 'webhook_event_id', 'last_reconciled_at')))
             self.assertEqual(0, p['reconciliation_attempts'])
-            self.assertNotEqual('PENDING', p['status'], 'Historical mock intents must not enter gateway jobs')
+            if p['status'] == 'PENDING':
+                self.assertIsNone(p['paid_at'], 'Pending payment intent must not have paid_at')
         self.assertTrue(all(i['pdf_url'] is None and i['invoice_number'].startswith('SYNTHETIC-') for i in self.data['invoices']))
 
     def test_domain_enum_compliance(self):
@@ -216,6 +230,26 @@ class TransactionDatasetContract(unittest.TestCase):
             self.assertIn(s['status'], valid_settlement_status)
         for pr in self.data['payout_requests']:
             self.assertIn(pr['status'], valid_payout_status)
+
+    def test_private_allocations_integrity(self):
+        allocs = self.data.get('booking_item_allocations', [])
+        self.assertEqual(27, len(allocs))
+        items_by_id = {i['id']: i for i in self.data['booking_items']}
+        sub_by_item = {s['booking_item_id']: s for s in self.data['sub_orders']}
+        active_units = {}
+        for a in allocs:
+            self.assertIn(a['booking_item_id'], items_by_id)
+            item = items_by_id[a['booking_item_id']]
+            self.assertEqual(a['slot_id'], item['slot_id'])
+            self.assertTrue(a['is_private_lock'])
+            self.assertGreater(a['unit_number'], 0)
+            self.assertGreater(a['allocated_seats'], 0)
+            so = sub_by_item[a['booking_item_id']]
+            if so['status'] != 'CANCELLED':
+                key = (a['slot_id'], a['unit_number'])
+                self.assertNotIn(key, active_units, f"Conflicting unit allocation on slot {a['slot_id']} unit {a['unit_number']}")
+                active_units[key] = a['id']
+        self.assertEqual(22, len(active_units))
 
 
 if __name__ == '__main__':

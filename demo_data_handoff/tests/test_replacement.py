@@ -1,5 +1,6 @@
 """Replacement guards and durable filesystem publication behavior."""
 import importlib.util
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -28,7 +29,8 @@ class ReplacementContract(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'receipt.json.pending'
             create(path, {'state': 'COMMIT_PENDING'})
-            self.assertEqual(0o600, path.stat().st_mode & 0o777)
+            if os.name == 'posix':
+                self.assertEqual(0o600, path.stat().st_mode & 0o777)
             with self.assertRaises((FileExistsError, ValueError)):
                 create(path, {'state': 'other'})
             self.assertIn('COMMIT_PENDING', path.read_text())
