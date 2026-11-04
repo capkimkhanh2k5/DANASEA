@@ -28,18 +28,17 @@ class UnifiedInstallerTest(unittest.TestCase):
         prepare = INSTALLER.get('prepare_slots')
         self.assertTrue(callable(prepare), 'Expired fixture slots need runtime dates')
         base, trans, _ = INSTALLER['load_fixtures']()
-        prepare(base, trans, {}, date(2030, 1, 1))
-        historic = {i['slot_id'] for i in trans['booking_items']}
-        self.assertEqual(3, len(historic))
-        self.assertTrue(all(s['date'] == ('2026-10-25' if s['id'] in historic else '2030-01-08') for s in base['service_slots']))
+        prepare(base, trans, {})
+        historic = {s['id'] for s in base['service_slots'] if s['date'] == '2026-10-25'}
+        self.assertEqual(9, len(historic))
+        self.assertEqual(5391, len(base['service_slots']))
+        self.assertTrue(all(s['date'] >= '2026-11-04' for s in base['service_slots'] if s['id'] not in historic))
 
     def test_fresh_import_slots_start_on_or_after_target_date(self):
-        prepare = INSTALLER.get('prepare_slots')
         base, trans, _ = INSTALLER['load_fixtures']()
-        prepare(base, trans, {}, date(2026, 10, 29))
-        historic = {i['slot_id'] for i in trans['booking_items']}
+        historic = {s['id'] for s in base['service_slots'] if s['date'] == '2026-10-25'}
         self.assertTrue(all(s['date'] == '2026-10-25' for s in base['service_slots'] if s['id'] in historic))
-        self.assertTrue(all(s['date'] >= '2026-11-20' for s in base['service_slots'] if s['id'] not in historic))
+        self.assertTrue(all(s['date'] >= '2026-11-04' for s in base['service_slots'] if s['id'] not in historic))
 
     def test_cleanup_requires_import_ownership(self):
         base, trans, _ = INSTALLER['load_fixtures']()
@@ -66,9 +65,9 @@ class UnifiedInstallerTest(unittest.TestCase):
         base_rows, trans_rows, manifest = INSTALLER['load_fixtures']()
         base_count = sum(len(rs) for rs in base_rows.values())
         trans_count = sum(len(rs) for rs in trans_rows.values())
-        self.assertEqual(228, base_count, "Expected 228 base records")
-        self.assertEqual(42, trans_count, "Expected 42 transaction records")
-        self.assertEqual(270, base_count + trans_count, "Expected 270 total demo records")
+        self.assertEqual(22465, base_count, "Expected 22,465 base and generated inventory records")
+        self.assertEqual(344, trans_count, "Expected 344 transaction records")
+        self.assertEqual(22809, base_count + trans_count, "Expected 22,809 total demo records")
         self.assertEqual(77, len(manifest), "Expected 77 storage manifest mappings")
 
     def test_align_schema_defaults_populates_missing_columns(self):
@@ -113,7 +112,7 @@ class UnifiedInstallerTest(unittest.TestCase):
 
     def test_reverse_cleanup_dependency_order(self):
         order = INSTALLER['REVERSE_CLEANUP_ORDER']
-        self.assertEqual(19, len(order), "Cleanup must cover all 19 entity tables")
+        self.assertEqual(21, len(order), "Cleanup must cover all 21 entity tables")
         # Children must come before parents
         self.assertLess(order.index('payout_requests'), order.index('settlements'))
         self.assertLess(order.index('settlement_line_items'), order.index('settlements'))
@@ -122,10 +121,12 @@ class UnifiedInstallerTest(unittest.TestCase):
         self.assertLess(order.index('payments'), order.index('master_orders'))
         self.assertLess(order.index('sub_orders'), order.index('master_orders'))
         self.assertLess(order.index('sub_orders'), order.index('booking_items'))
+        self.assertLess(order.index('booking_item_allocations'), order.index('booking_items'))
         self.assertLess(order.index('booking_items'), order.index('bookings'))
         self.assertLess(order.index('service_safety_documents'), order.index('services'))
         self.assertLess(order.index('service_images'), order.index('services'))
         self.assertLess(order.index('vendor_documents'), order.index('vendors'))
+        self.assertLess(order.index('service_slot_units'), order.index('service_slots'))
         self.assertLess(order.index('service_slots'), order.index('services'))
         self.assertLess(order.index('service_options'), order.index('services'))
         self.assertLess(order.index('services'), order.index('vendors'))

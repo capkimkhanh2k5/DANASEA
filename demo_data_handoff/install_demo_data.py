@@ -1,5 +1,5 @@
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone, time
 from pathlib import Path
 import argparse
 import copy
@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parent
 BASE_DIR = ROOT / 'base' if (ROOT / 'base').is_dir() else ROOT / 'data'
 TRANS_DIR = ROOT / 'transactions' if (ROOT / 'transactions').is_dir() else ROOT / 'data'
 
-BASE_TABLES = [
+
+BASE_JSON_TABLES = [
     'categories',
     'users',
     'vendors',
@@ -27,11 +28,25 @@ BASE_TABLES = [
     'service_images',
     'service_safety_documents'
 ]
+
+BASE_TABLES = [
+    'categories',
+    'users',
+    'vendors',
+    'services',
+    'service_options',
+    'service_slots',
+    'service_slot_units',
+    'vendor_documents',
+    'service_images',
+    'service_safety_documents'
+]
 TABLES = BASE_TABLES
 
 TRANSACTION_TABLES = [
     'bookings',
     'booking_items',
+    'booking_item_allocations',
     'master_orders',
     'sub_orders',
     'payments',
@@ -59,11 +74,13 @@ REVERSE_CLEANUP_ORDER = [
     'payments',
     'sub_orders',
     'master_orders',
+    'booking_item_allocations',
     'booking_items',
     'bookings',
     'service_safety_documents',
     'service_images',
     'vendor_documents',
+    'service_slot_units',
     'service_slots',
     'service_options',
     'services',
@@ -141,12 +158,38 @@ def validate_rows(rows):
     users = {u['id']: u for u in rows['users']}
     require(all(u['password_hash'] is None and u['email'].endswith('@danasea.test') and
                 u['is_email_verified'] is True for u in users.values()), 'Unexpected credential/email activation fixture')
+    admin_ids = {u['id'] for u in users.values() if u['role'] == 'ADMIN'}
+    require(len(admin_ids) > 0, 'Missing ADMIN user in fixture')
     for v in rows['vendors']:
         require(users[v['user_id']]['role'] == 'VENDOR', 'Vendor owner must be VENDOR')
         require(isinstance(v['bank_account_number'], str) and v['bank_account_number'].isdigit(), 'Bank number must be STRING')
         require(users[v['user_id']]['full_name'] == v['business_name'], 'User/Vendor name mismatch')
-    require(all(d['status'] == 'PENDING' and d['reviewed_by'] is None and d['reviewed_at'] is None
-                for d in rows['vendor_documents']), 'Document approval is forbidden in fixture')
+        require(v['verification_status'] in ('PENDING', 'APPROVED', 'REJECTED'), 'Invalid vendor verification status')
+        require(v['badge_tier'] in ('NONE', 'VERIFIED', 'TOP_RATED'), 'Invalid vendor badge tier')
+        if v['verification_status'] == 'APPROVED':
+            require(v.get('verified_by') in admin_ids, 'Approved vendor must be verified by an ADMIN user')
+            require(v.get('verified_at') is not None, 'Approved vendor must have verified_at')
+            if v.get('created_at') and v.get('verified_at'):
+                require(v['created_at'] <= v['verified_at'], 'Vendor created_at must not be after verified_at')
+            if v.get('verified_at') and v.get('updated_at'):
+                require(v['verified_at'] <= v['updated_at'], 'Vendor verified_at must not be after updated_at')
+        elif v['verification_status'] == 'PENDING':
+            require(v.get('verified_by') is None and v.get('verified_at') is None,
+                    'Pending vendor must not have verified_by or verified_at')
+
+    for d in rows['vendor_documents']:
+        require(d['status'] in ('PENDING', 'APPROVED', 'REJECTED'), 'Invalid vendor document status')
+        if d['status'] == 'APPROVED':
+            require(d.get('reviewed_by') in admin_ids, 'Approved vendor document must be reviewed by an ADMIN user')
+            require(d.get('reviewed_at') is not None, 'Approved vendor document must have reviewed_at')
+            if d.get('created_at') and d.get('reviewed_at'):
+                require(d['created_at'] <= d['reviewed_at'], 'Vendor document created_at must not be after reviewed_at')
+            if d.get('reviewed_at') and d.get('updated_at'):
+                require(d['reviewed_at'] <= d['updated_at'], 'Vendor document reviewed_at must not be after updated_at')
+        elif d['status'] == 'PENDING':
+            require(d.get('reviewed_by') is None and d.get('reviewed_at') is None,
+                    'Pending vendor document must not have reviewed_by or reviewed_at')
+
     required_accounts = {'admin_demo@danasea.test': 'ADMIN', 'customer_1@danasea.test': 'CUSTOMER',
                          'customer_2@danasea.test': 'CUSTOMER',
                          **{'vender_' + str(i) + '@danasea.test': 'VENDOR' for i in range(1, 10)}}
@@ -157,9 +200,21 @@ def validate_rows(rows):
     safety = rows['service_safety_documents']
     require(len(safety) == len(needed) and {d['service_id'] for d in safety} == needed,
             'Safety document coverage differs from category/weather policy')
-    require(all(d['status'] == 'PENDING' and d['reviewed_by'] is None and d['reviewed_at'] is None and
-                d['rejection_reason'] is None and 'doc_type' not in d for d in safety),
-            'Safety SAMPLE must be PENDING and unreviewed; no document-type enum exists')
+    for d in safety:
+        require(d['status'] in ('PENDING', 'APPROVED', 'REJECTED') and 'doc_type' not in d,
+                'Safety document status invalid; no document-type enum exists')
+        if d['status'] == 'APPROVED':
+            require(d.get('reviewed_by') in admin_ids, 'Approved safety document must be reviewed by an ADMIN user')
+            require(d.get('reviewed_at') is not None, 'Approved safety document must have reviewed_at')
+            if d.get('created_at') and d.get('reviewed_at'):
+                require(d['created_at'] <= d['reviewed_at'], 'Safety document created_at must not be after reviewed_at')
+            if d.get('reviewed_at') and d.get('updated_at'):
+                require(d['reviewed_at'] <= d['updated_at'], 'Safety document reviewed_at must not be after updated_at')
+        elif d['status'] == 'PENDING':
+            require(d.get('reviewed_by') is None and d.get('reviewed_at') is None,
+                    'Pending safety document must not have reviewed_by or reviewed_at')
+
+    require(all(s['status'] in ('DRAFT', 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'PAUSED') for s in rows['services']), 'Invalid service status')
 
 
 def validate_transactions(base, trans):
@@ -170,6 +225,7 @@ def validate_transactions(base, trans):
     relations = {
         'bookings': {'customer_id': 'users'},
         'booking_items': {'booking_id': 'bookings', 'service_id': 'services', 'vendor_id': 'vendors', 'slot_id': 'service_slots', 'option_id': 'service_options'},
+        'booking_item_allocations': {'booking_item_id': 'booking_items', 'slot_id': 'service_slots'},
         'master_orders': {'booking_id': 'bookings', 'customer_id': 'users'},
         'sub_orders': {'master_order_id': 'master_orders', 'booking_item_id': 'booking_items', 'vendor_id': 'vendors', 'service_id': 'services', 'slot_id': 'service_slots', 'waiver_accepted_by': 'users'},
         'payments': {'master_order_id': 'master_orders'},
@@ -179,8 +235,20 @@ def validate_transactions(base, trans):
         'settlement_line_items': {'settlement_id': 'settlements', 'sub_order_id': 'sub_orders'},
         'payout_requests': {'vendor_id': 'vendors', 'settlement_id': 'settlements', 'processed_by': 'users'}}
     for table, cols in relations.items():
-        for row in trans[table]:
-            require(all(row.get(c) is None or row[c] in indexes[parent] for c, parent in cols.items()), 'Orphan transaction: ' + table)
+        if table in trans:
+            for row in trans[table]:
+                require(all(row.get(c) is None or row[c] in indexes[parent] for c, parent in cols.items()), 'Orphan transaction: ' + table)
+    if 'booking_item_allocations' in trans:
+        sub_by_item = {s['booking_item_id']: s for s in trans['sub_orders']}
+        active_allocs = set()
+        for a in trans['booking_item_allocations']:
+            require(a['allocated_seats'] > 0 and a['unit_number'] > 0, 'Invalid allocation seats or unit')
+            require(a['is_private_lock'] is True, 'Demo allocations must be private locks')
+            so = sub_by_item[a['booking_item_id']]
+            if so['status'] != 'CANCELLED':
+                key = (a['slot_id'], a['unit_number'])
+                require(key not in active_allocs, f'Conflicting unit allocation on slot {a["slot_id"]} unit {a["unit_number"]}')
+                active_allocs.add(key)
     for b in trans['bookings']:
         items = [i for i in trans['booking_items'] if i['booking_id'] == b['id']]
         require(indexes['users'][b['customer_id']]['role'] == 'CUSTOMER' and
@@ -208,9 +276,14 @@ def validate_transactions(base, trans):
         order = indexes['master_orders'][p['master_order_id']]
         booking = indexes['bookings'][order['booking_id']]
         require(Decimal(p['amount']) == Decimal(order['total_amount']), 'Payment amount mismatch')
-        require(all(p.get(c) is None for c in ('provider_order_id', 'provider_transaction_id', 'raw_webhook_payload', 'webhook_event_id', 'payment_url', 'qr_code_url')) and p['status'] != 'PENDING', 'Synthetic gateway evidence/live intent forbidden')
-        state = {'SUCCESS': ('PAID', 'CONFIRMED'), 'REFUNDED': ('REFUNDED', 'CANCELLED'), 'FAILED': ('UNPAID', 'CANCELLED')}
-        require(p['status'] in state and (order['payment_status'], booking['status']) == state[p['status']] and
+        require(all(p.get(c) is None for c in ('provider_order_id', 'provider_transaction_id', 'raw_webhook_payload', 'webhook_event_id', 'payment_url', 'qr_code_url')), 'Synthetic gateway evidence forbidden')
+        valid_states = {
+            'SUCCESS': [('PAID', 'CONFIRMED'), ('NO_REFUND', 'CANCELLED'), ('REFUNDED', 'CANCELLED')],
+            'REFUNDED': [('REFUNDED', 'CANCELLED')],
+            'FAILED': [('UNPAID', 'CANCELLED')],
+            'PENDING': [('UNPAID', 'PENDING_PAYMENT'), ('UNPAID', 'HOLD')]
+        }
+        require(p['status'] in valid_states and (order['payment_status'], booking['status']) in valid_states[p['status']] and
                 bool(p['paid_at']) == (p['status'] in ('SUCCESS', 'REFUNDED')), 'Payment/order/booking status contradiction')
     for r in trans['refunds']:
         s = indexes['sub_orders'][r['sub_order_id']]
@@ -245,15 +318,153 @@ def resolve_demo_password(args):
     return password
 
 
-def prepare_slots(base, trans, ownership, today=None):
-    # UTC+07 has no daylight-saving transitions; works without a Windows tzdata install.
-    today = today or datetime.now(timezone(timedelta(hours=7), 'Asia/Ho_Chi_Minh')).date()
-    historical = {i['slot_id'] for i in trans['booking_items']}
-    min_slot_date = date(2026, 11, 20)
-    default_date = max(today + timedelta(days=7), min_slot_date).isoformat()
+
+
+
+
+SLOT_NAMESPACE = uuid.UUID('e3e067fa-e384-51ca-b6be-dc91406f25af')
+DEFAULT_START_DATE = date(2026, 11, 4)
+DEFAULT_END_DATE = date(2027, 2, 28)
+
+NIGHT_SERVICE_SLUGS = frozenset({
+    'cau-muc-dem-khue-nguyen',
+    'cau-muc-dem-co-bua-toi-danafi',
+})
+
+PRIVATE_SERVICE_CONFIG = {
+    '88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08': (1, 8),
+    '4190046d-112a-5b93-beb2-bcc8b1cd16d4': (4, 2),
+    '3758c297-54ff-5887-89bd-62220227570b': (4, 2),
+    'c4c56ae2-5f9b-555c-81f1-f0d4c8dd7c1b': (4, 2),
+    '2cdfabcf-13a2-550a-8f9e-283aad7053c9': (3, 2),
+    '088d874c-a61e-5b58-a7a9-497f32a56901': (3, 2),
+    'bf8626cd-2271-59ab-9273-4fdd10eb451e': (7, 2),
+    'fd6fced2-812e-56ce-817f-80bb3d0841e9': (2, 5),
+    '83ee83c5-c08b-5f6e-924e-db3ceaacd364': (2, 5),
+    '160e67fc-f236-5871-9971-5555cf855d02': (15, 1),
+    '4b79c4cd-a138-59ca-83c3-d396c1208ac4': (15, 1),
+    '508d4dad-4227-527b-9df3-8416dd870c04': (12, 1),
+}
+
+
+def _minutes(value):
+    t = time.fromisoformat(value)
+    return t.hour * 60 + t.minute
+
+
+def _clock(minutes):
+    return f'{minutes // 60:02d}:{minutes % 60:02d}:00'
+
+
+def _schedule_for(service, seed):
+    start = _minutes(seed['start_time'])
+    end = _minutes(seed['end_time'])
+    first = (seed['start_time'], seed['end_time'])
+    if service['slug'] in NIGHT_SERVICE_SLUGS:
+        return [first]
+    duration = end - start
+    if start >= 12 * 60:
+        alternate_start = 8 * 60 if duration > 150 else 8 * 60 + 30
+    elif 'sup' in service['slug'] and start <= 6 * 60 + 30:
+        alternate_start = 16 * 60 + 30
+    else:
+        alternate_start = 13 * 60 if duration > 210 else 14 * 60
+    alternate_end = alternate_start + duration
+    second = (_clock(alternate_start), _clock(alternate_end))
+    return sorted([first, second])
+
+
+def prepare_slots_and_inventory(base_rows, trans_rows, start_date=DEFAULT_START_DATE, end_date=DEFAULT_END_DATE):
+    for s in base_rows['service_slots']:
+        if s['service_id'] in PRIVATE_SERVICE_CONFIG:
+            s['inventory_type'] = 'SHARED_CAPACITY_UNITS'
+        else:
+            s['inventory_type'] = 'PERSON_LIMIT'
+
+    services = base_rows['services']
+    slots = base_rows['service_slots']
+    by_service = {s['id']: s for s in services}
+    schedules = {s['service_id']: (_schedule_for(by_service[s['service_id']], s), s) for s in slots}
+
+    days = (end_date - start_date).days + 1
+    existing_keys = {(s['service_id'], s['date'], s['start_time']) for s in slots}
+    existing_ids = {s['id'] for s in slots}
+
+    new_slots = []
+    for index in range(days):
+        day = (start_date + timedelta(days=index)).isoformat()
+        for service_id in sorted(schedules):
+            times, original = schedules[service_id]
+            for departure, arrival in times:
+                if (service_id, day, departure) in existing_keys:
+                    continue
+                new_id = str(uuid.uuid5(SLOT_NAMESPACE, f'{service_id}|{day}|{departure}'))
+                if new_id in existing_ids:
+                    raise ValueError('Deterministic UUID collision with canonical base')
+                existing_ids.add(new_id)
+                new_slots.append({
+                    'id': new_id,
+                    'service_id': service_id,
+                    'date': day,
+                    'start_time': departure,
+                    'end_time': arrival,
+                    'capacity': original['capacity'],
+                    'inventory_type': 'SHARED_CAPACITY_UNITS' if service_id in PRIVATE_SERVICE_CONFIG else 'PERSON_LIMIT',
+                    'status': 'OPEN',
+                    'booked_count': 0
+                })
+
+    base_rows['service_slots'].extend(new_slots)
+
+    all_units = []
+    unit_map = {}
+    for s in base_rows['service_slots']:
+        if s['inventory_type'] == 'SHARED_CAPACITY_UNITS':
+            num_units, unit_cap = PRIVATE_SERVICE_CONFIG[s['service_id']]
+            for u in range(1, num_units + 1):
+                unit_id = str(uuid.uuid5(SLOT_NAMESPACE, s['id'] + '|unit|' + str(u)))
+                unit = {
+                    'id': unit_id,
+                    'slot_id': s['id'],
+                    'unit_number': u,
+                    'capacity': unit_cap,
+                    'booked_count': 0
+                }
+                all_units.append(unit)
+                unit_map[(s['id'], u)] = unit
+
+    base_rows['service_slot_units'] = all_units
+
+    slot_map = {s['id']: s for s in base_rows['service_slots']}
+    allocs = trans_rows.get('booking_item_allocations', [])
+    alloc_items = {a['booking_item_id'] for a in allocs}
+    sub_by_item = {s['booking_item_id']: s for s in trans_rows.get('sub_orders', [])}
+
+    for a in allocs:
+        so = sub_by_item.get(a['booking_item_id'])
+        if so and so['status'] != 'CANCELLED':
+            u = unit_map.get((a['slot_id'], a['unit_number']))
+            if u:
+                u['booked_count'] += 1
+            sl = slot_map.get(a['slot_id'])
+            if sl:
+                sl['booked_count'] += 1
+
+    for bi in trans_rows.get('booking_items', []):
+        if bi['id'] not in alloc_items:
+            so = sub_by_item.get(bi['id'])
+            if so and so['status'] != 'CANCELLED':
+                sl = slot_map.get(bi['slot_id'])
+                if sl:
+                    sl['booked_count'] += bi['quantity']
+
+
+def prepare_slots(base, trans, ownership=None, today=None):
+    if not ownership or 'slotDates' not in ownership:
+        return
     for slot in base['service_slots']:
-        if slot['id'] not in historical:
-            slot['date'] = ownership.get('slotDates', {}).get(slot['id'], default_date)
+        if slot['id'] in ownership['slotDates']:
+            slot['date'] = ownership['slotDates'][slot['id']]
 
 
 def validate_identity(identity, database):
@@ -265,7 +476,7 @@ def validate_identity(identity, database):
 
 def load_fixtures():
     base_records = {t: json.loads((BASE_DIR / f'{t}.json').read_text(encoding='utf8'))['records']
-                    for t in BASE_TABLES}
+                    for t in BASE_JSON_TABLES}
     base_rows = {t: [copy.deepcopy(r['sqlRow']) for r in rs] for t, rs in base_records.items()}
     validate_rows(base_rows)
 
@@ -281,6 +492,9 @@ def load_fixtures():
     trans_data = json.loads((TRANS_DIR / 'demo_transactions.json').read_text(encoding='utf8'))
     trans_rows = {t: copy.deepcopy(trans_data[t]) for t in TRANSACTION_TABLES}
     require(trans_data['classification'] == 'DEVELOPMENT_SYNTHETIC', 'Synthetic classification required')
+
+    prepare_slots_and_inventory(base_rows, trans_rows)
+
     validate_transactions(base_rows, trans_rows)
 
     return base_rows, trans_rows, manifest_data
@@ -392,9 +606,13 @@ def preflight_audit(session, base_rows, trans_rows):
         if not rs:
             continue
         expected = source(table, rs)
-        id_list = ','.join(lit(r['id']) + '::uuid' for r in rs)
-
-        existing_ids = session.query(f"SELECT coalesce(json_agg(id), '[]'::json) FROM public.{table} WHERE id IN ({id_list})")
+        if len(rs) > 500:
+            existing_ids = session.query(
+                f"SELECT coalesce(json_agg(t.id), '[]'::json) FROM public.{table} t JOIN {expected} e ON t.id=e.id")
+        else:
+            id_list = ','.join(lit(r['id']) + '::uuid' for r in rs)
+            existing_ids = session.query(
+                f"SELECT coalesce(json_agg(id), '[]'::json) FROM public.{table} WHERE id IN ({id_list})")
         existing_set = set(existing_ids)
 
         missing_count = len(rs) - len(existing_set)
@@ -465,7 +683,8 @@ def preflight_audit(session, base_rows, trans_rows):
         'businessReadiness': {
             'publishedServices': sum(s['status'] == 'PUBLISHED' for s in base_rows['services']),
             'activeOptions': sum(o['status'] == 'ACTIVE' for o in base_rows['service_options']),
-            'pendingSafetySamples': len(base_rows['service_safety_documents']),
+            'pendingSafetySamples': sum(d['status'] == 'PENDING' for d in base_rows['service_safety_documents']),
+            'approvedSafetyDocuments': sum(d['status'] == 'APPROVED' for d in base_rows['service_safety_documents']),
             'futureSlots': sum(s['date'] > datetime.now(timezone(timedelta(hours=7))).date().isoformat() for s in base_rows['service_slots']),
             'notice': 'SQL preflight is not demo readiness. Compliance approval, PRIVATE units, APIs and Frontend require separate verification.'}
     }
@@ -509,14 +728,37 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
         expressions = ','.join('coalesce(r."' + k + '",CURRENT_TIMESTAMP)' if k in ('created_at', 'updated_at')
                                else 'r."' + k + '"' for k in names)
 
+        where_cond = f"WHERE NOT EXISTS(SELECT 1 FROM public.{table} t WHERE t.id=r.id"
+        if table == 'service_slots':
+            where_cond += " OR (t.service_id=r.service_id AND t.date=r.date AND t.start_time=r.start_time)"
+        elif table == 'service_slot_units':
+            where_cond += " OR (t.slot_id=r.slot_id AND t.unit_number=r.unit_number)"
+        elif table == 'settlements':
+            where_cond += " OR (t.vendor_id=r.vendor_id AND t.period_start=r.period_start AND t.period_end=r.period_end)"
+        where_cond += ")"
+
         inserted = session.query(
             f"WITH added AS (INSERT INTO public.{table} ({targets}) "
             f"SELECT {expressions} FROM {exp} r "
-            f"WHERE NOT EXISTS(SELECT 1 FROM public.{table} t WHERE t.id=r.id) RETURNING id) "
+            f"{where_cond} RETURNING id) "
             f"SELECT coalesce(json_agg(id),'[]'::json) FROM added")
 
         inserted_results[table] = len(inserted)
         inserted_ids[table] = inserted
+
+    # Align slot & unit booked_count and inventory_type on existing slots/units
+    session.send(
+        f"UPDATE public.service_slots s "
+        f"SET booked_count = r.booked_count, inventory_type = r.inventory_type "
+        f"FROM {source('service_slots', base_rows['service_slots'])} r "
+        f"WHERE s.id = r.id AND (s.booked_count <> r.booked_count OR s.inventory_type <> r.inventory_type)"
+    )
+    session.send(
+        f"UPDATE public.service_slot_units u "
+        f"SET booked_count = r.booked_count "
+        f"FROM {source('service_slot_units', base_rows['service_slot_units'])} r "
+        f"WHERE u.id = r.id AND u.booked_count <> r.booked_count"
+    )
 
     provisioned = 0
     for u in base_rows['users']:
@@ -527,8 +769,11 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
 
     for table in ALL_TABLES:
         rs = all_rows[table]
-        id_list = ','.join(lit(r['id']) + '::uuid' for r in rs)
-        cnt = session.query(f"SELECT to_json(count(*)) FROM public.{table} WHERE id IN ({id_list})")
+        if len(rs) > 500:
+            cnt = session.query(f"SELECT to_json(count(*)) FROM public.{table} t JOIN {source(table, rs)} e ON t.id=e.id")
+        else:
+            id_list = ','.join(lit(r['id']) + '::uuid' for r in rs)
+            cnt = session.query(f"SELECT to_json(count(*)) FROM public.{table} WHERE id IN ({id_list})")
         require(cnt == len(rs), f"Post-sync fixture count incomplete for table: {table}")
 
     return {
@@ -542,7 +787,7 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     }
 
 
-# Replacement accepts only the exact reviewed V1-V45 table/column/FK/trigger inventory.
+# Replacement accepts only the exact reviewed V1-V44 table/column/FK/trigger inventory.
 RESET_INVENTORY_SQL = """
 SELECT json_build_object(
  'schemas',(SELECT json_agg(nspname ORDER BY nspname) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),
@@ -672,10 +917,11 @@ def execute_replace(session, base_rows, trans_rows, demo_password):
     validated = preflight_audit(session, base_rows, trans_rows)
     require(validated['status'] == 'PREFLIGHT_PASS' and all(v['presentInDb'] == v['expected'] and v['conflicts'] == 0 for v in validated['tables'].values()),
             'Replacement canonical fixture verification failed')
-    require(result['totalVerifiedInDb'] == 270, 'Replacement requires 270 canonical rows')
+    expected_canonical = sum(len(rs) for rs in base_rows.values()) + sum(len(rs) for rs in trans_rows.values())
+    require(result['totalVerifiedInDb'] == expected_canonical, f'Replacement requires {expected_canonical} canonical rows')
     historical = {i['slot_id'] for i in trans_rows['booking_items']}
     today = datetime.now(timezone(timedelta(hours=7))).date().isoformat()
-    require(all(s['date'] > today for s in base_rows['service_slots'] if s['id'] not in historical), 'Replacement requires future demo slots')
+    require(all(s['date'] >= today for s in base_rows['service_slots'] if s['id'] not in historical), 'Replacement requires future demo slots')
     after = protected_snapshot(session, snapshot_tables)
     require(before == after, 'Protected configuration fingerprint changed; replacement rolled back')
     session.send('SET CONSTRAINTS ALL IMMEDIATE')
@@ -687,6 +933,8 @@ def execute_replace(session, base_rows, trans_rows, demo_password):
 
 
 def fsync_directory(path):
+    if not hasattr(os, 'O_DIRECTORY'):
+        return
     fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
     try:
         os.fsync(fd)
@@ -713,6 +961,10 @@ def validate_modes(args):
 def row_fingerprints(session, table, ids):
     if not ids:
         return {}
+    if len(ids) > 500:
+        return session.query(
+            f"SELECT coalesce(json_object_agg(t.id,md5(to_jsonb(t)::text)), '{{}}'::json) "
+            f"FROM public.{table} t JOIN jsonb_array_elements_text({jlit(ids)}) x ON t.id = x::uuid")
     id_list = ','.join(lit(i) + '::uuid' for i in ids)
     return session.query(f"SELECT coalesce(json_object_agg(id,md5(to_jsonb(t)::text)), '{{}}'::json) FROM public.{table} t WHERE id IN ({id_list})")
 
