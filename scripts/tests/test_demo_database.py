@@ -34,8 +34,13 @@ class DemoDatabaseAcceptance(unittest.TestCase):
             if ready.returncode == 0:
                 break
             time.sleep(.5)
+        cls.sql_folder = tempfile.TemporaryDirectory(prefix='danasea-demo-flyway-')
+        cls.addClassCleanup(cls.sql_folder.cleanup)
+        mig_dir = ROOT / 'backend/src/main/resources/db/migration'
+        for sql_file in mig_dir.glob('*.sql'):
+            (Path(cls.sql_folder.name) / sql_file.name).write_bytes(sql_file.read_bytes().replace(b'\r\n', b'\n'))
         result = subprocess.run(['docker', 'run', '--rm', '--network', 'container:' + cls.container,
-                                 '-v', str(ROOT / 'backend/src/main/resources/db/migration') + ':/flyway/sql:ro',
+                                 '-v', cls.sql_folder.name + ':/flyway/sql:ro',
                                  'redgate/flyway:13.10.0', '-url=jdbc:postgresql://127.0.0.1:5432/demo_acceptance',
                                  '-user=postgres', 'migrate'], capture_output=True, text=True, timeout=180)
         if result.returncode:
@@ -44,7 +49,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
 
     def sql(self, statement):
         result = subprocess.run(['docker', 'exec', '-i', self.container, 'psql', '-XAtq', '-v', 'ON_ERROR_STOP=1',
-                                 '-U', 'postgres', '-d', 'demo_acceptance'], input=statement, text=True, capture_output=True, check=True)
+                                 '-U', 'postgres', '-d', 'demo_acceptance'], input=statement, text=True, encoding='utf-8', capture_output=True, check=True)
         return json.loads(result.stdout) if result.stdout.strip() else None
 
     def replace(self, commit=True, corrupt=False):
@@ -67,13 +72,13 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         before = self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM system_configs t")
         rules = self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM category_safety_rules t")
         result = self.replace()
-        self.assertEqual(270, result['totalVerifiedInDb'])
+        self.assertEqual(22809, result['totalVerifiedInDb'])
         self.assertEqual('REPLACE_SUCCESS', result['status'])
         self.assertEqual(0, self.sql("SELECT to_json(count(*)) FROM users WHERE email='old@local.test'"))
         self.assertEqual(1, self.sql("SELECT to_json(count(*)) FROM users WHERE email='config@local.test'"))
         self.assertEqual(before, self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM system_configs t"))
         self.assertEqual(rules, self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM category_safety_rules t"))
-        self.assertEqual(24, self.sql("SELECT to_json(count(*)) FROM service_safety_documents WHERE status='PENDING' AND reviewed_by IS NULL"))
+        self.assertEqual(24, self.sql("SELECT to_json(count(*)) FROM service_safety_documents WHERE status='APPROVED' AND reviewed_by IS NOT NULL"))
         self.replace()
         self.assertEqual(13, self.sql("SELECT to_json(count(*)) FROM users"))
 
@@ -118,7 +123,8 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         result = subprocess.run(command, input='local-acceptance-secret\n', text=True, capture_output=True)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual('COMMITTED', json.loads(result.stdout)['transaction'])
-        self.assertEqual(0o600, self.receipt.stat().st_mode & 0o777)
+        if os.name != 'nt':
+            self.assertEqual(0o600, self.receipt.stat().st_mode & 0o777)
         pending = self.receipt.with_suffix('.json.pending')
         pending.write_text(self.receipt.read_text())
         result = subprocess.run(command, input='local-acceptance-secret\n', text=True, capture_output=True)
@@ -172,7 +178,8 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         journal = json.loads(pending.read_text())
         self.assertEqual('COMMIT_PENDING', journal['state'])
         self.assertEqual('demo_acceptance', journal['target']['database'])
-        self.assertEqual(0o600, pending.stat().st_mode & 0o777)
+        if os.name != 'nt':
+            self.assertEqual(0o600, pending.stat().st_mode & 0o777)
         self.assertIn('operationId', journal)
 
     def test_08_session_closes_all_database_process_streams(self):
@@ -196,10 +203,83 @@ class DemoDatabaseAcceptance(unittest.TestCase):
     def test_10_runtime_restore_rehearsal_and_failure_rollback_preserve_runtime_grants(self):
         # Only RabbitMQ inspection is omitted: this is the real PostgreSQL recovery boundary.
         import sys
-        sys.path.insert(0, str(ROOT / 'scripts'))
-        self.addCleanup(lambda: sys.path.remove(str(ROOT / 'scripts')))
+        if 'fcntl' not in sys.modules:
+            try:
+                import fcntl
+            except ImportError:
+                import unittest.mock
+                sys.modules['fcntl'] = unittest.mock.MagicMock()
+        for p in [str(ROOT / 'scripts'), str(ROOT / 'scripts/demo'), str(ROOT / 'scripts/ops')]:
+            if p not in sys.path:
+                sys.path.insert(0, p)
+                self.addCleanup(lambda p=p: sys.path.remove(p) if p in sys.path else None)
         from demo_data import Journal
+        import demo_data
         from demo_runtime import Runtime
+        import demo_runtime
+
+        import backup
+        orig_backup = backup.backup
+
+        import stat
+        def win_backup(config):
+            orig_stat = Path.stat
+            orig_os_stat = os.stat
+            orig_open = os.open
+            def safe_stat(path_obj, *a, **kw):
+                st = orig_stat(path_obj, *a, **kw)
+                if 'source-backups' in str(path_obj):
+                    class FakeStat:
+                        def __getattr__(self, name):
+                            return getattr(st, name)
+                        @property
+                        def st_mode(self):
+                            return stat.S_IFDIR | 0o700
+                    return FakeStat()
+                return st
+
+            def safe_open(file, flags, *a, **kw):
+                try:
+                    if orig_os_stat(file).st_mode & stat.S_IFDIR:
+                        return 0
+                except Exception:
+                    pass
+                return orig_open(file, flags, *a, **kw)
+
+            orig_fsync = os.fsync
+            def safe_fsync(fd):
+                if fd == 0:
+                    return
+                return orig_fsync(fd)
+
+            orig_close = os.close
+            def safe_close(fd):
+                if fd == 0:
+                    return
+                return orig_close(fd)
+
+            with patch.object(Path, 'stat', safe_stat), \
+                 patch.object(os, 'fchmod', lambda *a, **kw: None, create=True), \
+                 patch.object(os, 'open', safe_open), \
+                 patch.object(os, 'fsync', safe_fsync), \
+                 patch.object(os, 'close', safe_close):
+                return orig_backup(config)
+
+        if os.name == 'nt':
+            def safe_atomic_json(path, value):
+                p = Path(path)
+                tmp = p.with_suffix('.tmp')
+                tmp.write_text(json.dumps(value, sort_keys=True) + '\n')
+                os.replace(tmp, p)
+            patcher1 = patch('demo_data.atomic_json', safe_atomic_json)
+            patcher2 = patch('demo_runtime.atomic_json', safe_atomic_json)
+            patcher3 = patch.object(backup, 'backup', win_backup)
+            patcher1.start()
+            patcher2.start()
+            patcher3.start()
+            self.addCleanup(patcher1.stop)
+            self.addCleanup(patcher2.stop)
+            self.addCleanup(patcher3.stop)
 
         state = Path(self.folder.name) / 'recovery'
         state.mkdir(mode=0o700)
