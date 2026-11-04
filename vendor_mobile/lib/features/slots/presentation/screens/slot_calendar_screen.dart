@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/data/vendor_mock_database.dart';
+import '../../../../core/data/vendor_mock_repositories.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/toast_notification.dart';
 import 'slot_config_screen.dart';
@@ -27,15 +28,25 @@ class SlotCalendarScreen extends StatefulWidget {
 
 class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
   final _db = VendorMockDatabase.instance;
+  final _slotRepo = VendorSlotRepository();
   late String _selectedServiceId;
-  DateTime _selectedDate = DateTime(2025, 5, 4);
+  DateTime _selectedDate = DateTime.now();
   String _slotFilter = 'all'; // all, open, blocked
 
   @override
   void initState() {
     super.initState();
-    _selectedServiceId = widget.initialServiceId ?? (_db.services.isNotEmpty ? _db.services.first.serviceId : 'srv-001');
+    final now = DateTime.now();
+    _selectedDate = DateTime(now.year, now.month, now.day);
+    _selectedServiceId = widget.initialServiceId ?? (_db.services.isNotEmpty ? _db.services.first.serviceId : '');
     _db.addListener(_onDbChanged);
+    _loadSlots();
+  }
+
+  void _loadSlots() {
+    if (_selectedServiceId.isNotEmpty) {
+      _slotRepo.getSlotsForService(_selectedServiceId, _selectedDate);
+    }
   }
 
   @override
@@ -51,26 +62,28 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final services = _db.services;
+    final hasMatch = services.any((s) => s.serviceId == _selectedServiceId);
+    if (!hasMatch && services.isNotEmpty) {
+      _selectedServiceId = services.first.serviceId;
+      _loadSlots();
+    }
 
     final dateStr =
         '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
 
     final slotsForDay = _db.slots.where((s) {
       if (s.serviceId != _selectedServiceId) return false;
-      if (s.slotDate != dateStr) return false;
+      if (!s.matchesDate(_selectedDate)) return false;
       if (_slotFilter == 'open') return !s.isBlocked && s.bookedCount < s.capacity;
       if (_slotFilter == 'blocked') return s.isBlocked;
       return true;
     }).toList();
 
     // Summary metrics for day
-    final totalSlots = _db.slots.where((s) => s.serviceId == _selectedServiceId && s.slotDate == dateStr).length;
-    final totalBooked = _db.slots
-        .where((s) => s.serviceId == _selectedServiceId && s.slotDate == dateStr)
-        .fold<int>(0, (sum, s) => sum + s.bookedCount);
-    final totalCap = _db.slots
-        .where((s) => s.serviceId == _selectedServiceId && s.slotDate == dateStr)
-        .fold<int>(0, (sum, s) => sum + s.capacity);
+    final daySlots = _db.slots.where((s) => s.serviceId == _selectedServiceId && s.matchesDate(_selectedDate));
+    final totalSlots = daySlots.length;
+    final totalBooked = daySlots.fold<int>(0, (sum, s) => sum + s.bookedCount);
+    final totalCap = daySlots.fold<int>(0, (sum, s) => sum + s.capacity);
 
     final fillRate = totalCap > 0 ? (totalBooked / totalCap * 100).toInt() : 0;
 
@@ -165,9 +178,10 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                           const LocalizedText('DỊCH VỤ ÁP DỤNG', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.tertiary, letterSpacing: 0.5)),
                           DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
-                              value: _selectedServiceId,
+                              value: services.any((s) => s.serviceId == _selectedServiceId) ? _selectedServiceId : null,
                               isDense: true,
                               isExpanded: true,
+                              hint: const LocalizedText('Chưa có dịch vụ nào', style: TextStyle(fontSize: 13, color: AppColors.outline)),
                               items: services.map((s) {
                                 return DropdownMenuItem<String>(
                                   value: s.serviceId,
@@ -175,7 +189,10 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                                 );
                               }).toList(),
                               onChanged: (val) {
-                                if (val != null) setState(() => _selectedServiceId = val);
+                                if (val != null) {
+                                  setState(() => _selectedServiceId = val);
+                                  _slotRepo.getSlotsForService(val, _selectedDate);
+                                }
                               },
                             ),
                           ),
@@ -234,8 +251,9 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                   ),
                   TextButton.icon(
                     onPressed: () {
+                      final now = DateTime.now();
                       setState(() {
-                        _selectedDate = DateTime(2025, 5, 4);
+                        _selectedDate = DateTime(now.year, now.month, now.day);
                       });
                     },
                     icon: const Icon(Icons.calendar_today, size: 14, color: AppColors.secondary),
@@ -245,18 +263,20 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
               ),
               const SizedBox(height: 8),
 
-              // 7-day pill row
+              // 14-day pill row
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: List.generate(7, (i) {
-                    final dayDate = DateTime(2025, 5, 2 + i);
-                    final isSelected = dayDate.day == _selectedDate.day && dayDate.month == _selectedDate.month;
+                  children: List.generate(14, (i) {
+                    final today = DateTime.now();
+                    final dayDate = DateTime(today.year, today.month, today.day).add(Duration(days: i - 2));
+                    final isSelected = dayDate.day == _selectedDate.day &&
+                        dayDate.month == _selectedDate.month &&
+                        dayDate.year == _selectedDate.year;
                     final dayOfWeekNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
                     final dayName = dayOfWeekNames[dayDate.weekday % 7];
 
-                    final dStr = '${dayDate.year}-${dayDate.month.toString().padLeft(2, '0')}-${dayDate.day.toString().padLeft(2, '0')}';
-                    final daySlotsCount = _db.slots.where((s) => s.serviceId == _selectedServiceId && s.slotDate == dStr).length;
+                    final daySlotsCount = _db.slots.where((s) => s.serviceId == _selectedServiceId && s.matchesDate(dayDate)).length;
 
                     return GestureDetector(
                       onTap: () => setState(() => _selectedDate = dayDate),
