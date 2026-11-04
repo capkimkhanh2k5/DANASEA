@@ -437,6 +437,23 @@ class AdminDiscountCodeUseCaseTest {
     }
 
     @Test
+    void cannotChangeVendorFundedCompensationAfterItIsIssued() {
+        DiscountCodeJpaEntity voucher = createValidPlatformEntity();
+        voucher.setCompensationDisruptionId(UUID.randomUUID());
+        BigDecimal issuedAmount = voucher.getDiscountValue();
+        when(discountCodeRepository.findByIdForUpdate(discountId)).thenReturn(Optional.of(voucher));
+
+        var update = new UpdateDiscountCodeRequest(issuedAmount.add(BigDecimal.ONE),
+                null, null, null, null, null, null, null);
+
+        assertThatThrownBy(() -> useCase.updateDiscountCode(discountId, update))
+                .isInstanceOf(InvalidDiscountException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "INVALID_DISCOUNT");
+        assertThat(voucher.getDiscountValue()).isEqualByComparingTo(issuedAmount);
+        verify(discountCodeRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("updateDiscountCode preserves replacement voucher invariants (must remain personal, single-use, PLATFORM FIXED)")
     void updateDiscountCodePreservesReplacementVoucherInvariants() {
         DiscountCodeJpaEntity replacementVoucher = createValidPlatformEntity();

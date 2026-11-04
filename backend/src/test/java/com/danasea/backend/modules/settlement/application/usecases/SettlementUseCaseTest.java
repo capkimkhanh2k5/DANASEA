@@ -1,5 +1,8 @@
 package com.danasea.backend.modules.settlement.application.usecases;
 
+import com.danasea.backend.modules.order.application.services.VendorFaultCompensationService;
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import com.danasea.backend.modules.booking.domain.ports.VendorLookupPort;
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.dispute.domain.models.DisputeStatus;
@@ -57,6 +60,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -124,7 +128,8 @@ class SettlementUseCaseTest {
         finalizeSettlementUseCase = new FinalizeSettlementUseCase(
                 settlementRepository,
                 mapper,
-                auditLogInternalApi
+                auditLogInternalApi,
+                new VendorFaultCompensationService(mock(JdbcTemplate.class), null, null, 0, 30)
         );
 
         getSettlementsUseCase = new GetSettlementsUseCase(

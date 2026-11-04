@@ -1,11 +1,30 @@
 # Demo Data on the server
 
 The `Demo Data` workflow replaces application data with the canonical
-`demo_data_handoff` package. Existing accounts, bookings and other application
+`DB_Demo` package. Existing accounts, bookings and other application
 data are removed unless needed by preserved system configuration. Schema,
 Flyway history, system configuration and safety rules are retained. Importing
 the package does not approve pending safety documents or prove every booking
 flow ready for demonstration.
+
+## Operating schedules and equipment
+
+Flyway V46–V49 add cancellation, recurring schedule, equipment and compensation
+records. Migrating an existing database keeps the dates and IDs of existing
+departures and bookings. Recurring rules and equipment links start empty.
+The scheduler generates the rolling 90-day horizon after a vendor saves a rule.
+
+The reviewed `DB_Demo` fixture keeps the existing concrete departures and
+booking anchors (24 departures, including 3 historical booking anchors). The
+reviewed replacement requires Flyway V49 and clears application data, including operating rules,
+exceptions and physical equipment, so demo these workflows by creating new
+vendor configuration after the fixture import. A schema migration alone does
+not replace application data. The legacy generated SQL is for disposable local
+databases. It skips conflicting departures to avoid reopening or moving them.
+
+The V45 → V49 rehearsal on disposable PostgreSQL preserved the existing values
+of 24 departures, 6 bookings, their order and payment records, and a legacy
+seat allocation. New schedule and equipment tables remained empty.
 
 ## Before the first run
 

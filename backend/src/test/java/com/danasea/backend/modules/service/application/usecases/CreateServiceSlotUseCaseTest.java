@@ -22,6 +22,7 @@ import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
+import com.danasea.backend.modules.service.infrastructure.persistence.adapters.OperatingScheduleStore;
 import com.danasea.backend.modules.service.presentation.dtos.CreateServiceSlotRequest;
 import com.danasea.backend.modules.service.presentation.dtos.CreateSlotUnitRequest;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
@@ -49,6 +50,7 @@ class CreateServiceSlotUseCaseTest {
     @Mock private ServiceRepositoryPort services;
     @Mock private ServiceSlotRepositoryPort slots;
     @Mock private VendorPort vendors;
+    @Mock private OperatingScheduleStore scheduleStore;
     @Captor private ArgumentCaptor<List<ServiceSlotUnit>> unitsCaptor;
     private CreateServiceSlotUseCase useCase;
     private UUID userId;
@@ -58,7 +60,7 @@ class CreateServiceSlotUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new CreateServiceSlotUseCase(services, slots, vendors);
+        useCase = new CreateServiceSlotUseCase(services, slots, vendors, scheduleStore);
         userId = UUID.randomUUID();
         vendorId = UUID.randomUUID();
         serviceId = UUID.randomUUID();

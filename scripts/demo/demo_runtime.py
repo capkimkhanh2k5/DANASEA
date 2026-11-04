@@ -78,7 +78,7 @@ class Runtime:
         self.policy = policy
         self.state = Path(state)
         self.app = Path(policy['app_dir']).resolve()
-        self.package = self.app / 'demo_data_handoff'
+        self.package = self.app / 'DB_Demo'
         self.environment = dict(os.environ)
         self.journal = None
         self.config_fingerprint = None
@@ -123,9 +123,9 @@ class Runtime:
             raise ValueError('Deployed SHA drift')
         if self.command(['git', 'rev-parse', 'HEAD']).decode().strip() != body['sha']:
             raise ValueError('Checkout SHA drift')
-        self.command(['git', 'diff', '--quiet', 'HEAD', '--', 'demo_data_handoff', 'docker-compose.prod.yml'])
+        self.command(['git', 'diff', '--quiet', 'HEAD', '--', 'DB_Demo', 'docker-compose.prod.yml'])
         # Bind the signed checksum to the accepted Git object as well as the working tree.
-        committed = self.command(['git', 'show', body['sha'] + ':demo_data_handoff/MANIFEST.sha256'])
+        committed = self.command(['git', 'show', body['sha'] + ':DB_Demo/MANIFEST.sha256'])
         if hashlib.sha256(committed).hexdigest() != body['package_sha256']:
             raise ValueError('Committed package manifest mismatch')
         verify_package(self.package, body['package_sha256'])

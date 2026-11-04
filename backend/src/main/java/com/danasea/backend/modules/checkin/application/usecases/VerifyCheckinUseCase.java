@@ -127,7 +127,7 @@ public class VerifyCheckinUseCase {
         }
 
         // 8. Tải thông tin SubOrder và kiểm tra trạng thái
-        SubOrderJpaEntity subOrder = subOrderRepository.findById(payload.getSubOrderId())
+        SubOrderJpaEntity subOrder = subOrderRepository.findByIdForUpdate(payload.getSubOrderId())
                 .orElseThrow(() -> new OrderNotFoundException("Sub-order not found: " + payload.getSubOrderId()));
 
         if (subOrder.getStatus() == SubOrderStatus.CANCELLED || subOrder.getStatus() == SubOrderStatus.REFUNDED) {
@@ -138,9 +138,13 @@ public class VerifyCheckinUseCase {
         }
 
         if (slotRepository != null && checkinWindowPolicy != null) {
-            var slot = slotRepository.findById(subOrder.getSlotId())
+            var slot = slotRepository.findByIdForUpdate(subOrder.getSlotId())
                     .orElseThrow(() -> new InvalidCheckinStateException("Service slot not found for this order."));
             checkinWindowPolicy.validate(slot, now);
+            if (subOrder.getBookingItemId() != null
+                    && slotRepository.hasBlockedEquipmentForBookingItem(subOrder.getBookingItemId())) {
+                throw new InvalidCheckinStateException("The assigned equipment is unavailable.");
+            }
         }
 
         // 9. Kiểm soát cô lập đa Vendor (Multi-tenant Vendor Isolation)

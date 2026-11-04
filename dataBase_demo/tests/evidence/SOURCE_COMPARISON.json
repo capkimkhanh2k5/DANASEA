@@ -1,8 +1,0 @@
-{
-  "result": "PASS",
-  "fieldMismatches": {},
-  "fixtureAccounts": 12,
-  "vendors": 9,
-  "protectedBaseRecordsUnchanged": true,
-  "sourceFlyway": "24"
-}

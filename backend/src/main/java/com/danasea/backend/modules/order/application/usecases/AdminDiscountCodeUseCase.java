@@ -122,6 +122,10 @@ public class AdminDiscountCodeUseCase {
         DiscountCodeJpaEntity entity = discountCodeRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new InvalidDiscountException("DISCOUNT_NOT_FOUND", "Discount code was not found: " + id));
 
+        if (entity.getCompensationDisruptionId() != null) {
+            throw new InvalidDiscountException("INVALID_DISCOUNT", "Vendor-fault compensation vouchers cannot be edited.");
+        }
+
         if (request.discountValue() != null) {
             entity.setDiscountValue(request.discountValue());
         }

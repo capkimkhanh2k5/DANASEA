@@ -111,7 +111,7 @@ class DiscountControllersTest {
                 UUID.randomUUID(), "ADMINPROMO", DiscountScope.PLATFORM, DiscountSponsorType.PLATFORM,
                 null, null, DiscountType.FIXED, new BigDecimal("50000.00"), BigDecimal.ZERO, null,
                 100, 0, 1, null, null, true, OffsetDateTime.now(), OffsetDateTime.now()
-        , null, null);
+        , null, null, null);
 
         when(adminDiscountCodeUseCase.createDiscountCode(request)).thenReturn(expected);
 
@@ -130,7 +130,7 @@ class DiscountControllersTest {
                 UUID.randomUUID(), "CODE1", DiscountScope.PLATFORM, DiscountSponsorType.PLATFORM,
                 null, null, DiscountType.FIXED, new BigDecimal("10000.00"), BigDecimal.ZERO, null,
                 50, 5, 1, null, null, true, OffsetDateTime.now(), OffsetDateTime.now()
-        , null, null);
+        , null, null, null);
         Page<DiscountCodeResponse> page = new PageImpl<>(List.of(item), pageable, 1);
 
         when(adminDiscountCodeUseCase.getDiscountCodes(null, null, null, null, pageable)).thenReturn(page);
@@ -168,7 +168,7 @@ class DiscountControllersTest {
                 UUID.randomUUID(), "MYSHOP20", DiscountScope.VENDOR, DiscountSponsorType.VENDOR,
                 testVendorId, null, DiscountType.PERCENTAGE, new BigDecimal("20.00"), new BigDecimal("100000.00"), new BigDecimal("50000.00"),
                 200, 0, 2, null, null, true, OffsetDateTime.now(), OffsetDateTime.now()
-        , null, null);
+        , null, null, null);
 
         when(vendorDiscountCodeUseCase.createVendorDiscountCode(eq(testVendorId), eq(request))).thenReturn(expected);
 

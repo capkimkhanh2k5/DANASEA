@@ -36,6 +36,9 @@ public class ServiceSlot extends BaseDomainModel {
     }
 
     public int getAvailableCapacity() {
+        if (inventoryType == InventoryType.SHARED_CAPACITY_UNITS && units != null && !units.isEmpty()) {
+            return units.stream().mapToInt(ServiceSlotUnit::getAvailableCapacity).sum();
+        }
         int cap = capacity != null ? capacity : 0;
         int booked = bookedCount != null ? bookedCount : 0;
         return Math.max(0, cap - booked);

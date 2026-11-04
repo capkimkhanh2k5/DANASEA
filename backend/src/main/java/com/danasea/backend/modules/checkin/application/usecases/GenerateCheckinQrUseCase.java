@@ -13,6 +13,7 @@ import com.danasea.backend.modules.order.infrastructure.persistence.entities.Mas
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
+import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
@@ -137,6 +138,11 @@ public class GenerateCheckinQrUseCase {
             Optional<ServiceSlotJpaEntity> slotOpt = slotRepository.findById(subOrder.getSlotId());
             if (slotOpt.isPresent()) {
                 ServiceSlotJpaEntity slot = slotOpt.get();
+                if (slot.getStatus() == SlotStatus.CANCELLED
+                        || (subOrder.getBookingItemId() != null
+                        && slotRepository.hasBlockedEquipmentForBookingItem(subOrder.getBookingItemId()))) {
+                    throw new InvalidCheckinStateException("The departure or assigned equipment is unavailable.");
+                }
                 if (slot.getDate() != null) {
                     LocalTime endTime = slot.getEndTime() != null
                             ? slot.getEndTime()

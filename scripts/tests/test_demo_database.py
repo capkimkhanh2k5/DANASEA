@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = importlib.util.spec_from_file_location('demo_importer', ROOT / 'demo_data_handoff/install_demo_data.py')
+SPEC = importlib.util.spec_from_file_location('demo_importer', ROOT / 'DB_Demo/install_demo_data.py')
 IMPORTER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(IMPORTER)
 
@@ -112,7 +112,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
             self.sql('UPDATE categories SET name=' + IMPORTER.lit(category['name']) + " WHERE id='a0000001-0000-0000-0000-000000000001'")
 
     def test_05_cli_commits_private_receipt_and_rejects_pending_replay(self):
-        command = [os.sys.executable, '-B', str(ROOT / 'demo_data_handoff/install_demo_data.py'), '--replace', '--apply',
+        command = [os.sys.executable, '-B', str(ROOT / 'DB_Demo/install_demo_data.py'), '--replace', '--apply',
                    '--confirm-backup', '--docker-container', self.container, '--database', 'demo_acceptance',
                    '--ownership-file', str(self.receipt), '--demo-password-stdin']
         result = subprocess.run(command, input='local-acceptance-secret\n', text=True, capture_output=True)
@@ -196,8 +196,8 @@ class DemoDatabaseAcceptance(unittest.TestCase):
     def test_10_runtime_restore_rehearsal_and_failure_rollback_preserve_runtime_grants(self):
         # Only RabbitMQ inspection is omitted: this is the real PostgreSQL recovery boundary.
         import sys
-        sys.path.insert(0, str(ROOT / 'scripts'))
-        self.addCleanup(lambda: sys.path.remove(str(ROOT / 'scripts')))
+        self.addCleanup(setattr, sys, 'path', sys.path.copy())
+        sys.path[:0] = [str(ROOT / 'scripts' / 'demo'), str(ROOT / 'scripts' / 'ops')]
         from demo_data import Journal
         from demo_runtime import Runtime
 

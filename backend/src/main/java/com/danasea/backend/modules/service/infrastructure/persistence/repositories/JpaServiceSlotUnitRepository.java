@@ -23,7 +23,7 @@ public interface JpaServiceSlotUnitRepository extends JpaRepository<ServiceSlotU
     void deleteBySlotId(UUID slotId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE ServiceSlotUnitJpaEntity u SET u.bookedCount = u.bookedCount + :quantity WHERE u.slotId = :slotId AND u.unitNumber = :unitNumber AND (u.capacity - u.bookedCount) >= :quantity")
+    @Query("UPDATE ServiceSlotUnitJpaEntity u SET u.bookedCount = u.bookedCount + :quantity WHERE u.slotId = :slotId AND u.unitNumber = :unitNumber AND u.equipmentBlocked = false AND (u.capacity - u.bookedCount) >= :quantity")
     int incrementUnitBookedCount(@Param("slotId") UUID slotId, @Param("unitNumber") Integer unitNumber, @Param("quantity") int quantity);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

@@ -27,6 +27,8 @@ public class Settlement {
     private BigDecimal totalGrossRevenue;
     private BigDecimal totalCommission;
     private BigDecimal totalNetPayout;
+    @Builder.Default
+    private BigDecimal vendorFaultCompensationDeductedAmount = BigDecimal.ZERO;
     private SettlementStatus status;
     private OffsetDateTime generatedAt;
     private OffsetDateTime createdAt;

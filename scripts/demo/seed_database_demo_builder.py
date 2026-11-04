@@ -1,5 +1,5 @@
 """
-Script to build docs/Data/seed_database_demo.sql from dataBase_demo JSON fixtures.
+Script to build docs/Data/seed_database_demo.sql from DB_Demo/base JSON fixtures.
 Matches exact PostgreSQL schema from Flyway migrations.
 Configures all vendors to APPROVED and all services to PUBLISHED so that
 the entire DANASEA UI (Customer, Vendor, Admin) can immediately use the dataset.
@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = ROOT / 'dataBase_demo' / 'data'
+DATA_DIR = ROOT / 'DB_Demo' / 'base'
 OUT_SQL = ROOT / 'docs' / 'Data' / 'seed_database_demo.sql'
 
 def escape_sql(val):
@@ -29,11 +29,11 @@ def slugify(text):
 def main():
     lines = [
         "-- =========================================================================",
-        "-- DANASEA — SCRIPT SEED TOÀN DIỆN DỮ LIỆU DEMO CHUẨN TỪ DATABASE_DEMO",
+        "-- DANASEA — SCRIPT SEED TOÀN DIỆN DỮ LIỆU DEMO CHUẨN TỪ DB_Demo",
         "-- Nạp đầy đủ 12 Danh mục, 12 Users, 9 Vendors (APPROVED),",
         "-- 24 Services (100% PUBLISHED), 33 Options, 72 Images (Cloudinary CDN),",
-        "-- và Slots hoạt động thực tế cho Hôm nay, Ngày mai, Ngày kia.",
-        "-- Chạy lệnh: Get-Content docs/Data/seed_database_demo.sql -Raw | docker exec -i pbl6-postgres-1 psql -U danasea_user -d danasea_db",
+        "-- và ca cụ thể cho hôm nay và ngày mai.",
+        "-- Chỉ nạp SQL này vào database demo dùng một lần. Dùng DB_Demo/install_demo_data.py cho quy trình chính thức.",
         "-- =========================================================================",
         "",
         "BEGIN;",
@@ -74,7 +74,7 @@ def main():
     # 3. VENDORS
     print("Processing vendors...")
     vendors = json.load(open(DATA_DIR / 'vendors.json', encoding='utf-8'))['records']
-    admin_id = users[0]['sqlRow']['id']
+    admin_id = next(row['sqlRow']['id'] for row in users if row['sqlRow']['role'] == 'ADMIN')
     lines.append("-- 3. BẢNG VENDORS (9 Nhà cung cấp - Kích hoạt APPROVED 100%)")
     lines.append("INSERT INTO vendors (id, user_id, business_name, tax_code, address, bank_name, bank_account_number, bank_account_holder, verification_status, verified_by, verified_at, rating_avg, rating_count, badge_tier, created_at, updated_at) VALUES")
     v_vals = []
@@ -148,7 +148,7 @@ def main():
         slot_vals.append(row_tomorrow)
 
     lines.append(",\n".join(slot_vals))
-    lines.append("ON CONFLICT (id) DO UPDATE SET status = 'OPEN', date = EXCLUDED.date, start_time = EXCLUDED.start_time, end_time = EXCLUDED.end_time, updated_at = NOW();\n")
+    lines.append("ON CONFLICT DO NOTHING;\n")
 
     # 8. SERVICE IMAGES (Cloudinary URLs)
     print("Processing service images...")

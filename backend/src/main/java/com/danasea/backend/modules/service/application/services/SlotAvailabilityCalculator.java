@@ -58,6 +58,9 @@ public class SlotAvailabilityCalculator {
         int largest = 0;
         int requiredCapacity = Math.max(1, valueOrZero(option.getMaxPaxPerPackage()));
         for (ServiceSlotUnit unit : units) {
+            if (unit.isEquipmentBlocked()) {
+                continue;
+            }
             int booked = valueOrZero(unit.getBookedCount());
             int held = heldSeats.getOrDefault(unit.getUnitNumber(), 0);
             if (privateHolds.getOrDefault(unit.getUnitNumber(), false)) {

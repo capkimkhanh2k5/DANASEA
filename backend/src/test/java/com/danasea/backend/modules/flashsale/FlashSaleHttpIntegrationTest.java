@@ -347,7 +347,7 @@ class FlashSaleHttpIntegrationTest extends BaseFlashSaleIntegrationTest {
         UUID category=UUID.randomUUID();
         db.update("INSERT INTO categories(id,name,slug,is_active,requires_safety_cert,created_at,updated_at) VALUES (?,'FIXTURE','fixture',true,false,now(),now())",category);
         var expected=new HashSet<String>();
-        for(var record:json.readTree(Files.readString(Path.of("../dataBase_demo/data/services.json"))).path("records")) {
+        for(var record:json.readTree(Files.readString(Path.of("../DB_Demo/base/services.json"))).path("records")) {
             var row=record.path("sqlRow"); service=UUID.fromString(row.path("id").asText()); expected.add(service.toString());
             db.update("INSERT INTO services(id,vendor_id,category_id,name,status,price,weather_sensitive,view_count,waiver_required,created_at,updated_at) VALUES (?,?,?,?,'PUBLISHED',500000,false,0,false,now(),now())",service,vendor,category,row.path("name").asText());
             UUID privateId=slot("SHARED_CAPACITY_UNITS",128);
@@ -355,7 +355,7 @@ class FlashSaleHttpIntegrationTest extends BaseFlashSaleIntegrationTest {
         }
         assertThat(expected).hasSize(24);
         int fixtureOptions=0;
-        for(var record:json.readTree(Files.readString(Path.of("../dataBase_demo/data/service_options.json"))).path("records")) {
+        for(var record:json.readTree(Files.readString(Path.of("../DB_Demo/base/service_options.json"))).path("records")) {
             var row=record.path("sqlRow");
             db.update("INSERT INTO service_options(id,service_id,name,option_type,pricing_unit,price,max_pax_per_package,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,'ACTIVE',now(),now())",UUID.fromString(row.path("id").asText()),UUID.fromString(row.path("service_id").asText()),row.path("name").asText(),row.path("option_type").asText(),row.path("pricing_unit").asText(),new BigDecimal(row.path("price").asText()),row.path("max_pax_per_package").isNull()?("PRIVATE".equals(row.path("option_type").asText())?Integer.valueOf(1):null):Integer.valueOf(row.path("max_pax_per_package").asInt()));
             fixtureOptions++;
