@@ -104,6 +104,26 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen> {
         );
       }
     } catch (e) {
+      if (e is AuthFailure && (e.status == 403 || e.payload?['code'] == 'EMAIL_NOT_VERIFIED')) {
+        final pendingToken = e.payload?['accessToken'] as String?;
+        _authRepo.setPendingVerification(
+          email: _loginEmailController.text,
+          accessToken: pendingToken,
+        );
+        _authRepo.sendOtp().catchError((_) {});
+        if (mounted) {
+          final verified = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(builder: (_) => const VerifyEmailScreen()),
+          );
+          if (verified == true && mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const VendorAccessScreen()),
+            );
+          }
+        }
+        return;
+      }
       if (mounted) {
         showVendorToast(
           context,

@@ -46,6 +46,9 @@ class VendorAuthRepository implements IVendorAuthRepository {
       await _session.login(email, password);
       return await getCurrentUser();
     } catch (e) {
+      if (e is AuthFailure && (e.status == 403 || e.payload?['code'] == 'EMAIL_NOT_VERIFIED')) {
+        rethrow;
+      }
       // Allow fallback if offline or mock account
       if (_db.currentUser.isLocked) {
         throw Exception('Tài khoản bị khóa. Vui lòng liên hệ quản trị viên.');

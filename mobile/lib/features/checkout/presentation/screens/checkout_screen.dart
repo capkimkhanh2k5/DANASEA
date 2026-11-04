@@ -89,14 +89,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   void _updateHoldCountdown() {
     if (_order != null) {
-      final deadline = _order!.createdAt.add(const Duration(minutes: 15));
+      final deadline = _order!.createdAt.add(const Duration(minutes: 5));
       final diff = deadline.difference(DateTime.now());
       setState(() {
         _holdRemaining = diff.isNegative ? Duration.zero : diff;
       });
     } else {
       setState(() {
-        _holdRemaining = const Duration(minutes: 14, seconds: 55);
+        _holdRemaining = const Duration(minutes: 4, seconds: 55);
       });
     }
   }

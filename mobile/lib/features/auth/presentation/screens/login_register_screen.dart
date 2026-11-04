@@ -98,7 +98,27 @@ class _LoginRegisterScreenState extends State<LoginRegisterScreen>
         );
         if (verified != true) return;
       } else if (_isLogin) {
-        await auth.login(email, _passwordController.text);
+        try {
+          await auth.login(email, _passwordController.text);
+        } catch (e) {
+          if (e is AuthFailure &&
+              (e.status == 403 || e.payload?['code'] == 'EMAIL_NOT_VERIFIED')) {
+            final pendingToken = e.payload?['accessToken'] as String?;
+            auth.setPendingVerification(
+              email: email,
+              accessToken: pendingToken,
+            );
+            auth.sendOtp().catchError((_) {});
+            if (!mounted) return;
+            final verified = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(builder: (_) => const VerifyEmailScreen()),
+            );
+            if (verified != true) return;
+          } else {
+            rethrow;
+          }
+        }
       } else {
         await auth.register(
           _nameController.text,

@@ -21,7 +21,7 @@ class AuthSession {
     var raw = (custom ??
             const String.fromEnvironment(
               'API_BASE_URL',
-              defaultValue: 'http://127.0.0.1:8080',
+              defaultValue: 'https://danasea.tailfc3563.ts.net',
             ))
         .trim();
     while (raw.endsWith('/')) {
@@ -91,7 +91,7 @@ class AuthSession {
     try {
       final req = await client
           .openUrl(method, uri)
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 30));
       req.followRedirects = false;
       req.headers.contentType = ContentType.json;
       req.headers.set('Accept-Language', AppLanguage.instance.code);
@@ -105,11 +105,11 @@ class AuthSession {
         req.cookies.add(Cookie('refresh_token', _refresh!));
       }
       if (data != null) req.write(jsonEncode(data));
-      final response = await req.close().timeout(const Duration(seconds: 20));
+      final response = await req.close().timeout(const Duration(seconds: 60));
       final text = await utf8.decoder
           .bind(response)
           .join()
-          .timeout(const Duration(seconds: 20));
+          .timeout(const Duration(seconds: 60));
       dynamic body;
       try {
         body = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
@@ -173,7 +173,7 @@ class AuthSession {
     try {
       final req = await client
           .openUrl(method, uri)
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 30));
       req.followRedirects = false;
       req.headers.set('Accept-Language', AppLanguage.instance.code);
       if (authenticated && _access != null)
@@ -181,10 +181,10 @@ class AuthSession {
       if (headers != null) {
         headers.forEach(req.headers.set);
       }
-      final response = await req.close().timeout(const Duration(seconds: 20));
+      final response = await req.close().timeout(const Duration(seconds: 60));
       final chunks = await response
           .fold<List<int>>(<int>[], (acc, chunk) => acc..addAll(chunk))
-          .timeout(const Duration(seconds: 20));
+          .timeout(const Duration(seconds: 60));
       if (response.statusCode == 401 &&
           authenticated &&
           _access != null &&
@@ -252,7 +252,7 @@ class AuthSession {
     try {
       final req = await client
           .openUrl('POST', uri)
-          .timeout(const Duration(seconds: 20));
+          .timeout(const Duration(seconds: 60));
       req.followRedirects = false;
       req.headers.set(
         HttpHeaders.contentTypeHeader,
@@ -267,7 +267,7 @@ class AuthSession {
       final text = await utf8.decoder
           .bind(response)
           .join()
-          .timeout(const Duration(seconds: 20));
+          .timeout(const Duration(seconds: 60));
       dynamic body;
       try {
         body = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
@@ -387,6 +387,20 @@ class AuthSession {
     pendingEmail = null;
     await _save();
     await loadProfile();
+  }
+
+  void setPendingVerification({
+    required String email,
+    String? accessToken,
+    String? name,
+  }) {
+    pendingVerification = true;
+    pendingEmail = email.trim();
+    if (name != null) pendingName = name.trim();
+    if (accessToken != null && accessToken.isNotEmpty) {
+      _access = accessToken;
+    }
+    _save();
   }
 
   Future<void> register(String name, String email, String password) async {

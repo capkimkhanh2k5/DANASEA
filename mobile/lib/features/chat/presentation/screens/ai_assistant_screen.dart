@@ -19,7 +19,10 @@ class AiAssistantScreen extends StatefulWidget {
   State<AiAssistantScreen> createState() => _AiAssistantScreenState();
 }
 
-class _AiAssistantScreenState extends State<AiAssistantScreen> {
+class _AiAssistantScreenState extends State<AiAssistantScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _orbAnimController;
+  late final Animation<double> _orbFloatAnimation;
   final AssistantRepository _repository = AssistantRepository.instance;
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -28,24 +31,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   String? _conversationId;
   bool _isSending = false;
 
-  final List<String> _suggestedPrompts = [
-    'Đi biển 2 người dưới 300k/người?',
-    'Lặn ngắm san hô Sơn Trà hôm nay biển có trong không?',
-    'Gợi ý lịch trình biển 1 ngày ở Đà Nẵng',
-  ];
 
   @override
   void initState() {
     super.initState();
-    _messages = [
-      AiMessageModel(
-        id: 'ai-welcome',
-        role: AiRole.assistant,
-        content:
-            'Xin chào! Tôi là trợ lý du lịch biển DANASEA AI. Bạn muốn tìm hoạt động biển, lập lịch trình hay hỗ trợ đơn hàng hôm nay?',
-        createdAt: DateTime.now(),
-      ),
-    ];
+    _orbAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2600),
+    )..repeat(reverse: true);
+    _orbFloatAnimation = Tween<double>(begin: -8.0, end: 8.0).animate(
+      CurvedAnimation(parent: _orbAnimController, curve: Curves.easeInOutSine),
+    );
+    _messages = [];
     if (widget.initialPrompt != null &&
         widget.initialPrompt!.trim().isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -56,6 +53,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   @override
   void dispose() {
+    _orbAnimController.dispose();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -145,6 +143,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
   }
 
+  // ignore: unused_element
   Future<void> _reloadHistoryOrReset() async {
     if (_isSending) return;
     if (_conversationId != null && _conversationId!.isNotEmpty) {
@@ -171,18 +170,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
     setState(() {
       _conversationId = null;
-      _messages = [
-        AiMessageModel(
-          id: 'ai-welcome',
-          role: AiRole.assistant,
-          content:
-              'Xin chào! Tôi là trợ lý du lịch biển DANASEA AI. Bạn muốn tìm hoạt động biển, lập lịch trình hay hỗ trợ đơn hàng hôm nay?',
-          createdAt: DateTime.now(),
-        ),
-      ];
+      _messages = [];
     });
   }
 
+  // ignore: unused_element
   Future<void> _openItinerariesSheet() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -195,6 +187,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     );
   }
 
+  // ignore: unused_element
   Future<void> _openPreferencesSheet() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -207,6 +200,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     );
   }
 
+  // ignore: unused_element
   Future<void> _openSupportSheet() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -221,324 +215,490 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Only switch to chat stream when an assistant response has arrived
+    final bool hasChatted = _messages.any((m) => m.role == AiRole.assistant);
+
     return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.onSurface),
-          onPressed: () => Navigator.pop(context),
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFE4F3F7), // Soft maritime pastel
+              Color(0xFFEFF7FA),
+              Color(0xFFFAF9F6),
+            ],
+          ),
         ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColors.secondaryContainer,
-                borderRadius: BorderRadius.circular(8),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // 1. TOP BAR
+              _buildTopBar(),
+
+              // 2. MAIN BODY (HERO OR CHAT STREAM)
+              Expanded(
+                child: hasChatted
+                    ? _buildChatStream()
+                    : _buildHeroCenter(),
               ),
-              child: const Icon(
-                Icons.auto_awesome,
-                size: 16,
-                color: AppColors.secondary,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: LocalizedText(
-                'DANASEA AI',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypography.headlineSm(color: AppColors.onSurface),
-              ),
-            ),
-          ],
+
+              // USER QUERY BUBBLE RIGHT ABOVE INPUT BAR (WHEN THINKING IN HERO VIEW)
+              if (!hasChatted && _isSending && _messages.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(18),
+                          topRight: Radius.circular(18),
+                          bottomLeft: Radius.circular(18),
+                          bottomRight: Radius.circular(4),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        _messages.last.content,
+                        style: AppTypography.bodyMd(
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // 3. FLOATING INPUT BAR
+              _buildFloatingInputBar(),
+            ],
+          ),
         ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: _openItinerariesSheet,
-            icon: const Icon(
-              Icons.map_outlined,
-              size: 20,
-              color: AppColors.secondary,
+      ),
+    );
+  }
+
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Row(
+        children: [
+          // Circular Back Button
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            tooltip: tr(context, 'Lịch trình AI'),
-          ),
-          IconButton(
-            onPressed: _openPreferencesSheet,
-            icon: const Icon(
-              Icons.tune,
-              size: 20,
-              color: AppColors.secondary,
+            child: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                color: AppColors.onSurface,
+              ),
+              onPressed: () => Navigator.pop(context),
             ),
-            tooltip: tr(context, 'Sở thích AI'),
-          ),
-          IconButton(
-            onPressed: _openSupportSheet,
-            icon: const Icon(
-              Icons.support_agent,
-              size: 20,
-              color: AppColors.secondary,
-            ),
-            tooltip: tr(context, 'Hỗ trợ đơn hàng AI'),
-          ),
-          IconButton(
-            onPressed: _reloadHistoryOrReset,
-            icon: const Icon(
-              Icons.refresh,
-              size: 20,
-              color: AppColors.secondary,
-            ),
-            tooltip: tr(context, 'Làm mới'),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // LIVE OCEAN ALERT STRIP
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: AppColors.surfaceContainerLow,
+    );
+  }
+
+  Widget _buildHeroCenter() {
+    final userName = AuthSession.instance.profile?['fullName'] ?? '';
+    final greetingText = userName.toString().trim().isNotEmpty
+        ? 'Tôi có thể giúp gì cho bạn hôm nay, $userName!'
+        : 'Tôi có thể giúp gì cho chuyến đi của bạn hôm nay!';
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          children: [
+            const SizedBox(height: 28),
+
+            // Animated Floating 3D Glowing Orb (P1 when idle, P2 when thinking)
+            AnimatedBuilder(
+              animation: _orbFloatAnimation,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(0, _orbFloatAnimation.value),
+                  child: child,
+                );
+              },
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Ambient colored glows behind orb
+                  Container(
+                    width: 170,
+                    height: 170,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF95F1FF).withValues(alpha: 0.45),
+                          blurRadius: 60,
+                          spreadRadius: 12,
+                        ),
+                        BoxShadow(
+                          color: const Color(0xFFFFB4A7).withValues(alpha: 0.25),
+                          blurRadius: 45,
+                          spreadRadius: 6,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 3D Glass Orb Image
+                  Image.asset(
+                    _isSending
+                        ? 'assets/qua-cau-p2-trong-suot.gif'
+                        : 'assets/qua-cau-p1-trong-suot.gif',
+                    width: 210,
+                    height: 210,
+                    fit: BoxFit.contain,
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 36),
+
+            // Greeting Headline or Thinking State
+            LocalizedText(
+              _isSending ? 'DANASEA AI đang suy nghĩ...' : greetingText,
+              textAlign: TextAlign.center,
+              style: AppTypography.headlineSm(
+                color: AppColors.onSurface,
+                fontWeight: FontWeight.w700,
+              ).copyWith(letterSpacing: -0.3, height: 1.35),
+            ),
+
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatStream() {
+    final int totalCount = _messages.length + (_isSending ? 1 : 0);
+
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppShapes.gutterMobile,
+        vertical: 12,
+      ),
+      itemCount: totalCount,
+      itemBuilder: (context, index) {
+        // Thinking indicator bubble at the end
+        if (index == _messages.length && _isSending) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 12),
             child: Row(
               children: [
-                const Icon(Icons.waves, size: 16, color: AppColors.secondary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      LocalizedText(
-                        'TRẠNG THÁI BIỂN ĐÀ NẴNG HÔM NAY',
-                        style: AppTypography.labelSm(
-                          color: AppColors.onSurfaceVariant,
-                          fontWeight: FontWeight.w700,
-                        ).copyWith(fontSize: 10),
+                ClipOval(
+                  child: Image.asset(
+                    'assets/qua-cau-p2-trong-suot.gif',
+                    width: 28,
+                    height: 28,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
                       ),
-                      LocalizedText(
-                        'Mỹ Khê & Sơn Trà: Sóng 0.4m • Nắng dịu • Lý tưởng',
-                        style: AppTypography.labelSm(
+                    ],
+                    border: Border.all(
+                      color: AppColors.borderSubtle.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(
+                        width: 13,
+                        height: 13,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
                           color: AppColors.secondary,
-                          fontWeight: FontWeight.w700,
-                        ).copyWith(fontSize: 11),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      LocalizedText(
+                        'DANASEA AI đang suy nghĩ...',
+                        style: AppTypography.bodySm(
+                          color: AppColors.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.secondaryContainer,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: LocalizedText(
-                    'LIVE',
-                    style: AppTypography.labelSm(
-                      color: AppColors.onSecondaryContainer,
-                      fontWeight: FontWeight.w800,
-                    ).copyWith(fontSize: 10),
-                  ),
-                ),
               ],
             ),
-          ),
+          );
+        }
 
-          // CHAT STREAM
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(AppShapes.gutterMobile),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                final isUser = msg.role == AiRole.user;
+        final msg = _messages[index];
+        final isUser = msg.role == AiRole.user;
 
-                return Column(
-                  crossAxisAlignment:
-                      isUser
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
-                  children: [
-                    // Sender info
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (!isUser) ...[
-                            Container(
-                              width: 18,
-                              height: 18,
-                              decoration: const BoxDecoration(
-                                color: AppColors.secondary,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.smart_toy,
-                                size: 11,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          LocalizedText(
-                            isUser ? 'Bạn' : 'DANASEA AI',
-                            style: AppTypography.labelSm(
-                              color: AppColors.onSurfaceVariant,
-                            ).copyWith(fontSize: 10),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Bubble
+        return Column(
+          crossAxisAlignment:
+              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            // Sender info
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 2,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!isUser) ...[
                     Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.all(12),
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.85,
+                      width: 22,
+                      height: 22,
+                      decoration: const BoxDecoration(
+                        color: AppColors.secondary,
+                        shape: BoxShape.circle,
                       ),
-                      decoration: BoxDecoration(
-                        color:
-                            isUser
-                                ? AppColors.primary
-                                : AppColors.surfaceContainerLowest,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: AppShapes.shadowLevel1,
-                        border:
-                            isUser
-                                ? null
-                                : Border.all(color: AppColors.borderSubtle),
-                      ),
-                      child: LocalizedText(
-                        msg.content,
-                        style: AppTypography.bodyMd(
-                          color: isUser ? Colors.white : AppColors.onSurface,
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/qua-cau-p1-trong-suot.gif',
+                          width: 22,
+                          height: 22,
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
-
-                    // Embedded Recommendation Card (if AI suggests a service)
-                    if (msg.recommendedService != null)
-                      _buildRecommendedCard(msg.recommendedService!),
-
-                    const SizedBox(height: 10),
+                    const SizedBox(width: 6),
                   ],
-                );
-              },
-            ),
-          ),
-
-          // SUGGESTED PROMPTS
-          Container(
-            height: 38,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _suggestedPrompts.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                return ActionChip(
-                  label: LocalizedText(
-                    _suggestedPrompts[index],
-                    style: AppTypography.labelSm(color: AppColors.secondary),
+                  LocalizedText(
+                    isUser ? 'Bạn' : 'DANASEA AI',
+                    style: AppTypography.labelSm(
+                      color: AppColors.onSurfaceVariant,
+                    ).copyWith(fontSize: 10),
                   ),
-                  backgroundColor: AppColors.secondaryContainer.withValues(
-                    alpha: 0.3,
-                  ),
-                  onPressed:
-                      _isSending
-                          ? null
-                          : () =>
-                              _sendQuery(tr(context, _suggestedPrompts[index])),
-                );
-              },
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 6),
 
-          // INPUT BAR
-          Container(
-            padding: EdgeInsets.only(
-              left: 12,
-              right: 12,
-              top: 8,
-              bottom: MediaQuery.of(context).padding.bottom + 8,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLowest,
-              border: Border(
-                top: BorderSide(
-                  color: AppColors.borderSubtle.withValues(alpha: 0.8),
+            // Bubble
+            Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.82,
+              ),
+              decoration: BoxDecoration(
+                color: isUser
+                    ? AppColors.primary
+                    : AppColors.surfaceContainerLowest,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(isUser ? 18 : 4),
+                  bottomRight: Radius.circular(isUser ? 4 : 18),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+                border: isUser
+                    ? null
+                    : Border.all(color: AppColors.borderSubtle.withValues(alpha: 0.6)),
+              ),
+              child: LocalizedText(
+                msg.content,
+                style: AppTypography.bodyMd(
+                  color: isUser ? Colors.white : AppColors.onSurface,
                 ),
               ),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: TextField(
-                      controller: _controller,
-                      enabled: !_isSending,
-                      decoration: InputDecoration(
-                        hintText: tr(
-                          context,
-                          'Hỏi bất kỳ điều gì về du lịch biển Đà Nẵng...',
-                        ),
-                        hintStyle: AppTypography.bodySm(
-                          color: AppColors.outline,
-                        ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 10,
-                        ),
-                      ),
-                      onSubmitted: _sendQuery,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                CircleAvatar(
-                  backgroundColor: AppColors.primary,
-                  radius: 20,
-                  child:
-                      _isSending
-                          ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                          : IconButton(
-                            icon: const Icon(
-                              Icons.send,
-                              size: 18,
-                              color: Colors.white,
-                            ),
-                            onPressed: () => _sendQuery(_controller.text),
-                          ),
-                ),
-              ],
-            ),
+
+            // Embedded Recommendation Card (if AI suggests a service)
+            if (msg.recommendedService != null)
+              _buildRecommendedCard(msg.recommendedService!),
+
+            const SizedBox(height: 10),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFloatingInputBar() {
+    return Container(
+      margin: EdgeInsets.fromLTRB(
+        16,
+        4,
+        16,
+        MediaQuery.of(context).padding.bottom + 12,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Input field
+          TextField(
+            controller: _controller,
+            enabled: !_isSending,
+            style: AppTypography.bodyMd(color: AppColors.onSurface),
+            decoration: InputDecoration(
+              hintText: tr(context, 'Hỏi bất kỳ điều gì...'),
+              hintStyle: AppTypography.bodySm(color: AppColors.outline),
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 8,
+              ),
+            ),
+            onSubmitted: _sendQuery,
+          ),
+          const SizedBox(height: 4),
+
+          // Bottom buttons row: (+)  [Image]  ... [Mic] [Send]
+          Row(
+            children: [
+              // Plus button (+)
+              _buildToolCircleButton(
+                icon: Icons.add,
+                onTap: () {},
+              ),
+              const SizedBox(width: 8),
+
+              // Image icon
+              _buildToolCircleButton(
+                icon: Icons.image_outlined,
+                onTap: () {},
+              ),
+
+              const Spacer(),
+
+              // Waveform / Mic icon
+              Icon(
+                Icons.graphic_eq_rounded,
+                size: 22,
+                color: AppColors.secondary.withValues(alpha: 0.7),
+              ),
+              const SizedBox(width: 10),
+
+              // Send button with Gradient and Airplane icon
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF006874), // Danasea Secondary Teal
+                      Color(0xFF087F8C),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.secondary.withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  icon: _isSending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.near_me_rounded,
+                          color: Colors.white,
+                          size: 19,
+                        ),
+                  onPressed: () => _sendQuery(_controller.text),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToolCircleButton({
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLow,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          size: 17,
+          color: AppColors.onSurfaceVariant,
+        ),
       ),
     );
   }
