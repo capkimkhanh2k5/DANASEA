@@ -1,21 +1,84 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import { createPortal } from "react-dom";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
-import { MOCK_NOTIFICATIONS, type VendorNotificationItem } from "../services/vendorMockService";
+import { notificationService } from "../services/notificationService";
+import type { NotificationResponse } from "../types/notification";
+import { 
+  LayoutDashboard, 
+  TrendingUp, 
+  Ticket, 
+  CalendarDays, 
+  Sailboat, 
+  Tag, 
+  MessageSquare, 
+  Wallet, 
+  Landmark, 
+  Scale, 
+  LogOut, 
+  Bell, 
+  Pin,
+  CheckCheck,
+  LifeBuoy
+} from "lucide-react";
+import { AtlasAvatar } from "../components/vendor/atlas/AtlasDesignSystem";
+import { toast } from "../store/useToastStore";
+
+interface NavItem {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  exact?: boolean;
+}
+
+interface NavGroup {
+  groupTitle: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    groupTitle: "VẬN HÀNH & ĐIỀU PHỐI",
+    items: [
+      { to: "/vendor", label: "Tổng quan", icon: LayoutDashboard, exact: true },
+      { to: "/vendor/analytics", label: "Phân tích kinh doanh", icon: TrendingUp },
+      { to: "/vendor/orders", label: "Đơn đặt chỗ & Vé", icon: Ticket },
+      { to: "/vendor/schedule", label: "Lịch khởi hành", icon: CalendarDays },
+    ],
+  },
+  {
+    groupTitle: "DỊCH VỤ & BẾN BÃI",
+    items: [
+      { to: "/vendor/services", label: "Dịch vụ & Ca tour", icon: Sailboat },
+      { to: "/vendor/equipment", label: "Quản lý thiết bị", icon: LifeBuoy },
+      { to: "/vendor/promotions", label: "Mã khuyến mãi", icon: Tag },
+      { to: "/vendor/reviews", label: "Đánh giá của khách", icon: MessageSquare },
+    ],
+  },
+  {
+    groupTitle: "TÀI CHÍNH & PHÁP LÝ",
+    items: [
+      { to: "/vendor/revenue", label: "Doanh thu & Đối soát", icon: Wallet },
+      { to: "/vendor/payouts", label: "Quyết toán rút tiền", icon: Landmark },
+      { to: "/vendor/disputes", label: "Khiếu nại & Hỗ trợ", icon: Scale },
+    ],
+  },
+];
 
 const VENDOR_PAGE_ORDER: Record<string, number> = {
   "/vendor": 0,
-  "/vendor/orders": 1,
-  "/vendor/schedule": 2,
-  "/vendor/services": 3,
-  "/vendor/services/new": 4,
-  "/vendor/promotions": 5,
-  "/vendor/reviews": 6,
-  "/vendor/revenue": 7,
-  "/vendor/payouts": 8,
-  "/vendor/disputes": 9,
-  "/vendor/profile": 10,
+  "/vendor/analytics": 1,
+  "/vendor/orders": 2,
+  "/vendor/schedule": 3,
+  "/vendor/services": 4,
+  "/vendor/equipment": 5,
+  "/vendor/services/new": 6,
+  "/vendor/promotions": 6,
+  "/vendor/reviews": 7,
+  "/vendor/revenue": 8,
+  "/vendor/payouts": 9,
+  "/vendor/disputes": 10,
+  "/vendor/profile": 11,
 };
 
 export function VendorLayout() {
@@ -25,16 +88,91 @@ export function VendorLayout() {
 
   useEffect(() => {
     if (!accessToken || !isAuthenticated) {
-      console.warn('[VendorLayout] Chưa đăng nhập hoặc phiên hết hạn. Đang chuyển hướng về /auth...');
       navigate("/auth", { replace: true });
     }
   }, [accessToken, isAuthenticated, navigate]);
+
   const [prevPath, setPrevPath] = useState(location.pathname);
   const [animationClass, setAnimationClass] = useState("animate-fade-in-up");
 
   const [isNotiOpen, setIsNotiOpen] = useState(false);
-  const [selectedNoti, setSelectedNoti] = useState<VendorNotificationItem | null>(null);
-  const [notifications] = useState<VendorNotificationItem[]>(MOCK_NOTIFICATIONS);
+  const [selectedNoti, setSelectedNoti] = useState<NotificationResponse | null>(null);
+  const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Collapsible sidebar states (Hover expand + Pin lock)
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPinned, setIsPinned] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("danasea_vendor_sidebar_pinned") === "true";
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("danasea_vendor_sidebar_pinned", String(isPinned));
+  }, [isPinned]);
+
+  const isExpanded = isPinned || isHovered;
+
+  const loadNotifications = useCallback(async () => {
+    try {
+      const [res, unread] = await Promise.allSettled([
+        notificationService.getMyNotifications(0, 15),
+        notificationService.getUnreadCount()
+      ]);
+      if (res.status === 'fulfilled' && res.value?.content) {
+        setNotifications(res.value.content);
+      }
+      if (unread.status === 'fulfilled' && unread.value) {
+        setUnreadCount(typeof unread.value === "number" ? unread.value : 0);
+      }
+    } catch {
+      // Keep empty list
+    }
+  }, []);
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await notificationService.markAllAsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+      toast.success("Đã đánh dấu tất cả thông báo là đã đọc.");
+    } catch (err) {
+      console.error("[VendorLayout] Failed to mark all notifications as read:", err);
+      toast.error("Không thể đánh dấu đã đọc. Vui lòng thử lại sau.");
+    }
+  };
+
+  const handleNotificationClick = async (noti: NotificationResponse) => {
+    if (!noti.isRead) {
+      try {
+        await notificationService.markAsRead(noti.id);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === noti.id ? { ...n, isRead: true } : n))
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      } catch (err) {
+        console.warn("[VendorLayout] Failed to mark notification as read:", err);
+      }
+    }
+    setSelectedNoti({ ...noti, isRead: true });
+  };
+
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadNotifications();
+    }
+  }, [isAuthenticated, loadNotifications]);
+
+  if (!accessToken || !isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-600">
+        <p className="text-sm font-semibold">Chuyển hướng xác thực tài khoản đối tác...</p>
+      </div>
+    );
+  }
 
   if (location.pathname !== prevPath) {
     const prevOrder = VENDOR_PAGE_ORDER[prevPath] ?? 0;
@@ -50,294 +188,291 @@ export function VendorLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
-      {/* 9-item Sticky Sidebar */}
-      <aside className="w-64 bg-surface-container-lowest border-r border-outline-variant/30 flex flex-col justify-between shrink-0 select-none">
-        <div className="flex flex-col">
+    <div className="flex h-screen bg-background overflow-hidden print:h-auto print:overflow-visible print:bg-white">
+      {/* Spacer so main content does not jump or reflow */}
+      <div 
+        className={`shrink-0 transition-all duration-200 ease-in-out print:hidden ${
+          isPinned ? "w-64" : "w-[68px]"
+        }`} 
+      />
+
+      {/* Modern Collapsible Sidebar (Compact Rail -> Hover Expand / Pin) */}
+      <aside 
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`fixed top-0 bottom-0 left-0 z-30 bg-white border-r border-slate-200/80 flex flex-col justify-between select-none print:hidden transition-[width,box-shadow] duration-200 ease-out ${
+          isExpanded ? "w-64 shadow-2xl shadow-slate-900/10" : "w-[68px]"
+        }`}
+      >
+        <div className="flex flex-col min-h-0 flex-1">
           {/* Brand Header */}
-          <div className="p-space-lg border-b border-outline-variant/30 flex items-center justify-between">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
-              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-on-primary font-black text-lg shadow-sm">
-                D
-              </div>
-              <div className="flex flex-col">
-                <span className="font-headline-sm text-headline-sm font-extrabold tracking-tight text-primary leading-none">
+          <div className="h-16 px-3.5 border-b border-slate-200/80 flex items-center justify-between shrink-0 overflow-hidden">
+            <div 
+              className="flex items-center gap-3 cursor-pointer shrink-0" 
+              onClick={() => navigate("/")}
+              title="DANASEA Kênh đối tác"
+            >
+              <img
+                src="/images/danasea-logo.png"
+                alt="DANASEA Logo"
+                className="w-9 h-9 object-contain rounded-xl shrink-0 shadow-xs"
+              />
+              <div 
+                className={`flex flex-col transition-all duration-200 ${
+                  isExpanded ? "opacity-100 max-w-[150px]" : "opacity-0 max-w-0 overflow-hidden"
+                }`}
+              >
+                <span className="font-extrabold text-base tracking-tight text-slate-900 leading-none">
                   DANASEA
                 </span>
-                <span className="text-[11px] text-on-surface-variant font-medium mt-0.5">
-                  Đối tác Trải nghiệm
+                <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase mt-1 whitespace-nowrap">
+                  KÊNH ĐỐI TÁC
                 </span>
               </div>
             </div>
-            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-medium flex items-center gap-1">
-              <span className="material-symbols-outlined text-[13px]">verified</span>
-              Đã xác thực
-            </span>
+
+            {isExpanded && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsPinned((prev) => !prev);
+                }}
+                className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer shrink-0 ${
+                  isPinned ? "text-slate-900 bg-slate-100" : ""
+                }`}
+                title={isPinned ? "Bỏ ghim (Tự động thu gọn)" : "Ghim cố định thanh bên"}
+                aria-label="Toggle pin sidebar"
+              >
+                <Pin className={`w-4 h-4 ${isPinned ? "rotate-45 fill-current text-slate-900" : ""}`} />
+              </button>
+            )}
           </div>
 
-          {/* Navigation Links */}
-          <nav className="p-space-sm flex flex-col gap-1 overflow-y-auto max-h-[calc(100vh-160px)]">
-            <NavLink
-              to="/vendor"
-              end
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-space-md py-2.5 rounded-xl font-label-md transition-colors ${
-                  isActive
-                    ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                }`
-              }
-            >
-              <span className="material-symbols-outlined text-[20px]">dashboard</span>
-              <span>Tổng quan (Dashboard)</span>
-            </NavLink>
+          {/* Navigation Links Grouped */}
+          <nav className="p-3 flex flex-col gap-3 overflow-y-auto overflow-x-hidden flex-1">
+            {NAV_GROUPS.map((group, gIdx) => (
+              <div key={gIdx} className="flex flex-col gap-1">
+                {/* Group Title / Divider */}
+                {isExpanded ? (
+                  <div className="pt-2 pb-1 px-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 select-none">
+                      {group.groupTitle}
+                    </span>
+                  </div>
+                ) : (
+                  gIdx > 0 && <div className="my-1.5 mx-2 border-t border-slate-100" />
+                )}
 
-            <NavLink
-              to="/vendor/orders"
-              className={({ isActive }) =>
-                `flex items-center justify-between px-space-md py-2.5 rounded-xl font-label-md transition-colors ${
-                  isActive
-                    ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                }`
-              }
-            >
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[20px]">confirmation_number</span>
-                <span>Đơn hàng</span>
+                {group.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.exact}
+                    title={!isExpanded ? item.label : undefined}
+                    className={({ isActive }) =>
+                      `group flex items-center h-10 rounded-xl text-sm font-medium transition-all duration-150 relative ${
+                        isExpanded
+                          ? "px-3 w-full"
+                          : "w-10 justify-center mx-auto"
+                      } ${
+                        isActive
+                          ? "bg-slate-900 text-white shadow-xs font-semibold"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+                      }`
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <item.icon
+                          className={`w-5 h-5 shrink-0 transition-colors ${
+                            isActive ? "text-white" : "text-slate-500 group-hover:text-slate-900"
+                          }`}
+                          strokeWidth={1.75}
+                        />
+                        <span
+                          className={`truncate whitespace-nowrap transition-all duration-200 ${
+                            isExpanded
+                              ? "opacity-100 max-w-[180px] ml-3"
+                              : "opacity-0 max-w-0 ml-0 overflow-hidden"
+                          }`}
+                        >
+                          {item.label}
+                        </span>
+                      </>
+                    )}
+                  </NavLink>
+                ))}
               </div>
-              <span className="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold">
-                1
-              </span>
-            </NavLink>
-
-            <NavLink
-              to="/vendor/schedule"
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-space-md py-2.5 rounded-xl font-label-md transition-colors ${
-                  isActive
-                    ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                }`
-              }
-            >
-              <span className="material-symbols-outlined text-[20px]">calendar_month</span>
-              <span>Lịch khởi hành</span>
-            </NavLink>
-
-            <NavLink
-              to="/vendor/services"
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-space-md py-2.5 rounded-xl font-label-md transition-colors ${
-                  isActive
-                    ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                }`
-              }
-            >
-              <span className="material-symbols-outlined text-[20px]">kitesurfing</span>
-              <span>Dịch vụ</span>
-            </NavLink>
-
-            <NavLink
-              to="/vendor/promotions"
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-space-md py-2.5 rounded-xl font-label-md transition-colors ${
-                  isActive
-                    ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                }`
-              }
-            >
-              <span className="material-symbols-outlined text-[20px]">sell</span>
-              <span>Khuyến mãi</span>
-            </NavLink>
-
-            <NavLink
-              to="/vendor/reviews"
-              className={({ isActive }) =>
-                `flex items-center justify-between px-space-md py-2.5 rounded-xl font-label-md transition-colors ${
-                  isActive
-                    ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                }`
-              }
-            >
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[20px]">chat</span>
-                <span>Đánh giá &amp; Phản hồi</span>
-              </div>
-              <span className="px-1.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed text-[10px] font-bold">
-                147
-              </span>
-            </NavLink>
-
-            <NavLink
-              to="/vendor/revenue"
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-space-md py-2.5 rounded-xl font-label-md transition-colors ${
-                  isActive
-                    ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                }`
-              }
-            >
-              <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
-              <span>Doanh thu</span>
-            </NavLink>
-
-            <NavLink
-              to="/vendor/payouts"
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-space-md py-2.5 rounded-xl font-label-md transition-colors ${
-                  isActive
-                    ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                }`
-              }
-            >
-              <span className="material-symbols-outlined text-[20px]">payments</span>
-              <span>Quyết toán</span>
-            </NavLink>
-
-            <NavLink
-              to="/vendor/disputes"
-              className={({ isActive }) =>
-                `flex items-center justify-between px-space-md py-2.5 rounded-xl font-label-md transition-colors ${
-                  isActive
-                    ? "bg-primary text-on-primary font-bold shadow-sm"
-                    : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
-                }`
-              }
-            >
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[20px]">gavel</span>
-                <span>Khiếu nại</span>
-              </div>
-              <span className="px-1.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[10px] font-bold">
-                1
-              </span>
-            </NavLink>
+            ))}
           </nav>
         </div>
 
-        {/* Footer info */}
-        <div className="p-space-md border-t border-outline-variant/30 flex flex-col gap-2">
-          <NavLink
-            to="/vendor/profile"
-            className="flex items-center gap-3 px-space-md py-2 rounded-xl text-on-surface-variant hover:bg-surface-container hover:text-on-surface font-label-md transition-colors"
+        {/* Footer info: Notifications, Profile & Logout in Sidebar */}
+        <div className="p-3 border-t border-slate-200/80 flex flex-col gap-2 shrink-0">
+          {/* Notifications in Sidebar */}
+          <div className="relative">
+            <button
+              onClick={() => setIsNotiOpen((prev) => !prev)}
+              title={!isExpanded ? `Thông báo ${unreadCount > 0 ? `(${unreadCount})` : ''}` : undefined}
+              className={`group flex items-center h-10 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer relative ${
+                isExpanded ? "px-3 w-full" : "w-10 justify-center mx-auto"
+              } ${
+                isNotiOpen
+                  ? "bg-slate-900 text-white shadow-xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+              }`}
+            >
+              <div className="relative shrink-0 flex items-center justify-center">
+                <Bell
+                  className={`w-5 h-5 transition-colors ${
+                    isNotiOpen ? "text-white" : "text-slate-500 group-hover:text-slate-900"
+                  }`}
+                  strokeWidth={1.75}
+                />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
+                )}
+              </div>
+              <span
+                className={`truncate whitespace-nowrap transition-all duration-200 ${
+                  isExpanded
+                    ? "opacity-100 max-w-[150px] ml-3"
+                    : "opacity-0 max-w-0 ml-0 overflow-hidden"
+                }`}
+              >
+                Thông báo
+              </span>
+              {isExpanded && unreadCount > 0 && (
+                <span className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold font-mono bg-rose-100 text-rose-700">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Popover floating next to Sidebar */}
+            {isNotiOpen && (
+              <div 
+                className={`fixed z-50 bg-white rounded-2xl shadow-2xl border border-slate-200 w-80 sm:w-96 flex flex-col overflow-hidden animate-scale-in ${
+                  isExpanded ? "left-[264px] bottom-16" : "left-[74px] bottom-16"
+                }`}
+              >
+                <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-slate-900">Thông báo đối tác</span>
+                    {unreadCount > 0 && (
+                      <span className="px-2 py-0.5 rounded-full text-xs font-bold font-mono bg-rose-100 text-rose-700">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllAsRead}
+                      className="text-xs font-semibold text-sky-600 hover:text-sky-700 transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <CheckCheck className="w-3.5 h-3.5" />
+                      <span>Đã đọc tất cả</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-80 overflow-y-auto flex flex-col divide-y divide-slate-100">
+                  {notifications.length === 0 ? (
+                    <div className="py-8 px-4 text-center text-slate-400 text-xs">
+                      Chưa có thông báo nào
+                    </div>
+                  ) : (
+                    notifications.map((noti) => (
+                      <div
+                        key={noti.id}
+                        onClick={() => handleNotificationClick(noti)}
+                        className={`p-3.5 hover:bg-slate-50 transition-colors cursor-pointer flex flex-col gap-1 relative ${
+                          !noti.isRead ? "bg-sky-50/40" : ""
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {!noti.isRead && (
+                              <span className="w-2 h-2 rounded-full bg-sky-500 shrink-0" />
+                            )}
+                            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md border border-slate-200 bg-slate-100 text-slate-700">
+                              {noti.type}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-slate-400">
+                            {noti.createdAt ? new Date(noti.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-slate-900 text-xs line-clamp-1">{noti.title}</h4>
+                        <p className="text-slate-600 text-xs line-clamp-2">{noti.body}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="p-2.5 border-t border-slate-100 text-center bg-slate-50/50">
+                  <button
+                    onClick={() => setIsNotiOpen(false)}
+                    className="text-xs text-slate-600 font-semibold hover:text-slate-900 cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Account Profile Card */}
+          <div
+            onClick={() => navigate("/vendor/profile")}
+            title={!isExpanded ? user?.fullName || "Hồ sơ đối tác" : undefined}
+            className={`group flex items-center h-12 rounded-xl transition-all duration-150 cursor-pointer ${
+              isExpanded 
+                ? "px-2.5 w-full bg-slate-50 hover:bg-slate-100/90 border border-slate-200/60" 
+                : "w-10 justify-center mx-auto"
+            }`}
           >
-            <span className="material-symbols-outlined text-[20px]">badge</span>
-            <span>Hồ sơ &amp; Pháp lý</span>
-          </NavLink>
+            <AtlasAvatar name={user?.fullName || "Danabeach"} size="sm" />
+            {isExpanded && (
+              <div className="flex flex-col min-w-0 ml-2.5 text-left flex-1">
+                <span className="text-xs font-bold text-slate-900 truncate leading-tight">
+                  {user?.fullName || "Danabeach Club"}
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
+                  Đối tác vận hành
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Logout Button */}
           <button
-            onClick={() => navigate("/")}
-            className="flex items-center gap-3 px-space-md py-2 rounded-xl text-error hover:bg-error/10 font-label-md transition-colors w-full text-left"
+            onClick={() => {
+              useAuthStore.getState().logout();
+              navigate("/auth");
+            }}
+            title={!isExpanded ? "Đăng xuất" : undefined}
+            className={`group flex items-center h-9 rounded-xl text-xs font-medium text-rose-600 hover:bg-rose-50 transition-all duration-150 cursor-pointer ${
+              isExpanded ? "px-3 w-full" : "w-10 justify-center mx-auto"
+            }`}
           >
-            <span className="material-symbols-outlined text-[18px]">logout</span>
-            <span>Quay về trang khách</span>
+            <LogOut className="w-4 h-4 text-rose-500 shrink-0" strokeWidth={1.75} />
+            <span
+              className={`truncate whitespace-nowrap transition-all duration-200 ${
+                isExpanded
+                  ? "opacity-100 max-w-[180px] ml-3"
+                  : "opacity-0 max-w-0 ml-0 overflow-hidden"
+              }`}
+            >
+              Đăng xuất
+            </span>
           </button>
         </div>
       </aside>
 
       {/* Main dynamic outlet */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar for Vendor */}
-        <header className="h-16 bg-surface-container-lowest/80 backdrop-blur-md border-b border-outline-variant/30 px-6 flex items-center justify-between sticky top-0 z-20">
-          <div className="flex items-center gap-2.5">
-            <img
-              alt="DANASEA"
-              className="h-8 w-auto object-contain"
-              src="https://lh3.googleusercontent.com/aida/AEtjO1Wc3PDumzL5I2MlIC7zdJZmfwBfm4RHsplJ5nk-9ZaRKWyozKczleP4gMlRMYECYGlmoy61P0H5GG6zbTiOnv9OfrbuVqBwoPco9lX5TdnIOndbHvSBQrTFFImlLmSHKB20EH_fp68zcXl68-GiUe2CUKvkZGprNc2OedIHPdFefB5izHfijulRwWFEJMtI3mN_pen7Nzc9tS1VIfkLiHft_-cJWqR00zO95yZuFm90DNcjzOJt5JEfyFNO"
-            />
-            <span className="font-bold text-base tracking-tight text-primary">DANASEA</span>
-            <span className="text-slate-300 font-light">|</span>
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kênh Đối tác</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary font-label-sm text-label-sm font-semibold">
-              <span className="material-symbols-outlined text-[16px]">waves</span>
-              <span>Sóng 0.5m • Êm biển</span>
-            </div>
-
-            {/* Notification Bell */}
-            <div className="relative">
-              <button
-                onClick={() => setIsNotiOpen(!isNotiOpen)}
-                className="relative p-2 rounded-xl text-on-surface-variant hover:bg-surface-container-low transition-colors"
-                title="Thông báo đối tác"
-              >
-                <span className="material-symbols-outlined text-[22px]">notifications</span>
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-secondary"></span>
-              </button>
-
-              {/* Notification Dropdown Panel */}
-              {isNotiOpen && (
-                <div className="absolute right-0 top-12 w-80 sm:w-96 bg-surface rounded-2xl shadow-2xl border border-outline-variant/30 z-50 flex flex-col overflow-hidden animate-in fade-in zoom-in-95">
-                  <div className="p-space-md border-b border-outline-variant/20 flex items-center justify-between">
-                    <span className="font-headline-sm text-headline-sm font-bold text-on-surface">Thông báo</span>
-                    <span className="text-[11px] text-on-surface-variant font-medium">Trạng thái: SENT</span>
-                  </div>
-
-                  <div className="max-h-96 overflow-y-auto flex flex-col divide-y divide-outline-variant/10">
-                    {notifications.map((noti) => (
-                      <div
-                        key={noti.id}
-                        onClick={() => setSelectedNoti(noti)}
-                        className="p-3 hover:bg-surface-container-low transition-colors cursor-pointer flex flex-col gap-1"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            noti.type === 'WEATHER_ALERT' ? 'bg-amber-100 text-amber-900' :
-                            noti.type === 'ORDER' ? 'bg-blue-100 text-blue-900' : 'bg-emerald-100 text-emerald-900'
-                          }`}>
-                            {noti.type}
-                          </span>
-                          <span className="text-[11px] text-on-surface-variant">{noti.createdAt}</span>
-                        </div>
-                        <h4 className="font-label-md font-bold text-on-surface line-clamp-1">{noti.title}</h4>
-                        <p className="font-body-sm text-on-surface-variant text-[12px] line-clamp-2">{noti.message}</p>
-                        <div className="flex items-center gap-2 text-[10px] text-outline mt-0.5">
-                          <span>Kênh: {noti.channel}</span>
-                          <span>•</span>
-                          <span>Trạng thái: {noti.status}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="p-2 border-t border-outline-variant/20 text-center">
-                    <button
-                      onClick={() => setIsNotiOpen(false)}
-                      className="text-[12px] text-primary font-semibold hover:underline"
-                    >
-                      Đóng
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div
-              onClick={() => navigate("/vendor/profile")}
-              className="flex items-center gap-2 pl-2 border-l border-outline-variant/30 cursor-pointer"
-            >
-              <div className="w-8 h-8 rounded-full bg-primary-fixed text-on-primary-fixed flex items-center justify-center font-bold text-label-sm overflow-hidden shadow-xs">
-                {user?.avatarUrl ? (
-                  <img src={user.avatarUrl} alt={user.fullName || 'Vendor'} className="w-full h-full object-cover" />
-                ) : (
-                  (user?.fullName || user?.email || 'V').charAt(0).toUpperCase()
-                )}
-              </div>
-              <span className="font-label-md text-label-md text-on-surface font-semibold hidden sm:inline max-w-[160px] truncate">
-                {user?.fullName || user?.email || 'Kênh đối tác'}
-              </span>
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 print:block print:w-full print:m-0 print:p-0">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden print:overflow-visible print:h-auto print:w-full print:m-0 print:p-0">
           <div
             key={location.pathname}
             onAnimationEnd={() => setAnimationClass("")}
@@ -350,8 +485,8 @@ export function VendorLayout() {
 
       {/* Notification Detail Modal (Portaled directly to document.body) */}
       {selectedNoti && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-          <div className="bg-surface rounded-2xl max-w-md w-full p-space-lg shadow-2xl flex flex-col gap-space-md border border-outline-variant/30 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-lg flex flex-col gap-4 border border-slate-200/90">
             <div className="flex items-center justify-between border-b border-outline-variant/30 pb-2">
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">notifications_active</span>
@@ -365,42 +500,35 @@ export function VendorLayout() {
             <div className="flex flex-col gap-2 font-body-sm">
               <div className="flex justify-between text-[12px] text-on-surface-variant">
                 <span>Phân loại: <strong>{selectedNoti.type}</strong></span>
-                <span>Thời gian: {selectedNoti.createdAt}</span>
+                <span>Thời gian: {selectedNoti.createdAt ? new Date(selectedNoti.createdAt).toLocaleString('vi-VN') : ''}</span>
               </div>
               <h4 className="font-headline-sm font-bold text-on-surface mt-1">{selectedNoti.title}</h4>
               <p className="p-3 rounded-xl bg-surface-container-low text-on-surface leading-relaxed">
-                {selectedNoti.message}
+                {selectedNoti.body}
               </p>
 
-              {/* Related objects link (Service / Slot / Order) */}
-              {selectedNoti.relatedSlotId && (
-                <div className="p-2.5 rounded-xl bg-amber-50 text-amber-900 text-[12px] flex items-center justify-between">
-                  <span>Liên kết ca khởi hành: <strong>{selectedNoti.relatedSlotId}</strong> (Tour: {selectedNoti.relatedServiceId})</span>
+              {/* Related entity link */}
+              {selectedNoti.relatedEntityId && (
+                <div className="p-2.5 rounded-xl bg-sky-50 text-sky-900 text-[12px] flex items-center justify-between">
+                  <span>Thực thể liên quan: <strong>{selectedNoti.relatedEntityType || 'Đối tượng'} #{selectedNoti.relatedEntityId.slice(0, 8)}</strong></span>
                   <button 
-                    onClick={() => { setSelectedNoti(null); setIsNotiOpen(false); navigate('/vendor/schedule'); }}
-                    className="font-bold underline ml-2"
+                    onClick={() => {
+                      setSelectedNoti(null);
+                      setIsNotiOpen(false);
+                      if (selectedNoti.relatedEntityType === 'ORDER' || selectedNoti.relatedEntityType === 'SUB_ORDER') {
+                        navigate('/vendor/orders');
+                      } else {
+                        navigate('/vendor/schedule');
+                      }
+                    }}
+                    className="font-bold underline ml-2 text-sky-700 hover:text-sky-900 cursor-pointer"
                   >
-                    Xem lịch ca
+                    Chi tiết
                   </button>
                 </div>
               )}
 
-              {selectedNoti.relatedOrderId && (
-                <div className="p-2.5 rounded-xl bg-blue-50 text-blue-900 text-[12px] flex items-center justify-between">
-                  <span>Liên kết đơn hàng: <strong>{selectedNoti.relatedOrderId}</strong></span>
-                  <button 
-                    onClick={() => { setSelectedNoti(null); setIsNotiOpen(false); navigate('/vendor/orders'); }}
-                    className="font-bold underline ml-2"
-                  >
-                    Xem đơn
-                  </button>
-                </div>
-              )}
 
-              <div className="flex justify-between text-[11px] text-outline pt-2 border-t border-outline-variant/20">
-                <span>Kênh phát: {selectedNoti.channel}</span>
-                <span>Trạng thái máy chủ: {selectedNoti.status}</span>
-              </div>
             </div>
 
             <div className="flex justify-end pt-2">
