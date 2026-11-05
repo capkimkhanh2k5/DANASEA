@@ -112,7 +112,7 @@ The platform is designed around a **Modular Clean Monolith** adhering to Hexagon
 ## Server Demo Data
 
 The manual **Demo Data** GitHub Actions workflow can inspect, replace and restore
-application demo data after a verified backup. See the [operator runbook](docs/demo-data-workflow.md)
+application demo data after a verified backup. See the [operator runbook](docs/Data/demo-data-workflow.md)
 for the required server bootstrap, production secrets and recovery procedure.
 
 ## Authors

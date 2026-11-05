@@ -1,0 +1,107 @@
+name: Payment Sandbox Acceptance
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: Sandbox provider
+        required: true
+        type: choice
+        options: [paypal, vnpay]
+      command:
+        description: Lifecycle phase
+        required: true
+        type: choice
+        options: [preflight, create-intent, capture, verify, refund]
+      session_run_id:
+        description: Previous workflow run containing encrypted private session (required after create-intent)
+        required: false
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: payments-sandbox
+  cancel-in-progress: false
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    environment: payments-sandbox
+    timeout-minutes: 15
+    env:
+      PHASE: ${{ inputs.command }}
+      PROVIDER: ${{ inputs.provider }}
+      PAYMENT_SESSION_KEY: ${{ secrets.PAYMENT_SESSION_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+      - name: Prepare private attestation and credentials
+        env:
+          TOKEN: ${{ secrets.PAYMENT_SANDBOX_CUSTOMER_TOKEN }}
+          MANIFEST: ${{ secrets.PAYMENT_SANDBOX_MANIFEST }}
+          SIGNATURE: ${{ secrets.PAYMENT_SANDBOX_MANIFEST_SIGNATURE }}
+          SIGNERS: ${{ vars.PAYMENT_SANDBOX_SIGNERS }}
+          RECEIPT: ${{ secrets.PAYMENT_SANDBOX_PROVIDER_RECEIPT }}
+          RECEIPT_SIGNATURE: ${{ secrets.PAYMENT_SANDBOX_PROVIDER_RECEIPT_SIGNATURE }}
+          PREVIOUS_RUN: ${{ inputs.session_run_id }}
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/private" "$RUNNER_TEMP/evidence"
+          test -n "$TOKEN" && test -n "$MANIFEST" && test -n "$SIGNATURE" && test -n "$SIGNERS" && [[ ${#PAYMENT_SESSION_KEY} -ge 32 ]]
+          if [[ "$PHASE" != preflight && "$PHASE" != create-intent ]]; then
+            [[ "$PREVIOUS_RUN" =~ ^[0-9]+$ ]] || { echo '::error::Previous session run required'; exit 1; }
+          fi
+          printf %s "$TOKEN" > "$RUNNER_TEMP/private/token"
+          printf %s "$MANIFEST" > "$RUNNER_TEMP/private/manifest.json"
+          printf %s "$SIGNATURE" > "$RUNNER_TEMP/private/manifest.json.sig"
+          printf %s "$SIGNERS" > "$RUNNER_TEMP/private/signers"
+          if [[ -n "$RECEIPT" ]]; then
+            printf %s "$RECEIPT" > "$RUNNER_TEMP/private/receipt.json"
+            printf %s "$RECEIPT_SIGNATURE" > "$RUNNER_TEMP/private/receipt.json.sig"
+          fi
+      - name: Download private session envelope
+        if: inputs.session_run_id != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: payment-private-session
+          run-id: ${{ inputs.session_run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/encrypted
+      - name: Restore encrypted session
+        if: inputs.session_run_id != ''
+        run: python3 scripts/qa/payment_session.py open --input "$RUNNER_TEMP/encrypted/session.enc" --output "$RUNNER_TEMP/private/session.json"
+      - name: Preflight and lifecycle action
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          args=(--provider "$PROVIDER" --expected-revision "$EXPECTED_SHA"
+            --base-url "$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/private/manifest.json"))["base_url"])')"
+            --token-file "$RUNNER_TEMP/private/token" --signers "$RUNNER_TEMP/private/signers"
+            --deployment-manifest "$RUNNER_TEMP/private/manifest.json"
+            --session "$RUNNER_TEMP/private/session.json" --evidence-dir "$RUNNER_TEMP/evidence")
+          python3 scripts/qa/acceptance_payments.py preflight "${args[@]}"
+          if [[ "$PHASE" == create-intent ]]; then
+            args+=(--order-id "$(python3 -c 'import json,os; print(json.load(open(os.environ["RUNNER_TEMP"]+"/private/manifest.json"))["fixture"]["order_id"])')")
+          fi
+          if [[ "$PHASE" == verify ]]; then args+=(--provider-receipt "$RUNNER_TEMP/private/receipt.json"); fi
+          if [[ "$PHASE" != preflight ]]; then python3 scripts/qa/acceptance_payments.py "$PHASE" "${args[@]}"; fi
+      - name: Encrypt resumable private session
+        if: always()
+        run: |
+          if [[ -f "$RUNNER_TEMP/private/session.json" ]]; then
+            mkdir -p "$RUNNER_TEMP/encrypted"
+            python3 scripts/qa/payment_session.py seal --input "$RUNNER_TEMP/private/session.json" --output "$RUNNER_TEMP/encrypted/session.enc"
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: payment-private-session
+          path: ${{ runner.temp }}/encrypted/session.enc
+          retention-days: 1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: payment-acceptance-evidence
+          path: ${{ runner.temp }}/evidence/
+          retention-days: 14

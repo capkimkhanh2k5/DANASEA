@@ -9,7 +9,7 @@ Backend chỉ gọi LLM và moderation qua CLI Proxy. Proxy dùng các tài kho�
 Từ thư mục gốc repo, tạo `.env` từ `.env.example`, điền các cấu hình dịch vụ, sau đó:
 
 ```bash
-python3 scripts/production.py prepare
+python3 scripts/ops/production.py prepare
 ```
 
 Script sinh các khóa còn thiếu và config riêng `private/cli-proxy/config.yaml`. Không ghi giá trị khóa vào Git, không ghi đè cấu hình proxy đã tồn tại, không xoá token OAuth. File `cli-proxy/config.yaml` trong Git chỉ là mẫu với management tắt và danh sách client key rỗng.

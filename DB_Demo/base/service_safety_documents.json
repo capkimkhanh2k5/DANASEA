@@ -1,0 +1,509 @@
+{
+  "classification": "DEVELOPMENT_SYNTHETIC",
+  "records": [
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "7ebfcb235a6e16b05d2711c6411d95acd8ddd8a993d8734229bad91f3e31baf6",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "mo-to-nuoc-jetski",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--nos1VThy--/v1793625652/danasea_demo_data_package/service_safety_documents/7ebfcb235a6e16b05d2711c6411d95acd8ddd8a993d8734229bad91f3e31baf6.png",
+        "id": "85ba29a4-3330-5cc2-891b-a0e9cbe66477",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "088d874c-a61e-5b58-a7a9-497f32a56901",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "33128560060d7b803049992113c6885d1610b24922366d10a8179c45441f9f09",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "thue-sup",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--rg4uJmxT--/v1793625657/danasea_demo_data_package/service_safety_documents/33128560060d7b803049992113c6885d1610b24922366d10a8179c45441f9f09.png",
+        "id": "51af8b64-8477-5733-ac2e-9393e8c2e52c",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "160e67fc-f236-5871-9971-5555cf855d02",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "6dc6412a5cedb76ffaea40482ab3aca9e55b1ae6624092e87eab4f51811a6c95",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "hoc-luot-song",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--k6PW72is--/v1793625664/danasea_demo_data_package/service_safety_documents/6dc6412a5cedb76ffaea40482ab3aca9e55b1ae6624092e87eab4f51811a6c95.png",
+        "id": "5607f487-417d-53f9-8923-7b029386138f",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "1dd26db5-f863-5b03-b562-ac46f43df9d2",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "cafcd402557cd2eb8c6ec44753a45211cadad9352a5147063ff75347f2903353",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "mo-to-nuoc-jetski",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--aIi_s0rG--/v1793625669/danasea_demo_data_package/service_safety_documents/cafcd402557cd2eb8c6ec44753a45211cadad9352a5147063ff75347f2903353.png",
+        "id": "71dd2bee-abd0-52d9-82f8-25b71276ebc4",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "2cdfabcf-13a2-550a-8f9e-283aad7053c9",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "cdc3882192d455857a725cf18ac470bd6026ae9524394f668884d61b13d647df",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "cano-du-bay",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--RWgiu47u--/v1793625675/danasea_demo_data_package/service_safety_documents/cdc3882192d455857a725cf18ac470bd6026ae9524394f668884d61b13d647df.png",
+        "id": "5afca621-d820-5c70-be10-220b6ce30b63",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "3758c297-54ff-5887-89bd-62220227570b",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "636e01482bfd6482ac4e0dbcee92aad9f3b8a36deff4341a07fe220f2c64a1f5",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "cano-du-bay",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--W42XM1cm--/v1793625680/danasea_demo_data_package/service_safety_documents/636e01482bfd6482ac4e0dbcee92aad9f3b8a36deff4341a07fe220f2c64a1f5.png",
+        "id": "939add8f-4617-5344-a48e-12f256c4d66a",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "4190046d-112a-5b93-beb2-bcc8b1cd16d4",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "70096e7bc7aa3ae947f340386e8fbd2730736696ed723e9a8c10c587ccf005d7",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "thue-van-luot-song",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--4F3F8Q4B--/v1793625685/danasea_demo_data_package/service_safety_documents/70096e7bc7aa3ae947f340386e8fbd2730736696ed723e9a8c10c587ccf005d7.png",
+        "id": "4f379e3e-2ae9-57f8-9a29-3ee8511e7d07",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "4b79c4cd-a138-59ca-83c3-d396c1208ac4",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "5e3e75f7440d41f3457b276ffa22f91a8e6719b5181e4a7c216ab0feec74d611",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "thue-van-luot-song",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--xO_B9d9U--/v1793625690/danasea_demo_data_package/service_safety_documents/5e3e75f7440d41f3457b276ffa22f91a8e6719b5181e4a7c216ab0feec74d611.png",
+        "id": "07f65ba7-78ce-50b7-adbb-ced07c011463",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "508d4dad-4227-527b-9df3-8416dd870c04",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "5a7fed5cc5a91dc63e6cdd5dbb1a784b9ac28516d17d60000e5b932c1f1cabab",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "cau-ca-bien",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--9ZHNHddB--/v1793625696/danasea_demo_data_package/service_safety_documents/5a7fed5cc5a91dc63e6cdd5dbb1a784b9ac28516d17d60000e5b932c1f1cabab.png",
+        "id": "6befab33-03dd-5511-a0b4-a483b50f910e",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "5536f743-3b6d-518e-af2b-05634a218195",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "e9029a09144c9afb58692a8d413e7c816fb4115b0027e7cb824ad2cfc6544ed9",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "lan-ngam-san-ho",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--2Mf7it25--/v1793625701/danasea_demo_data_package/service_safety_documents/e9029a09144c9afb58692a8d413e7c816fb4115b0027e7cb824ad2cfc6544ed9.png",
+        "id": "04ab1226-0069-5066-a5c5-be690ef87134",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "57c22a43-22fd-57da-894c-257ade02450d",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "2ceeac2b4aadb5f8d315c225046acdabb423596fb0dda6ff053058429328cf87",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "hoc-luot-song",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--xA3W4Feo--/v1793625706/danasea_demo_data_package/service_safety_documents/2ceeac2b4aadb5f8d315c225046acdabb423596fb0dda6ff053058429328cf87.png",
+        "id": "f1c06c03-b860-5e5a-b138-bfd4fc994b79",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "5943ecd7-6480-5b4a-b42b-43abc0988776",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "0e81da17a1c05f0de0716a02022fca8f8d8564c993b804c9159c58f1d46eb170",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "cheo-sup-kayak",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--n3YRzAjl--/v1793625712/danasea_demo_data_package/service_safety_documents/0e81da17a1c05f0de0716a02022fca8f8d8564c993b804c9159c58f1d46eb170.png",
+        "id": "5a1387fc-2d8d-5840-85c5-b108a76b5cb9",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "6d4249fe-a82b-5537-a712-818b23c177d2",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "57dd29c859c764a31ff905e81ddd55242cc66b797f539162df8b24f0c4c4aa48",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "truot-phao-chuoi",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--yKWGMCnd--/v1793625717/danasea_demo_data_package/service_safety_documents/57dd29c859c764a31ff905e81ddd55242cc66b797f539162df8b24f0c4c4aa48.png",
+        "id": "cb70ab00-7331-5659-a74f-3d674c082483",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "83ee83c5-c08b-5f6e-924e-db3ceaacd364",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "5967fce217bf2aabe25f97419e1882b8dfb43df0fd00cb64da36bcc11affdcb3",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "cau-ca-bien",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--BHUnWtqX--/v1793625722/danasea_demo_data_package/service_safety_documents/5967fce217bf2aabe25f97419e1882b8dfb43df0fd00cb64da36bcc11affdcb3.png",
+        "id": "becfc931-eb04-5c96-9344-213da650c012",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "2e3ab1504f1f50ad33a7358afeadcef69121696028c9744bf427f38179a7b013",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "cau-muc-dem",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--nLTC0Yom--/v1793625727/danasea_demo_data_package/service_safety_documents/2e3ab1504f1f50ad33a7358afeadcef69121696028c9744bf427f38179a7b013.png",
+        "id": "61d7c3b5-bab5-5813-80c3-a8edf9c5bc32",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "9b3444ce-b7c7-5f40-9f14-2c1ca4258dea",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "964a8b42dfce1241d845ebb09df586627637ba3c18f40ceccebf636ba0a843d1",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "cheo-sup-kayak",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--TFXRjMhe--/v1793625732/danasea_demo_data_package/service_safety_documents/964a8b42dfce1241d845ebb09df586627637ba3c18f40ceccebf636ba0a843d1.png",
+        "id": "88fcb9e8-3471-5faa-9932-ce1effffeb07",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "9b575c51-196b-56eb-940e-aaf2f61c966f",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "5dbbee45bb5f579efb4995bb5d00853259377fce33eed24b1359f735de90e092",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "surf-tour-co-huong-dan",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--3_eeJyKx--/v1793625737/danasea_demo_data_package/service_safety_documents/5dbbee45bb5f579efb4995bb5d00853259377fce33eed24b1359f735de90e092.png",
+        "id": "8dfbaf05-2a17-5c0d-ad31-d36fb120668f",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "9f4eb04d-9ec6-5295-8de6-475b728e5cfc",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "ac0b66219d7d678b73e67577d72e5178a539f9d7701a882e98202aeaed8b3eaf",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "cau-ca-bien",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--S1JWw90X--/v1793625742/danasea_demo_data_package/service_safety_documents/ac0b66219d7d678b73e67577d72e5178a539f9d7701a882e98202aeaed8b3eaf.png",
+        "id": "dfc1dba0-bb01-5cfb-b183-26888187e964",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "a6f4ab9c-4794-542b-a443-e3013e6bbe47",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "abbdfd3010383bc6819a95c78b832cebb1feb4ae53d7380828ab54eac14f1b53",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "thue-kayak",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--s4UF3nYr--/v1793625747/danasea_demo_data_package/service_safety_documents/abbdfd3010383bc6819a95c78b832cebb1feb4ae53d7380828ab54eac14f1b53.png",
+        "id": "80111207-53ca-5dc7-846d-15646b8b686c",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "bf8626cd-2271-59ab-9273-4fdd10eb451e",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "d9367575351f44c7ae17d18b080f9886614a403e095ac97640b11d38b33135cd",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "cano-du-bay",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--fuiFvUTO--/v1793625752/danasea_demo_data_package/service_safety_documents/d9367575351f44c7ae17d18b080f9886614a403e095ac97640b11d38b33135cd.png",
+        "id": "0d19c0a8-e8c1-501f-a50e-7cf0b0bf35da",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "c4c56ae2-5f9b-555c-81f1-f0d4c8dd7c1b",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "89876a5831472570321c4db67d12cc37ee04ca183654bb545f86ea802178f662",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "cheo-sup-kayak",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--qXNPCG4X--/v1793625758/danasea_demo_data_package/service_safety_documents/89876a5831472570321c4db67d12cc37ee04ca183654bb545f86ea802178f662.png",
+        "id": "d6f28037-bee2-51b5-b40b-00c11a6e3bbc",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "cd0c7a8d-b0b8-579a-968c-a1783174a0fc",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "1bd8764365e41e5e14de369b6c8dec4c7544d8106c0854f36481f58db4f5efe9",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "lan-ngam-san-ho",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--0cUbthTr--/v1793625763/danasea_demo_data_package/service_safety_documents/1bd8764365e41e5e14de369b6c8dec4c7544d8106c0854f36481f58db4f5efe9.png",
+        "id": "e4c94cbc-187c-5797-b7b7-7bd5c7191355",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "d51355fc-bf7e-5366-b199-6272efe7f52b",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "7a9e761176df87e7ac902828b0b09267b00a3314c0c173c7ad7f2d25d218e3fc",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "cau-muc-dem",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--lXVrrVBO--/v1793625768/danasea_demo_data_package/service_safety_documents/7a9e761176df87e7ac902828b0b09267b00a3314c0c173c7ad7f2d25d218e3fc.png",
+        "id": "6e942dc5-0f43-529b-95f8-f9947bf37a6e",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "dab42f5f-e61d-5ebf-811d-34ab8d293143",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    },
+    {
+      "classification": "DEVELOPMENT_SYNTHETIC",
+      "mediaSha256": "16003b2e2cd9bdfe3763d12a583f8ced9856f00bac3358d7f1e89c6733acca46",
+      "requiredBy": {
+        "categoryRequiresSafetyCert": true,
+        "weatherSensitive": true
+      },
+      "samplePurpose": "Blank UI/workflow test checklist; not evidence of legal or safety compliance",
+      "serviceCategorySlug": "truot-phao-chuoi",
+      "sqlRow": {
+        "created_at": "2026-10-16T17:25:02.669209+00:00",
+        "file_url": "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--ju0Toq-z--/v1793625775/danasea_demo_data_package/service_safety_documents/16003b2e2cd9bdfe3763d12a583f8ced9856f00bac3358d7f1e89c6733acca46.png",
+        "id": "29ed3364-e62f-54f7-85eb-85a83760895c",
+        "rejection_reason": null,
+        "reviewed_at": "2026-10-20T10:00:00+00:00",
+        "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "service_id": "fd6fced2-812e-56ce-817f-80bb3d0841e9",
+        "status": "APPROVED",
+        "updated_at": "2026-10-20T10:00:00+00:00"
+      }
+    }
+  ]
+}

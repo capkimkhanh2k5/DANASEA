@@ -30,7 +30,8 @@ public record DiscountCodeResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
         UUID recipientCustomerId,
-        UUID replacementSubOrderId
+        UUID replacementSubOrderId,
+        UUID compensationDisruptionId
 ) {
     public static DiscountCodeResponse fromEntity(DiscountCodeJpaEntity entity) {
         if (entity == null) {
@@ -56,7 +57,8 @@ public record DiscountCodeResponse(
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
                 entity.getRecipientCustomerId(),
-                entity.getReplacementSubOrderId()
+                entity.getReplacementSubOrderId(),
+                entity.getCompensationDisruptionId()
         );
     }
 
@@ -84,7 +86,8 @@ public record DiscountCodeResponse(
                 domain.getCreatedAt(),
                 domain.getUpdatedAt(),
                 domain.getRecipientCustomerId(),
-                domain.getReplacementSubOrderId()
+                domain.getReplacementSubOrderId(),
+                domain.getCompensationDisruptionId()
         );
     }
 }

@@ -18,6 +18,7 @@ public record SettlementDetailResponse(
     BigDecimal grossAmount,
     BigDecimal commissionAmount,
     BigDecimal netPayableAmount,
+    BigDecimal vendorFaultCompensationDeductedAmount,
     SettlementStatus status,
     OffsetDateTime generatedAt,
     OffsetDateTime createdAt,

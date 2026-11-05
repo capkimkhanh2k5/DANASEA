@@ -36,4 +36,10 @@ public class ServiceSlotUnitJpaEntity extends BaseJpaEntity {
 
     @Column(name = "booked_count", nullable = false)
     private Integer bookedCount;
+
+    @Column(name = "equipment_id")
+    private UUID equipmentId;
+
+    @Column(name = "equipment_blocked", nullable = false)
+    private boolean equipmentBlocked;
 }

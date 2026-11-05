@@ -12,6 +12,7 @@ import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.security.authentication.application.ports.PasswordHasher;
 import com.danasea.backend.security.authentication.application.ports.TokenProvider;
 import com.danasea.backend.security.authentication.application.results.LoginResult;
+import com.danasea.backend.security.authentication.domain.exceptions.EmailNotVerifiedException;
 import com.danasea.backend.security.authentication.domain.exceptions.InvalidCredentialsException;
 import com.danasea.backend.security.authentication.domain.models.Authentication;
 import com.danasea.backend.security.authentication.infrastructure.security.HashUtils;
@@ -39,11 +40,15 @@ public class LoginUseCase {
                 Boolean.TRUE.equals(account.getIsEmailVerified()), account.getLocale(), account.getSessionVersion());
 
         if (!user.enabled()
-                || !user.emailVerified()
                 || !passwordHasher.matches(
                         password,
                         user.passwordHash())) {
             throw new InvalidCredentialsException();
+        }
+
+        if (!user.emailVerified()) {
+            String pendingToken = tokenProvider.generateAccessToken(user);
+            throw new EmailNotVerifiedException(user.email(), pendingToken);
         }
 
         String accessToken = tokenProvider.generateAccessToken(user);

@@ -13,7 +13,15 @@ export function Footer() {
           <div className="lg:col-span-6 flex flex-col gap-5">
             {/* Logo DANASEA */}
             <div className="flex items-center gap-2.5">
-              <img alt="DANASEA" className="h-8 w-8 object-contain shrink-0" src="/images/danasea-logo.png" />
+              <img
+                alt="DANASEA"
+                width={32}
+                height={32}
+                loading="lazy"
+                decoding="async"
+                className="h-8 w-8 object-contain shrink-0"
+                src="/images/danasea-logo-sm.png"
+              />
               <span className="font-black text-2xl tracking-tight text-white">
                 DANASEA
               </span>

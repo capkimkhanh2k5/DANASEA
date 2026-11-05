@@ -1,0 +1,16 @@
+{
+  "id": "REFUND-ACCEPT-1",
+  "status": "COMPLETED",
+  "invoice_id": "REFUND-REQ-ACCEPT-1",
+  "amount": {
+    "currency_code": "USD",
+    "value": "19.31"
+  },
+  "links": [
+    {
+      "href": "https://api-m.sandbox.paypal.com/v2/payments/captures/CAPTURE-ACCEPT-1",
+      "rel": "up",
+      "method": "GET"
+    }
+  ]
+}

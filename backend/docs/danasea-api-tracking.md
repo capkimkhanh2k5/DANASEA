@@ -177,6 +177,18 @@
 - [x] GET /api/vendor/services/{id}/slots (Xem ca và cấu hình tồn chỗ)
 - [x] POST /api/vendor/services/{id}/slots (Tạo ca: PERSON_LIMIT hoặc SHARED_CAPACITY_UNITS)
 - [x] PATCH /api/vendor/services/{id}/slots/{slotId} (Sửa ca, hạn mức, bảo vệ cam kết hoặc đóng/mở)
+- [x] POST /api/vendor/services/{serviceId}/slots/{slotId}/cancel (Hủy vận hành chuyến)
+- [x] GET /api/vendor/services/{serviceId}/slots/{slotId}/cancel (Đọc trạng thái hủy và các hoàn tiền có trước cần đối soát)
+- [x] GET /api/vendor/services/{id}/operating-schedule (Đọc lịch lặp)
+- [x] PUT /api/vendor/services/{id}/operating-schedule (Cấu hình lịch lặp 90 ngày)
+- [x] GET /api/vendor/services/{id}/operating-schedule/exceptions (Liệt kê ngoại lệ)
+- [x] POST /api/vendor/services/{id}/operating-schedule/exceptions (Đóng bán theo khoảng ngày hoặc giờ)
+- [x] DELETE /api/vendor/services/{id}/operating-schedule/exceptions/{exceptionId} (Bỏ ngoại lệ)
+- [x] GET /api/vendor/equipment (Danh mục thiết bị)
+- [x] POST /api/vendor/equipment (Đăng ký thiết bị)
+- [x] PUT /api/vendor/equipment/{equipmentId}/slots/{slotId}/units/{unitNumber} (Gán thiết bị vào ca)
+- [x] PUT /api/vendor/equipment/{equipmentId}/maintenance/{maintenanceId} (Ghi lịch bảo trì)
+- [x] GET /api/vendor/equipment/{equipmentId}/maintenance/{maintenanceId} (Đọc kết quả bảo trì)
 
 ### Vendor Services — Test
 - [x] CreateServiceUseCaseTest (6 case)
@@ -208,9 +220,15 @@
 ### Public Catalog + Wishlist + Recently Viewed — API
 - [x] GET /api/services
 - [x] GET /api/services/{id} (trả chi tiết dịch vụ kèm danh sách options để khách chọn)
+- [x] GET /api/services/by-slug/{slug} (trả chi tiết dịch vụ theo SEO slug hoặc UUID)
+- [x] GET /api/services/og/{idOrSlug} (trả HTML OpenGraph/JSON-LD prerender cho social & search bots)
+- [x] GET /api/services/sitemap.xml (trả XML sitemap động cho các dịch vụ PUBLISHED)
 - [x] GET /api/services/{id}/slots?optionId=&from=&to=&quantity=&allowSplit= (Khách xem ca khả dụng theo lựa chọn đặt)
 - [x] GET /api/v1/catalog (alias của GET /api/services)
 - [x] GET /api/v1/catalog/{id} (alias của GET /api/services/{id})
+- [x] GET /api/v1/catalog/by-slug/{slug} (alias của GET /api/services/by-slug/{slug})
+- [x] GET /api/v1/catalog/og/{idOrSlug} (alias của GET /api/services/og/{idOrSlug})
+- [x] GET /api/v1/catalog/sitemap.xml (alias của GET /api/services/sitemap.xml)
 - [x] POST /api/wishlists/{serviceId}
 - [x] DELETE /api/wishlists/{serviceId}
 - [x] GET /api/wishlists

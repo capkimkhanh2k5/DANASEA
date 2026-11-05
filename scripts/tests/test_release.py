@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'release.py'
+SCRIPT = Path(__file__).resolve().parents[1] / 'ops' / 'release.py'
 SHA = 'a' * 40
 REPO = 'capkimkhanh2k5/DANASEA'
 

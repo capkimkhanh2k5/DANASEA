@@ -10,5 +10,7 @@ public record ServiceSlotUnitResponse(
         Integer unitNumber,
         Integer capacity,
         Integer bookedCount,
-        Integer availableCapacity
+        Integer availableCapacity,
+        UUID equipmentId,
+        boolean equipmentBlocked
 ) {}

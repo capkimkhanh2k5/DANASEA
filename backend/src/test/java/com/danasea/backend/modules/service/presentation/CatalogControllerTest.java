@@ -110,4 +110,97 @@ class CatalogControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("SERVICE_NOT_FOUND"));
     }
+
+    @Test
+    void getServiceDetail_WhenMalformedUuid_ShouldReturn400() throws Exception {
+        mockMvc.perform(get("/api/services/not-a-valid-uuid")
+                .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getServiceDetail_BySlug_ShouldReturn200() throws Exception {
+        String slug = "tour-lan-bien-ngam-san-ho";
+        ServiceDetailResult result = ServiceDetailResult.builder()
+                .id(UUID.randomUUID())
+                .name("Tour Lặn Biển Ngắm San Hô")
+                .slug(slug)
+                .build();
+
+        when(getServiceDetailUseCase.executeByIdOrSlug(eq(slug), any(), any())).thenReturn(result);
+
+        mockMvc.perform(get("/api/v1/catalog/by-slug/" + slug))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.slug").value(slug))
+                .andExpect(jsonPath("$.name").value("Tour Lặn Biển Ngắm San Hô"));
+    }
+
+    @Test
+    void generateSitemap_ShouldReturnValidXml() throws Exception {
+        mockMvc.perform(get("/api/v1/catalog/sitemap.xml"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_XML))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<urlset")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("https://danasea.tailfc3563.ts.net/")));
+    }
+
+    @Test
+    void getOpenGraphPreview_ShouldReturnHtmlInVietnameseByDefault() throws Exception {
+        String slug = "tour-lan-bien";
+        ServiceDetailResult result = ServiceDetailResult.builder()
+                .id(UUID.randomUUID())
+                .name("Tour Lặn Biển")
+                .slug(slug)
+                .description("Mô tả tour lặn")
+                .build();
+
+        when(getServiceDetailUseCase.readOnlySnapshotByIdOrSlug(eq(slug))).thenReturn(result);
+
+        mockMvc.perform(get("/api/v1/catalog/og/" + slug))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<html lang=\"vi\">")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("og:title")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Đang chuyển hướng đến ")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("https://danasea.tailfc3563.ts.net/tour/" + slug)));
+    }
+
+    @Test
+    void getOpenGraphPreview_ShouldReturnHtmlInEnglishWhenRequested() throws Exception {
+        String slug = "tour-lan-bien";
+        ServiceDetailResult result = ServiceDetailResult.builder()
+                .id(UUID.randomUUID())
+                .name("Coral Diving Tour")
+                .slug(slug)
+                .build();
+
+        when(getServiceDetailUseCase.readOnlySnapshotByIdOrSlug(eq(slug))).thenReturn(result);
+
+        mockMvc.perform(get("/api/v1/catalog/og/" + slug)
+                .header("Accept-Language", "en-US,en;q=0.9"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<html lang=\"en\">")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("DANASEA - Da Nang Marine Experiences")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Redirecting to ")));
+    }
+
+    @Test
+    void getOpenGraphPreview_ShouldIgnoreUntrustedHostHeader() throws Exception {
+        String slug = "tour-lan-bien";
+        ServiceDetailResult result = ServiceDetailResult.builder()
+                .id(UUID.randomUUID())
+                .name("Tour Lặn Biển")
+                .slug(slug)
+                .build();
+
+        when(getServiceDetailUseCase.readOnlySnapshotByIdOrSlug(eq(slug))).thenReturn(result);
+
+        mockMvc.perform(get("/api/v1/catalog/og/" + slug)
+                .header("X-Forwarded-Host", "evil-attacker.example.com")
+                .header("X-Forwarded-Proto", "https"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("https://danasea.tailfc3563.ts.net/tour/" + slug)))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("evil-attacker.example.com"))));
+    }
 }

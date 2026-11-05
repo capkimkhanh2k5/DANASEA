@@ -12,9 +12,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -130,6 +135,85 @@ class PaymentGatewaySafetyTest {
                 .as("500000 VND order must not be paid by 0.01 EUR").isInstanceOf(PaymentGatewayException.class);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
         verifyNoInteractions(confirmation);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("invalidCaptureResults")
+    void captureRejectsEachInvalidResultIndependently(String scenario, PaymentCaptureResult result) {
+        prepareCapture();
+        when(gateway.captureOrder(any(), any(), any())).thenReturn(result);
+
+        assertThatThrownBy(() -> service.capturePayPalOrder(order.getCustomerId(), payment.getId(),
+                "ORDER-REGISTERED", "capture-stable-key"))
+                .isInstanceOf(PaymentGatewayException.class);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+        assertThat(order.getStatus()).isEqualTo(MasterOrderStatus.PENDING_PAYMENT);
+        assertThat(payment.getProviderTransactionId()).isEqualTo("CAPTURE-ORIGINAL");
+        assertThat(payment.getLastError()).contains("GATEWAY_TIMEOUT_AWAITING_VERIFICATION");
+        verifyNoInteractions(confirmation);
+        verify(subs, never()).saveAll(any());
+    }
+
+    private static Stream<Arguments> invalidCaptureResults() {
+        BigDecimal validAmount = new BigDecimal("19.31");
+        return Stream.of(
+                Arguments.of("wrong amount only", new PaymentCaptureResult(true, "CAPTURE-NEW",
+                        new BigDecimal("0.01"), "USD", "COMPLETED", null)),
+                Arguments.of("wrong currency only", new PaymentCaptureResult(true, "CAPTURE-NEW",
+                        validAmount, "EUR", "COMPLETED", null)),
+                Arguments.of("missing capture ID", new PaymentCaptureResult(true, null,
+                        validAmount, "USD", "COMPLETED", null)),
+                Arguments.of("blank capture ID", new PaymentCaptureResult(true, " ",
+                        validAmount, "USD", "COMPLETED", null)),
+                Arguments.of("missing amount", new PaymentCaptureResult(true, "CAPTURE-NEW",
+                        null, "USD", "COMPLETED", null)),
+                Arguments.of("pending provider status", new PaymentCaptureResult(true, "CAPTURE-NEW",
+                        validAmount, "USD", "PENDING", null)),
+                Arguments.of("unsuccessful completed result", new PaymentCaptureResult(false, "CAPTURE-NEW",
+                        validAmount, "USD", "COMPLETED", null)),
+                Arguments.of("missing provider result", null));
+    }
+
+    @Test
+    void captureRejectsADifferentNonNullPersistedProviderOrderBeforeGatewayAccess() {
+        prepareCapture();
+
+        assertThatThrownBy(() -> service.capturePayPalOrder(order.getCustomerId(), payment.getId(),
+                "ANOTHER-ORDER", "capture-stable-key"))
+                .isInstanceOf(InvalidOrderStateException.class)
+                .hasMessageContaining("does not match");
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+        verifyNoInteractions(gateway, confirmation);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PaymentProvider.class, names = {"VNPAY", "MOMO", "SEPAY"})
+    void captureRejectsANonPayPalPaymentBeforeGatewayAccess(PaymentProvider provider) {
+        prepareCapture();
+        payment.setProvider(provider);
+
+        assertThatThrownBy(() -> service.capturePayPalOrder(order.getCustomerId(), payment.getId(),
+                "ORDER-REGISTERED", "capture-stable-key"))
+                .isInstanceOf(InvalidOrderStateException.class);
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
+        verifyNoInteractions(gateway, confirmation);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PaymentStatus.class, names = {"FAILED", "REFUNDED"})
+    void captureCannotResurrectATerminalPaymentWithOtherwiseValidBinding(PaymentStatus status) {
+        prepareCapture();
+        payment.setStatus(status);
+
+        assertThatThrownBy(() -> service.capturePayPalOrder(order.getCustomerId(), payment.getId(),
+                "ORDER-REGISTERED", "capture-stable-key"))
+                .isInstanceOf(InvalidOrderStateException.class);
+
+        assertThat(payment.getStatus()).isEqualTo(status);
+        verifyNoInteractions(gateway, confirmation);
     }
 
     @Test

@@ -32,6 +32,18 @@ const IMAGE_SCENES: ImageScene[] = [
 export const CinematicSceneBackdrop: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [activeSceneId, setActiveSceneId] = useState<string>('hero');
+  const [loadSecondaryScenes, setLoadSecondaryScenes] = useState<boolean>(false);
+
+  // Defer secondary full-screen scene images (~2.5MB) until after initial paint or first scroll
+  useEffect(() => {
+    const enableSecondary = () => setLoadSecondaryScenes(true);
+    const timer = window.setTimeout(enableSecondary, 1200);
+    window.addEventListener('scroll', enableSecondary, { once: true, passive: true });
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('scroll', enableSecondary);
+    };
+  }, []);
 
   // 1. Mouse Parallax (Stratum Drift)
   useEffect(() => {
@@ -172,14 +184,17 @@ export const CinematicSceneBackdrop: React.FC = () => {
         >
           {IMAGE_SCENES.map((scene, idx) => {
             const isActive = scene.id === activeSceneId;
+            const shouldRenderSrc = idx === 0 || loadSecondaryScenes || isActive;
 
             return (
               <img
                 key={scene.id}
-                src={scene.url}
+                src={shouldRenderSrc ? scene.url : undefined}
                 alt=""
                 aria-hidden="true"
                 loading={idx === 0 ? 'eager' : 'lazy'}
+                fetchPriority={idx === 0 ? 'high' : 'low'}
+                decoding="async"
                 className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ease-in-out ${
                   isActive ? 'opacity-100' : 'opacity-0'
                 }`}

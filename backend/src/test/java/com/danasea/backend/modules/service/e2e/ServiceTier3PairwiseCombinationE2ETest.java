@@ -1,228 +1,137 @@
 package com.danasea.backend.modules.service.e2e;
-import org.hamcrest.Matchers;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+
+import com.danasea.backend.modules.service.domain.models.ServiceStatus;
+import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.math.BigDecimal;
+import java.util.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
-import java.util.*;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
-/**
- * Tier 3: Cross-Feature Combinations (Pairwise State Machine & Cross-Feature Transitions).
- *
- * <p>Requirements Coverage:
- * - ORIGINAL_REQUEST.md: R1, R2, R3, R4
- * - Full permutation of state transitions: DRAFT -> PENDING_REVIEW -> PUBLISHED -> PAUSED -> PUBLISHED
- * - Rejection remediation cycle: PENDING_REVIEW -> REJECTED -> update -> PENDING_REVIEW -> PUBLISHED
- * - Live update auto-re-review: PUBLISHED -> edit -> PENDING_REVIEW
- * - Deletion constraints across states: only DRAFT allowed
- * - Multi-tenant isolation and security matrix
- */
-@DisplayName("Tier 3: Services Module Pairwise Cross-Feature Combinations E2E Tests")
+/** Executable regression cases retaining the original legacy case identities. */
+@DisplayName("Services: strict integration tier 3")
 public class ServiceTier3PairwiseCombinationE2ETest extends BaseServiceE2ETest {
 
     @Test
     @DisplayName("P1: Complete Happy Path Lifecycle: Create -> Submit -> Approve -> Pause -> Resume")
     void testPairwise_Create_Then_Submit_Then_Approve_Then_Pause_Then_Resume() throws Exception {
-        // Step 1: Vendor creates service in DRAFT
-        String createPayload = buildValidStandardServicePayload();
-        mockMvc.perform(authenticateAsVendorA(post(VENDOR_API_BASE))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(createPayload))
-                .andExpect(status().is2xxSuccessful());
-
-        UUID serviceId = UUID.randomUUID();
-
-        // Step 2: Vendor submits service for review (DRAFT -> PENDING_REVIEW)
-        mockMvc.perform(authenticateAsVendorA(post(VENDOR_API_BASE + "/" + serviceId + "/submit")))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
-
-        // Step 3: Admin approves service (PENDING_REVIEW -> PUBLISHED)
-        mockMvc.perform(authenticateAsAdmin(patch(ADMIN_API_BASE + "/" + serviceId + "/approve")))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
-
-        // Step 4: Vendor pauses service (PUBLISHED -> PAUSED)
-        mockMvc.perform(authenticateAsVendorA(patch(VENDOR_API_BASE + "/" + serviceId + "/pause")))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
-
-        // Step 5: Vendor resumes service (PAUSED -> PUBLISHED)
-        mockMvc.perform(authenticateAsVendorA(patch(VENDOR_API_BASE + "/" + serviceId + "/resume")))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
+        UUID serviceId = id(create(standardPayload()));
+        addImage(serviceId, 0);
+        transition(serviceId, "submit", ServiceStatus.PENDING_REVIEW);
+        transition(serviceId, "approve", ServiceStatus.PUBLISHED);
+        transition(serviceId, "pause", ServiceStatus.PAUSED);
+        transition(serviceId, "resume", ServiceStatus.PUBLISHED);
+        assertThat(detail(serviceId).path("status").asText()).isEqualTo("PUBLISHED");
+        assertThat(auditCount(serviceId)).isEqualTo(1);
     }
 
     @Test
     @DisplayName("P2: Rejection Remediation Loop: Create -> Submit -> Reject -> Edit -> Resubmit -> Approve")
     void testPairwise_Create_Then_Submit_Then_Reject_Then_Update_Then_Resubmit_Then_Approve() throws Exception {
-        UUID serviceId = UUID.randomUUID();
-
-        // Step 1: Submit draft
-        mockMvc.perform(authenticateAsVendorA(post(VENDOR_API_BASE + "/" + serviceId + "/submit")))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
-
-        // Step 2: Admin rejects with reason (PENDING_REVIEW -> REJECTED)
-        String rejectPayload = buildRejectPayload("Thiếu mô tả điều kiện hoàn hủy vé");
-        mockMvc.perform(authenticateAsAdmin(patch(ADMIN_API_BASE + "/" + serviceId + "/reject"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(rejectPayload))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
-
-        // Step 3: Vendor updates description on REJECTED service (allowed per R3)
-        Map<String, Object> updates = Collections.singletonMap("description", "Bổ sung chính sách hoàn tiền 100% trước 24h");
-        mockMvc.perform(authenticateAsVendorA(patch(VENDOR_API_BASE + "/" + serviceId))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(buildUpdateServicePayload(updates)))
-                .andExpect(status().is(Matchers.isOneOf(200, 404)));
-
-        // Step 4: Vendor resubmits (REJECTED -> PENDING_REVIEW allowed per R3)
-        mockMvc.perform(authenticateAsVendorA(post(VENDOR_API_BASE + "/" + serviceId + "/submit")))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
-
-        // Step 5: Admin approves resubmitted service (PENDING_REVIEW -> PUBLISHED)
-        mockMvc.perform(authenticateAsAdmin(patch(ADMIN_API_BASE + "/" + serviceId + "/approve")))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
+        UUID serviceId = id(create(standardPayload()));
+        addImage(serviceId, 0);
+        transition(serviceId, "submit", ServiceStatus.PENDING_REVIEW);
+        reject(serviceId, "Refund policy incomplete");
+        update(serviceId, Map.of("description", "Refund policy corrected"));
+        assertState(serviceId, ServiceStatus.REJECTED);
+        transition(serviceId, "submit", ServiceStatus.PENDING_REVIEW);
+        JsonNode result = transition(serviceId, "approve", ServiceStatus.PUBLISHED);
+        assertThat(result.path("rejectionReason").asText(null)).isNull();
+        assertThat(reload(serviceId).getDescription()).isEqualTo("Refund policy corrected");
+        assertThat(auditCount(serviceId)).isEqualTo(2);
     }
 
     @Test
     @DisplayName("P3: Live Service Modification Auto Re-review: Published -> Update -> Auto PENDING_REVIEW")
     void testPairwise_Create_Then_UpdateDraft_Then_Submit_Then_Approve_Then_UpdatePublished_AutoPendingReview() throws Exception {
-        UUID serviceId = UUID.randomUUID();
-
-        // Step 1: Service is PUBLISHED, Vendor edits price
-        Map<String, Object> updates = Collections.singletonMap("price", 1500000.0);
-        mockMvc.perform(authenticateAsVendorA(patch(VENDOR_API_BASE + "/" + serviceId))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(buildUpdateServicePayload(updates)))
-                .andExpect(status().is(Matchers.isOneOf(200, 404)));
-
-        // Step 2: Verify service transitioned to PENDING_REVIEW
-        mockMvc.perform(authenticateAsVendorA(get(VENDOR_API_BASE + "/" + serviceId)))
-                .andExpect(status().is(Matchers.isOneOf(200, 404)));
-
-        // Step 3: Admin re-approves updated service
-        mockMvc.perform(authenticateAsAdmin(patch(ADMIN_API_BASE + "/" + serviceId + "/approve")))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
+        UUID serviceId = id(create(standardPayload()));
+        update(serviceId, Map.of("name", "Updated draft name"));
+        assertState(serviceId, ServiceStatus.DRAFT);
+        addImage(serviceId, 0);
+        transition(serviceId, "submit", ServiceStatus.PENDING_REVIEW);
+        transition(serviceId, "approve", ServiceStatus.PUBLISHED);
+        update(serviceId, Map.of("price", 1500000));
+        assertState(serviceId, ServiceStatus.PENDING_REVIEW);
+        assertThat(detail(serviceId).path("price").decimalValue()).isEqualByComparingTo("1500000.00");
+        transition(serviceId, "approve", ServiceStatus.PUBLISHED);
+        assertThat(auditCount(serviceId)).isEqualTo(2);
     }
 
     @Test
     @DisplayName("P4: Deletion Constraints Across State Lifecycle: Only DRAFT deletable")
     void testPairwise_CreateDraft_Then_AttemptDelete_AcrossAllStateTransitions() throws Exception {
-        UUID draftServiceId = UUID.randomUUID();
-        UUID pendingServiceId = UUID.randomUUID();
-        UUID publishedServiceId = UUID.randomUUID();
-        UUID pausedServiceId = UUID.randomUUID();
-
-        // Deleting DRAFT succeeds (204)
-        mockMvc.perform(authenticateAsVendorA(delete(VENDOR_API_BASE + "/" + draftServiceId)))
-                .andExpect(status().is(Matchers.isOneOf(200, 204, 400, 404)));
-
-        // Deleting PENDING_REVIEW fails (400)
-        mockMvc.perform(authenticateAsVendorA(delete(VENDOR_API_BASE + "/" + pendingServiceId)))
-                .andExpect(status().is(Matchers.isOneOf(400, 404)));
-
-        // Deleting PUBLISHED fails (400 per R3)
-        mockMvc.perform(authenticateAsVendorA(delete(VENDOR_API_BASE + "/" + publishedServiceId)))
-                .andExpect(status().is(Matchers.isOneOf(400, 404)));
-
-        // Deleting PAUSED fails (400 per R3)
-        mockMvc.perform(authenticateAsVendorA(delete(VENDOR_API_BASE + "/" + pausedServiceId)))
-                .andExpect(status().is(Matchers.isOneOf(400, 404)));
+        UUID draft = id(create(standardPayload()));
+        addImage(draft, 0);
+        assertDeleted(draft);
+        for (ServiceStatus state : List.of(ServiceStatus.PENDING_REVIEW, ServiceStatus.PUBLISHED, ServiceStatus.PAUSED, ServiceStatus.REJECTED)) {
+            invalidState("delete", state);
+        }
     }
 
     @Test
     @DisplayName("P5: Image Requirement Remediation: Submit with 0 images blocked -> Add images -> Submit succeeds")
     void testPairwise_SubmitWithoutImages_Blocked_Then_AddImages_SubmitSucceeds() throws Exception {
-        UUID serviceId = UUID.randomUUID();
-
-        // Submit without images fails (400)
-        mockMvc.perform(authenticateAsVendorA(post(VENDOR_API_BASE + "/" + serviceId + "/submit")))
-                .andExpect(status().is(Matchers.isOneOf(400, 404)));
-
-        // Subsequent submit after images added succeeds (200)
-        mockMvc.perform(authenticateAsVendorA(post(VENDOR_API_BASE + "/" + serviceId + "/submit")))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
+        UUID serviceId = id(create(standardPayload()));
+        error(authenticateAsVendorA(post(VENDOR_API_BASE + "/" + serviceId + "/submit")), 400, "SERVICE_IMAGES_REQUIRED");
+        assertState(serviceId, ServiceStatus.DRAFT);
+        addImage(serviceId, 0);
+        JsonNode result = transition(serviceId, "submit", ServiceStatus.PENDING_REVIEW);
+        assertThat(result.path("images").size()).isEqualTo(1);
     }
 
     @Test
     @DisplayName("P6: Audit Trail Recording for Sequential Admin Actions (Reject followed by Approve)")
     void testPairwise_AdminReject_AuditLog_Then_AdminApprove_AuditLog() throws Exception {
-        UUID serviceId = UUID.randomUUID();
-
-        // Action 1: Reject (records SERVICE_REJECTED)
-        String rejectPayload = buildRejectPayload("Thiếu danh sách trang thiết bị bảo hộ");
-        mockMvc.perform(authenticateAsAdmin(patch(ADMIN_API_BASE + "/" + serviceId + "/reject"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(rejectPayload))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
-
-        // Action 2: Approve (records SERVICE_APPROVED)
-        mockMvc.perform(authenticateAsAdmin(patch(ADMIN_API_BASE + "/" + serviceId + "/approve")))
-                .andExpect(status().is(Matchers.isOneOf(200, 400, 404)));
+        UUID serviceId = id(create(standardPayload()));
+        addImage(serviceId, 0);
+        transition(serviceId, "submit", ServiceStatus.PENDING_REVIEW);
+        reject(serviceId, "Safety equipment list incomplete");
+        // Rejected services must be resubmitted; direct approval is forbidden by the current state machine.
+        error(authenticateAsAdmin(patch(ADMIN_API_BASE + "/" + serviceId + "/approve")), 400, "INVALID_SERVICE_STATE");
+        assertState(serviceId, ServiceStatus.REJECTED);
+        assertThat(auditCount(serviceId)).isEqualTo(1);
+        update(serviceId, Map.of("description", "Safety equipment supplied"));
+        transition(serviceId, "submit", ServiceStatus.PENDING_REVIEW);
+        transition(serviceId, "approve", ServiceStatus.PUBLISHED);
+        assertThat(auditCount(serviceId)).isEqualTo(2);
     }
 
     @Test
     @DisplayName("P7: Multi-Tenant Cross-Vendor Isolation Across All Operations")
     void testPairwise_MultiTenantCrossVendorIsolationMatrix() throws Exception {
-        UUID serviceIdOfVendorA = UUID.randomUUID();
-
-        // Vendor B cannot view Vendor A's service
-        mockMvc.perform(authenticateAsVendorB(get(VENDOR_API_BASE + "/" + serviceIdOfVendorA)))
-                .andExpect(status().is(Matchers.isOneOf(403, 404)));
-
-        // Vendor B cannot edit Vendor A's service
-        mockMvc.perform(authenticateAsVendorB(patch(VENDOR_API_BASE + "/" + serviceIdOfVendorA))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(buildUpdateServicePayload(Collections.singletonMap("price", 1000.0))))
-                .andExpect(status().is(Matchers.isOneOf(403, 404)));
-
-        // Vendor B cannot submit Vendor A's service
-        mockMvc.perform(authenticateAsVendorB(post(VENDOR_API_BASE + "/" + serviceIdOfVendorA + "/submit")))
-                .andExpect(status().is(Matchers.isOneOf(403, 404)));
-
-        // Vendor B cannot pause Vendor A's service
-        mockMvc.perform(authenticateAsVendorB(patch(VENDOR_API_BASE + "/" + serviceIdOfVendorA + "/pause")))
-                .andExpect(status().is(Matchers.isOneOf(403, 404)));
-
-        // Vendor B cannot resume Vendor A's service
-        mockMvc.perform(authenticateAsVendorB(patch(VENDOR_API_BASE + "/" + serviceIdOfVendorA + "/resume")))
-                .andExpect(status().is(Matchers.isOneOf(403, 404)));
-
-        // Vendor B cannot delete Vendor A's service
-        mockMvc.perform(authenticateAsVendorB(delete(VENDOR_API_BASE + "/" + serviceIdOfVendorA)))
-                .andExpect(status().is(Matchers.isOneOf(403, 404)));
+        UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        UUID vendorBService = seed(ServiceStatus.DRAFT, VENDOR_B_ID).getId();
+        for (String action : List.of("get", "update", "submit", "pause", "resume", "delete")) {
+            MockHttpServletRequestBuilder request = vendorRequest(serviceId, action);
+            error(authenticateAsVendorB(request), 403, "UNAUTHORIZED_SERVICE_ACCESS");
+            assertState(serviceId, ServiceStatus.PUBLISHED);
+            assertThat(reload(serviceId).getPrice()).isEqualByComparingTo("1250000.00");
+        }
+        assertVendorList(serviceId);
+        assertThat(ids(response(authenticateAsVendorB(get(VENDOR_API_BASE)), 200))).containsExactly(vendorBService);
+        assertThat(auditCount(serviceId)).isZero();
     }
 
     @Test
     @DisplayName("P8: RBAC Security Matrix Across All Endpoints (Vendor vs Admin vs Customer vs Anon)")
     void testPairwise_RBAC_RolePermissionMatrix() throws Exception {
-        UUID serviceId = UUID.randomUUID();
-
-        // 1. Customer blocked on vendor endpoint
-        mockMvc.perform(authenticateAsCustomer(get(VENDOR_API_BASE)))
-                .andExpect(status().isForbidden());
-
-        // 2. Admin blocked on vendor endpoint
-        mockMvc.perform(authenticateAsAdmin(get(VENDOR_API_BASE)))
-                .andExpect(status().isForbidden());
-
-        // 3. Vendor blocked on admin endpoint
-        mockMvc.perform(authenticateAsVendorA(get(ADMIN_API_BASE)))
-                .andExpect(status().isForbidden());
-
-        // 4. Customer blocked on admin endpoint
-        mockMvc.perform(authenticateAsCustomer(get(ADMIN_API_BASE)))
-                .andExpect(status().isForbidden());
-
-        // 5. Vendor blocked on admin approve endpoint
-        mockMvc.perform(authenticateAsVendorA(patch(ADMIN_API_BASE + "/" + serviceId + "/approve")))
-                .andExpect(status().isForbidden());
-
-        // 6. Vendor blocked on admin reject endpoint
-        mockMvc.perform(authenticateAsVendorA(patch(ADMIN_API_BASE + "/" + serviceId + "/reject"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(buildRejectPayload("Forbidden")))
-                .andExpect(status().isForbidden());
+        UUID serviceId = seed(ServiceStatus.PENDING_REVIEW).getId();
+        for (String action : List.of("create", "list", "get", "update", "submit", "pause", "resume", "delete")) {
+            error(authenticateAsCustomer(vendorRequest(serviceId, action)), 403, "ACCESS_DENIED");
+            error(authenticateAsAdmin(vendorRequest(serviceId, action)), 403, "ACCESS_DENIED");
+            error(vendorRequest(serviceId, action), 401, "UNAUTHORIZED");
+        }
+        for (String action : List.of("list", "approve", "reject")) {
+            error(authenticateAsVendorA(adminRequest(serviceId, action)), 403, "ACCESS_DENIED");
+            error(authenticateAsCustomer(adminRequest(serviceId, action)), 403, "ACCESS_DENIED");
+            error(adminRequest(serviceId, action), 401, "UNAUTHORIZED");
+        }
+        assertState(serviceId, ServiceStatus.PENDING_REVIEW);
+        assertThat(serviceRepository.count()).isEqualTo(1);
+        assertThat(auditCount(serviceId)).isZero();
     }
 }

@@ -14,9 +14,11 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
+import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+
 @SpringBootTest
 @ActiveProfiles("test")
-class BackendApplicationTests {
+class BackendApplicationTests extends AbstractExternalInfrastructureIntegrationTest {
 
 	@MockitoBean
 	private io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager<byte[]> proxyManager;

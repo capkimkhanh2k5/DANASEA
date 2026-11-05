@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 class BackupTest(unittest.TestCase):
     def module(self):
-        spec = importlib.util.spec_from_file_location('backup', Path(__file__).resolve().parents[1] / 'backup.py')
+        spec = importlib.util.spec_from_file_location('backup', Path(__file__).resolve().parents[1] / 'ops' / 'backup.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module

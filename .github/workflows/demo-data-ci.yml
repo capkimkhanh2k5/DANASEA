@@ -1,0 +1,52 @@
+name: Demo Data CI
+
+on:
+  push:
+    branches:
+      - main
+      - data_additional
+    paths:
+      - 'DB_Demo/**'
+      - '.github/workflows/demo-data-ci.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'DB_Demo/**'
+      - '.github/workflows/demo-data-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: demo-data-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Demo Data Package Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install bcrypt==4.3.0
+
+      - name: Verify Python syntax
+        run: |
+          python -m py_compile DB_Demo/install_demo_data.py
+
+      - name: Run demo handoff tests and manifest verification
+        run: |
+          python -B -m unittest discover -s DB_Demo/tests -v

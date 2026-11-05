@@ -23,7 +23,7 @@ class DemoWorkflowTest(unittest.TestCase):
         self.assertNotIn('upload-artifact', str(job))
 
     def test_summary_omits_secrets_and_rejects_markdown_injection(self):
-        spec = importlib.util.spec_from_file_location('demo_report', ROOT / 'scripts/demo_report.py')
+        spec = importlib.util.spec_from_file_location('demo_report', ROOT / 'scripts/demo/demo_report.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         text = module.render({'status': 'REPLACED', 'password': 'secret',

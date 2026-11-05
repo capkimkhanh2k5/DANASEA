@@ -117,6 +117,8 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
                             .unitNumber(u.getUnitNumber())
                             .capacity(u.getCapacity())
                             .bookedCount(u.getBookedCount() != null ? u.getBookedCount() : 0)
+                            .equipmentId(u.getEquipmentId())
+                            .equipmentBlocked(u.isEquipmentBlocked())
                             .build();
                     if (u.getId() != null) e.setId(u.getId());
                     return e;
@@ -260,6 +262,8 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
                 .unitNumber(entity.getUnitNumber())
                 .capacity(entity.getCapacity())
                 .bookedCount(entity.getBookedCount())
+                .equipmentId(entity.getEquipmentId())
+                .equipmentBlocked(entity.isEquipmentBlocked())
                 .build();
         domain.setId(entity.getId());
         domain.setCreatedAt(entity.getCreatedAt());

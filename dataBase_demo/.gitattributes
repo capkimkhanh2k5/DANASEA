@@ -1,8 +1,0 @@
-# Keep checksummed text identical in the Git index and on every checkout.
-* text eol=lf
-
-# Media must retain their original bytes.
-*.png -text -diff -merge
-*.jpg -text -diff -merge
-*.jpeg -text -diff -merge
-*.webp -text -diff -merge

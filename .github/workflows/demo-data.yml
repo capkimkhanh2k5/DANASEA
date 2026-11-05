@@ -37,8 +37,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           [[ "$GITHUB_REF" == refs/heads/main ]] || { echo '::error::Run Demo Data from main'; exit 1; }
-          python3 scripts/check_repository_controls.py --repository "$GITHUB_REPOSITORY"
-          python3 -B -m unittest discover -s demo_data_handoff/tests -v
+          python3 scripts/governance/check_repository_controls.py --repository "$GITHUB_REPOSITORY"
+          python3 -B -m unittest discover -s DB_Demo/tests -v
       - name: Prepare existing deployment connection
         env:
           DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -55,7 +55,7 @@ jobs:
           install -m 700 -d ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-      - uses: tailscale/github-action@99a8333667fff04fdd6cffb46dfd409f8329a7bf # v4.3.0
+      - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
@@ -76,13 +76,13 @@ jobs:
           ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" status > "$private_dir/release.json"
           DEPLOYED_SHA=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sha"])' "$private_dir/release.json")
           [[ "$DEPLOYED_SHA" == "$GITHUB_SHA" ]] || { echo '::error::Deploy this main revision before running Demo Data'; exit 1; }
-          PACKAGE_SHA=$(shasum -a 256 demo_data_handoff/MANIFEST.sha256 | cut -d ' ' -f 1)
-          python3 scripts/demo_request.py create --action "$DEMO_ACTION" --sha "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY" --package-sha256 "$PACKAGE_SHA" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --confirmation "$CONFIRMATION" --backup-id "$BACKUP_ID" --output "$private_dir/request.json"
+          PACKAGE_SHA=$(shasum -a 256 DB_Demo/MANIFEST.sha256 | cut -d ' ' -f 1)
+          python3 scripts/demo/demo_request.py create --action "$DEMO_ACTION" --sha "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY" --package-sha256 "$PACKAGE_SHA" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --confirmation "$CONFIRMATION" --backup-id "$BACKUP_ID" --output "$private_dir/request.json"
           ssh-keygen -Y sign -f ~/.ssh/id_ed25519 -n danasea-demo-data "$private_dir/request.json"
           password_args=()
           if [[ "$DEMO_ACTION" == replace ]]; then password_args=(--password-env DEMO_USER_PASSWORD); fi
-          python3 scripts/demo_request.py envelope --request "$private_dir/request.json" --signature "$private_dir/request.json.sig" "${password_args[@]}" > "$private_dir/envelope.json"
+          python3 scripts/demo/demo_request.py envelope --request "$private_dir/request.json" --signature "$private_dir/request.json.sig" "${password_args[@]}" > "$private_dir/envelope.json"
           result=0
           ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" 'demo-data '"$GITHUB_SHA" < "$private_dir/envelope.json" > "$private_dir/result.json" || result=$?
-          python3 scripts/demo_report.py "$private_dir/result.json" --output "$GITHUB_STEP_SUMMARY"
+          python3 scripts/demo/demo_report.py "$private_dir/result.json" --output "$GITHUB_STEP_SUMMARY"
           exit "$result"

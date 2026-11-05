@@ -193,7 +193,15 @@ export function Header() {
         
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-2.5 shrink-0 group">
-          <img alt="DANASEA" className="h-8 w-8 object-contain shrink-0" src="/images/danasea-logo.png" />
+          <img
+            alt="DANASEA"
+            width={32}
+            height={32}
+            fetchPriority="high"
+            decoding="async"
+            className="h-8 w-8 object-contain shrink-0"
+            src="/images/danasea-logo-sm.png"
+          />
           <span className={`text-lg font-black tracking-tight transition-colors ${
     isTransparent ? "text-white drop-shadow-sm" : "text-slate-900 group-hover:text-sky-600"
   }`}>

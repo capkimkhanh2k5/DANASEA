@@ -7,14 +7,17 @@ import com.danasea.backend.modules.booking.domain.exceptions.BookingHoldExpiredE
 import com.danasea.backend.modules.booking.domain.exceptions.BookingNotFoundException;
 import com.danasea.backend.modules.booking.domain.exceptions.InvalidBookingStateException;
 import com.danasea.backend.modules.booking.domain.models.BookingStatus;
+import com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort;
 import com.danasea.backend.modules.booking.infrastructure.persistence.entities.BookingItemJpaEntity;
 import com.danasea.backend.modules.booking.infrastructure.persistence.entities.BookingJpaEntity;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
+import com.danasea.backend.modules.flashsale.domain.FlashSaleException;
 import com.danasea.backend.modules.order.application.dtos.CreatePaymentIntentCommand;
 import com.danasea.backend.modules.order.application.services.DisruptionDecisionService;
 import com.danasea.backend.modules.order.application.services.WaiverAcceptanceGuard;
 import com.danasea.backend.modules.order.application.usecases.CreatePaymentIntentUseCase;
 import com.danasea.backend.modules.order.domain.events.PaymentSuccessEvent;
+import com.danasea.backend.modules.order.application.services.DepartureCheckoutGuard;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidWebhookException;
 import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
@@ -97,11 +100,11 @@ public class OrderPaymentService {
 
     private static final Pattern IDEMPOTENCY_KEY = Pattern.compile("[A-Za-z0-9._:-]{8,100}");
     private CommissionPolicyPort configuredCommission;
-    private com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale;
+    private FlashSaleBookingPort flashSale;
     @Autowired
     public void setConfiguredCommission(CommissionPolicyPort configuredCommission) { this.configuredCommission=configuredCommission; }
     @Autowired
-    public void setFlashSale(com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
+    public void setFlashSale(FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
 
     private DisruptionDecisionService disruptionDecisions;
 
@@ -129,6 +132,13 @@ public class OrderPaymentService {
     @Autowired
     public void setLocalizedContentSelector(LocalizedContentSelector localizedContentSelector) {
         this.localizedContentSelector = localizedContentSelector;
+    }
+
+    private DepartureCheckoutGuard departureCheckout;
+
+    @Autowired
+    public void setDepartureCheckout(DepartureCheckoutGuard departureCheckout) {
+        this.departureCheckout = departureCheckout;
     }
 
     private final JpaBookingRepository bookingRepository;
@@ -292,6 +302,10 @@ public class OrderPaymentService {
             throw new InvalidBookingStateException("A booking must contain at least one item.");
         }
 
+        if (departureCheckout != null) {
+            departureCheckout.requireBookable(booking);
+        }
+
         MasterOrderJpaEntity order = new MasterOrderJpaEntity();
         order.setBookingId(bookingId);
         order.setCustomerId(customerId);
@@ -305,7 +319,7 @@ public class OrderPaymentService {
         for (BookingItemJpaEntity item : booking.getItems()) {
             var promotion=flashSale!=null?flashSale.snapshot(item.getId()).orElse(null):null;
             BigDecimal rate=promotion!=null?promotion.commissionRate():configuredCommission!=null?configuredCommission.getCommissionRate(item.getVendorId()):null;
-            if(rate==null) throw new com.danasea.backend.modules.flashsale.domain.FlashSaleException("COMMISSION_POLICY_MISSING");
+            if(rate==null) throw new FlashSaleException("COMMISSION_POLICY_MISSING");
             BigDecimal subtotal = item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
             BigDecimal commission = subtotal.multiply(rate).setScale(2, RoundingMode.HALF_UP);
 
@@ -461,9 +475,6 @@ public class OrderPaymentService {
         if (PaymentStatus.SUCCESS.equals(request.status())) {
             MasterOrderJpaEntity order = masterOrderRepository.findByIdForUpdate(payment.getMasterOrderId())
                     .orElseThrow(() -> new InvalidWebhookException("Payment order not found."));
-            if (!MasterOrderStatus.PENDING_PAYMENT.equals(order.getStatus()) && !MasterOrderStatus.PAID.equals(order.getStatus())) {
-                throw new InvalidOrderStateException("The order is not awaiting payment.");
-            }
             if (order.getTotalAmount().compareTo(payment.getAmount()) != 0) {
                 throw new InvalidWebhookException("The paid amount does not match the order total.");
             }
@@ -501,6 +512,9 @@ public class OrderPaymentService {
             if ((payment.getExpiresAt() != null && payment.getExpiresAt().isBefore(OffsetDateTime.now()))
                     || (order.getPaymentDeadline() != null && order.getPaymentDeadline().isBefore(OffsetDateTime.now()))) {
                 throw new InvalidOrderStateException("The payment intent has expired.");
+            }
+            if (departureCheckout != null && order.getBookingId() != null) {
+                departureCheckout.requireBookable(departureCheckout.lockBooking(order.getBookingId()));
             }
             payment.setCaptureRequestId(UUID.randomUUID().toString());
             payment.setCaptureRequestedAt(OffsetDateTime.now());
@@ -635,7 +649,7 @@ public class OrderPaymentService {
         } catch (IllegalArgumentException | InvalidOrderStateException | PaymentGatewayException ex) {
             throw new InvalidWebhookException(ex.getMessage());
         }
-        if (payment.getStatus() == PaymentStatus.SUCCESS) {
+        if (payment.getStatus() == PaymentStatus.SUCCESS || payment.getStatus() == PaymentStatus.REFUNDED) {
             if (!captureId.equals(payment.getProviderTransactionId())) {
                 throw new InvalidWebhookException("Capture ID does not match the completed payment.");
             }
@@ -744,7 +758,7 @@ public class OrderPaymentService {
         String transactionNo = params.get("vnp_TransactionNo");
 
         if ("00".equals(responseCode) && "00".equals(params.get("vnp_TransactionStatus"))) {
-            if (transactionNo == null || transactionNo.isBlank() || masterOrder.getStatus() != MasterOrderStatus.PENDING_PAYMENT) {
+            if (transactionNo == null || transactionNo.isBlank()) {
                 return Map.of("RspCode", "99", "Message", "Payment requires reconciliation");
             }
             applyPaymentSuccess(payment, masterOrder, transactionNo, transactionNo, params.toString());
@@ -773,9 +787,22 @@ public class OrderPaymentService {
             String webhookEventId,
             String rawPayload) {
 
-        requirePendingPayment(payment, order);
+        boolean locallyExpired = order.getStatus() == MasterOrderStatus.CANCELLED
+                && order.getPaymentStatus() == PaymentOrderStatus.UNPAID;
+        if (!locallyExpired) {
+            requirePendingPayment(payment, order);
+        } else if (payment.getStatus() != PaymentStatus.PENDING || payment.getAmount() == null
+                || payment.getAmount().compareTo(order.getTotalAmount()) != 0) {
+            throw new InvalidOrderStateException("Payment and order amounts must match.");
+        }
         if (providerTransactionId == null || providerTransactionId.isBlank()) {
             throw new InvalidWebhookException("Provider transaction ID is required.");
+        }
+        BookingJpaEntity booking = departureCheckout == null || order.getBookingId() == null ? null
+                : departureCheckout.lockBooking(order.getBookingId());
+        var affected = booking == null ? java.util.Set.<UUID>of() : departureCheckout.affectedItems(booking);
+        if (locallyExpired && affected.isEmpty()) {
+            throw new InvalidOrderStateException("The order is not awaiting payment.");
         }
         payment.setLastError(null);
         payment.setStatus(PaymentStatus.SUCCESS);
@@ -794,19 +821,60 @@ public class OrderPaymentService {
         }
         paymentRepository.save(payment);
 
-        if (MasterOrderStatus.PENDING_PAYMENT.equals(order.getStatus())) {
-            order.setStatus(MasterOrderStatus.PAID);
-            order.setPaymentStatus(PaymentOrderStatus.PAID);
-            masterOrderRepository.save(order);
+        List<SubOrderJpaEntity> subOrders = subOrderRepository.findByMasterOrderId(order.getId());
+        boolean voidCheckout = !affected.isEmpty() && (locallyExpired
+                || booking.getStatus() == BookingStatus.CANCELLED
+                || (booking.getHoldExpiresAt() != null && OffsetDateTime.now().isAfter(booking.getHoldExpiresAt()))
+                || booking.getItems().size() == affected.size());
 
-            List<SubOrderJpaEntity> subOrders = subOrderRepository.findByMasterOrderId(order.getId());
-            subOrders.forEach(subOrder -> subOrder.setStatus(SubOrderStatus.CONFIRMED));
-            subOrderRepository.saveAll(subOrders);
-
-            confirmBookingUseCase.execute(new ConfirmBookingCommand(order.getBookingId(), order.getCustomerId()));
-            if (eventPublisher != null) {
-                eventPublisher.publishEvent(new PaymentSuccessEvent(order.getId(), order.getCustomerId(), order.getBookingId()));
+        order.setStatus(voidCheckout ? MasterOrderStatus.CANCELLED : MasterOrderStatus.PAID);
+        order.setPaymentStatus(PaymentOrderStatus.PAID);
+        masterOrderRepository.save(order);
+        for (var subOrder : subOrders) {
+            boolean affectedSubOrder = !affected.isEmpty() && affected.contains(subOrder.getBookingItemId());
+            if (voidCheckout || affectedSubOrder) {
+                refundUnfulfilledPayment(subOrder, payment, order.getCustomerId(), affectedSubOrder);
+            } else {
+                subOrder.setStatus(SubOrderStatus.CONFIRMED);
             }
+        }
+        subOrderRepository.saveAll(subOrders);
+
+        var command = new ConfirmBookingCommand(order.getBookingId(), order.getCustomerId());
+        if (voidCheckout) {
+            confirmBookingUseCase.voidUnfulfilledPayment(order.getBookingId());
+            return;
+        }
+        if (affected.isEmpty()) {
+            confirmBookingUseCase.execute(command);
+        } else {
+            confirmBookingUseCase.executeExcluding(command, affected);
+            bookingRepository.markCapacityNotCommitted(affected);
+        }
+        if (eventPublisher != null) {
+            eventPublisher.publishEvent(new PaymentSuccessEvent(order.getId(), order.getCustomerId(), order.getBookingId()));
+        }
+    }
+
+    private void refundUnfulfilledPayment(SubOrderJpaEntity subOrder, PaymentJpaEntity payment,
+            UUID customerId, boolean affected) {
+        RefundReason reason = affected ? RefundReason.VENDOR_FAULT : RefundReason.SYSTEM_FAULT;
+        subOrder.setStatus(SubOrderStatus.CANCELLED);
+        subOrder.setCancellationReason(reason);
+        boolean refundPending = subOrder.getFinalAmount().signum() > 0;
+        if (refundPending) {
+            var refund = new RefundJpaEntity();
+            refund.setSubOrderId(subOrder.getId());
+            refund.setPaymentId(payment.getId());
+            refund.setAmount(subOrder.getFinalAmount());
+            refund.setRefundPercentage(BigDecimal.valueOf(100));
+            refund.setReason(reason);
+            refund.setStatus(RefundStatus.PENDING);
+            refund.setIdempotencyKey("departure-payment:" + payment.getId() + ":" + subOrder.getId());
+            refundRepository.save(refund);
+        }
+        if (disruptionDecisions != null) {
+            disruptionDecisions.notifyUnfulfilledPayment(customerId, subOrder.getId(), payment.getId(), refundPending);
         }
     }
 

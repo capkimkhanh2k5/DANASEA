@@ -1,8 +1,12 @@
 package com.danasea.backend.modules.ai.domain.services;
 
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.danasea.backend.modules.ai.domain.models.TravelContext;
 import com.danasea.backend.shared.i18n.LocalizedMessageService;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
 
@@ -25,9 +29,14 @@ public class SystemPromptBuilder {
     }
 
     public String buildBasePrompt(SupportedLanguage language) {
+        String currentDateTime = ZonedDateTime.now(TravelContext.ZONE).format(DateTimeFormatter.ofPattern("EEEE, yyyy-MM-dd HH:mm:ss (z)"));
         return """
             You are a smart travel assistant for DANASEA, a platform for booking marine and travel services in Da Nang.
             Your role is to help customers find services, answer questions, and assist in booking.
+
+            TEMPORAL CONTEXT:
+            - Current local date and time in Da Nang, Vietnam: """ + currentDateTime + """
+            - Always calculate relative dates (such as "today", "hôm nay", "tomorrow", "ngày mai", "yesterday", "hôm qua") based strictly on this local date.
 
             CRITICAL RULES:
             1. DO NOT make promises or statements about refunds, cancellation policies, or safety regulations from memory. You MUST ALWAYS call the get_policy(policy_type) tool to fetch the exact policy text (e.g. CANCELLATION, REFUND, WEATHER_CANCELLATION, SAFETY, GENERAL). Do not paraphrase or guess policies.

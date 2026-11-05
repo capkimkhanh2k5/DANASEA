@@ -5,7 +5,7 @@ import { useAuthStore } from "../../../store/useAuthStore";
 import { authService } from "../../../services/authService";
 import { AuthCinematicBackdrop } from "../../../components/customer/AuthCinematicBackdrop";
 import { GoogleLoginButton } from "../../../components/customer/GoogleLoginButton";
-import type { User } from "../../../types";
+import type { User, Role } from "../../../types";
 import {
   LogIn,
   UserPlus,
@@ -23,6 +23,12 @@ import {
   MailCheck,
   Info,
 } from "lucide-react";
+
+const DEFAULT_AVATARS: Record<Role, string> = {
+  ADMIN: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+  VENDOR: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+  CUSTOMER: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+};
 
 export function Auth() {
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
@@ -115,11 +121,7 @@ export function Auth() {
       console.log('[Bước 3/5] Backend trả về kết quả thành công (200 OK):', authRes);
 
       const role = authRes.role;
-      const avatarUrl = role === 'ADMIN'
-        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'
-        : role === 'VENDOR'
-        ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'
-        : 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150';
+      const avatarUrl = DEFAULT_AVATARS[role] || DEFAULT_AVATARS.CUSTOMER;
 
       const userModel: User = {
         id: authRes.userId,
@@ -162,6 +164,35 @@ export function Auth() {
         setBanner('wrong_creds');
       } else if (status === 403) {
         const errCode = (err.response?.data as { code?: string })?.code;
+        if (errCode === 'EMAIL_NOT_VERIFIED') {
+          console.warn('[Auth Flow] Tài khoản chưa kích hoạt email (403 Forbidden - EMAIL_NOT_VERIFIED)');
+          const resData = err.response?.data as { accessToken?: string; email?: string; userId?: string };
+          if (resData?.accessToken) {
+            setPendingToken(resData.accessToken);
+          }
+          const userModel: User = {
+            id: resData?.userId || '',
+            email: resData?.email || trimmedEmail,
+            role: 'CUSTOMER',
+            fullName: (resData?.email || trimmedEmail).split('@')[0],
+            avatarUrl: DEFAULT_AVATARS.CUSTOMER,
+            isEmailVerified: false,
+            isLocked: false,
+            phone: '',
+            passwordHash: '',
+            locale: 'vi',
+          };
+          setPendingUser(userModel);
+          setRegEmail(resData?.email || trimmedEmail);
+          setActiveTab('register');
+          setRegStep('otp');
+          setOtpCooldown(60);
+          setOtpSessionExpiresAt(Date.now() + 15 * 60 * 1000);
+          authService.sendVerificationOtp().catch((otpErr) => {
+            console.warn('[Auth Flow] Tự động gửi lại OTP thất bại:', otpErr);
+          });
+          return;
+        }
         const isLocked = errCode === 'USER_LOCKED' ||
           serverMessage?.toLowerCase().includes('khóa') ||
           serverMessage?.toLowerCase().includes('locked') ||
@@ -222,7 +253,7 @@ export function Auth() {
           email: profile.email,
           role: profile.role,
           fullName: profile.fullName || authRes.email.split('@')[0],
-          avatarUrl: profile.avatarUrl || 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+          avatarUrl: profile.avatarUrl || DEFAULT_AVATARS[profile.role] || DEFAULT_AVATARS.CUSTOMER,
           isEmailVerified: profile.isEmailVerified,
           isLocked: false,
           phone: '',
@@ -236,7 +267,7 @@ export function Auth() {
           email: authRes.email,
           role: authRes.role,
           fullName: authRes.email.split('@')[0],
-          avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+          avatarUrl: DEFAULT_AVATARS[authRes.role] || DEFAULT_AVATARS.CUSTOMER,
           isEmailVerified: true,
           isLocked: false,
           phone: '',
@@ -331,7 +362,7 @@ export function Auth() {
         email: authRes.email,
         role: authRes.role,
         fullName: trimmedFullName || trimmedEmail.split('@')[0],
-        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+        avatarUrl: DEFAULT_AVATARS[authRes.role] || DEFAULT_AVATARS.CUSTOMER,
         isEmailVerified: false,
         isLocked: false,
         phone: '',
@@ -516,7 +547,15 @@ export function Auth() {
           <div className="w-full max-w-md bg-white/95 backdrop-blur-2xl rounded-2xl shadow-xl border border-white/40 p-5 sm:p-6 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <img alt="DANASEA" className="h-8 w-8 object-contain shrink-0" src="/images/danasea-logo.png" />
+                <img
+                  alt="DANASEA"
+                  width={32}
+                  height={32}
+                  fetchPriority="high"
+                  decoding="async"
+                  className="h-8 w-8 object-contain shrink-0"
+                  src="/images/danasea-logo-sm.png"
+                />
                 <span className="text-lg font-black tracking-tight text-slate-900">
                   DANASEA
                 </span>

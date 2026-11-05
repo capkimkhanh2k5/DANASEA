@@ -51,6 +51,7 @@ public class DisruptionDecisionService {
     private final JpaSafetyRuleEvaluationRepository evaluations;
     private final AuditLogInternalApi audit;
     private final SendNotificationUseCase notifications;
+    private final VendorFaultCompensationService compensation;
 
     @Value("${app.refund.replacement-voucher-valid-days:30}")
     private int voucherValidDays = 30;
@@ -97,6 +98,7 @@ public class DisruptionDecisionService {
         disruption.setVerifiedBy(actor);
         disruption.setStatus(AWAITING);
         disruption = disruptions.saveAndFlush(disruption);
+        if (reason == RefundReason.VENDOR_FAULT) compensation.issue(disruption, locked);
         audit.recordTransactionalAuditLog(
                 actor,
                 "VERIFY_SUB_ORDER_DISRUPTION",
@@ -125,26 +127,34 @@ public class DisruptionDecisionService {
         if (previous.isPresent()) return previous.get();
         var disruption = disruptions.findBySubOrderIdAndStatus(subId, AWAITING).orElse(null);
         if (disruption == null) {
-            var alert =
-                    evaluations
-                            .findTopBySlotIdOrderByEvaluatedAtDesc(locked.sub().getSlotId())
-                            .filter(
-                                    a ->
-                                            RescheduleSupport.weatherAlert(a)
-                                                    && (Boolean.FALSE.equals(a.getIsSafe())
-                                                            || "RED".equals(a.getAlertLevel())))
-                            .orElseThrow(
-                                    () ->
-                                            RescheduleSupport.conflict(
-                                                    "No verified disruption permits a full"
-                                                            + " refund."));
-            disruption =
-                    record(
-                            subId,
-                            RefundReason.WEATHER,
-                            "Verified unsafe weather",
-                            "weather-" + alert.getId(),
-                            null);
+            UUID slotId = locked.sub().getSlotId();
+            var cancellation = slots.findVendorCancellation(slotId);
+            if (cancellation.isPresent()) {
+                var details = cancellation.get();
+                disruption = record(subId, RefundReason.VENDOR_FAULT, details.getReason(),
+                        "vendor-departure:" + slotId, details.getRequestedBy());
+            } else {
+                var alert =
+                        evaluations
+                                .findTopBySlotIdOrderByEvaluatedAtDesc(locked.sub().getSlotId())
+                                .filter(
+                                        a ->
+                                                RescheduleSupport.weatherAlert(a)
+                                                        && (Boolean.FALSE.equals(a.getIsSafe())
+                                                                || "RED".equals(a.getAlertLevel())))
+                                .orElseThrow(
+                                        () ->
+                                                RescheduleSupport.conflict(
+                                                        "No verified disruption permits a full"
+                                                                + " refund."));
+                disruption =
+                        record(
+                                subId,
+                                RefundReason.WEATHER,
+                                "Verified unsafe weather",
+                                "weather-" + alert.getId(),
+                                null);
+            }
         }
         if (AWAITING.equals(disruption.getStatus())) requestRefund(disruption, locked, customerId);
         return disruption;
@@ -246,6 +256,9 @@ public class DisruptionDecisionService {
         var active = disruptions.findBySubOrderIdAndStatus(subId, AWAITING);
         if (active.isPresent() && Objects.equals(active.get().getOriginalSlotId(), slotId))
             return Optional.of(active.get().getReason());
+        if (slots.findVendorCancellation(slotId).isPresent()) {
+            return Optional.of(RefundReason.VENDOR_FAULT);
+        }
         return evaluations
                 .findTopBySlotIdOrderByEvaluatedAtDesc(slotId)
                 .filter(
@@ -315,6 +328,28 @@ public class DisruptionDecisionService {
                 refund == null ? "no_payment" : "refund",
                 new Object[] {sub.getId()},
                 "refund");
+    }
+
+    @Transactional
+    public void recordVendorDeparture(UUID subId, UUID expectedSlotId, String reason, UUID actor) {
+        var locked = support.lock(subId);
+        if (!Objects.equals(locked.sub().getSlotId(), expectedSlotId)
+                || locked.sub().getStatus() != SubOrderStatus.CONFIRMED
+                || locked.sub().getCheckedInAt() != null
+                || locked.master().getPaymentStatus() != PaymentOrderStatus.PAID) {
+            return;
+        }
+        record(subId, RefundReason.VENDOR_FAULT, reason, "vendor-departure:" + expectedSlotId, actor);
+    }
+
+    public void notifyUnfulfilledPayment(UUID customerId, UUID subOrderId, UUID paymentId, boolean refundPending) {
+        String action = refundPending ? "refund" : "no_payment";
+        notifications.executeOnce(
+                new NotificationCommand(customerId, "DISRUPTION_REFUND", NotificationChannel.IN_APP,
+                        LocalizedMessageRef.of("notification.disruption." + action + ".title"),
+                        LocalizedMessageRef.of("notification.disruption." + action + ".body", subOrderId),
+                        "SUB_ORDER", subOrderId, null),
+                "departure-payment:" + paymentId + ":" + subOrderId);
     }
 
     private void issueReplacement(UUID subId, UUID customerId, BigDecimal amount) {

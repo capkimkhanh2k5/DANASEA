@@ -1,0 +1,25 @@
+User-agent: *
+
+# Public read-only data needed to render tour pages.
+Allow: /api/services$
+Allow: /api/services?
+Allow: /api/services/
+Allow: /api/categories$
+Allow: /api/categories?
+Allow: /api/categories/
+Allow: /api/flash-sales/active$
+Allow: /api/flash-sales/active?
+
+Disallow: /admin$
+Disallow: /admin/
+Disallow: /vendor$
+Disallow: /vendor/
+Disallow: /profile$
+Disallow: /profile/
+Disallow: /cart
+Disallow: /checkout
+Disallow: /payment/
+Disallow: /auth
+Disallow: /api/
+
+Sitemap: https://danasea.tailfc3563.ts.net/sitemap.xml

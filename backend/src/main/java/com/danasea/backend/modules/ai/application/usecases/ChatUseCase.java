@@ -1,5 +1,8 @@
 package com.danasea.backend.modules.ai.application.usecases;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -293,18 +296,18 @@ public class ChatUseCase {
                     if (parsedParty != null) criteria.put("partySize", parsedParty);
                 }
                 if (supplied == null || !supplied.has("totalBudget")) {
-                    java.math.BigDecimal parsedBudget = TravelQueryParser.budget(message);
+                    BigDecimal parsedBudget = TravelQueryParser.budget(message);
                     if (parsedBudget != null) {
                         if (TravelQueryParser.perPersonBudget(message)) {
                             int party = Math.max(1, criteria.path("partySize").asInt(1));
-                            parsedBudget = parsedBudget.multiply(java.math.BigDecimal.valueOf(party));
+                            parsedBudget = parsedBudget.multiply(BigDecimal.valueOf(party));
                         }
                         criteria.put("totalBudget", parsedBudget);
                     }
                 }
                 if (supplied == null || (!supplied.has("from") && !supplied.has("to"))) {
                     try {
-                        java.time.LocalDate[] dates = TravelQueryParser.dates(message);
+                        LocalDate[] dates = TravelQueryParser.dates(message);
                         if (dates[0] != null) {
                             criteria.put("from", dates[0].toString());
                             criteria.put("to", (dates[1] != null ? dates[1] : dates[0]).toString());
@@ -313,7 +316,7 @@ public class ChatUseCase {
                 }
                 if (supplied == null || (!supplied.has("dayStart") && !supplied.has("dayEnd"))) {
                     try {
-                        java.time.LocalTime[] times = TravelQueryParser.times(message);
+                        LocalTime[] times = TravelQueryParser.times(message);
                         if (times[0] != null) criteria.put("dayStart", times[0].toString());
                         if (times[1] != null) criteria.put("dayEnd", times[1].toString());
                     } catch (Exception ignored) { }

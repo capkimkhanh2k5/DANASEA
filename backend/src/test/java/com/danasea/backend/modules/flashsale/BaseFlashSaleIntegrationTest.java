@@ -5,8 +5,10 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
+import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+
 /** Owned, disposable infrastructure: these destructive tests never accept an external JDBC URL. */
-abstract class BaseFlashSaleIntegrationTest {
+abstract class BaseFlashSaleIntegrationTest extends AbstractExternalInfrastructureIntegrationTest {
     private static final GenericContainer<?> POSTGRES = new GenericContainer<>("postgres:17-alpine")
             .withEnv("POSTGRES_DB", "danasea_flashsale_test")
             .withEnv("POSTGRES_USER", "postgres")

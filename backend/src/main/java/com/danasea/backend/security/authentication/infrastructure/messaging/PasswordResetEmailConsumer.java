@@ -31,9 +31,13 @@ public class PasswordResetEmailConsumer {
     @RabbitListener(queues = RabbitMQConfig.NOTIFICATION_PASSWORD_RESET_EMAIL_QUEUE)
     public void handlePasswordResetRequestedEvent(PasswordResetRequestedEvent event) {
         log.info("Received PasswordResetRequestedEvent for email: {}", event.email());
+        if (mailProperties == null || mailProperties.getUsername() == null || mailProperties.getUsername().isBlank()) {
+            log.error("Cannot send password reset email to {}: spring.mail.username is not configured", event.email());
+            throw new AmqpRejectAndDontRequeueException("spring.mail.username is not configured");
+        }
         try {
             SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailProperties.getUsername());
+            message.setFrom(mailProperties.getUsername().trim());
             message.setTo(event.email());
             SupportedLanguage language = SupportedLanguage.fromTag(event.locale()).orElse(SupportedLanguage.VI);
             message.setSubject(messages.get("email.password_reset.subject", language));

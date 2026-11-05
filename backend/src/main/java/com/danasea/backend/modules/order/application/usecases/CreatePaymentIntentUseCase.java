@@ -2,6 +2,7 @@ package com.danasea.backend.modules.order.application.usecases;
 
 import com.danasea.backend.modules.order.application.dtos.CreatePaymentIntentCommand;
 import com.danasea.backend.modules.order.application.services.WaiverAcceptanceGuard;
+import com.danasea.backend.modules.order.application.services.DepartureCheckoutGuard;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
 import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
 import com.danasea.backend.modules.order.domain.exceptions.PaymentGatewayException;
@@ -48,6 +49,13 @@ public class CreatePaymentIntentUseCase {
     private final SubOrderRepositoryPort subOrderRepository;
     private final ServiceWaiverLookupPort serviceWaiverLookupPort;
     private final LocalizedContentSelector localizedContentSelector;
+
+    private DepartureCheckoutGuard departureCheckout;
+
+    @Autowired
+    public void setDepartureCheckout(DepartureCheckoutGuard departureCheckout) {
+        this.departureCheckout = departureCheckout;
+    }
 
     @Autowired
     public CreatePaymentIntentUseCase(
@@ -200,6 +208,9 @@ public class CreatePaymentIntentUseCase {
         }
         if (order.getPaymentDeadline() != null && !order.getPaymentDeadline().isAfter(OffsetDateTime.now())) {
             throw new InvalidOrderStateException("The order payment deadline has expired.");
+        }
+        if (departureCheckout != null && order.getBookingId() != null) {
+            departureCheckout.requireBookable(departureCheckout.lockBooking(order.getBookingId()));
         }
         return order;
     }

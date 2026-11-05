@@ -25,6 +25,39 @@ import java.util.Objects;
 class PostgreSqlMigrationIntegrationTest {
 
     @Test
+    void coordinateUpgradePreservesExistingValuesAndSubsequentPreciseCoordinates() throws Exception {
+        String url = "jdbc:postgresql://" + POSTGRES.getHost() + ":"
+                + POSTGRES.getFirstMappedPort() + "/migration_test";
+        waitForPostgres(url, "migration_user", "migration_password");
+        String schema = "coordinate_upgrade";
+        Flyway.configure().dataSource(url, "migration_user", "migration_password")
+                .schemas(schema).defaultSchema(schema).target("44").load().migrate();
+        java.util.UUID id = java.util.UUID.randomUUID();
+        try (var connection = DriverManager.getConnection(url, "migration_user", "migration_password");
+                var insert = connection.prepareStatement("INSERT INTO " + schema
+                        + ".services(id,latitude,longitude,created_at,updated_at) VALUES (?,16.12,108.26,now(),now())")) {
+            insert.setObject(1, id);
+            insert.executeUpdate();
+        }
+        Flyway.configure().dataSource(url, "migration_user", "migration_password")
+                .schemas(schema).defaultSchema(schema).load().migrate();
+        try (var connection = DriverManager.getConnection(url, "migration_user", "migration_password");
+                var statement = connection.createStatement()) {
+            try (var row = statement.executeQuery("SELECT latitude,longitude FROM " + schema + ".services")) {
+                assertTrue(row.next());
+                assertEquals(0, row.getBigDecimal(1).compareTo(new java.math.BigDecimal("16.12")));
+                assertEquals(0, row.getBigDecimal(2).compareTo(new java.math.BigDecimal("108.26")));
+            }
+            statement.executeUpdate("UPDATE " + schema + ".services SET latitude=16.0025123456,longitude=108.2635123456");
+            try (var row = statement.executeQuery("SELECT latitude,longitude FROM " + schema + ".services")) {
+                assertTrue(row.next());
+                assertEquals(new java.math.BigDecimal("16.0025123456"), row.getBigDecimal(1));
+                assertEquals(new java.math.BigDecimal("108.2635123456"), row.getBigDecimal(2));
+            }
+        }
+    }
+
+    @Test
     void commissionDefaultsToTenPercentWithoutReplacingAnExistingRate() throws Exception {
         String url = "jdbc:postgresql://" + POSTGRES.getHost() + ":"
                 + POSTGRES.getFirstMappedPort() + "/migration_test";

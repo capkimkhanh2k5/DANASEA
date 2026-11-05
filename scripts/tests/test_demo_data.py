@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 def load():
-    path = Path(__file__).resolve().parents[1] / 'demo_data.py'
+    path = Path(__file__).resolve().parents[1] / 'demo' / 'demo_data.py'
     spec = importlib.util.spec_from_file_location('demo_data', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -179,7 +179,9 @@ class LifecycleTest(unittest.TestCase):
 
 class RuntimeGuardsTest(unittest.TestCase):
     def setUp(self):
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        scripts = Path(__file__).resolve().parents[1]
+        self.addCleanup(setattr, sys, 'path', sys.path.copy())
+        sys.path[:0] = [str(scripts / 'demo'), str(scripts / 'ops')]
         import demo_runtime
         self.module = demo_runtime
 

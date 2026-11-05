@@ -4,6 +4,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 import com.danasea.backend.modules.communication.domain.models.NotificationChannel;
 import com.danasea.backend.modules.communication.domain.models.NotificationStatus;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -21,11 +22,11 @@ public class NotificationResponse {
     private NotificationStatus status;
     private OffsetDateTime sentAt;
     private OffsetDateTime createdAt;
-    @com.fasterxml.jackson.annotation.JsonProperty("isRead")
+    @JsonProperty("isRead")
     private Boolean isRead;
     private OffsetDateTime readAt;
 
-    @com.fasterxml.jackson.annotation.JsonProperty("isRead")
+    @JsonProperty("isRead")
     public Boolean getIsRead() {
         return isRead;
     }

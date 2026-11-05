@@ -13,6 +13,7 @@ import com.danasea.backend.modules.communication.application.usecases.SendNotifi
 import com.danasea.backend.modules.communication.domain.models.NotificationChannel;
 import com.danasea.backend.modules.order.domain.events.PaymentSuccessEvent;
 import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
+import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
@@ -46,6 +47,7 @@ public class PaymentNotificationEventListener {
 
         Set<UUID> notifiedVendors = new HashSet<>();
         for (var subOrder : subOrders.findByMasterOrderId(order.getId())) {
+            if (subOrder.getStatus() != SubOrderStatus.CONFIRMED) continue;
             UUID vendorId = subOrder.getVendorId();
             if (vendorId == null || !notifiedVendors.add(vendorId)) {
                 continue;

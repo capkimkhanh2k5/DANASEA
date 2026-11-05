@@ -20,9 +20,11 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+
 @SpringBootTest
 @ActiveProfiles("test")
-class RefreshTokenUseCaseIntegrationTest {
+class RefreshTokenUseCaseIntegrationTest extends AbstractExternalInfrastructureIntegrationTest {
 
     @MockitoBean
     private RabbitTemplate rabbitTemplate;

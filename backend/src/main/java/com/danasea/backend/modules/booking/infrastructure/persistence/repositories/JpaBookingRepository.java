@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -31,6 +32,10 @@ public interface JpaBookingRepository extends JpaRepository<BookingJpaEntity, UU
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT DISTINCT b FROM BookingJpaEntity b LEFT JOIN FETCH b.items WHERE b.id = :id")
     Optional<BookingJpaEntity> findByIdWithItemsForUpdate(@Param("id") UUID id);
+
+    @Modifying(flushAutomatically = true)
+    @Query("UPDATE BookingItemJpaEntity i SET i.capacityReleased = true WHERE i.id IN :itemIds")
+    int markCapacityNotCommitted(@Param("itemIds") Collection<UUID> itemIds);
 
     @EntityGraph(attributePaths = {"items"})
     @Query("SELECT b FROM BookingJpaEntity b WHERE b.customerId = :customerId AND (:status IS NULL OR b.status = :status)")
