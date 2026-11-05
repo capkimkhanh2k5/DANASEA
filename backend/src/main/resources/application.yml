@@ -122,6 +122,14 @@ app:
       base-url: ${APP_PAYPAL_BASE_URL:https://api-m.sandbox.paypal.com}
       return-url: ${APP_PAYPAL_RETURN_URL:http://localhost:3000/payment/success}
       cancel-url: ${APP_PAYPAL_CANCEL_URL:http://localhost:3000/payment/cancel}
+      exchange-rate:
+        api-url: ${APP_PAYPAL_EXCHANGE_RATE_API_URL:https://api.frankfurter.dev/v2/rate/usd/vnd}
+        cron: ${APP_PAYPAL_EXCHANGE_RATE_CRON:0 0 20 * * *}
+        zone: ${APP_PAYPAL_EXCHANGE_RATE_ZONE:Asia/Ho_Chi_Minh}
+        max-age-days: ${APP_PAYPAL_EXCHANGE_RATE_MAX_AGE_DAYS:3}
+        volatility-threshold: ${APP_PAYPAL_EXCHANGE_RATE_VOLATILITY_THRESHOLD:0.03}
+        connect-timeout: ${APP_PAYPAL_EXCHANGE_RATE_CONNECT_TIMEOUT:5s}
+        read-timeout: ${APP_PAYPAL_EXCHANGE_RATE_READ_TIMEOUT:5s}
     vnpay:
       api-url: ${APP_VNPAY_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
       ip-address: ${APP_VNPAY_IP_ADDRESS:127.0.0.1}

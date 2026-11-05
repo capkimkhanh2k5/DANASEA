@@ -1,6 +1,7 @@
 package com.danasea.backend.modules.order.infrastructure.persistence.entities;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -18,6 +19,13 @@ import lombok.Setter;
 @Setter
 @Table(name = "payments")
 public class PaymentJpaEntity extends BaseJpaEntity {
+
+    @Column(name = "exchange_rate", precision = 15, scale = 6)
+    private BigDecimal exchangeRate;
+    @Column(name = "exchange_rate_date")
+    private LocalDate exchangeRateDate;
+    @Column(name = "exchange_rate_source", length = 50)
+    private String exchangeRateSource;
 
     @Column(precision = 20, scale = 2)
     private BigDecimal providerAmount;

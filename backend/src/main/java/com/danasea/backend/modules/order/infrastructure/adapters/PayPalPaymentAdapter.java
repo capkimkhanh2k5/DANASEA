@@ -9,7 +9,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
+import com.danasea.backend.modules.order.application.services.ExchangeRateService;
+import java.time.LocalDate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -42,25 +45,47 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PayPalPaymentAdapter implements PaymentGatewayPort {
 
-    private static final BigDecimal DEFAULT_VND_TO_USD_RATE = new BigDecimal("25900");
     private static final BigDecimal MIN_USD_AMOUNT = new BigDecimal("1.00");
 
     private final RestClient restClient;
     private final PayPalProperties payPalProperties;
     private final ObjectMapper objectMapper;
     private final VNPayPaymentAdapter vnPayPaymentAdapter;
+    private final ExchangeRateService exchangeRateService;
+
+    @Autowired
+    public PayPalPaymentAdapter(
+            RestClient.Builder restClientBuilder,
+            PayPalProperties payPalProperties,
+            ObjectMapper objectMapper,
+            VNPayPaymentAdapter vnPayPaymentAdapter,
+            ExchangeRateService exchangeRateService) {
+        this.payPalProperties = payPalProperties;
+        this.objectMapper = objectMapper;
+        this.vnPayPaymentAdapter = vnPayPaymentAdapter;
+        this.exchangeRateService = exchangeRateService;
+        this.restClient = restClientBuilder
+                .baseUrl(payPalProperties.baseUrl())
+                .build();
+    }
 
     public PayPalPaymentAdapter(
             RestClient.Builder restClientBuilder,
             PayPalProperties payPalProperties,
             ObjectMapper objectMapper,
             VNPayPaymentAdapter vnPayPaymentAdapter) {
-        this.payPalProperties = payPalProperties;
-        this.objectMapper = objectMapper;
-        this.vnPayPaymentAdapter = vnPayPaymentAdapter;
-        this.restClient = restClientBuilder
-                .baseUrl(payPalProperties.baseUrl())
-                .build();
+        this(restClientBuilder, payPalProperties, objectMapper, vnPayPaymentAdapter, new ExchangeRateService() {
+            @Override
+            public ExchangeRateSnapshot getCurrentUsdToVndRate() {
+                return new ExchangeRateSnapshot(new BigDecimal("25900"), LocalDate.now(), "FALLBACK");
+            }
+            @Override
+            public ExchangeRateSnapshot syncRateFromFrankfurter() {
+                return getCurrentUsdToVndRate();
+            }
+            @Override
+            public void initializeRateOnStartup() {}
+        });
     }
 
     /**
@@ -101,12 +126,19 @@ public class PayPalPaymentAdapter implements PaymentGatewayPort {
         UUID effectivePaymentId = paymentId != null ? paymentId : UUID.randomUUID();
         OffsetDateTime expiresAt = OffsetDateTime.now().plusMinutes(15);
 
-        // Convert the VND order amount to the configured integration currency (USD).
-        BigDecimal usdAmount = (amount != null && amount.compareTo(BigDecimal.ZERO) > 0)
-                ? amount.divide(DEFAULT_VND_TO_USD_RATE, 2, RoundingMode.HALF_UP)
-                : MIN_USD_AMOUNT;
+        ExchangeRateService.ExchangeRateSnapshot rateSnapshot = exchangeRateService.getCurrentUsdToVndRate();
+        BigDecimal exchangeRate = rateSnapshot.rate();
+        LocalDate rateDate = rateSnapshot.effectiveDate();
+        String rateSource = rateSnapshot.source();
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidOrderStateException("The order amount must be positive.");
+        }
+
+        BigDecimal usdAmount = amount.divide(exchangeRate, 2, RoundingMode.HALF_UP);
         if (usdAmount.compareTo(MIN_USD_AMOUNT) < 0) {
-            usdAmount = MIN_USD_AMOUNT;
+            throw new InvalidOrderStateException(
+                    "The order amount is below the minimum threshold ($1.00 USD) supported by PayPal.");
         }
 
         String approveUrl = null;
@@ -177,7 +209,13 @@ public class PayPalPaymentAdapter implements PaymentGatewayPort {
                 approveUrl,
                 qrCodeUrl,
                 expiresAt,
-                payPalOrderId, usdAmount, "USD", null
+                payPalOrderId,
+                usdAmount,
+                "USD",
+                null,
+                exchangeRate,
+                rateDate,
+                rateSource
         );
     }
 

@@ -7,6 +7,7 @@ import com.danasea.backend.shared.core.domain.models.BaseDomainModel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 @Data
@@ -23,4 +24,7 @@ public class Payment extends BaseDomainModel {
     private String paymentUrl;
     private String qrCodeUrl;
     private OffsetDateTime expiresAt;
+    private BigDecimal exchangeRate;
+    private LocalDate exchangeRateDate;
+    private String exchangeRateSource;
 }

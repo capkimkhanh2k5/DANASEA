@@ -182,6 +182,11 @@ public class CreatePaymentIntentUseCase {
             if (result.providerOrderId() != null) {
                 payment.setProviderOrderId(result.providerOrderId());
             }
+            if (result.exchangeRate() != null) {
+                payment.setExchangeRate(result.exchangeRate());
+                payment.setExchangeRateDate(result.exchangeRateDate());
+                payment.setExchangeRateSource(result.exchangeRateSource());
+            }
             if (result.expiresAt() != null && result.expiresAt().isBefore(payment.getExpiresAt())) {
                 payment.setExpiresAt(result.expiresAt());
             }
@@ -190,7 +195,8 @@ public class CreatePaymentIntentUseCase {
         return new IntentOutcome(new PaymentIntentResult(payment.getId(), payment.getMasterOrderId(),
                 payment.getProvider(), payment.getAmount(), payment.getPaymentUrl(), payment.getQrCodeUrl(),
                 payment.getExpiresAt(), payment.getProviderOrderId(), payment.getProviderAmount(),
-                payment.getProviderCurrency(), payment.getProviderTransactionDate()), false);
+                payment.getProviderCurrency(), payment.getProviderTransactionDate(),
+                payment.getExchangeRate(), payment.getExchangeRateDate(), payment.getExchangeRateSource()), false);
     }
 
     private MasterOrder requirePayableOrder(CreatePaymentIntentCommand command) {
