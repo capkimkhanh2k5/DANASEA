@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 
 import com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort;
 import com.danasea.backend.modules.order.application.OrderPaymentService;
+import com.danasea.backend.modules.order.application.services.DepartureCheckoutGuard;
 import com.danasea.backend.modules.order.application.services.DisruptionDecisionService;
 import com.danasea.backend.modules.order.domain.ports.CommissionPolicyPort;
 import com.danasea.backend.modules.order.domain.ports.ServiceWaiverLookupPort;
@@ -18,6 +19,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 class InternalPaymentWebhookProfileTest {
     private final ApplicationContextRunner runner =
             new ApplicationContextRunner()
+                    .withBean(DepartureCheckoutGuard.class, () -> mock(DepartureCheckoutGuard.class))
                     .withBean(
                             DisruptionDecisionService.class,
                             () -> mock(DisruptionDecisionService.class))

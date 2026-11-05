@@ -1,5 +1,8 @@
 package com.danasea.backend.modules.integration;
 
+import com.danasea.backend.modules.order.application.services.VendorFaultCompensationService;
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.booking.domain.ports.VendorLookupPort;
 import com.danasea.backend.modules.checkin.application.usecases.GenerateCheckinQrUseCase;
@@ -213,7 +216,8 @@ public class FullLifecycleServiceIntegrationTest {
 
         finalizeSettlementUseCase = new FinalizeSettlementUseCase(
                 settlementRepository, settlementMapper,
-                mock(AuditLogInternalApi.class));
+                mock(AuditLogInternalApi.class),
+                new VendorFaultCompensationService(mock(JdbcTemplate.class), null, null, 0, 30));
 
         getSettlementsUseCase = new GetSettlementsUseCase(
                 settlementRepository, settlementLineItemRepository, vendorLookupPort, settlementMapper);
@@ -735,6 +739,10 @@ public class FullLifecycleServiceIntegrationTest {
             UUID id = inv.getArgument(0);
             return Optional.ofNullable(subOrderStore.get(id));
         });
+        org.mockito.Mockito.lenient().when(subOrderRepository.findByIdForUpdate(any())).thenAnswer(inv -> {
+            UUID id = inv.getArgument(0);
+            return Optional.ofNullable(subOrderStore.get(id));
+        });
         when(subOrderRepository.save(any())).thenAnswer(inv -> {
             SubOrderJpaEntity e = inv.getArgument(0);
             if (e.getId() == null) e.setId(UUID.randomUUID());
@@ -758,6 +766,10 @@ public class FullLifecycleServiceIntegrationTest {
 
     private void wireSlotRepository() {
         when(slotRepository.findById(any())).thenAnswer(inv -> {
+            UUID id = inv.getArgument(0);
+            return Optional.ofNullable(slotStore.get(id));
+        });
+        org.mockito.Mockito.lenient().when(slotRepository.findByIdForUpdate(any())).thenAnswer(inv -> {
             UUID id = inv.getArgument(0);
             return Optional.ofNullable(slotStore.get(id));
         });

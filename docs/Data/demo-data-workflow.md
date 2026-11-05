@@ -1,11 +1,39 @@
 # Demo Data on the server
 
 The `Demo Data` workflow replaces application data with the canonical
-`demo_data_handoff` package. Existing accounts, bookings and other application
+`DB_Demo` package. Existing accounts, bookings and other application
 data are removed unless needed by preserved system configuration. Schema,
 Flyway history, system configuration and safety rules are retained. Importing
 the package does not approve pending safety documents or prove every booking
 flow ready for demonstration.
+
+## Operating schedules and equipment
+
+Flyway V46–V49 add cancellation, recurring schedule, equipment and compensation
+records. Migrating an existing database keeps the dates and IDs of existing
+departures and bookings. Recurring rules and equipment links start empty.
+The scheduler generates the rolling 90-day horizon after a vendor saves a rule.
+
+The reviewed `DB_Demo` replacement on Flyway V49 keeps the 25 departures
+referenced by the 50 booking fixtures, including the departure originally
+derived from a booking's recorded time. It seeds daily rules for all 24
+published demo services and materializes future departures through the 90th
+calendar day in Vietnam time. Each service keeps its reviewed demo hours and
+capacity. The backend scheduler extends the window over time.
+
+Replacement creates named synthetic equipment for the private package examples
+and the shared snorkelling example. It skips dates and start times already
+represented by a fixture booking anchor. The `demoOperatingSchedule` report
+counts the generated records separately from the 646 canonical rows.
+
+Replacement clears the target's previous operating rules, exceptions and
+equipment before seeding the demo set. Normal migrations and non-replacement
+sync do not seed the rolling window. The legacy generated SQL only creates
+concrete slots for disposable local databases.
+
+The V45 → V49 rehearsal on disposable PostgreSQL preserved the existing values
+of 24 departures, 6 bookings, their order and payment records, and a legacy
+seat allocation. New schedule and equipment tables remained empty.
 
 ## Before the first run
 

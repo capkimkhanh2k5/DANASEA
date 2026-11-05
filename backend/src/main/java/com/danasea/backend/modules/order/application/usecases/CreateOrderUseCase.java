@@ -4,6 +4,7 @@ import com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort;
 import com.danasea.backend.modules.flashsale.domain.FlashSaleException;
 import com.danasea.backend.modules.order.application.dtos.CreateOrderCommand;
 import com.danasea.backend.modules.order.application.dtos.MasterOrderDetailResult;
+import com.danasea.backend.modules.order.application.services.DepartureCheckoutGuard;
 import com.danasea.backend.modules.order.domain.exceptions.BookingNotEligibleForOrderException;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidDiscountException;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
@@ -53,6 +54,13 @@ public class CreateOrderUseCase {
     private FlashSaleBookingPort flashSale;
     @Autowired
     public void setFlashSale(FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
+
+    private DepartureCheckoutGuard departureCheckout;
+
+    @Autowired
+    public void setDepartureCheckout(DepartureCheckoutGuard departureCheckout) {
+        this.departureCheckout = departureCheckout;
+    }
 
     private final MasterOrderRepositoryPort masterOrderRepository;
     private final SubOrderRepositoryPort subOrderRepository;
@@ -190,6 +198,10 @@ public class CreateOrderUseCase {
         // 7. Kiểm tra danh sách Booking Items
         if (booking.items() == null || booking.items().isEmpty()) {
             throw new BookingNotEligibleForOrderException(command.bookingId(), "Booking contains no items.");
+        }
+
+        if (departureCheckout != null) {
+            departureCheckout.requireBookable(departureCheckout.lockBooking(command.bookingId()));
         }
 
         if(flashSale!=null && command.discountCode()!=null && !command.discountCode().isBlank() && flashSale.hasAllocation(command.bookingId()))

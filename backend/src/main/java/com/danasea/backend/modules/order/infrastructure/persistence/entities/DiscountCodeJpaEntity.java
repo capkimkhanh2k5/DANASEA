@@ -43,6 +43,9 @@ public class DiscountCodeJpaEntity extends BaseJpaEntity {
     @Column(name = "replacement_sub_order_id")
     private UUID replacementSubOrderId;
 
+    @Column(name = "compensation_disruption_id")
+    private UUID compensationDisruptionId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DiscountType discountType;

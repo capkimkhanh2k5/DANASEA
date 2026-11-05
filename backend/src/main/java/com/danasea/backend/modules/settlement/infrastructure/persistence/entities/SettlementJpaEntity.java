@@ -45,6 +45,10 @@ public class SettlementJpaEntity extends BaseJpaEntity {
     @Column(name = "net_payable_amount", precision = 38, scale = 2)
     private BigDecimal netPayableAmount;
 
+    @Builder.Default
+    @Column(name = "vendor_fault_compensation_deducted_amount", nullable = false, precision = 38, scale = 2)
+    private BigDecimal vendorFaultCompensationDeductedAmount = BigDecimal.ZERO;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private SettlementStatus status;

@@ -19,6 +19,7 @@ public class DiscountCode extends BaseDomainModel {
     private UUID serviceId;
     private UUID recipientCustomerId;
     private UUID replacementSubOrderId;
+    private UUID compensationDisruptionId;
     private DiscountType discountType;
     private BigDecimal discountValue;
     private BigDecimal minOrderAmount = BigDecimal.ZERO;

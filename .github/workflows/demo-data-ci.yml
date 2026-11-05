@@ -6,13 +6,13 @@ on:
       - main
       - data_additional
     paths:
-      - 'demo_data_handoff/**'
+      - 'DB_Demo/**'
       - '.github/workflows/demo-data-ci.yml'
   pull_request:
     branches:
       - main
     paths:
-      - 'demo_data_handoff/**'
+      - 'DB_Demo/**'
       - '.github/workflows/demo-data-ci.yml'
   workflow_dispatch:
 
@@ -45,8 +45,8 @@ jobs:
 
       - name: Verify Python syntax
         run: |
-          python -m py_compile demo_data_handoff/install_demo_data.py
+          python -m py_compile DB_Demo/install_demo_data.py
 
       - name: Run demo handoff tests and manifest verification
         run: |
-          python -B -m unittest discover -s demo_data_handoff/tests -v
+          python -B -m unittest discover -s DB_Demo/tests -v

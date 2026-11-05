@@ -69,6 +69,8 @@ public class GetVendorServiceSlotsUseCase {
                 .capacity(u.getCapacity())
                 .bookedCount(u.getBookedCount())
                 .availableCapacity(u.getAvailableCapacity())
+                .equipmentId(u.getEquipmentId())
+                .equipmentBlocked(u.isEquipmentBlocked())
                 .build();
     }
 }

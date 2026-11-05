@@ -8,6 +8,7 @@ import com.danasea.backend.security.authorization.domain.exceptions.AccessDenied
 import com.danasea.backend.shared.i18n.LocalizedException;
 import com.danasea.backend.shared.i18n.LocalizedMessageService;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.TypeMismatchException;
@@ -104,6 +105,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMissingEndpoint(NoResourceFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse("ENDPOINT_NOT_FOUND", messages.get("error.endpoint_not_found")));
+    }
+
+    @ExceptionHandler(ApiConflictException.class)
+    public ResponseEntity<ErrorResponse> handleApiConflict(ApiConflictException exception) {
+        String code = exception.getCode();
+        String message = messages.getOrDefault("error." + code.toLowerCase(Locale.ROOT), exception.getReason());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(code, message));
     }
 
     @ExceptionHandler(ResponseStatusException.class)

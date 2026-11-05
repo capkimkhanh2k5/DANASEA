@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.service.application.usecases;
 
+import com.danasea.backend.shared.presentation.ApiConflictException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -21,6 +22,7 @@ import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
+import com.danasea.backend.modules.service.infrastructure.persistence.adapters.OperatingScheduleStore;
 import com.danasea.backend.modules.service.presentation.dtos.CreateServiceSlotRequest;
 import com.danasea.backend.modules.service.presentation.dtos.CreateSlotUnitRequest;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotResponse;
@@ -36,6 +38,7 @@ public class CreateServiceSlotUseCase {
     private final ServiceRepositoryPort serviceRepository;
     private final ServiceSlotRepositoryPort serviceSlotRepository;
     private final VendorPort vendorPort;
+    private final OperatingScheduleStore scheduleStore;
 
     @Transactional
     public ServiceSlotResponse execute(UUID userId, UUID serviceId, CreateServiceSlotRequest request) {
@@ -57,6 +60,10 @@ public class CreateServiceSlotUseCase {
 
         if (!request.startTime().isBefore(request.endTime())) {
             throw new IllegalArgumentException("Start time must be before end time");
+        }
+
+        if (scheduleStore.blocks(serviceId, request.date(), request.startTime())) {
+            throw new ApiConflictException("OPERATING_SCHEDULE_CONFLICT", "An operating schedule exception blocks this slot");
         }
 
         if (serviceSlotRepository.existsByServiceIdAndDateAndStartTime(serviceId, request.date(), request.startTime())) {
@@ -157,6 +164,8 @@ public class CreateServiceSlotUseCase {
                 .capacity(u.getCapacity())
                 .bookedCount(u.getBookedCount())
                 .availableCapacity(u.getAvailableCapacity())
+                .equipmentId(u.getEquipmentId())
+                .equipmentBlocked(u.isEquipmentBlocked())
                 .build();
     }
 }

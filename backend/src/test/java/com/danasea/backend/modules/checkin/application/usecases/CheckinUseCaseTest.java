@@ -325,7 +325,7 @@ class CheckinUseCaseTest {
 
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
             when(checkinTokenRepository.markAsUsedAtomic(eq(tokenId), any(), eq(staffId))).thenReturn(1);
 
             VerifyCheckinResponse response = verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId);
@@ -407,7 +407,7 @@ class CheckinUseCaseTest {
 
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
 
             assertThatThrownBy(() -> verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId))
                     .isInstanceOf(UnauthorizedVendorCheckinException.class);
@@ -467,7 +467,7 @@ class CheckinUseCaseTest {
 
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
 
             // Lần 1: Cập nhật nguyên tử thành công
             when(checkinTokenRepository.markAsUsedAtomic(eq(tokenId), any(), eq(staffId))).thenAnswer(inv -> {
@@ -530,7 +530,7 @@ class CheckinUseCaseTest {
             subOrder.setVendorId(vendorId);
 
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId))
@@ -564,7 +564,7 @@ class CheckinUseCaseTest {
 
             when(vendorLookupPort.findVendorIdByUserId(any())).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
 
             // Mô phỏng cập nhật nguyên tử tầng cơ sở dữ liệu
             AtomicBoolean claimed = new AtomicBoolean(false);

@@ -345,7 +345,7 @@ class CheckinAdversarialEmpiricalTest {
 
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
             when(checkinTokenRepository.markAsUsedAtomic(eq(tokenId), any(), eq(staffId))).thenReturn(1);
 
             VerifyCheckinResponse response = verifyCheckinUseCase.execute(new VerifyCheckinRequest(validToken), staffId);
@@ -410,7 +410,7 @@ class CheckinAdversarialEmpiricalTest {
 
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
 
             assertThatThrownBy(() -> verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId))
                     .isInstanceOf(UnauthorizedVendorCheckinException.class)
@@ -446,7 +446,7 @@ class CheckinAdversarialEmpiricalTest {
 
             when(vendorLookupPort.findVendorIdByUserId(any())).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
 
             AtomicBoolean claimed = new AtomicBoolean(false);
             when(checkinTokenRepository.markAsUsedAtomic(eq(tokenId), any(), any())).thenAnswer(inv -> {

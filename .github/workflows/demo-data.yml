@@ -38,7 +38,7 @@ jobs:
         run: |
           [[ "$GITHUB_REF" == refs/heads/main ]] || { echo '::error::Run Demo Data from main'; exit 1; }
           python3 scripts/governance/check_repository_controls.py --repository "$GITHUB_REPOSITORY"
-          python3 -B -m unittest discover -s demo_data_handoff/tests -v
+          python3 -B -m unittest discover -s DB_Demo/tests -v
       - name: Prepare existing deployment connection
         env:
           DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -76,7 +76,7 @@ jobs:
           ssh "${ssh_options[@]}" "$DEPLOY_USER@$DEPLOY_HOST" status > "$private_dir/release.json"
           DEPLOYED_SHA=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sha"])' "$private_dir/release.json")
           [[ "$DEPLOYED_SHA" == "$GITHUB_SHA" ]] || { echo '::error::Deploy this main revision before running Demo Data'; exit 1; }
-          PACKAGE_SHA=$(shasum -a 256 demo_data_handoff/MANIFEST.sha256 | cut -d ' ' -f 1)
+          PACKAGE_SHA=$(shasum -a 256 DB_Demo/MANIFEST.sha256 | cut -d ' ' -f 1)
           python3 scripts/demo/demo_request.py create --action "$DEMO_ACTION" --sha "$GITHUB_SHA" --repository "$GITHUB_REPOSITORY" --package-sha256 "$PACKAGE_SHA" --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT" --confirmation "$CONFIRMATION" --backup-id "$BACKUP_ID" --output "$private_dir/request.json"
           ssh-keygen -Y sign -f ~/.ssh/id_ed25519 -n danasea-demo-data "$private_dir/request.json"
           password_args=()

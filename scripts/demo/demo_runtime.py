@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import backup
@@ -78,7 +79,7 @@ class Runtime:
         self.policy = policy
         self.state = Path(state)
         self.app = Path(policy['app_dir']).resolve()
-        self.package = self.app / 'demo_data_handoff'
+        self.package = self.app / 'DB_Demo'
         self.environment = dict(os.environ)
         self.journal = None
         self.config_fingerprint = None
@@ -123,9 +124,9 @@ class Runtime:
             raise ValueError('Deployed SHA drift')
         if self.command(['git', 'rev-parse', 'HEAD']).decode().strip() != body['sha']:
             raise ValueError('Checkout SHA drift')
-        self.command(['git', 'diff', '--quiet', 'HEAD', '--', 'demo_data_handoff', 'docker-compose.prod.yml'])
+        self.command(['git', 'diff', '--quiet', 'HEAD', '--', 'DB_Demo', 'docker-compose.prod.yml'])
         # Bind the signed checksum to the accepted Git object as well as the working tree.
-        committed = self.command(['git', 'show', body['sha'] + ':demo_data_handoff/MANIFEST.sha256'])
+        committed = self.command(['git', 'show', body['sha'] + ':DB_Demo/MANIFEST.sha256'])
         if hashlib.sha256(committed).hexdigest() != body['package_sha256']:
             raise ValueError('Committed package manifest mismatch')
         verify_package(self.package, body['package_sha256'])
@@ -261,8 +262,12 @@ finally:s.close()
         self.sql(f'ALTER ROLE "{self.runtime_role}" NOLOGIN; ALTER DATABASE "{self.database}" CONNECTION LIMIT 0')
         self.sql("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
                  f"WHERE datname=current_database() AND pid<>pg_backend_pid() AND usename='{self.runtime_role}'")
-        if self.sql("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()") != '0':
-            raise ValueError('Database writer remains active')
+        # Termination signals are asynchronous and internal workers can still be exiting.
+        deadline = time.monotonic() + 5
+        while self.sql("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()") != '0':
+            if time.monotonic() >= deadline:
+                raise ValueError('Database writer remains active')
+            time.sleep(0.25)
 
     def ungate(self, journal):
         settings = journal.get('database_gate')
@@ -321,7 +326,7 @@ finally:s.close()
                      '--database', database, '--user', self.admin, '--backup-file', str(archive),
                      '--ownership-file', str(ownership), '--demo-password-stdin']
         result = json.loads(self.command(arguments, input=(password + '\n').encode(), timeout=600))
-        if apply and (result.get('transaction') != 'COMMITTED' or result.get('totalVerifiedInDb') not in (270, 22809)):
+        if apply and (result.get('transaction') != 'COMMITTED' or result.get('totalVerifiedInDb') != 646):
             raise ValueError('Replacement did not return a verified committed receipt')
         return result
 
