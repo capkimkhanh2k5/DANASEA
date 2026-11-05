@@ -97,12 +97,23 @@ public class CaseAndAccountEmailRenderer {
                 financialImpact = messages.get("email.dispute_resolved.vendor.no_deduction", lang);
             }
 
+            String ctaUrl = properties.getPublicBaseUrl() + "/vendor/disputes/" + disputeId;
             sb.append(messages.get("email.dispute_resolved.vendor.details", lang, disputeId, resolution, financialImpact)).append("\n\n");
-            sb.append(messages.get("email.dispute_resolved.vendor.cta", lang, properties.getPublicBaseUrl() + "/vendor/disputes/" + disputeId)).append("\n\n");
+            sb.append(messages.get("email.dispute_resolved.vendor.cta", lang, ctaUrl)).append("\n\n");
             sb.append(messages.get("email.common.signature", lang));
 
             String body = sb.toString();
-            return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+            String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                    subject,
+                    lang == SupportedLanguage.EN ? "Dispute Resolution" : "Phán quyết tranh chấp",
+                    TransactionalEmailHtmlLayout.Theme.OCEAN,
+                    body,
+                    lang == SupportedLanguage.EN ? "View Dispute Case" : "Xem hồ sơ tranh chấp",
+                    ctaUrl,
+                    properties.getSupportPhone(),
+                    lang
+            );
+            return new RenderedEmail(recipient.email(), subject, body, htmlBody);
         } else {
             // Customer template
             String recipientName = resolveRecipientName(entity.getRecipientKey());
@@ -127,7 +138,17 @@ public class CaseAndAccountEmailRenderer {
             sb.append(messages.get("email.common.signature", lang));
 
             String body = sb.toString();
-            return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+            String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                    subject,
+                    lang == SupportedLanguage.EN ? "Dispute Resolved" : "Kết quả giải quyết tranh chấp",
+                    TransactionalEmailHtmlLayout.Theme.OCEAN,
+                    body,
+                    lang == SupportedLanguage.EN ? "View Case & Order Details" : "Xem kết quả & Chi tiết đơn hàng",
+                    link,
+                    properties.getSupportPhone(),
+                    lang
+            );
+            return new RenderedEmail(recipient.email(), subject, body, htmlBody);
         }
     }
 
@@ -159,7 +180,17 @@ public class CaseAndAccountEmailRenderer {
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                lang == SupportedLanguage.EN ? "Security Notice" : "Bảo mật tài khoản",
+                TransactionalEmailHtmlLayout.Theme.WARNING,
+                body,
+                lang == SupportedLanguage.EN ? "Recover Account Password" : "Khôi phục mật khẩu ngay",
+                recoveryUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     // =========================================================================
@@ -187,7 +218,17 @@ public class CaseAndAccountEmailRenderer {
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                lang == SupportedLanguage.EN ? "Account Locked" : "Tài khoản tạm khóa",
+                TransactionalEmailHtmlLayout.Theme.DANGER,
+                body,
+                null,
+                null,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     // =========================================================================
@@ -226,7 +267,17 @@ public class CaseAndAccountEmailRenderer {
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                lang == SupportedLanguage.EN ? "Settlement Finalized" : "Hoàn tất đối soát",
+                TransactionalEmailHtmlLayout.Theme.SUCCESS,
+                body,
+                lang == SupportedLanguage.EN ? "View Settlement Statement" : "Xem bảng kê đối soát doanh thu",
+                ctaUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     // =========================================================================
@@ -248,7 +299,17 @@ public class CaseAndAccountEmailRenderer {
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                lang == SupportedLanguage.EN ? "Security Alert" : "Cảnh báo bảo mật",
+                TransactionalEmailHtmlLayout.Theme.WARNING,
+                body,
+                null,
+                null,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     // =========================================================================

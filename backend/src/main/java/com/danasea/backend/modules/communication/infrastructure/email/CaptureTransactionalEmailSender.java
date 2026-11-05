@@ -53,6 +53,7 @@ public class CaptureTransactionalEmailSender implements TransactionalEmailSender
                         + "<hr><p style='color: gray; font-size: 12px;'>[DANASEA CAPTURE SINK - Intended recipient: "
                         + email.to() + "]</p>";
                 helper.setText(textBody, htmlBody);
+                EmailInlineAssetHelper.attachInlineAssets(helper, htmlBody);
             } else {
                 helper.setText(textBody, false);
             }

@@ -2,7 +2,10 @@ package com.danasea.backend.modules.communication.infrastructure.email.renderers
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
@@ -13,6 +16,8 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository;
+import com.danasea.backend.modules.checkin.application.usecases.GenerateCheckinQrUseCase;
 import com.danasea.backend.modules.communication.application.email.RenderedEmail;
 import com.danasea.backend.modules.communication.application.email.ResolvedRecipient;
 import com.danasea.backend.modules.communication.application.email.TransactionalEmailRenderer;
@@ -53,6 +58,12 @@ public class BookingEmailRenderer implements TransactionalEmailRenderer {
 
     @Autowired
     private LocalizedMessageService messages = LocalizedMessageService.standalone();
+
+    @Autowired(required = false)
+    private JpaUserRepository userRepository;
+
+    @Autowired(required = false)
+    private GenerateCheckinQrUseCase generateCheckinQrUseCase;
 
     public boolean supports(TransactionalEmailType type) {
         return type == TransactionalEmailType.BOOKING_CONFIRMED
@@ -110,8 +121,22 @@ public class BookingEmailRenderer implements TransactionalEmailRenderer {
                 .collect(Collectors.groupingBy(RefundJpaEntity::getSubOrderId));
 
         StringBuilder sb = new StringBuilder();
-        String greetingName = recipient.email(); // default
-        sb.append(messages.get("email.booking.greeting", language, greetingName)).append("\n\n");
+        String customerName = recipient.email();
+        String customerPhone = null;
+        if (userRepository != null && masterOrder.getCustomerId() != null) {
+            try {
+                var userOpt = userRepository.findById(masterOrder.getCustomerId());
+                if (userOpt.isPresent()) {
+                    if (userOpt.get().getFullName() != null && !userOpt.get().getFullName().isBlank()) {
+                        customerName = userOpt.get().getFullName();
+                    }
+                    customerPhone = userOpt.get().getPhone();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        sb.append(messages.get("email.booking.greeting", language, customerName)).append("\n\n");
 
         String introKey = isPartial ? "email.booking.partial.intro" : "email.booking.confirmed.intro";
         sb.append(messages.get(introKey, language, orderCode)).append("\n\n");
@@ -120,6 +145,9 @@ public class BookingEmailRenderer implements TransactionalEmailRenderer {
         BigDecimal totalSubtotal = BigDecimal.ZERO;
         BigDecimal totalRefundPending = BigDecimal.ZERO;
         BigDecimal totalRefundProcessed = BigDecimal.ZERO;
+        List<TransactionalEmailHtmlLayout.TicketItemView> ticketItems = new ArrayList<>();
+        String primaryDepartureTime = null;
+        UUID primaryConfirmedSubOrderId = null;
 
         for (SubOrderJpaEntity so : subOrders) {
             ServiceJpaEntity svc = so.getServiceId() != null
@@ -133,14 +161,24 @@ public class BookingEmailRenderer implements TransactionalEmailRenderer {
                     ? (language == SupportedLanguage.EN && svc.getNameEn() != null ? svc.getNameEn() : svc.getName())
                     : "DANASEA Service";
 
-            String location = svc != null
-                    ? (svc.getAddress() != null ? svc.getAddress() : svc.getLocationName())
-                    : "Đà Nẵng";
+            String locationName = svc != null && svc.getLocationName() != null && !svc.getLocationName().isBlank()
+                    ? svc.getLocationName()
+                    : (svc != null && svc.getAddress() != null ? svc.getAddress() : "Đà Nẵng");
+            String address = svc != null && svc.getAddress() != null ? svc.getAddress() : locationName;
+
+            Double lat = (svc != null && svc.getLatitude() != null) ? svc.getLatitude().doubleValue() : null;
+            Double lng = (svc != null && svc.getLongitude() != null) ? svc.getLongitude().doubleValue() : null;
+            String googleMapsUrl = TransactionalEmailHtmlLayout.buildGoogleMapsUrl(lat, lng, address);
 
             String departureTime = slot != null && slot.getDate() != null && slot.getStartTime() != null
                     ? slot.getStartTime().format(DateTimeFormatter.ofPattern("HH:mm")) + " "
                     + slot.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
                     : "Đang cập nhật";
+
+            if (primaryDepartureTime == null && isValidActiveSubOrder(so)) {
+                primaryDepartureTime = departureTime;
+                primaryConfirmedSubOrderId = so.getId();
+            }
 
             BigDecimal subtotal = so.getSubtotalAmount() != null
                     ? so.getSubtotalAmount()
@@ -152,6 +190,7 @@ public class BookingEmailRenderer implements TransactionalEmailRenderer {
             // Determine status text
             List<RefundJpaEntity> itemRefunds = refundMap.getOrDefault(so.getId(), List.of());
             String statusText = resolveSubOrderStatusText(so.getStatus(), itemRefunds, language);
+            String cleanStatusLabel = statusText.replace("[", "").replace("]", "");
 
             for (RefundJpaEntity ref : itemRefunds) {
                 if (ref.getStatus() == RefundStatus.PROCESSED) {
@@ -161,9 +200,26 @@ public class BookingEmailRenderer implements TransactionalEmailRenderer {
                 }
             }
 
+            String subCode = "SUB-" + so.getId().toString().substring(0, 6).toUpperCase();
+            String qtyLabel = (so.getQuantity() != null ? so.getQuantity() : 1)
+                    + (language == SupportedLanguage.EN ? " pax" : " vé");
+
+            ticketItems.add(new TransactionalEmailHtmlLayout.TicketItemView(
+                    svcName,
+                    subCode,
+                    qtyLabel,
+                    cleanStatusLabel,
+                    isValidActiveSubOrder(so),
+                    departureTime,
+                    locationName,
+                    address,
+                    googleMapsUrl,
+                    formatCurrency(subtotal) + " đ"
+            ));
+
             sb.append("• ").append(svcName).append(" - ").append(statusText).append("\n");
             sb.append("  ").append(messages.get("email.booking.label.departure", language, departureTime)).append("\n");
-            sb.append("  ").append(messages.get("email.booking.label.location", language, location)).append("\n");
+            sb.append("  ").append(messages.get("email.booking.label.location", language, address)).append("\n");
             sb.append("  ").append(messages.get("email.booking.label.quantity", language, so.getQuantity())).append("\n");
             sb.append("  ").append(messages.get("email.booking.label.subtotal", language, formatCurrency(subtotal))).append("\n\n");
         }
@@ -194,10 +250,51 @@ public class BookingEmailRenderer implements TransactionalEmailRenderer {
         sb.append("---\n");
         sb.append(messages.get("email.common.footer", language));
 
+        String qrData = orderCode;
+        if (generateCheckinQrUseCase != null && primaryConfirmedSubOrderId != null && masterOrder.getCustomerId() != null) {
+            try {
+                var qrResp = generateCheckinQrUseCase.execute(primaryConfirmedSubOrderId, masterOrder.getCustomerId());
+                if (qrResp != null && qrResp.qrToken() != null && !qrResp.qrToken().isBlank()) {
+                    qrData = qrResp.qrToken();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        String confirmedAtText = masterOrder.getCreatedAt() != null
+                ? masterOrder.getCreatedAt().atZoneSameInstant(ZoneId.of("Asia/Ho_Chi_Minh"))
+                        .format(DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy"))
+                : ZonedDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"))
+                        .format(DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy"));
+
+        String textBody = sb.toString();
+        String htmlBody = TransactionalEmailHtmlLayout.buildBookingTicketHtml(
+                new TransactionalEmailHtmlLayout.BookingTicketView(
+                        customerName,
+                        customerPhone,
+                        recipient.email(),
+                        orderCode,
+                        confirmedAtText,
+                        isPartial,
+                        qrData,
+                        primaryDepartureTime,
+                        ticketItems,
+                        formatCurrency(totalSubtotal) + " đ",
+                        discount.compareTo(BigDecimal.ZERO) > 0 ? formatCurrency(discount) + " đ" : null,
+                        formatCurrency(totalPaid) + " đ",
+                        totalRefundPending.compareTo(BigDecimal.ZERO) > 0 ? formatCurrency(totalRefundPending) + " đ" : null,
+                        totalRefundProcessed.compareTo(BigDecimal.ZERO) > 0 ? formatCurrency(totalRefundProcessed) + " đ" : null,
+                        ctaUrl,
+                        properties.getSupportPhone(),
+                        language
+                )
+        );
+
         return RenderedEmail.builder()
                 .to(recipient.email())
                 .subject(subject)
-                .textBody(sb.toString())
+                .textBody(textBody)
+                .htmlBody(htmlBody)
                 .build();
     }
 
@@ -263,10 +360,25 @@ public class BookingEmailRenderer implements TransactionalEmailRenderer {
         sb.append("---\n");
         sb.append(messages.get("email.common.footer", language));
 
+        String textBody = sb.toString();
+        String badgeLabel = language == SupportedLanguage.EN ? "New Booking" : "Đơn đặt mới";
+        String ctaLabel = language == SupportedLanguage.EN ? "Manage Vendor Orders" : "Quản lý đơn hàng Đối tác";
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                badgeLabel,
+                TransactionalEmailHtmlLayout.Theme.OCEAN,
+                textBody,
+                ctaLabel,
+                ctaUrl,
+                properties.getSupportPhone(),
+                language
+        );
+
         return RenderedEmail.builder()
                 .to(recipient.email())
                 .subject(subject)
-                .textBody(sb.toString())
+                .textBody(textBody)
+                .htmlBody(htmlBody)
                 .build();
     }
 

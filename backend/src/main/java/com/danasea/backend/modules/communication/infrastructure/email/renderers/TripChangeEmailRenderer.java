@@ -146,7 +146,18 @@ public class TripChangeEmailRenderer implements TransactionalEmailRenderer {
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String ctaUrl = properties.getPublicBaseUrl() + "/profile/orders";
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                lang == SupportedLanguage.EN ? "Red Weather Alert" : "Cảnh báo Thời tiết Đỏ",
+                TransactionalEmailHtmlLayout.Theme.DANGER,
+                body,
+                lang == SupportedLanguage.EN ? "Check Trip Status" : "Kiểm tra trạng thái chuyến đi",
+                ctaUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     private RenderedEmail renderTripCancelled(
@@ -170,10 +181,21 @@ public class TripChangeEmailRenderer implements TransactionalEmailRenderer {
             if (!reason.isBlank()) {
                 sb.append(messages.get("email.trip_cancelled.reason", lang, reason)).append("\n\n");
             }
-            sb.append(messages.get("email.vendor_trip_cancelled.cta", lang, properties.getPublicBaseUrl() + "/vendor/orders")).append("\n\n");
+            String ctaUrl = properties.getPublicBaseUrl() + "/vendor/orders";
+            sb.append(messages.get("email.vendor_trip_cancelled.cta", lang, ctaUrl)).append("\n\n");
             sb.append(messages.get("email.common.signature", lang));
             String body = sb.toString();
-            return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+            String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                    subject,
+                    lang == SupportedLanguage.EN ? "Trip Cancelled" : "Hủy chuyến",
+                    TransactionalEmailHtmlLayout.Theme.DANGER,
+                    body,
+                    lang == SupportedLanguage.EN ? "View Affected Orders" : "Xem đơn hàng bị ảnh hưởng",
+                    ctaUrl,
+                    properties.getSupportPhone(),
+                    lang
+            );
+            return new RenderedEmail(recipient.email(), subject, body, htmlBody);
         }
 
         // Customer cancellation email
@@ -238,7 +260,18 @@ public class TripChangeEmailRenderer implements TransactionalEmailRenderer {
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String ctaUrl = properties.getPublicBaseUrl() + "/profile/orders";
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                lang == SupportedLanguage.EN ? "Trip Cancelled" : "Đã hủy chuyến",
+                TransactionalEmailHtmlLayout.Theme.DANGER,
+                body,
+                lang == SupportedLanguage.EN ? "View Order & Refund Status" : "Xem chi tiết đơn & hoàn tiền",
+                ctaUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     private RenderedEmail renderRescheduleProposed(
@@ -288,7 +321,18 @@ public class TripChangeEmailRenderer implements TransactionalEmailRenderer {
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String ctaUrl = properties.getPublicBaseUrl() + "/profile/orders";
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                lang == SupportedLanguage.EN ? "Reschedule Proposal" : "Đề xuất đổi lịch",
+                TransactionalEmailHtmlLayout.Theme.WARNING,
+                body,
+                lang == SupportedLanguage.EN ? "Review & Confirm New Schedule" : "Xem & Xác nhận lịch mới",
+                ctaUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     private RenderedEmail renderRescheduled(
@@ -315,7 +359,18 @@ public class TripChangeEmailRenderer implements TransactionalEmailRenderer {
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String ctaUrl = properties.getPublicBaseUrl() + "/profile/orders";
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                lang == SupportedLanguage.EN ? "Schedule Updated" : "Đã đổi lịch",
+                TransactionalEmailHtmlLayout.Theme.SUCCESS,
+                body,
+                lang == SupportedLanguage.EN ? "View Updated Ticket" : "Xem vé với lịch khởi hành mới",
+                ctaUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     private RenderedEmail renderOpsDisruptionAlert(
@@ -329,6 +384,7 @@ public class TripChangeEmailRenderer implements TransactionalEmailRenderer {
         String slotId = (String) payload.getOrDefault("slotId", "");
 
         String subject = messages.get("email.ops_disruption_alert.subject", lang, serviceName);
+        String ctaUrl = properties.getPublicBaseUrl() + "/admin/weather-alerts";
         StringBuilder sb = new StringBuilder();
         sb.append("[DANASEA OPERATIONS ALERT]\n\n");
         sb.append("Phát hiện sự cố ca khởi hành cần xử lý / theo dõi:\n");
@@ -336,10 +392,20 @@ public class TripChangeEmailRenderer implements TransactionalEmailRenderer {
         sb.append("- Mã ca (Slot ID): ").append(slotId).append("\n");
         sb.append("- Giai đoạn / Mức độ: ").append(stage).append("\n\n");
         sb.append("Vui lòng đăng nhập hệ thống quản trị Danasea để kiểm tra và xử lý.\n");
-        sb.append(properties.getPublicBaseUrl()).append("/admin/weather-alerts\n");
+        sb.append(ctaUrl).append("\n");
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                "OPS ALERT · " + stage,
+                TransactionalEmailHtmlLayout.Theme.DANGER,
+                body,
+                "Mở trang Quản trị Cảnh báo Thời tiết",
+                ctaUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     private RenderedEmail renderDisruptionDecision(
@@ -360,7 +426,18 @@ public class TripChangeEmailRenderer implements TransactionalEmailRenderer {
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String ctaUrl = properties.getPublicBaseUrl() + "/profile/orders";
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                lang == SupportedLanguage.EN ? "Trip Update" : "Cập nhật chuyến đi",
+                TransactionalEmailHtmlLayout.Theme.WARNING,
+                body,
+                lang == SupportedLanguage.EN ? "View Trip Options" : "Xem phương án xử lý chuyến đi",
+                ctaUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     private Map<String, Object> parsePayload(String json) {

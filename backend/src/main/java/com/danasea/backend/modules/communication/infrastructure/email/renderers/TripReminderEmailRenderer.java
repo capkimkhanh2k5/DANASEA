@@ -297,10 +297,33 @@ public class TripReminderEmailRenderer implements TransactionalEmailRenderer {
         sb.append(messages.get("email.trip_reminder_24h.cta", language, orderUrl)).append("\n\n");
         sb.append(messages.get("email.common.footer", language));
 
+        String textBody = sb.toString();
+        String htmlSource = textBody;
+        if (coordinatesStr != null) {
+            String[] parts = coordinatesStr.split(", ");
+            String rawCoordLine = messages.get("email.trip_reminder_24h.label.coordinates", language, parts[0], parts[1]);
+            String mapsUrl = TransactionalEmailHtmlLayout.buildGoogleMapsUrl(null, null, coordinatesStr);
+            String mapLine = (language == SupportedLanguage.EN ? "- Google Maps: " : "- Chỉ đường bản đồ: ") + mapsUrl;
+            htmlSource = htmlSource.replace(rawCoordLine, mapLine);
+        }
+        String badgeLabel = language == SupportedLanguage.EN ? "24h Trip Reminder" : "Nhắc lịch khởi hành";
+        String ctaLabel = language == SupportedLanguage.EN ? "View Ticket & Meeting Point" : "Xem vé & Điểm hẹn trên DANASEA";
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                badgeLabel,
+                TransactionalEmailHtmlLayout.Theme.OCEAN,
+                htmlSource,
+                ctaLabel,
+                orderUrl,
+                properties.getSupportPhone(),
+                language
+        );
+
         return RenderedEmail.builder()
                 .to(recipient.email())
                 .subject(subject)
-                .textBody(sb.toString())
+                .textBody(textBody)
+                .htmlBody(htmlBody)
                 .build();
     }
 

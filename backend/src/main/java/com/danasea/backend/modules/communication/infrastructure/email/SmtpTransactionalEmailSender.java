@@ -46,6 +46,7 @@ public class SmtpTransactionalEmailSender implements TransactionalEmailSender {
 
             if (hasHtml) {
                 helper.setText(email.textBody() != null ? email.textBody() : "", email.htmlBody());
+                EmailInlineAssetHelper.attachInlineAssets(helper, email.htmlBody());
             } else {
                 helper.setText(email.textBody() != null ? email.textBody() : "", false);
             }

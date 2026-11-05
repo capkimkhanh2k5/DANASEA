@@ -11,9 +11,11 @@ import com.danasea.backend.modules.communication.infrastructure.email.entities.T
 import com.danasea.backend.modules.communication.infrastructure.email.renderers.BookingEmailRenderer;
 import com.danasea.backend.modules.communication.infrastructure.email.renderers.CaseAndAccountEmailRenderer;
 import com.danasea.backend.modules.communication.infrastructure.email.renderers.RefundVoucherEmailRenderer;
+import com.danasea.backend.modules.communication.infrastructure.email.renderers.TransactionalEmailHtmlLayout;
 import com.danasea.backend.modules.communication.infrastructure.email.renderers.TripChangeEmailRenderer;
 import com.danasea.backend.modules.communication.infrastructure.email.renderers.TripReminderEmailRenderer;
 import com.danasea.backend.modules.communication.infrastructure.email.renderers.TripReviewEmailRenderer;
+import com.danasea.backend.shared.i18n.SupportedLanguage;
 
 @Primary
 @Component
@@ -69,10 +71,22 @@ public class DefaultTransactionalEmailRenderer implements TransactionalEmailRend
                 + "\nThời gian: " + entity.getOccurredAt()
                 + "\n\nTrân trọng,\nĐội ngũ DANASEA";
 
+        String html = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                entity.getType().name(),
+                TransactionalEmailHtmlLayout.Theme.OCEAN,
+                text,
+                null,
+                null,
+                "1900-6868",
+                SupportedLanguage.VI
+        );
+
         return RenderedEmail.builder()
                 .to(recipient.email())
                 .subject(subject)
                 .textBody(text)
+                .htmlBody(html)
                 .build();
     }
 }

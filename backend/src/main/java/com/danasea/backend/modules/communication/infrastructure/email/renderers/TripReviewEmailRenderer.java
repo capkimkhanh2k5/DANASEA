@@ -22,6 +22,7 @@ import com.danasea.backend.modules.order.infrastructure.persistence.entities.Sub
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
+import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -150,32 +151,40 @@ public class TripReviewEmailRenderer {
     }
 
     private String buildVietnameseHtml(String name, String serviceName, String reviewUrl) {
-        return "<div style=\"font-family: sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px;\">"
-                + "<div style=\"margin-bottom: 20px;\"><h2 style=\"color: #0284c7; margin: 0;\">DANASEA</h2></div>"
-                + "<p>Xin chào <strong>" + name + "</strong>,</p>"
-                + "<p>Cảm ơn bạn đã đồng hành và trải nghiệm dịch vụ <strong>" + serviceName + "</strong> cùng DANASEA!</p>"
+        String bodyHtml = "<p>Xin chào <strong>" + TransactionalEmailHtmlLayout.escapeHtml(name) + "</strong>,</p>"
+                + "<p>Cảm ơn bạn đã đồng hành và trải nghiệm dịch vụ <strong>" + TransactionalEmailHtmlLayout.escapeHtml(serviceName) + "</strong> cùng DANASEA!</p>"
                 + "<p>Chuyến đi của bạn diễn ra như thế nào? Sự hài lòng và những chia sẻ quý báu từ bạn sẽ giúp đối tác hoàn thiện hơn và giúp những du khách tiếp theo có lựa chọn tuyệt vời nhất.</p>"
-                + "<div style=\"text-align: center; margin: 30px 0;\">"
-                + "<a href=\"" + reviewUrl + "\" style=\"background-color: #0284c7; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;\">⭐ Đánh giá chuyến đi ngay</a>"
-                + "</div>"
-                + "<p style=\"font-size: 13px; color: #64748b;\">Nếu nút bấm không hoạt động, bạn có thể sao chép và dán liên kết sau vào trình duyệt:<br><a href=\"" + reviewUrl + "\" style=\"color: #0284c7;\">" + reviewUrl + "</a></p>"
-                + "<hr style=\"border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;\">"
-                + "<p style=\"font-size: 13px; color: #64748b; margin: 0;\">Hotline hỗ trợ: " + properties.getSupportPhone() + " | Email: cskh@danasea.vn</p>"
-                + "</div>";
+                + "<p style=\"font-size:13px;color:#64748b;\">Nếu nút bấm không hoạt động, bạn có thể mở trực tiếp liên kết:<br/><a href=\""
+                + TransactionalEmailHtmlLayout.escapeHtml(reviewUrl) + "\" style=\"color:#0284c7;\">"
+                + TransactionalEmailHtmlLayout.escapeHtml(reviewUrl) + "</a></p>";
+        return TransactionalEmailHtmlLayout.wrapDocument(
+                "Chia sẻ cảm nhận về chuyến đi cùng DANASEA",
+                "Đánh giá chuyến đi",
+                TransactionalEmailHtmlLayout.Theme.OCEAN,
+                bodyHtml,
+                "Đánh giá chuyến đi ngay",
+                reviewUrl,
+                properties.getSupportPhone(),
+                SupportedLanguage.VI
+        );
     }
 
     private String buildEnglishHtml(String name, String serviceName, String reviewUrl) {
-        return "<div style=\"font-family: sans-serif; line-height: 1.6; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px;\">"
-                + "<div style=\"margin-bottom: 20px;\"><h2 style=\"color: #0284c7; margin: 0;\">DANASEA</h2></div>"
-                + "<p>Dear <strong>" + name + "</strong>,</p>"
-                + "<p>Thank you for experiencing <strong>" + serviceName + "</strong> with DANASEA!</p>"
+        String bodyHtml = "<p>Dear <strong>" + TransactionalEmailHtmlLayout.escapeHtml(name) + "</strong>,</p>"
+                + "<p>Thank you for experiencing <strong>" + TransactionalEmailHtmlLayout.escapeHtml(serviceName) + "</strong> with DANASEA!</p>"
                 + "<p>How was your trip? Your feedback helps our partners improve and guides future travelers in Da Nang.</p>"
-                + "<div style=\"text-align: center; margin: 30px 0;\">"
-                + "<a href=\"" + reviewUrl + "\" style=\"background-color: #0284c7; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;\">⭐ Leave a Review</a>"
-                + "</div>"
-                + "<p style=\"font-size: 13px; color: #64748b;\">If the button doesn't work, copy and paste this link into your browser:<br><a href=\"" + reviewUrl + "\" style=\"color: #0284c7;\">" + reviewUrl + "</a></p>"
-                + "<hr style=\"border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;\">"
-                + "<p style=\"font-size: 13px; color: #64748b; margin: 0;\">Support: " + properties.getSupportPhone() + " | Email: cskh@danasea.vn</p>"
-                + "</div>";
+                + "<p style=\"font-size:13px;color:#64748b;\">If the button doesn't work, open this link directly:<br/><a href=\""
+                + TransactionalEmailHtmlLayout.escapeHtml(reviewUrl) + "\" style=\"color:#0284c7;\">"
+                + TransactionalEmailHtmlLayout.escapeHtml(reviewUrl) + "</a></p>";
+        return TransactionalEmailHtmlLayout.wrapDocument(
+                "How was your trip? Share your review with us",
+                "Trip Review",
+                TransactionalEmailHtmlLayout.Theme.OCEAN,
+                bodyHtml,
+                "Leave a Review",
+                reviewUrl,
+                properties.getSupportPhone(),
+                SupportedLanguage.EN
+        );
     }
 }

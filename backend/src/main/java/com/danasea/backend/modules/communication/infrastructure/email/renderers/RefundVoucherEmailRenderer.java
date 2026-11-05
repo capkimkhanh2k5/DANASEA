@@ -147,15 +147,26 @@ public class RefundVoucherEmailRenderer implements TransactionalEmailRenderer {
         String amountStr = formatCurrency(payload.get("amount"));
 
         String subject = messages.get("email.refund_requested.subject", lang);
+        String ctaUrl = properties.getPublicBaseUrl() + "/profile/orders";
         StringBuilder sb = new StringBuilder();
         sb.append(messages.get("email.common.greeting", lang, recipientName)).append("\n\n");
         sb.append(messages.get("email.refund_requested.headline", lang)).append("\n\n");
         sb.append(messages.get("email.refund_requested.details", lang, amountStr, refundIdStr != null ? refundIdStr : "N/A")).append("\n\n");
-        sb.append(messages.get("email.refund_requested.cta", lang, properties.getPublicBaseUrl() + "/profile/orders")).append("\n\n");
+        sb.append(messages.get("email.refund_requested.cta", lang, ctaUrl)).append("\n\n");
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                lang == SupportedLanguage.EN ? "Refund Requested" : "Đang xử lý hoàn tiền",
+                TransactionalEmailHtmlLayout.Theme.WARNING,
+                body,
+                lang == SupportedLanguage.EN ? "Track Refund Status" : "Theo dõi trạng thái hoàn tiền",
+                ctaUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     private RenderedEmail renderRefundProcessed(
@@ -169,16 +180,27 @@ public class RefundVoucherEmailRenderer implements TransactionalEmailRenderer {
         String amountStr = formatCurrency(payload.get("amount"));
 
         String subject = messages.get("email.refund_processed.subject", lang);
+        String ctaUrl = properties.getPublicBaseUrl() + "/profile/orders";
         StringBuilder sb = new StringBuilder();
         sb.append(messages.get("email.common.greeting", lang, recipientName)).append("\n\n");
         sb.append(messages.get("email.refund_processed.headline", lang)).append("\n\n");
         sb.append(messages.get("email.refund_processed.gateway_disclaimer", lang)).append("\n\n");
         sb.append(messages.get("email.refund_processed.details", lang, amountStr, refundIdStr != null ? refundIdStr : "N/A")).append("\n\n");
-        sb.append(messages.get("email.refund_processed.cta", lang, properties.getPublicBaseUrl() + "/profile/orders")).append("\n\n");
+        sb.append(messages.get("email.refund_processed.cta", lang, ctaUrl)).append("\n\n");
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                lang == SupportedLanguage.EN ? "Refund Processed" : "Hoàn tiền thành công",
+                TransactionalEmailHtmlLayout.Theme.SUCCESS,
+                body,
+                lang == SupportedLanguage.EN ? "View Refund Details" : "Xem chi tiết giao dịch hoàn",
+                ctaUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     private RenderedEmail renderRefundNeedsAttention(
@@ -205,6 +227,7 @@ public class RefundVoucherEmailRenderer implements TransactionalEmailRenderer {
         String amountStr = formatCurrency(payload.get("amount"));
 
         String subject = messages.get("email.refund_needs_attention.subject", lang, reason);
+        String ctaUrl = properties.getPublicBaseUrl() + "/admin/orders";
         StringBuilder sb = new StringBuilder();
         sb.append(messages.get("email.refund_needs_attention.headline", lang, reason)).append("\n\n");
         sb.append(messages.get("email.refund_needs_attention.details", lang,
@@ -213,11 +236,21 @@ public class RefundVoucherEmailRenderer implements TransactionalEmailRenderer {
                 reason,
                 lastError
         )).append("\n\n");
-        sb.append(messages.get("email.refund_needs_attention.cta", lang, properties.getPublicBaseUrl() + "/admin/orders")).append("\n\n");
+        sb.append(messages.get("email.refund_needs_attention.cta", lang, ctaUrl)).append("\n\n");
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String htmlBody = TransactionalEmailHtmlLayout.fromPlainText(
+                subject,
+                "OPS · " + reason,
+                TransactionalEmailHtmlLayout.Theme.DANGER,
+                body,
+                lang == SupportedLanguage.EN ? "Open Admin Orders" : "Mở trang Quản trị Đơn hàng",
+                ctaUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     private RenderedEmail renderPersonalVoucherIssued(
@@ -264,15 +297,29 @@ public class RefundVoucherEmailRenderer implements TransactionalEmailRenderer {
         }
 
         String subject = messages.get("email.personal_voucher.subject", lang, code);
+        String ctaUrl = properties.getPublicBaseUrl() + "/profile/vouchers";
         StringBuilder sb = new StringBuilder();
         sb.append(messages.get("email.common.greeting", lang, recipientName)).append("\n\n");
         sb.append(messages.get("email.personal_voucher.headline", lang)).append("\n\n");
         sb.append(messages.get("email.personal_voucher.details", lang, code, discountValueStr, minOrderStr, validToStr)).append("\n\n");
-        sb.append(messages.get("email.personal_voucher.cta", lang, properties.getPublicBaseUrl() + "/profile/vouchers")).append("\n\n");
+        sb.append(messages.get("email.personal_voucher.cta", lang, ctaUrl)).append("\n\n");
         sb.append(messages.get("email.common.signature", lang));
 
         String body = sb.toString();
-        return new RenderedEmail(recipient.email(), subject, body, body.replace("\n", "<br/>"));
+        String voucherHtml = "<p>" + TransactionalEmailHtmlLayout.escapeHtml(messages.get("email.common.greeting", lang, recipientName)) + "</p>"
+                + "<p>" + TransactionalEmailHtmlLayout.escapeHtml(messages.get("email.personal_voucher.headline", lang)) + "</p>"
+                + TransactionalEmailHtmlLayout.buildVoucherBox(code, discountValueStr, minOrderStr, validToStr, lang);
+        String htmlBody = TransactionalEmailHtmlLayout.wrapDocument(
+                subject,
+                lang == SupportedLanguage.EN ? "Personal Voucher" : "Mã ưu đãi riêng",
+                TransactionalEmailHtmlLayout.Theme.OCEAN,
+                voucherHtml,
+                lang == SupportedLanguage.EN ? "View My Vouchers" : "Mở Kho Voucher của tôi",
+                ctaUrl,
+                properties.getSupportPhone(),
+                lang
+        );
+        return new RenderedEmail(recipient.email(), subject, body, htmlBody);
     }
 
     private String resolveRecipientName(String recipientKey) {
