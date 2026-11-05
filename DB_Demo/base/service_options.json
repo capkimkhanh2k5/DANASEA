@@ -88,7 +88,7 @@
         "updated_at": "2026-10-15T09:06:26.816505+00:00",
         "option_type": "PRIVATE",
         "pricing_unit": "PER_PACKAGE",
-        "max_pax_per_package": null
+        "max_pax_per_package": 1
       }
     },
     {
@@ -215,7 +215,7 @@
       "sqlRow": {
         "id": "7e3cafbc-eefb-5999-8bad-3f05ead10f3c",
         "name": "Nguyên cano – tối đa 8 khách",
-        "price": "8000000.00",
+        "price": "2400000.00",
         "status": "ACTIVE",
         "benefits": null,
         "created_at": "2026-10-15T09:06:26.816505+00:00",
@@ -298,7 +298,7 @@
         "updated_at": "2026-10-15T09:06:26.816505+00:00",
         "option_type": "PRIVATE",
         "pricing_unit": "PER_PACKAGE",
-        "max_pax_per_package": null
+        "max_pax_per_package": 1
       }
     },
     {
@@ -343,7 +343,7 @@
         "updated_at": "2026-10-15T09:06:26.816505+00:00",
         "option_type": "PRIVATE",
         "pricing_unit": "PER_PACKAGE",
-        "max_pax_per_package": null
+        "max_pax_per_package": 1
       }
     },
     {
@@ -403,7 +403,7 @@
         "updated_at": "2026-10-15T09:06:26.816505+00:00",
         "option_type": "PRIVATE",
         "pricing_unit": "PER_PACKAGE",
-        "max_pax_per_package": null
+        "max_pax_per_package": 1
       }
     },
     {
@@ -418,7 +418,7 @@
         "updated_at": "2026-10-15T09:06:26.816505+00:00",
         "option_type": "PRIVATE",
         "pricing_unit": "PER_PACKAGE",
-        "max_pax_per_package": null
+        "max_pax_per_package": 2
       }
     },
     {
@@ -478,7 +478,7 @@
         "updated_at": "2026-10-15T09:06:26.816505+00:00",
         "option_type": "PRIVATE",
         "pricing_unit": "PER_PACKAGE",
-        "max_pax_per_package": null
+        "max_pax_per_package": 1
       }
     },
     {
