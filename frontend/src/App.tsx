@@ -25,7 +25,9 @@ const Wishlist = lazy(() => import("./pages/customer/Profile/Wishlist").then((m)
 
 // Vendor Phase 4
 const VendorDashboard = lazy(() => import("./pages/vendor/Dashboard/Dashboard").then((m) => ({ default: m.Dashboard })));
+const AnalyticsDashboard = lazy(() => import("./pages/vendor/Analytics/AnalyticsDashboard").then((m) => ({ default: m.AnalyticsDashboard })));
 const Services = lazy(() => import("./pages/vendor/Services/Services").then((m) => ({ default: m.Services })));
+const Equipment = lazy(() => import("./pages/vendor/Equipment/Equipment").then((m) => ({ default: m.Equipment })));
 const ServiceForm = lazy(() => import("./pages/vendor/Services/ServiceForm").then((m) => ({ default: m.ServiceForm })));
 const Schedule = lazy(() => import("./pages/vendor/Schedule/Schedule").then((m) => ({ default: m.Schedule })));
 const VendorOrders = lazy(() => import("./pages/vendor/Orders/VendorOrders").then((m) => ({ default: m.VendorOrders })));
@@ -66,6 +68,7 @@ function App() {
           <Route path="explore" element={<Explore />} />
           <Route path="search" element={<Search />} />
           <Route path="tour/:id" element={<ExperienceDetail />} />
+          <Route path="tours/:id" element={<ExperienceDetail />} />
           <Route path="experience/:id" element={<ExperienceDetail />} />
           
           {/* Phase 3 */}
@@ -84,8 +87,10 @@ function App() {
         {/* NHÀ CUNG CẤP */}
         <Route path="/vendor" element={<VendorLayout />}>
           <Route index element={<VendorDashboard />} />
+          <Route path="analytics" element={<AnalyticsDashboard />} />
           <Route path="profile" element={<VendorProfile />} />
           <Route path="services" element={<Services />} />
+          <Route path="equipment" element={<Equipment />} />
           <Route path="services/new" element={<ServiceForm />} />
           <Route path="services/:serviceId/edit" element={<ServiceForm />} />
           <Route path="services/:serviceId" element={<ServiceForm />} />
