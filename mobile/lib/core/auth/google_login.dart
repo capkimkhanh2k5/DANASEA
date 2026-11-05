@@ -6,7 +6,10 @@ class GoogleLogin {
   static Future<void>? _initialization;
 
   static Future<String?> idToken() async {
-    const serverId = String.fromEnvironment('GOOGLE_SERVER_CLIENT_ID');
+    const serverId = String.fromEnvironment(
+      'GOOGLE_SERVER_CLIENT_ID',
+      defaultValue: '183371974774-75djkakuuigpidlj4ovfrcdmmmt39rm5.apps.googleusercontent.com',
+    );
     const clientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
     if (serverId.isEmpty) {
       throw AuthFailure('Chưa cấu hình đăng nhập Google cho ứng dụng.');

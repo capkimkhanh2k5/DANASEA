@@ -516,7 +516,8 @@ class ServiceSafetyDocumentModel {
 enum SlotStatus {
   open,
   closed,
-  blocked;
+  blocked,
+  cancelled;
 
   String get labelVi {
     switch (this) {
@@ -526,6 +527,8 @@ enum SlotStatus {
         return 'Đã đóng';
       case SlotStatus.blocked:
         return 'Chặn nhận thêm (BLOCKED)';
+      case SlotStatus.cancelled:
+        return 'Đã hủy';
     }
   }
 
@@ -537,6 +540,8 @@ enum SlotStatus {
         return 'CLOSED';
       case SlotStatus.blocked:
         return 'BLOCKED';
+      case SlotStatus.cancelled:
+        return 'CANCELLED';
     }
   }
 }
@@ -568,7 +573,11 @@ class ServiceSlotModel {
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : id = id ?? slotId ?? '',
-        date = date ?? (slotDate is DateTime ? slotDate : DateTime.now()),
+        date = date ??
+            (slotDate is DateTime
+                ? slotDate
+                : (slotDate is String ? DateTime.tryParse(slotDate) : null) ??
+                    DateTime.now()),
         status = status ?? (isBlocked == true ? SlotStatus.blocked : SlotStatus.open);
 
   int get availableCount => max(0, capacity - bookedCount - heldCount);
@@ -576,6 +585,10 @@ class ServiceSlotModel {
   String get slotId => id;
   String get slotDate => '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   DateTime get createdAt => date;
+
+  bool matchesDate(DateTime target) {
+    return date.year == target.year && date.month == target.month && date.day == target.day;
+  }
 
   ServiceSlotModel copyWith({
     int? capacity,
