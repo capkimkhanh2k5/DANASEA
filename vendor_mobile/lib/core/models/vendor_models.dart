@@ -516,7 +516,8 @@ class ServiceSafetyDocumentModel {
 enum SlotStatus {
   open,
   closed,
-  blocked;
+  blocked,
+  cancelled;
 
   String get labelVi {
     switch (this) {
@@ -526,6 +527,8 @@ enum SlotStatus {
         return 'Đã đóng';
       case SlotStatus.blocked:
         return 'Chặn nhận thêm (BLOCKED)';
+      case SlotStatus.cancelled:
+        return 'Đã hủy';
     }
   }
 
@@ -537,6 +540,8 @@ enum SlotStatus {
         return 'CLOSED';
       case SlotStatus.blocked:
         return 'BLOCKED';
+      case SlotStatus.cancelled:
+        return 'CANCELLED';
     }
   }
 }

@@ -74,7 +74,7 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
     final slotsForDay = _db.slots.where((s) {
       if (s.serviceId != _selectedServiceId) return false;
       if (!s.matchesDate(_selectedDate)) return false;
-      if (_slotFilter == 'open') return !s.isBlocked && s.bookedCount < s.capacity;
+      if (_slotFilter == 'open') return s.status == SlotStatus.open && s.availableCount > 0;
       if (_slotFilter == 'blocked') return s.isBlocked;
       return true;
     }).toList();
@@ -557,7 +557,9 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                   ),
                 ],
               ),
-              if (slot.isBlocked)
+              if (slot.status == SlotStatus.cancelled || slot.status == SlotStatus.closed)
+                LocalizedText(slot.status.labelVi)
+              else if (slot.isBlocked)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -626,49 +628,50 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
           const SizedBox(height: 12),
 
           // Actions
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // Toggle block button
-              TextButton.icon(
-                onPressed: () {
-                  _db.toggleSlotBlocked(slot.slotId);
-                  ToastNotification.showInfo(
-                    context,
-                    slot.isBlocked ? 'Đã mở khóa slot ${slot.startTime}' : 'Đã tạm khóa slot ${slot.startTime}',
-                  );
-                },
-                icon: Icon(slot.isBlocked ? Icons.lock_open : Icons.block, size: 15, color: slot.isBlocked ? AppColors.secondary : AppColors.error),
-                label: LocalizedText(
-                  slot.isBlocked ? 'Mở khóa' : 'Tạm khóa',
-                  style: TextStyle(fontSize: 12, color: slot.isBlocked ? AppColors.secondary : AppColors.error),
+          if (slot.status != SlotStatus.cancelled)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Toggle block button
+                TextButton.icon(
+                  onPressed: () {
+                    _db.toggleSlotBlocked(slot.slotId);
+                    ToastNotification.showInfo(
+                      context,
+                      slot.isBlocked ? 'Đã mở khóa slot ${slot.startTime}' : 'Đã tạm khóa slot ${slot.startTime}',
+                    );
+                  },
+                  icon: Icon(slot.isBlocked ? Icons.lock_open : Icons.block, size: 15, color: slot.isBlocked ? AppColors.secondary : AppColors.error),
+                  label: LocalizedText(
+                    slot.isBlocked ? 'Mở khóa' : 'Tạm khóa',
+                    style: TextStyle(fontSize: 12, color: slot.isBlocked ? AppColors.secondary : AppColors.error),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              // Edit config button
-              ElevatedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => SlotConfigScreen(
-                        slot: slot,
-                        serviceId: _selectedServiceId,
+                const SizedBox(width: 8),
+                // Edit config button
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => SlotConfigScreen(
+                          slot: slot,
+                          serviceId: _selectedServiceId,
+                        ),
                       ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.tune, size: 14),
-                label: const LocalizedText('Cấu hình', style: TextStyle(fontSize: 12)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.surfaceContainerLow,
-                  foregroundColor: AppColors.secondary,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    );
+                  },
+                  icon: const Icon(Icons.tune, size: 14),
+                  label: const LocalizedText('Cấu hình', style: TextStyle(fontSize: 12)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.surfaceContainerLow,
+                    foregroundColor: AppColors.secondary,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
