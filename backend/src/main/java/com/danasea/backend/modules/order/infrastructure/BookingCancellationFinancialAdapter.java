@@ -2,6 +2,9 @@ package com.danasea.backend.modules.order.infrastructure;
 
 import com.danasea.backend.modules.booking.domain.models.CancellationFinancialResult;
 import com.danasea.backend.modules.booking.domain.ports.BookingCancellationFinancialPort;
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.order.application.DiscountReservationService;
 import com.danasea.backend.modules.order.application.RefundProcessingService;
 import com.danasea.backend.modules.order.application.services.DisruptionDecisionService;
@@ -19,6 +22,8 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaRefundRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
+import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
+import com.danasea.backend.modules.vendor.domain.models.Vendor;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -30,7 +35,11 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Component
 public class BookingCancellationFinancialAdapter implements BookingCancellationFinancialPort {
@@ -49,6 +58,12 @@ public class BookingCancellationFinancialAdapter implements BookingCancellationF
     private final RefundPolicyEngine refundPolicyEngine;
     private final RefundProcessingService refundProcessingService;
     private final DiscountReservationService reservations;
+
+    @Autowired(required = false)
+    private TransactionalEmailPort transactionalEmailPort;
+
+    @Autowired(required = false)
+    private VendorInternalApi vendorInternalApi;
 
     @Autowired
     public BookingCancellationFinancialAdapter(
@@ -166,6 +181,22 @@ public class BookingCancellationFinancialAdapter implements BookingCancellationF
                 refund.setRequestedBy(requestedBy);
                 refund.setIdempotencyKey(idempotencyKey);
                 refund = refundRepository.save(refund);
+                if (transactionalEmailPort != null && refund != null && refund.getId() != null) {
+                    transactionalEmailPort.enqueue(new EmailRequest(
+                            TransactionalEmailType.REFUND_REQUESTED,
+                            "refund:" + refund.getId() + ":requested",
+                            "USER:" + order.getCustomerId(),
+                            requestedAt,
+                            requestedAt,
+                            null,
+                            1,
+                            Map.of(
+                                    "refundId", refund.getId().toString(),
+                                    "subOrderId", subOrder.getId().toString(),
+                                    "amount", refund.getAmount() != null ? refund.getAmount().doubleValue() : 0.0
+                            )
+                    ));
+                }
             }
             subOrder.setStatus(SubOrderStatus.CANCELLED);
             subOrder.setCancellationReason(RefundReason.CUSTOMER_CANCEL);
@@ -176,6 +207,52 @@ public class BookingCancellationFinancialAdapter implements BookingCancellationF
         order.setPaymentStatus(
                 refundTotal.signum() == 0 ? PaymentOrderStatus.NO_REFUND : PaymentOrderStatus.PAID);
         masterOrderRepository.save(order);
+
+        if (transactionalEmailPort != null) {
+            transactionalEmailPort.enqueue(new EmailRequest(
+                    TransactionalEmailType.TRIP_CANCELLED,
+                    "booking:" + bookingId + ":cancelled",
+                    "USER:" + order.getCustomerId(),
+                    requestedAt,
+                    requestedAt,
+                    requestedAt.plusDays(7),
+                    1,
+                    Map.of(
+                            "bookingId", bookingId.toString(),
+                            "serviceName", "Dịch vụ Danasea",
+                            "reason", "Khách hàng yêu cầu hủy đơn",
+                            "subOrderIds", subOrders.stream().map(s -> s.getId().toString()).toList()
+                    )
+            ));
+            if (vendorInternalApi != null) {
+                Set<UUID> distinctVendorIds = subOrders.stream()
+                        .map(SubOrderJpaEntity::getVendorId)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+                for (UUID vId : distinctVendorIds) {
+                    UUID vendorOwnerUserId = vendorInternalApi.findById(vId)
+                            .map(Vendor::getUserId)
+                            .orElse(null);
+                    if (vendorOwnerUserId != null) {
+                        transactionalEmailPort.enqueue(new EmailRequest(
+                                TransactionalEmailType.TRIP_CANCELLED,
+                                "booking:" + bookingId + ":vendor:" + vId + ":cancelled",
+                                "USER:" + vendorOwnerUserId,
+                                requestedAt,
+                                requestedAt,
+                                requestedAt.plusDays(7),
+                                1,
+                                Map.of(
+                                        "bookingId", bookingId.toString(),
+                                        "serviceName", "Dịch vụ Danasea",
+                                        "reason", "Khách hàng hủy đơn",
+                                        "isVendor", true
+                                )
+                        ));
+                    }
+                }
+            }
+        }
 
         int percentage =
                 originalTotal.compareTo(BigDecimal.ZERO) == 0

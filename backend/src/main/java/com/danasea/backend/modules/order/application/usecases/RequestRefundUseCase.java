@@ -28,11 +28,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -43,6 +49,13 @@ public class RequestRefundUseCase {
     @Autowired
     public void setDisruptionDecisions(DisruptionDecisionService disruptionDecisions) {
         this.disruptionDecisions = disruptionDecisions;
+    }
+
+    @Autowired(required = false)
+    private TransactionalEmailPort transactionalEmailPort;
+
+    public void setTransactionalEmailPort(TransactionalEmailPort transactionalEmailPort) {
+        this.transactionalEmailPort = transactionalEmailPort;
     }
 
     private final MasterOrderRepositoryPort masterOrderRepository;
@@ -294,6 +307,24 @@ public class RequestRefundUseCase {
                     refund.setProviderTransactionId(originalPayment.getProviderTransactionId());
                 }
                 refund = refundRepository.save(refund);
+
+                if (transactionalEmailPort != null) {
+                    OffsetDateTime now = OffsetDateTime.now();
+                    transactionalEmailPort.enqueue(new EmailRequest(
+                            TransactionalEmailType.REFUND_REQUESTED,
+                            "refund:" + refund.getId() + ":requested",
+                            "USER:" + command.customerId(),
+                            now,
+                            now,
+                            null,
+                            1,
+                            Map.of(
+                                    "refundId", refund.getId().toString(),
+                                    "subOrderId", subOrder.getId().toString(),
+                                    "amount", refund.getAmount() != null ? refund.getAmount().doubleValue() : 0.0
+                            )
+                    ));
+                }
 
                 results.add(
                         new OrderRefundResult(

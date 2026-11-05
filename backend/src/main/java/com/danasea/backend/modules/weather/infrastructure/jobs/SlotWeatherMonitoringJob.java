@@ -1,8 +1,11 @@
 package com.danasea.backend.modules.weather.infrastructure.jobs;
 
 import com.danasea.backend.modules.communication.application.dtos.NotificationCommand;
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
 import com.danasea.backend.modules.communication.application.usecases.SendNotificationUseCase;
 import com.danasea.backend.modules.communication.domain.models.NotificationChannel;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.domain.services.RefundPolicyEngine;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
@@ -16,6 +19,8 @@ import com.danasea.backend.modules.service.infrastructure.persistence.entities.S
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaCategoryRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
+import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
+import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import com.danasea.backend.modules.weather.application.dtos.WeatherInfoDto;
 import com.danasea.backend.modules.weather.application.ports.output.WeatherProviderPort;
 import com.danasea.backend.modules.weather.application.services.LocalizedWeatherEvaluationValue;
@@ -45,6 +50,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -57,6 +63,10 @@ public class SlotWeatherMonitoringJob {
     @Autowired private Clock clock;
 
     @Autowired private WeatherBookingCancellationService weatherCancellation;
+
+    @Autowired(required = false) private TransactionalEmailPort transactionalEmailPort;
+
+    @Autowired(required = false) private VendorInternalApi vendorInternalApi;
 
     private final JpaServiceSlotRepository slotRepository;
     private final JpaServiceRepository serviceRepository;
@@ -364,6 +374,73 @@ public class SlotWeatherMonitoringJob {
                                 subOrder.getId());
                     }
 
+                    // 4. Transactional Emails
+                    if (transactionalEmailPort != null) {
+                        OffsetDateTime emailNow = OffsetDateTime.now(clock);
+                        String sName = (serviceOpt.isPresent() && serviceOpt.get().getName() != null)
+                                ? serviceOpt.get().getName()
+                                : "Dịch vụ Danasea";
+                        // Customers
+                        for (SubOrderJpaEntity subOrder : cancelled) {
+                            UUID customerId = resolveCustomerId(subOrder);
+                            if (customerId != null) {
+                                transactionalEmailPort.enqueue(new EmailRequest(
+                                        TransactionalEmailType.TRIP_CANCELLED,
+                                        "slot:" + slot.getId() + ":cancellation",
+                                        "USER:" + customerId,
+                                        emailNow,
+                                        emailNow,
+                                        emailNow.plusDays(7),
+                                        1,
+                                        Map.of(
+                                                "slotId", slot.getId().toString(),
+                                                "serviceName", sName,
+                                                "reason", "Tự động hủy ca do thời tiết xấu cấp độ Đỏ",
+                                                "subOrderIds", List.of(subOrder.getId().toString())
+                                        )
+                                ));
+                            }
+                        }
+                        // Vendor owner
+                        if (serviceOpt.isPresent() && serviceOpt.get().getVendorId() != null && vendorInternalApi != null) {
+                            UUID vendorOwnerUserId = vendorInternalApi.findById(serviceOpt.get().getVendorId())
+                                    .map(Vendor::getUserId)
+                                    .orElse(null);
+                            if (vendorOwnerUserId != null) {
+                                transactionalEmailPort.enqueue(new EmailRequest(
+                                        TransactionalEmailType.TRIP_CANCELLED,
+                                        "slot:" + slot.getId() + ":cancellation",
+                                        "USER:" + vendorOwnerUserId,
+                                        emailNow,
+                                        emailNow,
+                                        emailNow.plusDays(7),
+                                        1,
+                                        Map.of(
+                                                "slotId", slot.getId().toString(),
+                                                "serviceName", sName,
+                                                "reason", "Tự động hủy ca do thời tiết xấu cấp độ Đỏ",
+                                                "isVendor", true
+                                        )
+                                ));
+                            }
+                        }
+                        // OPS alert
+                        transactionalEmailPort.enqueue(new EmailRequest(
+                                TransactionalEmailType.OPS_DISRUPTION_ALERT,
+                                "slot:" + slot.getId() + ":ops:auto_cancelled",
+                                "OPS:OPERATIONS",
+                                emailNow,
+                                emailNow,
+                                emailNow.plusDays(7),
+                                1,
+                                Map.of(
+                                        "slotId", slot.getId().toString(),
+                                        "serviceName", sName,
+                                        "stage", "AUTO_CANCELLED_FOR_SAFETY"
+                                )
+                        ));
+                    }
+
                     return true;
                 }
             }
@@ -655,6 +732,56 @@ public class SlotWeatherMonitoringJob {
                     },
                     "SERVICE_SLOT",
                     slot.getId());
+        }
+
+        // 4. Transactional Emails
+        if (transactionalEmailPort != null) {
+            OffsetDateTime emailNow = OffsetDateTime.now(clock);
+            LocalDateTime slotStart = LocalDateTime.of(slot.getDate(), slot.getStartTime());
+            OffsetDateTime departureAt = slotStart.atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toOffsetDateTime();
+            String sName = service.getName() != null ? service.getName() : "Dịch vụ Danasea";
+            String warningMsg = evalResult.getWarningMessage() != null ? evalResult.getWarningMessage() : "";
+
+            for (SubOrderJpaEntity subOrder : subOrders) {
+                if (subOrder.getStatus() == SubOrderStatus.CONFIRMED) {
+                    UUID customerId = resolveCustomerId(subOrder);
+                    if (customerId != null) {
+                        transactionalEmailPort.enqueue(new EmailRequest(
+                                TransactionalEmailType.TRIP_RED_ALERT,
+                                "slot:" + slot.getId() + ":weather:red",
+                                "USER:" + customerId,
+                                emailNow,
+                                emailNow,
+                                departureAt,
+                                1,
+                                Map.of(
+                                        "slotId", slot.getId().toString(),
+                                        "serviceName", sName,
+                                        "date", slot.getDate().toString(),
+                                        "startTime", slot.getStartTime().toString(),
+                                        "warning", warningMsg
+                                )
+                        ));
+                    }
+                }
+            }
+
+            if (isEscalation) {
+                transactionalEmailPort.enqueue(new EmailRequest(
+                        TransactionalEmailType.OPS_DISRUPTION_ALERT,
+                        "slot:" + slot.getId() + ":ops:weather:red",
+                        "OPS:OPERATIONS",
+                        emailNow,
+                        emailNow,
+                        departureAt,
+                        1,
+                        Map.of(
+                                "slotId", slot.getId().toString(),
+                                "serviceName", sName,
+                                "stage", "RED_ESCALATION"
+                        )
+                ));
+            }
         }
     }
 

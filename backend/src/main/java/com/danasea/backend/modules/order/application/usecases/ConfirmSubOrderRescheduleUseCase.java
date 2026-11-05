@@ -9,6 +9,9 @@ import com.danasea.backend.modules.booking.infrastructure.persistence.entities.B
 import com.danasea.backend.modules.booking.infrastructure.persistence.mappers.BookingMapper;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingItemRepository;
 import com.danasea.backend.modules.checkin.infrastructure.persistence.repositories.JpaCheckinTokenRepository;
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.order.application.services.DisruptionDecisionService;
 import com.danasea.backend.modules.order.application.services.RescheduleSupport;
 import com.danasea.backend.modules.order.domain.events.SubOrderRescheduledEvent;
@@ -25,6 +28,8 @@ import com.danasea.backend.modules.service.domain.models.OptionType;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotUnitRepository;
+import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
+import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import com.danasea.backend.modules.weather.infrastructure.persistence.repositories.JpaSafetyRuleEvaluationRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
 import com.danasea.backend.shared.i18n.LocalizedMessageService;
@@ -33,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -46,6 +52,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -72,6 +79,12 @@ public class ConfirmSubOrderRescheduleUseCase {
     private final BookingMapper bookingMapper;
     private final DisruptionDecisionService decisions;
     private final JpaSubOrderDisruptionRepository disruptions;
+
+    @Autowired(required = false)
+    private TransactionalEmailPort transactionalEmailPort;
+
+    @Autowired(required = false)
+    private VendorInternalApi vendorInternalApi;
 
     @Transactional(timeout = 30)
     public SubOrderRescheduleResponse execute(
@@ -349,6 +362,51 @@ public class ConfirmSubOrderRescheduleUseCase {
                             + "\",\"version\":"
                             + sub.getRescheduleVersion()
                             + "}");
+
+            if (transactionalEmailPort != null) {
+                OffsetDateTime emailNow = OffsetDateTime.now(ZoneOffset.ofHours(7));
+                transactionalEmailPort.enqueue(new EmailRequest(
+                        TransactionalEmailType.TRIP_RESCHEDULED,
+                        "reschedule:" + history.getId(),
+                        "USER:" + master.getCustomerId(),
+                        emailNow,
+                        emailNow,
+                        emailNow.plusDays(7),
+                        1,
+                        Map.of(
+                                "historyId", history.getId().toString(),
+                                "subOrderId", subOrderId.toString(),
+                                "serviceName", "Dịch vụ Danasea",
+                                "newDate", target.getDate().toString(),
+                                "newTime", target.getStartTime().toString()
+                        )
+                ));
+                if (vendorInternalApi != null && sub.getVendorId() != null) {
+                    UUID vendorOwnerUserId = vendorInternalApi.findById(sub.getVendorId())
+                            .map(Vendor::getUserId)
+                            .orElse(null);
+                    if (vendorOwnerUserId != null) {
+                        transactionalEmailPort.enqueue(new EmailRequest(
+                                TransactionalEmailType.TRIP_RESCHEDULED,
+                                "reschedule:" + history.getId(),
+                                "USER:" + vendorOwnerUserId,
+                                emailNow,
+                                emailNow,
+                                emailNow.plusDays(7),
+                                1,
+                                Map.of(
+                                        "historyId", history.getId().toString(),
+                                        "subOrderId", subOrderId.toString(),
+                                        "serviceName", "Dịch vụ Danasea",
+                                        "newDate", target.getDate().toString(),
+                                        "newTime", target.getStartTime().toString(),
+                                        "isVendor", true
+                                )
+                        ));
+                    }
+                }
+            }
+
             eventPublisher.publishEvent(
                     new SubOrderRescheduledEvent(
                             history.getId(),

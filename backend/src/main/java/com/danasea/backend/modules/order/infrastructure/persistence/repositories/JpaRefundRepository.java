@@ -38,6 +38,8 @@ public interface JpaRefundRepository extends JpaRepository<RefundJpaEntity, UUID
 
     List<RefundJpaEntity> findByStatusAndRetryCountLessThanOrderByCreatedAtAsc(RefundStatus status, int maxRetryCount);
 
+    List<RefundJpaEntity> findByStatusAndCreatedAtLessThanOrderByCreatedAtAsc(RefundStatus status, OffsetDateTime threshold);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM RefundJpaEntity r WHERE r.id = :id")
     Optional<RefundJpaEntity> findByIdForUpdate(@Param("id") UUID id);

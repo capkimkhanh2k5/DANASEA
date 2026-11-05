@@ -18,7 +18,8 @@ public class I18nConfig {
             "classpath:i18n/weather",
             "classpath:i18n/notification",
             "classpath:i18n/ai",
-            "classpath:i18n/policy"
+            "classpath:i18n/policy",
+            "classpath:i18n/transactional_email"
     };
 
     @Bean
