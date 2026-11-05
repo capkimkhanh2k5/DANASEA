@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import backup
@@ -261,8 +262,12 @@ finally:s.close()
         self.sql(f'ALTER ROLE "{self.runtime_role}" NOLOGIN; ALTER DATABASE "{self.database}" CONNECTION LIMIT 0')
         self.sql("SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
                  f"WHERE datname=current_database() AND pid<>pg_backend_pid() AND usename='{self.runtime_role}'")
-        if self.sql("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()") != '0':
-            raise ValueError('Database writer remains active')
+        # Termination signals are asynchronous and internal workers can still be exiting.
+        deadline = time.monotonic() + 5
+        while self.sql("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()") != '0':
+            if time.monotonic() >= deadline:
+                raise ValueError('Database writer remains active')
+            time.sleep(0.25)
 
     def ungate(self, journal):
         settings = journal.get('database_gate')
