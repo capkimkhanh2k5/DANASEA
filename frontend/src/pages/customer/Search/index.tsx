@@ -72,45 +72,6 @@ export function Search() {
   // Search input state
   const [keyword, setKeyword] = useState<string>(keywordParam);
 
-  // Interactive Query Bar Date & Pax States
-  const today = useMemo(() => new Date(), []);
-  const formatIsoDate = (d: Date) => d.toISOString().split('T')[0];
-  const formatDisplayDate = (d: Date) => {
-    return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
-  };
-
-  const [dateType, setDateType] = useState<'today' | 'tomorrow' | 'weekend' | 'custom'>('today');
-  const [selectedDate, setSelectedDate] = useState<string>(() => formatIsoDate(today));
-  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-
-  // Guests & Equipment Counts
-  const [adults, setAdults] = useState<number>(2);
-  const [childrenCount, setChildrenCount] = useState<number>(0);
-  const [equipmentCount, setEquipmentCount] = useState<number>(1);
-  const [isGuestsPickerOpen, setIsGuestsPickerOpen] = useState(false);
-
-  const dateDisplayText = useMemo(() => {
-    if (dateType === 'today') return `Hôm nay, ${formatDisplayDate(today)}`;
-    if (dateType === 'tomorrow') {
-      const tm = new Date(today.getTime() + 86400000);
-      return `Ngày mai, ${formatDisplayDate(tm)}`;
-    }
-    if (dateType === 'weekend') return 'Cuối tuần này (T7/CN)';
-    try {
-      return `Ngày ${formatDisplayDate(new Date(selectedDate))}`;
-    } catch {
-      return selectedDate;
-    }
-  }, [dateType, selectedDate, today]);
-
-  const guestsDisplayText = useMemo(() => {
-    const parts: string[] = [];
-    parts.push(`${adults} Người lớn`);
-    if (childrenCount > 0) parts.push(`${childrenCount} Trẻ em`);
-    parts.push(`${equipmentCount} Cano/Ván`);
-    return parts.join(', ');
-  }, [adults, childrenCount, equipmentCount]);
-
   // Traveloka Filter States
   // 1. Popular Filters (Bộ lọc phổ biến)
   const [popFreeCancel, setPopFreeCancel] = useState<boolean>(false);
@@ -397,13 +358,14 @@ export function Search() {
     <div className="w-full bg-[#f8fafc] min-h-screen text-slate-900 pt-20 pb-32">
       
       {/* =========================================================================
-          TOP UNIFIED SEARCH & CONTROL STRIP (Header Query Bar with Maritime Ocean Backdrop)
+          TOP UNIFIED SEARCH & CONTROL STRIP (Header Query Bar)
          ========================================================================= */}
-      <section className="bg-white border-b border-slate-200/80 py-4 sm:py-5 px-4 sm:px-6 lg:px-8 shadow-xs">
+      <section className="bg-white border-b border-slate-200/80 text-slate-900 py-4 sm:py-5 px-4 sm:px-6 lg:px-8 shadow-xs">
         <div className="max-w-[1440px] mx-auto animate-fadeInUp">
-          {/* Quick Query Bar (Solid White Card with Hairline Border) */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 flex flex-col md:flex-row items-center gap-2 text-slate-800 shadow-sm">
-
+          
+          {/* Quick Query Bar (Modern Geometric Design: rounded-2xl & rounded-xl) */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 flex flex-col md:flex-row items-center gap-2 text-slate-800 shadow-xs hover:border-slate-300 transition-colors">
+            
             {/* Field 1: Destination / Keyword */}
             <div className="flex-1 min-w-0 w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-500 border border-transparent focus-within:border-sky-500 transition-all">
               <MapPin className="w-4 h-4 text-sky-700 shrink-0" />
@@ -418,246 +380,34 @@ export function Search() {
                 />
               </div>
               {keyword && (
-                <button type="button" onClick={() => setKeyword('')} className="text-slate-400 hover:text-slate-700 text-sm px-1 cursor-pointer">×</button>
+                <button type="button" onClick={() => setKeyword('')} className="text-slate-400 hover:text-slate-700 text-sm px-1 cursor-pointer">✕</button>
               )}
             </div>
 
-            {/* Field 2: Date Selector (Interactive Popover) */}
-            <div className="relative w-full md:w-60 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsDatePickerOpen((prev) => !prev);
-                  setIsGuestsPickerOpen(false);
-                }}
-                className={`w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                  isDatePickerOpen
-                    ? 'bg-white border-sky-500 ring-1 ring-sky-500 shadow-xs'
-                    : 'bg-slate-50 hover:bg-slate-100/80 border-transparent'
-                }`}
-              >
-                <Calendar className="w-4 h-4 text-sky-700 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">Ngày trải nghiệm</p>
-                  <p className="text-[13px] sm:text-sm font-semibold text-slate-900 truncate">
-                    {dateDisplayText}
-                  </p>
-                </div>
-              </button>
-
-              {/* Date Popover */}
-              {isDatePickerOpen && (
-                <div className="absolute top-full left-0 mt-2 z-50 w-72 p-3.5 bg-white rounded-2xl border border-slate-200 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-150">
-                  <p className="text-xs font-bold text-slate-800 mb-2">Chọn ngày khởi hành:</p>
-                  <div className="grid grid-cols-2 gap-1.5 mb-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDateType('today');
-                        setSelectedDate(formatIsoDate(today));
-                        setIsDatePickerOpen(false);
-                      }}
-                      className={`px-3 py-2 rounded-xl text-xs font-semibold text-center transition-colors cursor-pointer ${
-                        dateType === 'today'
-                          ? 'bg-sky-600 text-white shadow-xs'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      Hôm nay
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDateType('tomorrow');
-                        const tm = new Date(today.getTime() + 86400000);
-                        setSelectedDate(formatIsoDate(tm));
-                        setIsDatePickerOpen(false);
-                      }}
-                      className={`px-3 py-2 rounded-xl text-xs font-semibold text-center transition-colors cursor-pointer ${
-                        dateType === 'tomorrow'
-                          ? 'bg-sky-600 text-white shadow-xs'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      Ngày mai
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDateType('weekend');
-                        setIsDatePickerOpen(false);
-                      }}
-                      className={`px-3 py-2 rounded-xl text-xs font-semibold text-center transition-colors cursor-pointer col-span-2 ${
-                        dateType === 'weekend'
-                          ? 'bg-sky-600 text-white shadow-xs'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      Cuối tuần này (T7 / CN)
-                    </button>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-100">
-                    <label className="block text-[11px] font-medium text-slate-500 mb-1">
-                      Hoặc chọn ngày cụ thể:
-                    </label>
-                    <input
-                      type="date"
-                      min={formatIsoDate(today)}
-                      value={selectedDate}
-                      onChange={(e) => {
-                        setSelectedDate(e.target.value);
-                        setDateType('custom');
-                        setIsDatePickerOpen(false);
-                      }}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                    />
-                  </div>
-                </div>
-              )}
+            {/* Field 2: Date Selector */}
+            <div className="w-full md:w-56 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-transparent transition-colors cursor-pointer shrink-0">
+              <Calendar className="w-4 h-4 text-sky-700 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">Ngày trải nghiệm</p>
+                <p className="text-[13px] sm:text-sm font-semibold text-slate-900 truncate">Hôm nay - Ngày mai</p>
+              </div>
             </div>
 
-            {/* Field 3: Pax / Guests Count (Interactive Popover) */}
-            <div className="relative w-full md:w-64 lg:w-72 shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsGuestsPickerOpen((prev) => !prev);
-                  setIsDatePickerOpen(false);
-                }}
-                className={`w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                  isGuestsPickerOpen
-                    ? 'bg-white border-sky-500 ring-1 ring-sky-500 shadow-xs'
-                    : 'bg-slate-50 hover:bg-slate-100/80 border-transparent'
-                }`}
-              >
-                <Users className="w-4 h-4 text-sky-700 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">Số lượng khách</p>
-                  <p className="text-[13px] sm:text-sm font-semibold text-slate-900 truncate" title={guestsDisplayText}>
-                    {guestsDisplayText}
-                  </p>
-                </div>
-              </button>
-
-              {/* Guests Popover */}
-              {isGuestsPickerOpen && (
-                <div className="absolute top-full left-0 md:right-0 md:left-auto mt-2 z-50 w-80 p-4 bg-white rounded-2xl border border-slate-200 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-150">
-                  <p className="text-xs font-bold text-slate-900 mb-3">Số lượng người tham gia & phương tiện:</p>
-                  
-                  {/* Stepper 1: Người lớn */}
-                  <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                    <div>
-                      <p className="text-xs font-bold text-slate-800">Người lớn</p>
-                      <p className="text-[11px] text-slate-400">Từ 12 tuổi trở lên</p>
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <button
-                        type="button"
-                        disabled={adults <= 1}
-                        onClick={() => setAdults((prev) => Math.max(1, prev - 1))}
-                        className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer font-bold text-sm"
-                      >
-                        -
-                      </button>
-                      <span className="w-5 text-center font-bold text-xs font-mono tabular-nums text-slate-900">
-                        {adults}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={adults >= 20}
-                        onClick={() => setAdults((prev) => Math.min(20, prev + 1))}
-                        className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer font-bold text-sm"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Stepper 2: Trẻ em */}
-                  <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                    <div>
-                      <p className="text-xs font-bold text-slate-800">Trẻ em</p>
-                      <p className="text-[11px] text-slate-400">Dưới 12 tuổi (áo phao riêng)</p>
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <button
-                        type="button"
-                        disabled={childrenCount <= 0}
-                        onClick={() => setChildrenCount((prev) => Math.max(0, prev - 1))}
-                        className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer font-bold text-sm"
-                      >
-                        -
-                      </button>
-                      <span className="w-5 text-center font-bold text-xs font-mono tabular-nums text-slate-900">
-                        {childrenCount}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={childrenCount >= 10}
-                        onClick={() => setChildrenCount((prev) => Math.min(10, prev + 1))}
-                        className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer font-bold text-sm"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Stepper 3: Số phương tiện */}
-                  <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                    <div>
-                      <p className="text-xs font-bold text-slate-800">Cano / Ván SUP</p>
-                      <p className="text-[11px] text-slate-400">Số lượng thiết bị cần thuê</p>
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                      <button
-                        type="button"
-                        disabled={equipmentCount <= 1}
-                        onClick={() => setEquipmentCount((prev) => Math.max(1, prev - 1))}
-                        className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer font-bold text-sm"
-                      >
-                        -
-                      </button>
-                      <span className="w-5 text-center font-bold text-xs font-mono tabular-nums text-slate-900">
-                        {equipmentCount}
-                      </span>
-                      <button
-                        type="button"
-                        disabled={equipmentCount >= 10}
-                        onClick={() => setEquipmentCount((prev) => Math.min(10, prev + 1))}
-                        className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer font-bold text-sm"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Done Button */}
-                  <div className="mt-3 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setIsGuestsPickerOpen(false)}
-                      className="px-4 py-1.5 rounded-xl bg-sky-700 hover:bg-sky-600 text-white text-xs font-bold cursor-pointer transition-colors"
-                    >
-                      Áp dụng
-                    </button>
-                  </div>
-                </div>
-              )}
+            {/* Field 3: Pax / Guests Count - Widen to 260px & add min-w-0 flex-1 so text never overflows */}
+            <div className="w-full md:w-64 lg:w-72 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-transparent transition-colors cursor-pointer shrink-0">
+              <Users className="w-4 h-4 text-sky-700 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">Số lượng khách</p>
+                <p className="text-[13px] sm:text-sm font-semibold text-slate-900 truncate" title="2 Người lớn, 1 Cano/Ván">
+                  2 Người lớn, 1 Cano/Ván
+                </p>
+              </div>
             </div>
 
             {/* Search Submit Button */}
             <button
               type="button"
-              onClick={() => {
-                const params: Record<string, string> = {};
-                if (keyword.trim()) params.q = keyword.trim();
-                if (categoryParam) params.category = categoryParam;
-                setSearchParams(params);
-                setIsDatePickerOpen(false);
-                setIsGuestsPickerOpen(false);
-              }}
-              className="w-full md:w-auto px-6 py-3 rounded-xl bg-sky-700 hover:bg-sky-600 active:bg-sky-800 text-white font-bold text-[13px] sm:text-sm flex items-center justify-center gap-2 transition-all shrink-0 hover:-translate-y-0.5 shadow-md cursor-pointer"
+              className="w-full md:w-auto px-6 py-3 rounded-xl bg-sky-700 hover:bg-sky-600 active:bg-sky-800 text-white font-bold text-[13px] sm:text-sm flex items-center justify-center gap-2 transition-all shrink-0 hover:-translate-y-0.5 shadow-xs cursor-pointer"
             >
               <SearchIcon className="w-4 h-4" />
               <span>Tìm kiếm</span>
