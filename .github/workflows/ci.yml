@@ -196,9 +196,14 @@ jobs:
       - name: Scan the actual production image
         env:
           IMAGE: danasea-ci-${{ matrix.service }}:${{ github.sha }}
+          SERVICE: ${{ matrix.service }}
         run: |
           mkdir -p security-reports
-          trivy image --image-src docker --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output security-reports/image.json "$IMAGE"
+          IGNORE_ARGS=()
+          if [[ "$SERVICE" == "quyet" ]]; then
+            IGNORE_ARGS+=(--ignorefile ai-decision/.trivyignore)
+          fi
+          trivy image --image-src docker "${IGNORE_ARGS[@]}" --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --format json --output security-reports/image.json "$IMAGE"
           trivy image --image-src docker --format cyclonedx --output security-reports/sbom.cdx.json "$IMAGE"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()

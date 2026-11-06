@@ -508,6 +508,13 @@ def align_schema_defaults(rows, colmap):
     if ('service_slot_units', 'equipment_blocked') in colmap:
         for unit in rows.get('service_slot_units', []):
             unit.setdefault('equipment_blocked', False)
+    if ('payments', 'attempt_number') in colmap:
+        for p in rows.get('payments', []):
+            p.setdefault('attempt_number', 1)
+            p.setdefault('attempt_state', 'COMPLETED' if p.get('status') == 'SUCCESS' else ('FAILED' if p.get('status') == 'FAILED' else ('TERMINATED' if p.get('status') == 'CANCELLED' else 'PENDING')))
+            p.setdefault('cancel_status', 'NONE')
+            p.setdefault('is_active', False)
+            p.setdefault('is_canonical', False)
 
 
 class Session:
@@ -781,8 +788,8 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     }
 
 
-# Replacement accepts only the exact reviewed V1-V49 table/column/FK/trigger inventory.
-REPLACEMENT_FLYWAY_VERSION = 49
+# Replacement accepts only the exact reviewed V1-V52 table/column/FK/trigger inventory.
+REPLACEMENT_FLYWAY_VERSION = 52
 RESET_INVENTORY_SQL = """
 SELECT json_build_object(
  'schemas',(SELECT json_agg(nspname ORDER BY nspname) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),
@@ -809,7 +816,7 @@ SELECT json_build_object(
    WHERE NOT t.tgisinternal AND n.nspname !~ '^pg_') x))
 """
 
-PROTECTED_TABLES = ('flyway_schema_history', 'system_configs', 'category_safety_rules', 'vendor_commission_policies')
+PROTECTED_TABLES = ('flyway_schema_history', 'system_configs', 'category_safety_rules', 'vendor_commission_policies', 'exchange_rates')
 # These source-defined relationships predate explicit FK constraints.
 PROTECTED_LEGACY_REFERENCES = (
     ('system_configs', 'updated_by', 'users'),
