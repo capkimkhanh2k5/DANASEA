@@ -718,18 +718,20 @@ export function Orders() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const s = status.toUpperCase();
+  const getMasterStatusBadge = (status: string) => {
+    const s = (status || "").toUpperCase();
     switch (s) {
       case "PAID":
         return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ THANH TOÁN</span>;
       case "PENDING_PAYMENT":
-      case "PENDING":
+      case "UNPAID":
         return <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-xs font-semibold tracking-tight">CHỜ THANH TOÁN</span>;
       case "CONFIRMED":
         return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ XÁC NHẬN</span>;
       case "CHECKED_IN":
         return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ CHECK-IN</span>;
+      case "PARTIALLY_COMPLETED":
+        return <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold tracking-tight">HOÀN TẤT MỘT PHẦN</span>;
       case "COMPLETED":
         return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">HOÀN TẤT</span>;
       case "CANCELLED":
@@ -741,6 +743,75 @@ export function Orders() {
         return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">{s}</span>;
     }
   };
+
+  const getSubOrderStatusBadge = (subStatus: string, masterStatus: string) => {
+    const s = (subStatus || "").toUpperCase();
+    const m = (masterStatus || "").toUpperCase();
+
+    // If master order is unpaid, sub-orders are also waiting for payment
+    if (m === "PENDING_PAYMENT" || m === "UNPAID") {
+      return (
+        <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-xs font-semibold tracking-tight">
+          CHỜ THANH TOÁN
+        </span>
+      );
+    }
+
+    // If master order is already paid, PENDING means waiting for operator confirmation/dispatch
+    switch (s) {
+      case "PENDING":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold tracking-tight">
+            CHỜ TIẾP NHẬN
+          </span>
+        );
+      case "CONFIRMED":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
+            ĐÃ XÁC NHẬN
+          </span>
+        );
+      case "CHECKED_IN":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
+            ĐÃ CHECK-IN
+          </span>
+        );
+      case "IN_PROGRESS":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold tracking-tight">
+            ĐANG DIỄN RA
+          </span>
+        );
+      case "COMPLETED":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
+            HOÀN TẤT
+          </span>
+        );
+      case "CANCELLED":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold tracking-tight">
+            ĐÃ HỦY
+          </span>
+        );
+      case "REFUNDED":
+      case "PARTIALLY_REFUNDED":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">
+            ĐÃ HOÀN TIỀN
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">
+            {s}
+          </span>
+        );
+    }
+  };
+
+
 
   // Unauthenticated Guard Screen
   if (!isAuthenticated || !user) {
@@ -1000,7 +1071,7 @@ export function Orders() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Đơn hàng:</span>
                             <span className="text-base font-bold text-slate-900 font-mono">{orderCode}</span>
-                            {!hasRefund && getStatusBadge(masterOrder.status || "PENDING")}
+                            {!hasRefund && getMasterStatusBadge(masterOrder.status || "PENDING")}
                             {hasRefund && (
                               <span
                                 className="px-2.5 py-0.5 rounded-md text-xs font-semibold border tracking-tight bg-slate-100 text-slate-800 border-slate-200"
@@ -1077,20 +1148,28 @@ export function Orders() {
                           )}
 
                           {masterStatus === "PENDING_PAYMENT" && (
-                            isOrderPaymentExpired(masterOrder) ? (
-                              <span className="px-3.5 py-1.5 rounded-xl bg-slate-100 text-slate-500 text-xs font-semibold border border-slate-200 flex items-center gap-1.5 shadow-2xs">
-                                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                                <span>Hết hạn thanh toán (15 phút)</span>
-                              </span>
-                            ) : (
+                            <div className="flex items-center gap-2">
+                              {isOrderPaymentExpired(masterOrder) && (
+                                <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-[11px] font-semibold border border-amber-200 flex items-center gap-1 shadow-2xs">
+                                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>Quá hạn giữ chỗ</span>
+                                </span>
+                              )}
                               <button
                                 onClick={() => handlePayNow(masterOrder)}
                                 disabled={payingOrderId === masterOrder.id}
-                                className="px-4 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                                className="px-4 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold shadow-xs cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1.5"
                               >
-                                {payingOrderId === masterOrder.id ? "Đang mở cổng..." : "Thanh toán ngay"}
+                                {payingOrderId === masterOrder.id ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Đang mở cổng...</span>
+                                  </>
+                                ) : (
+                                  <span>Thanh toán ngay</span>
+                                )}
                               </button>
-                            )
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1207,7 +1286,7 @@ export function Orders() {
                                 {/* Sub-Order Footer & Actions */}
                                 <div className="flex flex-wrap items-center justify-between gap-3 pt-3 mt-3 border-t border-slate-200">
                                   <div className="flex items-center gap-2">
-                                    {getStatusBadge(subOrder.status)}
+                                    {getSubOrderStatusBadge(subOrder.status, masterStatus)}
                                     {submittedDisputes[subOrder.id] && (
                                       submittedDisputes[subOrder.id].status === "RESOLVED_REJECTED" ? (
                                         <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold">
@@ -1226,6 +1305,23 @@ export function Orders() {
                                   </div>
 
                                   <div className="flex items-center gap-2">
+                                    {masterStatus === "PENDING_PAYMENT" && (
+                                      <button
+                                        onClick={() => handlePayNow(masterOrder)}
+                                        disabled={payingOrderId === masterOrder.id}
+                                        className="px-3.5 py-1.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                                        type="button"
+                                      >
+                                        {payingOrderId === masterOrder.id ? (
+                                          <>
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <span>Đang mở cổng...</span>
+                                          </>
+                                        ) : (
+                                          <span>Thanh toán ngay</span>
+                                        )}
+                                      </button>
+                                    )}
                                     {/* Check-in QR button (P0 for CONFIRMED suborders) */}
                                     {isConfirmed && (
                                       <button

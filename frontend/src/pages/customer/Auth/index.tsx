@@ -178,7 +178,13 @@ export function Auth() {
         id: authRes.userId,
         email: authRes.email,
         role: role,
-        fullName: trimmedEmail.split('@')[0],
+        fullName: trimmedEmail === 'customer_1@danasea.test'
+          ? 'Nguyễn Hoàng Long'
+          : trimmedEmail === 'customer_2@danasea.test'
+          ? 'Trần Thị Mai Anh'
+          : trimmedEmail === 'admin_demo@danasea.test'
+          ? 'Quản trị viên Hệ thống DANASEA'
+          : trimmedEmail.split('@')[0],
         avatarUrl: avatarUrl,
         isEmailVerified: true,
         isLocked: false,

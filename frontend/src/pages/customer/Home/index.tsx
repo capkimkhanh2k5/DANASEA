@@ -233,6 +233,7 @@ export function Home() {
       slotsLeft: Math.max(0, fs.stockAllocated - fs.stockSold),
       totalSlots: fs.stockAllocated || 10,
       imageUrl: getCardThumbnailUrl(fs.imageUrl || FALLBACK_CARD_IMAGE),
+      endTime: fs.endTime,
     }));
   }, [activeFlashSales]);
 

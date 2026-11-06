@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import type { FlashSaleExperience } from '../../data/customerHomeData';
 import { useWishlistStore } from '../../store/useWishlistStore';
@@ -32,34 +32,27 @@ export function FlashSaleSection({ experiences = [] }: FlashSaleSectionProps = {
     return () => observer.disconnect();
   }, []);
 
-  // Stable persistent countdown: Target is 23:59:59 of current day
-  const [timeLeft, setTimeLeft] = useState(() => {
-    const now = new Date();
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-    const diff = Math.max(0, Math.floor((endOfDay.getTime() - now.getTime()) / 1000));
+  // Real-time backend-synchronized countdown: derives from active flash sale endTime
+  const calculateTimeLeft = useCallback(() => {
+    const targetTime = experiences[0]?.endTime ? new Date(experiences[0].endTime).getTime() : 0;
+    const now = Date.now();
+    const diff = Math.max(0, Math.floor((targetTime - now) / 1000));
     return {
       hours: Math.floor(diff / 3600),
       minutes: Math.floor((diff % 3600) / 60),
       seconds: diff % 60,
     };
-  });
+  }, [experiences]);
+
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
 
   useEffect(() => {
+    setTimeLeft(calculateTimeLeft());
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev.seconds > 0) {
-          return { ...prev, seconds: prev.seconds - 1 };
-        } else if (prev.minutes > 0) {
-          return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
-        } else if (prev.hours > 0) {
-          return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        }
-        return { hours: 0, minutes: 0, seconds: 0 };
-      });
+      setTimeLeft(calculateTimeLeft());
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [calculateTimeLeft]);
 
   const formatNumber = (num: number) => String(num).padStart(2, '0');
 

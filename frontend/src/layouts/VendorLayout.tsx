@@ -19,7 +19,8 @@ import {
   Bell, 
   Pin,
   CheckCheck,
-  LifeBuoy
+  LifeBuoy,
+  Star
 } from "lucide-react";
 import { AtlasAvatar } from "../components/vendor/atlas/AtlasDesignSystem";
 import { toast } from "../store/useToastStore";
@@ -43,6 +44,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/vendor", label: "Tổng quan", icon: LayoutDashboard, exact: true },
       { to: "/vendor/analytics", label: "Phân tích kinh doanh", icon: TrendingUp },
       { to: "/vendor/orders", label: "Đơn đặt chỗ & Vé", icon: Ticket },
+      { to: "/vendor/messages", label: "Tin nhắn khách hàng", icon: MessageSquare },
       { to: "/vendor/schedule", label: "Lịch khởi hành", icon: CalendarDays },
     ],
   },
@@ -52,7 +54,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/vendor/services", label: "Dịch vụ & Ca tour", icon: Sailboat },
       { to: "/vendor/equipment", label: "Quản lý thiết bị", icon: LifeBuoy },
       { to: "/vendor/promotions", label: "Mã khuyến mãi", icon: Tag },
-      { to: "/vendor/reviews", label: "Đánh giá của khách", icon: MessageSquare },
+      { to: "/vendor/reviews", label: "Đánh giá của khách", icon: Star },
     ],
   },
   {
@@ -69,6 +71,7 @@ const VENDOR_PAGE_ORDER: Record<string, number> = {
   "/vendor": 0,
   "/vendor/analytics": 1,
   "/vendor/orders": 2,
+  "/vendor/messages": 2.5,
   "/vendor/schedule": 3,
   "/vendor/services": 4,
   "/vendor/equipment": 5,
