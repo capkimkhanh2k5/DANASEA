@@ -258,7 +258,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
               decoration: BoxDecoration(
-                color: active ? Colors.white.withOpacity(0.25) : AppColors.surfaceContainerHighest,
+                color: active ? Colors.white.withValues(alpha: 0.25) : AppColors.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: LocalizedText(
