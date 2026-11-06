@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -15,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import com.danasea.backend.modules.booking.domain.models.BookingStatus;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.order.domain.events.RefundCompletedEvent;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidWebhookException;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
@@ -50,6 +54,13 @@ public class RefundProcessingService {
     @Autowired
     public void setEventPublisher(ApplicationEventPublisher eventPublisher) {
         this.eventPublisher = eventPublisher;
+    }
+
+    @Autowired(required = false)
+    private TransactionalEmailPort transactionalEmailPort;
+
+    public void setTransactionalEmailPort(TransactionalEmailPort transactionalEmailPort) {
+        this.transactionalEmailPort = transactionalEmailPort;
     }
 
     private final JpaRefundRepository refundRepository;
@@ -284,6 +295,24 @@ public class RefundProcessingService {
             refund.setStatus(RefundStatus.FAILED);
             refund.setLastError("GATEWAY_REFUND_FAILED: " + result.message());
             refundRepository.save(refund);
+            if (transactionalEmailPort != null) {
+                OffsetDateTime now = OffsetDateTime.now();
+                transactionalEmailPort.enqueue(new EmailRequest(
+                        TransactionalEmailType.REFUND_NEEDS_ATTENTION,
+                        "refund:" + refund.getId() + ":failed",
+                        "OPS:FINANCE",
+                        now,
+                        now,
+                        null,
+                        1,
+                        Map.of(
+                                "refundId", refund.getId().toString(),
+                                "reason", "FAILED",
+                                "lastError", refund.getLastError() != null ? refund.getLastError() : "GATEWAY_REFUND_FAILED",
+                                "amount", refund.getAmount() != null ? refund.getAmount().doubleValue() : 0.0
+                        )
+                ));
+            }
             return false;
         }
         awaitingVerification(refund, "Gateway refund remains pending.");

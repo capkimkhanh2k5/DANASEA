@@ -1,8 +1,11 @@
 package com.danasea.backend.modules.order.application.services;
 
 import com.danasea.backend.modules.communication.application.dtos.NotificationCommand;
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
 import com.danasea.backend.modules.communication.application.usecases.SendNotificationUseCase;
 import com.danasea.backend.modules.communication.domain.models.NotificationChannel;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.order.domain.models.DiscountScope;
 import com.danasea.backend.modules.order.domain.models.DiscountSponsorType;
 import com.danasea.backend.modules.order.domain.models.DiscountType;
@@ -12,6 +15,7 @@ import com.danasea.backend.modules.order.infrastructure.persistence.entities.Sub
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaDiscountCodeRepository;
 import com.danasea.backend.shared.i18n.LocalizedMessageRef;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -32,6 +37,13 @@ public class VendorFaultCompensationService {
     private final SendNotificationUseCase notifications;
     private final int basisPoints;
     private final int validityDays;
+
+    @Autowired(required = false)
+    private TransactionalEmailPort transactionalEmailPort;
+
+    public void setTransactionalEmailPort(TransactionalEmailPort transactionalEmailPort) {
+        this.transactionalEmailPort = transactionalEmailPort;
+    }
 
     public VendorFaultCompensationService(
             JdbcTemplate jdbc,
@@ -96,6 +108,23 @@ public class VendorFaultCompensationService {
                         LocalizedMessageRef.of("notification.disruption.vendor_compensation.body", sub.getId()),
                         "SUB_ORDER", sub.getId(), null),
                 "vendor-fault-compensation:" + disruption.getId());
+
+        if (transactionalEmailPort != null) {
+            transactionalEmailPort.enqueue(new EmailRequest(
+                    TransactionalEmailType.PERSONAL_VOUCHER_ISSUED,
+                    "voucher:" + voucher.getId(),
+                    "USER:" + customerId,
+                    now,
+                    now,
+                    null,
+                    1,
+                    Map.of(
+                            "voucherId", voucher.getId().toString(),
+                            "code", voucher.getCode(),
+                            "amount", voucher.getDiscountValue() != null ? voucher.getDiscountValue().doubleValue() : 0.0
+                    )
+            ));
+        }
     }
 
     @Transactional(propagation = Propagation.MANDATORY)

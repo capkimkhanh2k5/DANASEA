@@ -1,5 +1,7 @@
 package com.danasea.backend.modules.admin.application.usecases;
 
+import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 import com.danasea.backend.modules.account.application.api.AccountInternalApi;
@@ -8,7 +10,11 @@ import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.admin.domain.exceptions.SelfLockNotAllowedException;
 import com.danasea.backend.modules.admin.domain.exceptions.UserAlreadyLockedException;
 import com.danasea.backend.modules.admin.domain.exceptions.UserNotFoundException;
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
@@ -18,6 +24,13 @@ public class LockUserUseCase {
 
     private final AccountInternalApi accountInternalApi;
     private final AuditLogInternalApi auditLogInternalApi;
+
+    @Autowired(required = false)
+    private TransactionalEmailPort transactionalEmailPort;
+
+    public void setTransactionalEmailPort(TransactionalEmailPort transactionalEmailPort) {
+        this.transactionalEmailPort = transactionalEmailPort;
+    }
 
     @Transactional
     public void execute(UUID actorId, UUID targetUserId, String reason) {
@@ -50,6 +63,26 @@ public class LockUserUseCase {
                 targetUserId,
                 buildMetadataJson(reason)
         );
+
+        if (transactionalEmailPort != null) {
+            OffsetDateTime now = OffsetDateTime.now();
+            String securityEventId = UUID.randomUUID().toString();
+            transactionalEmailPort.enqueue(new EmailRequest(
+                    TransactionalEmailType.ACCOUNT_LOCKED,
+                    "security:account-locked:" + targetUserId + ":" + securityEventId,
+                    "USER:" + targetUserId,
+                    now,
+                    now,
+                    null,
+                    1,
+                    Map.of(
+                            "userId", targetUserId.toString(),
+                            "timestamp", now.toString(),
+                            "securityEventId", securityEventId,
+                            "reason", reason != null ? reason : ""
+                    )
+            ));
+        }
     }
 
     private String buildMetadataJson(String reason) {

@@ -1,6 +1,8 @@
 package com.danasea.backend.modules.communication.infrastructure.listeners;
 
+import java.time.OffsetDateTime;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -9,8 +11,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.danasea.backend.modules.communication.application.dtos.NotificationCommand;
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
 import com.danasea.backend.modules.communication.application.usecases.SendNotificationUseCase;
 import com.danasea.backend.modules.communication.domain.models.NotificationChannel;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.order.domain.events.PaymentSuccessEvent;
 import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
@@ -28,6 +33,7 @@ public class PaymentNotificationEventListener {
     private final JpaMasterOrderRepository masterOrders;
     private final JpaSubOrderRepository subOrders;
     private final JpaVendorRepository vendors;
+    private final TransactionalEmailPort transactionalEmailPort;
 
     @EventListener
     @Transactional
@@ -40,10 +46,24 @@ public class PaymentNotificationEventListener {
             return;
         }
         UUID customerId = order.getCustomerId();
+        OffsetDateTime now = OffsetDateTime.now();
+
         notifications.executeOnce(new NotificationCommand(customerId, "PAYMENT_SUCCESS", NotificationChannel.IN_APP,
                 LocalizedMessageRef.of("notification.payment.success.title"),
                 LocalizedMessageRef.of("notification.payment.success.body"), "ORDER", order.getId(), null),
                 "payment:" + order.getId() + ":customer:" + customerId);
+
+        // Transactional outbox for customer confirmation
+        transactionalEmailPort.enqueue(EmailRequest.builder()
+                .type(TransactionalEmailType.BOOKING_CONFIRMED)
+                .businessKey("order:" + order.getId())
+                .recipientKey("USER:" + customerId)
+                .occurredAt(now)
+                .dueAt(now)
+                .expiresAt(now.plusHours(24))
+                .payloadVersion(1)
+                .payload(Map.of("orderId", order.getId().toString()))
+                .build());
 
         Set<UUID> notifiedVendors = new HashSet<>();
         for (var subOrder : subOrders.findByMasterOrderId(order.getId())) {
@@ -52,11 +72,24 @@ public class PaymentNotificationEventListener {
             if (vendorId == null || !notifiedVendors.add(vendorId)) {
                 continue;
             }
-            vendors.findById(vendorId).filter(vendor -> vendor.getUserId() != null).ifPresent(vendor ->
-                    notifications.executeOnce(new NotificationCommand(vendor.getUserId(), "NEW_BOOKING_ORDER",
-                            NotificationChannel.IN_APP, LocalizedMessageRef.of("notification.booking.new.title"),
-                            LocalizedMessageRef.of("notification.booking.new.body"), "SUB_ORDER", subOrder.getId(), null),
-                            "payment:" + order.getId() + ":vendor:" + vendorId));
+            vendors.findById(vendorId).filter(vendor -> vendor.getUserId() != null).ifPresent(vendor -> {
+                notifications.executeOnce(new NotificationCommand(vendor.getUserId(), "NEW_BOOKING_ORDER",
+                        NotificationChannel.IN_APP, LocalizedMessageRef.of("notification.booking.new.title"),
+                        LocalizedMessageRef.of("notification.booking.new.body"), "SUB_ORDER", subOrder.getId(), null),
+                        "payment:" + order.getId() + ":vendor:" + vendorId);
+
+                // Transactional outbox for vendor confirmation
+                transactionalEmailPort.enqueue(EmailRequest.builder()
+                        .type(TransactionalEmailType.VENDOR_BOOKING_CONFIRMED)
+                        .businessKey("order:" + order.getId() + ":vendor:" + vendorId)
+                        .recipientKey("USER:" + vendor.getUserId())
+                        .occurredAt(now)
+                        .dueAt(now)
+                        .expiresAt(now.plusHours(24))
+                        .payloadVersion(1)
+                        .payload(Map.of("orderId", order.getId().toString(), "vendorId", vendorId.toString()))
+                        .build());
+            });
         }
     }
 }

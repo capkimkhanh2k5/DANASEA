@@ -3,7 +3,15 @@ package com.danasea.backend.modules.dispute.application.usecases;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
+
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
+import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
+import com.danasea.backend.modules.vendor.domain.models.Vendor;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -40,6 +48,20 @@ public class ResolveDisputeUseCase {
     private final JpaSubOrderRepository subOrderRepository;
     private final JpaRefundRepository refundRepository;
     private final RefundProcessingService refundProcessingService;
+
+    @Autowired(required = false)
+    private TransactionalEmailPort transactionalEmailPort;
+
+    @Autowired(required = false)
+    private VendorInternalApi vendorInternalApi;
+
+    public void setTransactionalEmailPort(TransactionalEmailPort transactionalEmailPort) {
+        this.transactionalEmailPort = transactionalEmailPort;
+    }
+
+    public void setVendorInternalApi(VendorInternalApi vendorInternalApi) {
+        this.vendorInternalApi = vendorInternalApi;
+    }
 
     @Autowired
     public ResolveDisputeUseCase(
@@ -95,6 +117,7 @@ public class ResolveDisputeUseCase {
 
         OffsetDateTime now = OffsetDateTime.now();
         BigDecimal appliedRefundPercentage = null;
+        RefundJpaEntity refund = null;
 
         // 4. Phân xử tài chính
         if (resolution == DisputeStatus.RESOLVED_REFUND || resolution == DisputeStatus.RESOLVED_PARTIAL) {
@@ -121,7 +144,6 @@ public class ResolveDisputeUseCase {
 
             String idempotencyKey = "dispute-" + disputeId;
             var existingRefund = refundRepository.findBySubOrderIdAndIdempotencyKey(subOrder.getId(), idempotencyKey);
-            RefundJpaEntity refund = null;
             if (existingRefund.isEmpty() && refundAmount.signum() > 0) {
                 RefundJpaEntity newRefund = new RefundJpaEntity();
                 newRefund.setSubOrderId(subOrder.getId());
@@ -132,10 +154,25 @@ public class ResolveDisputeUseCase {
                 newRefund.setRequestedBy(adminUserId);
                 newRefund.setIdempotencyKey(idempotencyKey);
                 refund = refundRepository.save(newRefund);
+                if (transactionalEmailPort != null && refund != null && refund.getId() != null) {
+                    transactionalEmailPort.enqueue(new EmailRequest(
+                            TransactionalEmailType.REFUND_REQUESTED,
+                            "refund:" + refund.getId() + ":requested",
+                            "USER:" + dispute.getCustomerId(),
+                            now,
+                            now,
+                            null,
+                            1,
+                            Map.of(
+                                    "refundId", refund.getId().toString(),
+                                    "subOrderId", subOrder.getId().toString(),
+                                    "amount", refund.getAmount() != null ? refund.getAmount().doubleValue() : 0.0
+                            )
+                    ));
+                }
             } else {
                 refund = existingRefund.orElse(null);
             }
-
 
             log.info("Dispute {} approved refund amount: {} ({}%) for sub-order {}. Positive cash refunds are queued for provider processing.",
                     disputeId, refundAmount, appliedRefundPercentage, subOrder.getId());
@@ -151,6 +188,63 @@ public class ResolveDisputeUseCase {
         dispute.setResolvedBy(adminUserId);
         dispute.setResolvedAt(now);
         DisputeJpaEntity savedDispute = disputeRepository.save(dispute);
+
+        if (transactionalEmailPort != null) {
+            // 1. Email cho Khách hàng
+            Map<String, Object> customerPayload = new HashMap<>();
+            customerPayload.put("disputeId", savedDispute.getId().toString());
+            customerPayload.put("recipientRole", "CUSTOMER");
+            customerPayload.put("resolution", savedDispute.getStatus().name());
+            customerPayload.put("refundPercentage", savedDispute.getRefundPercentage() != null ? savedDispute.getRefundPercentage().doubleValue() : 0.0);
+            customerPayload.put("refundAmount", refund != null && refund.getAmount() != null ? refund.getAmount().doubleValue() : 0.0);
+            customerPayload.put("refundId", refund != null ? refund.getId().toString() : "");
+            customerPayload.put("reason", savedDispute.getReason() != null ? savedDispute.getReason().name() : "");
+            customerPayload.put("adminNote", savedDispute.getAdminNote() != null ? savedDispute.getAdminNote() : "");
+            customerPayload.put("orderId", savedDispute.getOrderId() != null ? savedDispute.getOrderId().toString() : "");
+
+            transactionalEmailPort.enqueue(new EmailRequest(
+                    TransactionalEmailType.DISPUTE_RESOLVED,
+                    "dispute:" + savedDispute.getId() + ":customer:resolved",
+                    "USER:" + savedDispute.getCustomerId(),
+                    now,
+                    now,
+                    null,
+                    1,
+                    customerPayload
+            ));
+
+            // 2. Email cho Đối tác
+            UUID vendorId = null;
+            var subOrderOpt = subOrderRepository.findById(savedDispute.getSubOrderId());
+            if (subOrderOpt.isPresent()) {
+                vendorId = subOrderOpt.get().getVendorId();
+            }
+            if (vendorId != null && vendorInternalApi != null) {
+                UUID vendorOwnerUserId = vendorInternalApi.findById(vendorId)
+                        .map(Vendor::getUserId)
+                        .orElse(null);
+                if (vendorOwnerUserId != null) {
+                    Map<String, Object> vendorPayload = new HashMap<>();
+                    vendorPayload.put("disputeId", savedDispute.getId().toString());
+                    vendorPayload.put("recipientRole", "VENDOR");
+                    vendorPayload.put("resolution", savedDispute.getStatus().name());
+                    vendorPayload.put("refundPercentage", savedDispute.getRefundPercentage() != null ? savedDispute.getRefundPercentage().doubleValue() : 0.0);
+                    vendorPayload.put("refundAmount", refund != null && refund.getAmount() != null ? refund.getAmount().doubleValue() : 0.0);
+                    vendorPayload.put("subOrderId", savedDispute.getSubOrderId().toString());
+
+                    transactionalEmailPort.enqueue(new EmailRequest(
+                            TransactionalEmailType.DISPUTE_RESOLVED,
+                            "dispute:" + savedDispute.getId() + ":vendor:resolved",
+                            "USER:" + vendorOwnerUserId,
+                            now,
+                            now,
+                            null,
+                            1,
+                            vendorPayload
+                    ));
+                }
+            }
+        }
 
         return DisputeResponse.fromEntity(savedDispute);
     }
