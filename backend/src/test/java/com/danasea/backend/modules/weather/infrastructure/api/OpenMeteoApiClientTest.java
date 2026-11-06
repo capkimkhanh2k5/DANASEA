@@ -2,6 +2,11 @@ package com.danasea.backend.modules.weather.infrastructure.api;
 
 import com.danasea.backend.modules.weather.infrastructure.api.dtos.OpenMeteoMarineResponse;
 import com.danasea.backend.modules.weather.infrastructure.api.dtos.OpenMeteoWeatherResponse;
+import com.sun.net.httpserver.HttpServer;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -198,46 +203,70 @@ public class OpenMeteoApiClientTest {
     }
 
     @Nested
-    @DisplayName("Live Integration Tests (Real Network Calls)")
-    class LiveIntegrationTests {
+    @DisplayName("HTTP Transport Integration Tests (Loopback Server)")
+    class HttpTransportIntegrationTests {
 
-        private OpenMeteoApiClient liveClient;
+        private OpenMeteoApiClient client;
+        private HttpServer server;
+        private final AtomicReference<String> query = new AtomicReference<>();
 
         @BeforeEach
-        void setUp() {
-            liveClient = new OpenMeteoApiClient(
-                    RestClient.builder(),
-                    "https://api.open-meteo.com",
-                    "https://marine-api.open-meteo.com"
-            );
+        void setUp() throws Exception {
+            server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            server.createContext("/v1/forecast", exchange -> {
+                query.set(exchange.getRequestURI().getRawQuery());
+                byte[] body = buildMockWeatherJson(384).getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, body.length);
+                try (var output = exchange.getResponseBody()) { output.write(body); }
+            });
+            server.createContext("/v1/marine", exchange -> {
+                query.set(exchange.getRequestURI().getRawQuery());
+                byte[] body = buildMockMarineJson(192).getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, body.length);
+                try (var output = exchange.getResponseBody()) { output.write(body); }
+            });
+            server.start();
+            String base = "http://127.0.0.1:" + server.getAddress().getPort();
+            client = new OpenMeteoApiClient(RestClient.builder(), base, base);
+        }
+
+        @AfterEach
+        void stopServer() {
+            if (server != null) { server.stop(0); }
         }
 
         @Test
-        @DisplayName("Live: Fetch Weather returns 16-day forecast and valid parameters")
+        @DisplayName("HTTP: Fetch Weather returns 16-day forecast and valid parameters")
         void shouldFetchWeatherSuccessfully() {
             double lat = 16.0544;
             double lon = 108.2022;
 
-            OpenMeteoWeatherResponse response = liveClient.fetchWeather(lat, lon);
-            if (response != null) {
-                assertNotNull(response.getCurrent());
-                assertNotNull(response.getCurrent().getTemperature2m());
-                assertNotNull(response.getHourly());
-                assertTrue(response.getHourly().getTime().size() >= 336);
-            }
+            OpenMeteoWeatherResponse response = client.fetchWeather(lat, lon);
+            assertNotNull(response);
+            assertNotNull(response.getCurrent());
+            assertEquals(28.5, response.getCurrent().getTemperature2m());
+            assertNotNull(response.getHourly());
+            assertEquals(384, response.getHourly().getTime().size());
+            assertTrue(query.get().contains("forecast_days=16"));
+            assertTrue(query.get().contains("latitude=16.0544"));
+            assertTrue(query.get().contains("longitude=108.2022"));
         }
 
         @Test
-        @DisplayName("Live: Fetch Marine returns 8-day forecast (192 hours) and marine fields")
+        @DisplayName("HTTP: Fetch Marine returns 8-day forecast (192 hours) and marine fields")
         void shouldFetchMarineSuccessfully() {
             double lat = 16.0544;
             double lon = 108.2022;
 
-            OpenMeteoMarineResponse response = liveClient.fetchMarine(lat, lon);
-            if (response != null) {
-                assertNotNull(response.getHourly());
-                assertEquals(192, response.getHourly().getTime().size());
-            }
+            OpenMeteoMarineResponse response = client.fetchMarine(lat, lon);
+            assertNotNull(response);
+            assertNotNull(response.getHourly());
+            assertEquals(192, response.getHourly().getTime().size());
+            assertTrue(query.get().contains("forecast_days=8"));
+            assertTrue(query.get().contains("latitude=16.0544"));
+            assertTrue(query.get().contains("longitude=108.2022"));
         }
     }
 

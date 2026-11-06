@@ -21,34 +21,56 @@ import com.danasea.backend.modules.service.domain.models.PricingUnit;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.HexFormat;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-@RequiredArgsConstructor
 public class CreateBookingHoldUseCase {
 
-    public static final Duration HOLD_DURATION = Duration.ofMinutes(15);
+    public static final Duration DEFAULT_HOLD_DURATION = Duration.ofMinutes(5);
+    public static final Duration HOLD_DURATION = DEFAULT_HOLD_DURATION;
     private static final int MAX_REQUEST_ITEMS = 20;
     private static final int MAX_TOTAL_QUANTITY = 100;
 
     private final BookingRepositoryPort bookingRepository;
     private final InventoryLockPort inventoryLockPort;
     private final ServiceSlotPort serviceSlotPort;
+    private final Duration holdDuration;
     private FlashSaleBookingPort flashSale;
-    @org.springframework.beans.factory.annotation.Autowired
+
+    public CreateBookingHoldUseCase(
+            BookingRepositoryPort bookingRepository,
+            InventoryLockPort inventoryLockPort,
+            ServiceSlotPort serviceSlotPort,
+            Duration holdDuration) {
+        this.bookingRepository = bookingRepository;
+        this.inventoryLockPort = inventoryLockPort;
+        this.serviceSlotPort = serviceSlotPort;
+        this.holdDuration = holdDuration != null ? holdDuration : DEFAULT_HOLD_DURATION;
+    }
+
+    public CreateBookingHoldUseCase(
+            BookingRepositoryPort bookingRepository,
+            InventoryLockPort inventoryLockPort,
+            ServiceSlotPort serviceSlotPort) {
+        this(bookingRepository, inventoryLockPort, serviceSlotPort, DEFAULT_HOLD_DURATION);
+    }
+    @Autowired
     public void setFlashSale(FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
 
     private record AggregationKey(UUID slotId, UUID optionId, Integer participantsCount, boolean allowSplit, UUID flashSaleId, int groupIndex) {}
@@ -74,7 +96,7 @@ public class CreateBookingHoldUseCase {
             if(flashSale==null) throw new FlashSaleException("FLASH_SALE_NOT_CONFIGURED");
             try { fingerprint=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(command.items().toString().getBytes(StandardCharsets.UTF_8))); }
-            catch(java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
+            catch(NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
             UUID replay=flashSale.replay(command.customerId(),command.idempotencyKey(),fingerprint);
             if(replay!=null) return mapToResult(bookingRepository.findByIdWithItems(replay).orElseThrow());
         }
@@ -245,7 +267,7 @@ public class CreateBookingHoldUseCase {
             }
 
             // 5. Atomic Redis inventory lock (All-or-Nothing)
-            inventoryLockPort.acquireHolds(bookingId, lockItems, HOLD_DURATION);
+            inventoryLockPort.acquireHolds(bookingId, lockItems, this.holdDuration);
             for(int i=0;i<bookingItems.size();i++) {
                 var item=bookingItems.get(i);
                 var allocations=lockItems.get(i).getAllocations();
@@ -266,7 +288,7 @@ public class CreateBookingHoldUseCase {
             }
 
             OffsetDateTime now = OffsetDateTime.now();
-            Booking booking = Booking.createHold(bookingId, command.customerId(), bookingItems, HOLD_DURATION, now);
+            Booking booking = Booking.createHold(bookingId, command.customerId(), bookingItems, this.holdDuration, now);
             Booking savedBooking = bookingRepository.save(booking);
             if(promotional) flashSale.remember(command.customerId(),command.idempotencyKey(),fingerprint,bookingId);
 
@@ -279,7 +301,7 @@ public class CreateBookingHoldUseCase {
     }
 
     private List<UUID> orderedOfferIds(CreateBookingHoldCommand command) {
-        return command.items().stream().map(BookingHoldItemDto::flashSaleId).filter(java.util.Objects::nonNull).distinct().sorted().toList();
+        return command.items().stream().map(BookingHoldItemDto::flashSaleId).filter(Objects::nonNull).distinct().sorted().toList();
     }
     private SlotValidationDetails.ServiceOptionValidationDetails resolveOption(SlotValidationDetails details, UUID optionId) {
         if (optionId != null) {

@@ -39,6 +39,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -55,10 +56,13 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+
 @SpringBootTest
 @ActiveProfiles("test")
 @Testcontainers
-class ReviewConcurrencyIntegrationTest {
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+class ReviewConcurrencyIntegrationTest extends AbstractExternalInfrastructureIntegrationTest {
     @Container
     static GenericContainer<?> postgres =
             new GenericContainer<>("postgres:16-alpine")

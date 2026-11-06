@@ -1,5 +1,7 @@
 {
   "required_classes": [
+    "com.danasea.backend.configs.TestDatabaseIsolationTest",
+    "com.danasea.backend.Milestone1EmpiricalPersistenceChallengerTest",
     "com.danasea.backend.modules.flashsale.FlashSaleHttpIntegrationTest",
     "com.danasea.backend.modules.flashsale.FlashSaleCommissionUnificationIntegrationTest",
     "com.danasea.backend.PostgreSqlMigrationIntegrationTest",
@@ -8,21 +10,41 @@
     "com.danasea.backend.security.authentication.integration.PasswordResetSecurityIntegrationTest",
     "com.danasea.backend.security.authorization.RbacCacheInvalidationIntegrationTest",
     "com.danasea.backend.configs.CacheWriteVisibilityIntegrationTest",
-    "com.danasea.backend.security.authorization.SharedSecuritySchemaIntegrationTest"
-  ],
-  "allowed_skipped_classes": [
+    "com.danasea.backend.security.authorization.SharedSecuritySchemaIntegrationTest",
     "com.danasea.backend.modules.service.e2e.ServiceTier1FeatureCoverageE2ETest",
     "com.danasea.backend.modules.service.e2e.ServiceTier2BoundaryCornerCaseE2ETest",
     "com.danasea.backend.modules.service.e2e.ServiceTier3PairwiseCombinationE2ETest",
     "com.danasea.backend.modules.service.e2e.ServiceTier4RealWorldScenarioE2ETest",
-    "com.danasea.backend.modules.ai.infrastructure.cliproxy.ProxyLiveSmokeTest",
-    "Tier 2: Services Module Boundary & Corner Cases E2E Tests",
-    "Tier 4: Services Module Real-World Application Scenarios E2E Tests",
-    "Tier 1: Services Module Feature Coverage E2E Tests",
-    "Tier 3: Services Module Pairwise Cross-Feature Combinations E2E Tests"
+    "com.danasea.backend.modules.order.application.PaymentWebhookSignerTest",
+    "com.danasea.backend.modules.order.application.RefundProcessingSafetyBranchesTest",
+    "com.danasea.backend.modules.order.application.usecases.PaymentIntentGatewayContractTest",
+    "com.danasea.backend.shared.presentation.GlobalRequestValidationTest",
+    "com.danasea.backend.modules.service.application.usecases.DeleteServiceImageUseCaseTest",
+    "com.danasea.backend.modules.admin.application.usecases.GetVendorDetailUseCaseTest",
+    "com.danasea.backend.modules.admin.application.usecases.GetVendorsUseCaseTest",
+    "com.danasea.backend.modules.admin.application.usecases.RejectVendorUseCaseTest",
+    "com.danasea.backend.modules.operation.application.usecases.GetAdminReviewsUseCaseTest",
+    "com.danasea.backend.modules.account.application.usecases.GetMyProfileUseCaseTest",
+    "com.danasea.backend.modules.vendor.application.usecases.GetVendorProfileUseCaseTest",
+    "com.danasea.backend.modules.service.application.usecases.GetSafetyDocumentsUseCaseTest",
+    "com.danasea.backend.modules.operation.application.usecases.GetVendorReviewsUseCaseTest",
+    "com.danasea.backend.modules.service.e2e.ServiceAuditExecutorTest",
+    "com.danasea.backend.modules.service.application.services.CustomerChangeSlotReaderTest",
+    "com.danasea.backend.modules.order.application.api.AiPolicyReaderTest",
+    "com.danasea.backend.modules.service.application.usecases.CreateServiceSlotUseCaseTest",
+    "com.danasea.backend.modules.service.application.usecases.CreateServiceOptionUseCaseTest",
+    "com.danasea.backend.modules.ai.infrastructure.redis.RedisConfirmationCardStoreTest",
+    "com.danasea.backend.modules.ai.infrastructure.redis.RedisConfirmationCardStoreIntegrationTest"
   ],
+  "allowed_skipped_classes": [],
   "allowed_skipped_tests": [
+    "com.danasea.backend.modules.ai.infrastructure.cliproxy.ProxyLiveSmokeTest#realModelAcceptsHighReasoningAndMaximumOutputCeiling(String)",
+    "com.danasea.backend.modules.ai.infrastructure.cliproxy.ProxyLiveSmokeTest#realProxyCompactionKeepsOldNonSwimmingConstraintAndAnswersCurrentQuestion",
     "com.danasea.backend.modules.ai.QuyetDecisionAdapterTest#actualPinnedLocalWorkerExecutesAllSevenTasksThroughJavaAdapter"
   ],
-  "reason": "Legacy ServiceTier suites are superseded by executable integration/controller tests. Provider acceptance runs on the server after deployment; actual Quyet inference is required in image rehearsal. All other skips fail CI."
+  "reason": "All business/unit/integration suites must execute. Only these exact three explicit external-provider/local-model acceptance cases may skip; worker inference has a separate required CI job. No legacy suite skip or class-wide whitelist remains.",
+  "required_tests": {
+    "com.danasea.backend.modules.order.application.usecases.AdminDiscountCodeUseCaseTest#updateDiscountCodeValidatesInvariants": 1,
+    "com.danasea.backend.modules.order.application.usecases.VendorDiscountCodeUseCaseTest#updateVendorDiscountCodeMaxUsesBoundary": 1
+  }
 }

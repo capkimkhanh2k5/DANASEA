@@ -2,8 +2,11 @@ package com.danasea.backend.modules.order.application.services;
 
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.communication.application.dtos.NotificationCommand;
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
 import com.danasea.backend.modules.communication.application.usecases.SendNotificationUseCase;
 import com.danasea.backend.modules.communication.domain.models.NotificationChannel;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.order.domain.models.DiscountScope;
 import com.danasea.backend.modules.order.domain.models.DiscountSponsorType;
 import com.danasea.backend.modules.order.domain.models.DiscountType;
@@ -20,11 +23,14 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRescheduleProposalRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
+import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
+import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import com.danasea.backend.modules.weather.infrastructure.persistence.repositories.JpaSafetyRuleEvaluationRepository;
 import com.danasea.backend.shared.i18n.LocalizedMessageRef;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +38,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,6 +59,13 @@ public class DisruptionDecisionService {
     private final JpaSafetyRuleEvaluationRepository evaluations;
     private final AuditLogInternalApi audit;
     private final SendNotificationUseCase notifications;
+    private final VendorFaultCompensationService compensation;
+
+    @Autowired(required = false)
+    private TransactionalEmailPort transactionalEmailPort;
+
+    @Autowired(required = false)
+    private VendorInternalApi vendorInternalApi;
 
     @Value("${app.refund.replacement-voucher-valid-days:30}")
     private int voucherValidDays = 30;
@@ -97,6 +112,7 @@ public class DisruptionDecisionService {
         disruption.setVerifiedBy(actor);
         disruption.setStatus(AWAITING);
         disruption = disruptions.saveAndFlush(disruption);
+        if (reason == RefundReason.VENDOR_FAULT) compensation.issue(disruption, locked);
         audit.recordTransactionalAuditLog(
                 actor,
                 "VERIFY_SUB_ORDER_DISRUPTION",
@@ -125,26 +141,34 @@ public class DisruptionDecisionService {
         if (previous.isPresent()) return previous.get();
         var disruption = disruptions.findBySubOrderIdAndStatus(subId, AWAITING).orElse(null);
         if (disruption == null) {
-            var alert =
-                    evaluations
-                            .findTopBySlotIdOrderByEvaluatedAtDesc(locked.sub().getSlotId())
-                            .filter(
-                                    a ->
-                                            RescheduleSupport.weatherAlert(a)
-                                                    && (Boolean.FALSE.equals(a.getIsSafe())
-                                                            || "RED".equals(a.getAlertLevel())))
-                            .orElseThrow(
-                                    () ->
-                                            RescheduleSupport.conflict(
-                                                    "No verified disruption permits a full"
-                                                            + " refund."));
-            disruption =
-                    record(
-                            subId,
-                            RefundReason.WEATHER,
-                            "Verified unsafe weather",
-                            "weather-" + alert.getId(),
-                            null);
+            UUID slotId = locked.sub().getSlotId();
+            var cancellation = slots.findVendorCancellation(slotId);
+            if (cancellation.isPresent()) {
+                var details = cancellation.get();
+                disruption = record(subId, RefundReason.VENDOR_FAULT, details.getReason(),
+                        "vendor-departure:" + slotId, details.getRequestedBy());
+            } else {
+                var alert =
+                        evaluations
+                                .findTopBySlotIdOrderByEvaluatedAtDesc(locked.sub().getSlotId())
+                                .filter(
+                                        a ->
+                                                RescheduleSupport.weatherAlert(a)
+                                                        && (Boolean.FALSE.equals(a.getIsSafe())
+                                                                || "RED".equals(a.getAlertLevel())))
+                                .orElseThrow(
+                                        () ->
+                                                RescheduleSupport.conflict(
+                                                        "No verified disruption permits a full"
+                                                                + " refund."));
+                disruption =
+                        record(
+                                subId,
+                                RefundReason.WEATHER,
+                                "Verified unsafe weather",
+                                "weather-" + alert.getId(),
+                                null);
+            }
         }
         if (AWAITING.equals(disruption.getStatus())) requestRefund(disruption, locked, customerId);
         return disruption;
@@ -246,6 +270,9 @@ public class DisruptionDecisionService {
         var active = disruptions.findBySubOrderIdAndStatus(subId, AWAITING);
         if (active.isPresent() && Objects.equals(active.get().getOriginalSlotId(), slotId))
             return Optional.of(active.get().getReason());
+        if (slots.findVendorCancellation(slotId).isPresent()) {
+            return Optional.of(RefundReason.VENDOR_FAULT);
+        }
         return evaluations
                 .findTopBySlotIdOrderByEvaluatedAtDesc(slotId)
                 .filter(
@@ -284,6 +311,23 @@ public class DisruptionDecisionService {
             refund.setRequestedBy(actor);
             refund.setIdempotencyKey("disruption-" + disruption.getId());
             refund = refunds.saveAndFlush(refund);
+            if (transactionalEmailPort != null) {
+                OffsetDateTime emailNow = OffsetDateTime.now();
+                transactionalEmailPort.enqueue(new EmailRequest(
+                        TransactionalEmailType.REFUND_REQUESTED,
+                        "refund:" + refund.getId() + ":requested",
+                        "USER:" + locked.master().getCustomerId(),
+                        emailNow,
+                        emailNow,
+                        null,
+                        1,
+                        Map.of(
+                                "refundId", refund.getId().toString(),
+                                "subOrderId", sub.getId().toString(),
+                                "amount", refund.getAmount() != null ? refund.getAmount().doubleValue() : 0.0
+                        )
+                ));
+            }
         }
         sub.setStatus(SubOrderStatus.CANCELLED);
         sub.setCancellationReason(disruption.getReason());
@@ -315,6 +359,74 @@ public class DisruptionDecisionService {
                 refund == null ? "no_payment" : "refund",
                 new Object[] {sub.getId()},
                 "refund");
+
+        if (transactionalEmailPort != null) {
+            OffsetDateTime emailNow = OffsetDateTime.now();
+            UUID slotId = disruption.getOriginalSlotId();
+            UUID customerId = locked.master().getCustomerId();
+            String reasonText = disruption.getReason() == RefundReason.WEATHER
+                    ? "Thời tiết nguy hiểm"
+                    : (disruption.getDetails() != null ? disruption.getDetails() : "Sự cố vận hành");
+            transactionalEmailPort.enqueue(new EmailRequest(
+                    TransactionalEmailType.TRIP_CANCELLED,
+                    "slot:" + slotId + ":cancellation",
+                    "USER:" + customerId,
+                    emailNow,
+                    emailNow,
+                    emailNow.plusDays(7),
+                    1,
+                    Map.of(
+                            "slotId", slotId.toString(),
+                            "serviceName", "Dịch vụ Danasea",
+                            "reason", reasonText,
+                            "subOrderIds", List.of(sub.getId().toString())
+                    )
+            ));
+            if (vendorInternalApi != null && sub.getVendorId() != null) {
+                UUID vendorOwnerUserId = vendorInternalApi.findById(sub.getVendorId())
+                        .map(Vendor::getUserId)
+                        .orElse(null);
+                if (vendorOwnerUserId != null) {
+                    transactionalEmailPort.enqueue(new EmailRequest(
+                            TransactionalEmailType.TRIP_CANCELLED,
+                            "slot:" + slotId + ":cancellation",
+                            "USER:" + vendorOwnerUserId,
+                            emailNow,
+                            emailNow,
+                            emailNow.plusDays(7),
+                            1,
+                            Map.of(
+                                    "slotId", slotId.toString(),
+                                    "serviceName", "Dịch vụ Danasea",
+                                    "reason", reasonText,
+                                    "isVendor", true
+                            )
+                    ));
+                }
+            }
+        }
+    }
+
+    @Transactional
+    public void recordVendorDeparture(UUID subId, UUID expectedSlotId, String reason, UUID actor) {
+        var locked = support.lock(subId);
+        if (!Objects.equals(locked.sub().getSlotId(), expectedSlotId)
+                || locked.sub().getStatus() != SubOrderStatus.CONFIRMED
+                || locked.sub().getCheckedInAt() != null
+                || locked.master().getPaymentStatus() != PaymentOrderStatus.PAID) {
+            return;
+        }
+        record(subId, RefundReason.VENDOR_FAULT, reason, "vendor-departure:" + expectedSlotId, actor);
+    }
+
+    public void notifyUnfulfilledPayment(UUID customerId, UUID subOrderId, UUID paymentId, boolean refundPending) {
+        String action = refundPending ? "refund" : "no_payment";
+        notifications.executeOnce(
+                new NotificationCommand(customerId, "DISRUPTION_REFUND", NotificationChannel.IN_APP,
+                        LocalizedMessageRef.of("notification.disruption." + action + ".title"),
+                        LocalizedMessageRef.of("notification.disruption." + action + ".body", subOrderId),
+                        "SUB_ORDER", subOrderId, null),
+                "departure-payment:" + paymentId + ":" + subOrderId);
     }
 
     private void issueReplacement(UUID subId, UUID customerId, BigDecimal amount) {
@@ -340,6 +452,24 @@ public class DisruptionDecisionService {
         code.setValidFrom(now);
         code.setValidTo(now.plusDays(voucherValidDays));
         discounts.saveAndFlush(code);
+
+        if (transactionalEmailPort != null) {
+            OffsetDateTime emailNow = OffsetDateTime.now();
+            transactionalEmailPort.enqueue(new EmailRequest(
+                    TransactionalEmailType.PERSONAL_VOUCHER_ISSUED,
+                    "voucher:" + code.getId(),
+                    "USER:" + customerId,
+                    emailNow,
+                    emailNow,
+                    null,
+                    1,
+                    Map.of(
+                            "voucherId", code.getId().toString(),
+                            "code", code.getCode(),
+                            "amount", code.getDiscountValue() != null ? code.getDiscountValue().doubleValue() : 0.0
+                    )
+            ));
+        }
     }
 
     private void notifyCustomer(

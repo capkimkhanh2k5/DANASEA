@@ -1,254 +1,348 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MOCK_DISPUTES } from '../../../mockData';
+import { disputeService } from '../../../services/disputeService';
+import type { DisputeResponse } from '../../../types/dispute';
+import { toast } from '../../../store/useToastStore';
+import { ArrowLeft, Loader2, Send, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 export function DisputeDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const dispute = MOCK_DISPUTES.find(d => d.id === id);
-  const [evidence, setEvidence] = useState<File[]>([]);
 
-  if (!dispute) {
-    return (
-      <div className="p-8 text-center text-xs text-error">
-        Không tìm thấy khiếu nại.
-      </div>
-    );
-  }
+  const [dispute, setDispute] = useState<DisputeResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [vendorResponseText, setVendorResponseText] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setEvidence(prev => [...prev, ...Array.from(e.target.files!)]);
+  const fetchDetail = useCallback(async () => {
+    if (!id) return;
+    try {
+      setIsLoading(true);
+      const data = await disputeService.getVendorDisputeDetail(id);
+      setDispute(data);
+      if (data.vendorResponse) {
+        setVendorResponseText(data.vendorResponse);
+      }
+    } catch (err) {
+      console.error('[VendorDisputeDetail] Lỗi tải chi tiết khiếu nại:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchDetail();
+  }, [fetchDetail]);
+
+  const handleSubmitResponse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id || !vendorResponseText.trim()) return;
+
+    try {
+      setIsSubmitting(true);
+      const updated = await disputeService.submitVendorResponse(id, {
+        response: vendorResponseText.trim(),
+      });
+      setDispute(updated);
+      toast.success('Gửi văn bản giải trình thành công!');
+    } catch (err: unknown) {
+      console.error('[VendorDisputeDetail] Lỗi gửi giải trình:', err);
+      let msg = 'Không thể gửi giải trình.';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const resp = (err as { response?: { data?: { message?: string } } }).response;
+        if (resp?.data?.message) msg = resp.data.message;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      toast.error('Lỗi: ' + msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleRemoveFile = (index: number) => {
-    setEvidence(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status?: string) => {
     switch (status) {
       case 'OPEN':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono tabular-nums bg-sky-50 text-sky-700 text-xs font-semibold border border-sky-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-500 "></span>
             <span>Mới mở (OPEN)</span>
           </span>
         );
       case 'IN_PROGRESS':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-semibold">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono tabular-nums bg-amber-50 text-amber-700 text-xs font-semibold border border-amber-200">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             <span>Đang xử lý</span>
           </span>
         );
-      case 'RESOLVED':
+      case 'UNDER_REVIEW':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono tabular-nums bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+            <span>Đang xử lý (Admin)</span>
+          </span>
+        );
+      case 'RESOLVED':
+      case 'RESOLVED_REFUND':
+      case 'RESOLVED_PARTIAL':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono tabular-nums bg-amber-50 text-amber-700 text-xs font-semibold border border-amber-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            <span>Chấp thuận hoàn tiền</span>
+          </span>
+        );
+      case 'RESOLVED_REJECTED':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono tabular-nums bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            <span>Đã giải quyết</span>
+            <span>Bác bỏ khiếu nại (Đối tác thắng)</span>
           </span>
         );
       case 'CLOSED':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-outline"></span>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono tabular-nums bg-slate-100 text-slate-600 text-xs font-medium border border-slate-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
             <span>Đã đóng</span>
           </span>
         );
       default:
         return (
-          <span className="px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface text-xs font-medium">
+          <span className="px-2 py-0.5 rounded-md font-mono tabular-nums bg-slate-100 text-slate-800 text-xs">
             {status}
           </span>
         );
     }
   };
 
-  return (
-    <div className="w-full px-6 py-6 space-y-6">
-      {/* Top Navigation & Header */}
-      <div className="space-y-2 pb-3 border-b border-outline-variant/20">
-        <button 
-          onClick={() => navigate('/vendor/disputes')} 
-          className="inline-flex items-center gap-1 text-xs text-on-surface-variant hover:text-primary transition-colors cursor-pointer"
-          type="button"
-        >
-          <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-          <span>Quay lại danh sách khiếu nại</span>
-        </button>
+  const getReasonLabel = (reason?: string) => {
+    switch (reason) {
+      case 'SERVICE_NOT_AS_DESCRIBED':
+        return 'Dịch vụ không đúng mô tả / cam kết';
+      case 'VENDOR_NO_SHOW':
+        return 'Nhà cung cấp vắng mặt / không đến đón';
+      case 'SAFETY_CONCERN':
+        return 'Vấn đề an toàn / thiếu trang bị cứu sinh';
+      case 'PAYMENT_ISSUE':
+        return 'Sự cố thanh toán / phụ thu sai quy định';
+      default:
+        return reason || 'Khác';
+    }
+  };
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl md:text-2xl font-bold font-mono text-on-surface tracking-tight">
-              {dispute.id}
-            </h1>
-            <span className="text-xs text-on-surface-variant">•</span>
-            <span className="text-xs text-on-surface-variant font-medium">
-              Đơn hàng: <strong className="font-mono text-on-surface">{dispute.subOrderId}</strong>
-            </span>
-          </div>
-          <div>
-            {getStatusBadge(dispute.status)}
-          </div>
+  if (isLoading) {
+    return (
+      <div className="w-full max-w-5xl mx-auto py-8 space-y-6 ">
+        <div className="h-8 bg-slate-100 rounded-lg w-1/4"></div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="h-64 bg-slate-100 rounded-xl md:col-span-2 border border-slate-200"></div>
+          <div className="h-64 bg-slate-100 rounded-xl border border-slate-200"></div>
         </div>
       </div>
+    );
+  }
 
-      {/* Main 12-Column Console Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* LEFT COLUMN (8 cols): Chronological Dispute Resolution Thread */}
-        <div className="lg:col-span-8 bg-surface-container-lowest rounded-xl border border-outline-variant/20 shadow-xs divide-y divide-outline-variant/15 overflow-hidden">
-          {/* Step 1: Customer Report */}
-          <div className="p-5 sm:p-6 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[18px]">report_problem</span>
-                </span>
-                <div>
-                  <h2 className="text-sm font-bold text-on-surface">1. Nội dung khiếu nại từ khách hàng</h2>
-                  <p className="text-[11px] text-on-surface-variant">Khởi tạo bởi {dispute.raisedBy}</p>
-                </div>
-              </div>
-              <span className="text-xs font-mono text-on-surface-variant">
-                {new Date(dispute.createdAt).toLocaleString('vi-VN')}
-              </span>
-            </div>
+  if (!dispute) {
+    return (
+      <div className="w-full p-8 text-center space-y-3">
+        <AlertTriangle className="w-8 h-8 text-rose-500 mx-auto" />
+        <p className="text-sm font-bold text-slate-800">Không tìm thấy hồ sơ khiếu nại.</p>
+        <button
+          onClick={() => navigate('/vendor/disputes')}
+          className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
+        >
+          Quay lại danh sách
+        </button>
+      </div>
+    );
+  }
 
-            <div className="p-3.5 rounded-lg bg-surface-container-low/40 border border-outline-variant/15 text-xs text-on-surface leading-relaxed">
-              <div className="mb-1 text-[11px] font-semibold text-outline">
-                Phân loại vi phạm: <span className="text-on-surface">{dispute.category}</span>
-              </div>
-              <p>{dispute.description}</p>
-            </div>
-          </div>
-
-          {/* Step 2: Vendor Evidence Submission */}
-          <div className="p-5 sm:p-6 space-y-3">
+  return (
+    <div className="w-full bg-surface min-h-screen">
+      <div className="w-full px-6 py-4 space-y-4">
+        {/* Top Utility Header */}
+        <div className="flex items-center gap-3 pb-3 border-b border-slate-200/80">
+          <button
+            onClick={() => navigate('/vendor/disputes')}
+            className="p-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer shadow-xs"
+            aria-label="Quay lại"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div>
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                <span className="material-symbols-outlined text-[18px]">upload_file</span>
-              </span>
-              <div>
-                <h2 className="text-sm font-bold text-on-surface">2. Minh chứng đối ứng của Nhà cung cấp</h2>
-                <p className="text-[11px] text-on-surface-variant">Tải lên hình ảnh, hóa đơn hoặc văn bản giải trình để Hội đồng xem xét</p>
-              </div>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight font-display">
+                Chi tiết vụ việc #DIS-{dispute.id.slice(0, 8).toUpperCase()}
+              </h1>
+              {getStatusBadge(dispute.status)}
             </div>
-
-            {/* Dropzone */}
-            <label className="border border-dashed border-outline-variant/40 rounded-lg p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-surface-container-low/30 transition-colors">
-              <span className="material-symbols-outlined text-primary text-[24px] mb-1">cloud_upload</span>
-              <span className="text-xs font-semibold text-on-surface">Bấm để chọn tệp hoặc kéo thả vào đây</span>
-              <span className="text-[11px] text-on-surface-variant mt-0.5">Hỗ trợ PDF, PNG, JPG (Tối đa 10MB/tệp)</span>
-              <input type="file" multiple accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleFileUpload} />
-            </label>
-
-            {/* Selected Evidence List */}
-            {evidence.length > 0 && (
-              <div className="space-y-2 pt-1">
-                <h4 className="text-xs font-semibold text-on-surface">Tệp đã đính kèm ({evidence.length}):</h4>
-                <div className="divide-y divide-outline-variant/15 border border-outline-variant/20 rounded-lg overflow-hidden">
-                  {evidence.map((file, idx) => (
-                    <div key={idx} className="flex items-center justify-between p-2.5 bg-surface-container-low/20 text-xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="material-symbols-outlined text-[16px] text-primary">description</span>
-                        <span className="truncate font-medium text-on-surface max-w-[280px]">{file.name}</span>
-                        <span className="text-[11px] text-on-surface-variant">({(file.size / 1024).toFixed(1)} KB)</span>
-                      </div>
-                      <button 
-                        type="button" 
-                        onClick={() => handleRemoveFile(idx)} 
-                        className="text-error hover:bg-error/10 p-1 rounded transition-colors cursor-pointer"
-                        title="Xóa tệp"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">close</span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <button 
-                  type="button"
-                  className="px-4 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold shadow-xs hover:bg-primary-container transition-colors cursor-pointer"
-                >
-                  Gửi minh chứng bổ sung
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Step 3: Admin & Port Authority Resolution */}
-          <div className="p-5 sm:p-6 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-                <span className="material-symbols-outlined text-[18px]">gavel</span>
-              </span>
-              <div>
-                <h2 className="text-sm font-bold text-on-surface">3. Phán quyết &amp; Kết luận từ Sàn DANASEA</h2>
-                <p className="text-[11px] text-on-surface-variant">Quyết định giải quyết tranh chấp có hiệu lực thi hành</p>
-              </div>
-            </div>
-
-            {dispute.resolutionNote ? (
-              <div className="p-3.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800 text-xs leading-relaxed">
-                <div className="flex items-center gap-1.5 font-bold mb-1">
-                  <span className="material-symbols-outlined text-[16px]">verified</span>
-                  <span>Kết luận chính thức của Admin:</span>
-                </div>
-                <p>{dispute.resolutionNote}</p>
-              </div>
-            ) : (
-              <div className="p-4 rounded-lg bg-surface-container-low/30 text-center text-xs text-on-surface-variant border border-outline-variant/15 flex flex-col items-center gap-1.5">
-                <span className="material-symbols-outlined text-[24px] text-outline">hourglass_top</span>
-                <p className="font-medium">Hồ sơ đang trong quá trình thụ lý và xem xét bởi Hội đồng Cảng vụ DANASEA.</p>
-                <span className="text-[11px] text-outline">Thời gian xử lý trung bình: 24h - 48h làm việc.</span>
-              </div>
-            )}
+            <p className="text-xs text-slate-500">
+              Hồ sơ khiếu nại cho đơn hàng con #VE-{dispute.subOrderId.slice(0, 8).toUpperCase()}
+            </p>
           </div>
         </div>
 
-        {/* RIGHT COLUMN (4 cols): Sticky Summary Drawer Panel */}
-        <div className="lg:col-span-4 sticky top-20">
-          <div className="bg-surface-container-lowest rounded-xl border border-outline-variant/20 shadow-xs p-5 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-outline-variant/15">
-              <h3 className="text-sm font-bold text-on-surface">Tóm tắt hồ sơ</h3>
-              <span className="text-[11px] font-mono text-primary font-bold">{dispute.id}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+          {/* LEFT COLUMN: Main Investigation Steps */}
+          <div className="lg:col-span-8 space-y-3.5">
+            {/* Step 1: Customer Claim */}
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-5 space-y-3">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-700 flex items-center justify-center font-bold text-xs border border-rose-200/60">
+                  1
+                </span>
+                <h2 className="text-sm font-bold text-slate-900 font-display">Nội dung khiếu nại từ du khách</h2>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div>
+                  <span className="text-slate-500 font-medium">Lý do khiếu nại:</span>
+                  <p className="font-semibold text-rose-700 mt-0.5">{getReasonLabel(dispute.reason)}</p>
+                </div>
+
+                <div>
+                  <span className="text-slate-500 font-medium">Mô tả sự việc:</span>
+                  <div className="mt-1 p-3.5 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-800 leading-relaxed whitespace-pre-line text-xs">
+                    {dispute.description || 'Không có mô tả chi tiết.'}
+                  </div>
+                </div>
+
+                {dispute.evidenceUrls && dispute.evidenceUrls.length > 0 && (
+                  <div>
+                    <span className="text-slate-500 font-medium">Hình ảnh / Bằng chứng từ khách:</span>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      {dispute.evidenceUrls.map((url, i) => (
+                        <a
+                          key={i}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200 hover:opacity-80 transition-opacity"
+                        >
+                          <img src={url} alt="Bằng chứng" className="w-full h-full object-cover" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-on-surface-variant">Trạng thái</span>
-                <div>{getStatusBadge(dispute.status)}</div>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-on-surface-variant">Mã đơn con (SubOrder)</span>
-                <span className="font-mono font-bold text-on-surface">{dispute.subOrderId}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-on-surface-variant">Khách hàng khiếu nại</span>
-                <span className="font-semibold text-on-surface">{dispute.raisedBy}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-on-surface-variant">Phân loại</span>
-                <span className="font-medium text-on-surface">{dispute.category}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-on-surface-variant">Ngày khởi tạo</span>
-                <span className="font-mono text-on-surface-variant">
-                  {new Date(dispute.createdAt).toLocaleDateString('vi-VN')}
+            {/* Step 2: Vendor Response */}
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-5 space-y-3">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-800 flex items-center justify-center font-bold text-xs border border-slate-200">
+                  2
                 </span>
+                <h2 className="text-sm font-bold text-slate-900 font-display">Văn bản giải trình từ Nhà cung cấp</h2>
               </div>
+
+              {dispute.vendorResponse && (
+                <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs space-y-1">
+                  <div className="flex items-center justify-between text-slate-900 font-bold">
+                    <span>Giải trình đã gửi:</span>
+                    {dispute.vendorRespondedAt && (
+                      <span className="text-[11px] text-slate-500 font-mono font-normal">
+                        {new Date(dispute.vendorRespondedAt).toLocaleString('vi-VN')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-slate-700 leading-relaxed whitespace-pre-line">{dispute.vendorResponse}</p>
+                </div>
+              )}
+
+              {dispute.status !== 'RESOLVED' && dispute.status !== 'CLOSED' && dispute.status !== 'RESOLVED_REFUND' && dispute.status !== 'RESOLVED_REJECTED' && dispute.status !== 'RESOLVED_PARTIAL' && (
+                <form onSubmit={handleSubmitResponse} className="space-y-3 pt-1">
+                  <label className="text-xs font-bold text-slate-700 block">
+                    {dispute.vendorResponse ? 'Cập nhật lại văn bản giải trình:' : 'Nhập giải trình của cơ sở:'}
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={vendorResponseText}
+                    onChange={(e) => setVendorResponseText(e.target.value)}
+                    placeholder="Nêu rõ diễn biến thực tế, nguyên nhân khách quan, nhật ký điều phối tàu hoặc bằng chứng trao đổi với khách..."
+                    className="w-full p-3 rounded-lg border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900 resize-none leading-relaxed"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !vendorResponseText.trim()}
+                    className="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-all"
+                  >
+                    {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                    <span>{isSubmitting ? 'Đang gửi...' : 'Gửi văn bản giải trình'}</span>
+                  </button>
+                </form>
+              )}
             </div>
 
-            {/* Policy Notes */}
-            <div className="pt-3 border-t border-outline-variant/15">
-              <div className="p-3 rounded-lg bg-surface-container-low/40 border border-outline-variant/15 space-y-1 text-[11px] text-on-surface-variant leading-relaxed">
-                <span className="font-semibold text-on-surface flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px] text-primary">info</span>
-                  Quy chuẩn hòa giải:
+            {/* Step 3: Admin Resolution */}
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-5 space-y-3">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
+                <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs border border-emerald-200/60">
+                  3
                 </span>
-                <p>
-                  Tiền cược đối soát của đơn con liên quan sẽ tạm giữ trên ví bảo chứng ký quỹ cho đến khi có phán quyết cuối cùng từ Admin.
-                </p>
+                <h2 className="text-sm font-bold text-slate-900 font-display">Phán quyết &amp; Kết luận từ Sàn DANASEA</h2>
+              </div>
+
+              {dispute.adminNote ? (
+                <div className="p-3.5 rounded-lg bg-emerald-50/70 border border-emerald-200/70 text-emerald-900 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    <span>Kết luận chính thức của Điều phối viên / Cảng vụ:</span>
+                  </div>
+                  <p className="leading-relaxed">{dispute.adminNote}</p>
+                  {dispute.refundPercentage !== undefined && dispute.refundPercentage !== null && (
+                    <p className="font-semibold pt-1">
+                      Mức hoàn tiền chỉ định: <strong className="font-mono">{dispute.refundPercentage}%</strong>
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 rounded-lg bg-slate-50 border border-slate-200/80 text-center text-xs text-slate-500 space-y-1">
+                  <p className="font-medium text-slate-700">Vụ việc đang được xem xét và xử lý bởi Ban quản lý DANASEA.</p>
+                  <p className="text-[11px] text-slate-400">Thời gian xử lý trung bình: 24h - 48h làm việc.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Summary Card */}
+          <div className="lg:col-span-4">
+            <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs p-5 space-y-4">
+              <h3 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 font-display">
+                Tóm tắt hồ sơ tranh chấp
+              </h3>
+
+              <div className="space-y-2.5 text-xs">
+                <div className="flex justify-between items-center py-0.5">
+                  <span className="text-slate-500">Mã khiếu nại:</span>
+                  <span className="font-mono font-bold text-slate-900">#DIS-{dispute.id.slice(0, 8).toUpperCase()}</span>
+                </div>
+                <div className="flex justify-between items-center py-0.5">
+                  <span className="text-slate-500">Đơn hàng con:</span>
+                  <span className="font-mono font-bold text-slate-800">#VE-{dispute.subOrderId.slice(0, 8).toUpperCase()}</span>
+                </div>
+                <div className="flex justify-between items-center py-0.5">
+                  <span className="text-slate-500">Mã đơn tổng:</span>
+                  <span className="font-mono text-slate-600">#ORD-{dispute.orderId.slice(0, 8).toUpperCase()}</span>
+                </div>
+                <div className="flex justify-between items-center py-0.5">
+                  <span className="text-slate-500">Ngày tạo:</span>
+                  <span className="font-mono text-slate-600">{new Date(dispute.createdAt).toLocaleString('vi-VN')}</span>
+                </div>
+                <div className="flex justify-between items-center py-0.5">
+                  <span className="text-slate-500">Trạng thái:</span>
+                  {getStatusBadge(dispute.status)}
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 text-[11px] text-slate-600 space-y-1">
+                <div className="flex items-center gap-1 font-bold text-slate-800">
+                  <ShieldCheck className="w-3.5 h-3.5 text-slate-700" />
+                  <span>Quy trình bảo vệ đôi bên</span>
+                </div>
+                <p className="leading-relaxed">Mọi khoản thanh toán của chuyến đi bị khiếu nại sẽ được giữ an toàn tại tài khoản ủy thác cho tới khi có phán quyết cuối cùng.</p>
               </div>
             </div>
           </div>

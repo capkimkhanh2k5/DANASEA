@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.danasea.backend.configs.properties.CheckinProperties;
 import com.danasea.backend.modules.checkin.domain.exceptions.InvalidCheckinStateException;
+import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 
 @Component
@@ -23,6 +24,9 @@ public class CheckinWindowPolicy {
     public void validate(ServiceSlotJpaEntity slot, OffsetDateTime now) {
         if (slot == null || slot.getDate() == null || slot.getStartTime() == null || slot.getEndTime() == null) {
             throw new InvalidCheckinStateException("The service slot has incomplete check-in timing data.");
+        }
+        if (slot.getStatus() == SlotStatus.CANCELLED) {
+            throw new InvalidCheckinStateException("This departure was cancelled.");
         }
         OffsetDateTime start = LocalDateTime.of(slot.getDate(), slot.getStartTime())
                 .atZone(VIETNAM_ZONE).toOffsetDateTime();

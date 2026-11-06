@@ -7,7 +7,7 @@ from pathlib import Path
 
 class AcceptanceTest(unittest.TestCase):
     def module(self):
-        spec = importlib.util.spec_from_file_location('acceptance', Path(__file__).resolve().parents[1] / 'acceptance.py')
+        spec = importlib.util.spec_from_file_location('acceptance', Path(__file__).resolve().parents[1] / 'qa' / 'acceptance.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module

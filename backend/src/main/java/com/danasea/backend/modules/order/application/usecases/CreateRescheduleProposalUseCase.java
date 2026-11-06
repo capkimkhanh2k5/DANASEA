@@ -2,6 +2,9 @@ package com.danasea.backend.modules.order.application.usecases;
 
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.booking.domain.ports.ServiceSlotPort;
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.order.application.services.DisruptionDecisionService;
 import com.danasea.backend.modules.order.application.services.RescheduleSupport;
 import com.danasea.backend.modules.order.domain.events.RescheduleProposalCreatedEvent;
@@ -21,6 +24,7 @@ import com.danasea.backend.security.infrastructure.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -31,6 +35,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -50,6 +55,9 @@ public class CreateRescheduleProposalUseCase {
     private final ApplicationEventPublisher eventPublisher;
     private final ServiceSlotPort serviceSlotPort;
     private final DisruptionDecisionService decisions;
+
+    @Autowired(required = false)
+    private TransactionalEmailPort transactionalEmailPort;
 
     @Transactional
     public RescheduleProposalResponse execute(
@@ -187,6 +195,27 @@ public class CreateRescheduleProposalUseCase {
                         + "\",\"expiresAt\":\""
                         + expiresAt
                         + "\"}");
+
+        if (transactionalEmailPort != null) {
+            UUID customerId = locked.master().getCustomerId();
+            transactionalEmailPort.enqueue(new EmailRequest(
+                    TransactionalEmailType.TRIP_RESCHEDULE_PROPOSED,
+                    "proposal:" + saved.getId(),
+                    "USER:" + customerId,
+                    now,
+                    now,
+                    expiresAt,
+                    1,
+                    Map.of(
+                            "proposalId", saved.getId().toString(),
+                            "subOrderId", subOrderId.toString(),
+                            "serviceName", "Dịch vụ Danasea",
+                            "proposedDate", proposedSlot.getDate().toString(),
+                            "proposedTime", proposedSlot.getStartTime().toString(),
+                            "reason", request.reason().trim()
+                    )
+            ));
+        }
 
         eventPublisher.publishEvent(new RescheduleProposalCreatedEvent(saved.getId()));
 

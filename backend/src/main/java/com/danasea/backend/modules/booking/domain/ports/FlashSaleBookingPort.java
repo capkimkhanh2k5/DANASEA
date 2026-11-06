@@ -2,11 +2,12 @@ package com.danasea.backend.modules.booking.domain.ports;
 
 import com.danasea.backend.modules.flashsale.domain.FlashSalePricing.Snapshot;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface FlashSaleBookingPort {
-    void lockOffers(java.util.List<UUID> ids);
+    void lockOffers(List<UUID> ids);
     UUID replay(UUID customerId, String key, String fingerprint);
     void remember(UUID customerId, String key, String fingerprint, UUID bookingId);
     Snapshot reserve(UUID saleId, UUID serviceId, UUID optionId, BigDecimal verifiedPrice,

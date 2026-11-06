@@ -9,6 +9,7 @@ import time
 import unittest
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'demo'))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import demo_request
 

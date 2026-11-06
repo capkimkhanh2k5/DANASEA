@@ -38,11 +38,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
 @DisplayName("Review & Rating End-to-End Lifecycle Integration Test")
-public class ReviewRatingIntegrationTest {
+public class ReviewRatingIntegrationTest extends AbstractExternalInfrastructureIntegrationTest {
 
     @MockitoBean
     private io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager proxyManager;

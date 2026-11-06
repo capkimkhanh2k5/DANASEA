@@ -16,9 +16,13 @@ export function VendorStatus({ status }: { status: VerificationStatus }) {
   </AdminBadge>;
 }
 
-export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview, demo }: {
+export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview, onApproveDoc, onRejectDoc, isSubmitting, demo }: {
   vendor: VendorRecord; timeline: VendorReviewEvent[]; tier: BadgeTier;
-  onTierChange: (tier: BadgeTier) => void; onPreview: (name: string) => void; demo: boolean;
+  onTierChange: (tier: BadgeTier) => void; onPreview: (urlOrName: string, name?: string) => void;
+  onApproveDoc?: (docId: string) => Promise<void>;
+  onRejectDoc?: (docId: string, reason: string) => Promise<void>;
+  isSubmitting?: boolean;
+  demo: boolean;
 }) {
   return <div className="admin-vendors-profile">
     <section className="admin-detail-section admin-vendors-profile-summary" aria-label="Thông tin chính">
@@ -29,38 +33,108 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
         <div><dt>Mã số thuế</dt><dd>{formatTaxCode(vendor.taxCode) === 'Chưa cập nhật' ? <span style={{ fontStyle: 'italic', color: '#64748b' }}>Chưa cập nhật</span> : <span className="admin-vendors-mono">{vendor.taxCode}</span>}</dd></div><div><dt>Đánh giá</dt><dd>{vendor.ratingAvg} / 5 · {vendor.ratingCount} đánh giá</dd></div></dl>
     </section>
 
-    <section className="admin-detail-section" aria-labelledby="vendor-documents-heading"><div className="admin-vendors-section-heading"><h3 id="vendor-documents-heading">Tài liệu minh họa</h3><span>2 bản xem trước mẫu</span></div>
-      <p className="admin-detail-note">Hai tên tệp cố định để xem thử giao diện, không phải chứng từ đã được đối tác tải lên hoặc xác thực.</p>
-      <div className="admin-documents">{[
-        {
-          name: 'giay_phep_kinh_doanh_2024.pdf',
-          detail: '2.8 MB · Mã mẫu: #GP-DANANG-2024',
-          subMeta: 'Cấp bởi: Sở Kế hoạch & Đầu tư Đà Nẵng · Hạn: 12/2026',
-          status: vendor.verificationStatus === 'REJECTED' ? 'Cần bổ sung' : 'Đã xác minh (mẫu)',
-          statusTone: vendor.verificationStatus === 'REJECTED' ? 'rose' : 'teal',
-          reason: vendor.verificationStatus === 'REJECTED' ? 'Khu vực bến thủy chưa được công bố hoạt động hợp chuẩn.' : undefined,
-        },
-        {
-          name: 'chung_chi_cuu_ho_padi_rescue.pdf',
-          detail: '4.1 MB · PADI Rescue Standard (mẫu)',
-          subMeta: 'Tiêu chuẩn: PADI Rescue Diver & First Aid · Hạn: 08/2025',
-          status: vendor.verificationStatus === 'PENDING' ? 'Chờ kiểm tra' : vendor.verificationStatus === 'REJECTED' ? 'Cần bổ sung' : 'Đã xác minh (mẫu)',
-          statusTone: vendor.verificationStatus === 'PENDING' ? 'amber' : vendor.verificationStatus === 'REJECTED' ? 'rose' : 'teal',
-          reason: vendor.verificationStatus === 'PENDING' ? (vendor.safetyCertificateStatus || 'Chờ đối soát danh sách cứu hộ viên trực ban theo QCVN.') : undefined,
-        },
-      ].map(document => <button type="button" key={document.name} onClick={() => onPreview(document.name)} className="admin-vendors-document" aria-haspopup="dialog">
-        <FileText size={22} aria-hidden="true" className="admin-vendors-doc-icon" />
-        <span className="admin-vendors-doc-info">
-          <div className="admin-vendors-doc-top">
-            <strong>{document.name}</strong>
-            <AdminBadge tone={document.statusTone as 'teal' | 'amber' | 'rose'}>{document.status}</AdminBadge>
-          </div>
-          <small>{document.detail}</small>
-          <span className="admin-vendors-doc-meta">{document.subMeta}</span>
-          {document.reason && <span className="admin-vendors-doc-reason">Lý do chưa đạt: {document.reason}</span>}
-        </span>
-        <span className="admin-vendors-preview-link">Xem mẫu</span>
-      </button>)}</div>
+    <section className="admin-detail-section" aria-labelledby="vendor-documents-heading">
+      <div className="admin-vendors-section-heading">
+        <h3 id="vendor-documents-heading">Hồ sơ pháp lý & Chứng chỉ</h3>
+        <span>{vendor.documents && vendor.documents.length > 0 ? `${vendor.documents.length} chứng từ CSDL` : '2 bản xem trước mẫu'}</span>
+      </div>
+      {vendor.documents && vendor.documents.length > 0 ? (
+        <div className="admin-documents">
+          {vendor.documents.map(doc => {
+            const isLicense = doc.docType === 'BUSINESS_LICENSE';
+            const docTitle = isLicense
+              ? 'Giấy phép Đăng ký Kinh doanh (GPKD)'
+              : (doc.docType === 'SAFETY_CERT' ? 'Chứng nhận An toàn Giao thông Đường thủy' : doc.docType);
+            const statusLabel = doc.status === 'APPROVED' ? 'Đã duyệt' : (doc.status === 'PENDING' ? 'Chờ kiểm tra' : 'Từ chối');
+            const statusTone = doc.status === 'APPROVED' ? 'teal' : (doc.status === 'PENDING' ? 'amber' : 'rose');
+
+            return (
+              <div key={doc.id} className="admin-vendors-document" style={{ cursor: 'default' }}>
+                <FileText size={22} aria-hidden="true" className="admin-vendors-doc-icon" />
+                <div className="admin-vendors-doc-info">
+                  <div className="admin-vendors-doc-top">
+                    <strong>{docTitle}</strong>
+                    <AdminBadge tone={statusTone as 'teal' | 'amber' | 'rose'}>{statusLabel}</AdminBadge>
+                  </div>
+                  <small>Mã số hồ sơ: #{doc.id.slice(0, 8)} · Loại: {doc.docType}</small>
+                  {doc.reviewedBy && (
+                    <span className="admin-vendors-doc-meta">
+                      Người duyệt: {doc.reviewedBy} {doc.reviewedAt ? `(${date(doc.reviewedAt)})` : ''}
+                    </span>
+                  )}
+                  <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="admin-vendors-preview-link"
+                      onClick={() => onPreview(doc.fileUrl, docTitle)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      🔍 Xem ảnh scan gốc
+                    </button>
+                    {!demo && doc.status === 'PENDING' && onApproveDoc && (
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => onApproveDoc(doc.id)}
+                        style={{ marginLeft: 'auto', background: '#059669', color: '#fff', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+                      >
+                        ✔ Duyệt chứng từ
+                      </button>
+                    )}
+                    {!demo && doc.status === 'PENDING' && onRejectDoc && (
+                      <button
+                        type="button"
+                        disabled={isSubmitting}
+                        onClick={() => {
+                          const reason = window.prompt('Nhập lý do từ chối / yêu cầu bổ sung chứng từ:');
+                          if (reason) onRejectDoc(doc.id, reason);
+                        }}
+                        style={{ background: '#f43f5e', color: '#fff', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+                      >
+                        ✖ Từ chối
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <>
+          <p className="admin-detail-note">Hai tên tệp cố định để xem thử giao diện, không phải chứng từ đã được đối tác tải lên hoặc xác thực.</p>
+          <div className="admin-documents">{[
+            {
+              name: 'giay_phep_kinh_doanh_2024.pdf',
+              detail: '2.8 MB · Mã mẫu: #GP-DANANG-2024',
+              subMeta: 'Cấp bởi: Sở Kế hoạch & Đầu tư Đà Nẵng · Hạn: 12/2026',
+              status: vendor.verificationStatus === 'REJECTED' ? 'Cần bổ sung' : 'Đã xác minh (mẫu)',
+              statusTone: vendor.verificationStatus === 'REJECTED' ? 'rose' : 'teal',
+              reason: vendor.verificationStatus === 'REJECTED' ? 'Khu vực bến thủy chưa được công bố hoạt động hợp chuẩn.' : undefined,
+            },
+            {
+              name: 'chung_chi_cuu_ho_padi_rescue.pdf',
+              detail: '4.1 MB · PADI Rescue Standard (mẫu)',
+              subMeta: 'Tiêu chuẩn: PADI Rescue Diver & First Aid · Hạn: 08/2025',
+              status: vendor.verificationStatus === 'PENDING' ? 'Chờ kiểm tra' : vendor.verificationStatus === 'REJECTED' ? 'Cần bổ sung' : 'Đã xác minh (mẫu)',
+              statusTone: vendor.verificationStatus === 'PENDING' ? 'amber' : vendor.verificationStatus === 'REJECTED' ? 'rose' : 'teal',
+              reason: vendor.verificationStatus === 'PENDING' ? (vendor.safetyCertificateStatus || 'Chờ đối soát danh sách cứu hộ viên trực ban theo QCVN.') : undefined,
+            },
+          ].map(document => <button type="button" key={document.name} onClick={() => onPreview(document.name)} className="admin-vendors-document" aria-haspopup="dialog">
+            <FileText size={22} aria-hidden="true" className="admin-vendors-doc-icon" />
+            <span className="admin-vendors-doc-info">
+              <div className="admin-vendors-doc-top">
+                <strong>{document.name}</strong>
+                <AdminBadge tone={document.statusTone as 'teal' | 'amber' | 'rose'}>{document.status}</AdminBadge>
+              </div>
+              <small>{document.detail}</small>
+              <span className="admin-vendors-doc-meta">{document.subMeta}</span>
+              {document.reason && <span className="admin-vendors-doc-reason">Lý do chưa đạt: {document.reason}</span>}
+            </span>
+            <span className="admin-vendors-preview-link">Xem mẫu</span>
+          </button>)}</div>
+        </>
+      )}
     </section>
 
     <AdminDisclosure title="Pháp lý & tài khoản thụ hưởng" description="Mã số thuế, ngân hàng và thông tin người thụ hưởng">

@@ -75,7 +75,7 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
     final slotsForDay = _db.slots.where((s) {
       if (s.serviceId != _selectedServiceId) return false;
       if (!s.matchesDate(_selectedDate)) return false;
-      if (_slotFilter == 'open') return !s.isBlocked && s.bookedCount < s.capacity;
+      if (_slotFilter == 'open') return s.status == SlotStatus.open && s.availableCount > 0;
       if (_slotFilter == 'blocked') return s.isBlocked;
       return true;
     }).toList();
@@ -517,7 +517,9 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                   color: slot.isBlocked ? AppColors.tertiary : AppColors.navyAnchor,
                 ),
               ),
-              if (slot.isBlocked)
+              if (slot.status == SlotStatus.cancelled || slot.status == SlotStatus.closed)
+                LocalizedText(slot.status.labelVi)
+              else if (slot.isBlocked)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
@@ -589,82 +591,83 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
           const SizedBox(height: 8),
 
           // Actions
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // Toggle block button
-              InkWell(
-                onTap: () {
-                  _db.toggleSlotBlocked(slot.slotId);
-                  ToastNotification.showInfo(
-                    context,
-                    slot.isBlocked ? 'Đã mở khóa slot ${slot.startTime}' : 'Đã tạm khóa slot ${slot.startTime}',
-                  );
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        slot.isBlocked ? Icons.lock_open : Icons.block,
-                        size: 14,
-                        color: slot.isBlocked ? AppColors.secondary : AppColors.tertiary,
-                      ),
-                      const SizedBox(width: 4),
-                      LocalizedText(
-                        slot.isBlocked ? 'Mở khóa' : 'Tạm khóa',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
+          if (slot.status != SlotStatus.cancelled)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Toggle block button
+                InkWell(
+                  onTap: () {
+                    _db.toggleSlotBlocked(slot.slotId);
+                    ToastNotification.showInfo(
+                      context,
+                      slot.isBlocked ? 'Đã mở khóa slot ${slot.startTime}' : 'Đã tạm khóa slot ${slot.startTime}',
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          slot.isBlocked ? Icons.lock_open : Icons.block,
+                          size: 14,
                           color: slot.isBlocked ? AppColors.secondary : AppColors.tertiary,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        LocalizedText(
+                          slot.isBlocked ? 'Mở khóa' : 'Tạm khóa',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: slot.isBlocked ? AppColors.secondary : AppColors.tertiary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              // Edit config button
-              InkWell(
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => SlotConfigScreen(
-                        slot: slot,
-                        serviceId: _selectedServiceId,
-                      ),
-                    ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.secondary.withOpacity(0.25)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.edit_outlined, size: 13, color: AppColors.secondary),
-                      SizedBox(width: 4),
-                      LocalizedText(
-                        'Chỉnh sửa',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.secondary,
+                const SizedBox(width: 6),
+                // Edit config button
+                InkWell(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => SlotConfigScreen(
+                          slot: slot,
+                          serviceId: _selectedServiceId,
                         ),
                       ),
-                    ],
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.secondary.withOpacity(0.25)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.edit_outlined, size: 13, color: AppColors.secondary),
+                        SizedBox(width: 4),
+                        LocalizedText(
+                          'Chỉnh sửa',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );

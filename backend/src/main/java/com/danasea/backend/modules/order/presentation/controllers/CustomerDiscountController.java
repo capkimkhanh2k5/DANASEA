@@ -23,7 +23,7 @@ public class CustomerDiscountController {
 
     @GetMapping("/api/customers/me/discount-codes")
     @PreAuthorize("hasRole('CUSTOMER')")
-    @Operation(summary = "List personal replacement vouchers, including used and expired vouchers")
+    @Operation(summary = "List personal replacement and compensation vouchers, including used and expired vouchers")
     public Page<DiscountCodeResponse> list(@PageableDefault(size = 20) Pageable pageable) {
         if (pageable.getPageSize() > 100) throw new IllegalArgumentException("Page size cannot exceed 100.");
         var userId = SecurityUtils.getCurrentUserId().orElseThrow(() -> new AccessDeniedException("User is not authenticated."));

@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -15,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import com.danasea.backend.modules.booking.domain.models.BookingStatus;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.order.domain.events.RefundCompletedEvent;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidWebhookException;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
@@ -43,12 +47,20 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 public class RefundProcessingService {
     public static final int MAX_RETRIES = 3;
     private static final String AWAITING = "GATEWAY_TIMEOUT_AWAITING_VERIFICATION";
+    private enum Preparation { CREATE, RECONCILE, BLOCKED }
 
     private ApplicationEventPublisher eventPublisher;
 
     @Autowired
     public void setEventPublisher(ApplicationEventPublisher eventPublisher) {
         this.eventPublisher = eventPublisher;
+    }
+
+    @Autowired(required = false)
+    private TransactionalEmailPort transactionalEmailPort;
+
+    public void setTransactionalEmailPort(TransactionalEmailPort transactionalEmailPort) {
+        this.transactionalEmailPort = transactionalEmailPort;
     }
 
     private final JpaRefundRepository refundRepository;
@@ -91,10 +103,10 @@ public class RefundProcessingService {
         if (transaction == null) {
             throw new IllegalStateException("Transactional refund processor is not configured.");
         }
-        boolean fresh = Boolean.TRUE.equals(transaction.execute(tx -> {
+        Preparation preparation = transaction.execute(tx -> {
             RefundJpaEntity refund = refundRepository.findByIdForUpdate(refundId).orElse(null);
             if (refund == null || refund.getStatus() != RefundStatus.PENDING) {
-                return false;
+                return Preparation.RECONCILE;
             }
             try {
                 RefundContext context = lockContext(refund);
@@ -105,17 +117,21 @@ public class RefundProcessingService {
                         refund.setGatewayRequestedAt(OffsetDateTime.now());
                         refundRepository.saveAndFlush(refund);
                     }
-                    return false;
+                    return Preparation.RECONCILE;
                 }
                 refund.setGatewayRequestedAt(OffsetDateTime.now());
                 refund.setLastError(AWAITING);
                 refundRepository.saveAndFlush(refund);
-                return true;
+                return Preparation.CREATE;
             } catch (IllegalArgumentException | IllegalStateException ex) {
                 configurationError(refund, ex.getMessage());
-                return false;
+                return Preparation.BLOCKED;
             }
-        }));
+        });
+        if (preparation == null || preparation == Preparation.BLOCKED) {
+            return false;
+        }
+        boolean fresh = preparation == Preparation.CREATE;
         return Boolean.TRUE.equals(transaction.execute(tx -> {
             RefundJpaEntity refund = refundRepository.findByIdForUpdate(refundId).orElse(null);
             if (refund == null) {
@@ -124,8 +140,14 @@ public class RefundProcessingService {
             if (refund.getStatus() != RefundStatus.PENDING) {
                 return refund.getStatus() == RefundStatus.PROCESSED;
             }
-            RefundContext context = lockContext(refund);
             if (refund.getGatewayRequestId() == null || refund.getProviderAmount() == null) {
+                return false;
+            }
+            RefundContext context;
+            try {
+                context = lockContext(refund);
+            } catch (IllegalArgumentException | IllegalStateException ex) {
+                configurationError(refund, ex.getMessage());
                 return false;
             }
             GatewayRefundRequest request = toGatewayRequest(refund, context.payment());
@@ -273,6 +295,24 @@ public class RefundProcessingService {
             refund.setStatus(RefundStatus.FAILED);
             refund.setLastError("GATEWAY_REFUND_FAILED: " + result.message());
             refundRepository.save(refund);
+            if (transactionalEmailPort != null) {
+                OffsetDateTime now = OffsetDateTime.now();
+                transactionalEmailPort.enqueue(new EmailRequest(
+                        TransactionalEmailType.REFUND_NEEDS_ATTENTION,
+                        "refund:" + refund.getId() + ":failed",
+                        "OPS:FINANCE",
+                        now,
+                        now,
+                        null,
+                        1,
+                        Map.of(
+                                "refundId", refund.getId().toString(),
+                                "reason", "FAILED",
+                                "lastError", refund.getLastError() != null ? refund.getLastError() : "GATEWAY_REFUND_FAILED",
+                                "amount", refund.getAmount() != null ? refund.getAmount().doubleValue() : 0.0
+                        )
+                ));
+            }
             return false;
         }
         awaitingVerification(refund, "Gateway refund remains pending.");

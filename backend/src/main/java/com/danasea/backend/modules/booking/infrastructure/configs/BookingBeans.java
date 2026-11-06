@@ -1,5 +1,8 @@
 package com.danasea.backend.modules.booking.infrastructure.configs;
 
+import java.time.Duration;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -24,8 +27,9 @@ public class BookingBeans {
     public CreateBookingHoldUseCase createBookingHoldUseCase(
             BookingRepositoryPort bookingRepository,
             InventoryLockPort inventoryLockPort,
-            ServiceSlotPort serviceSlotPort) {
-        return new CreateBookingHoldUseCase(bookingRepository, inventoryLockPort, serviceSlotPort);
+            ServiceSlotPort serviceSlotPort,
+            @Value("${app.booking.hold-duration:5m}") Duration holdDuration) {
+        return new CreateBookingHoldUseCase(bookingRepository, inventoryLockPort, serviceSlotPort, holdDuration);
     }
 
     @Bean

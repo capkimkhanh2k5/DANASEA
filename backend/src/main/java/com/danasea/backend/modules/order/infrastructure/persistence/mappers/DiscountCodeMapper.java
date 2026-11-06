@@ -21,6 +21,7 @@ public class DiscountCodeMapper {
         domain.setServiceId(entity.getServiceId());
         domain.setRecipientCustomerId(entity.getRecipientCustomerId());
         domain.setReplacementSubOrderId(entity.getReplacementSubOrderId());
+        domain.setCompensationDisruptionId(entity.getCompensationDisruptionId());
         domain.setDiscountType(entity.getDiscountType());
         domain.setDiscountValue(entity.getDiscountValue());
         domain.setMinOrderAmount(entity.getMinOrderAmount());
@@ -51,6 +52,7 @@ public class DiscountCodeMapper {
         entity.setServiceId(domain.getServiceId());
         entity.setRecipientCustomerId(domain.getRecipientCustomerId());
         entity.setReplacementSubOrderId(domain.getReplacementSubOrderId());
+        entity.setCompensationDisruptionId(domain.getCompensationDisruptionId());
         entity.setDiscountType(domain.getDiscountType());
         entity.setDiscountValue(domain.getDiscountValue());
         entity.setMinOrderAmount(domain.getMinOrderAmount());

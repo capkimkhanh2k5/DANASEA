@@ -12,5 +12,6 @@ scripts/*
 !scripts/run.sh
 config/quyet-small.lock.txt
 
-!scripts/build_runtime.py
 !scripts/container_entrypoint.py
+!scripts/check_runtime.py
+!scripts/install_dependencies.py

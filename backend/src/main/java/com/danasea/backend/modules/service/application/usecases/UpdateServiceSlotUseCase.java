@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.service.application.usecases;
 
+import com.danasea.backend.shared.presentation.ApiConflictException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -17,10 +18,12 @@ import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedEx
 import com.danasea.backend.modules.service.domain.models.InventoryType;
 import com.danasea.backend.modules.service.domain.models.Service;
 import com.danasea.backend.modules.service.domain.models.ServiceSlot;
+import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.domain.models.ServiceSlotUnit;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
+import com.danasea.backend.modules.service.infrastructure.persistence.adapters.OperatingScheduleStore;
 import com.danasea.backend.modules.service.presentation.dtos.CreateSlotUnitRequest;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotResponse;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotUnitResponse;
@@ -36,6 +39,7 @@ public class UpdateServiceSlotUseCase {
     private final ServiceRepositoryPort serviceRepository;
     private final ServiceSlotRepositoryPort serviceSlotRepository;
     private final VendorPort vendorPort;
+    private final OperatingScheduleStore scheduleStore;
 
     @Transactional
     public ServiceSlotResponse execute(UUID userId, UUID serviceId, UUID slotId, UpdateServiceSlotRequest request) {
@@ -58,7 +62,15 @@ public class UpdateServiceSlotUseCase {
             throw new IllegalArgumentException("Slot does not belong to the specified service");
         }
 
+        if (request.status() == SlotStatus.OPEN && scheduleStore.blocks(serviceId, slot.getDate(), slot.getStartTime())) {
+            throw new ApiConflictException("OPERATING_SCHEDULE_CONFLICT", "An operating schedule exception blocks this slot");
+        }
+
         if (request.status() != null) {
+            if (slot.getStatus() == SlotStatus.CANCELLED
+                    || request.status() == SlotStatus.CANCELLED) {
+                throw new IllegalArgumentException("Use the departure cancellation endpoint for cancellations.");
+            }
             slot.setStatus(request.status());
         }
 
@@ -86,6 +98,10 @@ public class UpdateServiceSlotUseCase {
                     }
 
                     ServiceSlotUnit existing = currentUnitMap.get(uReq.unitNumber());
+                    if (existing != null && existing.getEquipmentId() != null
+                            && !uReq.capacity().equals(existing.getCapacity())) {
+                        throw new IllegalArgumentException("Cannot resize a unit linked to physical equipment");
+                    }
                     if (existing != null && !uReq.capacity().equals(existing.getCapacity())
                             && serviceSlotRepository.hasPrivateCommitmentForUnit(slotId, uReq.unitNumber())) {
                         throw new IllegalArgumentException("Cannot resize a unit reserved for a private package");
@@ -104,6 +120,8 @@ public class UpdateServiceSlotUseCase {
                             .unitNumber(uReq.unitNumber())
                             .capacity(uReq.capacity())
                             .bookedCount(booked)
+                            .equipmentId(existing == null ? null : existing.getEquipmentId())
+                            .equipmentBlocked(existing != null && existing.isEquipmentBlocked())
                             .build());
                     sumCapacity = Math.addExact(sumCapacity, uReq.capacity());
                 }
@@ -111,6 +129,9 @@ public class UpdateServiceSlotUseCase {
                 // Check removed units: if any removed unit has booked > 0 or has active hold -> reject!
                 for (ServiceSlotUnit oldU : currentUnits) {
                     if (!newUnitNumbers.contains(oldU.getUnitNumber())) {
+                        if (oldU.getEquipmentId() != null) {
+                            throw new IllegalArgumentException("A unit linked to physical equipment must be managed by equipment maintenance");
+                        }
                         int committed = serviceSlotRepository.getCommittedCountForUnit(slotId, oldU.getUnitNumber());
                         int booked = Math.max(oldU.getBookedCount() != null ? oldU.getBookedCount() : 0, committed);
                         if (booked > 0) {
@@ -170,6 +191,8 @@ public class UpdateServiceSlotUseCase {
                 .capacity(u.getCapacity())
                 .bookedCount(u.getBookedCount())
                 .availableCapacity(u.getAvailableCapacity())
+                .equipmentId(u.getEquipmentId())
+                .equipmentBlocked(u.isEquipmentBlocked())
                 .build();
     }
 }

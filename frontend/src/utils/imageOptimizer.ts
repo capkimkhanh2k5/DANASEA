@@ -130,3 +130,19 @@ export function getCardThumbnailUrl(url?: string | null, fallback = FALLBACK_CAR
     quality: 'auto:good',
   });
 }
+
+/**
+ * Preset for Featured 3D Stage / Showcase Cards (Aspect 4:3, High Resolution 1200x900, crystal clear)
+ */
+export function getStageCardImageUrl(url?: string | null, fallback = FALLBACK_HERO_IMAGE): string {
+  if (!url || !url.trim()) return fallback;
+  return optimizeCloudinaryUrl(url, {
+    width: 1200,
+    height: 900,
+    aspectRatio: '4:3',
+    crop: 'fill',
+    gravity: 'auto',
+    quality: 'auto:best',
+    sharpen: 30,
+  });
+}

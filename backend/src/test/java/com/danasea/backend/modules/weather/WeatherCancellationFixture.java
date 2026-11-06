@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.communication.application.usecases.SendNotificationUseCase;
 import com.danasea.backend.modules.order.application.services.DisruptionDecisionService;
+import com.danasea.backend.modules.order.application.services.VendorFaultCompensationService;
 import com.danasea.backend.modules.order.application.services.RescheduleSupport;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
@@ -88,7 +89,8 @@ final class WeatherCancellationFixture {
                         mock(JpaSubOrderRescheduleProposalRepository.class),
                         mock(JpaSafetyRuleEvaluationRepository.class),
                         mock(AuditLogInternalApi.class),
-                        mock(SendNotificationUseCase.class));
+                        mock(SendNotificationUseCase.class),
+                        mock(VendorFaultCompensationService.class));
         ReflectionTestUtils.setField(
                 coordinator,
                 "weatherCancellation",

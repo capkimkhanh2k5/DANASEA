@@ -16,6 +16,8 @@ import com.danasea.backend.modules.booking.application.usecases.ConfirmBookingUs
 import com.danasea.backend.modules.booking.application.usecases.CreateBookingHoldUseCase;
 import com.danasea.backend.modules.booking.domain.exceptions.InsufficientInventoryException;
 import com.danasea.backend.modules.booking.domain.exceptions.InvalidBookingStateException;
+import com.danasea.backend.modules.booking.domain.exceptions.SlotNotAvailableException;
+import com.danasea.backend.modules.booking.domain.models.Booking;
 import com.danasea.backend.modules.booking.domain.ports.BookingRepositoryPort;
 import com.danasea.backend.modules.booking.domain.ports.InventoryLockPort;
 import com.danasea.backend.modules.booking.domain.ports.ServiceSlotPort;
@@ -191,7 +193,7 @@ public class ServiceOptionsAndInventoryAllocationIntegrationTest
         // 5. Create Slot with 3 units × 10 capacity (SHARED_CAPACITY_UNITS)
         testSlot = new ServiceSlotJpaEntity();
         testSlot.setServiceId(testService.getId());
-        testSlot.setDate(LocalDate.now().plusDays(2));
+        testSlot.setDate(LocalDate.now(Booking.VIETNAM_ZONE).plusDays(2));
         testSlot.setStartTime(LocalTime.of(8, 0));
         testSlot.setEndTime(LocalTime.of(12, 0));
         testSlot.setCapacity(30);
@@ -743,7 +745,7 @@ public class ServiceOptionsAndInventoryAllocationIntegrationTest
 
     @Test
     void reviewStartedSlotMustRejectHold() {
-        testSlot.setDate(LocalDate.now());
+        testSlot.setDate(LocalDate.now(Booking.VIETNAM_ZONE));
         testSlot.setStartTime(LocalTime.MIN);
         serviceSlotRepository.save(testSlot);
         assertThatThrownBy(
@@ -757,7 +759,7 @@ public class ServiceOptionsAndInventoryAllocationIntegrationTest
                                                                 1,
                                                                 sharedOption.getId(),
                                                                 null)))))
-                .isInstanceOf(RuntimeException.class);
+                .isInstanceOf(SlotNotAvailableException.class);
     }
 
     @Test

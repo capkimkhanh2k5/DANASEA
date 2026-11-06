@@ -4,9 +4,11 @@ import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort;
 import com.danasea.backend.modules.flashsale.domain.*;
 import com.danasea.backend.modules.flashsale.domain.FlashSalePricing.*;
+import com.danasea.backend.modules.order.infrastructure.adapters.CommissionPolicyAdapter;
 import java.math.*;
 import java.time.*;
 import java.util.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,11 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class FlashSaleService implements FlashSaleBookingPort {
     private final FlashSaleStore store;
     private final AuditLogInternalApi audit;
-    private final com.danasea.backend.modules.order.infrastructure.adapters.CommissionPolicyAdapter commissionPolicy;
+    private final CommissionPolicyAdapter commissionPolicy;
     private Clock clock=Clock.systemUTC();
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public FlashSaleService(FlashSaleStore store,AuditLogInternalApi audit,
-            @org.springframework.beans.factory.annotation.Autowired(required=false) com.danasea.backend.modules.order.infrastructure.adapters.CommissionPolicyAdapter commissionPolicy) {
+            @Autowired(required=false) CommissionPolicyAdapter commissionPolicy) {
         this.store=store; this.audit=audit; this.commissionPolicy=commissionPolicy;
     }
     public FlashSaleService(FlashSaleStore store,AuditLogInternalApi audit) { this(store,audit,null); }

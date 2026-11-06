@@ -31,9 +31,11 @@ spring:
       mail.smtp:
         auth: true
         starttls.enable: true
-        connectiontimeout: 5000
-        timeout: 5000
-        writetimeout: 5000
+        starttls.required: true
+        ssl.trust: smtp.gmail.com
+        connectiontimeout: 10000
+        timeout: 10000
+        writetimeout: 10000
   data:
     redis:
       host: ${SPRING_REDIS_HOST:localhost}
@@ -94,6 +96,8 @@ management:
       show-details: never
 
 app:
+  booking:
+    hold-duration: ${APP_BOOKING_HOLD_DURATION:5m}
   jwt:
     secret: ${APP_JWT_SECRET}
     access-token-minutes: ${APP_JWT_ACCESS_TOKEN_MINUTES:15}
@@ -145,6 +149,23 @@ app:
     weather-fetch-rate: ${APP_WEATHER_FETCH_RATE:30m}
   weather:
     monitoring-cron: ${APP_WEATHER_MONITORING_CRON:0 */30 * * * *}
+  transactional-email:
+    mode: ${APP_TRANSACTIONAL_EMAIL_MODE:off}
+    enabled-families: ${APP_TRANSACTIONAL_EMAIL_ENABLED_FAMILIES:}
+    live-from-by-family: ${APP_TRANSACTIONAL_EMAIL_LIVE_FROM_BY_FAMILY:}
+    live-pilot-recipients: ${APP_TRANSACTIONAL_EMAIL_LIVE_PILOT_RECIPIENTS:}
+    public-base-url: ${APP_TRANSACTIONAL_EMAIL_PUBLIC_BASE_URL:https://danasea.tailfc3563.ts.net/}
+    capture-sink-email: ${APP_TRANSACTIONAL_EMAIL_CAPTURE_SINK_EMAIL:capture@danasea.vn}
+    ops-emails:
+      operations: ${APP_TRANSACTIONAL_EMAIL_OPS_OPERATIONS:}
+      finance: ${APP_TRANSACTIONAL_EMAIL_OPS_FINANCE:}
+      support: ${APP_TRANSACTIONAL_EMAIL_OPS_SUPPORT:}
+    worker:
+      enabled: ${APP_TRANSACTIONAL_EMAIL_WORKER_ENABLED:false}
+      poll-interval-ms: ${APP_TRANSACTIONAL_EMAIL_POLL_INTERVAL_MS:15000}
+      lease-duration-seconds: ${APP_TRANSACTIONAL_EMAIL_LEASE_DURATION_SECONDS:120}
+      max-attempts: ${APP_TRANSACTIONAL_EMAIL_MAX_ATTEMPTS:4}
+      batch-size: ${APP_TRANSACTIONAL_EMAIL_BATCH_SIZE:20}
 
 cloudinary:
   cloud-name: ${CLOUDINARY_CLOUD_NAME:}

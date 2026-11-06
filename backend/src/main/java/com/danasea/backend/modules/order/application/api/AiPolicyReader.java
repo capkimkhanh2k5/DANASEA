@@ -20,8 +20,7 @@ public class AiPolicyReader implements AiPolicyReadApi {
     public Snapshot current() {
         LocalDateTime now = LocalDateTime.of(2026, 1, 1, 0, 0);
         return new Snapshot("COMMON_PLATFORM_POLICY", List.of(
-                tier("MORE_THAN_48_HOURS", now, 2881), tier("24_TO_48_HOURS_INCLUSIVE", now, 1440),
-                tier("2_TO_UNDER_24_HOURS", now, 120), tier("UNDER_2_HOURS", now, 119)),
+                tier("MORE_THAN_24_HOURS", now, 1441), tier("AT_MOST_24_HOURS", now, 1440)),
                 policy.evaluate(RefundReason.WEATHER, now.plusDays(1), now, BigDecimal.valueOf(100)).refundPercentage(),
                 "RefundPolicyEngine", "USE_OWNED_ORDER_CANCELLATION_PREVIEW_FOR_ACTUAL_ELIGIBILITY_AND_AMOUNT");
     }

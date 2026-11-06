@@ -28,7 +28,7 @@ const SPOTLIGHT_ITEMS: SpotlightItemData[] = [
     description: 'Rạn san hô tự nhiên tại Hòn Sụp với làn nước trong sáng sớm và hướng dẫn viên lặn kèm sát 1:1.',
     descriptionEn: 'Natural coral reefs at Hon Sup with crystal morning water and 1:1 certified dive guide.',
     videoUrl: '/videos/danasea_ocean_10s_720p.mp4',
-    posterUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1200&q=80',
+    posterUrl: '/images/hero/01-lan-ngam-san-ho-sontra.jpg',
     ctaText: 'Khám phá tour lặn biển Sơn Trà',
     ctaTextEn: 'Explore Son Tra Diving Tours',
     link: '/search?category=lan-ngam-san-ho',
@@ -42,7 +42,7 @@ const SPOTLIGHT_ITEMS: SpotlightItemData[] = [
     description: 'Ngắm trọn vịnh biển từ độ cao 80m trên dù bay và trải nghiệm cano cao tốc lướt sóng Mỹ Khê.',
     descriptionEn: 'Panoramic coastal views from 80m parasail and high-speed wave riding at My Khe.',
     videoUrl: '/videos/danasea_sunset_10s_720p.mp4',
-    posterUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80',
+    posterUrl: '/images/hero/03-du-bay-cano-vinh-da-nang.jpg',
     ctaText: 'Xem lịch cano & dù bay Mỹ Khê',
     ctaTextEn: 'View My Khe Speedboat Slots',
     link: '/search?category=cano-du-bay',
@@ -56,53 +56,92 @@ const SPOTLIGHT_ITEMS: SpotlightItemData[] = [
     description: 'Trải nghiệm thuyền chuối siêu tốc lướt trên từng ngọn sóng cùng đội cano cứu hộ theo sát.',
     descriptionEn: 'High-speed banana boat rides across coastal swells with safety escort patrol.',
     videoUrl: '/videos/danasea_banana_boat_10s_720p.mp4',
-    posterUrl: 'https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?auto=format&fit=crop&w=1200&q=80',
+    posterUrl: '/images/hero/09-phao-chuoi-cam-giac-manh.jpg',
     ctaText: 'Khám phá thuyền chuối & kayak',
     ctaTextEn: 'Explore Banana Boat & Kayak',
     link: '/search?category=cheo-sup-kayak',
   },
 ];
 
-// Lazy looping video player with viewport play/pause
+// Lazy looping video player with 700px ahead pre-buffering and smooth poster crossfade
 const SpotlightVideo: React.FC<{ src: string; poster: string; title: string }> = ({ src, poster, title }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
   const [isInView, setIsInView] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // 1. Preload observer: start buffering video 700px before it enters viewport
+    const preloadObserver = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldLoad(true);
+          preloadObserver.disconnect();
+        }
+      },
+      { rootMargin: '700px 0px' }
+    );
+
+    // 2. Playback observer: play/pause when actually visible
+    const playObserver = new IntersectionObserver(
+      ([entry]) => {
+        setIsInView(entry.isIntersecting);
+      },
+      { threshold: 0.15 }
+    );
+
+    preloadObserver.observe(container);
+    playObserver.observe(container);
+
+    return () => {
+      preloadObserver.disconnect();
+      playObserver.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     const el = videoRef.current;
-    if (!el) return;
+    if (!el || !shouldLoad) return;
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsInView(true);
-          el.play().catch(() => {});
-        } else {
-          el.pause();
-        }
-      },
-      { threshold: 0.25 }
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+    if (isInView) {
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+    }
+  }, [isInView, shouldLoad, isVideoReady]);
 
   return (
-    <div className="relative w-full aspect-[16/10] rounded-3xl overflow-hidden bg-slate-900 shadow-2xl border border-slate-200/90 group">
+    <div
+      ref={containerRef}
+      className="relative w-full aspect-[16/10] rounded-3xl overflow-hidden bg-slate-900 shadow-2xl border border-slate-200/90 group"
+    >
+      <img
+        src={poster}
+        alt={title}
+        loading="lazy"
+        decoding="async"
+        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+      />
       <video
         ref={videoRef}
-        src={isInView ? src : undefined}
+        src={shouldLoad ? src : undefined}
         poster={poster}
-        preload="none"
-        autoPlay
+        preload={shouldLoad ? 'auto' : 'none'}
+        autoPlay={isInView}
         loop
         muted
         playsInline
+        onLoadedData={() => setIsVideoReady(true)}
         aria-label={title}
-        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+        className={`relative z-10 w-full h-full object-cover group-hover:scale-105 transition-all duration-700 ease-out ${
+          isVideoReady ? 'opacity-100' : 'opacity-0'
+        }`}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent pointer-events-none" />
+      <div className="absolute inset-0 z-20 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent pointer-events-none" />
     </div>
   );
 };

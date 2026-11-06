@@ -95,6 +95,20 @@ export function Users() {
           createdAt: u.createdAt,
           updatedAt: u.updatedAt,
         }));
+        try {
+          const lockedMap: Record<string, { id: string; email: string; fullName: string; reason?: string }> = {};
+          (res.content || []).forEach(u => {
+            if (u.isLocked) {
+              lockedMap[u.email.toLowerCase()] = {
+                id: u.id,
+                email: u.email.toLowerCase(),
+                fullName: u.fullName || u.email,
+                reason: 'Tài khoản đã bị khóa bởi Quản trị viên',
+              };
+            }
+          });
+          localStorage.setItem('danasea_locked_users', JSON.stringify(lockedMap));
+        } catch (err) { console.debug("[Users] Local storage sync ignored:", err); }
         setUsers(mapped);
         setLoading(false);
       })
@@ -193,8 +207,23 @@ export function Users() {
       setIsSubmittingLock(true);
       if (lockTarget.isLocked) {
         await adminUserService.unlockUser(lockTarget.id);
+        try {
+          const lockedMap = JSON.parse(localStorage.getItem('danasea_locked_users') || '{}');
+          delete lockedMap[lockTarget.email.toLowerCase()];
+          localStorage.setItem('danasea_locked_users', JSON.stringify(lockedMap));
+        } catch (err) { console.debug("[Users] Local storage sync ignored:", err); }
       } else {
         await adminUserService.lockUser(lockTarget.id, lockReason);
+        try {
+          const lockedMap = JSON.parse(localStorage.getItem('danasea_locked_users') || '{}');
+          lockedMap[lockTarget.email.toLowerCase()] = {
+            id: lockTarget.id,
+            email: lockTarget.email.toLowerCase(),
+            fullName: lockTarget.fullName,
+            reason: lockReason.trim() || 'Tài khoản vi phạm điều khoản hoặc bị tạm ngưng bởi Ban Quản trị DANASEA',
+          };
+          localStorage.setItem('danasea_locked_users', JSON.stringify(lockedMap));
+        } catch (err) { console.debug("[Users] Local storage sync ignored:", err); }
       }
       const nextLocked = !lockTarget.isLocked;
       const updatedList = users.map(u =>

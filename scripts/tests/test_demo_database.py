@@ -4,6 +4,7 @@ import importlib.util
 import io
 import json
 import os
+import stat
 import subprocess
 import tempfile
 import time
@@ -13,7 +14,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = importlib.util.spec_from_file_location('demo_importer', ROOT / 'demo_data_handoff/install_demo_data.py')
+SPEC = importlib.util.spec_from_file_location('demo_importer', ROOT / 'DB_Demo/install_demo_data.py')
 IMPORTER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(IMPORTER)
 
@@ -27,24 +28,29 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         cls.receipt = Path(cls.folder.name) / 'ownership.json'
         subprocess.run(['docker', 'run', '-d', '--name', cls.container, '-e', 'POSTGRES_HOST_AUTH_METHOD=trust',
                         '-e', 'POSTGRES_USER=postgres', '-e', 'POSTGRES_DB=demo_acceptance', 'postgres:17-alpine'], check=True, capture_output=True)
-        cls.addClassCleanup(lambda: subprocess.run(['docker', 'rm', '-f', cls.container], capture_output=True))
+        cls.addClassCleanup(lambda: subprocess.run(['docker', 'rm', '-f', cls.container], capture_output=True, check=False))
         cls.addClassCleanup(cls.folder.cleanup)
         for _ in range(60):
-            ready = subprocess.run(['docker', 'exec', cls.container, 'pg_isready', '-U', 'postgres'], capture_output=True)
+            ready = subprocess.run(['docker', 'exec', cls.container, 'pg_isready', '-U', 'postgres'], capture_output=True, check=False)
             if ready.returncode == 0:
                 break
             time.sleep(.5)
+        cls.sql_folder = tempfile.TemporaryDirectory(prefix='danasea-demo-flyway-')
+        cls.addClassCleanup(cls.sql_folder.cleanup)
+        mig_dir = ROOT / 'backend/src/main/resources/db/migration'
+        for sql_file in mig_dir.glob('*.sql'):
+            (Path(cls.sql_folder.name) / sql_file.name).write_bytes(sql_file.read_bytes().replace(b'\r\n', b'\n'))
         result = subprocess.run(['docker', 'run', '--rm', '--network', 'container:' + cls.container,
-                                 '-v', str(ROOT / 'backend/src/main/resources/db/migration') + ':/flyway/sql:ro',
+                                 '-v', cls.sql_folder.name + ':/flyway/sql:ro',
                                  'redgate/flyway:13.10.0', '-url=jdbc:postgresql://127.0.0.1:5432/demo_acceptance',
-                                 '-user=postgres', 'migrate'], capture_output=True, text=True, timeout=180)
+                                 '-user=postgres', 'migrate'], capture_output=True, text=True, timeout=180, check=False)
         if result.returncode:
             raise RuntimeError('Disposable Flyway migrations failed: ' + result.stdout + result.stderr)
         cls.args = IMPORTER.build_parser().parse_args(['--docker-container', cls.container, '--database', 'demo_acceptance'])
 
     def sql(self, statement):
         result = subprocess.run(['docker', 'exec', '-i', self.container, 'psql', '-XAtq', '-v', 'ON_ERROR_STOP=1',
-                                 '-U', 'postgres', '-d', 'demo_acceptance'], input=statement, text=True, capture_output=True, check=True)
+                                 '-U', 'postgres', '-d', 'demo_acceptance'], input=statement, text=True, encoding='utf-8', capture_output=True, check=True)
         return json.loads(result.stdout) if result.stdout.strip() else None
 
     def replace(self, commit=True, corrupt=False):
@@ -67,15 +73,52 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         before = self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM system_configs t")
         rules = self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM category_safety_rules t")
         result = self.replace()
-        self.assertEqual(270, result['totalVerifiedInDb'])
+        self.assertEqual(646, result['totalVerifiedInDb'])
         self.assertEqual('REPLACE_SUCCESS', result['status'])
         self.assertEqual(0, self.sql("SELECT to_json(count(*)) FROM users WHERE email='old@local.test'"))
         self.assertEqual(1, self.sql("SELECT to_json(count(*)) FROM users WHERE email='config@local.test'"))
         self.assertEqual(before, self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM system_configs t"))
         self.assertEqual(rules, self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM category_safety_rules t"))
-        self.assertEqual(24, self.sql("SELECT to_json(count(*)) FROM service_safety_documents WHERE status='PENDING' AND reviewed_by IS NULL"))
+        self.assertEqual(24, self.sql("SELECT to_json(count(*)) FROM service_safety_documents WHERE status='APPROVED' AND reviewed_by IS NOT NULL"))
         self.replace()
         self.assertEqual(13, self.sql("SELECT to_json(count(*)) FROM users"))
+
+    def test_01b_replacement_materializes_bookable_demo_horizon(self):
+        result = self.replace()
+        schedule = result['demoOperatingSchedule']
+        self.assertEqual(24, schedule['services'])
+        self.assertEqual(90, schedule['horizonDays'])
+        self.assertEqual(74, schedule['equipment'])
+        self.assertGreater(schedule['departures'], 4000)
+        self.assertEqual(24, self.sql("""
+            SELECT to_json(count(DISTINCT s.service_id))
+            FROM service_operating_schedules g JOIN service_slots s ON s.service_id = g.service_id
+            WHERE s.date = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')::date + 89
+              AND s.status = 'OPEN'
+        """))
+        self.assertEqual(0, self.sql("""
+            SELECT to_json(count(*)) FROM service_operating_schedules o JOIN services s ON s.id = o.service_id
+            WHERE s.status <> 'PUBLISHED' OR NOT o.active OR o.ends_on IS NOT NULL
+        """))
+        self.assertEqual(0, self.sql("""
+            SELECT to_json(count(*))
+            FROM service_options o JOIN service_operating_schedules p ON p.service_id = o.service_id
+            WHERE o.option_type = 'PRIVATE' AND o.status = 'ACTIVE' AND NOT EXISTS (
+                SELECT 1 FROM service_operating_schedule_slots g JOIN service_slots s ON s.id = g.slot_id
+                JOIN service_slot_units u ON u.slot_id = s.id
+                WHERE s.service_id = o.service_id AND s.status = 'OPEN'
+                  AND s.inventory_type = 'SHARED_CAPACITY_UNITS'
+                  AND u.equipment_id IS NOT NULL AND u.capacity >= o.max_pax_per_package
+            )
+        """))
+        base, transactions, _ = IMPORTER.load_fixtures()
+        historical = {item['slot_id'] for item in transactions['booking_items']}
+        original_dates = {row['id']: row['date'] for row in base['service_slots'] if row['id'] in historical}
+        actual_dates = self.sql("""
+            SELECT json_object_agg(s.id, s.date) FROM service_slots s
+            WHERE s.id IN (SELECT slot_id FROM booking_items)
+        """)
+        self.assertEqual(original_dates, actual_dates)
 
     def test_02_failed_import_and_dry_run_restore_old_data(self):
         self.sql("INSERT INTO users(id,created_at,updated_at,email,role) VALUES ('ffffffff-0000-0000-0000-000000000003',now(),now(),'rollback@local.test','CUSTOMER')")
@@ -112,16 +155,17 @@ class DemoDatabaseAcceptance(unittest.TestCase):
             self.sql('UPDATE categories SET name=' + IMPORTER.lit(category['name']) + " WHERE id='a0000001-0000-0000-0000-000000000001'")
 
     def test_05_cli_commits_private_receipt_and_rejects_pending_replay(self):
-        command = [os.sys.executable, '-B', str(ROOT / 'demo_data_handoff/install_demo_data.py'), '--replace', '--apply',
+        command = [os.sys.executable, '-B', str(ROOT / 'DB_Demo/install_demo_data.py'), '--replace', '--apply',
                    '--confirm-backup', '--docker-container', self.container, '--database', 'demo_acceptance',
                    '--ownership-file', str(self.receipt), '--demo-password-stdin']
-        result = subprocess.run(command, input='local-acceptance-secret\n', text=True, capture_output=True)
+        result = subprocess.run(command, input='local-acceptance-secret\n', text=True, capture_output=True, check=False)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual('COMMITTED', json.loads(result.stdout)['transaction'])
-        self.assertEqual(0o600, self.receipt.stat().st_mode & 0o777)
+        if os.name != 'nt':
+            self.assertEqual(0o600, self.receipt.stat().st_mode & 0o777)
         pending = self.receipt.with_suffix('.json.pending')
         pending.write_text(self.receipt.read_text())
-        result = subprocess.run(command, input='local-acceptance-secret\n', text=True, capture_output=True)
+        result = subprocess.run(command, input='local-acceptance-secret\n', text=True, capture_output=True, check=False)
         self.assertNotEqual(0, result.returncode)
         self.assertIn('pending', result.stderr.lower())
         self.assertTrue(pending.exists())
@@ -164,15 +208,21 @@ class DemoDatabaseAcceptance(unittest.TestCase):
 
         argv = ['install_demo_data.py', '--replace', '--apply', '--confirm-backup', '--docker-container', self.container,
                 '--database', 'demo_acceptance', '--ownership-file', str(receipt)]
-        with patch('sys.argv', argv), patch.dict(os.environ, {'DEMO_USER_PASSWORD': 'local-acceptance-secret'}), patch.object(IMPORTER.os, 'replace', side_effect=interrupted):
-            with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(OSError):
-                IMPORTER.main()
+        with (
+            patch('sys.argv', argv),
+            patch.dict(os.environ, {'DEMO_USER_PASSWORD': 'local-acceptance-secret'}),
+            patch.object(IMPORTER.os, 'replace', side_effect=interrupted),
+            contextlib.redirect_stdout(io.StringIO()),
+            self.assertRaises(OSError),
+        ):
+            IMPORTER.main()
         self.assertEqual(0, self.sql("SELECT to_json(count(*)) FROM users WHERE email='publication@local.test'"))
         self.assertFalse(receipt.exists())
         journal = json.loads(pending.read_text())
         self.assertEqual('COMMIT_PENDING', journal['state'])
         self.assertEqual('demo_acceptance', journal['target']['database'])
-        self.assertEqual(0o600, pending.stat().st_mode & 0o777)
+        if os.name != 'nt':
+            self.assertEqual(0o600, pending.stat().st_mode & 0o777)
         self.assertIn('operationId', journal)
 
     def test_08_session_closes_all_database_process_streams(self):
@@ -196,10 +246,81 @@ class DemoDatabaseAcceptance(unittest.TestCase):
     def test_10_runtime_restore_rehearsal_and_failure_rollback_preserve_runtime_grants(self):
         # Only RabbitMQ inspection is omitted: this is the real PostgreSQL recovery boundary.
         import sys
-        sys.path.insert(0, str(ROOT / 'scripts'))
-        self.addCleanup(lambda: sys.path.remove(str(ROOT / 'scripts')))
+
+        if 'fcntl' not in sys.modules and importlib.util.find_spec('fcntl') is None:
+            sys.modules['fcntl'] = unittest.mock.MagicMock()
+        for p in [str(ROOT / 'scripts'), str(ROOT / 'scripts/demo'), str(ROOT / 'scripts/ops')]:
+            if p not in sys.path:
+                sys.path.insert(0, p)
+                self.addCleanup(lambda p=p: sys.path.remove(p) if p in sys.path else None)
+
+        import backup
         from demo_data import Journal
         from demo_runtime import Runtime
+
+        orig_backup = backup.backup
+
+        def win_backup(config):
+            orig_stat = Path.stat
+            orig_open = os.open
+
+            def safe_stat(path_obj, *a, **kw):
+                st = orig_stat(path_obj, *a, **kw)
+                if 'source-backups' in str(path_obj):
+                    class FakeStat:
+                        def __getattr__(self, name):
+                            return getattr(st, name)
+
+                        @property
+                        def st_mode(self):
+                            return stat.S_IFDIR | 0o700
+
+                    return FakeStat()
+                return st
+
+            def safe_open(file, flags, *a, **kw):
+                if isinstance(file, (str, bytes, os.PathLike)) and os.path.isdir(file):
+                    return 0
+                return orig_open(file, flags, *a, **kw)
+
+            orig_fsync = os.fsync
+
+            def safe_fsync(fd):
+                if fd == 0:
+                    return
+                return orig_fsync(fd)
+
+            orig_close = os.close
+
+            def safe_close(fd):
+                if fd == 0:
+                    return
+                return orig_close(fd)
+
+            with (
+                patch.object(Path, 'stat', safe_stat),
+                patch.object(os, 'fchmod', lambda *a, **kw: None, create=True),
+                patch.object(os, 'open', safe_open),
+                patch.object(os, 'fsync', safe_fsync),
+                patch.object(os, 'close', safe_close),
+            ):
+                return orig_backup(config)
+
+        if os.name == 'nt':
+            def safe_atomic_json(path, value):
+                p = Path(path)
+                tmp = p.with_suffix('.tmp')
+                tmp.write_text(json.dumps(value, sort_keys=True) + '\n')
+                os.replace(tmp, p)
+            patcher1 = patch('demo_data.atomic_json', safe_atomic_json)
+            patcher2 = patch('demo_runtime.atomic_json', safe_atomic_json)
+            patcher3 = patch.object(backup, 'backup', win_backup)
+            patcher1.start()
+            patcher2.start()
+            patcher3.start()
+            self.addCleanup(patcher1.stop)
+            self.addCleanup(patcher2.stop)
+            self.addCleanup(patcher3.stop)
 
         state = Path(self.folder.name) / 'recovery'
         state.mkdir(mode=0o700)
@@ -237,9 +358,11 @@ class DemoDatabaseAcceptance(unittest.TestCase):
                 stream.seek(0)
             return real_command(arguments, **kwargs)
 
-        with patch.object(runtime, 'command', side_effect=fail_restored_sql):
-            with self.assertRaises(subprocess.CalledProcessError) as failure:
-                runtime.restore(point)
+        with (
+            patch.object(runtime, 'command', side_effect=fail_restored_sql),
+            self.assertRaises(subprocess.CalledProcessError) as failure,
+        ):
+            runtime.restore(point)
         self.assertIn(b'22012', failure.exception.stderr)
         self.assertEqual(0, self.sql("SELECT to_json(count(*)) FROM users WHERE email='original-recovery@local.test'"))
         self.assertEqual(12, self.sql("SELECT to_json(count(*)) FROM users WHERE email LIKE '%@danasea.test'"))
@@ -252,9 +375,9 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         runtime.ungate(runtime.journal)
         command = ['docker', 'exec', '-i', self.container, 'psql', '-XAtq', '-v', 'ON_ERROR_STOP=1',
                    '-U', 'demo_recovery_app', '-d', 'demo_acceptance']
-        allowed = subprocess.run(command, input='SELECT count(*) FROM users;', text=True, capture_output=True)
+        allowed = subprocess.run(command, input='SELECT count(*) FROM users;', text=True, capture_output=True, check=False)
         self.assertEqual(0, allowed.returncode, allowed.stderr)
-        forbidden = subprocess.run(command, input='DELETE FROM flyway_schema_history WHERE false;', text=True, capture_output=True)
+        forbidden = subprocess.run(command, input='DELETE FROM flyway_schema_history WHERE false;', text=True, capture_output=True, check=False)
         self.assertNotEqual(0, forbidden.returncode)
         self.assertIn('permission denied', forbidden.stderr)
 

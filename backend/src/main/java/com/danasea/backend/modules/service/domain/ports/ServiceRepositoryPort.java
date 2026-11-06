@@ -27,6 +27,12 @@ public interface ServiceRepositoryPort {
 
     Optional<Service> findPublishedById(UUID id);
 
+    Optional<Service> findPublishedBySlug(String slug);
+
+    Optional<Service> findBySlug(String slug);
+
+    boolean existsBySlug(String slug);
+
     int incrementViewCount(UUID id, ServiceStatus status);
 
     List<Service> searchPublishedServices(

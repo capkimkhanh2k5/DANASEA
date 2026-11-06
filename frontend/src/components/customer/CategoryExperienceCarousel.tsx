@@ -5,6 +5,7 @@ import type { ActivityCardData } from '../../data/customerHomeData';
 import { useWishlistStore } from '../../store/useWishlistStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { ArrowRight, Star } from 'lucide-react';
+import { getTourUrl } from '../../utils/seo';
 
 interface CategoryExperienceCarouselProps {
   title: string;
@@ -54,7 +55,7 @@ export function CategoryExperienceCarousel({
   const [canScrollPrev, setCanScrollPrev] = useState(false);
   const [canScrollNext, setCanScrollNext] = useState(false);
   const [hoveredCardId, setHoveredCardId] = useState<string | number | null>(null);
-  const [isRevealed, setIsRevealed] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(true);
   const sectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -96,6 +97,10 @@ export function CategoryExperienceCarousel({
   const scrollNext = useCallback(() => {
     if (emblaApi) emblaApi.scrollNext();
   }, [emblaApi]);
+
+  if (!displayItems || displayItems.length === 0) {
+    return null;
+  }
 
   return (
     <div ref={sectionRef} data-ui="carousel-deck" className="py-4 sm:py-6">
@@ -175,16 +180,14 @@ export function CategoryExperienceCarousel({
                   style={{ zIndex: isThisHovered ? 20 : 1 }}
                 >
                   <Link
-                    to={`/tour/${item.id}`}
+                    to={getTourUrl(item)}
                     onMouseEnter={() => setHoveredCardId(item.id)}
                     onMouseLeave={() => setHoveredCardId(null)}
                     style={{
                       transitionDelay: isRevealed ? `${idx * 60}ms` : '0ms',
                     }}
                     className={`group flex-1 flex flex-col bg-white rounded-2xl p-3 border transition-all duration-300 ease-out cursor-pointer ${
-                      !isRevealed
-                        ? 'opacity-0 translate-y-6'
-                        : isThisHovered
+                      isThisHovered
                         ? 'border-slate-300 -translate-y-0.5'
                         : 'border-slate-200/80 hover:border-slate-300'
                     }`}
@@ -239,7 +242,7 @@ export function CategoryExperienceCarousel({
                       {/* Price & Rating (Bottom Row) */}
                       <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
                         <div className="flex items-baseline gap-1">
-                          <span className="font-bold text-base text-slate-900 tabular-nums">
+                          <span className="font-bold text-base text-[#991b1b] tabular-nums">
                             {item.price.toLocaleString('vi-VN')}₫
                           </span>
                           <span className="text-[13px] text-slate-500">

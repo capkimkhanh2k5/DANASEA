@@ -95,6 +95,7 @@ public class ServiceSlotAdapter implements ServiceSlotPort {
 
                     List<ServiceSlotUnitJpaEntity> rawUnits = unitsBySlotId.getOrDefault(slot.getId(), Collections.emptyList());
                     List<SlotValidationDetails.SlotUnitValidationDetails> slotUnits = rawUnits.stream()
+                            .filter(u -> !u.isEquipmentBlocked())
                             .map(u -> SlotValidationDetails.SlotUnitValidationDetails.builder()
                                     .id(u.getId())
                                     .unitNumber(u.getUnitNumber())

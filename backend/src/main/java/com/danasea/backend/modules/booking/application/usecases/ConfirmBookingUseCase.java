@@ -2,6 +2,8 @@ package com.danasea.backend.modules.booking.application.usecases;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 import com.danasea.backend.modules.booking.application.dtos.BookingHoldItemResult;
 import com.danasea.backend.modules.booking.application.dtos.BookingHoldResult;
@@ -47,6 +49,11 @@ public class ConfirmBookingUseCase {
 
     @Transactional
     public BookingHoldResult execute(ConfirmBookingCommand command) {
+        return executeExcluding(command, Set.of());
+    }
+
+    @Transactional
+    public BookingHoldResult executeExcluding(ConfirmBookingCommand command, Set<UUID> unavailableItems) {
         if (command == null || command.bookingId() == null) {
             throw new IllegalArgumentException("Booking ID cannot be null");
         }
@@ -72,7 +79,8 @@ public class ConfirmBookingUseCase {
         booking.confirm(now);
 
         // Deduct/commit capacity into PostgreSQL service_slots
-        serviceSlotPort.commitCapacityBatch(booking.getItems());
+        serviceSlotPort.commitCapacityBatch(booking.getItems().stream()
+                .filter(item -> !unavailableItems.contains(item.getId())).toList());
 
         List<InventoryLockItem> lockItems = booking.getItems().stream()
                 .map(item -> InventoryLockItem.of(item.getSlotId(), item.getQuantity(), 0))
@@ -81,6 +89,22 @@ public class ConfirmBookingUseCase {
         Booking savedBooking = bookingRepository.save(booking);
         releaseHoldsAfterCommit(booking.getId(), lockItems);
         return mapToResult(savedBooking);
+    }
+
+    @Transactional
+    public void voidUnfulfilledPayment(UUID bookingId) {
+        Booking booking = bookingRepository.findByIdWithItemsForUpdate(bookingId)
+                .orElseThrow(() -> new BookingNotFoundException(bookingId));
+        if (booking.isConfirmed()) {
+            throw new InvalidBookingStateException("A confirmed booking cannot be voided as an unfulfilled payment.");
+        }
+        if (!booking.isCancelled()) {
+            booking.cancel(OffsetDateTime.now());
+            bookingRepository.save(booking);
+        }
+        var locks = booking.getItems().stream()
+                .map(item -> InventoryLockItem.of(item.getSlotId(), item.getQuantity(), 0)).toList();
+        releaseHoldsAfterCommit(bookingId, locks);
     }
 
     private void releaseHoldsAfterCommit(UUID bookingId, List<InventoryLockItem> lockItems) {

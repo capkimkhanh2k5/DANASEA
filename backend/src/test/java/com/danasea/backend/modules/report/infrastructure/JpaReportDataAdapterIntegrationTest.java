@@ -52,11 +52,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
 @DisplayName("JpaReportDataAdapter Real H2 Database Integration Test")
-class JpaReportDataAdapterIntegrationTest {
+class JpaReportDataAdapterIntegrationTest extends AbstractExternalInfrastructureIntegrationTest {
 
     @MockitoBean
     private io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager<byte[]> proxyManager;

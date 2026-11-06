@@ -1,17 +1,22 @@
 package com.danasea.backend.shared.presentation;
 
 import com.danasea.backend.modules.ai.domain.exceptions.AiConversationLocaleMismatchException;
+import com.danasea.backend.security.authentication.domain.exceptions.EmailNotVerifiedException;
 import com.danasea.backend.security.authentication.domain.exceptions.InvalidCredentialsException;
 import com.danasea.backend.security.authentication.infrastructure.security.CookieUtils;
 import com.danasea.backend.security.authorization.domain.exceptions.AccessDeniedException;
 import com.danasea.backend.shared.i18n.LocalizedException;
 import com.danasea.backend.shared.i18n.LocalizedMessageService;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
@@ -51,6 +56,11 @@ public class GlobalExceptionHandler {
                 
         CookieUtils.clearRefreshTokenCookie(response);
 
+        if (exception instanceof EmailNotVerifiedException) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new ErrorResponse("EMAIL_NOT_VERIFIED", messages.get("error.email_not_verified")));
+        }
+
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ErrorResponse("INVALID_CREDENTIALS", messages.get("error.invalid_credentials")));
     }
@@ -74,6 +84,13 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("INVALID_INPUT", messages.get("error.invalid_input")));
     }
 
+    @ExceptionHandler({TypeMismatchException.class, HttpMessageNotReadableException.class,
+            ServletRequestBindingException.class})
+    public ResponseEntity<ErrorResponse> handleInvalidRequest(Exception exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("INVALID_INPUT", messages.get("error.invalid_input")));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException exception) {
         String message = exception.getBindingResult().getFieldErrors().stream()
@@ -88,6 +105,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleMissingEndpoint(NoResourceFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse("ENDPOINT_NOT_FOUND", messages.get("error.endpoint_not_found")));
+    }
+
+    @ExceptionHandler(ApiConflictException.class)
+    public ResponseEntity<ErrorResponse> handleApiConflict(ApiConflictException exception) {
+        String code = exception.getCode();
+        String message = messages.getOrDefault("error." + code.toLowerCase(Locale.ROOT), exception.getReason());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(code, message));
     }
 
     @ExceptionHandler(ResponseStatusException.class)

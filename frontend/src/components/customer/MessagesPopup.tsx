@@ -153,27 +153,27 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
       aria-label="Cửa sổ Tin nhắn hỗ trợ"
       className="fixed bottom-22 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-[88px] z-50 w-auto sm:w-[400px] h-[520px] max-h-[calc(100vh-96px)] bg-white rounded-2xl border border-slate-200/90 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
     >
-      {/* Header */}
-      <div className="p-3.5 sm:p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
-        <div className="flex items-center gap-2.5">
+      {/* Top Header - Synced with Brand Navy (#031d44) and AiChatPopup */}
+      <div className="p-3.5 bg-[#031d44] text-white flex items-center justify-between border-b border-sky-950 shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
           {activeConvId && (
             <button
               type="button"
               onClick={() => setActiveConvId(null)}
-              className="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer mr-0.5"
+              className="w-7 h-7 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer mr-0.5 shrink-0"
               title="Quay lại danh sách"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-3.5 h-3.5" />
             </button>
           )}
 
-          <div className="w-9 h-9 rounded-xl bg-sky-600/30 border border-sky-400/30 flex items-center justify-center text-sky-400 shrink-0">
-            <MessageSquare className="w-5 h-5 text-sky-300" />
+          <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
+            <MessageSquare className="w-4 h-4 text-white" />
           </div>
 
-          <div>
-            <span className="font-bold text-sm tracking-tight text-white block">
-              {activeConversation ? activeConversation.name : 'Tin nhắn điều hành biển'}
+          <div className="min-w-0 flex-1">
+            <span className="font-semibold text-xs sm:text-sm tracking-tight text-white block truncate">
+              {activeConversation ? activeConversation.name : 'Tin nhắn'}
             </span>
           </div>
         </div>
@@ -183,9 +183,9 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
           onClick={onClose}
           title="Thu nhỏ"
           aria-label="Thu nhỏ"
-          className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+          className="w-7 h-7 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer shrink-0 ml-2"
         >
-          <Minus className="w-5 h-5" />
+          <Minus className="w-4 h-4" />
         </button>
       </div>
 
@@ -249,10 +249,10 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
                 className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
               >
                 <div
-                  className={`px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed max-w-[85%] ${
+                  className={`px-3.5 py-2.5 rounded-xl text-xs leading-relaxed max-w-[85%] ${
                     m.sender === 'user'
-                      ? 'bg-sky-600 text-white rounded-br-xs font-medium shadow-xs'
-                      : 'bg-white border border-slate-200/90 text-slate-800 rounded-bl-xs shadow-xs'
+                      ? 'bg-[#031d44] text-white rounded-tr-xs font-normal shadow-xs'
+                      : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs shadow-xs'
                   }`}
                 >
                   {m.text}
@@ -270,7 +270,7 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
                 key={idx}
                 type="button"
                 onClick={() => setInputMessage(chip)}
-                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[11px] font-medium text-slate-700 whitespace-nowrap transition-colors cursor-pointer shrink-0"
+                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[11px] font-medium text-slate-700 whitespace-nowrap transition-colors cursor-pointer shrink-0"
               >
                 {chip}
               </button>
@@ -287,16 +287,16 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               placeholder="Nhập tin nhắn..."
-              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs sm:text-[13px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white transition-all shadow-xs"
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#031d44] focus:bg-white transition-all shadow-xs"
             />
             <button
               type="submit"
               disabled={!inputMessage.trim()}
               title="Gửi tin nhắn"
               aria-label="Gửi tin nhắn"
-              className="w-9 h-9 rounded-xl bg-sky-600 hover:bg-sky-500 text-white flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-xs"
+              className="w-9 h-9 rounded-xl bg-[#031d44] hover:bg-[#021838] text-white flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-xs"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-3.5 h-3.5" />
             </button>
           </form>
         </div>

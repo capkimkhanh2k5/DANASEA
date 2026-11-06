@@ -13,6 +13,7 @@ import com.danasea.backend.modules.order.infrastructure.persistence.entities.Mas
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
+import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
@@ -54,10 +55,65 @@ public class GenerateCheckinQrUseCase {
     public GenerateQrResponse execute(UUID identifier, UUID customerId) {
         log.info("Generating check-in QR for identifier: {}, customerId: {}", identifier, customerId);
 
-        // 1. Phân giải đa tầng (Dual-resolution: SubOrder hoặc MasterOrder)
-        SubOrderJpaEntity subOrder = resolveSubOrder(identifier);
+        // 1. Phân giải đa tầng: SubOrder trước (tương thích ngược Mockito tests), sau đó MasterOrder
+        Optional<SubOrderJpaEntity> subOpt = subOrderRepository.findById(identifier);
+        if (subOpt.isPresent()) {
+            return generateForSubOrder(subOpt.get(), customerId);
+        }
 
-        // 2. Kiểm tra quyền sở hữu đơn hàng (IDOR Protection)
+        Optional<MasterOrderJpaEntity> masterOpt = masterOrderRepository.findById(identifier);
+        if (masterOpt.isPresent()) {
+            return generateForMasterOrder(masterOpt.get(), customerId);
+        }
+
+        throw new OrderNotFoundException("Order or service item not found: " + identifier);
+    }
+
+    private GenerateQrResponse generateForMasterOrder(MasterOrderJpaEntity masterOrder, UUID customerId) {
+        boolean isAdmin = checkIsAdmin();
+        if (!isAdmin && (masterOrder.getCustomerId() == null || !Objects.equals(masterOrder.getCustomerId(), customerId))) {
+            log.warn("IDOR_ATTEMPT: User {} attempted to retrieve a QR code owned by user {}", customerId, masterOrder.getCustomerId());
+            throw new UnauthorizedCheckinAccessException("User does not have permission to view or generate QR for this booking");
+        }
+
+        List<SubOrderJpaEntity> subOrders = subOrderRepository.findByMasterOrderId(masterOrder.getId());
+        if (subOrders.isEmpty()) {
+            throw new InvalidSubOrderStateException("Order contains no activities");
+        }
+
+        List<SubOrderJpaEntity> activeSubOrders = subOrders.stream()
+                .filter(s -> s.getStatus() == SubOrderStatus.CONFIRMED || s.getStatus() == SubOrderStatus.CHECKED_IN)
+                .toList();
+
+        if (activeSubOrders.isEmpty()) {
+            throw new InvalidSubOrderStateException("No confirmed activities in this order ready for check-in");
+        }
+
+        OffsetDateTime maxExpiresAt = activeSubOrders.stream()
+                .map(this::calculateExpirationAndValidateSlot)
+                .max(OffsetDateTime::compareTo)
+                .orElse(OffsetDateTime.now().plusDays(1));
+
+        String rawToken = qrTokenSigner.generateToken(masterOrder.getId(), maxExpiresAt);
+        String tokenHash = QrTokenSigner.hashToken(rawToken);
+
+        Optional<CheckinTokenJpaEntity> existingOpt = checkinTokenRepository
+                .findFirstBySubOrderIdAndUsedAtIsNullOrderByCreatedAtDesc(activeSubOrders.get(0).getId());
+        CheckinTokenJpaEntity tokenEntity = existingOpt.orElseGet(() -> CheckinTokenJpaEntity.builder()
+                .subOrderId(activeSubOrders.get(0).getId())
+                .usedAt(null)
+                .usedByVendorStaffId(null)
+                .build());
+
+        tokenEntity.setQrTokenHash(tokenHash);
+        tokenEntity.setExpiresAt(maxExpiresAt);
+        checkinTokenRepository.save(tokenEntity);
+
+        log.info("Generated Master QR code for order: {}, expiresAt: {}", masterOrder.getId(), maxExpiresAt);
+        return new GenerateQrResponse(masterOrder.getId(), rawToken, maxExpiresAt);
+    }
+
+    private GenerateQrResponse generateForSubOrder(SubOrderJpaEntity subOrder, UUID customerId) {
         MasterOrderJpaEntity masterOrder = masterOrderRepository.findById(subOrder.getMasterOrderId())
                 .orElseThrow(() -> new OrderNotFoundException("Master order not found with id: " + subOrder.getMasterOrderId()));
 
@@ -67,7 +123,6 @@ public class GenerateCheckinQrUseCase {
             throw new UnauthorizedCheckinAccessException("User does not have permission to view or generate QR for this booking");
         }
 
-        // 3. Kiểm tra trạng thái đơn hàng
         if (subOrder.getStatus() == SubOrderStatus.PENDING) {
             throw new InvalidSubOrderStateException("Cannot generate a QR code for a pending, unpaid sub-order");
         }
@@ -78,14 +133,10 @@ public class GenerateCheckinQrUseCase {
             throw new InvalidSubOrderStateException("Only confirmed sub-orders can generate QR codes. Current status: " + subOrder.getStatus());
         }
 
-        // 4. Tính toán thời gian hết hạn (expiresAt) và kiểm tra slot đã kết thúc chưa
         OffsetDateTime expiresAt = calculateExpirationAndValidateSlot(subOrder);
-
-        // 5. Sinh chuỗi token ký số HMAC-SHA256 tất định
         String rawToken = qrTokenSigner.generateToken(subOrder.getId(), expiresAt);
         String tokenHash = QrTokenSigner.hashToken(rawToken);
 
-        // 6. Lưu trữ hoặc cập nhật bản ghi CheckinToken (Tuyệt đối KHÔNG lưu plaintext token)
         Optional<CheckinTokenJpaEntity> existingOpt = checkinTokenRepository
                 .findFirstBySubOrderIdAndUsedAtIsNullOrderByCreatedAtDesc(subOrder.getId());
         CheckinTokenJpaEntity tokenEntity = existingOpt.orElseGet(() -> CheckinTokenJpaEntity.builder()
@@ -106,29 +157,6 @@ public class GenerateCheckinQrUseCase {
         return new GenerateQrResponse(subOrder.getId(), rawToken, expiresAt);
     }
 
-    private SubOrderJpaEntity resolveSubOrder(UUID identifier) {
-        // Tầng 1: Tra cứu trực tiếp sub_orders
-        Optional<SubOrderJpaEntity> subOpt = subOrderRepository.findById(identifier);
-        if (subOpt.isPresent()) {
-            return subOpt.get();
-        }
-
-        // Tầng 2: Tra cứu master_orders
-        Optional<MasterOrderJpaEntity> masterOpt = masterOrderRepository.findById(identifier);
-        if (masterOpt.isPresent()) {
-            List<SubOrderJpaEntity> subOrders = subOrderRepository.findByMasterOrderId(identifier);
-            if (subOrders.size() == 1) {
-                return subOrders.get(0);
-            }
-            if (subOrders.size() > 1) {
-                throw new IllegalArgumentException(
-                        "This order contains multiple service items. Generate a QR code with a sub-order ID.");
-            }
-        }
-
-        throw new OrderNotFoundException("Order or service item not found: " + identifier);
-    }
-
     private OffsetDateTime calculateExpirationAndValidateSlot(SubOrderJpaEntity subOrder) {
         ZoneOffset vnOffset = ZoneOffset.ofHours(7);
         OffsetDateTime now = OffsetDateTime.now();
@@ -137,6 +165,11 @@ public class GenerateCheckinQrUseCase {
             Optional<ServiceSlotJpaEntity> slotOpt = slotRepository.findById(subOrder.getSlotId());
             if (slotOpt.isPresent()) {
                 ServiceSlotJpaEntity slot = slotOpt.get();
+                if (slot.getStatus() == SlotStatus.CANCELLED
+                        || (subOrder.getBookingItemId() != null
+                        && slotRepository.hasBlockedEquipmentForBookingItem(subOrder.getBookingItemId()))) {
+                    throw new InvalidCheckinStateException("The departure or assigned equipment is unavailable.");
+                }
                 if (slot.getDate() != null) {
                     LocalTime endTime = slot.getEndTime() != null
                             ? slot.getEndTime()

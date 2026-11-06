@@ -11,12 +11,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def simulate(infrastructure_changed=False, previous_worker=True, deploy_fails=True,
-             acceptance_fails=False, backup_fails=False, preflight_fails=False, migrations_changed=False, app_dir_in_environment=True, availability_fails=False, availability_missing=False):
+             acceptance_fails=False, backup_fails=False, preflight_fails=False, migrations_changed=False, app_dir_in_environment=True, availability_fails=False, availability_missing=False, legacy_checkout=False):
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         binary = root / 'bin'
         binary.mkdir()
         (root / 'frontend').mkdir()
+        production_script = root / ('scripts/production.py' if legacy_checkout else 'scripts/ops/production.py')
+        production_script.parent.mkdir(parents=True)
+        production_script.touch()
         (root / '.releases').mkdir()
         (root / '.deploy-state').write_text('b' * 40)
         (root / '.env').write_text('fixture')
@@ -55,7 +58,7 @@ if name == 'python3':
         print(root)
     elif args[0] == '-' and args[1] == os.environ['DEPLOY_POLICY']:
         print('capkimkhanh2k5/DANASEA\\nhttps://example.invalid\\n' + str(root / 'signers') + '\\n' + str(root / 'backup.json') + '\\n30\\n60')
-    elif args[0] == 'scripts/production.py':
+    elif args[0] in ('scripts/production.py', 'scripts/ops/production.py'):
         record(['preflight-modes', (root / 'frontend/nginx.prod.conf').stat().st_mode & 0o777, (root / '.env').stat().st_mode & 0o777])
         sys.exit(17 if os.environ['PREFLIGHT_FAILS'] == '1' else 0)
     elif args[0].endswith('/availability.py'):
@@ -88,6 +91,6 @@ if name == 'docker':
                             ('DEPLOY_FAILS', deploy_fails), ('ACCEPTANCE_FAILS', acceptance_fails),
                             ('BACKUP_FAILS', backup_fails), ('PREFLIGHT_FAILS', preflight_fails), ('MIGRATIONS_CHANGED', migrations_changed), ('AVAILABILITY_FAILS', availability_fails), ('AVAILABILITY_MISSING', availability_missing)]:
             environment[name] = '1' if value else '0'
-        result = subprocess.run(['bash', str(ROOT / 'scripts/deploy.sh')], env=environment, input=json.dumps(envelope), capture_output=True, text=True, check=False)
+        result = subprocess.run(['bash', str(ROOT / 'scripts/ops/deploy.sh')], env=environment, input=json.dumps(envelope), capture_output=True, text=True, check=False)
         calls = [json.loads(line) for line in log.read_text().splitlines()]
         return result, calls, (root / '.deploy-state').read_text().strip()

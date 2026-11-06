@@ -38,6 +38,9 @@ public class ErrorResponseLocalizationAdvice implements ResponseBodyAdvice<Objec
             return responseBody;
         }
         String key = "error." + body.code().toLowerCase(Locale.ROOT);
-        return new ErrorResponse(body.code(), messages.getOrDefault(key, messages.get("error.internal")));
+        String fallback = (body.message() != null && !body.message().isBlank())
+                ? body.message()
+                : messages.get("error.internal");
+        return new ErrorResponse(body.code(), messages.getOrDefault(key, fallback));
     }
 }

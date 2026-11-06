@@ -98,4 +98,30 @@ class RegisterUseCaseTest {
 
         assertThrows(EmailAlreadyUsedException.class, () -> registerUseCase.execute(email, "Password1!"));
     }
+
+    @Test
+    void shouldAllowReRegistrationWhenAccountExistsButNotVerified() {
+        String email = "unverified@example.com";
+        String normalizedEmail = "unverified@example.com";
+        UUID userId = UUID.randomUUID();
+        Authentication existing = new Authentication(userId, normalizedEmail, "old-hash", "CUSTOMER", true, false);
+
+        when(userAccountPort.existsByEmail(normalizedEmail)).thenReturn(true);
+        when(userAccountPort.findByEmail(normalizedEmail)).thenReturn(java.util.Optional.of(existing));
+        when(passwordHasher.hash("NewPassword1!")).thenReturn("new-hash");
+
+        Authentication updated = new Authentication(userId, normalizedEmail, "new-hash", "CUSTOMER", true, false);
+        when(userAccountPort.save(any(Authentication.class))).thenReturn(updated);
+        when(tokenProvider.generateAccessToken(updated)).thenReturn("new-access-token");
+        when(tokenProvider.generateRefreshToken(updated)).thenReturn("new-refresh-token");
+
+        LoginResult result = registerUseCase.execute(email, "NewPassword1!");
+
+        assertNotNull(result);
+        assertEquals("new-access-token", result.accessToken());
+        assertEquals("new-refresh-token", result.refreshToken());
+        assertEquals(userId, result.userId());
+        assertEquals(email, result.email());
+        verify(accountInternalApi).saveRefreshToken(any(RefreshToken.class));
+    }
 }

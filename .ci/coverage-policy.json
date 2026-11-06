@@ -1,0 +1,205 @@
+{
+  "minimum_ratios": {
+    "LINE": 0.82,
+    "BRANCH": 0.62,
+    "METHOD": 0.78
+  },
+  "minimum_covered": {
+    "LINE": 17300,
+    "BRANCH": 7050
+  },
+  "required_classes": {
+    "com/danasea/backend/modules/service/application/usecases/PauseServiceUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/service/application/usecases/GetVendorServicesUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/service/application/usecases/ResumeServiceUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/service/application/usecases/GetAdminServicesUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/service/application/usecases/DeleteServiceImageUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/admin/application/usecases/GetVendorDetailUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/admin/application/usecases/RejectVendorUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/admin/application/usecases/GetVendorsUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/operation/application/usecases/GetAdminReviewsUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/order/application/OrderPaymentService": {
+      "minimum_covered": {
+        "LINE": 595,
+        "BRANCH": 290
+      }
+    },
+    "com/danasea/backend/modules/order/application/RefundProcessingService": {
+      "minimum_covered": {
+        "LINE": 192,
+        "BRANCH": 132
+      }
+    },
+    "com/danasea/backend/modules/order/application/PaymentWebhookSigner": {
+      "minimum_covered": {
+        "LINE": 10,
+        "BRANCH": 3
+      }
+    },
+    "com/danasea/backend/modules/order/application/usecases/CreatePaymentIntentUseCase": {
+      "minimum_covered": {
+        "LINE": 91,
+        "BRANCH": 56
+      }
+    },
+    "com/danasea/backend/modules/order/application/usecases/RequestRefundUseCase": {
+      "minimum_covered": {
+        "LINE": 122,
+        "BRANCH": 45
+      }
+    },
+    "com/danasea/backend/modules/booking/application/usecases/CreateBookingHoldUseCase": {
+      "minimum_covered": {
+        "LINE": 178,
+        "BRANCH": 96
+      }
+    },
+    "com/danasea/backend/modules/booking/application/usecases/ConfirmBookingUseCase": {
+      "minimum_covered": {
+        "LINE": 48,
+        "BRANCH": 9
+      }
+    },
+    "com/danasea/backend/security/authentication/application/usecases/ResetPasswordUseCase": {
+      "minimum_covered": {
+        "LINE": 22,
+        "BRANCH": 8
+      }
+    },
+    "com/danasea/backend/security/authentication/application/usecases/ForgotPasswordUseCase": {
+      "minimum_covered": {
+        "LINE": 25,
+        "BRANCH": 8
+      }
+    },
+    "com/danasea/backend/security/authentication/infrastructure/security/JwtAuthenticationFilter": {
+      "minimum_covered": {
+        "LINE": 36,
+        "BRANCH": 16
+      }
+    },
+    "com/danasea/backend/modules/account/application/usecases/GetMyProfileUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/vendor/application/usecases/GetVendorProfileUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/service/application/usecases/GetSafetyDocumentsUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/operation/application/usecases/GetVendorReviewsUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/service/application/services/CustomerChangeSlotReader": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/order/application/api/AiPolicyReader": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/service/application/usecases/CreateServiceSlotUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 0.97
+      }
+    },
+    "com/danasea/backend/modules/service/application/usecases/CreateServiceOptionUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/service/application/usecases/UpdateServiceOptionUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/order/application/usecases/AdminDiscountCodeUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 0.94
+      }
+    },
+    "com/danasea/backend/modules/order/application/usecases/VendorDiscountCodeUseCase": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 0.83
+      }
+    },
+    "com/danasea/backend/modules/weather/infrastructure/jobs/FetchWeatherJob": {
+      "minimum_ratios": {
+        "LINE": 0.92,
+        "BRANCH": 1.0
+      }
+    },
+    "com/danasea/backend/modules/ai/infrastructure/redis/RedisConfirmationCardStore": {
+      "minimum_ratios": {
+        "LINE": 1.0,
+        "BRANCH": 0.97
+      }
+    }
+  }
+}

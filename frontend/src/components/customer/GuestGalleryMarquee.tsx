@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { GUEST_GALLERY_ROW_1, GUEST_GALLERY_ROW_2 } from '../../data/customerHomeData';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { apiClient } from '../../services/apiClient';
 
@@ -15,137 +14,35 @@ interface GuestCard {
   isReal?: boolean;
 }
 
-const GUEST_CARDS_ROW_1: GuestCard[] = [
-  {
-    imageUrl: GUEST_GALLERY_ROW_1[0],
-    guestName: 'Nguyễn Thảo My',
-    guestLocation: 'Hà Nội',
-    activity: 'SUP Bình Minh Mỹ Khê',
-    activityEn: 'Sunrise SUP My Khe',
-    quote: 'Nước biển trong vắt, anh hướng dẫn chụp ảnh có tâm đến từng góc máy!',
-    quoteEn: 'Crystal waters and the guide took breathtaking photos for us!',
-    rating: 5,
-  },
-  {
-    imageUrl: GUEST_GALLERY_ROW_1[1],
-    guestName: 'David & Sarah',
-    guestLocation: 'Australia',
-    activity: 'Lặn Scuba Sơn Trà',
-    activityEn: 'Son Tra Scuba Dive',
-    quote: 'Rạn san hô tại bán đảo Sơn Trà tuyệt đẹp. Trang thiết bị lặn chuyên nghiệp và hướng dẫn viên nhiệt tình!',
-    quoteEn: 'The coral reef in Da Nang surprised us completely. Professional diving gear and certified safety guidance!',
-    rating: 5,
-  },
-  {
-    imageUrl: GUEST_GALLERY_ROW_1[2],
-    guestName: 'Trần Minh Quân',
-    guestLocation: 'TP. Hồ Chí Minh',
-    activity: 'Cano & Lặn Bãi Rạng',
-    activityEn: 'Speedboat & Snorkel',
-    quote: 'Chuyến đi đáng giá từng xu! Cả nhà đều hào hứng lướt sóng và lặn ngắm san hô.',
-    quoteEn: 'Worth every penny! My whole family had a blast riding waves and snorkeling.',
-    rating: 5,
-  },
-  {
-    imageUrl: GUEST_GALLERY_ROW_1[3],
-    guestName: 'Lê Hoàng Phong',
-    guestLocation: 'Đà Nẵng',
-    activity: 'Bay Dù Lượn Vịnh Biển',
-    activityEn: 'Coastal Parasailing',
-    quote: 'Cảm giác lơ lửng ngắm toàn cảnh thành phố từ trên không trung cực kỳ đã.',
-    quoteEn: 'Floating high above the bay with panoramic views was sensational.',
-    rating: 5,
-  },
-  {
-    imageUrl: GUEST_GALLERY_ROW_1[4],
-    guestName: 'Kim Min-seo',
-    guestLocation: 'South Korea',
-    activity: 'Kayak Hoàng Hôn Mũi Nghê',
-    activityEn: 'Sunset Kayak Mui Nghe',
-    quote: '다낭 바다 노을이 너무 아름다웠어요. DANASEA 최고입니다!',
-    quoteEn: 'Da Nang sunset was so breathtaking. Highly recommended experience!',
-    rating: 5,
-  },
-];
-
-const GUEST_CARDS_ROW_2: GuestCard[] = [
-  {
-    imageUrl: GUEST_GALLERY_ROW_2[0],
-    guestName: 'Phạm Nhật Anh',
-    guestLocation: 'Hải Phòng',
-    activity: 'Jet Ski Cao Tốc 1800cc',
-    activityEn: 'High-speed Jet Ski',
-    quote: 'Tay ga bốc, sóng văng tung bọt sảng khoái không tả nổi!',
-    quoteEn: 'Pure throttle power, slicing through ocean waves was pure euphoria!',
-    rating: 5,
-  },
-  {
-    imageUrl: GUEST_GALLERY_ROW_2[1],
-    guestName: 'Emma Watson',
-    guestLocation: 'United Kingdom',
-    activity: 'Sunset Luxury Yacht',
-    activityEn: 'Sunset Luxury Yacht',
-    quote: 'Champagne on the deck while sunset painted the bay in pink. 10/10.',
-    quoteEn: 'Champagne on the deck while sunset painted the bay in pink. 10/10.',
-    rating: 5,
-  },
-  {
-    imageUrl: GUEST_GALLERY_ROW_2[2],
-    guestName: 'Vũ Đăng Khoa',
-    guestLocation: 'Cần Thơ',
-    activity: 'Chèo SUP & Snorkeling',
-    activityEn: 'SUP & Snorkeling Combo',
-    quote: 'Combo hoàn hảo, vừa rèn luyện thể lực vừa ngắm trọn hệ sinh thái san hô.',
-    quoteEn: 'Perfect combination, rewarding exercise while exploring living corals.',
-    rating: 5,
-  },
-  {
-    imageUrl: GUEST_GALLERY_ROW_2[3],
-    guestName: 'Sato Kenji',
-    guestLocation: 'Japan',
-    activity: 'Phao Chuối Cảm Giác Mạnh',
-    activityEn: 'Banana Boat Adventure',
-    quote: '友達と最高の思い出ができました。海の青さが忘れられません。',
-    quoteEn: 'Made unforgettable memories with friends. The ocean blue is unforgettable.',
-    rating: 5,
-  },
-  {
-    imageUrl: GUEST_GALLERY_ROW_2[4],
-    guestName: 'Hoàng Thị Mai',
-    guestLocation: 'Quảng Ninh',
-    activity: 'Cano Tham Quan Đảo Khỉ',
-    activityEn: 'Monkey Island Speedboat',
-    quote: 'Cano chạy êm, áo phao tiêu chuẩn mới tinh, gia đình rất an tâm.',
-    quoteEn: 'Smooth speedboat ride, brand new SOLAS life vests, our family felt completely safe.',
-    rating: 5,
-  },
-];
-
 export const GuestGalleryMarquee: React.FC = () => {
   const { language } = useLanguageStore();
-  const [row1, setRow1] = useState<GuestCard[]>(GUEST_CARDS_ROW_1);
-  const [row2, setRow2] = useState<GuestCard[]>(GUEST_CARDS_ROW_2);
+  const [row1, setRow1] = useState<GuestCard[]>([]);
+  const [row2, setRow2] = useState<GuestCard[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let isMounted = true;
-    async function loadRealReviews() {
+    async function loadRealShowcase() {
       try {
-        const res = await apiClient.get('/services', { params: { size: 10 } });
+        setIsLoading(true);
+        const res = await apiClient.get('/services', { params: { size: 12 } });
         const services = res.data?.data?.content || res.data?.content || [];
         if (!Array.isArray(services) || services.length === 0) return;
 
-        const realReviews: GuestCard[] = [];
+        const cards: GuestCard[] = [];
+
+        // 1. Gather real reviews from real services
         for (const s of services) {
           try {
-            const revRes = await apiClient.get(`/services/${s.id}/reviews`, { params: { size: 5 } });
+            const revRes = await apiClient.get(`/services/${s.id}/reviews`, { params: { size: 3 } });
             const reviews = revRes.data?.data?.content || revRes.data?.content || [];
             if (Array.isArray(reviews)) {
               for (const r of reviews) {
                 if (r.isVisible !== false && r.comment) {
-                  realReviews.push({
-                    imageUrl: r.customerAvatar || s.primaryImageUrl || GUEST_GALLERY_ROW_1[realReviews.length % GUEST_GALLERY_ROW_1.length],
-                    guestName: r.customerName || 'Du khách DANASEA',
-                    guestLocation: language === 'en' ? 'Verified Booking' : 'Đã trải nghiệm',
+                  cards.push({
+                    imageUrl: r.customerAvatar || s.primaryImageUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=400&q=80',
+                    guestName: r.customerName || (language === 'en' ? 'Verified Guest' : 'Du khách DANASEA'),
+                    guestLocation: language === 'en' ? 'Verified Experience' : 'Đã trải nghiệm',
                     activity: s.name,
                     activityEn: s.name,
                     quote: r.comment,
@@ -161,37 +58,62 @@ export const GuestGalleryMarquee: React.FC = () => {
           }
         }
 
-        if (isMounted && realReviews.length > 0) {
-          // Distribute real reviews across Row 1 & Row 2
+        // 2. Add real service highlight cards from the real catalog
+        for (const s of services) {
+          cards.push({
+            imageUrl: s.primaryImageUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=400&q=80',
+            guestName: s.vendorName || (language === 'en' ? 'Verified Provider' : 'Đơn vị tổ chức uy tín'),
+            guestLocation: s.location || 'Đà Nẵng',
+            activity: s.name,
+            activityEn: s.name,
+            quote: s.shortDescription || s.description || (language === 'en' ? 'Certified marine sport experience' : 'Trải nghiệm thể thao biển an toàn đạt chuẩn SOLAS'),
+            quoteEn: s.shortDescription || s.description || 'Certified marine sport experience',
+            rating: s.averageRating && s.averageRating > 0 ? Number(s.averageRating.toFixed(1)) : 5,
+            isReal: true,
+          });
+        }
+
+        if (isMounted && cards.length > 0) {
           const newRow1: GuestCard[] = [];
           const newRow2: GuestCard[] = [];
 
-          realReviews.forEach((rev, idx) => {
-            if (idx % 2 === 0) newRow1.push(rev);
-            else newRow2.push(rev);
+          cards.forEach((card, idx) => {
+            if (idx % 2 === 0) newRow1.push(card);
+            else newRow2.push(card);
           });
 
-          // Fill remaining slots up to at least 5 per row with fallback cards to keep smooth infinite loop
-          GUEST_CARDS_ROW_1.forEach((fb) => {
-            if (newRow1.length < 5) newRow1.push(fb);
-          });
-          GUEST_CARDS_ROW_2.forEach((fb) => {
-            if (newRow2.length < 5) newRow2.push(fb);
-          });
+          // Duplicate cards if needed for seamless infinite marquee loop
+          const minCardsPerRow = 6;
+          while (newRow1.length > 0 && newRow1.length < minCardsPerRow) {
+            newRow1.push(...newRow1);
+          }
+          while (newRow2.length > 0 && newRow2.length < minCardsPerRow) {
+            newRow2.push(...newRow2);
+          }
 
           setRow1(newRow1);
           setRow2(newRow2);
         }
       } catch (err) {
-        console.warn('[GuestGalleryMarquee] Dùng fallback mock reviews:', err);
+        console.warn('[GuestGalleryMarquee] Lỗi tải dữ liệu thật:', err);
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     }
 
-    loadRealReviews();
+    loadRealShowcase();
     return () => {
       isMounted = false;
     };
   }, [language]);
+
+  if (isLoading && row1.length === 0) {
+    return null;
+  }
+
+  if (row1.length === 0 && row2.length === 0) {
+    return null;
+  }
 
   return (
     <div className="py-8 sm:py-12 overflow-hidden bg-transparent">
@@ -222,113 +144,81 @@ export const GuestGalleryMarquee: React.FC = () => {
         }
       `}</style>
 
-      {/* Header */}
-      <div className="text-center max-w-2xl mx-auto mb-8 px-4">
-        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
-          {language === 'en' ? 'Authentic Guest Memories' : 'Khoảnh Khắc Cùng Du Khách'}
-        </h2>
+      {/* Row 1: Left */}
+      <div className="flex overflow-hidden mb-4 sm:mb-6">
+        <div className="animate-marquee-left flex gap-4 sm:gap-6 pl-4">
+          {[...row1, ...row1].map((card, idx) => (
+            <div
+              key={`r1-${idx}`}
+              className="w-72 sm:w-80 shrink-0 bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-slate-200/80 shadow-xs hover:shadow-md transition-all duration-300 -translate-y-0.5"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <img
+                  src={card.imageUrl}
+                  alt={card.guestName}
+                  className="w-12 h-12 rounded-full object-cover border border-slate-200"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=400&q=80';
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-slate-900 truncate">{card.guestName}</h4>
+                  <p className="text-xs text-slate-500 truncate">{card.guestLocation}</p>
+                </div>
+                <div className="flex items-center gap-0.5 text-amber-500 font-bold text-xs">
+                  <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                  <span>{card.rating}</span>
+                </div>
+              </div>
+              <div className="mb-2">
+                <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200 truncate max-w-full">
+                  {language === 'en' ? card.activityEn : card.activity}
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 line-clamp-2 italic leading-relaxed">
+                “{language === 'en' ? card.quoteEn : card.quote}”
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Infinite Dual Marquee Track */}
-      <div
-        className="space-y-4 overflow-hidden"
-        style={{
-          maskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
-        }}
-      >
-        {/* Marquee Row 1 (Moving Left) */}
-        <div className="overflow-hidden">
-          <div className="flex animate-marquee-left gap-4">
-            {[...row1, ...row1].map((card, idx) => (
-              <div
-                key={`row1-${idx}`}
-                data-ui="marquee-card"
-                className="w-80 sm:w-96 flex-shrink-0 bg-white border border-slate-200/90 rounded-2xl p-4 flex gap-3.5 hover:border-sky-400 hover:shadow-md transition-all"
-              >
+      {/* Row 2: Right */}
+      <div className="flex overflow-hidden">
+        <div className="animate-marquee-right flex gap-4 sm:gap-6 pl-4">
+          {[...row2, ...row2].map((card, idx) => (
+            <div
+              key={`r2-${idx}`}
+              className="w-72 sm:w-80 shrink-0 bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-slate-200/80 shadow-xs hover:shadow-md transition-all duration-300 -translate-y-0.5"
+            >
+              <div className="flex items-center gap-3 mb-3">
                 <img
                   src={card.imageUrl}
                   alt={card.guestName}
-                  className="w-20 h-28 rounded-xl object-cover flex-shrink-0 bg-slate-100"
-                  loading="lazy"
+                  className="w-12 h-12 rounded-full object-cover border border-slate-200"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=400&q=80';
+                  }}
                 />
-                <div className="flex flex-col justify-between overflow-hidden">
-                  <div>
-                    <div className="flex items-center gap-0.5 text-amber-400 mb-1">
-                      {Array.from({ length: card.rating }).map((_, i) => (
-                        <svg key={i} className="w-3.5 h-3.5 fill-current text-amber-400" viewBox="0 0 20 20">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                      {card.isReal && (
-                        <span className="inline-flex items-center text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded ml-1.5 border border-emerald-200">
-                          ✓ {language === 'en' ? 'Verified' : 'Đã trải nghiệm'}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[13px] text-slate-700 italic line-clamp-3 mb-2 leading-relaxed">
-                      "{language === 'en' ? card.quoteEn : card.quote}"
-                    </p>
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-bold text-slate-900 truncate">
-                      {card.guestName} <span className="text-slate-500 font-normal">({card.guestLocation})</span>
-                    </div>
-                    <div className="text-[13px] text-sky-700 font-semibold truncate">
-                      {language === 'en' ? card.activityEn : card.activity}
-                    </div>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-bold text-slate-900 truncate">{card.guestName}</h4>
+                  <p className="text-xs text-slate-500 truncate">{card.guestLocation}</p>
+                </div>
+                <div className="flex items-center gap-0.5 text-amber-500 font-bold text-xs">
+                  <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
+                  <span>{card.rating}</span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Marquee Row 2 (Moving Right) */}
-        <div className="overflow-hidden">
-          <div className="flex animate-marquee-right gap-4">
-            {[...row2, ...row2].map((card, idx) => (
-              <div
-                key={`row2-${idx}`}
-                data-ui="marquee-card"
-                className="w-80 sm:w-96 flex-shrink-0 bg-white border border-slate-200/90 rounded-2xl p-4 flex gap-3.5 hover:border-sky-400 hover:shadow-md transition-all"
-              >
-                <img
-                  src={card.imageUrl}
-                  alt={card.guestName}
-                  className="w-20 h-28 rounded-xl object-cover flex-shrink-0 bg-slate-100"
-                  loading="lazy"
-                />
-                <div className="flex flex-col justify-between overflow-hidden">
-                  <div>
-                    <div className="flex items-center gap-0.5 text-amber-400 mb-1">
-                      {Array.from({ length: card.rating }).map((_, i) => (
-                        <svg key={i} className="w-3.5 h-3.5 fill-current text-amber-400" viewBox="0 0 20 20">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                      {card.isReal && (
-                        <span className="inline-flex items-center text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded ml-1.5 border border-emerald-200">
-                          ✓ {language === 'en' ? 'Verified' : 'Đã trải nghiệm'}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[13px] text-slate-700 italic line-clamp-3 mb-2 leading-relaxed">
-                      "{language === 'en' ? card.quoteEn : card.quote}"
-                    </p>
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-bold text-slate-900 truncate">
-                      {card.guestName} <span className="text-slate-500 font-normal">({card.guestLocation})</span>
-                    </div>
-                    <div className="text-[13px] text-sky-700 font-semibold truncate">
-                      {language === 'en' ? card.activityEn : card.activity}
-                    </div>
-                  </div>
-                </div>
+              <div className="mb-2">
+                <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 truncate max-w-full">
+                  {language === 'en' ? card.activityEn : card.activity}
+                </span>
               </div>
-            ))}
-          </div>
+              <p className="text-xs text-slate-600 line-clamp-2 italic leading-relaxed">
+                “{language === 'en' ? card.quoteEn : card.quote}”
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

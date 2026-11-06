@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
-SPEC = importlib.util.spec_from_file_location('production', ROOT / 'scripts/production.py')
+SPEC = importlib.util.spec_from_file_location('production', ROOT / 'scripts/ops/production.py')
 
 
 class ProductionPreparationTest(unittest.TestCase):
@@ -159,7 +159,7 @@ class ProductionPreparationTest(unittest.TestCase):
 
 class DeploymentGuardTest(unittest.TestCase):
     def simulate_failed_deploy(self, infrastructure_changed, previous_worker=True):
-        from deploy_fixture import simulate
+        from scripts.tests.deploy_fixture import simulate
         result, calls, _ = simulate(infrastructure_changed, previous_worker)
         return result, calls
 
@@ -241,14 +241,16 @@ class DeploymentGuardTest(unittest.TestCase):
         self.assertIn('PRODUCTION_DEPLOY_ENABLED', (ROOT / '.github/workflows/cd.yml').read_text())
 
     def test_preflight_failure_never_starts_or_pulls_containers(self):
-        from deploy_fixture import simulate
-        result, calls, _ = simulate(preflight_fails=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertTrue(any(c[:2] == ['python3', 'scripts/production.py'] for c in calls))
-        self.assertFalse(any(c[0] == 'docker' for c in calls))
+        from scripts.tests.deploy_fixture import simulate
+        for legacy, script in ((False, 'scripts/ops/production.py'), (True, 'scripts/production.py')):
+            with self.subTest(legacy_checkout=legacy):
+                result, calls, _ = simulate(preflight_fails=True, legacy_checkout=legacy)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(any(c[:2] == ['python3', script] for c in calls))
+                self.assertFalse(any(c[0] == 'docker' for c in calls))
 
     def test_forced_command_rejects_extra_arguments_before_git(self):
-        result = subprocess.run(['bash', str(ROOT / 'scripts/deploy.sh')], env={**os.environ, 'SSH_ORIGINAL_COMMAND': 'deploy ' + 'a' * 40 + ' extra'}, capture_output=True, text=True, check=False)
+        result = subprocess.run(['bash', str(ROOT / 'scripts/ops/deploy.sh')], env={**os.environ, 'SSH_ORIGINAL_COMMAND': 'deploy ' + 'a' * 40 + ' extra'}, capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 2)
         self.assertIn('Usage:', result.stderr)
 

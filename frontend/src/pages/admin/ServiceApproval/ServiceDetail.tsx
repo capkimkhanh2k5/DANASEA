@@ -1,8 +1,11 @@
-import { Anchor, Compass, History, ShieldCheck, Waves, Wind } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Anchor, Compass, FileCheck, FileText, History, ShieldCheck, Waves, Wind } from 'lucide-react';
 import type { ServiceStatus } from '../../../types';
 import { AdminBadge } from '../../../components/admin/AdminUI';
 import { AdminDisclosure } from '../../../components/admin/AdminWorkspace';
 import type { ServiceRecord, ServiceReviewEvent } from './serviceApprovalModel';
+import { adminServiceApprovalService } from '../../../services/adminServiceApprovalService';
+import type { SafetyDocumentResponse } from '../../../types/adminServiceApproval';
 
 function formatDateTime(value?: string) {
   if (!value) return 'Chưa có dữ liệu';
@@ -12,23 +15,23 @@ function formatDateTime(value?: string) {
     : parsed.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
 }
 
-export function ServiceStatusBadge({ status }: { status: ServiceStatus }) {
+export function ServiceStatusBadge({ status }: { status: ServiceStatus | string }) {
   const tone =
-    status === 'ACTIVE' || status === 'APPROVED'
+    status === 'ACTIVE' || status === 'APPROVED' || status === 'PUBLISHED'
       ? 'teal'
-      : status === 'PENDING_APPROVAL'
+      : status === 'PENDING_APPROVAL' || status === 'PENDING_REVIEW'
       ? 'amber'
       : status === 'REJECTED'
       ? 'rose'
       : 'neutral';
 
   const label =
-    status === 'ACTIVE'
+    status === 'ACTIVE' || status === 'PUBLISHED'
       ? 'Đang mở bán'
       : status === 'APPROVED'
       ? 'Đã duyệt'
-      : status === 'PENDING_APPROVAL'
-      ? 'Chờ thẩm định'
+      : status === 'PENDING_APPROVAL' || status === 'PENDING_REVIEW'
+      ? 'Chờ duyệt'
       : status === 'REJECTED'
       ? 'Bị từ chối'
       : status === 'PAUSED'
@@ -45,7 +48,7 @@ export function ServiceStatusBadge({ status }: { status: ServiceStatus }) {
 export function ServiceDetail({
   service,
   timeline,
-  demo: _demo,
+  demo,
   adminNote,
   onAdminNoteChange,
 }: {
@@ -56,6 +59,52 @@ export function ServiceDetail({
   onAdminNoteChange: (note: string) => void;
 }) {
   const price = service.price ?? service.basePrice ?? 0;
+  const [safetyDocs, setSafetyDocs] = useState<SafetyDocumentResponse[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [docActionId, setDocActionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (demo || !service?.id) return;
+    let isMounted = true;
+    setLoadingDocs(true);
+    adminServiceApprovalService.getSafetyDocuments(service.id)
+      .then(docs => {
+        if (isMounted) setSafetyDocs(docs);
+      })
+      .catch(() => {
+        if (isMounted) setSafetyDocs([]);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingDocs(false);
+      });
+    return () => { isMounted = false; };
+  }, [service?.id, demo]);
+
+  const handleApproveDoc = async (docId: string) => {
+    try {
+      setDocActionId(docId);
+      const updated = await adminServiceApprovalService.approveSafetyDocument(service.id, docId);
+      setSafetyDocs(prev => prev.map(d => d.id === docId ? updated : d));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDocActionId(null);
+    }
+  };
+
+  const handleRejectDoc = async (docId: string) => {
+    const reason = window.prompt('Nhập lý do từ chối chứng chỉ an toàn:') || '';
+    if (!reason.trim()) return;
+    try {
+      setDocActionId(docId);
+      const updated = await adminServiceApprovalService.rejectSafetyDocument(service.id, docId, reason.trim());
+      setSafetyDocs(prev => prev.map(d => d.id === docId ? updated : d));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDocActionId(null);
+    }
+  };
 
   return (
     <div className="admin-services-detail">
@@ -113,11 +162,11 @@ export function ServiceDetail({
           </h4>
           <span className="admin-services-safety-status">
             <span className="admin-services-status-dot" aria-hidden="true" />
-            Đạt điều kiện mở bán (dữ liệu mẫu)
+            Đạt điều kiện mở bán
           </span>
         </div>
         <p className="admin-detail-note">
-          Thông số sóng, gió và điều kiện biển do đơn vị vận hành khai báo trong hồ sơ mẫu; không thay thế kiểm định của cơ quan chức năng.
+          Thông số sóng, gió và điều kiện biển do đơn vị vận hành khai báo; chứng từ an toàn được kiểm tra thực tế theo quy chuẩn Cảng vụ.
         </p>
 
         <div className="admin-services-safety-grid">
@@ -147,6 +196,100 @@ export function ServiceDetail({
               ? 'Dịch vụ nhạy cảm thời tiết biển Đà Nẵng. Cần theo dõi diễn biến sóng gió trước mỗi ca khởi hành.'
               : 'Dịch vụ ven bờ theo điều kiện hoạt động khai báo.'}
           </span>
+        </div>
+
+        {/* Safety Documents attached */}
+        <div style={{ marginTop: '16px', borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <strong style={{ fontSize: '14px', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FileCheck size={16} /> Chứng chỉ an toàn biển ({safetyDocs.length})
+            </strong>
+          </div>
+          {loadingDocs ? (
+            <p className="admin-detail-note">Đang tải danh sách chứng chỉ an toàn...</p>
+          ) : safetyDocs.length === 0 ? (
+            <p className="admin-detail-note">
+              {demo ? 'Dịch vụ mẫu – chưa liên kết tệp chứng nhận an toàn thực tế.' : 'Chưa có chứng từ an toàn nào được tải lên.'}
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {safetyDocs.map((doc, idx) => (
+                <div
+                  key={doc.id || idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #e2e8f0',
+                    background: '#f8fafc',
+                    fontSize: '13px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FileText size={16} color="#0284c7" />
+                    <div>
+                      <a
+                        href={doc.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: '#0284c7', fontWeight: 600, textDecoration: 'underline' }}
+                      >
+                        Chứng từ an toàn #{idx + 1}
+                      </a>
+                      {doc.rejectionReason && (
+                        <div style={{ color: '#e11d48', fontSize: '12px' }}>
+                          Lý do từ chối: {doc.rejectionReason}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <AdminBadge tone={doc.status === 'APPROVED' ? 'teal' : doc.status === 'REJECTED' ? 'rose' : 'amber'}>
+                      {doc.status === 'APPROVED' ? 'Đã duyệt' : doc.status === 'REJECTED' ? 'Bị từ chối' : 'Chờ duyệt'}
+                    </AdminBadge>
+                    {doc.status === 'PENDING' && !demo && (
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          type="button"
+                          disabled={docActionId === doc.id}
+                          onClick={() => handleApproveDoc(doc.id)}
+                          style={{
+                            fontSize: '12px',
+                            padding: '4px 8px',
+                            background: '#0284c7',
+                            color: '#fff',
+                            borderRadius: '4px',
+                            border: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Duyệt
+                        </button>
+                        <button
+                          type="button"
+                          disabled={docActionId === doc.id}
+                          onClick={() => handleRejectDoc(doc.id)}
+                          style={{
+                            fontSize: '12px',
+                            padding: '4px 8px',
+                            background: '#fff',
+                            color: '#e11d48',
+                            borderRadius: '4px',
+                            border: '1px solid #e11d48',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Từ chối
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -246,7 +389,7 @@ export function ServiceDetail({
           />
         </label>
         <p className="admin-detail-note">
-          Ghi chú này được lưu trong phiên xem thử demo hiện tại.
+          {demo ? 'Ghi chú này được lưu trong phiên xem thử demo hiện tại.' : 'Ghi chú rà soát nội bộ phục vụ biên bản thẩm định.'}
         </p>
       </section>
 

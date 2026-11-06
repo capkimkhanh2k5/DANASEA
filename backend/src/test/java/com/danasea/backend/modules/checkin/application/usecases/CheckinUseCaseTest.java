@@ -97,7 +97,7 @@ class CheckinUseCaseTest {
         generateCheckinQrUseCase = new GenerateCheckinQrUseCase(
                 checkinTokenRepository, subOrderRepository, masterOrderRepository, slotRepository, qrTokenSigner);
         verifyCheckinUseCase = new VerifyCheckinUseCase(
-                checkinTokenRepository, subOrderRepository, vendorLookupPort, qrTokenSigner);
+                checkinTokenRepository, subOrderRepository, vendorLookupPort, qrTokenSigner, slotRepository, null, masterOrderRepository);
 
         customerId = UUID.randomUUID();
         staffId = UUID.randomUUID();
@@ -295,6 +295,40 @@ class CheckinUseCaseTest {
             assertThat(savedEntity.getQrTokenHash()).doesNotContain(".");
             assertThat(savedEntity.getQrTokenHash()).matches("^[0-9a-f]{64}$");
         }
+
+        @Test
+        @DisplayName("1.8. Success: Generate single master QR pass for an entire master order with multiple sub-orders")
+        void testGenerateQr_MasterOrder_Success() {
+            MasterOrderJpaEntity masterOrder = new MasterOrderJpaEntity();
+            masterOrder.setId(orderId);
+            masterOrder.setCustomerId(customerId);
+
+            SubOrderJpaEntity sub1 = new SubOrderJpaEntity();
+            sub1.setId(UUID.randomUUID());
+            sub1.setMasterOrderId(orderId);
+            sub1.setVendorId(vendorId);
+            sub1.setStatus(SubOrderStatus.CONFIRMED);
+
+            SubOrderJpaEntity sub2 = new SubOrderJpaEntity();
+            sub2.setId(UUID.randomUUID());
+            sub2.setMasterOrderId(orderId);
+            sub2.setVendorId(otherVendorId);
+            sub2.setStatus(SubOrderStatus.CONFIRMED);
+
+            when(subOrderRepository.findById(orderId)).thenReturn(Optional.empty());
+            when(masterOrderRepository.findById(orderId)).thenReturn(Optional.of(masterOrder));
+            when(subOrderRepository.findByMasterOrderId(orderId)).thenReturn(List.of(sub1, sub2));
+            when(checkinTokenRepository.findFirstBySubOrderIdAndUsedAtIsNullOrderByCreatedAtDesc(sub1.getId()))
+                    .thenReturn(Optional.empty());
+            when(checkinTokenRepository.save(any(CheckinTokenJpaEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            GenerateQrResponse response = generateCheckinQrUseCase.execute(orderId, customerId);
+
+            assertThat(response).isNotNull();
+            assertThat(response.subOrderId()).isEqualTo(orderId);
+            assertThat(response.qrToken()).contains(orderId.toString());
+            verify(checkinTokenRepository).save(any(CheckinTokenJpaEntity.class));
+        }
     }
 
     @Nested
@@ -325,7 +359,7 @@ class CheckinUseCaseTest {
 
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
             when(checkinTokenRepository.markAsUsedAtomic(eq(tokenId), any(), eq(staffId))).thenReturn(1);
 
             VerifyCheckinResponse response = verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId);
@@ -407,7 +441,7 @@ class CheckinUseCaseTest {
 
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
 
             assertThatThrownBy(() -> verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId))
                     .isInstanceOf(UnauthorizedVendorCheckinException.class);
@@ -467,7 +501,7 @@ class CheckinUseCaseTest {
 
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
 
             // Lần 1: Cập nhật nguyên tử thành công
             when(checkinTokenRepository.markAsUsedAtomic(eq(tokenId), any(), eq(staffId))).thenAnswer(inv -> {
@@ -530,8 +564,94 @@ class CheckinUseCaseTest {
             subOrder.setVendorId(vendorId);
 
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
             when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId))
+                    .isInstanceOf(UnauthorizedVendorCheckinException.class);
+        }
+
+        @Test
+        @DisplayName("2.11. Success: Master QR pass scanned by vendor automatically resolves and checks in that vendor's sub-order")
+        void testVerifyCheckin_MasterOrder_Success_MatchesVendorSubOrder() {
+            OffsetDateTime expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusHours(2);
+            String rawToken = qrTokenSigner.generateToken(orderId, expiresAt);
+            String tokenHash = QrTokenSigner.hashToken(rawToken);
+
+            CheckinTokenJpaEntity tokenEntity = new CheckinTokenJpaEntity();
+            tokenEntity.setId(tokenId);
+            tokenEntity.setSubOrderId(orderId);
+            tokenEntity.setQrTokenHash(tokenHash);
+            tokenEntity.setExpiresAt(expiresAt);
+            tokenEntity.setUsedAt(null);
+
+            MasterOrderJpaEntity masterOrder = new MasterOrderJpaEntity();
+            masterOrder.setId(orderId);
+
+            UUID vendorASubOrderId = UUID.randomUUID();
+            SubOrderJpaEntity subOrderA = new SubOrderJpaEntity();
+            subOrderA.setId(vendorASubOrderId);
+            subOrderA.setMasterOrderId(orderId);
+            subOrderA.setVendorId(vendorId);
+            subOrderA.setServiceId(UUID.randomUUID());
+            subOrderA.setSlotId(slotId);
+            subOrderA.setQuantity(2);
+            subOrderA.setStatus(SubOrderStatus.CONFIRMED);
+
+            UUID vendorBSubOrderId = UUID.randomUUID();
+            SubOrderJpaEntity subOrderB = new SubOrderJpaEntity();
+            subOrderB.setId(vendorBSubOrderId);
+            subOrderB.setMasterOrderId(orderId);
+            subOrderB.setVendorId(otherVendorId);
+            subOrderB.setServiceId(UUID.randomUUID());
+            subOrderB.setSlotId(slotId);
+            subOrderB.setQuantity(1);
+            subOrderB.setStatus(SubOrderStatus.CONFIRMED);
+
+            when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
+            when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
+            when(subOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.empty());
+            when(masterOrderRepository.findById(orderId)).thenReturn(Optional.of(masterOrder));
+            when(subOrderRepository.findByMasterOrderIdForUpdate(orderId)).thenReturn(List.of(subOrderA, subOrderB));
+
+            VerifyCheckinResponse response = verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId);
+
+            assertThat(response).isNotNull();
+            assertThat(response.subOrderId()).isEqualTo(vendorASubOrderId);
+            assertThat(response.status()).isEqualTo(SubOrderStatus.CHECKED_IN);
+            assertThat(subOrderA.getStatus()).isEqualTo(SubOrderStatus.CHECKED_IN);
+            verify(subOrderRepository).save(subOrderA);
+            verify(checkinTokenRepository, never()).markAsUsedAtomic(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("2.12. Rejection (403): Master QR pass scanned by vendor with no matching sub-orders throws UnauthorizedVendorCheckinException")
+        void testVerifyCheckin_MasterOrder_UnauthorizedVendor_ThrowsException() {
+            OffsetDateTime expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusHours(2);
+            String rawToken = qrTokenSigner.generateToken(orderId, expiresAt);
+            String tokenHash = QrTokenSigner.hashToken(rawToken);
+
+            CheckinTokenJpaEntity tokenEntity = new CheckinTokenJpaEntity();
+            tokenEntity.setId(tokenId);
+            tokenEntity.setSubOrderId(orderId);
+            tokenEntity.setQrTokenHash(tokenHash);
+            tokenEntity.setExpiresAt(expiresAt);
+            tokenEntity.setUsedAt(null);
+
+            MasterOrderJpaEntity masterOrder = new MasterOrderJpaEntity();
+            masterOrder.setId(orderId);
+
+            SubOrderJpaEntity subOrderOther = new SubOrderJpaEntity();
+            subOrderOther.setId(UUID.randomUUID());
+            subOrderOther.setMasterOrderId(orderId);
+            subOrderOther.setVendorId(otherVendorId);
+            subOrderOther.setStatus(SubOrderStatus.CONFIRMED);
+
+            when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
+            when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
+            when(subOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.empty());
+            when(masterOrderRepository.findById(orderId)).thenReturn(Optional.of(masterOrder));
+            when(subOrderRepository.findByMasterOrderIdForUpdate(orderId)).thenReturn(List.of(subOrderOther));
 
             assertThatThrownBy(() -> verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId))
                     .isInstanceOf(UnauthorizedVendorCheckinException.class);
@@ -564,7 +684,7 @@ class CheckinUseCaseTest {
 
             when(vendorLookupPort.findVendorIdByUserId(any())).thenReturn(Optional.of(vendorId));
             when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
-            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
 
             // Mô phỏng cập nhật nguyên tử tầng cơ sở dữ liệu
             AtomicBoolean claimed = new AtomicBoolean(false);

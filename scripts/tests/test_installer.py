@@ -51,13 +51,13 @@ public.write_text('ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAA
 environment = dict(os.environ, PATH=str(binary) + ':' + os.environ['PATH'],
     FAIL_ADOPTION='1' if scenario == 'adoption-failed' else '0')
 origin = 'http://example.invalid' if scenario == 'invalid-origin' else 'https://example.invalid'
-result = subprocess.run(['bash', '/source/install-production-controls.sh', user, str(app), origin,
+result = subprocess.run(['bash', '/source/ops/install-production-controls.sh', user, str(app), origin,
     str(public), '123', str(root / 'backups')], env=environment, capture_output=True, text=True)
 policy = pathlib.Path('/etc/danasea/backup.json')
 saved = app / '.releases' / ('a' * 40 + '.json')
 report = {'exit': result.returncode, 'old_wrapper_preserved': wrapper.read_text() == old,
     'old_helper_preserved': backup.read_text() == 'previous helper', 'adopted': saved.exists(),
-    'backup_keep': json.loads(policy.read_text())['keep'] if policy.exists() else None}
+    'backup_keep': json.loads(policy.read_text())['keep'] if policy.exists() else None, 'stderr': result.stderr}
 if scenario == 'success' and result.returncode == 0:
     status = subprocess.run(['runuser', '-u', 'nobody', '--', str(wrapper), 'status'],
         env=environment, capture_output=True, text=True)
@@ -87,7 +87,7 @@ class InstallerTest(unittest.TestCase):
 
     def test_successful_install_adopts_legacy_release_and_serves_restricted_status(self):
         result = self.install('success')
-        self.assertEqual(result['exit'], 0)
+        self.assertEqual(result['exit'], 0, result.get('stderr'))
         self.assertFalse(result['old_wrapper_preserved'])
         self.assertTrue(result['adopted'])
         self.assertEqual(result['backup_keep'], 7)

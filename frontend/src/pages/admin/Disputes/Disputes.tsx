@@ -14,6 +14,10 @@ import {
 } from 'lucide-react';
 import { MOCK_ADMIN_DISPUTES } from '../../../data/adminMockData';
 import { adminDisputeService, getAdminDisputeError } from '../../../services/adminDisputeService';
+import { adminOrderService } from '../../../services/adminOrderService';
+import { adminVendorService } from '../../../services/adminVendorService';
+import { serviceCatalogService } from '../../../services/serviceCatalogService';
+import { adminUserService } from '../../../services/adminUserService';
 import {
   AdminBadge,
   AdminState,
@@ -34,7 +38,29 @@ import {
   type DisputeExtended,
   type DisputeStatusFilter,
 } from './disputesModel';
+import type { OrderResponse, SubOrderResponse } from '../../../types/order';
+import type { AdminVendorResponse } from '../../../types/adminVendor';
+import type { AdminUserSummaryDto } from '../../../types/adminUser';
+import type { ServiceSummaryDto } from '../../../types/service';
 import './Disputes.css';
+
+function formatDateTime(isoStr?: string | null): string {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return isoStr;
+    return d.toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return isoStr;
+  }
+}
 
 export function Disputes() {
   const location = useLocation();
@@ -68,38 +94,88 @@ export function Disputes() {
     if (demo) return;
 
     let isMounted = true;
-    adminDisputeService.getDisputes({ page: 0, size: 50 })
-      .then(res => {
+    (async () => {
+      try {
+        const [disputesPage, servicesPage, vendorsPage, usersPage] = await Promise.all([
+          adminDisputeService.getDisputes({ page: 0, size: 50 }),
+          serviceCatalogService.getServices({ size: 100 }).catch(() => ({ content: [] })),
+          adminVendorService.getVendors({ size: 100 }).catch(() => ({ content: [] })),
+          adminUserService.getUsers({ size: 100 }).catch(() => ({ content: [] })),
+        ]);
+
         if (!isMounted) return;
-        const mapped: DisputeExtended[] = (res.content || []).map(d => ({
-          id: d.id,
-          subOrderId: d.subOrderId || '',
-          raisedBy: d.customerId,
-          category: 'SERVICE_QUALITY',
-          description: d.description || '',
-          status: (d.status === 'RESOLVED_REFUND' || d.status === 'RESOLVED_REJECTED' || d.status === 'RESOLVED_PARTIAL' ? 'RESOLVED' : d.status === 'UNDER_REVIEW' ? 'IN_PROGRESS' : 'OPEN') as unknown as DisputeExtended['status'],
-          resolutionNote: d.adminNote || '',
-          resolvedBy: d.resolvedBy || '',
-          resolvedAt: d.resolvedAt || '',
-          customerName: `Khách hàng ${d.customerId.substring(0, 8)}`,
-          customerPhone: '',
-          vendorName: 'Đơn vị đối tác',
-          serviceName: 'Dịch vụ biển',
-          orderAmount: 0,
-          evidenceImages: d.evidenceUrls || [],
-          createdAt: d.createdAt,
-          updatedAt: d.updatedAt,
-        }));
+
+        const rawDisputes = disputesPage.content || [];
+
+        // Fetch order details for disputes to get subOrder amounts, serviceId, vendorId
+        const orderMap = new Map<string, OrderResponse>();
+        const orderIds = Array.from(new Set(rawDisputes.map(d => d.orderId).filter(Boolean)));
+        await Promise.allSettled(
+          orderIds.map(async oid => {
+            try {
+              const ord = await adminOrderService.getOrder(oid);
+              orderMap.set(oid, ord);
+            } catch {
+              // ignore
+            }
+          })
+        );
+
+        if (!isMounted) return;
+
+        const services: ServiceSummaryDto[] = servicesPage.content || [];
+        const vendors: AdminVendorResponse[] = vendorsPage.content || [];
+        const users: AdminUserSummaryDto[] = usersPage.content || [];
+
+        const mapped: DisputeExtended[] = rawDisputes.map(d => {
+          const ord = orderMap.get(d.orderId);
+          const subOrd = ord?.subOrders?.find((s: SubOrderResponse) => s.id === d.subOrderId || s.subOrderId === d.subOrderId);
+
+          const matchedService = services.find(s => s.id === subOrd?.serviceId);
+          const matchedVendor = vendors.find(v => v.id === subOrd?.vendorId);
+          const matchedUser = users.find(u => u.id === d.customerId);
+
+          const customerName = matchedUser?.fullName || `Khách hàng ${d.customerId.substring(0, 8)}`;
+          const customerPhone = matchedUser?.phone || '';
+          const vendorName = matchedVendor?.businessName || 'Đơn vị đối tác';
+          const serviceName = matchedService?.name || 'Dịch vụ trải nghiệm biển';
+          const orderAmount = subOrd?.finalAmount ?? subOrd?.subtotalAmount ?? (subOrd?.unitPrice && subOrd?.quantity ? subOrd.unitPrice * subOrd.quantity : 0);
+
+          return {
+            id: d.id,
+            orderId: d.orderId,
+            subOrderId: d.subOrderId || '',
+            raisedBy: d.customerId,
+            category: 'SERVICE_QUALITY',
+            description: d.description || '',
+            status: (d.status === 'RESOLVED_REFUND' || d.status === 'RESOLVED_REJECTED' || d.status === 'RESOLVED_PARTIAL' ? 'RESOLVED' : d.status === 'UNDER_REVIEW' ? 'IN_PROGRESS' : 'OPEN') as unknown as DisputeExtended['status'],
+            resolutionNote: d.adminNote || '',
+            resolvedBy: d.resolvedBy || '',
+            resolvedAt: d.resolvedAt || '',
+            customerName,
+            customerPhone,
+            vendorName,
+            serviceName,
+            orderAmount,
+            evidenceImages: d.evidenceUrls || [],
+            createdAt: d.createdAt,
+            updatedAt: d.updatedAt,
+            vendorResponse: d.vendorResponse || null,
+            vendorRespondedAt: d.vendorRespondedAt || null,
+            vendorEvidenceUrls: d.vendorEvidenceUrls || [],
+          };
+        });
+
         setDisputes(mapped);
         if (mapped.length > 0) setSelectedDisputeId(mapped[0].id);
         setLoading(false);
-      })
-      .catch(err => {
+      } catch (err) {
         if (!isMounted) return;
         const msg = getAdminDisputeError(err, 'Không thể tải danh sách khiếu nại.');
         setErrorMessage(msg);
         setLoading(false);
-      });
+      }
+    })();
 
     return () => {
       isMounted = false;
@@ -220,7 +296,7 @@ export function Disputes() {
         <div className="admin-disputes__summary-item">
           <span className="admin-disputes__summary-badge admin-disputes__summary-badge--pending">
             <Clock size={14} />
-            Đang thụ lý / Chờ xử lý: {metrics.pendingActionCount}
+            Đang xử lý: {metrics.pendingActionCount}
           </span>
           <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)' }}>
             ({metrics.totalDisputedAmount.toLocaleString('vi-VN')} đ giá trị liên quan)
@@ -348,7 +424,7 @@ export function Disputes() {
                             : 'amber'
                         }
                       >
-                        {d.status === 'RESOLVED' ? 'ĐÃ XONG' : d.status === 'IN_PROGRESS' ? 'ĐANG THỤ LÝ' : 'CHỜ DUYỆT'}
+                        {d.status === 'RESOLVED' ? 'ĐÃ XONG' : d.status === 'IN_PROGRESS' ? 'ĐANG XỬ LÝ' : 'CHỜ DUYỆT'}
                       </AdminBadge>
                     </div>
 
@@ -410,7 +486,7 @@ export function Disputes() {
                     : 'amber'
                 }
               >
-                {selectedDispute.status === 'RESOLVED' ? 'ĐÃ XONG' : selectedDispute.status === 'IN_PROGRESS' ? 'ĐANG THỤ LÝ' : 'CHỜ DUYỆT'}
+                {selectedDispute.status === 'RESOLVED' ? 'ĐÃ XONG' : selectedDispute.status === 'IN_PROGRESS' ? 'ĐANG XỬ LÝ' : 'CHỜ DUYỆT'}
               </AdminBadge>
             </div>
 
@@ -469,6 +545,84 @@ export function Disputes() {
                 </div>
               </div>
             )}
+
+            {/* Vendor Defense / Explanation Section */}
+            <div className="admin-disputes__section">
+              <span className="admin-disputes__section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <ShieldAlert size={14} />
+                  Văn bản giải trình từ Đối tác / Nhà cung cấp
+                </span>
+                {selectedDispute.vendorRespondedAt && (
+                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--admin-muted, #64748b)' }}>
+                    Gửi lúc: {formatDateTime(selectedDispute.vendorRespondedAt)}
+                  </span>
+                )}
+              </span>
+
+              {selectedDispute.vendorResponse ? (
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: '#F8FAFC',
+                    border: '1px solid #E2E8F0',
+                    borderLeft: '4px solid #0284C7',
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    color: '#1E293B',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontWeight: 600, color: '#0369A1', fontSize: 12 }}>
+                    <CheckCircle2 size={14} />
+                    <span>Ý kiến phản hồi từ đối tác ({selectedDispute.vendorName}):</span>
+                  </div>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {selectedDispute.vendorResponse}
+                  </div>
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: '#FFFBEB',
+                    border: '1px solid #FEF3C7',
+                    borderLeft: '4px solid #F59E0B',
+                    fontSize: 13,
+                    color: '#92400E',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <Clock size={16} style={{ flexShrink: 0 }} />
+                  <span>Đối tác chưa gửi văn bản giải trình. Hệ thống đang chờ phản hồi từ nhà cung cấp trong thời hạn quy định (24h).</span>
+                </div>
+              )}
+
+              {/* Vendor Attached Evidence */}
+              {selectedDispute.vendorEvidenceUrls && selectedDispute.vendorEvidenceUrls.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                    <ImageIcon size={13} />
+                    Bằng chứng đối soát từ đối tác ({selectedDispute.vendorEvidenceUrls.length} tệp)
+                  </span>
+                  <div className="admin-disputes__gallery">
+                    {selectedDispute.vendorEvidenceUrls.map((img, idx) => (
+                      <img
+                        key={idx}
+                        src={img}
+                        alt="Bằng chứng từ đối tác"
+                        className="admin-disputes__evidence-thumb"
+                        onClick={() => setPreviewImage(img)}
+                        title="Bấm để xem ảnh phóng to"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Field Review Log (Neutral phrasing) */}
             <div className="admin-disputes__review-card">

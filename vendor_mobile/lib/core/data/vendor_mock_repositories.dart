@@ -571,6 +571,8 @@ class VendorSlotRepository implements IVendorSlotRepository {
       status = SlotStatus.blocked;
     } else if (stStr == 'CLOSED') {
       status = SlotStatus.closed;
+    } else if (stStr == 'CANCELLED') {
+      status = SlotStatus.cancelled;
     }
 
     final date = json['date'] != null

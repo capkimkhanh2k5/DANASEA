@@ -76,7 +76,7 @@ public interface JpaServiceSlotRepository extends JpaRepository<ServiceSlotJpaEn
             LocalDate date);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE ServiceSlotJpaEntity s SET s.bookedCount = s.bookedCount + :quantity WHERE s.id = :slotId AND (s.capacity - s.bookedCount) >= :quantity")
+    @Query("UPDATE ServiceSlotJpaEntity s SET s.bookedCount = s.bookedCount + :quantity WHERE s.id = :slotId AND s.status <> com.danasea.backend.modules.service.domain.models.SlotStatus.CANCELLED AND (s.capacity - s.bookedCount) >= :quantity")
     int incrementBookedCount(@Param("slotId") UUID slotId, @Param("quantity") int quantity);
 
     List<ServiceSlotJpaEntity> findByDateBetween(LocalDate start, LocalDate end);
@@ -86,7 +86,24 @@ public interface JpaServiceSlotRepository extends JpaRepository<ServiceSlotJpaEn
     int decrementBookedCount(@Param("slotId") UUID slotId, @Param("quantity") int quantity);
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query("UPDATE ServiceSlotJpaEntity s SET s.status = com.danasea.backend.modules.service.domain.models.SlotStatus.CLOSED WHERE s.id = :slotId")
+    @Query("UPDATE ServiceSlotJpaEntity s SET s.status = com.danasea.backend.modules.service.domain.models.SlotStatus.CLOSED WHERE s.id = :slotId AND s.status <> com.danasea.backend.modules.service.domain.models.SlotStatus.CANCELLED")
     int closeForWeather(@Param("slotId") UUID slotId);
 
+    @Query(value = """
+            SELECT EXISTS (
+                SELECT 1 FROM booking_item_allocations a
+                JOIN service_slot_units u ON u.slot_id=a.slot_id AND u.unit_number=a.unit_number
+                WHERE a.booking_item_id=:bookingItemId AND u.equipment_blocked
+            )
+            """, nativeQuery = true)
+    boolean hasBlockedEquipmentForBookingItem(@Param("bookingItemId") UUID bookingItemId);
+    @Query(value = """
+            SELECT reason, requested_by AS "requestedBy" FROM vendor_departure_cancellations WHERE slot_id = :slotId
+            """, nativeQuery = true)
+    Optional<VendorCancellationDetails> findVendorCancellation(@Param("slotId") UUID slotId);
+
+    interface VendorCancellationDetails {
+        String getReason();
+        UUID getRequestedBy();
+    }
 }

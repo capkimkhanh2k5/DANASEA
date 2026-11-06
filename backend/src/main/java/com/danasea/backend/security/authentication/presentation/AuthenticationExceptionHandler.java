@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.danasea.backend.security.authentication.domain.exceptions.EmailAlreadyUsedException;
+import com.danasea.backend.security.authentication.domain.exceptions.EmailNotVerifiedException;
+import com.danasea.backend.security.authentication.presentation.dtos.EmailNotVerifiedResponse;
 import com.danasea.backend.security.authentication.domain.exceptions.OtpExpiredException;
 import com.danasea.backend.security.authentication.domain.exceptions.OtpInvalidException;
 import com.danasea.backend.security.authentication.domain.exceptions.OtpMaxAttemptsExceededException;
@@ -32,6 +34,18 @@ public class AuthenticationExceptionHandler {
                                 .body(new ErrorResponse(
                                                 "EMAIL_ALREADY_USED",
                                                 messages.get("error.email_already_used")));
+        }
+
+        @ExceptionHandler(EmailNotVerifiedException.class)
+        public ResponseEntity<EmailNotVerifiedResponse> handleEmailNotVerified(
+                        EmailNotVerifiedException exception) {
+                return ResponseEntity
+                                .status(HttpStatus.FORBIDDEN)
+                                .body(new EmailNotVerifiedResponse(
+                                                "EMAIL_NOT_VERIFIED",
+                                                messages.get("error.email_not_verified"),
+                                                exception.getEmail(),
+                                                exception.getAccessToken()));
         }
 
         @ExceptionHandler({OtpInvalidException.class, OtpExpiredException.class, OtpMaxAttemptsExceededException.class})

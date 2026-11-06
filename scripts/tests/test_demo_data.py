@@ -5,10 +5,11 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 def load():
-    path = Path(__file__).resolve().parents[1] / 'demo_data.py'
+    path = Path(__file__).resolve().parents[1] / 'demo' / 'demo_data.py'
     spec = importlib.util.spec_from_file_location('demo_data', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -179,7 +180,9 @@ class LifecycleTest(unittest.TestCase):
 
 class RuntimeGuardsTest(unittest.TestCase):
     def setUp(self):
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        scripts = Path(__file__).resolve().parents[1]
+        self.addCleanup(setattr, sys, 'path', sys.path.copy())
+        sys.path[:0] = [str(scripts / 'demo'), str(scripts / 'ops')]
         import demo_runtime
         self.module = demo_runtime
 
@@ -258,6 +261,28 @@ class RuntimeGuardsTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, '[Dd]atabase writer'):
                 runtime.gate(journal)
         self.assertFalse(any('ALTER ' in query for query in queries))
+
+    def test_database_gate_waits_for_remaining_sessions_and_still_fails_closed(self):
+        runtime = self.module.Runtime({'app_dir': '/tmp'}, Path('/tmp'))
+        runtime.runtime_role = 'danasea_app'
+        runtime.database = 'danasea'
+        for drained in (True, False):
+            with self.subTest(drained=drained):
+                journal = {'database_gate': {'limit': -1, 'login': True}}
+                responses = ['0', '', 't', '1'] + (['0'] if drained else [])
+                timestamps = [0, 1] if drained else [0, 5]
+                with (
+                    patch.object(runtime, 'sql', side_effect=responses),
+                    patch.object(self.module.time, 'monotonic', side_effect=timestamps),
+                    patch.object(self.module.time, 'sleep') as sleep,
+                ):
+                    if drained:
+                        runtime.gate(journal)
+                        sleep.assert_called_once_with(0.25)
+                    else:
+                        with self.assertRaisesRegex(ValueError, 'Database writer remains active'):
+                            runtime.gate(journal)
+                        sleep.assert_not_called()
 
     def test_manifest_rejects_paths_outside_package_and_modified_payload(self):
         import hashlib
