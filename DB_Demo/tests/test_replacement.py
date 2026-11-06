@@ -16,7 +16,8 @@ class ReplacementContract(unittest.TestCase):
     def test_reviewed_v49_operating_rows_are_replaceable(self):
         reviewed = json.loads((ROOT / 'expected_database_schema.json').read_text())
         for table in ('service_operating_schedules', 'vendor_equipment', 'equipment_maintenance',
-                      'vendor_departure_cancellations', 'vendor_fault_compensation_recoveries'):
+                      'vendor_departure_cancellations', 'vendor_fault_compensation_recoveries',
+                      'transactional_email_delivery'):
             self.assertEqual('replace', reviewed['classification'][table])
 
         references = MODULE.protected_references(reviewed)
