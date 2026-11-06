@@ -8,7 +8,6 @@ import {
   Clock,
   MapPin,
   ShieldCheck,
-  ChevronRight,
   ArrowRight,
   BadgeCheck,
 } from "lucide-react";
@@ -29,18 +28,6 @@ export function Cart() {
         {/* Sub-Header Progress Stepper Bar - Airbnb Clean Architecture */}
         <section className="w-full bg-slate-50 border-b border-slate-200/80">
           <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            {/* Breadcrumb Navigation */}
-            <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
-              <span 
-                className="hover:text-slate-900 cursor-pointer transition-colors" 
-                onClick={() => navigate('/')}
-              >
-                DANASEA
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-slate-900 font-semibold">Giỏ hàng trải nghiệm</span>
-            </div>
-
             {/* Stepper Component - Architectural Geometry */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
               {/* Step 1: Active in Cart */}
