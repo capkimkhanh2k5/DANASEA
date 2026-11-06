@@ -399,19 +399,10 @@ export function Search() {
       {/* =========================================================================
           TOP UNIFIED SEARCH & CONTROL STRIP (Header Query Bar with Maritime Ocean Backdrop)
          ========================================================================= */}
-      <section className="relative bg-gradient-to-r from-[#031d44] via-[#022b68] to-[#013571] text-white py-6 sm:py-7 px-4 sm:px-6 lg:px-8 shadow-md overflow-hidden">
-        {/* Subtle decorative maritime wave glow contours in background */}
-        <div className="absolute inset-0 pointer-events-none opacity-25">
-          <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-sky-400/20 blur-3xl" />
-          <div className="absolute -bottom-24 -right-24 w-96 h-96 rounded-full bg-cyan-400/20 blur-3xl" />
-          <svg className="absolute inset-0 w-full h-full object-cover opacity-15" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
-            <path fill="#ffffff" fillOpacity="0.4" d="M0,192L48,197.3C96,203,192,213,288,192C384,171,480,117,576,122.7C672,128,768,192,864,202.7C960,213,1056,171,1152,144C1248,117,1344,107,1392,101.3L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z" />
-          </svg>
-        </div>
-
-        <div className="max-w-[1440px] mx-auto relative z-10 animate-fadeInUp">
-          {/* Quick Query Bar (Solid White Floating Deck) */}
-          <div className="bg-white rounded-2xl border border-white/20 p-2 sm:p-2.5 flex flex-col md:flex-row items-center gap-2 text-slate-800 shadow-xl">
+      <section className="bg-white border-b border-slate-200/80 py-4 sm:py-5 px-4 sm:px-6 lg:px-8 shadow-xs">
+        <div className="max-w-[1440px] mx-auto animate-fadeInUp">
+          {/* Quick Query Bar (Solid White Card with Hairline Border) */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 flex flex-col md:flex-row items-center gap-2 text-slate-800 shadow-sm">
 
             {/* Field 1: Destination / Keyword */}
             <div className="flex-1 min-w-0 w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-500 border border-transparent focus-within:border-sky-500 transition-all">

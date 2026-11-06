@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Compass, Minus, Send, RotateCcw } from 'lucide-react';
+import { Bot, Minus, Send, RotateCcw } from 'lucide-react';
 import { useAiModalStore } from '../../store/useAiModalStore';
 
 const QUICK_SUGGESTIONS = [
@@ -57,11 +57,11 @@ export const AiChatPopup: React.FC = () => {
       {/* Top Header - Synced with Footer Brand Navy (#031d44) */}
       <div className="p-3.5 bg-[#031d44] text-white flex items-center justify-between border-b border-sky-950 shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-            <Compass className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-900 shadow-xs shrink-0">
+            <Bot className="w-4 h-4 text-slate-900" />
           </div>
           <div>
-            <span className="font-semibold text-xs tracking-tight text-white block">Tư vấn dịch vụ & Hải văn</span>
+            <span className="font-semibold text-xs tracking-tight text-white block">Trợ lý AI Danasea</span>
           </div>
         </div>
 
