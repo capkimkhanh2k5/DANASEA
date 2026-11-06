@@ -3,6 +3,8 @@ import { useCartStore } from "../../../store/useCartStore";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { bookingService } from "../../../services/bookingService";
 import { orderService } from "../../../services/orderService";
+import { customerDiscountService } from "../../../services/customerDiscountService";
+import type { DiscountCodeResponse } from "../../../types/adminDiscountCode";
 import { paymentService } from "../../../services/paymentService";
 import type { BookingHoldResponse } from "../../../types/booking";
 import type { DiscountPreviewResponse, PaymentProviderType } from "../../../types/order";
@@ -52,6 +54,8 @@ export function Checkout() {
   const [promoError, setPromoError] = useState<string>("");
   const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [isApplyingPromo, setIsApplyingPromo] = useState<boolean>(false);
+  const [availableVouchers, setAvailableVouchers] = useState<DiscountCodeResponse[]>([]);
+  const [isLoadingVouchers, setIsLoadingVouchers] = useState<boolean>(false);
 
   // Payment processing state
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
@@ -136,6 +140,35 @@ export function Checkout() {
   };
 
   // Promo Code Handler
+  // Load real available vouchers for customer
+  useEffect(() => {
+    if (!isVoucherModalOpen) return;
+    let isMounted = true;
+    setIsLoadingVouchers(true);
+    customerDiscountService
+      .getMyDiscountCodes({ size: 50 })
+      .then((res) => {
+        if (isMounted) {
+          setAvailableVouchers(res.content || []);
+        }
+      })
+      .catch((err) => {
+        console.warn('[Checkout] Lỗi tải danh sách voucher thực tế:', err);
+        if (isMounted) {
+          setAvailableVouchers([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingVouchers(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isVoucherModalOpen]);
+
   const handleApplyPromo = async () => {
     setPromoError("");
     const code = promoInput.trim().toUpperCase();
@@ -153,44 +186,19 @@ export function Checkout() {
         if (preview.valid) {
           setDiscountPreview(preview);
           setAppliedPromoCode(code);
-          setIsApplyingPromo(false);
-          return;
         } else {
           setPromoError(preview.message || "Mã khuyến mãi không hợp lệ hoặc không áp dụng cho đơn này.");
-          setIsApplyingPromo(false);
-          return;
         }
-      } catch (err) {
-        console.warn('[Checkout] Lỗi xác thực voucher từ server, kiểm tra mã dự phòng:', err);
+      } catch (err: unknown) {
+        console.warn('[Checkout] Lỗi áp dụng voucher từ hệ thống:', err);
+        setPromoError("Mã khuyến mãi không tồn tại hoặc đã hết hạn.");
+      } finally {
+        setIsApplyingPromo(false);
       }
-    }
-
-    // Client-side fallback voucher codes
-    if (code === "DANASEA10" || code === "HE2024") {
-      const discount = Math.round(getTotalPrice() * 0.1);
-      setDiscountPreview({
-        valid: true,
-        code,
-        originalTotalAmount: getTotalPrice(),
-        totalDiscountAmount: discount,
-        finalPayableAmount: Math.max(0, getTotalPrice() - discount),
-      });
-      setAppliedPromoCode(code);
-    } else if (code === "BIENXANH") {
-      const discount = 50000;
-      setDiscountPreview({
-        valid: true,
-        code,
-        originalTotalAmount: getTotalPrice(),
-        totalDiscountAmount: discount,
-        finalPayableAmount: Math.max(0, getTotalPrice() - discount),
-      });
-      setAppliedPromoCode(code);
     } else {
-      setPromoError("Mã khuyến mãi không hợp lệ hoặc đã hết lượt dùng.");
+      setPromoError("Chưa có phiên giữ chỗ hợp lệ để áp dụng mã.");
+      setIsApplyingPromo(false);
     }
-
-    setIsApplyingPromo(false);
   };
 
   const handleRemovePromo = () => {
@@ -684,7 +692,7 @@ export function Checkout() {
                           type="text"
                           value={promoInput}
                           onChange={(e) => setPromoInput(e.target.value)}
-                          placeholder="DANASEA10 hoặc HE2024"
+                          placeholder="Nhập mã ưu đãi..."
                           className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 uppercase focus:outline-none focus:border-slate-400 bg-slate-50"
                         />
                         <button
@@ -788,54 +796,60 @@ export function Checkout() {
             </div>
 
             <div className="py-4 space-y-3 max-h-[60vh] overflow-y-auto">
-              {[
-                {
-                  code: 'DANASEA10',
-                  title: 'Giảm 10% Cho Toàn Bộ Đơn Tour Biển',
-                  desc: 'Áp dụng cho mọi hoạt động lặn ngắm san hô, cano cao tốc và chèo SUP tại vịnh Đà Nẵng.',
-                  discount: 'Giảm 10%',
-                },
-                {
-                  code: 'HE2024',
-                  title: 'Ưu Đãi Hè Sôi Động',
-                  desc: 'Giảm 10% tổng đơn đặt chỗ trực tuyến qua cổng thanh toán VNPay và thẻ ngân hàng.',
-                  discount: 'Giảm 10%',
-                },
-                {
-                  code: 'BIENXANH',
-                  title: 'Khám Phá Biển Xanh',
-                  desc: 'Giảm trực tiếp 50.000 đ cho mỗi vé trải nghiệm biển có giá từ 200.000 đ.',
-                  discount: 'Giảm 50.000 đ',
-                },
-              ].map((voucher) => (
-                <div
-                  key={voucher.code}
-                  className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-sky-50/50 hover:border-sky-300 transition-all flex items-center justify-between gap-3"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 font-mono font-bold text-xs">
-                        {voucher.code}
-                      </span>
-                      <span className="text-xs font-bold text-[#991b1b]">
-                        {voucher.discount}
-                      </span>
-                    </div>
-                    <h4 className="text-xs font-bold text-slate-900 truncate">{voucher.title}</h4>
-                    <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{voucher.desc}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPromoInput(voucher.code);
-                      setIsVoucherModalOpen(false);
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors shadow-xs"
-                  >
-                    Áp dụng
-                  </button>
+              {isLoadingVouchers ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  Đang kiểm tra mã ưu đãi khả dụng...
                 </div>
-              ))}
+              ) : availableVouchers.length > 0 ? (
+                availableVouchers.map((voucher) => (
+                  <div
+                    key={voucher.id}
+                    className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100 transition-all flex items-center justify-between gap-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-800 font-mono font-bold text-xs">
+                          {voucher.code}
+                        </span>
+                        <span className="text-xs font-bold text-[#991b1b]">
+                          {voucher.discountType === 'PERCENTAGE'
+                            ? `Giảm ${voucher.discountValue}%`
+                            : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}₫`}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                        {voucher.minOrderAmount
+                          ? `Đơn tối thiểu ${voucher.minOrderAmount.toLocaleString('vi-VN')}₫`
+                          : 'Áp dụng cho đơn dịch vụ biển'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromoInput(voucher.code);
+                        setIsVoucherModalOpen(false);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors shadow-xs"
+                    >
+                      Áp dụng
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center flex flex-col items-center justify-center space-y-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                    <Tag className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-slate-800">
+                      Chưa có mã ưu đãi cá nhân
+                    </p>
+                    <p className="text-[11px] text-slate-500 max-w-xs leading-relaxed">
+                      Bạn hiện chưa có mã giảm giá cá nhân hoặc voucher đền bù nào khả dụng. Nếu có mã từ chương trình ưu đãi, bạn có thể nhập trực tiếp tại ô bên ngoài.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex justify-end">
