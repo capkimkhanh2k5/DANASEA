@@ -173,7 +173,7 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
 
           <div className="min-w-0 flex-1">
             <span className="font-semibold text-xs sm:text-sm tracking-tight text-white block truncate">
-              {activeConversation ? activeConversation.name : 'Tin nhắn điều hành biển'}
+              {activeConversation ? activeConversation.name : 'Tin nhắn'}
             </span>
           </div>
         </div>
