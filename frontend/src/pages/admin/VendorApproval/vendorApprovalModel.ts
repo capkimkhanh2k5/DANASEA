@@ -1,7 +1,10 @@
 import type { MOCK_ADMIN_VENDORS } from '../../../data/adminMockData';
 import type { BadgeTier, VerificationStatus } from '../../../types';
+import type { VendorDocumentResponse } from '../../../types/adminVendor';
 
-export type VendorRecord = typeof MOCK_ADMIN_VENDORS[number];
+export type VendorRecord = typeof MOCK_ADMIN_VENDORS[number] & {
+  documents?: VendorDocumentResponse[];
+};
 export type VendorDecision = {
   vendorId: string;
   kind: 'approve' | 'reject';

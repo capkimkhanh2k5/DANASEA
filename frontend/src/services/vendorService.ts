@@ -94,6 +94,11 @@ export const vendorService = {
   },
 
   // 4. SAFETY DOCUMENTS (V06 Tab 4)
+  async getSafetyDocuments(serviceId: string): Promise<SafetyDocumentDto[]> {
+    const res = await apiClient.get<SafetyDocumentDto[]>(`/vendor/services/${serviceId}/safety-documents`);
+    return res.data || [];
+  },
+
   async uploadSafetyDocument(serviceId: string, file: File): Promise<SafetyDocumentDto> {
     const formData = new FormData();
     formData.append('file', file);

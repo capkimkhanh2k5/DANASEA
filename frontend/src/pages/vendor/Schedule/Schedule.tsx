@@ -11,12 +11,27 @@ import type {
   SlotStatus,
   CreateSlotUnitRequest,
 } from "../../../types/vendorService";
+import {
+  Clock,
+  Plus,
+  RotateCcw,
+  X,
+  Lock,
+  Unlock,
+  Edit2,
+  CalendarDays,
+  AlertCircle
+} from "lucide-react";
+import {
+  AtlasPageHeader,
+  AtlasBadge,
+  AtlasButton
+} from "../../../components/vendor/atlas/AtlasDesignSystem";
 
 export function Schedule() {
   const [searchParams] = useSearchParams();
   const queryServiceId = searchParams.get("serviceId");
 
-  
   const showToast = (msg: string) => {
     toast.success(msg);
   };
@@ -46,6 +61,7 @@ export function Schedule() {
     { unitNumber: 1, capacity: 5 },
     { unitNumber: 2, capacity: 5 },
   ]);
+  const [repeatDays, setRepeatDays] = useState<number>(1);
   const [isSubmittingSlot, setIsSubmittingSlot] = useState(false);
 
   // Modal State: Edit Slot
@@ -152,54 +168,97 @@ export function Schedule() {
     }
 
     setIsUpdatingSlot(true);
+    setCapacityError(null);
     try {
       const updated = await vendorService.updateSlot(selectedServiceId, editingSlot.id, {
+        capacity: inputCapacity,
         status: inputStatus,
-        capacity: editingSlot.inventoryType === "PERSON_LIMIT" ? inputCapacity : undefined,
       });
-      setSlots((prev) => prev.map((s) => (s.id === editingSlot.id ? updated : s)));
-      showToast(`Đã cập nhật cấu hình ca thành công!`);
+      setSlots((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+      showToast("Cập nhật ca khởi hành thành công!");
       setEditingSlot(null);
     } catch (err: unknown) {
       console.error("[Schedule] Lỗi sửa ca:", err);
-      const msg = err instanceof Error ? err.message : "Cập nhật ca thất bại";
+      const msg = extractErrorMessage(err, "Cập nhật ca thất bại");
       setCapacityError(msg);
+      toast.error(msg);
     } finally {
       setIsUpdatingSlot(false);
     }
   };
 
-  // Create Slot
+  // Create New Slot
   const handleCreateSlot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedServiceId) {
-      toast.warning("Vui lòng chọn dịch vụ trước khi tạo ca.");
+      toast.warning("Vui lòng chọn một dịch vụ trước khi tạo ca.");
       return;
     }
 
-    if (newEndTime <= newStartTime) {
-      toast.warning("Giờ kết thúc ca biển phải sau giờ bắt đầu!");
+    if (newStartTime >= newEndTime) {
+      toast.warning("Giờ bắt đầu phải trước giờ kết thúc.");
       return;
     }
-
-    // Format start/end time HH:mm:ss if needed
-    const formatTime = (t: string) => (t.length === 5 ? `${t}:00` : t);
 
     setIsSubmittingSlot(true);
     try {
-      const payload = {
-        date: newDate,
-        startTime: formatTime(newStartTime),
-        endTime: formatTime(newEndTime),
+      const payloadBase = {
+        startTime: `${newStartTime}:00`,
+        endTime: `${newEndTime}:00`,
         inventoryType: newInventoryType,
-        capacity: newInventoryType === "PERSON_LIMIT" ? newCapacity : undefined,
+        capacity: newInventoryType === "PERSON_LIMIT"
+          ? newCapacity
+          : newUnits.reduce((acc, u) => acc + (u.capacity || 0), 0),
         units: newInventoryType === "SHARED_CAPACITY_UNITS" ? newUnits : undefined,
       };
 
-      const created = await vendorService.createSlot(selectedServiceId, payload);
-      setSlots((prev) => [...prev, created]);
-      showToast(`Đã tạo ca khởi hành mới (${newStartTime} - ${newEndTime}) thành công!`);
-      setIsCreateModalOpen(false);
+      const datesToCreate: string[] = [];
+      const base = new Date(newDate);
+      for (let i = 0; i < repeatDays; i++) {
+        const d = new Date(base);
+        d.setDate(base.getDate() + i);
+        datesToCreate.push(d.toISOString().split("T")[0]);
+      }
+
+      const createdSlots: VendorServiceSlotDto[] = [];
+      let successCount = 0;
+      let errorOccurred: unknown = null;
+
+      for (const dStr of datesToCreate) {
+        try {
+          const res = await vendorService.createSlot(selectedServiceId, {
+            ...payloadBase,
+            date: dStr,
+          });
+          createdSlots.push(res);
+          successCount++;
+        } catch (err) {
+          console.warn(`[Schedule] Bỏ qua ngày ${dStr} do trùng ca hoặc lỗi:`, err);
+          errorOccurred = err;
+        }
+      }
+
+      if (createdSlots.length > 0) {
+        setSlots((prev) => [...prev, ...createdSlots]);
+      }
+
+      if (repeatDays > 1) {
+        if (successCount > 0) {
+          showToast(`Đã tạo thành công ${successCount}/${datesToCreate.length} ca khởi hành liên tiếp!`);
+          setIsCreateModalOpen(false);
+        } else {
+          const msg = extractErrorMessage(errorOccurred, 'Không thể tạo chuỗi ca khởi hành');
+          toast.error(msg);
+        }
+      } else {
+        if (successCount > 0) {
+          showToast(`Đã tạo ca khởi hành mới (${newStartTime} - ${newEndTime}) thành công!`);
+          setIsCreateModalOpen(false);
+        } else {
+          const msg = extractErrorMessage(errorOccurred, 'Không thể tạo ca khởi hành');
+          toast.error(msg);
+        }
+      }
     } catch (err: unknown) {
       console.error('[Schedule] Lỗi tạo ca:', err);
       const msg = extractErrorMessage(err, 'Không thể tạo ca khởi hành');
@@ -218,485 +277,508 @@ export function Schedule() {
   const selectedServiceObj = services.find((s) => s.id === selectedServiceId);
 
   return (
-    <div className="w-full bg-background flex-1">
-      <div className="flex flex-col w-full px-6 py-4 space-y-4">
-        {/* Header Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-300">
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-black tracking-tight">
-              Lịch Dịch vụ &amp; Sức chứa
-            </h1>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Cấu hình các ca vận hành biển, quản lý tồn chỗ, đóng/mở ca và bảo vệ chỗ đã cam kết với du khách
-            </p>
-          </div>
+    <div className="w-full max-w-[1400px] mx-auto px-6 py-5 space-y-5">
+      {/* 1. Header Toolbar (Atlas Page Header) */}
+      <AtlasPageHeader
+        title="Lịch Khởi hành & Điều phối Ca"
+        actions={
+          <AtlasButton
+            variant="primary"
+            size="md"
+            onClick={() => setIsCreateModalOpen(true)}
+            disabled={!selectedServiceId}
+            icon={<Plus className="w-4 h-4" />}
+          >
+            Tạo ca khởi hành
+          </AtlasButton>
+        }
+      />
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              disabled={!selectedServiceId}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary/90 transition-colors shadow-xs disabled:opacity-50"
-              type="button"
+      {/* 2. Filter & Service Selection Panel (Atlas Toolbar) */}
+      <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Service Dropdown */}
+          <div className="min-w-[280px]">
+            <select
+              value={selectedServiceId}
+              onChange={(e) => setSelectedServiceId(e.target.value)}
+              className="w-full h-11 px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200 text-sm font-medium text-slate-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={isLoadingServices}
             >
-              <span className="material-symbols-outlined text-[16px]">add_circle</span>
-              <span>Tạo ca khởi hành mới</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Filter & Service Selection Panel */}
-        <div className="p-3.5 rounded-xl bg-white border border-slate-300 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {/* Service Dropdown */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-lg min-w-[240px]">
-              <span className="material-symbols-outlined text-slate-600 text-[18px]">surfing</span>
-              <select
-                value={selectedServiceId}
-                onChange={(e) => setSelectedServiceId(e.target.value)}
-                className="bg-transparent text-black text-xs font-bold focus:outline-none cursor-pointer w-full"
-                disabled={isLoadingServices}
-              >
-                {services.length === 0 ? (
-                  <option value="">(Chưa có dịch vụ nào)</option>
-                ) : (
-                  services.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.status})
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            {/* Date Picker */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-lg">
-              <span className="material-symbols-outlined text-slate-600 text-[18px]">calendar_today</span>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-transparent text-black text-xs font-semibold focus:outline-none cursor-pointer"
-              />
-              {selectedDate && (
-                <button
-                  onClick={() => setSelectedDate("")}
-                  className="text-slate-400 hover:text-black"
-                  title="Xem tất cả ngày"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[14px]">close</span>
-                </button>
+              {services.length === 0 ? (
+                <option value="">(Chưa có dịch vụ nào)</option>
+              ) : (
+                services.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.status})
+                  </option>
+                ))
               )}
-            </div>
+            </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => { if (selectedServiceId) { setIsLoadingSlots(true); loadSlots(selectedServiceId); } }}
-              className="p-1.5 rounded-lg bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200 transition-colors"
-              title="Làm mới lịch ca"
-              type="button"
-            >
-              <span className="material-symbols-outlined text-[16px]">refresh</span>
-            </button>
+          {/* Date Picker */}
+          <div className="relative flex items-center">
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="h-11 px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200 text-sm font-medium text-slate-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            {selectedDate && (
+              <button
+                onClick={() => setSelectedDate("")}
+                className="ml-2 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+                title="Xem tất cả ngày"
+                type="button"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
+
+          {selectedDate === todayStr && (
+            <AtlasBadge label="Hôm nay" variant="info" />
+          )}
         </div>
 
-        {/* Error Fallback */}
-        {slotsErrorMessage && (
-          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between text-rose-800 text-xs">
+        <button
+          onClick={() => {
+            if (selectedServiceId) {
+              setIsLoadingSlots(true);
+              loadSlots(selectedServiceId);
+            }
+          }}
+          className="h-11 w-11 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 transition-colors cursor-pointer self-end md:self-auto"
+          title="Làm mới lịch ca"
+          type="button"
+        >
+          <RotateCcw className="w-4 h-4 text-slate-600" />
+        </button>
+      </div>
+
+      {/* Error Fallback */}
+      {slotsErrorMessage && (
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between text-rose-800 text-sm">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
             <span>Lỗi tải danh sách ca: {slotsErrorMessage}</span>
-            <button
-              onClick={() => { if (selectedServiceId) { setIsLoadingSlots(true); loadSlots(selectedServiceId); } }}
-              className="px-2.5 py-1 bg-rose-600 text-white rounded font-bold hover:bg-rose-700"
-              type="button"
-            >
-              Thử lại
-            </button>
           </div>
-        )}
+          <AtlasButton
+            variant="danger"
+            size="sm"
+            onClick={() => {
+              if (selectedServiceId) {
+                setIsLoadingSlots(true);
+                loadSlots(selectedServiceId);
+              }
+            }}
+          >
+            Thử lại
+          </AtlasButton>
+        </div>
+      )}
 
-        {/* Loading Skeleton */}
-        {isLoadingSlots && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-44 bg-slate-100 rounded-xl border border-slate-200"></div>
-            ))}
-          </div>
-        )}
+      {/* Loading Skeleton */}
+      {isLoadingSlots && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-44 bg-slate-100 rounded-xl border border-slate-200/80" />
+          ))}
+        </div>
+      )}
 
-        {/* Slots Grid */}
-        {!isLoadingSlots && !slotsErrorMessage && (
-          <>
-            {filteredSlots.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredSlots.map((slot) => {
-                  const booked = slot.bookedCount || 0;
-                  const available = slot.availableCapacity != null ? slot.availableCapacity : (slot.capacity - booked);
-                  const isClosed = slot.status === "CLOSED";
-                  const isFull = available <= 0;
+      {/* Slots Grid */}
+      {!isLoadingSlots && !slotsErrorMessage && (
+        <>
+          {filteredSlots.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredSlots.map((slot) => {
+                const booked = slot.bookedCount || 0;
+                const available = slot.availableCapacity != null ? slot.availableCapacity : (slot.capacity - booked);
+                const isClosed = slot.status === "CLOSED";
+                const isFull = available <= 0;
 
-                  return (
-                    <div
-                      key={slot.id}
-                      className={`rounded-xl border p-4 bg-white shadow-xs transition-all flex flex-col justify-between ${
-                        isClosed ? "border-slate-200 opacity-70 bg-slate-50" : "border-slate-200 hover:border-primary/50"
+                return (
+                  <div
+                    key={slot.id}
+                    className={`rounded-xl border p-5 bg-white shadow-xs transition-all flex flex-col justify-between ${
+                      isClosed
+                        ? "border-slate-200/60 opacity-80 bg-slate-50/50"
+                        : "border-slate-200/80 hover:border-slate-300"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      {/* Time & Status Badge */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-slate-400" />
+                          <span className="font-mono text-base font-bold text-slate-900 tracking-tight">
+                            {slot.startTime.substring(0, 5)} - {slot.endTime.substring(0, 5)}
+                          </span>
+                        </div>
+
+                        <div>
+                          {isClosed ? (
+                            <AtlasBadge label="Đã đóng" variant="neutral" />
+                          ) : isFull ? (
+                            <AtlasBadge label="Hết chỗ" variant="danger" />
+                          ) : (
+                            <AtlasBadge label="Đang mở" variant="success" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Date & Inventory Type */}
+                      <div className="text-xs text-slate-500 flex items-center justify-between">
+                        <span>Ngày: <strong className="text-slate-800 font-mono">{slot.date}</strong></span>
+                        <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-600 font-medium">
+                          {slot.inventoryType === "SHARED_CAPACITY_UNITS" ? "Theo cano" : "Theo đầu người"}
+                        </span>
+                      </div>
+
+                      {/* Capacity Progress Bar */}
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500">Đã đặt:</span>
+                          <span className="font-mono font-bold text-slate-900 tabular-nums">
+                            {booked} / {slot.capacity} khách
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              isFull ? "bg-rose-500" : isClosed ? "bg-slate-400" : "bg-slate-900"
+                            }`}
+                            style={{ width: `${Math.min(100, (booked / Math.max(1, slot.capacity)) * 100)}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-500">
+                          <span>Chỗ khả dụng: <strong className="font-mono text-emerald-700 font-bold">{Math.max(0, available)}</strong></span>
+                          <span className="font-mono text-slate-400">
+                            {Math.round((booked / Math.max(1, slot.capacity)) * 100)}%
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Units Details if Shared Capacity Units */}
+                      {slot.units && slot.units.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100 space-y-1">
+                          <p className="text-xs font-semibold text-slate-700">Phương tiện điều phối:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {slot.units.map((u) => (
+                              <span
+                                key={u.id}
+                                className="text-xs font-mono px-2 py-0.5 bg-slate-50 border border-slate-200 rounded text-slate-700"
+                              >
+                                Cano #{u.unitNumber}: {u.bookedCount}/{u.capacity}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                      <AtlasButton
+                        variant={isClosed ? "secondary" : "outline"}
+                        size="sm"
+                        onClick={() => handleToggleStatus(slot)}
+                        icon={isClosed ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                      >
+                        {isClosed ? "Mở nhận khách" : "Đóng ca"}
+                      </AtlasButton>
+
+                      <AtlasButton
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleOpenEditCapacity(slot)}
+                        icon={<Edit2 className="w-3.5 h-3.5" />}
+                      >
+                        Điều chỉnh
+                      </AtlasButton>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Empty State */
+            <div className="w-full bg-white rounded-xl border border-slate-200/80 p-12 text-center">
+              <div className="flex flex-col items-center justify-center space-y-3 text-slate-500 max-w-sm mx-auto">
+                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
+                  <CalendarDays className="w-6 h-6" />
+                </div>
+                <p className="font-semibold text-slate-900 text-base">Chưa có ca khởi hành nào</p>
+                <p className="text-xs text-slate-500">
+                  {selectedServiceObj
+                    ? `Dịch vụ "${selectedServiceObj.name}" chưa có ca khởi hành trong ngày đã chọn. Hãy tạo ca mới để bắt đầu đón khách!`
+                    : "Vui lòng chọn một dịch vụ từ danh sách phía trên."}
+                </p>
+                {selectedServiceId && (
+                  <AtlasButton
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setIsCreateModalOpen(true)}
+                    icon={<Plus className="w-4 h-4" />}
+                  >
+                    Tạo ca khởi hành mới
+                  </AtlasButton>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Modal: Create Slot */}
+      {isCreateModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200/90 w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-base text-slate-900">Tạo ca khởi hành mới</h3>
+              <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateSlot} className="space-y-3 text-sm">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Dịch vụ:</label>
+                <input
+                  type="text"
+                  disabled
+                  value={selectedServiceObj?.name || "Chưa chọn"}
+                  className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-slate-800 font-semibold text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Ngày diễn ra:</label>
+                <input
+                  type="date"
+                  required
+                  min={todayStr}
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Giờ bắt đầu:</label>
+                  <input
+                    type="time"
+                    required
+                    value={newStartTime}
+                    onChange={(e) => setNewStartTime(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Giờ kết thúc:</label>
+                  <input
+                    type="time"
+                    required
+                    value={newEndTime}
+                    onChange={(e) => setNewEndTime(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Lặp lại lịch ca:</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: '1 ngày', val: 1 },
+                    { label: '7 ngày', val: 7 },
+                    { label: '14 ngày', val: 14 },
+                    { label: '30 ngày', val: 30 }
+                  ].map((opt) => (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() => setRepeatDays(opt.val)}
+                      className={`py-2 px-2 rounded-xl border text-xs font-semibold transition-colors cursor-pointer ${
+                        repeatDays === opt.val
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                          : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
-                      <div className="space-y-2">
-                        {/* Time & Status Badge */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-primary text-[18px]">schedule</span>
-                            <span className="font-bold text-sm text-black">
-                              {slot.startTime.substring(0, 5)} - {slot.endTime.substring(0, 5)}
-                            </span>
-                          </div>
-
-                          <div>
-                            {isClosed ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">
-                                Đã đóng
-                              </span>
-                            ) : isFull ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800">
-                                Hết chỗ
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                                Đang mở
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Date & Inventory Type */}
-                        <div className="text-xs text-slate-600 flex items-center justify-between">
-                          <span>Ngày: <strong className="text-black">{slot.date}</strong></span>
-                          <span className="text-[11px] px-1.5 py-0.2 bg-slate-100 rounded text-slate-600">
-                            {slot.inventoryType === "SHARED_CAPACITY_UNITS" ? "Đơn vị chia sẻ" : "Theo đầu người"}
-                          </span>
-                        </div>
-
-                        {/* Capacity Progress Bar */}
-                        <div className="space-y-1 pt-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-slate-500">Đã đặt:</span>
-                            <span className="font-bold text-black">
-                              {booked} / {slot.capacity} khách
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                isFull ? "bg-rose-500" : "bg-emerald-500"
-                              }`}
-                              style={{ width: `${Math.min(100, (booked / Math.max(1, slot.capacity)) * 100)}%` }}
-                            ></div>
-                          </div>
-                          <div className="flex justify-between text-[11px] text-slate-500">
-                            <span>Còn trống: <strong className="text-emerald-700">{Math.max(0, available)}</strong></span>
-                          </div>
-                        </div>
-
-                        {/* Units Details if Shared Capacity Units */}
-                        {slot.units && slot.units.length > 0 && (
-                          <div className="pt-2 border-t border-slate-100 space-y-1">
-                            <p className="text-[11px] font-semibold text-slate-700">Chi tiết phương tiện / units:</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {slot.units.map((u) => (
-                                <span
-                                  key={u.id}
-                                  className="text-[10px] px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-slate-700"
-                                >
-                                  Cano #{u.unitNumber}: {u.bookedCount}/{u.capacity}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                        <button
-                          onClick={() => handleToggleStatus(slot)}
-                          className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors flex items-center gap-1 ${
-                            isClosed
-                              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                          }`}
-                          type="button"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">
-                            {isClosed ? "lock_open" : "lock"}
-                          </span>
-                          <span>{isClosed ? "Mở lại ca" : "Đóng ca"}</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleOpenEditCapacity(slot)}
-                          className="px-2.5 py-1 rounded border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-1"
-                          type="button"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">edit</span>
-                          <span>Cấu hình</span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              /* Empty State */
-              <div className="w-full bg-white rounded-xl border border-slate-200 p-12 text-center">
-                <div className="flex flex-col items-center justify-center space-y-2 text-slate-500">
-                  <span className="material-symbols-outlined text-4xl text-slate-400">event_busy</span>
-                  <p className="font-semibold text-slate-700">Chưa có ca khởi hành nào</p>
-                  <p className="text-xs text-slate-500 max-w-sm">
-                    {selectedServiceObj
-                      ? `Dịch vụ "${selectedServiceObj.name}" chưa có ca khởi hành trong ngày đã chọn. Hãy tạo ca mới để bắt đầu đón khách!`
-                      : "Vui lòng chọn một dịch vụ từ danh sách phía trên."}
-                  </p>
-                  {selectedServiceId && (
-                    <button
-                      onClick={() => setIsCreateModalOpen(true)}
-                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:bg-primary/90 transition-colors"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">add</span>
-                      <span>Tạo ca khởi hành mới</span>
+                      {opt.label}
                     </button>
-                  )}
+                  ))}
                 </div>
               </div>
-            )}
-          </>
-        )}
 
-        {/* Modal: Create Slot */}
-        {isCreateModalOpen && createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-            <div className="bg-white rounded-xl shadow-lg border border-slate-200 w-full max-w-md p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-bold text-sm text-black">Tạo ca khởi hành mới</h3>
-                <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-black">
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Mô hình tồn chỗ:</label>
+                <select
+                  value={newInventoryType}
+                  onChange={(e) => setNewInventoryType(e.target.value as InventoryType)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none bg-white cursor-pointer"
+                >
+                  <option value="PERSON_LIMIT">Giới hạn theo đầu người</option>
+                  <option value="SHARED_CAPACITY_UNITS">Chia theo từng cano / phương tiện</option>
+                </select>
               </div>
 
-              <form onSubmit={handleCreateSlot} className="space-y-3 text-xs">
+              {newInventoryType === "PERSON_LIMIT" ? (
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Dịch vụ:</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Tổng sức chứa (khách):</label>
                   <input
-                    type="text"
-                    disabled
-                    value={selectedServiceObj?.name || "Chưa chọn"}
-                    className="w-full px-2.5 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-700 font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Ngày diễn ra:</label>
-                  <input
-                    type="date"
+                    type="number"
                     required
-                    min={todayStr}
-                    value={newDate}
-                    onChange={(e) => setNewDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none"
+                    min={1}
+                    value={newCapacity}
+                    onChange={(e) => setNewCapacity(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none font-bold"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Giờ bắt đầu:</label>
-                    <input
-                      type="time"
-                      required
-                      value={newStartTime}
-                      onChange={(e) => setNewStartTime(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none font-bold"
-                    />
+              ) : (
+                <div className="space-y-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-700 text-xs">Danh sách cano / phương tiện:</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNewUnits((prev) => [
+                          ...prev,
+                          { unitNumber: prev.length + 1, capacity: 5 },
+                        ])
+                      }
+                      className="text-primary text-xs font-bold hover:underline cursor-pointer"
+                    >
+                      + Thêm cano
+                    </button>
                   </div>
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Giờ kết thúc:</label>
-                    <input
-                      type="time"
-                      required
-                      value={newEndTime}
-                      onChange={(e) => setNewEndTime(e.target.value)}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Mô hình tồn chỗ:</label>
-                  <select
-                    value={newInventoryType}
-                    onChange={(e) => setNewInventoryType(e.target.value as InventoryType)}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none bg-white cursor-pointer"
-                  >
-                    <option value="PERSON_LIMIT">Giới hạn theo đầu người (PERSON_LIMIT)</option>
-                    <option value="SHARED_CAPACITY_UNITS">Chia theo đơn vị/cano (SHARED_CAPACITY_UNITS)</option>
-                  </select>
-                </div>
-
-                {newInventoryType === "PERSON_LIMIT" ? (
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">Tổng sức chứa (khách):</label>
-                    <input
-                      type="number"
-                      required
-                      min={1}
-                      value={newCapacity}
-                      onChange={(e) => setNewCapacity(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none font-bold"
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-2 p-2 bg-slate-50 border border-slate-200 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-700">Danh sách cano / units:</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setNewUnits((prev) => [
-                            ...prev,
-                            { unitNumber: prev.length + 1, capacity: 5 },
-                          ])
-                        }
-                        className="text-primary font-bold hover:underline"
-                      >
-                        + Thêm cano
-                      </button>
+                  {newUnits.map((u, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="text-slate-600 font-medium text-xs">#{u.unitNumber}</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={u.capacity}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setNewUnits((prev) =>
+                            prev.map((item, i) => (i === idx ? { ...item, capacity: val } : item))
+                          );
+                        }}
+                        className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg bg-white text-xs"
+                        placeholder="Sức chứa"
+                      />
+                      <span className="text-slate-500 text-xs">khách</span>
                     </div>
-                    {newUnits.map((u, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <span className="text-slate-600 font-medium">#{u.unitNumber}</span>
-                        <input
-                          type="number"
-                          min={1}
-                          value={u.capacity}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setNewUnits((prev) =>
-                              prev.map((item, i) => (i === idx ? { ...item, capacity: val } : item))
-                            );
-                          }}
-                          className="w-24 px-2 py-1 border border-slate-300 rounded bg-white text-xs"
-                          placeholder="Sức chứa"
-                        />
-                        <span className="text-slate-500">khách</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => setIsCreateModalOpen(false)}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    type="button"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmittingSlot}
-                    className="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
-                  >
-                    {isSubmittingSlot ? "Đang tạo..." : "Xác nhận tạo ca"}
-                  </button>
+                  ))}
                 </div>
-              </form>
-            </div>
-          </div>,
-          document.body
-        )}
+              )}
 
-        {/* Modal: Edit Slot Capacity / Status */}
-        {editingSlot && createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-            <div className="bg-white rounded-xl shadow-lg border border-slate-200 w-full max-w-sm p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-bold text-sm text-black">Cấu hình ca vận hành</h3>
-                <button onClick={() => setEditingSlot(null)} className="text-slate-400 hover:text-black">
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <AtlasButton
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsCreateModalOpen(false)}
+                >
+                  Hủy
+                </AtlasButton>
+                <AtlasButton
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={isSubmittingSlot}
+                >
+                  {isSubmittingSlot ? "Đang tạo..." : "Xác nhận tạo ca"}
+                </AtlasButton>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal: Edit Slot Capacity / Status */}
+      {editingSlot && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200/90 w-full max-w-sm p-5 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-base text-slate-900">Cấu hình ca vận hành</h3>
+              <button onClick={() => setEditingSlot(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCapacity} className="space-y-3 text-sm">
+              <div>
+                <p className="text-slate-600 text-xs">
+                  Thời gian: <strong className="text-slate-900">{editingSlot.startTime.substring(0, 5)} - {editingSlot.endTime.substring(0, 5)}</strong> ({editingSlot.date})
+                </p>
+                <p className="text-slate-600 text-xs mt-1">
+                  Số khách đã đặt: <strong className="text-emerald-700 font-bold">{editingSlot.bookedCount || 0} khách</strong>
+                </p>
               </div>
 
-              <form onSubmit={handleSaveCapacity} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Trạng thái ca:</label>
+                <select
+                  value={inputStatus}
+                  onChange={(e) => setInputStatus(e.target.value as SlotStatus)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none bg-white cursor-pointer text-sm"
+                >
+                  <option value="OPEN">Mở đón khách (OPEN)</option>
+                  <option value="CLOSED">Đóng ca (CLOSED)</option>
+                </select>
+              </div>
+
+              {editingSlot.inventoryType === "PERSON_LIMIT" && (
                 <div>
-                  <p className="text-slate-600">
-                    Thời gian: <strong className="text-black">{editingSlot.startTime.substring(0, 5)} - {editingSlot.endTime.substring(0, 5)}</strong> ({editingSlot.date})
-                  </p>
-                  <p className="text-slate-600 mt-0.5">
-                    Số khách đã đặt: <strong className="text-emerald-700">{editingSlot.bookedCount || 0} khách</strong>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Tổng sức chứa mới:
+                  </label>
+                  <input
+                    type="number"
+                    min={editingSlot.bookedCount || 1}
+                    value={inputCapacity}
+                    onChange={(e) => setInputCapacity(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 font-bold focus:ring-2 focus:ring-slate-900 focus:outline-none text-sm"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">
+                    Không được đặt nhỏ hơn số khách đã đặt ({editingSlot.bookedCount || 0} khách).
                   </p>
                 </div>
+              )}
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Trạng thái ca:</label>
-                  <select
-                    value={inputStatus}
-                    onChange={(e) => setInputStatus(e.target.value as SlotStatus)}
-                    className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black focus:ring-1 focus:ring-primary focus:outline-none bg-white cursor-pointer"
-                  >
-                    <option value="OPEN">Mở đón khách (OPEN)</option>
-                    <option value="CLOSED">Đóng ca (CLOSED)</option>
-                  </select>
-                </div>
+              {capacityError && (
+                <p className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs">
+                  {capacityError}
+                </p>
+              )}
 
-                {editingSlot.inventoryType === "PERSON_LIMIT" && (
-                  <div>
-                    <label className="block font-semibold text-slate-700 mb-1">
-                      Tổng sức chứa mới:
-                    </label>
-                    <input
-                      type="number"
-                      min={editingSlot.bookedCount || 1}
-                      value={inputCapacity}
-                      onChange={(e) => setInputCapacity(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-black font-bold focus:ring-1 focus:ring-primary focus:outline-none"
-                    />
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Không được đặt nhỏ hơn số khách đã đặt ({editingSlot.bookedCount || 0} khách).
-                    </p>
-                  </div>
-                )}
-
-                {capacityError && (
-                  <p className="p-2 bg-rose-50 border border-rose-200 rounded text-rose-700 text-[11px]">
-                    {capacityError}
-                  </p>
-                )}
-
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                  <button
-                    onClick={() => setEditingSlot(null)}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    type="button"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isUpdatingSlot}
-                    className="px-3.5 py-1.5 rounded-lg bg-primary text-on-primary text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
-                  >
-                    {isUpdatingSlot ? "Đang lưu..." : "Lưu thay đổi"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>,
-          document.body
-        )}
-
-        
-      </div>
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <AtlasButton
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditingSlot(null)}
+                >
+                  Hủy
+                </AtlasButton>
+                <AtlasButton
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={isUpdatingSlot}
+                >
+                  {isUpdatingSlot ? "Đang lưu..." : "Lưu thay đổi"}
+                </AtlasButton>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

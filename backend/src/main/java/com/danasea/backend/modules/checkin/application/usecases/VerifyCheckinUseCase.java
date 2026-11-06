@@ -20,6 +20,8 @@ import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundExceptio
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
+import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
+import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.communication.application.email.EmailRequest;
@@ -34,6 +36,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -70,6 +73,17 @@ public class VerifyCheckinUseCase {
         this.checkinWindowPolicy = checkinWindowPolicy;
         this.masterOrderRepository = masterOrderRepository;
         this.transactionalEmailPort = transactionalEmailPort;
+    }
+
+    public VerifyCheckinUseCase(
+            JpaCheckinTokenRepository checkinTokenRepository,
+            JpaSubOrderRepository subOrderRepository,
+            VendorLookupPort vendorLookupPort,
+            QrTokenSigner qrTokenSigner,
+            JpaServiceSlotRepository slotRepository,
+            CheckinWindowPolicy checkinWindowPolicy,
+            JpaMasterOrderRepository masterOrderRepository) {
+        this(checkinTokenRepository, subOrderRepository, vendorLookupPort, qrTokenSigner, slotRepository, checkinWindowPolicy, masterOrderRepository, null);
     }
 
     public VerifyCheckinUseCase(
@@ -147,9 +161,59 @@ public class VerifyCheckinUseCase {
             );
         }
 
-        // 8. Tải thông tin SubOrder và kiểm tra trạng thái
-        SubOrderJpaEntity subOrder = subOrderRepository.findByIdForUpdate(payload.getSubOrderId())
-                .orElseThrow(() -> new OrderNotFoundException("Sub-order not found: " + payload.getSubOrderId()));
+        // 8. Tải thông tin SubOrder hoặc bóc tách từ MasterOrder
+        UUID identifier = payload.getSubOrderId();
+        SubOrderJpaEntity subOrder = null;
+        boolean isMasterOrderScan = false;
+        List<SubOrderJpaEntity> allMasterSubOrders = null;
+
+        Optional<SubOrderJpaEntity> subOpt = subOrderRepository.findByIdForUpdate(identifier);
+        if (subOpt.isPresent()) {
+            subOrder = subOpt.get();
+        } else if (masterOrderRepository != null) {
+            Optional<MasterOrderJpaEntity> masterOpt = masterOrderRepository.findById(identifier);
+            if (masterOpt.isPresent()) {
+                isMasterOrderScan = true;
+                UUID staffVendorId = resolveStaffVendorId(staffId);
+                boolean isAdmin = checkIsAdmin();
+
+                allMasterSubOrders = subOrderRepository.findByMasterOrderIdForUpdate(identifier);
+
+                // Lọc các hoạt động thuộc vendor của nhân viên đang quét
+                List<SubOrderJpaEntity> vendorSubOrders = isAdmin ? allMasterSubOrders : allMasterSubOrders.stream()
+                        .filter(s -> Objects.equals(s.getVendorId(), staffVendorId))
+                        .toList();
+
+                if (vendorSubOrders.isEmpty()) {
+                    log.warn("VENDOR_ISOLATION_VIOLATION: Staff {} (vendor {}) attempted to scan master order {} with no items for vendor",
+                            staffId, staffVendorId, identifier);
+                    throw new UnauthorizedVendorCheckinException(
+                            String.format("Check-in denied: This order does not contain any activities for vendor %s", staffVendorId));
+                }
+
+                // Tìm hoạt động CONFIRMED của vendor này
+                Optional<SubOrderJpaEntity> readySubOrder = vendorSubOrders.stream()
+                        .filter(s -> s.getStatus() == SubOrderStatus.CONFIRMED)
+                        .findFirst();
+
+                if (readySubOrder.isEmpty()) {
+                    boolean alreadyDone = vendorSubOrders.stream()
+                            .anyMatch(s -> s.getStatus() == SubOrderStatus.CHECKED_IN || s.getStatus() == SubOrderStatus.COMPLETED);
+                    if (alreadyDone) {
+                        throw new QrTokenAlreadyUsedException(
+                                "Hoạt động của nhà tàu bạn trong đơn này đã được quét check-in trước đó.",
+                                now, staffId);
+                    }
+                    throw new InvalidSubOrderStateException("Hoạt động của nhà tàu trong đơn này không ở trạng thái sẵn sàng check-in.");
+                }
+
+                subOrder = readySubOrder.get();
+            }
+        }
+
+        if (subOrder == null) {
+            throw new OrderNotFoundException("Sub-order not found: " + identifier);
+        }
 
         if (subOrder.getStatus() == SubOrderStatus.CANCELLED || subOrder.getStatus() == SubOrderStatus.REFUNDED) {
             throw new InvalidSubOrderStateException("Cancelled or refunded orders cannot be checked in");
@@ -158,7 +222,7 @@ public class VerifyCheckinUseCase {
             throw new InvalidSubOrderStateException("The order has not been paid and cannot be checked in");
         }
 
-        if (slotRepository != null && checkinWindowPolicy != null) {
+        if (slotRepository != null && checkinWindowPolicy != null && subOrder.getSlotId() != null) {
             var slot = slotRepository.findByIdForUpdate(subOrder.getSlotId())
                     .orElseThrow(() -> new InvalidCheckinStateException("Service slot not found for this order."));
             checkinWindowPolicy.validate(slot, now);
@@ -169,35 +233,48 @@ public class VerifyCheckinUseCase {
         }
 
         // 9. Kiểm soát cô lập đa Vendor (Multi-tenant Vendor Isolation)
-        boolean isAdmin = checkIsAdmin();
-        if (!isAdmin) {
-            UUID staffVendorId = resolveStaffVendorId(staffId);
-            if (!Objects.equals(subOrder.getVendorId(), staffVendorId)) {
-                log.warn("VENDOR_ISOLATION_VIOLATION: Staff {} (vendor {}) attempted to check in order {} owned by vendor {}",
-                        staffId, staffVendorId, subOrder.getId(), subOrder.getVendorId());
-                throw new UnauthorizedVendorCheckinException(
-                        String.format("Check-in denied: the order belongs to vendor %s, but the account belongs to vendor %s",
-                                subOrder.getVendorId(), staffVendorId));
+        if (!isMasterOrderScan) {
+            boolean isAdmin = checkIsAdmin();
+            if (!isAdmin) {
+                UUID staffVendorId = resolveStaffVendorId(staffId);
+                if (!Objects.equals(subOrder.getVendorId(), staffVendorId)) {
+                    log.warn("VENDOR_ISOLATION_VIOLATION: Staff {} (vendor {}) attempted to check in order {} owned by vendor {}",
+                            staffId, staffVendorId, subOrder.getId(), subOrder.getVendorId());
+                    throw new UnauthorizedVendorCheckinException(
+                            String.format("Check-in denied: the order belongs to vendor %s, but the account belongs to vendor %s",
+                                    subOrder.getVendorId(), staffVendorId));
+                }
             }
         }
 
-        // 10. Cập nhật điều kiện nguyên tử (Atomic Conditional Update chống Race Condition)
-        int rowsUpdated = 0;
-        if (tokenEntity.getId() != null) {
-            rowsUpdated = checkinTokenRepository.markAsUsedAtomic(tokenEntity.getId(), now, staffId);
-        } else {
-            rowsUpdated = checkinTokenRepository.markAsUsedIfUnused(tokenHash, staffId, now, now);
-        }
+        // 10. Cập nhật điều kiện nguyên tử (Atomic Conditional Update)
+        if (!isMasterOrderScan) {
+            int rowsUpdated = 0;
+            if (tokenEntity.getId() != null) {
+                rowsUpdated = checkinTokenRepository.markAsUsedAtomic(tokenEntity.getId(), now, staffId);
+            } else {
+                rowsUpdated = checkinTokenRepository.markAsUsedIfUnused(tokenHash, staffId, now, now);
+            }
 
-        if (rowsUpdated == 0) {
-            // Luồng khác đã chiếm quyền check-in trước
-            CheckinTokenJpaEntity used = checkinTokenRepository.findByQrTokenHash(tokenHash).orElse(tokenEntity);
-            throw new QrTokenAlreadyUsedException(
-                    String.format("The ticket was used at %s by staff member %s",
-                            used.getUsedAt(), used.getUsedByVendorStaffId()),
-                    used.getUsedAt(),
-                    used.getUsedByVendorStaffId()
-            );
+            if (rowsUpdated == 0) {
+                CheckinTokenJpaEntity used = checkinTokenRepository.findByQrTokenHash(tokenHash).orElse(tokenEntity);
+                throw new QrTokenAlreadyUsedException(
+                        String.format("The ticket was used at %s by staff member %s",
+                                used.getUsedAt(), used.getUsedByVendorStaffId()),
+                        used.getUsedAt(),
+                        used.getUsedByVendorStaffId()
+                );
+            }
+        } else {
+            // Khi quét Master QR: Nếu tất cả các sub_orders khác trong đơn đã được check-in/hoàn tất thì khoá token
+            UUID checkedInSubOrderId = subOrder.getId();
+            boolean anyRemaining = allMasterSubOrders != null && allMasterSubOrders.stream()
+                    .anyMatch(s -> !s.getId().equals(checkedInSubOrderId) && s.getStatus() == SubOrderStatus.CONFIRMED);
+            if (!anyRemaining) {
+                tokenEntity.setUsedAt(now);
+                tokenEntity.setUsedByVendorStaffId(staffId);
+                checkinTokenRepository.save(tokenEntity);
+            }
         }
 
         // 11. Cập nhật trạng thái SubOrder sang CHECKED_IN

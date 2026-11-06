@@ -1,7 +1,12 @@
 import type { MOCK_ADMIN_DISPUTES } from '../../../data/adminMockData';
 import type { DisputeStatus } from '../../../types';
 
-export type DisputeExtended = (typeof MOCK_ADMIN_DISPUTES)[0];
+export type DisputeExtended = (typeof MOCK_ADMIN_DISPUTES)[0] & {
+  orderId?: string;
+  vendorResponse?: string | null;
+  vendorRespondedAt?: string | null;
+  vendorEvidenceUrls?: string[] | null;
+};
 export type DisputeStatusFilter = 'all' | 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
 export type DisputeCategoryFilter = 'all' | 'SERVICE_QUALITY' | 'WEATHER_CANCELLATION' | 'OVERCHARGING' | 'SAFETY_ISSUE';
 
@@ -33,7 +38,8 @@ export function filterDisputes(
       (d.serviceName && d.serviceName.toLowerCase().includes(q)) ||
       (d.customerName && d.customerName.toLowerCase().includes(q)) ||
       (d.vendorName && d.vendorName.toLowerCase().includes(q)) ||
-      (d.description && d.description.toLowerCase().includes(q));
+      (d.description && d.description.toLowerCase().includes(q)) ||
+      (d.vendorResponse && d.vendorResponse.toLowerCase().includes(q));
 
     return matchesStatus && matchesCategory && matchesQuery;
   });

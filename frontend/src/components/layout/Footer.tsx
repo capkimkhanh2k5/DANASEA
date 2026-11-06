@@ -132,7 +132,7 @@ export function Footer() {
 
           </div>
 
-          {/* Cột 2: Hỗ trợ & Chính sách lữ hành (chiếm 3 cột - Không trùng lặp danh mục tour) */}
+          {/* Cột 2: Hỗ trợ & Chính sách lữ hành (chiếm 3 cột) */}
           <div className="lg:col-span-3 flex flex-col gap-3">
             <h3 className="font-bold text-sm text-white tracking-tight">
               Hỗ trợ &amp; Pháp lý
@@ -157,6 +157,26 @@ export function Footer() {
                 Về chúng tôi &amp; Giấy phép lữ hành
               </li>
             </ul>
+
+            {/* Giấy chứng nhận pháp lý số hóa chính thức từ Cloudinary */}
+            <div className="mt-2 pt-3 border-t border-white/10 flex flex-col gap-2">
+              <span className="text-[11px] font-semibold text-white/80 tracking-wide">
+                Hồ sơ pháp lý số hóa
+              </span>
+              <a
+                href="https://res.cloudinary.com/xmxguqpi/image/authenticated/s--87pVT0lZ--/v1793625552/danasea_demo_data_package/vendor_documents/e2681ab1f16042a553303d0da9192b66c0ab21cf2492a35d72b5cfc512cd2bba.png"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Xem bản gốc Giấy phép đăng ký kinh doanh & thể thao biển số hóa Đà Nẵng"
+                className="group block relative w-full max-w-[240px] rounded-xl overflow-hidden border border-white/25 bg-white shadow-md hover:border-white/60 hover:shadow-lg transition-all"
+              >
+                <img
+                  src="/images/legal/legal_certificate.png"
+                  alt="Giấy chứng nhận đăng ký kinh doanh & thể thao biển số hóa Đà Nẵng"
+                  className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                />
+              </a>
+            </div>
           </div>
 
           {/* Cột 3: Mạng xã hội, Hotline & Cứu hộ bờ biển (chiếm 3 cột) */}
@@ -231,7 +251,7 @@ export function Footer() {
 
         </div>
 
-        {/* Chân trang bản quyền (Bottom Bar) */}
+{/* Chân trang bản quyền (Bottom Bar) */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/90 font-normal">
           <p>© 2026 DANASEA Marine Experiences. Bảo lưu mọi quyền.</p>
           <div className="flex items-center gap-3 text-xs text-white/90 font-normal">
