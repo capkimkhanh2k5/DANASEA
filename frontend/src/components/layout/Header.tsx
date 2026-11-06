@@ -41,8 +41,9 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
   const t = (type || '').toUpperCase();
   const r = (relatedEntityType || '').toUpperCase();
   const normTitle = normalizeText(title);
+  const commonBg = 'bg-white border border-slate-200/90 shadow-2xs';
 
-  // 1. Hoàn tiền / Yêu cầu hoàn tiền / Hủy đơn (Refund / Cancellation) -> Đỏ hồng (Rose) + RotateCcw
+  // 1. Hoàn tiền / Yêu cầu hoàn tiền / Hủy đơn -> RotateCcw màu đen nền trắng
   if (
     normTitle.includes('hoan tien') ||
     normTitle.includes('hoan toan bo tien') ||
@@ -53,12 +54,12 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
     t.includes('CANCEL')
   ) {
     return {
-      icon: <RotateCcw className="w-4 h-4 text-rose-600" />,
-      bg: 'bg-rose-50 border border-rose-200/80',
+      icon: <RotateCcw className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
     };
   }
 
-  // 2. Yêu cầu chọn phương án / Sự cố dịch vụ (Action Required / Incident / Choice) -> Cam cảnh báo (Orange) + AlertCircle
+  // 2. Yêu cầu chọn phương án / Sự cố dịch vụ -> AlertCircle màu đen nền trắng
   if (
     normTitle.includes('chon doi ca') ||
     normTitle.includes('hoac hoan') ||
@@ -68,12 +69,12 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
     t.includes('ACTION_REQUIRED')
   ) {
     return {
-      icon: <AlertCircle className="w-4 h-4 text-orange-600" />,
-      bg: 'bg-orange-50 border border-orange-200/80',
+      icon: <AlertCircle className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
     };
   }
 
-  // 3. Đề xuất đổi ca / Lịch vận hành mới (Reschedule / Shift Proposal) -> Vàng hổ phách (Amber) + CalendarClock
+  // 3. Đề xuất đổi ca / Lịch vận hành mới -> CalendarClock màu đen nền trắng
   if (
     normTitle.includes('doi ca') ||
     normTitle.includes('de xuat doi') ||
@@ -83,12 +84,12 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
     t.includes('SHIFT')
   ) {
     return {
-      icon: <CalendarClock className="w-4 h-4 text-amber-600" />,
-      bg: 'bg-amber-50 border border-amber-200/80',
+      icon: <CalendarClock className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
     };
   }
 
-  // 4. Nhắc lịch chuyến đi / Giờ khởi hành sắp tới (Trip Reminder / Upcoming Departure) -> Tím chàm (Indigo) + Calendar
+  // 4. Nhắc lịch chuyến đi / Giờ khởi hành sắp tới -> Calendar màu đen nền trắng
   if (
     normTitle.includes('nhac lich') ||
     normTitle.includes('chuyen di sap toi') ||
@@ -99,12 +100,12 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
     t.includes('UPCOMING')
   ) {
     return {
-      icon: <Calendar className="w-4 h-4 text-indigo-600" />,
-      bg: 'bg-indigo-50 border border-indigo-200/80',
+      icon: <Calendar className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
     };
   }
 
-  // 5. Thanh toán thành công / Đặt vé xác nhận (Payment Success / Booking Confirmed) -> Xanh lục (Emerald) + CheckCircle2
+  // 5. Thanh toán thành công / Đặt vé xác nhận -> CheckCircle2 màu đen nền trắng
   if (
     normTitle.includes('thanh toan thanh cong') ||
     normTitle.includes('xac nhan dat ve') ||
@@ -115,12 +116,12 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
     t.includes('PAYMENT')
   ) {
     return {
-      icon: <CheckCircle2 className="w-4 h-4 text-emerald-600" />,
-      bg: 'bg-emerald-50 border border-emerald-200/80',
+      icon: <CheckCircle2 className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
     };
   }
 
-  // 6. Cảnh báo thời tiết / Hải văn / An toàn cảng biển (Weather / Maritime Safety) -> Xanh biển (Sky) + Anchor
+  // 6. Cảnh báo thời tiết / Hải văn / An toàn cảng biển -> Anchor màu đen nền trắng
   if (
     normTitle.includes('thoi tiet') ||
     normTitle.includes('song bien') ||
@@ -133,24 +134,24 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
     t.includes('PORT')
   ) {
     return {
-      icon: <Anchor className="w-4 h-4 text-sky-600" />,
-      bg: 'bg-sky-50 border border-sky-200/80',
+      icon: <Anchor className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
     };
   }
 
-  // 7. Hợp đồng bảo hiểm điện tử (Insurance) -> Xanh ngọc (Teal) + ShieldCheck
+  // 7. Hợp đồng bảo hiểm điện tử -> ShieldCheck màu đen nền trắng
   if (
     normTitle.includes('bao hiem') ||
     t.includes('INSURANCE') ||
     r === 'INSURANCE'
   ) {
     return {
-      icon: <ShieldCheck className="w-4 h-4 text-teal-600" />,
-      bg: 'bg-teal-50 border border-teal-200/80',
+      icon: <ShieldCheck className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
     };
   }
 
-  // 8. Ưu đãi / Voucher / Khuyến mãi (Voucher / Promotion) -> Tím (Purple) + Tag
+  // 8. Ưu đãi / Voucher / Khuyến mãi -> Tag màu đen nền trắng
   if (
     normTitle.includes('uu dai') ||
     normTitle.includes('voucher') ||
@@ -160,31 +161,18 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
     t.includes('PROMO')
   ) {
     return {
-      icon: <Tag className="w-4 h-4 text-purple-600" />,
-      bg: 'bg-purple-50 border border-purple-200/80',
+      icon: <Tag className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
     };
   }
 
-  // 9. Thông tin đơn hàng / Vé thông thường (General Order / Ticket) -> Xanh dương slate (Slate) + Ticket
-  if (
-    t.includes('ORDER') ||
-    t.includes('BOOK') ||
-    t.includes('TICKET') ||
-    r === 'ORDER' ||
-    r === 'SUB_ORDER'
-  ) {
-    return {
-      icon: <Ticket className="w-4 h-4 text-slate-700" />,
-      bg: 'bg-slate-100 border border-slate-200',
-    };
-  }
-
+  // 9. Mặc định -> Ticket màu đen nền trắng
   return {
-    icon: <Ticket className="w-4 h-4 text-slate-600" />,
-    bg: 'bg-slate-100 border border-slate-200',
+    icon: <Ticket className="w-4 h-4 text-slate-900" />,
+    bg: commonBg,
   };
-};
-
+};
+
 export function Header() {
   const location = useLocation();
 
