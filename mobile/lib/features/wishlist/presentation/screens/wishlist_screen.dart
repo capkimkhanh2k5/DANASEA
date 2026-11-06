@@ -283,7 +283,11 @@ class _WishlistScreenState extends State<WishlistScreen> {
                     ),
                     const Spacer(),
                     LocalizedText(
-                      '${item.durationMinutes} phút',
+                      item.durationMinutes > 0
+                          ? (item.durationMinutes >= 60
+                              ? '${item.durationMinutes ~/ 60}h${item.durationMinutes % 60 > 0 ? '${item.durationMinutes % 60}p' : ''}'
+                              : '${item.durationMinutes}p')
+                          : 'Theo ca',
                       style: AppTypography.labelSm(color: AppColors.secondary),
                     ),
                   ],
@@ -306,9 +310,11 @@ class _WishlistScreenState extends State<WishlistScreen> {
                     const SizedBox(width: 4),
                     Expanded(
                       child: LocalizedText(
-                        item.locationName.isNotEmpty
-                            ? item.locationName
-                            : item.address,
+                        item.locationName.trim().isNotEmpty
+                            ? item.locationName.trim()
+                            : (item.address.trim().isNotEmpty
+                                ? item.address.trim()
+                                : 'Bãi biển Đà Nẵng'),
                         style: AppTypography.bodySm(
                           color: AppColors.onSurfaceVariant,
                         ),
