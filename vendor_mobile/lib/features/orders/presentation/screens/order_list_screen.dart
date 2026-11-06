@@ -2,15 +2,12 @@ import '../../../../core/data/vendor_mock_repositories.dart';
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/data/vendor_mock_database.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/status_badge.dart';
+import '../../../../core/widgets/partner_account_app_bar_button.dart';
 import 'sub_order_detail_screen.dart';
-import 'qr_checkin_screen.dart';
 import '../../../chat/presentation/screens/chat_conversation_screen.dart';
-import '../../../notifications/presentation/screens/notification_safety_screen.dart';
-import '../../../profile/presentation/screens/business_profile_screen.dart';
 
 class OrderListScreen extends StatefulWidget {
   final VoidCallback? onOpenNotifications;
@@ -28,8 +25,21 @@ class OrderListScreen extends StatefulWidget {
 
 class _OrderListScreenState extends State<OrderListScreen> {
   final _db = VendorMockDatabase.instance;
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedFilter = 'all'; // all, PENDING, CONFIRMED, COMPLETED, REJECTED, CANCELLED, REFUNDED
+
+  String _normalize(String s) {
+    var str = s.toLowerCase();
+    str = str.replaceAll(RegExp(r'[àáạảãâầấậẩẫăằắặẳẵ]'), 'a');
+    str = str.replaceAll(RegExp(r'[èéẹẻẽêềếệểễ]'), 'e');
+    str = str.replaceAll(RegExp(r'[ìíịỉĩ]'), 'i');
+    str = str.replaceAll(RegExp(r'[òóọỏõôồốộổỗơờớợởỡ]'), 'o');
+    str = str.replaceAll(RegExp(r'[ùúụủũưừứựửữ]'), 'u');
+    str = str.replaceAll(RegExp(r'[ỳýỵỷỹ]'), 'y');
+    str = str.replaceAll(RegExp(r'[đ]'), 'd');
+    return str;
+  }
 
   @override
   void initState() {
@@ -40,6 +50,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     _db.removeListener(_onDbChanged);
     super.dispose();
   }
@@ -53,10 +64,18 @@ class _OrderListScreenState extends State<OrderListScreen> {
     final subOrders = _db.subOrders.where((o) {
       if (_selectedFilter != 'all' && o.status.name.toUpperCase() != _selectedFilter) return false;
       if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.toLowerCase();
-        final matchCode = o.subOrderCode.toLowerCase().contains(q) || o.masterOrderCode.toLowerCase().contains(q);
-        final matchName = o.customerName.toLowerCase().contains(q);
-        final matchService = o.serviceName.toLowerCase().contains(q);
+        final rawQ = _searchQuery.trim().toLowerCase();
+        final cleanQ = rawQ.replaceAll('#', '').trim();
+        final normQ = _normalize(cleanQ);
+
+        final subCode = o.subOrderCode.toLowerCase();
+        final masterCode = o.masterOrderCode.toLowerCase();
+        final custName = _normalize(o.customerName);
+        final serviceName = _normalize(o.serviceName);
+
+        final matchCode = subCode.contains(cleanQ) || masterCode.contains(cleanQ);
+        final matchName = custName.contains(normQ) || o.customerName.toLowerCase().contains(rawQ);
+        final matchService = serviceName.contains(normQ) || o.serviceName.toLowerCase().contains(rawQ);
         return matchCode || matchName || matchService;
       }
       return true;
@@ -75,139 +94,65 @@ class _OrderListScreenState extends State<OrderListScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: LocalizedText(
-                    'DANASEA',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.secondary,
-                        ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryContainer,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const LocalizedText('VENDOR', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.onPrimary)),
-                ),
-              ],
-            ),
-            const LocalizedText('Đơn dịch vụ', style: TextStyle(fontSize: 12, color: AppColors.tertiary)),
-          ],
+        scrolledUnderElevation: 0,
+        titleSpacing: 16,
+        title: const LocalizedText(
+          'Quản lý đơn hàng',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.navyAnchor,
+          ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner, color: AppColors.primary),
-            tooltip: tr(context, 'Quét QR Check-in'),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const QrCheckinScreen()),
-              );
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: AppColors.secondary),
-            onPressed: () {
-              if (widget.onOpenNotifications != null) {
-                widget.onOpenNotifications!();
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const NotificationSafetyScreen()),
-                );
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: AppColors.primary),
-            onPressed: () {
-              if (widget.onOpenProfile != null) {
-                widget.onOpenProfile!();
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BusinessProfileScreen()),
-                );
-              }
-            },
-          ),
+          PartnerAccountAppBarButton(onPressed: widget.onOpenProfile),
         ],
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // Header context
+            // Search Bar
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(width: 6, height: 6, decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primaryContainer)),
-                            const SizedBox(width: 6),
-                            const Flexible(
-                              child: LocalizedText(
-                                'KÊNH ĐỐI TÁC BIỂN',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary, letterSpacing: 0.5),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(color: AppColors.surfaceContainerHigh, borderRadius: BorderRadius.circular(10)),
-                        child: LocalizedText('$allCount đơn ghi nhận', style: const TextStyle(fontSize: 10, color: AppColors.tertiary, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  const LocalizedText('Quản lý đơn dịch vụ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
-                  const SizedBox(height: 10),
-
-                  // Search input
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: AppShapes.shadowSm,
+              child: SizedBox(
+                height: 44,
+                child: TextField(
+                  controller: _searchController,
+                  textAlignVertical: TextAlignVertical.center,
+                  onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                  style: const TextStyle(fontSize: 13.5, color: AppColors.onSurface),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                    hintText: tr(context, 'Tìm theo mã đơn (#DNS...), tên khách hoặc dịch vụ...'),
+                    hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.outline),
+                    prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.tertiary),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.cancel, size: 18, color: AppColors.tertiary),
+                            splashRadius: 16,
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(22),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.search, size: 20, color: AppColors.tertiary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            onChanged: (val) => setState(() => _searchQuery = val.trim()),
-                            decoration:  InputDecoration(
-                              hintText: tr(context, 'Tìm theo mã đơn con, tên khách hoặc dịch vụ...'),
-                              hintStyle: TextStyle(fontSize: 12, color: AppColors.outline),
-                              border: InputBorder.none,
-                            ),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ],
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(22),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(22),
+                      borderSide: const BorderSide(color: AppColors.secondary, width: 1.5),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
 
@@ -233,32 +178,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 ],
               ),
             ),
-
-            // Ocean safety notice strip
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.secondaryFixed.withOpacity(0.4),
-                  borderRadius: AppShapes.radiusSm,
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.waves, size: 16, color: AppColors.secondary),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: LocalizedText(
-                        'Sóng 0.4m • Gió 9 km/h • Khung giờ 05:00 lý tưởng cho hoạt động SUP',
-                        style: TextStyle(fontSize: 11, color: AppColors.onSecondaryFixedVariant),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            const SizedBox(height: 4),
 
             // Sub-Orders List
             Expanded(
@@ -270,14 +190,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                           const Icon(Icons.receipt_long_outlined, size: 48, color: AppColors.tertiary),
                           const SizedBox(height: 8),
                           const LocalizedText('Không tìm thấy đơn hàng nào', style: TextStyle(color: AppColors.tertiary, fontSize: 14)),
-                          if (_searchQuery.isNotEmpty || _selectedFilter != 'all')
-                            TextButton(
-                              onPressed: () => setState(() {
-                                _searchQuery = '';
-                                _selectedFilter = 'all';
-                              }),
-                              child: const LocalizedText('Xóa bộ lọc'),
-                            ),
+
                         ],
                       ),
                     )
@@ -300,13 +213,18 @@ class _OrderListScreenState extends State<OrderListScreen> {
     final active = _selectedFilter == key;
     return InkWell(
       onTap: () => setState(() => _selectedFilter = key),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? AppColors.primaryContainer : AppColors.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: active ? AppShapes.shadowSm : null,
+          color: active ? AppColors.secondary : AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: active ? AppColors.secondary : AppColors.borderSubtle,
+          ),
+          boxShadow: active
+              ? [BoxShadow(color: AppColors.secondary.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))]
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -315,15 +233,15 @@ class _OrderListScreenState extends State<OrderListScreen> {
               label,
               style: TextStyle(
                 fontSize: 12,
-                fontWeight: active ? FontWeight.bold : FontWeight.normal,
-                color: active ? AppColors.onPrimary : AppColors.onSurfaceVariant,
+                fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                color: active ? AppColors.onSecondary : AppColors.onSurfaceVariant,
               ),
             ),
             const SizedBox(width: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                color: active ? AppColors.onPrimary.withOpacity(0.2) : AppColors.surfaceContainerHighest,
+                color: active ? AppColors.onSecondary.withOpacity(0.22) : AppColors.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: LocalizedText(
@@ -331,7 +249,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: active ? AppColors.onPrimary : AppColors.tertiary,
+                  color: active ? AppColors.onSecondary : AppColors.tertiary,
                 ),
               ),
             ),
@@ -342,231 +260,220 @@ class _OrderListScreenState extends State<OrderListScreen> {
   }
 
   Widget _buildSubOrderCard(SubOrderModel order) {
-    final hasCheckedIn = order.checkedInAt != null;
+    final bool hasCheckedIn = order.checkedInAt != null;
+    final formattedPrice = order.totalPrice.toStringAsFixed(0).replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => SubOrderDetailScreen(subOrder: order),
-            ),
-          );
-        },
-        borderRadius: AppShapes.radiusMd,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
-            borderRadius: AppShapes.radiusMd,
-            boxShadow: AppShapes.shadowSm,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderSubtle),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06102F3A),
+            blurRadius: 8,
+            offset: Offset(0, 2),
           ),
-          child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Codes & Status header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(
-                      child: LocalizedText(
-                        '#${order.subOrderCode}',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: LocalizedText(
-                        '(${order.masterOrderCode})',
-                        style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SubOrderDetailScreen(subOrder: order),
               ),
-              const SizedBox(width: 8),
-              StatusBadge(status: order.status),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Customer info & service
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Center(
-                  child: Icon(Icons.surfing, color: AppColors.secondary, size: 24),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    LocalizedText(
-                      order.serviceName,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        const Icon(Icons.person, size: 13, color: AppColors.tertiary),
-                        const SizedBox(width: 3),
-                        Flexible(
-                          child: LocalizedText(
-                            order.customerName,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.onSurface),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const LocalizedText(' • ', style: TextStyle(color: AppColors.tertiary)),
-                        LocalizedText('${order.quantity} khách', style: const TextStyle(fontSize: 12, color: AppColors.tertiary)),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        const Icon(Icons.schedule, size: 13, color: AppColors.secondary),
-                        const SizedBox(width: 3),
-                        Expanded(
-                          child: LocalizedText(
-                            '${order.slotDate} • ${order.slotTime}',
-                            style: const TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.bold),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Check-in & Financial Snapshot Bar
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: hasCheckedIn ? AppColors.secondary : AppColors.outlineVariant,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: LocalizedText(
-                          hasCheckedIn ? 'Đã check-in bãi' : 'Chưa check-in',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: hasCheckedIn ? AppColors.secondary : AppColors.tertiary,
-                            fontWeight: hasCheckedIn ? FontWeight.bold : FontWeight.normal,
+                // 1. Order Code & Status Badge Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '#${order.subOrderCode}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.navyAnchor,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                        if (order.masterOrderCode.isNotEmpty && order.masterOrderCode != order.subOrderCode) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '(${order.masterOrderCode})',
+                            style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
+                          ),
+                        ],
+                      ],
+                    ),
+                    StatusBadge(status: order.status),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // 2. Service & Customer Information (Clean, high-density typography)
+                Text(
+                  order.serviceName,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.navyAnchor,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${order.customerName} • ${order.quantity} khách • ${order.slotDate} (${order.slotTime})',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.tertiary,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(height: 10),
+                const Divider(height: 1, color: AppColors.surfaceContainerHigh),
+                const SizedBox(height: 8),
+                // 3. Check-in Status & Price Row
                 Row(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    LocalizedText(
-                      '${order.quantity}× ',
-                      style: const TextStyle(fontSize: 10, color: AppColors.tertiary),
+                    // Check-in badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: hasCheckedIn ? const Color(0xFFE8F5E9) : const Color(0xFFFFF8E1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            hasCheckedIn ? Icons.check_circle_rounded : Icons.pending_rounded,
+                            size: 12,
+                            color: hasCheckedIn ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            hasCheckedIn ? 'Đã check-in bãi' : 'Chờ khách check-in',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: hasCheckedIn ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    LocalizedText(
-                      '${order.totalPrice.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} đ',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary),
+
+                    // Total price
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          formattedPrice,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.navyAnchor,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        const Text(
+                          'đ',
+                          style: TextStyle(fontSize: 11, color: AppColors.tertiary, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+
+                // 4. Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ChatConversationScreen(
+                                conversationId: 'conv-001',
+                                customerName: order.customerName,
+                                subOrderCode: order.subOrderCode,
+                              ),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLowest,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.borderSubtle),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.navyAnchor),
+                              SizedBox(width: 4),
+                              Text('Nhắn tin', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.navyAnchor)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => SubOrderDetailScreen(subOrder: order),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.receipt_long_rounded, size: 14, color: AppColors.onSecondary),
+                              SizedBox(width: 4),
+                              Text('Chi tiết đơn', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSecondary)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 10),
-
-          // Actions
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ChatConversationScreen(
-                          conversationId: 'conv-001',
-                          customerName: order.customerName,
-                          subOrderCode: order.subOrderCode,
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.chat_bubble_outline, size: 14),
-                  label: const LocalizedText('Nhắn tin', style: TextStyle(fontSize: 12)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.onSurface,
-                    side: const BorderSide(color: AppColors.outlineVariant),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => SubOrderDetailScreen(subOrder: order),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.receipt_long, size: 14),
-                  label: const LocalizedText('Chi tiết đơn', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryContainer,
-                    foregroundColor: AppColors.onPrimary,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
-    ),
-  ),
-);
+    );
   }
 }

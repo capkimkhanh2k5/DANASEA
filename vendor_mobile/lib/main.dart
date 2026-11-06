@@ -39,11 +39,17 @@ Future<void> main() async {
 class DanaSeaVendorApp extends StatelessWidget {
   const DanaSeaVendorApp({super.key});
 
+  static final _navigatorObserver = _AppNavigatorObserver();
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: AppLanguage.instance,
       builder: (context, child) => MaterialApp(
+        navigatorObservers: [_navigatorObserver],
+        builder: (context, child) => _GlobalKeyboardDismissWrapper(
+          child: child ?? const SizedBox.shrink(),
+        ),
         locale: AppLanguage.instance.locale,
         supportedLocales: const [Locale('vi'), Locale('en')],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
@@ -102,6 +108,94 @@ class DanaSeaVendorApp extends StatelessWidget {
           return null;
         },
       ),
+    );
+  }
+}
+
+class _AppNavigatorObserver extends NavigatorObserver {
+  void _unfocus() {
+    FocusManager.instance.primaryFocus?.unfocus();
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _unfocus();
+    super.didPop(route, previousRoute);
+  }
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _unfocus();
+    super.didPush(route, previousRoute);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    _unfocus();
+    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    _unfocus();
+    super.didRemove(route, previousRoute);
+  }
+}
+
+class _GlobalKeyboardDismissWrapper extends StatefulWidget {
+  final Widget child;
+  const _GlobalKeyboardDismissWrapper({required this.child});
+
+  @override
+  State<_GlobalKeyboardDismissWrapper> createState() =>
+      _GlobalKeyboardDismissWrapperState();
+}
+
+class _GlobalKeyboardDismissWrapperState
+    extends State<_GlobalKeyboardDismissWrapper> with WidgetsBindingObserver {
+  double _lastBottomInset = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    final view = View.maybeOf(context);
+    final currentBottomInset = view?.viewInsets.bottom ?? 0;
+    // When the soft keyboard closes (e.g. via back button / gesture):
+    if (_lastBottomInset > 0 && currentBottomInset == 0) {
+      FocusManager.instance.primaryFocus?.unfocus();
+    }
+    _lastBottomInset = currentBottomInset;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) {
+        final currentFocus = FocusManager.instance.primaryFocus;
+        if (currentFocus != null && currentFocus.hasFocus) {
+          final renderObject = currentFocus.context?.findRenderObject();
+          if (renderObject is RenderBox) {
+            final localPos = renderObject.globalToLocal(event.position);
+            if (!renderObject.paintBounds.contains(localPos)) {
+              currentFocus.unfocus();
+            }
+          }
+        }
+      },
+      child: widget.child,
     );
   }
 }
