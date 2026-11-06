@@ -1334,26 +1334,33 @@ export function Home() {
             </div>
           </div>
 
-          {/* 13. Final Call to Action */}
-          <div className="rounded-2xl p-6 sm:p-8 bg-[#031d44] border border-sky-950 flex flex-col sm:flex-row items-center justify-between gap-6 text-white shadow-xl shadow-sky-950/20">
-            <div>
-              <h3 className="text-lg sm:text-xl font-bold mb-1 text-white drop-shadow-sm">
-                {language === 'en' ? 'Ready to Explore Da Nang Waters?' : 'Sẵn sàng trải nghiệm biển Đà Nẵng ngay hôm nay?'}
-              </h3>
-              <p className="text-base text-slate-200 max-w-xl font-normal drop-shadow-sm">
-                {language === 'en'
-                  ? 'Explore 20+ certified water sports and marine expeditions tailored for you.'
-                  : 'Hơn 20+ trải nghiệm thể thao biển chuẩn quốc tế với đầy đủ bảo hiểm và thiết bị chuyên nghiệp.'}
-              </p>
-            </div>
+          {/* 13. Final Call to Action with Ocean Backdrop */}
+          <div className="relative rounded-2xl overflow-hidden shadow-xl border border-sky-900/40 my-6">
+            <div 
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url('/images/hero/08-cano-cao-toc-luot-vinh-da-nang.jpg')` }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/75 to-slate-950/50" />
+            <div className="relative z-10 p-7 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 text-white">
+              <div>
+                <h3 className="text-xl sm:text-2xl font-bold mb-2 text-white drop-shadow-sm">
+                  {language === 'en' ? 'Ready to Explore Da Nang Waters?' : 'Sẵn sàng trải nghiệm biển Đà Nẵng ngay hôm nay?'}
+                </h3>
+                <p className="text-sm sm:text-base text-slate-200 max-w-xl font-normal drop-shadow-sm leading-relaxed">
+                  {language === 'en'
+                    ? 'Explore 20+ certified water sports and marine expeditions tailored for you.'
+                    : 'Hơn 20+ trải nghiệm thể thao biển chuẩn quốc tế với đầy đủ bảo hiểm và thiết bị chuyên nghiệp.'}
+                </p>
+              </div>
 
-            <Link
-              to="/search"
-              className="px-6 py-3.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs sm:text-sm transition-colors shrink-0 flex items-center gap-1.5 shadow-md shadow-sky-900/20"
-            >
-              <span>{language === 'en' ? 'Explore All Tours' : 'Xem toàn bộ tour'}</span>
-              <ArrowRight className="w-4 h-4 shrink-0" />
-            </Link>
+              <Link
+                to="/search"
+                className="px-6 py-3.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs sm:text-sm transition-all shrink-0 flex items-center gap-2 shadow-lg shadow-black/30 hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <span>{language === 'en' ? 'Explore All Tours' : 'Xem toàn bộ tour'}</span>
+                <ArrowRight className="w-4 h-4 shrink-0" />
+              </Link>
+            </div>
           </div>
 
         </div>
