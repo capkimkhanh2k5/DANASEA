@@ -1,14 +1,12 @@
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/data/vendor_mock_database.dart';
 import '../../../../core/data/vendor_mock_repositories.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/toast_notification.dart';
+import '../../../../core/widgets/partner_account_app_bar_button.dart';
 import 'slot_config_screen.dart';
-import '../../../notifications/presentation/screens/notification_safety_screen.dart';
-import '../../../profile/presentation/screens/business_profile_screen.dart';
 
 class SlotCalendarScreen extends StatefulWidget {
   final String? initialServiceId;
@@ -32,6 +30,7 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
   late String _selectedServiceId;
   DateTime _selectedDate = DateTime.now();
   String _slotFilter = 'all'; // all, open, blocked
+  bool _isServiceDropdownExpanded = false;
 
   @override
   void initState() {
@@ -59,6 +58,8 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
     if (mounted) setState(() {});
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     final services = _db.services;
@@ -85,181 +86,216 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
     final totalBooked = daySlots.fold<int>(0, (sum, s) => sum + s.bookedCount);
     final totalCap = daySlots.fold<int>(0, (sum, s) => sum + s.capacity);
 
-    final fillRate = totalCap > 0 ? (totalBooked / totalCap * 100).toInt() : 0;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
         backgroundColor: AppColors.surface,
         elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                LocalizedText(
-                  'DANASEA',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.secondary,
-                      ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryContainer,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const LocalizedText('VENDOR', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.onPrimary)),
-                ),
-              ],
-            ),
-            const LocalizedText('Lịch hoạt động & Slot', style: TextStyle(fontSize: 12, color: AppColors.tertiary)),
-          ],
+        scrolledUnderElevation: 0,
+        titleSpacing: 16,
+        title: const LocalizedText(
+          'Lịch hoạt động & Slot',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.navyAnchor,
+          ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: AppColors.secondary),
-            onPressed: () {
-              if (widget.onOpenNotifications != null) {
-                widget.onOpenNotifications!();
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const NotificationSafetyScreen()),
-                );
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.account_circle, color: AppColors.primary),
-            onPressed: () {
-              if (widget.onOpenProfile != null) {
-                widget.onOpenProfile!();
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BusinessProfileScreen()),
-                );
-              }
-            },
-          ),
+          PartnerAccountAppBarButton(onPressed: widget.onOpenProfile),
         ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Service Selector Floating Card
+              // Service Selector Card with Direct Downward Dropdown
               Container(
-                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLow,
-                  borderRadius: AppShapes.radiusMd,
-                  boxShadow: AppShapes.shadowSm,
+                  color: AppColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: _isServiceDropdownExpanded ? AppColors.secondary : AppColors.borderSubtle,
+                    width: _isServiceDropdownExpanded ? 1.5 : 1.0,
+                  ),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x06102F3A), blurRadius: 8, offset: Offset(0, 2)),
+                  ],
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.secondaryContainer,
-                      ),
-                      child: const Icon(Icons.surfing, color: AppColors.onSecondaryContainer, size: 20),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    // Main Selector Bar
+                    Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
                         children: [
-                          const LocalizedText('DỊCH VỤ ÁP DỤNG', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.tertiary, letterSpacing: 0.5)),
-                          DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              value: services.any((s) => s.serviceId == _selectedServiceId) ? _selectedServiceId : null,
-                              isDense: true,
-                              isExpanded: true,
-                              hint: const LocalizedText('Chưa có dịch vụ nào', style: TextStyle(fontSize: 13, color: AppColors.outline)),
-                              items: services.map((s) {
-                                return DropdownMenuItem<String>(
-                                  value: s.serviceId,
-                                  child: LocalizedText(s.nameVi, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface), overflow: TextOverflow.ellipsis),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                if (val != null) {
-                                  setState(() => _selectedServiceId = val);
-                                  _slotRepo.getSlotsForService(val, _selectedDate);
-                                }
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _isServiceDropdownExpanded = !_isServiceDropdownExpanded;
+                                });
                               },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 2.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const LocalizedText(
+                                      'DỊCH VỤ ÁP DỤNG',
+                                      style: TextStyle(
+                                        fontSize: 9.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.tertiary,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            services.cast<ServiceModel?>().firstWhere(
+                                                  (s) => s?.serviceId == _selectedServiceId,
+                                                  orElse: () => services.isNotEmpty ? services.first : null,
+                                                )?.nameVi ?? 'Chưa chọn dịch vụ',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.navyAnchor,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        AnimatedRotation(
+                                          turns: _isServiceDropdownExpanded ? 0.5 : 0.0,
+                                          duration: const Duration(milliseconds: 200),
+                                          child: const Icon(
+                                            Icons.keyboard_arrow_down,
+                                            size: 20,
+                                            color: AppColors.secondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => SlotConfigScreen(
+                                    serviceId: _selectedServiceId,
+                                    initialDate: dateStr,
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(19),
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.secondary,
+                              ),
+                              child: const Icon(Icons.add, color: AppColors.onSecondary, size: 20),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => SlotConfigScreen(
-                              serviceId: _selectedServiceId,
-                              initialDate: dateStr,
-                            ),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        width: 38,
-                        height: 38,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primary,
+
+                    // Dropdown Options expanding directly downwards from the card
+                    if (_isServiceDropdownExpanded) ...[
+                      const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        child: Column(
+                          children: services.map((s) {
+                            final isSelected = s.serviceId == _selectedServiceId;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 6),
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedServiceId = s.serviceId;
+                                    _isServiceDropdownExpanded = false;
+                                  });
+                                  _slotRepo.getSlotsForService(s.serviceId, _selectedDate);
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppColors.secondaryContainer.withOpacity(0.25)
+                                        : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSelected ? AppColors.secondary : const Color(0xFFE2E8F0),
+                                      width: isSelected ? 1.5 : 1.0,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: isSelected ? AppColors.secondary : AppColors.surfaceContainerLow,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.surfing,
+                                          color: isSelected ? Colors.white : AppColors.secondary,
+                                          size: 16,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          s.nameVi,
+                                          style: TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                            color: isSelected ? AppColors.secondary : AppColors.navyAnchor,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        const Icon(Icons.check_circle, color: AppColors.secondary, size: 18),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
                         ),
-                        child: const Icon(Icons.add, color: AppColors.onPrimary, size: 22),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Weekly Horizontal Date Strip
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: LocalizedText(
-                            'Tháng ${_selectedDate.month} / ${_selectedDate.year}',
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: BorderRadius.circular(10)),
-                          child: const LocalizedText('Tuần 18', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.onSecondaryFixed)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () {
-                      final now = DateTime.now();
-                      setState(() {
-                        _selectedDate = DateTime(now.year, now.month, now.day);
-                      });
-                    },
-                    icon: const Icon(Icons.calendar_today, size: 14, color: AppColors.secondary),
-                    label: const LocalizedText('Hôm nay', style: TextStyle(fontSize: 12, color: AppColors.secondary, fontWeight: FontWeight.bold)),
-                  ),
-                ],
+              // Weekly Horizontal Date Strip Header
+              LocalizedText(
+                'Tháng ${_selectedDate.month} / ${_selectedDate.year}',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
               ),
               const SizedBox(height: 8),
 
@@ -285,32 +321,37 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                         width: 58,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primary : AppColors.surfaceContainerLowest,
+                          color: isSelected ? AppColors.secondary : AppColors.surfaceContainerLowest,
                           borderRadius: BorderRadius.circular(16),
-                          boxShadow: AppShapes.shadowSm,
+                          border: isSelected ? null : Border.all(color: AppColors.borderSubtle),
+                          boxShadow: isSelected
+                              ? [BoxShadow(color: AppColors.secondary.withOpacity(0.28), blurRadius: 8, offset: const Offset(0, 3))]
+                              : const [BoxShadow(color: Color(0x06102F3A), blurRadius: 4, offset: Offset(0, 1))],
                         ),
                         child: Column(
                           children: [
-                            LocalizedText(dayName,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: isSelected ? Colors.white70 : AppColors.tertiary,
-                                )),
-                            const SizedBox(height: 4),
+                            LocalizedText(
+                              dayName,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected ? Colors.white70 : AppColors.tertiary,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
                             LocalizedText(
                               dayDate.day.toString().padLeft(2, '0'),
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: isSelected ? Colors.white : AppColors.onSurface,
+                                color: isSelected ? Colors.white : AppColors.navyAnchor,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: isSelected ? Colors.white.withOpacity(0.25) : AppColors.surfaceContainerHigh,
+                                color: isSelected ? Colors.white.withOpacity(0.22) : AppColors.surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: LocalizedText(
@@ -329,71 +370,20 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                   }),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Day Highlights & Tide Rhythm Bento Card
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainer,
-                  borderRadius: AppShapes.radiusMd,
-                  boxShadow: AppShapes.shadowSm,
-                ),
-                child: Column(
+              // Sleek 1-line summary (clean, low-noise)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              const Icon(Icons.tsunami, size: 18, color: AppColors.secondary),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: LocalizedText(
-                                  'Tổng quan ngày ${_selectedDate.day}/${_selectedDate.month}',
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: BorderRadius.circular(10)),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.waves, size: 12, color: AppColors.secondary),
-                              SizedBox(width: 3),
-                              LocalizedText('Sóng êm 0.4m', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildBentoMetric('Khung giờ', '$totalSlots ca', 'Sáng & Chiều'),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildBentoMetric('Khách đã đặt', '$totalBooked/$totalCap', 'Còn ${totalCap - totalBooked} chỗ'),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _buildBentoMetric('Tỉ lệ lấp đầy', '$fillRate%', 'Công suất', progress: fillRate / 100),
-                        ),
-                      ],
-                    ),
+                    Text('Ngày ${_selectedDate.day}/${_selectedDate.month} • $totalSlots ca chạy', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.navyAnchor)),
+                    Text('Đã đặt: $totalBooked/$totalCap khách', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.secondary)),
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-
+              const SizedBox(height: 8),
               // Filter pills: Tất cả, Đang mở, Đã khóa
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -407,7 +397,7 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
               // Slot Cards List
               if (slotsForDay.isEmpty)
@@ -416,7 +406,8 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: AppColors.surfaceContainerLowest,
-                    borderRadius: AppShapes.radiusMd,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.borderSubtle),
                   ),
                   child: Center(
                     child: Column(
@@ -467,54 +458,29 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
     );
   }
 
-  Widget _buildBentoMetric(String label, String value, String sub, {double? progress}) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LocalizedText(label, style: const TextStyle(fontSize: 10, color: AppColors.tertiary)),
-          const SizedBox(height: 4),
-          LocalizedText(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
-          const SizedBox(height: 2),
-          LocalizedText(sub, style: const TextStyle(fontSize: 10, color: AppColors.secondary, fontWeight: FontWeight.w600)),
-          if (progress != null) ...[
-            const SizedBox(height: 4),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(2),
-              child: LinearProgressIndicator(
-                value: progress.clamp(0.0, 1.0),
-                minHeight: 4,
-                backgroundColor: AppColors.surfaceContainerHigh,
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.secondary),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
   Widget _buildSlotFilterChip(String key, String label) {
     final active = _slotFilter == key;
     return InkWell(
       onTap: () => setState(() => _slotFilter = key),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: active ? AppColors.onSurface : AppColors.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(20),
+          color: active ? AppColors.secondary : AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: active ? AppColors.secondary : AppColors.borderSubtle,
+          ),
+          boxShadow: active
+              ? [BoxShadow(color: AppColors.secondary.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))]
+              : null,
         ),
         child: LocalizedText(
           label,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: active ? FontWeight.bold : FontWeight.normal,
+            fontWeight: active ? FontWeight.bold : FontWeight.w500,
             color: active ? Colors.white : AppColors.onSurfaceVariant,
           ),
         ),
@@ -526,12 +492,16 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
     final bool isFull = slot.bookedCount >= slot.capacity;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
-        borderRadius: AppShapes.radiusMd,
-        border: slot.isBlocked ? Border.all(color: AppColors.errorContainer, width: 1.5) : null,
-        boxShadow: AppShapes.shadowSm,
+        borderRadius: BorderRadius.circular(14),
+        border: slot.isBlocked
+            ? Border.all(color: AppColors.errorContainer, width: 1.5)
+            : Border.all(color: AppColors.borderSubtle),
+        boxShadow: const [
+          BoxShadow(color: Color(0x06102F3A), blurRadius: 8, offset: Offset(0, 2)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -539,35 +509,25 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    slot.startTime.startsWith('05') ? Icons.wb_twilight : Icons.wb_sunny,
-                    size: 18,
-                    color: slot.isBlocked ? AppColors.tertiary : AppColors.secondary,
-                  ),
-                  const SizedBox(width: 6),
-                  LocalizedText(
-                    '${slot.startTime.substring(0, 5)} - ${slot.endTime.substring(0, 5)}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: slot.isBlocked ? AppColors.tertiary : AppColors.onSurface,
-                    ),
-                  ),
-                ],
+              LocalizedText(
+                '${slot.startTime.substring(0, 5)} - ${slot.endTime.substring(0, 5)}',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: slot.isBlocked ? AppColors.tertiary : AppColors.navyAnchor,
+                ),
               ),
               if (slot.isBlocked)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.errorContainer,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.block, size: 12, color: AppColors.error),
-                      SizedBox(width: 4),
+                      Icon(Icons.block, size: 11, color: AppColors.error),
+                      SizedBox(width: 3),
                       LocalizedText('TẠM KHÓA', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.onErrorContainer)),
                     ],
                   ),
@@ -576,23 +536,23 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryFixed,
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppColors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const LocalizedText('HẾT CHỖ', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.onPrimaryFixedVariant)),
+                  child: const LocalizedText('HẾT CHỖ', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.tertiary)),
                 )
               else
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.secondaryContainer,
-                    borderRadius: BorderRadius.circular(10),
+                    color: AppColors.secondaryContainer.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const LocalizedText('CÒN CHỖ', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.onSecondaryContainer)),
+                  child: const LocalizedText('CÒN CHỖ', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary)),
                 ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
 
           // Capacity & Booked row
           Row(
@@ -600,54 +560,75 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
             children: [
               Row(
                 children: [
-                  const LocalizedText('Khách đã đặt: ', style: TextStyle(fontSize: 12, color: AppColors.tertiary)),
-                  LocalizedText('${slot.bookedCount}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                  LocalizedText(' / ${slot.capacity} khách', style: const TextStyle(fontSize: 12, color: AppColors.tertiary)),
+                  const LocalizedText('Khách đã đặt: ', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
+                  LocalizedText(
+                    '${slot.bookedCount}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                  ),
+                  LocalizedText(' / ${slot.capacity} khách', style: const TextStyle(fontSize: 11, color: AppColors.tertiary)),
                 ],
               ),
               if (slot.heldCount > 0)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.surfaceContainerHigh, borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(color: AppColors.surfaceContainerHigh, borderRadius: BorderRadius.circular(6)),
                   child: LocalizedText('Tạm giữ: ${slot.heldCount}', style: const TextStyle(fontSize: 10, color: AppColors.tertiary)),
                 ),
             ],
           ),
           const SizedBox(height: 6),
           ClipRRect(
-            borderRadius: BorderRadius.circular(3),
+            borderRadius: BorderRadius.circular(2),
             child: LinearProgressIndicator(
               value: slot.capacity > 0 ? (slot.bookedCount / slot.capacity).clamp(0.0, 1.0) : 0,
-              minHeight: 5,
+              minHeight: 4,
               backgroundColor: AppColors.surfaceContainerHigh,
               valueColor: AlwaysStoppedAnimation<Color>(slot.isBlocked ? AppColors.tertiary : AppColors.secondary),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
 
           // Actions
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               // Toggle block button
-              TextButton.icon(
-                onPressed: () {
+              InkWell(
+                onTap: () {
                   _db.toggleSlotBlocked(slot.slotId);
                   ToastNotification.showInfo(
                     context,
                     slot.isBlocked ? 'Đã mở khóa slot ${slot.startTime}' : 'Đã tạm khóa slot ${slot.startTime}',
                   );
                 },
-                icon: Icon(slot.isBlocked ? Icons.lock_open : Icons.block, size: 15, color: slot.isBlocked ? AppColors.secondary : AppColors.error),
-                label: LocalizedText(
-                  slot.isBlocked ? 'Mở khóa' : 'Tạm khóa',
-                  style: TextStyle(fontSize: 12, color: slot.isBlocked ? AppColors.secondary : AppColors.error),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        slot.isBlocked ? Icons.lock_open : Icons.block,
+                        size: 14,
+                        color: slot.isBlocked ? AppColors.secondary : AppColors.tertiary,
+                      ),
+                      const SizedBox(width: 4),
+                      LocalizedText(
+                        slot.isBlocked ? 'Mở khóa' : 'Tạm khóa',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: slot.isBlocked ? AppColors.secondary : AppColors.tertiary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               // Edit config button
-              ElevatedButton.icon(
-                onPressed: () {
+              InkWell(
+                onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (_) => SlotConfigScreen(
@@ -657,14 +638,29 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                     ),
                   );
                 },
-                icon: const Icon(Icons.tune, size: 14),
-                label: const LocalizedText('Cấu hình', style: TextStyle(fontSize: 12)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.surfaceContainerLow,
-                  foregroundColor: AppColors.secondary,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.secondary.withOpacity(0.25)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.edit_outlined, size: 13, color: AppColors.secondary),
+                      SizedBox(width: 4),
+                      LocalizedText(
+                        'Chỉnh sửa',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.secondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
