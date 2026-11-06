@@ -1,3 +1,4 @@
+import { BookingStepper } from "../../../components/customer/BookingStepper";
 import { useCartStore } from "../../../store/useCartStore";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
@@ -12,7 +13,6 @@ import {
   ShieldCheck,
   AlertCircle,
   XCircle,
-  ChevronRight,
   MailCheck,
   Users,
 } from "lucide-react";
@@ -218,61 +218,9 @@ export function PaymentResult() {
   return (
     <main className="w-full pt-24 bg-white min-h-[calc(100vh-80px)] flex-1">
       <div className="flex flex-col w-full">
-        {/* Sub-Header Progress Stepper Bar - Airbnb Style */}
-        <section className="w-full bg-slate-50 border-b border-slate-200/80">
-          <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            {/* Breadcrumb Navigation */}
-            <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
-              <span 
-                className="hover:text-slate-900 cursor-pointer transition-colors" 
-                onClick={() => navigate('/')}
-              >
-                DANASEA
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              <span 
-                className="hover:text-slate-900 cursor-pointer transition-colors" 
-                onClick={() => navigate('/profile/orders')}
-              >
-                Đơn hàng
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-slate-900 font-semibold">Kết quả thanh toán</span>
-            </div>
-
-            {/* Stepper Component */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
-              <div 
-                onClick={() => navigate('/cart')}
-                className="flex items-center gap-3 rounded-xl bg-slate-100/70 border border-slate-200/70 p-3 cursor-pointer hover:bg-slate-100 transition-colors"
-              >
-                <span className="text-sm font-semibold text-emerald-700">01.</span>
-                <div className="min-w-0">
-                  <p className="text-xs text-emerald-700 font-medium">Bước 1 (Đã chọn)</p>
-                  <p className="text-sm font-bold text-slate-900 truncate">Giỏ hàng</p>
-                </div>
-              </div>
-
-              <div 
-                onClick={() => navigate('/checkout')}
-                className="flex items-center gap-3 rounded-xl bg-slate-100/70 border border-slate-200/70 p-3 cursor-pointer hover:bg-slate-100 transition-colors"
-              >
-                <span className="text-sm font-semibold text-emerald-700">02.</span>
-                <div className="min-w-0">
-                  <p className="text-xs text-emerald-700 font-medium">Bước 2 (Đã chọn)</p>
-                  <p className="text-sm font-bold text-slate-900 truncate">Thông tin &amp; Thanh toán</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 rounded-xl bg-white border border-slate-300 p-3 shadow-xs">
-                <span className="text-sm font-bold text-slate-900">03.</span>
-                <div className="min-w-0">
-                  <p className="text-xs text-slate-500 font-medium">Bước 3</p>
-                  <p className="text-sm font-bold text-slate-900 truncate">Nhận vé điện tử QR</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Sub-Header Progress Stepper Bar */}
+        <section className="w-full bg-slate-50/70 border-b border-slate-200/80">
+          <BookingStepper currentStep={3} />
         </section>
 
         {/* Main Content Area */}

@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { BookingStepper } from "../../../components/customer/BookingStepper";
 import { useCartStore } from "../../../store/useCartStore";
 import {
   ShoppingCart,
@@ -25,39 +26,9 @@ export function Cart() {
   return (
     <main className="w-full pt-20 bg-white min-h-[calc(100vh-80px)] flex-1">
       <div className="flex flex-col w-full">
-        {/* Sub-Header Progress Stepper Bar - Airbnb Clean Architecture */}
-        <section className="w-full bg-slate-50 border-b border-slate-200/80">
-          <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            {/* Stepper Component - Architectural Geometry */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
-              {/* Step 1: Active in Cart */}
-              <div className="flex items-center gap-3 rounded-xl bg-white border border-slate-300 p-3">
-                <span className="text-sm font-bold text-slate-900">01.</span>
-                <div className="min-w-0">
-                  <p className="text-xs text-slate-500 font-medium">Bước 1</p>
-                  <p className="text-sm font-bold text-slate-900 truncate">Giỏ hàng</p>
-                </div>
-              </div>
-
-              {/* Step 2: Next */}
-              <div className="flex items-center gap-3 rounded-xl bg-slate-100/70 border border-slate-200/70 p-3">
-                <span className="text-sm font-semibold text-slate-600">02.</span>
-                <div className="min-w-0">
-                  <p className="text-xs text-slate-600 font-medium">Bước 2</p>
-                  <p className="text-sm font-medium text-slate-700 truncate">Thông tin &amp; Thanh toán</p>
-                </div>
-              </div>
-
-              {/* Step 3: Final */}
-              <div className="flex items-center gap-3 rounded-xl bg-slate-100/70 border border-slate-200/70 p-3">
-                <span className="text-sm font-semibold text-slate-600">03.</span>
-                <div className="min-w-0">
-                  <p className="text-xs text-slate-600 font-medium">Bước 3</p>
-                  <p className="text-sm font-medium text-slate-700 truncate">Nhận vé điện tử QR</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Sub-Header Progress Stepper Bar */}
+        <section className="w-full bg-slate-50/70 border-b border-slate-200/80">
+          <BookingStepper currentStep={1} />
         </section>
 
         {/* Main Content Layout - Airbnb 1280px Grid */}
