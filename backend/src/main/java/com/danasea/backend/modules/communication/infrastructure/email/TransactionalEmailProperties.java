@@ -51,7 +51,7 @@ public class TransactionalEmailProperties {
         return EmailDeliveryMode.fromString(mode);
     }
 
-    public boolean isWorkerEnabled() {
+    public boolean shouldRunWorker() {
         return worker.isEnabled() && getDeliveryMode() != EmailDeliveryMode.OFF;
     }
 
