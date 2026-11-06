@@ -63,6 +63,7 @@
     "sub_order_reschedule_proposals": "replace",
     "sub_orders": "replace",
     "system_configs": "preserve",
+    "transactional_email_delivery": "replace",
     "users": "replace",
     "vendor_commission_policies": "preserve",
     "vendor_departure_cancellations": "replace",
@@ -4689,6 +4690,138 @@
             "value",
             "character varying(255)",
             false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.transactional_email_delivery",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "type",
+            "character varying(64)",
+            true,
+            ""
+          ],
+          [
+            "business_key",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "recipient_key",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "family",
+            "character varying(32)",
+            true,
+            ""
+          ],
+          [
+            "mode",
+            "character varying(16)",
+            true,
+            ""
+          ],
+          [
+            "status",
+            "character varying(32)",
+            true,
+            ""
+          ],
+          [
+            "payload_version",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "payload",
+            "jsonb",
+            true,
+            ""
+          ],
+          [
+            "occurred_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "due_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "expires_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "attempt_count",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "next_attempt_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "lease_token",
+            "character varying(64)",
+            false,
+            ""
+          ],
+          [
+            "leased_until",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "accepted_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "last_error_code",
+            "character varying(64)",
+            false,
+            ""
+          ],
+          [
+            "last_error_message",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
             ""
           ]
         ]

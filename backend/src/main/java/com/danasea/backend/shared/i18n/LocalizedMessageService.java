@@ -34,7 +34,7 @@ public class LocalizedMessageService {
         source.setBasenames(
                 "classpath:i18n/common", "classpath:i18n/validation", "classpath:i18n/auth",
                 "classpath:i18n/booking", "classpath:i18n/weather", "classpath:i18n/notification",
-                "classpath:i18n/ai", "classpath:i18n/policy");
+                "classpath:i18n/ai", "classpath:i18n/policy", "classpath:i18n/transactional_email");
         source.setDefaultEncoding(StandardCharsets.UTF_8.name());
         source.setFallbackToSystemLocale(false);
         return new LocalizedMessageService(source);
