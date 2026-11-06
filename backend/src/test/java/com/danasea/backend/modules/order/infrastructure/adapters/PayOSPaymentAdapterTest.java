@@ -197,4 +197,39 @@ class PayOSPaymentAdapterTest {
         assertThat(captureResult.status()).isEqualTo("COMPLETED");
         assertThat(captureResult.amount()).isEqualByComparingTo("250000");
     }
+
+    @Test
+    @DisplayName("verifyWebhookSignature and verifyWebhookData validate payloads using checksum key")
+    void testWebhookVerification() {
+        Map<String, Object> dataMap = Map.of("amount", 250000, "orderCode", 123456);
+        String validSig = PayOSSignatureHelper.hmacSha256(CHECKSUM_KEY, "amount=250000&orderCode=123456");
+
+        assertThat(adapter.verifyWebhookData(dataMap, validSig)).isTrue();
+        assertThat(adapter.verifyWebhookData(dataMap, "invalid-sig")).isFalse();
+
+        Map<String, String> rawParams = Map.of("amount", "250000", "orderCode", "123456");
+        String rawSig = PayOSSignatureHelper.hmacSha256(CHECKSUM_KEY, "amount=250000&orderCode=123456");
+        assertThat(adapter.verifyWebhookSignature(rawParams, rawSig)).isTrue();
+    }
+
+    @Test
+    @DisplayName("cancelPayment with invalid provider or blank orderId returns failed result")
+    void testCancelPaymentInvalidInput() {
+        PaymentCancelResult res1 = adapter.cancelPayment(PaymentProvider.VNPAY, "123", "Reason");
+        assertThat(res1.success()).isFalse();
+        assertThat(res1.errorCode()).isEqualTo("INVALID_REQUEST");
+
+        PaymentCancelResult res2 = adapter.cancelPayment(PaymentProvider.PAYOS, "   ", "Reason");
+        assertThat(res2.success()).isFalse();
+        assertThat(res2.errorCode()).isEqualTo("INVALID_REQUEST");
+    }
+
+    @Test
+    @DisplayName("requestRefund returns manual review required result")
+    void testRequestRefundUnsupported() {
+        com.danasea.backend.modules.order.domain.ports.RefundResult refundResult =
+                adapter.requestRefund("tx-123", BigDecimal.TEN);
+        assertThat(refundResult.success()).isFalse();
+        assertThat(refundResult.providerRefundId()).isEqualTo("MANUAL_REVIEW_REQUIRED");
+    }
 }

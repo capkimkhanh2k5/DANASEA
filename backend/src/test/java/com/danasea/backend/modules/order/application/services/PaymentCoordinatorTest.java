@@ -1,10 +1,13 @@
 package com.danasea.backend.modules.order.application.services;
 
+import com.danasea.backend.modules.booking.domain.models.BookingStatus;
 import com.danasea.backend.modules.booking.domain.ports.InventoryLockPort;
 import com.danasea.backend.modules.booking.infrastructure.persistence.entities.BookingJpaEntity;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
 import com.danasea.backend.modules.order.application.OrderPaymentService;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
+import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
+import com.danasea.backend.modules.order.domain.exceptions.UnauthorizedOrderAccessException;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentAttemptState;
 import com.danasea.backend.modules.order.domain.models.PaymentCancelStatus;
@@ -375,5 +378,127 @@ class PaymentCoordinatorTest {
         assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "idemp-unresolved-01"))
                 .isInstanceOf(InvalidOrderStateException.class)
                 .hasMessageContaining("Previous payment request timed out and provider verification is pending");
+    }
+
+    @Test
+    @DisplayName("startPayment and switchProvider reject null inputs or malformed idempotency keys")
+    void testValidateInputsRejectsInvalidArguments() {
+        assertThatThrownBy(() -> coordinator.startPayment(null, orderId, PaymentProvider.PAYOS, "key-12345678"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> coordinator.startPayment(customerId, null, PaymentProvider.PAYOS, "key-12345678"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, null, "key-12345678"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "short"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThatThrownBy(() -> coordinator.switchProvider(null, orderId, PaymentProvider.PAYOS, "key-12345678"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("getPaymentStatus throws OrderNotFoundException when order does not exist")
+    void testGetPaymentStatusOrderNotFound() {
+        when(masterOrderRepository.findById(orderId)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> coordinator.getPaymentStatus(customerId, orderId))
+                .isInstanceOf(OrderNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("getPaymentStatus throws UnauthorizedOrderAccessException when customer does not match")
+    void testGetPaymentStatusUnauthorizedCustomer() {
+        UUID otherCustomer = UUID.randomUUID();
+        when(masterOrderRepository.findById(orderId)).thenReturn(Optional.of(masterOrder));
+        assertThatThrownBy(() -> coordinator.getPaymentStatus(otherCustomer, orderId))
+                .isInstanceOf(UnauthorizedOrderAccessException.class);
+    }
+
+    @Test
+    @DisplayName("getPaymentStatus marks window as expired when deadline is in the past")
+    void testGetPaymentStatusExpiredDeadline() {
+        masterOrder.setPaymentDeadline(OffsetDateTime.now().minusSeconds(10));
+        when(masterOrderRepository.findById(orderId)).thenReturn(Optional.of(masterOrder));
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
+
+        PaymentStatusResponse status = coordinator.getPaymentStatus(customerId, orderId);
+
+        assertThat(status).isNotNull();
+        assertThat(status.isExpired()).isTrue();
+        assertThat(status.remainingSeconds()).isZero();
+    }
+
+    @Test
+    @DisplayName("getPaymentStatus reconciles pending payment with gateway when orderPaymentService is configured")
+    void testGetPaymentStatusReconcilesWithGateway() {
+        masterOrder.setStatus(MasterOrderStatus.PENDING_PAYMENT);
+        when(masterOrderRepository.findById(orderId)).thenReturn(Optional.of(masterOrder));
+        when(orderPaymentService.reconcilePaymentWithGateway(orderId)).thenReturn(true);
+
+        MasterOrderJpaEntity paidOrder = new MasterOrderJpaEntity();
+        paidOrder.setId(orderId);
+        paidOrder.setCustomerId(customerId);
+        paidOrder.setStatus(MasterOrderStatus.PAID);
+        paidOrder.setPaymentStatus(PaymentOrderStatus.PAID);
+        when(masterOrderRepository.findById(orderId)).thenReturn(Optional.of(masterOrder), Optional.of(paidOrder));
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
+
+        PaymentStatusResponse status = coordinator.getPaymentStatus(customerId, orderId);
+
+        assertThat(status).isNotNull();
+        assertThat(status.orderStatus()).isEqualTo(MasterOrderStatus.PAID);
+        assertThat(status.paymentStatus()).isEqualTo(PaymentOrderStatus.PAID);
+    }
+
+    @Test
+    @DisplayName("sweepExpiredClosingOrders cancels master order and releases inventory when active attempt is absent")
+    void testSweepExpiredClosingOrdersWithoutActiveAttempt() {
+        masterOrder.setPaymentDeadline(OffsetDateTime.now().minusMinutes(2));
+        when(masterOrderRepository.findAll()).thenReturn(List.of(masterOrder));
+        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
+        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        coordinator.sweepExpiredClosingOrders();
+
+        assertThat(masterOrder.getStatus()).isEqualTo(MasterOrderStatus.CANCELLED);
+        verify(masterOrderRepository).save(masterOrder);
+        verify(inventoryLockPort).releaseHolds(eq(bookingId), any());
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        verify(bookingRepository).save(booking);
+    }
+
+    @Test
+    @DisplayName("sweepExpiredClosingOrders cancels provider order server-side and terminates attempt")
+    void testSweepExpiredClosingOrdersWithActiveAttempt() {
+        masterOrder.setPaymentDeadline(OffsetDateTime.now().minusMinutes(2));
+
+        PaymentJpaEntity activePayment = new PaymentJpaEntity();
+        activePayment.setId(UUID.randomUUID());
+        activePayment.setMasterOrderId(orderId);
+        activePayment.setProvider(PaymentProvider.PAYOS);
+        activePayment.setProviderOrderId("link-sweep-01");
+        activePayment.setIsActive(true);
+        activePayment.setAttemptState(PaymentAttemptState.PENDING);
+
+        when(masterOrderRepository.findAll()).thenReturn(List.of(masterOrder));
+        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
+        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(activePayment));
+        when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
+        when(payosAdapter.queryPayment(eq(PaymentProvider.PAYOS), eq("link-sweep-01"), any()))
+                .thenReturn(new PaymentCaptureResult(false, null, null, "VND", "PENDING", "Unpaid"));
+        when(payosAdapter.canCancelServerSide(PaymentProvider.PAYOS)).thenReturn(true);
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+
+        coordinator.sweepExpiredClosingOrders();
+
+        verify(payosAdapter).cancelPayment(PaymentProvider.PAYOS, "link-sweep-01", "DANASEA deadline expired");
+        assertThat(activePayment.getIsActive()).isFalse();
+        assertThat(activePayment.getAttemptState()).isEqualTo(PaymentAttemptState.TERMINATED);
+        assertThat(activePayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
+        verify(paymentRepository).save(activePayment);
+        assertThat(masterOrder.getStatus()).isEqualTo(MasterOrderStatus.CANCELLED);
+        verify(inventoryLockPort).releaseHolds(eq(bookingId), any());
     }
 }

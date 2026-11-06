@@ -250,4 +250,62 @@ class ZaloPayPaymentAdapterTest {
 
         adapter.setPaymentRepository(null);
     }
+
+    @Test
+    @DisplayName("verifyWebhookSignature and verifyCallback validate MAC with key2")
+    void testWebhookAndCallbackVerification() {
+        String data = "{\"app_id\":2553,\"app_trans_id\":\"261105_123456\",\"amount\":500000}";
+        String validMac = ZaloPaySignatureHelper.hmacSha256(KEY2, data);
+
+        assertThat(adapter.verifyCallback(data, validMac)).isTrue();
+        assertThat(adapter.verifyCallback(data, "bad-mac")).isFalse();
+
+        java.util.Map<String, String> rawParams = java.util.Map.of("data", data, "mac", validMac);
+        assertThat(adapter.verifyWebhookSignature(rawParams, validMac)).isTrue();
+        assertThat(adapter.verifyWebhookSignature(rawParams, null)).isTrue();
+    }
+
+    @Test
+    @DisplayName("cancelPayment with invalid provider or blank orderId returns failed result")
+    void testCancelPaymentInvalidInput() {
+        PaymentCancelResult res1 = adapter.cancelPayment(PaymentProvider.VNPAY, "123", "Reason");
+        assertThat(res1.success()).isFalse();
+        assertThat(res1.errorCode()).isEqualTo("INVALID_REQUEST");
+
+        PaymentCancelResult res2 = adapter.cancelPayment(PaymentProvider.ZALOPAY, "   ", "Reason");
+        assertThat(res2.success()).isFalse();
+        assertThat(res2.errorCode()).isEqualTo("INVALID_REQUEST");
+    }
+
+    @Test
+    @DisplayName("requestRefund returns manual review required result")
+    void testRequestRefundUnsupported() {
+        com.danasea.backend.modules.order.domain.ports.RefundResult refundResult =
+                adapter.requestRefund("tx-123", BigDecimal.TEN);
+        assertThat(refundResult.success()).isFalse();
+        assertThat(refundResult.providerRefundId()).isEqualTo("MANUAL_REVIEW_REQUIRED");
+    }
+
+    @Test
+    @DisplayName("createPaymentIntent 3-arg overload generates paymentId and calls 4-arg method")
+    void testCreatePaymentIntentThreeArgs() {
+        String mockResponse = """
+                {
+                    "return_code": 1,
+                    "return_message": "Giao dich thanh cong",
+                    "sub_return_code": 1,
+                    "sub_return_message": "Giao dich thanh cong",
+                    "order_url": "https://qcgateway.zalopay.vn/openinapp?order=test",
+                    "zp_trans_token": "26110500002"
+                }
+                """;
+
+        mockServer.expect(requestTo("https://sb-openapi.zalopay.vn/v2/create"))
+                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
+
+        PaymentIntentResult result = adapter.createPaymentIntent(UUID.randomUUID(), new BigDecimal("100000"), PaymentProvider.ZALOPAY);
+        assertThat(result).isNotNull();
+        assertThat(result.paymentUrl()).isEqualTo("https://qcgateway.zalopay.vn/openinapp?order=test");
+    }
 }
