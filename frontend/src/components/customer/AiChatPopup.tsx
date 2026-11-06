@@ -51,7 +51,7 @@ export const AiChatPopup: React.FC = () => {
   return (
     <div
       role="dialog"
-      aria-label="Cửa sổ Hỗ trợ & Tư vấn dịch vụ"
+      aria-label="Cửa sổ Trợ lý tư vấn dịch vụ"
       className="fixed bottom-20 right-3 left-3 sm:left-auto sm:bottom-6 sm:right-[88px] z-50 w-auto sm:w-[360px] h-[480px] max-h-[calc(100vh-80px)] bg-white rounded-2xl border border-slate-200/90 shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-left"
     >
       {/* Top Header - Synced with Footer Brand Navy (#031d44) */}
@@ -61,7 +61,7 @@ export const AiChatPopup: React.FC = () => {
             <Bot className="w-4 h-4 text-white" />
           </div>
           <div>
-            <span className="font-semibold text-xs tracking-tight text-white block">Tư vấn dịch vụ & Hải văn</span>
+            <span className="font-semibold text-xs tracking-tight text-white block">Trợ lý tư vấn dịch vụ</span>
           </div>
         </div>
 
