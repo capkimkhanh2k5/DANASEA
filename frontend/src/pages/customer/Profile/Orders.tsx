@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Lock,
   Compass,
@@ -15,6 +15,7 @@ import {
   Calendar,
   Clock,
   CheckCircle2,
+  XCircle,
   X,
   Send,
   AlertCircle,
@@ -27,8 +28,12 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { orderService } from "../../../services/orderService";
+import { paymentService } from "../../../services/paymentService";
 import { reviewService, type ReviewResponse } from "../../../services/reviewService";
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
+import { disputeService } from "../../../services/disputeService";
+import { notificationService } from "../../../services/notificationService";
+import type { DisputeReason, DisputeResponse } from "../../../types/dispute";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { authService } from "../../../services/authService";
 import { toast } from "../../../store/useToastStore";
@@ -47,6 +52,7 @@ type OrderFilter = "all" | "upcoming" | "pending" | "completed" | "cancelled";
 
 export function Orders() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, isAuthenticated, accessToken, setAuth } = useAuthStore();
 
   // State management
@@ -66,12 +72,59 @@ export function Orders() {
 
   const [serviceDetails, setServiceDetails] = useState<Record<string, ServiceDetailDto>>({});
 
+  // Order hold expiration check (15 minutes from creation)
+  const isOrderPaymentExpired = useCallback((order: OrderResponse, referenceTime = Date.now()) => {
+    if (order.status !== 'PENDING_PAYMENT') return false;
+    if (!order.createdAt) return false;
+    const createdMs = new Date(order.createdAt).getTime();
+    if (isNaN(createdMs)) return false;
+    return referenceTime - createdMs > 15 * 60 * 1000;
+  }, []);
+
+  // Pay now state
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
+
+  const handlePayNow = async (order: OrderResponse) => {
+    if (isOrderPaymentExpired(order)) {
+      toast.error('Đơn hàng này đã quá thời hạn giữ chỗ thanh toán (15 phút). Vui lòng đặt lại đơn mới.');
+      return;
+    }
+
+    try {
+      setPayingOrderId(order.id);
+      const res = await paymentService.createPaymentIntent(order.id, {
+        provider: 'VNPAY',
+      });
+      const url = res.paymentUrl || res.paymentReference;
+      if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+        window.location.assign(url);
+      } else {
+        toast.error('Không nhận được liên kết thanh toán. Vui lòng thử lại sau.');
+      }
+    } catch (err: unknown) {
+      console.error('[Orders] Lỗi khi mở cổng thanh toán:', err);
+      let msg = 'Không thể khởi tạo cổng thanh toán cho đơn hàng này. Vui lòng thử lại.';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const resp = (err as { response?: { status?: number; data?: { message?: string } } }).response;
+        if (resp?.status === 409) {
+          msg = 'Đơn hàng đã hết hạn giữ chỗ (15 phút) hoặc không thể thanh toán. Vui lòng đặt lại đơn mới.';
+        } else if (resp?.data?.message) {
+          msg = resp.data.message;
+        }
+      }
+      toast.error(msg);
+    } finally {
+      setPayingOrderId(null);
+    }
+  };
+
   // Reschedule state
   const [rescheduleMap, setRescheduleMap] = useState<Record<string, RescheduleOptionsSummaryResponse>>({});
   const [confirmingRescheduleId, setConfirmingRescheduleId] = useState<string | null>(null);
 
   // QR Modal state
   const [selectedSubOrder, setSelectedSubOrder] = useState<SubOrderResponse | null>(null);
+  const [selectedMasterOrder, setSelectedMasterOrder] = useState<OrderResponse | null>(null);
   const [qrData, setQrData] = useState<QrCodeResponse | null>(null);
   const [qrLoading, setQrLoading] = useState<boolean>(false);
   const [qrError, setQrError] = useState<string | null>(null);
@@ -112,8 +165,10 @@ export function Orders() {
 
   // Dispute Modal state
   const [disputingSubOrder, setDisputingSubOrder] = useState<SubOrderResponse | null>(null);
+  const [disputeReasonType, setDisputeReasonType] = useState<DisputeReason>("SERVICE_NOT_AS_DESCRIBED");
   const [disputeReason, setDisputeReason] = useState("");
-  const [submittedDisputes, setSubmittedDisputes] = useState<Record<string, string>>({});
+  const [isSubmittingDispute, setIsSubmittingDispute] = useState(false);
+  const [submittedDisputes, setSubmittedDisputes] = useState<Record<string, DisputeResponse>>({});
 
   const serviceDetailsCache = useRef<Record<string, ServiceDetailDto>>({});
 
@@ -129,37 +184,53 @@ export function Orders() {
 
       // Extract unique service IDs to fetch service details and fetch refund history
       const serviceIds = new Set<string>();
+      const activeSubOrderIds = new Set<string>();
       (res.content || []).forEach((ord) => {
+        // isPaidMaster verified
         const items = ord.items || ord.subOrders || [];
         items.forEach((item) => {
           if (item.serviceId) serviceIds.add(item.serviceId);
-          if (item.status === "CONFIRMED") {
-            orderService
-              .getRescheduleOptions(item.id)
-              .then((opts) => {
-                if (opts && opts.options && opts.options.some((o: RescheduleOptionItem) => o.isProposedByVendor)) {
-                  setRescheduleMap((prev) => ({ ...prev, [item.id]: opts }));
-                } else {
-                  setRescheduleMap((prev) => {
-                    if (!prev[item.id]) return prev;
-                    const next = { ...prev };
-                    delete next[item.id];
-                    return next;
-                  });
-                }
-              })
-              .catch(() => {
-                // Non-critical, ignore
-              });
-          } else {
-            setRescheduleMap((prev) => {
-              if (!prev[item.id]) return prev;
-              const next = { ...prev };
-              delete next[item.id];
-              return next;
-            });
+          if (item.id && (item.status === 'CONFIRMED' || item.status === 'PENDING')) {
+            activeSubOrderIds.add(item.id);
           }
         });
+      });
+
+      // Targeted: Load reschedule options ONLY for active sub-orders with proposals or URL params
+      const paramSubId = searchParams.get('rescheduleSubOrderId');
+      if (paramSubId && activeSubOrderIds.has(paramSubId)) {
+        orderService.getRescheduleOptions(paramSubId, true).then((summary) => {
+          if (summary && summary.options && summary.options.length > 0) {
+            setRescheduleMap((prev) => ({ ...prev, [paramSubId]: summary }));
+          }
+        }).catch(() => {});
+      }
+
+      notificationService.getMyNotifications(0, 50).then((notifRes) => {
+        if (notifRes && notifRes.content) {
+          const proposalSubIds = new Set(
+            notifRes.content
+              .filter(
+                (n) =>
+                  (n.type === 'RESCHEDULE_PROPOSAL' || n.type === 'DISRUPTION_DECISION') &&
+                  n.relatedEntityType === 'SUB_ORDER' &&
+                  n.relatedEntityId &&
+                  activeSubOrderIds.has(n.relatedEntityId)
+              )
+              .map((n) => n.relatedEntityId as string)
+          );
+
+          proposalSubIds.forEach((subId) => {
+            orderService.getRescheduleOptions(subId, true).then((summary) => {
+              if (summary && summary.options && summary.options.length > 0) {
+                setRescheduleMap((prev) => ({ ...prev, [subId]: summary }));
+              }
+            }).catch(() => {});
+          });
+        }
+      }).catch(() => {});
+
+      (res.content || []).forEach((ord) => {
 
         // Query refund history for each order
         orderService.getOrderRefunds(ord.id).then((refunds) => {
@@ -171,17 +242,49 @@ export function Orders() {
         });
       });
 
-      // Lazy load service details for titles and images
-      serviceIds.forEach(async (sId) => {
-        if (!serviceDetailsCache.current[sId]) {
-          try {
-            const detail = await serviceCatalogService.getServiceDetail(sId);
-            serviceDetailsCache.current[sId] = detail;
-            setServiceDetails((prev) => ({ ...prev, [sId]: detail }));
-          } catch {
-            // Non-critical, fallback will be used
-          }
+      // Load existing customer disputes from backend
+      disputeService.getCustomerDisputes(0, 50).then((pageRes) => {
+        if (pageRes && pageRes.content) {
+          const map: Record<string, DisputeResponse> = {};
+          pageRes.content.forEach((d) => {
+            if (d.subOrderId) map[d.subOrderId] = d;
+          });
+          setSubmittedDisputes((prev) => ({ ...prev, ...map }));
         }
+      }).catch(() => {
+        // Non-critical, ignore
+      });
+
+      // Load public services catalog in one batch to enrich order card titles and thumbnails
+      serviceCatalogService.getServices({ size: 100 }).then((catalogRes) => {
+        const list = catalogRes.content || [];
+        const detailsMap: Record<string, ServiceDetailDto> = {};
+        list.forEach((s) => {
+          if (s.id) {
+            const item: ServiceDetailDto = {
+              id: s.id,
+              name: s.name,
+              description: s.shortDescription || '',
+              price: s.price,
+              promotionalPrice: s.promotionalPrice,
+              address: s.address || '',
+              averageRating: s.averageRating || 5,
+              reviewCount: s.reviewCount || 0,
+              viewCount: s.viewCount || 0,
+              categoryId: '',
+              imageUrls: s.primaryImageUrl ? [s.primaryImageUrl] : [],
+              options: [],
+              vendorId: '',
+              waiverRequired: false,
+              slots: [],
+            };
+            serviceDetailsCache.current[s.id] = item;
+            detailsMap[s.id] = item;
+          }
+        });
+        setServiceDetails((prev) => ({ ...prev, ...detailsMap }));
+      }).catch(() => {
+        // Non-critical: subOrder defaults will be used
       });
     }).catch((err: unknown) => {
       console.error("[Orders] Lỗi khi tải danh sách đơn hàng:", err);
@@ -200,7 +303,7 @@ export function Orders() {
     }).finally(() => {
       setLoading(false);
     });
-  }, [isAuthenticated, accessToken]);
+  }, [isAuthenticated, accessToken, searchParams]);
 
   useEffect(() => {
     if (isAuthenticated && accessToken) {
@@ -247,31 +350,37 @@ export function Orders() {
 
       if (filter === "all") return true;
 
-      if (filter === "upcoming") {
-        return (
-          masterStatus === "PAID" ||
-          items.some((i) => i.status === "CONFIRMED")
-        );
-      }
-
       if (filter === "pending") {
         return masterStatus === "PENDING_PAYMENT";
       }
 
-      if (filter === "completed") {
-        return (
-          masterStatus === "COMPLETED" ||
-          masterStatus === "PARTIALLY_COMPLETED" ||
-          items.some((i) => i.status === "COMPLETED" || i.status === "CHECKED_IN")
-        );
+      if (items.length > 0) {
+        if (filter === "upcoming") {
+          return items.some((i) => {
+            const s = (i.status || "").toUpperCase();
+            return s === "CONFIRMED" || s === "PENDING";
+          });
+        }
+
+        if (filter === "completed") {
+          return items.some((i) => {
+            const s = (i.status || "").toUpperCase();
+            return s === "COMPLETED" || s === "CHECKED_IN";
+          });
+        }
+
+        if (filter === "cancelled") {
+          return items.some((i) => {
+            const s = (i.status || "").toUpperCase();
+            return s === "CANCELLED" || s === "REFUNDED" || s === "PARTIALLY_REFUNDED";
+          });
+        }
       }
 
-      if (filter === "cancelled") {
-        return (
-          masterStatus === "CANCELLED" ||
-          items.some((i) => i.status === "CANCELLED" || i.status === "REFUNDED" || i.status === "PARTIALLY_REFUNDED")
-        );
-      }
+      // Fallback if items array is empty
+      if (filter === "upcoming") return masterStatus === "PAID";
+      if (filter === "completed") return masterStatus === "COMPLETED" || masterStatus === "PARTIALLY_COMPLETED";
+      if (filter === "cancelled") return masterStatus === "CANCELLED";
 
       return true;
     });
@@ -323,6 +432,26 @@ export function Orders() {
       setQrData(data);
     } catch (err: unknown) {
       console.error("[Orders] Lỗi khi tạo mã QR Check-in:", err);
+      const msg = err instanceof Error ? err.message : "Không thể tạo mã QR cho đơn hàng này.";
+      setQrError(msg);
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  // Master Order QR Generation handler (All-in-One Pass)
+  const handleOpenMasterQrModal = async (order: OrderResponse) => {
+    setSelectedMasterOrder(order);
+    setSelectedSubOrder(null);
+    setQrLoading(true);
+    setQrError(null);
+    setQrData(null);
+
+    try {
+      const data = await orderService.getCheckinQrCode(order.id);
+      setQrData(data);
+    } catch (err: unknown) {
+      console.error("[Orders] Lỗi khi tạo mã QR đơn hàng:", err);
       const msg = err instanceof Error ? err.message : "Không thể tạo mã QR cho đơn hàng này.";
       setQrError(msg);
     } finally {
@@ -491,15 +620,63 @@ export function Orders() {
   const handleOpenDispute = (subOrder: SubOrderResponse) => {
     setDisputingSubOrder(subOrder);
     setDisputeReason("");
+    setDisputeReasonType("SERVICE_NOT_AS_DESCRIBED");
   };
 
-  const handleSubmitDispute = () => {
+  const handleSubmitDispute = async () => {
     if (!disputingSubOrder || !disputeReason.trim()) return;
-    setSubmittedDisputes((prev) => ({
-      ...prev,
-      [disputingSubOrder.id]: disputeReason,
-    }));
-    setDisputingSubOrder(null);
+
+    const parentOrder = orders.find((o) =>
+      (o.items || o.subOrders || []).some((sub) => sub.id === disputingSubOrder.id)
+    );
+    if (!parentOrder) {
+      toast.error("Không tìm thấy thông tin đơn hàng gốc.");
+      return;
+    }
+
+    try {
+      setIsSubmittingDispute(true);
+      const createdDispute = await disputeService.createDispute(parentOrder.id, {
+        subOrderId: disputingSubOrder.id,
+        reason: disputeReasonType,
+        description: disputeReason.trim(),
+      });
+      toast.success("Đã gửi khiếu nại thành công! Đội ngũ điều phối sẽ xử lý trong 24h.");
+      setSubmittedDisputes((prev) => ({
+        ...prev,
+        [disputingSubOrder.id]: createdDispute || {
+          id: "",
+          orderId: parentOrder.id,
+          subOrderId: disputingSubOrder.id,
+          customerId: parentOrder.customerId || "",
+          reason: disputeReasonType,
+          description: disputeReason.trim(),
+          status: "OPEN",
+          createdAt: new Date().toISOString(),
+        },
+      }));
+      setDisputingSubOrder(null);
+    } catch (err: unknown) {
+      console.error("[Orders] Lỗi gửi khiếu nại:", err);
+      let msg = "Không thể gửi khiếu nại.";
+      if (err && typeof err === "object" && "response" in err) {
+        const resp = (err as { response?: { data?: { message?: string; code?: string } } }).response;
+        const code = resp?.data?.code;
+        const rawMsg = resp?.data?.message || "";
+        if (code === "ACTIVE_DISPUTE_ALREADY_EXISTS" || rawMsg.includes("already exists")) {
+          msg = "Đơn này đã có khiếu nại đang được xử lý.";
+        } else if (code === "INVALID_SUB_ORDER_STATE" || rawMsg.includes("đánh giá") || rawMsg.includes("started")) {
+          msg = "Chuyến đi chưa đến giờ khởi hành hoặc trạng thái đơn chưa hợp lệ để mở khiếu nại.";
+        } else if (rawMsg) {
+          msg = rawMsg;
+        }
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      toast.error("Lỗi: " + msg);
+    } finally {
+      setIsSubmittingDispute(false);
+    }
   };
 
   // Helper formatting functions
@@ -541,29 +718,100 @@ export function Orders() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const s = status.toUpperCase();
+  const getMasterStatusBadge = (status: string) => {
+    const s = (status || "").toUpperCase();
     switch (s) {
       case "PAID":
-        return <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold tracking-tight">ĐÃ THANH TOÁN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ THANH TOÁN</span>;
       case "PENDING_PAYMENT":
-      case "PENDING":
-        return <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold tracking-tight">CHỜ THANH TOÁN</span>;
+      case "UNPAID":
+        return <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-xs font-semibold tracking-tight">CHỜ THANH TOÁN</span>;
       case "CONFIRMED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-xs font-bold tracking-tight">ĐÃ XÁC NHẬN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ XÁC NHẬN</span>;
       case "CHECKED_IN":
-        return <span className="px-2.5 py-0.5 rounded-md bg-cyan-50 text-cyan-800 border border-cyan-200 text-xs font-bold tracking-tight">ĐÃ CHECK-IN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ CHECK-IN</span>;
+      case "PARTIALLY_COMPLETED":
+        return <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold tracking-tight">HOÀN TẤT MỘT PHẦN</span>;
       case "COMPLETED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 text-xs font-bold tracking-tight">HOÀN TẤT</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">HOÀN TẤT</span>;
       case "CANCELLED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-rose-50 text-rose-800 border border-rose-200 text-xs font-bold tracking-tight">ĐÃ HỦY</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold tracking-tight">ĐÃ HỦY</span>;
       case "REFUNDED":
       case "PARTIALLY_REFUNDED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200 text-xs font-bold tracking-tight">ĐÃ HOÀN TIỀN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">ĐÃ HOÀN TIỀN</span>;
       default:
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold tracking-tight">{s}</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">{s}</span>;
     }
   };
+
+  const getSubOrderStatusBadge = (subStatus: string, masterStatus: string) => {
+    const s = (subStatus || "").toUpperCase();
+    const m = (masterStatus || "").toUpperCase();
+
+    // If master order is unpaid, sub-orders are also waiting for payment
+    if (m === "PENDING_PAYMENT" || m === "UNPAID") {
+      return (
+        <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-xs font-semibold tracking-tight">
+          CHỜ THANH TOÁN
+        </span>
+      );
+    }
+
+    // If master order is already paid, PENDING means waiting for operator confirmation/dispatch
+    switch (s) {
+      case "PENDING":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold tracking-tight">
+            CHỜ TIẾP NHẬN
+          </span>
+        );
+      case "CONFIRMED":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
+            ĐÃ XÁC NHẬN
+          </span>
+        );
+      case "CHECKED_IN":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
+            ĐÃ CHECK-IN
+          </span>
+        );
+      case "IN_PROGRESS":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold tracking-tight">
+            ĐANG DIỄN RA
+          </span>
+        );
+      case "COMPLETED":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
+            HOÀN TẤT
+          </span>
+        );
+      case "CANCELLED":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold tracking-tight">
+            ĐÃ HỦY
+          </span>
+        );
+      case "REFUNDED":
+      case "PARTIALLY_REFUNDED":
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">
+            ĐÃ HOÀN TIỀN
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">
+            {s}
+          </span>
+        );
+    }
+  };
+
+
 
   // Unauthenticated Guard Screen
   if (!isAuthenticated || !user) {
@@ -621,9 +869,6 @@ export function Orders() {
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                 Quản lý vé &amp; Đơn trải nghiệm
               </h1>
-              <p className="text-base text-slate-700 mt-1 leading-relaxed">
-                Theo dõi tình trạng đơn đặt, xuất mã QR check-in tại cầu tàu và gửi đánh giá chất lượng dịch vụ biển.
-              </p>
             </div>
 
             {/* Airbnb Signature Underline Tabs */}
@@ -771,17 +1016,30 @@ export function Orders() {
               {filteredOrders.map((masterOrder) => {
                 const subOrders = masterOrder.items || masterOrder.subOrders || [];
                 const orderCode = `#ORD-${(masterOrder.id || "").slice(0, 8).toUpperCase()}`;
-                const masterStatus = (masterOrder.status || "").toUpperCase();
+                const allSubCancelled = subOrders.length > 0 && subOrders.every((s) => {
+                  const st = (s.status || "").toUpperCase();
+                  return st === "CANCELLED" || st === "REFUNDED";
+                });
+                const masterStatus = allSubCancelled ? "CANCELLED" : (masterOrder.status || "").toUpperCase();
                 const canDownloadPdf = masterStatus === "PAID" || masterStatus === "COMPLETED";
                 const refunds = orderRefunds[masterOrder.id] || [];
                 const hasRefund = refunds.length > 0;
                 const latestRefund = hasRefund ? refunds[0] : null;
-                const canCancelOrder = masterStatus === "PAID" && !hasRefund;
+                const isAnyCheckedInOrDone = subOrders.some((s) => {
+                  const st = (s.status || "").toUpperCase();
+                  return st === "CHECKED_IN" || st === "COMPLETED";
+                });
+                const canCancelOrder = masterStatus === "PAID" && !hasRefund && !isAnyCheckedInOrDone;
 
                 const cancelledCount = subOrders.filter(
                   (s) => s.status === "CANCELLED" || s.status === "REFUNDED" || s.status === "PARTIALLY_REFUNDED"
                 ).length;
                 const isPartialRefund = hasRefund && cancelledCount > 0 && cancelledCount < subOrders.length;
+                const hasValidSubOrdersForQr = subOrders.some((s) => {
+                  const st = (s.status || "").toUpperCase();
+                  return st === "CONFIRMED" || st === "CHECKED_IN" || st === "COMPLETED";
+                });
+                const canShowMasterQr = (masterStatus === "PAID" || masterStatus === "COMPLETED" || masterStatus === "PARTIALLY_COMPLETED") && hasValidSubOrdersForQr;
 
                 const displayedSubOrders = subOrders.filter((subOrder) => {
                   const sStatus = (subOrder.status || "").toUpperCase();
@@ -813,14 +1071,10 @@ export function Orders() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Đơn hàng:</span>
                             <span className="text-base font-bold text-slate-900 font-mono">{orderCode}</span>
-                            {!hasRefund && getStatusBadge(masterOrder.status || "PENDING")}
+                            {!hasRefund && getMasterStatusBadge(masterOrder.status || "PENDING")}
                             {hasRefund && (
                               <span
-                                className={`px-2.5 py-0.5 rounded-md text-xs font-bold border tracking-tight ${
-                                  latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
-                                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                    : "bg-amber-50 text-amber-800 border-amber-200"
-                                }`}
+                                className="px-2.5 py-0.5 rounded-md text-xs font-semibold border tracking-tight bg-slate-100 text-slate-800 border-slate-200"
                               >
                                 {isPartialRefund
                                   ? `Hoàn tiền 1 phần (${cancelledCount}/${subOrders.length} dịch vụ)`
@@ -839,13 +1093,24 @@ export function Orders() {
                       <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
                         <div className="text-right">
                           <span className="text-xs text-slate-500 uppercase tracking-wider block font-medium">Tổng tiền</span>
-                          <span className="text-xl text-cyan-700 font-extrabold tabular-nums">
+                          <span className="text-xl text-[#991b1b] font-extrabold tabular-nums">
                             {formatVnd(masterOrder.finalAmount ?? masterOrder.totalAmount)}
                           </span>
                         </div>
 
                         {/* Master Order Action Buttons */}
                         <div className="flex items-center gap-2">
+                          {canShowMasterQr && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenMasterQrModal(masterOrder)}
+                              className="px-3.5 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer active:scale-95"
+                              title="Xem mã QR dùng chung cho toàn bộ hoạt động trong đơn"
+                            >
+                              <QrCode className="w-4 h-4" />
+                              <span>Vé QR toàn đơn</span>
+                            </button>
+                          )}
                           {canDownloadPdf && (
                             <button
                               onClick={() => handleDownloadReceiptPdf(masterOrder.id)}
@@ -883,12 +1148,28 @@ export function Orders() {
                           )}
 
                           {masterStatus === "PENDING_PAYMENT" && (
-                            <button
-                              onClick={() => navigate(`/checkout`)}
-                              className="px-4 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
-                            >
-                              Thanh toán ngay
-                            </button>
+                            <div className="flex items-center gap-2">
+                              {isOrderPaymentExpired(masterOrder) && (
+                                <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-[11px] font-semibold border border-amber-200 flex items-center gap-1 shadow-2xs">
+                                  <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                  <span>Quá hạn giữ chỗ</span>
+                                </span>
+                              )}
+                              <button
+                                onClick={() => handlePayNow(masterOrder)}
+                                disabled={payingOrderId === masterOrder.id}
+                                className="px-4 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold shadow-xs cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                              >
+                                {payingOrderId === masterOrder.id ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Đang mở cổng...</span>
+                                  </>
+                                ) : (
+                                  <span>Thanh toán ngay</span>
+                                )}
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -921,6 +1202,8 @@ export function Orders() {
                           const serviceDetail = serviceDetails[subOrder.serviceId];
                           const serviceName = serviceDetail?.name || subOrder.serviceName || `Dịch vụ #${subOrder.serviceId.slice(0, 8)}`;
                           const serviceImage = serviceDetail?.imageUrls?.[0] || subOrder.serviceThumbnail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80";
+                          const matchedSlot = serviceDetail?.slots?.find((s) => s.slotId === subOrder.slotId);
+                          const displaySlotTime = subOrder.slotTime || (matchedSlot ? `${matchedSlot.startTime.slice(0, 5)} - ${matchedSlot.endTime.slice(0, 5)} • ${matchedSlot.date}` : undefined);
                           const subOrderStatus = (subOrder.status || "").toUpperCase();
                           const isConfirmed = subOrderStatus === "CONFIRMED";
                           const isCheckedIn = subOrderStatus === "CHECKED_IN";
@@ -931,10 +1214,10 @@ export function Orders() {
                           return (
                             <div
                               key={subOrder.id}
-                              className="bg-slate-50/80 rounded-xl p-4 flex flex-col md:flex-row gap-4 border border-slate-200/60 hover:bg-slate-50 transition-colors"
+                              className="bg-white rounded-xl p-3.5 flex flex-col md:flex-row gap-3.5 border border-slate-200/70 hover:border-slate-300 transition-all shadow-2xs"
                             >
                               {/* Thumbnail */}
-                              <div className="relative w-full md:w-52 h-32 flex-shrink-0 rounded-xl overflow-hidden shadow-xs bg-slate-200">
+                              <div className="relative w-full md:w-44 h-28 flex-shrink-0 rounded-xl overflow-hidden shadow-xs bg-slate-200">
                                 <img
                                   src={serviceImage}
                                   alt={serviceName}
@@ -943,10 +1226,10 @@ export function Orders() {
                                     (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80";
                                   }}
                                 />
-                                {subOrder.slotTime && (
+                                {displaySlotTime && (
                                   <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-slate-900/80 backdrop-blur-sm text-white text-[11px] font-semibold flex items-center gap-1 shadow-xs">
                                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
-                                    {subOrder.slotTime}
+                                    {displaySlotTime}
                                   </span>
                                 )}
                               </div>
@@ -975,10 +1258,22 @@ export function Orders() {
                                           <span>{serviceDetail.address}</span>
                                         </div>
                                       )}
+
+                                      {displaySlotTime ? (
+                                        <div className="flex items-center gap-1.5 mt-1 text-xs text-sky-700 font-semibold">
+                                          <Clock className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                          <span>Khởi hành: {displaySlotTime}</span>
+                                        </div>
+                                      ) : subOrder.slotId ? (
+                                        <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500">
+                                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                          <span>Ca khởi hành: #{subOrder.slotId.slice(0, 8)}</span>
+                                        </div>
+                                      ) : null}
                                     </div>
 
                                     <div className="flex flex-col items-end">
-                                      <span className="text-base text-cyan-700 font-bold tabular-nums">
+                                      <span className="text-base text-[#991b1b] font-bold tabular-nums">
                                         {formatVnd(subOrder.finalAmount ?? subOrder.subtotalAmount)}
                                       </span>
                                       <span className="text-xs text-slate-500">
@@ -991,15 +1286,42 @@ export function Orders() {
                                 {/* Sub-Order Footer & Actions */}
                                 <div className="flex flex-wrap items-center justify-between gap-3 pt-3 mt-3 border-t border-slate-200">
                                   <div className="flex items-center gap-2">
-                                    {getStatusBadge(subOrder.status)}
+                                    {getSubOrderStatusBadge(subOrder.status, masterStatus)}
                                     {submittedDisputes[subOrder.id] && (
-                                      <span className="px-2.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold">
-                                        Đang khiếu nại
-                                      </span>
+                                      submittedDisputes[subOrder.id].status === "RESOLVED_REJECTED" ? (
+                                        <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold">
+                                          Khiếu nại bị từ chối
+                                        </span>
+                                      ) : submittedDisputes[subOrder.id].status === "RESOLVED_REFUND" || submittedDisputes[subOrder.id].status === "RESOLVED_PARTIAL" ? (
+                                        <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
+                                          Đã giải quyết hoàn tiền
+                                        </span>
+                                      ) : (
+                                        <span className="px-2.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold">
+                                          Đang khiếu nại
+                                        </span>
+                                      )
                                     )}
                                   </div>
 
                                   <div className="flex items-center gap-2">
+                                    {masterStatus === "PENDING_PAYMENT" && (
+                                      <button
+                                        onClick={() => handlePayNow(masterOrder)}
+                                        disabled={payingOrderId === masterOrder.id}
+                                        className="px-3.5 py-1.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                                        type="button"
+                                      >
+                                        {payingOrderId === masterOrder.id ? (
+                                          <>
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <span>Đang mở cổng...</span>
+                                          </>
+                                        ) : (
+                                          <span>Thanh toán ngay</span>
+                                        )}
+                                      </button>
+                                    )}
                                     {/* Check-in QR button (P0 for CONFIRMED suborders) */}
                                     {isConfirmed && (
                                       <button
@@ -1022,14 +1344,38 @@ export function Orders() {
 
                                     {/* Checked-in status display */}
                                     {isCheckedIn && (
-                                      <span className="px-3 py-1.5 rounded-xl bg-cyan-100/70 text-cyan-800 text-xs font-bold flex items-center gap-1">
-                                        <CheckCheck className="w-4 h-4 text-cyan-700" />
+                                      <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-800 border border-slate-200 text-xs font-semibold flex items-center gap-1">
+                                        <CheckCheck className="w-4 h-4 text-slate-700" />
                                         <span>Đã quét vé lên tàu</span>
                                       </span>
                                     )}
 
                                     {/* Support / Dispute action */}
-                                    {!submittedDisputes[subOrder.id] && (
+                                    {submittedDisputes[subOrder.id] ? (
+                                      submittedDisputes[subOrder.id].status === "RESOLVED_REJECTED" ? (
+                                        <span
+                                          className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 border border-slate-200 text-xs font-medium flex items-center gap-1.5 max-w-md"
+                                          title={submittedDisputes[subOrder.id].adminNote || undefined}
+                                        >
+                                          <Ban className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                          <span className="truncate">
+                                            Bác bỏ khiếu nại{submittedDisputes[subOrder.id].adminNote ? `: ${submittedDisputes[subOrder.id].adminNote}` : ''}
+                                          </span>
+                                        </span>
+                                      ) : submittedDisputes[subOrder.id].status === "RESOLVED_REFUND" || submittedDisputes[subOrder.id].status === "RESOLVED_PARTIAL" ? (
+                                        <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-800 border border-slate-200 text-xs font-semibold flex items-center gap-1.5">
+                                          <CheckCircle2 className="w-3.5 h-3.5 text-slate-700 shrink-0" />
+                                          <span>
+                                            Đã hoàn {submittedDisputes[subOrder.id].refundPercentage ? `${submittedDisputes[subOrder.id].refundPercentage}%` : ''} tiền dịch vụ
+                                          </span>
+                                        </span>
+                                      ) : (
+                                        <span className="px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold flex items-center gap-1.5">
+                                          <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                          <span>Đang khiếu nại: {submittedDisputes[subOrder.id].description}</span>
+                                        </span>
+                                      )
+                                    ) : (
                                       <button
                                         onClick={() => handleOpenDispute(subOrder)}
                                         className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
@@ -1173,6 +1519,16 @@ export function Orders() {
                                       </div>
 
                                       <div className="flex items-center gap-2 self-end md:self-center flex-shrink-0">
+                                        {summary.fullRefundAvailable && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleOpenCancellationModal(masterOrder)}
+                                            className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95"
+                                          >
+                                            <XCircle className="w-4 h-4 text-rose-600" />
+                                            <span>Từ chối & Hoàn tiền</span>
+                                          </button>
+                                        )}
                                         <button
                                           type="button"
                                           disabled={confirmingRescheduleId === subOrder.id}
@@ -1223,108 +1579,338 @@ export function Orders() {
       </div>
 
       {/* ============================================================== */}
-      {/* Portaled Check-in QR Code Modal (Real Backend HMAC Token)     */}
+      {/* Portaled Master Order All-in-One Check-in Pass Modal          */}
       {/* ============================================================== */}
-      {selectedSubOrder &&
+      {selectedMasterOrder &&
         createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-scale-in">
-            <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative text-center border border-slate-100">
-              <button
-                onClick={() => setSelectedSubOrder(null)}
-                className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer transition-colors"
-                aria-label="Đóng"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <h3 className="text-xl font-bold text-slate-900">
-                Vé check-in
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Xuất trình mã này tại quầy vé hoặc cầu tàu trước giờ khởi hành
-              </p>
-
-              {/* QR Content Body */}
-              <div className="my-4 p-3 sm:p-4 rounded-xl bg-slate-50 border border-slate-200 inline-block shadow-inner">
-                {qrLoading && (
-                  <div className="w-64 h-64 sm:w-72 sm:h-72 flex flex-col items-center justify-center space-y-2">
-                    <Loader2 className="w-9 h-9 text-cyan-600 animate-spin" />
-                    <span className="text-xs text-slate-500 font-medium">Đang sinh mã QR ký số...</span>
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-scale-in">
+            <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl relative border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh]">
+              {/* Header: Master Order context & Code */}
+              <div className="p-5 pb-4 bg-slate-50/70 border-b border-slate-100 flex items-start justify-between gap-3 shrink-0">
+                <div className="space-y-1 min-w-0 pr-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-sky-100 text-sky-900 border border-sky-200">
+                      #ORD-{(selectedMasterOrder.id || "").replace(/-/g, "").slice(-8).toUpperCase()}
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      {(selectedMasterOrder.items || selectedMasterOrder.subOrders || []).length} dịch vụ
+                    </span>
                   </div>
-                )}
+                  <h3 className="text-sm font-bold text-slate-900 leading-snug">
+                    Vé điện tử toàn đơn (All-in-One Pass)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Mã QR hợp nhất dùng cho tất cả hoạt động thuộc đơn hàng
+                  </p>
+                </div>
 
-                {!qrLoading && qrError && (
-                  <div className="w-64 h-64 sm:w-72 sm:h-72 flex flex-col items-center justify-center p-3 text-center space-y-2">
-                    <AlertTriangle className="w-8 h-8 text-rose-500" />
-                    <span className="text-xs text-rose-700 font-semibold">{qrError}</span>
-                  </div>
-                )}
-
-                {!qrLoading && !qrError && qrData && (
-                  <div className="flex flex-col items-center gap-3">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=${encodeURIComponent(
-                        qrData.qrToken
-                      )}`}
-                      alt="QR Check-in"
-                      className="w-64 h-64 sm:w-72 sm:h-72 mx-auto rounded-xl shadow-xs bg-white p-2.5"
-                    />
-                    <div className="w-full max-w-sm bg-cyan-50/90 border border-cyan-200 rounded-xl p-2.5 text-left flex items-center justify-between gap-2 shadow-xs">
-                      <div className="min-w-0 flex-1">
-                        <span className="text-[10px] font-bold text-cyan-800 uppercase tracking-wider block">Mã Token Check-in:</span>
-                        <span className="text-[11px] font-mono text-cyan-950 truncate block select-all" title={qrData.qrToken}>
-                          {qrData.qrToken}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(qrData.qrToken);
-                          setCopiedToken(true);
-                          setTimeout(() => setCopiedToken(false), 2000);
-                        }}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer flex-shrink-0 ${
-                          copiedToken
-                            ? "bg-emerald-600 text-white"
-                            : "bg-cyan-600 hover:bg-cyan-700 text-white shadow-xs"
-                        }`}
-                      >
-                        {copiedToken ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copiedToken ? "Đã copy" : "Copy mã"}</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedMasterOrder(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors shrink-0 cursor-pointer"
+                  aria-label="Đóng"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Ticket Details */}
-              <div className="bg-slate-50 rounded-xl p-3 text-left space-y-1.5 mb-5 border border-slate-200/60 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Mã vé:</span>
-                  <span className="font-mono font-bold text-cyan-700">
-                    #VE-{(selectedSubOrder.id || "").replace(/-/g, "").slice(-6).toUpperCase()}
+              {/* Scrollable Content */}
+              <div className="p-5 flex flex-col items-center text-center overflow-y-auto">
+                <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-center">
+                  {qrLoading && (
+                    <div className="w-56 h-56 flex flex-col items-center justify-center space-y-2">
+                      <Loader2 className="w-8 h-8 text-sky-600 animate-spin" />
+                      <span className="text-xs text-slate-500 font-medium">Đang tạo mã QR bảo mật...</span>
+                    </div>
+                  )}
+
+                  {!qrLoading && qrError && (
+                    <div className="w-56 h-56 flex flex-col items-center justify-center p-3 text-center space-y-2">
+                      <AlertTriangle className="w-8 h-8 text-rose-500" />
+                      <span className="text-xs text-rose-700 font-semibold">{qrError}</span>
+                    </div>
+                  )}
+
+                  {!qrLoading && !qrError && qrData && (
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
+                        qrData.qrToken
+                      )}`}
+                      alt="QR Check-in Toàn Đơn"
+                      className="w-56 h-56 object-contain"
+                    />
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-600 mt-3 font-medium px-2">
+                  Chỉ cần 1 mã này cho toàn bộ chuyến đi. Đến từng bến/điểm dịch vụ, điều hành viên tại bến sẽ quét mã để tự động nhận diện đúng dịch vụ.
+                </p>
+
+                {/* Fallback Token Box */}
+                {qrData?.qrToken && (
+                  <div className="w-full mt-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-left flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                        Mã ký số dự phòng
+                      </span>
+                      <span
+                        className="text-xs font-mono text-slate-800 truncate block select-all"
+                        title={qrData.qrToken}
+                      >
+                        {qrData.qrToken}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(qrData.qrToken);
+                        setCopiedToken(true);
+                        setTimeout(() => setCopiedToken(false), 2000);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer ${
+                        copiedToken
+                          ? "bg-emerald-600 text-white shadow-2xs"
+                          : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs"
+                      }`}
+                    >
+                      {copiedToken ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedToken ? "Đã chép" : "Sao chép"}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Perforated separator */}
+                <div className="w-full border-t border-dashed border-slate-200 relative my-4">
+                  <span className="absolute -left-7 -top-2 w-4 h-4 rounded-full bg-slate-950/70" />
+                  <span className="absolute -right-7 -top-2 w-4 h-4 rounded-full bg-slate-950/70" />
+                </div>
+
+                {/* Included Sub-Orders List */}
+                <div className="w-full text-left space-y-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+                    Các hoạt động áp dụng trong vé ({(selectedMasterOrder.items || selectedMasterOrder.subOrders || []).length})
                   </span>
+
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    {(selectedMasterOrder.items || selectedMasterOrder.subOrders || []).map((item, idx) => {
+                      const itemDetail = serviceDetails[item.serviceId];
+                      const sName = itemDetail?.name || item.serviceName || `Dịch vụ #${item.serviceId.slice(0, 8)}`;
+                      const st = (item.status || "").toUpperCase();
+                      const matchedSlot = itemDetail?.slots?.find((s) => s.slotId === item.slotId);
+                      const slotDisplay = item.slotTime || (matchedSlot ? `${matchedSlot.startTime.slice(0, 5)} - ${matchedSlot.endTime.slice(0, 5)} • ${matchedSlot.date}` : undefined);
+
+                      return (
+                        <div
+                          key={item.id || idx}
+                          className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/70 text-xs flex items-start justify-between gap-2"
+                        >
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <p className="font-bold text-slate-900 truncate">{sName}</p>
+                            {slotDisplay && (
+                              <p className="text-[11px] text-slate-500 flex items-center gap-1 font-medium">
+                                <Clock className="w-3 h-3 text-sky-600 shrink-0" />
+                                <span>{slotDisplay}</span>
+                              </p>
+                            )}
+                            <p className="text-[11px] text-slate-500">
+                              Số lượng: <strong className="text-slate-800">{item.quantity} khách</strong>
+                            </p>
+                          </div>
+                          <div className="shrink-0 pt-0.5">
+                            {st === "CHECKED_IN" ? (
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 font-semibold text-[10px]">
+                                ĐÃ CHECK-IN
+                              </span>
+                            ) : st === "CONFIRMED" ? (
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 font-semibold text-[10px]">
+                                CHỜ SOÁT VÉ
+                              </span>
+                            ) : st === "COMPLETED" ? (
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 font-semibold text-[10px]">
+                                HOÀN TẤT
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 font-medium text-[10px]">
+                                {st}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Số lượng khách:</span>
-                  <span className="font-bold text-slate-800">{selectedSubOrder.quantity} khách</span>
-                </div>
+
                 {qrData?.expiresAt && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Hiệu lực đến:</span>
-                    <span className="font-semibold text-slate-700">
+                  <div className="w-full flex justify-between items-center pt-3 text-[11px] text-slate-500">
+                    <span>Hiệu lực quét đến:</span>
+                    <span className="font-semibold text-slate-700 font-mono">
                       {formatDateTime(qrData.expiresAt)}
                     </span>
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Footer */}
+              <div className="p-4 pt-0 shrink-0">
                 <button
-                  onClick={() => setSelectedSubOrder(null)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors cursor-pointer"
+                  type="button"
+                  onClick={() => setSelectedMasterOrder(null)}
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer"
                 >
-                  Đóng
+                  Đóng vé
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      {/* ============================================================== */}
+      {/* Portaled Check-in QR Code Modal (Real Backend HMAC Token)     */}
+      {/* Redesigned under Taste Skill & Anti-Slop (Boarding Pass Model)*/}
+      {/* ============================================================== */}
+      {selectedSubOrder &&
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-scale-in">
+            <div className="bg-white rounded-2xl max-w-sm w-full shadow-2xl relative border border-slate-200/90 overflow-hidden flex flex-col">
+              {/* Header: Service context & Ticket Code */}
+              <div className="p-5 pb-4 bg-slate-50/70 border-b border-slate-100 flex items-start justify-between gap-3">
+                <div className="space-y-1 min-w-0 pr-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-sky-100 text-sky-900 border border-sky-200">
+                      #VE-{(selectedSubOrder.id || "").replace(/-/g, "").slice(-6).toUpperCase()}
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-1 pt-0.5">
+                    {serviceDetails[selectedSubOrder.serviceId]?.name || selectedSubOrder.serviceName || "Trải nghiệm biển Đà Nẵng"}
+                  </h3>
+                  {(() => {
+                    const modalMatchedSlot = serviceDetails[selectedSubOrder.serviceId]?.slots?.find((s) => s.slotId === selectedSubOrder.slotId);
+                    const modalSlotTime = selectedSubOrder.slotTime || (modalMatchedSlot ? `${modalMatchedSlot.startTime.slice(0, 5)} - ${modalMatchedSlot.endTime.slice(0, 5)} • ${modalMatchedSlot.date}` : undefined);
+                    return modalSlotTime ? (
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
+                        <Clock className="w-3.5 h-3.5 text-sky-700 shrink-0" />
+                        <span>Ca khởi hành: <strong className="text-slate-900">{modalSlotTime}</strong></span>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedSubOrder(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors shrink-0 cursor-pointer"
+                  aria-label="Đóng"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* QR Centerpiece */}
+              <div className="p-5 flex flex-col items-center text-center">
+                <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-center">
+                  {qrLoading && (
+                    <div className="w-56 h-56 flex flex-col items-center justify-center space-y-2">
+                      <Loader2 className="w-8 h-8 text-sky-600 animate-spin" />
+                      <span className="text-xs text-slate-500 font-medium">Đang tạo mã QR bảo mật...</span>
+                    </div>
+                  )}
+
+                  {!qrLoading && qrError && (
+                    <div className="w-56 h-56 flex flex-col items-center justify-center p-3 text-center space-y-2">
+                      <AlertTriangle className="w-8 h-8 text-rose-500" />
+                      <span className="text-xs text-rose-700 font-semibold">{qrError}</span>
+                    </div>
+                  )}
+
+                  {!qrLoading && !qrError && qrData && (
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
+                        qrData.qrToken
+                      )}`}
+                      alt="QR Check-in"
+                      className="w-56 h-56 object-contain"
+                    />
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-500 mt-2.5 font-medium">
+                  Xuất trình mã này cho điều hành viên tại cầu tàu để quét lên tàu
+                </p>
+
+                {/* Fallback Token Box (Compact Density & Mono) */}
+                {qrData?.qrToken && (
+                  <div className="w-full mt-4 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-left flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                        Mã ký số dự phòng
+                      </span>
+                      <span
+                        className="text-xs font-mono text-slate-800 truncate block select-all"
+                        title={qrData.qrToken}
+                      >
+                        {qrData.qrToken}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(qrData.qrToken);
+                        setCopiedToken(true);
+                        setTimeout(() => setCopiedToken(false), 2000);
+                      }}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer ${
+                        copiedToken
+                          ? "bg-emerald-600 text-white shadow-2xs"
+                          : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs"
+                      }`}
+                    >
+                      {copiedToken ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedToken ? "Đã chép" : "Sao chép"}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Perforated separator / border */}
+              <div className="border-t border-dashed border-slate-200 relative mx-5">
+                <span className="absolute -left-7 -top-2 w-4 h-4 rounded-full bg-slate-950/70" />
+                <span className="absolute -right-7 -top-2 w-4 h-4 rounded-full bg-slate-950/70" />
+              </div>
+
+              {/* Metadata details */}
+              <div className="p-5 pt-4 space-y-2 text-xs">
+                <div className="flex justify-between items-center py-0.5">
+                  <span className="text-slate-500">Số lượng khách:</span>
+                  <span className="font-bold text-slate-900">{selectedSubOrder.quantity} khách</span>
+                </div>
+                {serviceDetails[selectedSubOrder.serviceId]?.address && (
+                  <div className="flex justify-between items-start gap-2 py-0.5">
+                    <span className="text-slate-500 shrink-0">Điểm đón:</span>
+                    <span className="font-medium text-slate-800 text-right line-clamp-1">
+                      {serviceDetails[selectedSubOrder.serviceId].address}
+                    </span>
+                  </div>
+                )}
+                {qrData?.expiresAt && (
+                  <div className="flex justify-between items-center py-0.5">
+                    <span className="text-slate-500">Hiệu lực quét đến:</span>
+                    <span className="font-semibold text-slate-700 font-mono">
+                      {formatDateTime(qrData.expiresAt)}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer CTA */}
+              <div className="p-5 pt-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSubOrder(null)}
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Đóng vé
                 </button>
               </div>
             </div>
@@ -1626,7 +2212,22 @@ export function Orders() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Lý do khiếu nại</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">Phân loại sự cố</label>
+                <select
+                  value={disputeReasonType}
+                  onChange={(e) => setDisputeReasonType(e.target.value as DisputeReason)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 bg-white"
+                >
+                  <option value="SERVICE_NOT_AS_DESCRIBED">Dịch vụ không đúng mô tả / cam kết</option>
+                  <option value="VENDOR_NO_SHOW">Nhà cung cấp không đến / vắng mặt tại điểm hẹn</option>
+                  <option value="SAFETY_CONCERN">Vấn đề an toàn / thiếu trang thiết bị cứu sinh</option>
+                  <option value="PAYMENT_ISSUE">Sự cố thanh toán / phụ thu sai quy định</option>
+                  <option value="OTHER">Lý do khác</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">Mô tả chi tiết</label>
                 <textarea
                   rows={4}
                   value={disputeReason}
@@ -1643,18 +2244,20 @@ export function Orders() {
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                 <button
                   type="button"
+                  disabled={isSubmittingDispute}
                   onClick={() => setDisputingSubOrder(null)}
-                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-semibold cursor-pointer"
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-semibold cursor-pointer disabled:opacity-50"
                 >
                   Hủy
                 </button>
                 <button
                   type="button"
-                  disabled={!disputeReason.trim()}
+                  disabled={isSubmittingDispute || !disputeReason.trim()}
                   onClick={handleSubmitDispute}
-                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  Gửi khiếu nại
+                  {isSubmittingDispute && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isSubmittingDispute ? "Đang gửi..." : "Gửi khiếu nại"}</span>
                 </button>
               </div>
             </div>
@@ -1706,10 +2309,10 @@ export function Orders() {
                         <span
                           className={`px-2.5 py-0.5 rounded-md font-bold text-[11px] ${
                             isProcessed
-                              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                              ? "bg-slate-100 text-slate-800 border border-slate-200"
                               : isFailed
-                              ? "bg-rose-50 text-rose-800 border border-rose-200"
-                              : "bg-amber-50 text-amber-800 border border-amber-200"
+                              ? "bg-slate-100 text-slate-500 border border-slate-200"
+                              : "bg-amber-50 text-amber-900 border border-amber-200"
                           }`}
                         >
                           {isProcessed

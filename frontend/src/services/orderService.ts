@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { flowLogger } from '../utils/flowLogger';
 import type {
   CreateOrderRequest,
   OrderResponse,
@@ -34,12 +35,48 @@ export const orderService = {
    */
   async createOrder(request: CreateOrderRequest, idempotencyKey?: string): Promise<OrderResponse> {
     const key = idempotencyKey || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `order-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
-    const response = await apiClient.post<OrderResponse>('/orders', request, {
-      headers: {
-        'Idempotency-Key': key,
-      },
+    
+    flowLogger.start({
+      step: '04_ORDER',
+      stepName: 'Tạo đơn hàng (Master Order)',
+      operation: 'POST /api/orders',
+      payload: { ...request, idempotencyKey: key },
     });
-    return response.data;
+
+    try {
+      const response = await apiClient.post<OrderResponse>('/orders', request, {
+        headers: {
+          'Idempotency-Key': key,
+        },
+      });
+
+      flowLogger.success(
+        {
+          step: '04_ORDER',
+          stepName: 'Tạo đơn hàng (Master Order)',
+          operation: 'POST /api/orders',
+        },
+        {
+          orderId: response.data.id,
+          totalAmount: response.data.totalAmount,
+          status: response.data.status,
+          subOrdersCount: response.data.subOrders?.length ?? 0,
+        }
+      );
+
+      return response.data;
+    } catch (err) {
+      flowLogger.error(
+        {
+          step: '04_ORDER',
+          stepName: 'Tạo đơn hàng (Master Order)',
+          operation: 'POST /api/orders',
+          payload: { ...request, idempotencyKey: key },
+        },
+        err
+      );
+      throw err;
+    }
   },
 
   /**
@@ -156,13 +193,15 @@ export const orderService = {
     const response = await apiClient.post<QrCodeResponse>(`/bookings/${identifier}/qr-code`);
     return response.data;
   },
+
   /**
    * Get reschedule options and pending vendor proposal
    * GET /api/sub-orders/{id}/reschedule-options
    */
-  async getRescheduleOptions(subOrderId: string): Promise<RescheduleOptionsSummaryResponse> {
+  async getRescheduleOptions(subOrderId: string, silent = true): Promise<RescheduleOptionsSummaryResponse> {
     const response = await apiClient.get<RescheduleOptionsSummaryResponse>(
-      `/sub-orders/${subOrderId}/reschedule-options`
+      `/sub-orders/${subOrderId}/reschedule-options`,
+      { silent }
     );
     return response.data;
   },

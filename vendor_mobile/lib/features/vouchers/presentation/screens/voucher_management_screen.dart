@@ -312,7 +312,7 @@ class _VoucherManagementScreenState extends State<VoucherManagementScreen> with 
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 LocalizedText(
-                                  'Mã khuyến mãi Nhà cung cấp (VENDOR)',
+                                  'Mã khuyến mãi Nhà cung cấp',
                                   style: AppTypography.labelLg.copyWith(color: AppColors.onSurface),
                                   overflow: TextOverflow.ellipsis,
                                 ),
@@ -496,8 +496,8 @@ class _VoucherManagementScreenState extends State<VoucherManagementScreen> with 
                               const SizedBox(height: 2),
                               LocalizedText(
                                 v.discountType == DiscountType.percentage
-                                    ? 'Giảm theo tỷ lệ % (PERCENTAGE)'
-                                    : 'Giảm trừ trực tiếp (FIXED)',
+                                    ? 'Giảm theo tỷ lệ %'
+                                    : 'Giảm trừ trực tiếp',
                                 style: AppTypography.bodySm.copyWith(color: AppColors.tertiary),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,

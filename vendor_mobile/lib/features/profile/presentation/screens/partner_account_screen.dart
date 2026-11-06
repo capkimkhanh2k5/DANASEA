@@ -7,8 +7,8 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/data/vendor_mock_database.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../auth/presentation/screens/login_register_screen.dart';
-import '../../../notifications/presentation/screens/notification_safety_screen.dart';
 import 'business_profile_screen.dart';
+import 'representative_profile_screen.dart';
 import 'vendor_documents_screen.dart';
 import 'edit_profile_bank_screen.dart';
 import 'change_password_screen.dart';
@@ -17,6 +17,7 @@ import '../../../vouchers/presentation/screens/voucher_management_screen.dart';
 import '../../../settlements/presentation/screens/settlement_revenue_screen.dart';
 import '../../../settlements/presentation/screens/payout_detail_screen.dart';
 import '../../../disputes/presentation/screens/dispute_management_screen.dart';
+import '../../../../core/widgets/symbolic_vendor_avatar.dart';
 
 class PartnerAccountScreen extends StatefulWidget {
   const PartnerAccountScreen({super.key});
@@ -95,11 +96,28 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
             Container(
               width: 32,
               height: 32,
-              decoration: const BoxDecoration(
-                color: AppColors.secondary,
+              decoration: BoxDecoration(
+                color: Colors.white,
                 shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.secondary.withValues(alpha: 0.15),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.secondary.withValues(alpha: 0.12),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.waves, color: Colors.white, size: 18),
+              padding: const EdgeInsets.all(4),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/danasea-logo.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
             const SizedBox(width: 8),
             Flexible(
@@ -132,47 +150,7 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
         ),
         backgroundColor: AppColors.surface,
         elevation: 0,
-        actions: [
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 14),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.secondaryFixed.withAlpha(80),
-              borderRadius: BorderRadius.circular(AppShapes.rFull),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: const BoxDecoration(
-                    color: AppColors.secondary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                LocalizedText(
-                  'Sẵn sàng',
-                  style: AppTypography.labelSm.copyWith(
-                    color: AppColors.onSecondaryFixedVariant,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: AppColors.onSurfaceVariant),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (ctx) => const NotificationSafetyScreen()),
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
+
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -192,45 +170,22 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
               ),
               child: Column(
                 children: [
-                  // Avatar with verified badge
-                  Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 44,
-                        backgroundColor: AppColors.surfaceContainerLowest,
-                        backgroundImage: user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
-                        child: user.avatarUrl == null ? const Icon(Icons.person, size: 44) : null,
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 2,
-                        child: Container(
-                          width: 26,
-                          height: 26,
-                          decoration: const BoxDecoration(
-                            color: AppColors.secondary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.verified, color: Colors.white, size: 16),
-                        ),
-                      ),
-                    ],
+                  // Symbolic animated avatar with verified badge
+                  const SymbolicVendorAvatar(
+                    radius: 44,
+                    animate: true,
+                    showVerifiedBadge: true,
                   ),
                   const SizedBox(height: 12),
                   LocalizedText(
-                    (AuthSession.instance.profile?['fullName'] ?? AuthSession.instance.profile?['email'] ?? '').toString(),
+                    vendor.businessName.isNotEmpty
+                        ? vendor.businessName
+                        : (AuthSession.instance.profile?['fullName'] ?? '').toString(),
                     style: AppTypography.headlineSm.copyWith(
                       color: AppColors.onSurface,
                       fontWeight: FontWeight.bold,
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  LocalizedText(
-                    vendor.businessName,
-                    style: AppTypography.labelLg.copyWith(
-                      color: AppColors.secondary,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Container(
@@ -246,7 +201,7 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
                         const SizedBox(width: 4),
                         Flexible(
                           child: LocalizedText(
-                            'Đối tác biển đã xác thực',
+                            'Đã xác thực',
                             style: AppTypography.labelSm.copyWith(
                               color: AppColors.secondary,
                               fontWeight: FontWeight.bold,
@@ -377,7 +332,7 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
                       const Icon(Icons.translate, size: 18, color: AppColors.tertiary),
                       const SizedBox(width: 8),
                       LocalizedText(
-                        'Ngôn ngữ ứng dụng',
+                        'Ngôn ngữ',
                         style: AppTypography.labelMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold),
                       ),
                     ],
@@ -428,7 +383,7 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
             const SizedBox(height: 20),
 
             // Group 1: Business & Legal
-            _buildSectionHeader(Icons.corporate_fare, 'Kinh doanh & Pháp lý'),
+            _buildSectionHeader(Icons.business_center_outlined, 'Kinh doanh & Pháp lý'),
             Container(
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerLowest,
@@ -440,11 +395,10 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
               child: Column(
                 children: [
                   _buildMenuItem(
-                    icon: Icons.storefront,
+                    icon: Icons.storefront_outlined,
                     iconBgColor: AppColors.secondaryContainer.withAlpha(80),
                     iconColor: AppColors.secondary,
                     title: 'Hồ sơ doanh nghiệp',
-                    subtitle: '${vendor.businessName} • Lô 12 Võ Nguyên Giáp',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (ctx) => const BusinessProfileScreen()),
@@ -452,27 +406,35 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
                   ),
                   const Divider(height: 1, color: AppColors.surfaceContainerHigh),
                   _buildMenuItem(
-                    icon: Icons.verified,
+                    icon: Icons.badge_outlined,
                     iconBgColor: AppColors.secondaryContainer.withAlpha(80),
                     iconColor: AppColors.secondary,
-                    title: 'Giấy tờ & Chứng nhận an toàn',
-                    subtitle: '2 chứng nhận hợp lệ',
-                    badgeText: 'Chuẩn vị thế',
+                    title: 'Người đại diện pháp lý',
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (ctx) => const VendorDocumentsScreen()),
+                      MaterialPageRoute(builder: (ctx) => const RepresentativeProfileScreen()),
                     ),
                   ),
                   const Divider(height: 1, color: AppColors.surfaceContainerHigh),
                   _buildMenuItem(
-                    icon: Icons.account_balance,
+                    icon: Icons.account_balance_outlined,
                     iconBgColor: AppColors.secondaryContainer.withAlpha(80),
                     iconColor: AppColors.secondary,
                     title: 'Tài khoản ngân hàng nhận tiền',
-                    subtitle: '${vendor.bankName ?? "Vietcombank"} •••• ${vendor.bankAccountNumber?.substring(vendor.bankAccountNumber!.length - 4) ?? "8988"} (Đã kiểm duyệt)',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (ctx) => const EditProfileBankScreen()),
+                    ),
+                  ),
+                  const Divider(height: 1, color: AppColors.surfaceContainerHigh),
+                  _buildMenuItem(
+                    icon: Icons.verified_outlined,
+                    iconBgColor: AppColors.secondaryContainer.withAlpha(80),
+                    iconColor: AppColors.secondary,
+                    title: 'Giấy tờ & Chứng nhận an toàn',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (ctx) => const VendorDocumentsScreen()),
                     ),
                   ),
                 ],
@@ -481,7 +443,7 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
             const SizedBox(height: 20),
 
             // Group 2: Sales & Customer Care
-            _buildSectionHeader(Icons.sports_kabaddi, 'Bán hàng & Khách hàng'),
+            _buildSectionHeader(Icons.storefront_outlined, 'Bán hàng & Khách hàng'),
             Container(
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerLowest,
@@ -493,12 +455,10 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
               child: Column(
                 children: [
                   _buildMenuItem(
-                    icon: Icons.hotel_class,
+                    icon: Icons.star_outline_rounded,
                     iconBgColor: AppColors.primaryFixed.withAlpha(80),
                     iconColor: AppColors.primaryContainer,
                     title: 'Đánh giá của khách hàng',
-                    subtitle: '${vendor.ratingAvg} ★ • ${vendor.ratingCount} lượt phản hồi',
-                    badgeText: 'Xuất sắc',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (ctx) => const ReviewFeedbackScreen()),
@@ -506,11 +466,10 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
                   ),
                   const Divider(height: 1, color: AppColors.surfaceContainerHigh),
                   _buildMenuItem(
-                    icon: Icons.loyalty,
+                    icon: Icons.confirmation_number_outlined,
                     iconBgColor: AppColors.primaryFixed.withAlpha(80),
                     iconColor: AppColors.primaryContainer,
                     title: 'Mã giảm giá của đối tác',
-                    subtitle: '${_db.vouchers.where((v) => v.isActive).length} mã đang kích hoạt',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (ctx) => const VoucherManagementScreen()),
@@ -522,7 +481,7 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
             const SizedBox(height: 20),
 
             // Group 3: Finance & Dispatches
-            _buildSectionHeader(Icons.payments, 'Tài chính & Khiếu nại'),
+            _buildSectionHeader(Icons.account_balance_wallet_outlined, 'Tài chính & Khiếu nại'),
             Container(
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerLowest,
@@ -534,11 +493,10 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
               child: Column(
                 children: [
                   _buildMenuItem(
-                    icon: Icons.query_stats,
+                    icon: Icons.query_stats_outlined,
                     iconBgColor: AppColors.secondaryContainer.withAlpha(80),
                     iconColor: AppColors.secondary,
                     title: 'Đối soát doanh thu kỳ này',
-                    subtitle: 'Chu kỳ 16/10 - 31/10/2024',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (ctx) => const SettlementRevenueScreen()),
@@ -546,11 +504,10 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
                   ),
                   const Divider(height: 1, color: AppColors.surfaceContainerHigh),
                   _buildMenuItem(
-                    icon: Icons.history_edu,
+                    icon: Icons.payments_outlined,
                     iconBgColor: AppColors.secondaryContainer.withAlpha(80),
                     iconColor: AppColors.secondary,
                     title: 'Yêu cầu thanh toán & Lịch sử',
-                    subtitle: 'Lần chuyển gần nhất: 16/10',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (ctx) => const PayoutDetailScreen()),
@@ -558,13 +515,11 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
                   ),
                   const Divider(height: 1, color: AppColors.surfaceContainerHigh),
                   _buildMenuItem(
-                    icon: Icons.report_problem_outlined,
+                    icon: Icons.shield_outlined,
                     iconBgColor: AppColors.errorContainer.withAlpha(70),
                     iconColor: AppColors.error,
-                    title: 'Khiếu nại dịch vụ liên quan',
-                    subtitle: '${_db.disputes.where((d) => d.status == DisputeStatus.inReview).length} yêu cầu cần theo dõi',
-                    badgeText: 'Cần xử lý',
-                    badgeIsDestructive: true,
+                    title: 'Khiếu nại dịch vụ',
+                    badgeCount: _db.disputes.where((d) => d.status == DisputeStatus.inReview).length,
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (ctx) => const DisputeManagementScreen()),
@@ -576,7 +531,7 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
             const SizedBox(height: 20),
 
             // Group 4: System Settings
-            _buildSectionHeader(Icons.tune, 'Cài đặt hệ thống'),
+            _buildSectionHeader(Icons.settings_outlined, 'Cài đặt hệ thống'),
             Container(
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerLowest,
@@ -588,11 +543,10 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
               child: Column(
                 children: [
                   _buildMenuItem(
-                    icon: Icons.lock_reset,
+                    icon: Icons.lock_outline,
                     iconBgColor: AppColors.surfaceContainer,
                     iconColor: AppColors.onSurfaceVariant,
                     title: 'Đổi mật khẩu',
-                    subtitle: 'Cập nhật mật khẩu bảo mật tài khoản',
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (ctx) => const ChangePasswordScreen()),
@@ -604,7 +558,7 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
                     iconBgColor: AppColors.errorContainer.withAlpha(60),
                     iconColor: AppColors.error,
                     title: 'Đăng xuất',
-                    subtitle: 'Thoát khỏi phiên làm việc hiện tại',
+                    titleColor: AppColors.error,
                     onTap: _handleLogout,
                   ),
                 ],
@@ -645,18 +599,24 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
     required Color iconBgColor,
     required Color iconColor,
     required String title,
-    required String subtitle,
+    String? subtitle,
+    int? badgeCount,
     String? badgeText,
     bool badgeIsDestructive = false,
+    Color? titleColor,
     required VoidCallback onTap,
   }) {
+    final hasSubtitle = subtitle != null && subtitle.trim().isNotEmpty;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: hasSubtitle ? 12 : 14,
+          ),
           child: Row(
             children: [
               Container(
@@ -670,29 +630,60 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    LocalizedText(
-                      title,
-                      style: AppTypography.labelLg.copyWith(
-                        color: AppColors.onSurface,
-                        fontWeight: FontWeight.bold,
+                child: hasSubtitle
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          LocalizedText(
+                            title,
+                            style: AppTypography.labelLg.copyWith(
+                              color: titleColor ?? AppColors.onSurface,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          LocalizedText(
+                            subtitle,
+                            style: AppTypography.bodySm.copyWith(color: AppColors.tertiary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      )
+                    : LocalizedText(
+                        title,
+                        style: AppTypography.labelLg.copyWith(
+                          color: titleColor ?? AppColors.onSurface,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    LocalizedText(
-                      subtitle,
-                      style: AppTypography.bodySm.copyWith(color: AppColors.tertiary),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
               ),
-              if (badgeText != null) ...[
+              if (badgeCount != null && badgeCount > 0) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                  decoration: const BoxDecoration(
+                    color: AppColors.error,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      badgeCount > 99 ? '99+' : '$badgeCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ] else if (badgeText != null) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(

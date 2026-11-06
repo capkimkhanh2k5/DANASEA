@@ -1,23 +1,23 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { notificationService } from "../../../services/notificationService";
 import type { NotificationResponse } from "../../../types/notification";
+import { communicationService, type ConversationItem, type MessageItem } from "../../../services/communicationService";
+import { useAuthStore } from "../../../store/useAuthStore";
 import {
   MessageSquare,
   Bell,
   Search,
-  SlidersHorizontal,
   Send,
-  Paperclip,
   ShieldCheck,
-  CheckCheck,
   Phone,
-  ChevronDown,
   ArrowRight,
   ArrowLeft,
   Loader2,
   BellOff,
   CalendarCheck,
+  Store,
+  User,
 } from "lucide-react";
 
 export function Inbox() {
@@ -32,17 +32,26 @@ export function Inbox() {
       return next;
     });
   };
-  const [_activeChat, setActiveChat] = useState<number | null>(1);
-  const [showOrder, setShowOrder] = useState(false);
+
+  const { user, isAuthenticated } = useAuthStore();
+  const [conversations, setConversations] = useState<ConversationItem[]>([]);
+  const [vendorNames, setVendorNames] = useState<Record<string, string>>({});
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [inputMessage, setInputMessage] = useState("");
+  const [loadingConv, setLoadingConv] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [searchFilter, setSearchFilter] = useState("");
   const [notifications, setNotifications] = useState<NotificationResponse[]>([]);
   const [loadingNotifs, setLoadingNotifs] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Load notifications
   useEffect(() => {
     let ignore = false;
     const run = async () => {
-      await Promise.resolve();
-      if (ignore) return;
-      if (activeTab === "notifications") {
+      if (activeTab === "notifications" && isAuthenticated) {
         setLoadingNotifs(true);
         try {
           const res = await notificationService.getMyNotifications(0, 50);
@@ -58,7 +67,118 @@ export function Inbox() {
     return () => {
       ignore = true;
     };
-  }, [activeTab]);
+  }, [activeTab, isAuthenticated]);
+
+  // Load conversations
+  const loadConversations = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      setLoadingConv(true);
+      const res = await communicationService.getConversations(0, 50);
+      const items = res.content || [];
+      setConversations(items);
+
+      if (!activeConvId && items.length > 0) {
+        setActiveConvId(items[0].id);
+      }
+
+      // Fetch vendor names in parallel
+      const namesMap: Record<string, string> = {};
+      await Promise.all(
+        items.map(async (c) => {
+          if (!namesMap[c.vendorId]) {
+            const info = await communicationService.getVendorInfo(c.vendorId);
+            namesMap[c.vendorId] = info.businessName;
+          }
+        })
+      );
+      setVendorNames((prev) => ({ ...prev, ...namesMap }));
+    } catch {
+      // Graceful error handling
+    } finally {
+      setLoadingConv(false);
+    }
+  }, [isAuthenticated, activeConvId]);
+
+  useEffect(() => {
+    if (activeTab === "messages") {
+      loadConversations();
+    }
+  }, [activeTab, loadConversations]);
+
+  // Load messages for active conversation
+  const loadMessages = useCallback(async (convId: string) => {
+    try {
+      const msgs = await communicationService.getMessages(convId);
+      setMessages(msgs);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Polling for live messages while chat is open
+  useEffect(() => {
+    if (!activeConvId || activeTab !== "messages") return;
+
+    loadMessages(activeConvId);
+
+    const interval = setInterval(() => {
+      loadMessages(activeConvId);
+    }, 3500);
+
+    return () => clearInterval(interval);
+  }, [activeConvId, activeTab, loadMessages]);
+
+  // Auto-scroll on new messages (internal container only)
+  useEffect(() => {
+    if (activeConvId && messages.length > 0 && chatScrollContainerRef.current) {
+      chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight;
+    }
+  }, [activeConvId, messages.length]);
+
+  const activeConversation = conversations.find((c) => c.id === activeConvId);
+  const activeVendorName = activeConversation
+    ? vendorNames[activeConversation.vendorId] || "Nhà điều hành tour"
+    : "Hội thoại";
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputMessage.trim() || !activeConvId || sending) return;
+
+    const textToSend = inputMessage.trim();
+    setInputMessage("");
+    setSending(true);
+
+    try {
+      const saved = await communicationService.sendMessage(activeConvId, textToSend);
+      setMessages((prev) => [...prev, saved]);
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === activeConvId
+            ? { ...c, lastMessage: saved, updatedAt: saved.createdAt }
+            : c
+        )
+      );
+    } catch {
+      setInputMessage(textToSend);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const formatMessageTime = (isoString?: string) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const filteredConversations = conversations.filter((c) => {
+    const name = (vendorNames[c.vendorId] || "").toLowerCase();
+    const orderRef = (c.masterOrderId || "").toLowerCase();
+    const q = searchFilter.toLowerCase();
+    return name.includes(q) || orderRef.includes(q);
+  });
 
   return (
     <main className="w-full pt-20 bg-white min-h-[calc(100vh-80px)] flex-1">
@@ -67,7 +187,7 @@ export function Inbox() {
           {/* Navigation Breadcrumb */}
           <div className="flex items-center gap-2 text-[13px] text-slate-500 font-medium">
             <button 
-              onClick={() => navigate('/profile')} 
+              onClick={() => navigate("/profile")} 
               className="hover:text-slate-900 transition-colors cursor-pointer bg-transparent border-0 p-0 flex items-center gap-1 text-slate-600 font-semibold"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -84,11 +204,11 @@ export function Inbox() {
                 Hộp thư &amp; Thông báo
               </h1>
               <p className="text-sm text-slate-600 mt-1 max-w-2xl">
-                Quản lý trao đổi với câu lạc bộ biển và nhận cập nhật chuyến đi theo thời gian thực
+                Quản lý trao đổi trực tiếp với nhà điều hành biển và nhận thông báo từ hệ thống
               </p>
             </div>
 
-            {/* Segmented Tab Control - Airbnb Clean Style */}
+            {/* Segmented Tab Control */}
             <div className="flex items-center p-1 bg-slate-100 rounded-xl self-start md:self-auto border border-slate-200/60">
               <button
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
@@ -101,9 +221,11 @@ export function Inbox() {
               >
                 <MessageSquare className="w-4 h-4" />
                 <span>Tin nhắn câu lạc bộ</span>
-                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[11px] font-bold">
-                  3
-                </span>
+                {conversations.length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[11px] font-bold">
+                    {conversations.length}
+                  </span>
+                )}
               </button>
 
               <button
@@ -121,7 +243,7 @@ export function Inbox() {
             </div>
           </div>
 
-          {/* TAB VIEW 1: MESSAGES (MASTER-DETAIL CHAT) */}
+          {/* TAB VIEW 1: MESSAGES */}
           {activeTab === "messages" && (
             <div className="w-full grid grid-cols-12 gap-6 items-start">
               {/* LEFT COLUMN: CONVERSATION LIST */}
@@ -134,105 +256,91 @@ export function Inbox() {
                       className="w-full h-10 pl-9 pr-4 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white transition-colors"
                       placeholder="Tìm đối tác hoặc mã đơn..."
                       type="text"
+                      value={searchFilter}
+                      onChange={(e) => setSearchFilter(e.target.value)}
                     />
                   </div>
                   <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-1">
-                    <span>ĐỐI TÁC VẬN HÀNH BIỂN (4)</span>
-                    <span className="flex items-center gap-1 text-slate-700 hover:text-slate-900 cursor-pointer">
-                      <SlidersHorizontal className="w-3 h-3" />
-                      Lọc
+                    <span>ĐỐI TÁC VẬN HÀNH BIỂN</span>
+                    <span className="font-mono tabular-nums text-slate-400">
+                      {filteredConversations.length} hội thoại
                     </span>
                   </div>
                 </div>
 
                 {/* Conversation Items */}
                 <div className="flex flex-col overflow-y-auto p-2 space-y-1 flex-1">
-                  {/* Conversation 1 (Active) */}
-                  <div
-                    className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors bg-slate-50 border border-slate-200/70"
-                    onClick={() => setActiveChat(1)}
-                  >
-                    <div className="relative shrink-0">
-                      <div className="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm">
-                        ST
-                      </div>
-                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                  {loadingConv && conversations.length === 0 ? (
+                    <div className="p-3 space-y-2">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 animate-pulse">
+                          <div className="w-10 h-10 rounded-xl bg-slate-200 shrink-0" />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="h-3 bg-slate-200 rounded w-2/3" />
+                            <div className="h-2.5 bg-slate-100 rounded w-1/2" />
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline justify-between gap-1 mb-0.5">
-                        <span className="font-bold text-sm text-slate-900 truncate">
-                          Son Tra Marine Diving
-                        </span>
-                        <span className="text-[11px] text-slate-500 shrink-0">
-                          10:42
-                        </span>
+                  ) : filteredConversations.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-8 text-center min-h-[280px]">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
+                        <Store className="w-5 h-5" />
                       </div>
-                      <p className="text-xs text-slate-600 truncate font-semibold">
-                        Lặn ngắm san hô Bãi Bụt
-                      </p>
-                      <p className="text-xs text-slate-500 truncate mt-0.5">
-                        Dạ anh An, cano cao tốc đón anh lúc 07:30 sáng mai tại...
+                      <p className="text-xs font-semibold text-slate-700">Chưa có hội thoại nào</p>
+                      <p className="text-[11px] text-slate-400 mt-1 max-w-[200px]">
+                        Khi bạn đặt dịch vụ tour biển, kênh trao đổi với nhà điều hành sẽ hiển thị tại đây.
                       </p>
                     </div>
-                  </div>
+                  ) : (
+                    filteredConversations.map((conv) => {
+                      const isActive = conv.id === activeConvId;
+                      const vendorName = vendorNames[conv.vendorId] || "Nhà điều hành tour";
+                      const lastSnippet = conv.lastMessage?.content || "Chưa có tin nhắn";
+                      const timeStr = formatMessageTime(conv.lastMessage?.createdAt || conv.updatedAt);
 
-                  {/* Conversation 2 */}
-                  <div
-                    className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-slate-50 border border-transparent"
-                    onClick={() => setActiveChat(1)}
-                  >
-                    <div className="relative shrink-0">
-                      <div className="w-11 h-11 rounded-xl bg-sky-600 text-white flex items-center justify-center font-bold text-sm">
-                        DO
-                      </div>
-                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white"></span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline justify-between gap-1 mb-0.5">
-                        <span className="font-bold text-sm text-slate-900 truncate">
-                          Danang Ocean Club
-                        </span>
-                        <span className="text-[11px] text-slate-400 shrink-0">
-                          Hôm qua
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 truncate font-medium">
-                        Chèo SUP Mỹ Khê
-                      </p>
-                      <p className="text-xs text-slate-500 truncate mt-0.5">
-                        HLV Huy đã gửi ảnh flycam buổi chèo SUP của anh rồi ạ!
-                      </p>
-                    </div>
-                  </div>
+                      return (
+                        <div
+                          key={conv.id}
+                          className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors border ${
+                            isActive
+                              ? "bg-slate-50 border-slate-200/90 shadow-2xs"
+                              : "border-transparent hover:bg-slate-50/70"
+                          }`}
+                          onClick={() => setActiveConvId(conv.id)}
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-sky-100 border border-sky-200 text-sky-800 flex items-center justify-center shrink-0">
+                            <Store className="w-5 h-5" />
+                          </div>
 
-                  {/* Conversation 3 */}
-                  <div
-                    className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-slate-50 border border-transparent"
-                    onClick={() => setActiveChat(1)}
-                  >
-                    <div className="relative shrink-0">
-                      <div className="w-11 h-11 rounded-xl bg-slate-700 text-white flex items-center justify-center font-bold text-sm">
-                        SF
-                      </div>
-                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-slate-300 ring-2 ring-white"></span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline justify-between gap-1 mb-0.5">
-                        <span className="font-bold text-sm text-slate-900 truncate">
-                          SkyFly Dù Lượn Bán Đảo
-                        </span>
-                        <span className="text-[11px] text-slate-400 shrink-0">
-                          12/10
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 truncate font-medium">
-                        Dù lượn ngắm biển
-                      </p>
-                      <p className="text-xs text-slate-500 truncate mt-0.5">
-                        Cảm ơn anh đã đánh giá 5 sao cho phi công của SkyFly!
-                      </p>
-                    </div>
-                  </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline justify-between gap-1 mb-0.5">
+                              <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                                {vendorName}
+                              </span>
+                              <span className="text-[11px] font-mono tabular-nums text-slate-400 shrink-0">
+                                {timeStr}
+                              </span>
+                            </div>
+                            {conv.masterOrderId && (
+                              <p className="text-[11px] font-mono text-sky-700 truncate">
+                                Đơn #{conv.masterOrderId.slice(0, 8)}
+                              </p>
+                            )}
+                            <p className="text-xs text-slate-600 truncate mt-0.5">
+                              {lastSnippet}
+                            </p>
+                          </div>
+
+                          {conv.unreadCount && conv.unreadCount > 0 ? (
+                            <span className="w-5 h-5 rounded-full bg-rose-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-1">
+                              {conv.unreadCount}
+                            </span>
+                          ) : null}
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
 
                 {/* Direct Emergency Callout */}
@@ -247,173 +355,121 @@ export function Inbox() {
 
               {/* RIGHT COLUMN: CHAT WINDOW */}
               <div className="col-span-12 lg:col-span-8 flex flex-col bg-white rounded-2xl shadow-xs border border-slate-200/80 overflow-hidden min-h-[640px] max-h-[720px] relative">
-                {/* Chat Top Header */}
-                <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-4 z-10">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="relative shrink-0">
-                      <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm">
-                        ST
-                      </div>
-                      <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="font-bold text-sm sm:text-base text-slate-900 truncate">
-                          Son Tra Marine Diving
-                        </h2>
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
-                          Đối tác xác minh
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        <span>Đang trực tuyến • Tour Lặn san hô Bãi Bụt</span>
-                      </p>
-                    </div>
+                {!activeConversation ? (
+                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400">
+                    <MessageSquare className="w-12 h-12 stroke-[1.5] text-slate-300 mb-2" />
+                    <p className="text-sm font-semibold text-slate-700">Chọn một hội thoại để trao đổi</p>
+                    <p className="text-xs text-slate-400 mt-1">Danh sách đối tác biển nằm ở cột bên trái</p>
                   </div>
-
-                  {/* Toggle Related Order Drawer */}
-                  <button
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-800 text-xs font-semibold transition-colors cursor-pointer"
-                    onClick={() => setShowOrder(!showOrder)}
-                    type="button"
-                  >
-                    <span>Đơn liên quan #DNS-89412</span>
-                    <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
-                  </button>
-                </div>
-
-                {/* Collapsible Order Drawer */}
-                {showOrder && (
-                  <div className="bg-slate-50 border-b border-slate-200 p-4 transition-all">
-                    <div className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0 bg-slate-100">
-                          <img
-                            className="w-full h-full object-cover"
-                            alt="Tour Lặn biển"
-                            src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=200"
-                          />
+                ) : (
+                  <>
+                    {/* Chat Top Header */}
+                    <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-4 z-10">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-[#031d44] text-white flex items-center justify-center shrink-0 font-bold text-sm">
+                          <Store className="w-5 h-5" />
                         </div>
                         <div className="min-w-0">
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                            ĐÃ THANH TOÁN
-                          </span>
-                          <h4 className="font-bold text-xs sm:text-sm text-slate-900 mt-1 truncate">
-                            Tour Lặn biển Chuyên nghiệp Rạn San Hô Sơn Trà
-                          </h4>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            08:00 - 11:30, Ngày mai • 02 khách
-                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="font-bold text-sm sm:text-base text-slate-900 truncate">
+                              {activeVendorName}
+                            </h2>
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                              Đối tác xác minh
+                            </span>
+                          </div>
+                          {activeConversation.masterOrderId && (
+                            <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 font-mono">
+                              <span>Mã đơn: #{activeConversation.masterOrderId.slice(0, 8)}</span>
+                            </p>
+                          )}
                         </div>
                       </div>
+                    </div>
 
-                      <div className="flex sm:flex-col items-end justify-between sm:justify-center shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                        <span className="text-sm font-extrabold text-slate-900 tabular-nums">
-                          900.000₫
+                    {/* Chat Messages Log */}
+                    <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto p-5 flex flex-col gap-3.5 bg-slate-50/40">
+                      {messages.length === 0 ? (
+                        <div className="p-8 text-center text-xs text-slate-400">
+                          Chưa có tin nhắn nào trong hội thoại này. Gửi tin nhắn đầu tiên cho {activeVendorName}!
+                        </div>
+                      ) : (
+                        messages.map((m) => {
+                          const isUser = m.senderId === user?.id;
+
+                          return (
+                            <div
+                              key={m.id}
+                              className={`flex items-end gap-2.5 max-w-[80%] ${
+                                isUser ? "self-end flex-row-reverse" : "self-start"
+                              }`}
+                            >
+                              <div
+                                className={`w-7 h-7 rounded-lg text-white flex items-center justify-center font-bold text-xs shrink-0 mb-1 ${
+                                  isUser ? "bg-slate-700" : "bg-[#031d44]"
+                                }`}
+                              >
+                                {isUser ? <User className="w-4 h-4" /> : <Store className="w-4 h-4" />}
+                              </div>
+
+                              <div className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
+                                <div
+                                  className={`p-3.5 rounded-2xl text-xs sm:text-sm shadow-2xs leading-relaxed ${
+                                    isUser
+                                      ? "bg-[#031d44] text-white rounded-br-xs font-normal"
+                                      : "bg-white border border-slate-200 text-slate-800 rounded-bl-xs"
+                                  }`}
+                                >
+                                  <p>{m.content}</p>
+                                </div>
+                                <span className="text-[11px] font-mono tabular-nums text-slate-400 px-1">
+                                  {formatMessageTime(m.createdAt)}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                      <div ref={messagesEndRef} />
+                    </div>
+
+                    {/* Chat Composer */}
+                    <div className="p-4 bg-white border-t border-slate-100">
+                      <form className="flex items-center gap-2" onSubmit={handleSendMessage}>
+                        <input
+                          className="flex-1 h-10 px-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 outline-none focus:border-[#031d44] focus:bg-white transition-colors"
+                          placeholder="Nhập tin nhắn trao đổi với đối tác..."
+                          type="text"
+                          value={inputMessage}
+                          onChange={(e) => setInputMessage(e.target.value)}
+                          disabled={sending}
+                        />
+
+                        <button
+                          className="h-10 px-4 rounded-xl bg-[#031d44] hover:bg-[#021838] text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs disabled:opacity-40"
+                          type="submit"
+                          disabled={!inputMessage.trim() || sending}
+                        >
+                          {sending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              <span>Gửi</span>
+                              <Send className="w-3.5 h-3.5" />
+                            </>
+                          )}
+                        </button>
+                      </form>
+                      <div className="flex items-center justify-between mt-2 text-[11px] text-slate-500 px-1">
+                        <span className="flex items-center gap-1">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                          Hệ thống tin nhắn lưu trữ và đồng bộ thời gian thực
                         </span>
-                        <Link to="/profile/orders" className="text-xs text-sky-600 hover:underline font-medium">
-                          Xem vé điện tử
-                        </Link>
+                        <span className="hidden sm:inline">Nhấn Enter để gửi</span>
                       </div>
                     </div>
-                  </div>
+                  </>
                 )}
-
-                {/* Chat Messages Log */}
-                <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-4 bg-slate-50/40">
-                  <div className="flex items-center justify-center my-1">
-                    <span className="px-3 py-1 rounded-md bg-white border border-slate-200 text-slate-500 text-xs font-medium">
-                      Hôm nay
-                    </span>
-                  </div>
-
-                  {/* Vendor Message */}
-                  <div className="flex items-end gap-2.5 max-w-[80%] self-start">
-                    <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 mb-1">
-                      ST
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <div className="p-3.5 rounded-2xl rounded-bl-xs bg-white border border-slate-200 text-slate-800 text-xs sm:text-sm shadow-2xs">
-                        <p>
-                          Chào anh An! Đội ngũ huấn luyện viên lặn PADI của Son Tra Marine đã sẵn sàng cho chuyến thám hiểm san hô ngày mai của 2 bạn tại Bãi Bụt.
-                        </p>
-                      </div>
-                      <span className="text-[11px] text-slate-400 px-1">09:15</span>
-                    </div>
-                  </div>
-
-                  {/* Customer Message */}
-                  <div className="flex items-end gap-2 max-w-[75%] self-end">
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="p-3.5 rounded-2xl rounded-br-xs bg-[#0284c7] text-white text-xs sm:text-sm shadow-2xs">
-                        <p>
-                          Chào bạn! Ngày mai bọn mình có cần chuẩn bị kính lặn và chân vịt riêng không, hay bên bạn cung cấp sẵn?
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 px-1 text-[11px] text-slate-400">
-                        <span>09:30</span>
-                        <CheckCheck className="w-3.5 h-3.5 text-sky-600" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Vendor Message with Attachment */}
-                  <div className="flex items-end gap-2.5 max-w-[80%] self-start">
-                    <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 mb-1">
-                      ST
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <div className="p-3.5 rounded-2xl rounded-bl-xs bg-white border border-slate-200 text-slate-800 text-xs sm:text-sm shadow-2xs flex flex-col gap-2.5">
-                        <p>
-                          Anh hoàn toàn yên tâm nhé, gói tour #DNS-89412 đã bao gồm trọn bộ trang thiết bị chuẩn quốc tế đã khử khuẩn: kính lặn góc rộng kèm van thở khô, áo phao SOLAS và đồ bơi giữ nhiệt.
-                        </p>
-                        <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-                          <img
-                            src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=500"
-                            alt="Thiết bị lặn chuẩn PADI"
-                            className="w-full h-36 object-cover"
-                          />
-                        </div>
-                      </div>
-                      <span className="text-[11px] text-slate-400 px-1">09:35</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Chat Composer */}
-                <div className="p-4 bg-white border-t border-slate-100">
-                  <form className="flex items-center gap-2" onSubmit={(e) => e.preventDefault()}>
-                    <button
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
-                      title="Đính kèm tệp"
-                      type="button"
-                    >
-                      <Paperclip className="w-4 h-4" />
-                    </button>
-                    
-                    <input
-                      className="flex-1 h-10 px-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs sm:text-sm text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors"
-                      placeholder="Nhập tin nhắn trao đổi với đối tác..."
-                      type="text"
-                    />
-
-                    <button
-                      className="h-10 px-4 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer shrink-0 shadow-xs"
-                      type="submit"
-                    >
-                      <span>Gửi</span>
-                      <Send className="w-3.5 h-3.5" />
-                    </button>
-                  </form>
-                  <div className="flex items-center justify-between mt-2 text-[11px] text-slate-500 px-1">
-                    <span className="flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      Cuộc trò chuyện được lưu trữ và bảo vệ bởi DANASEA
-                    </span>
-                    <span className="hidden sm:inline">Nhấn Enter để gửi</span>
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -517,4 +573,5 @@ export function Inbox() {
     </main>
   );
 }
+
 export default Inbox;

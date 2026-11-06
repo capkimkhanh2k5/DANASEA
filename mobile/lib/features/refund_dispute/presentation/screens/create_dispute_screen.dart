@@ -116,6 +116,9 @@ class _CreateDisputeScreenState extends State<CreateDisputeScreen> {
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(sheetContext).size.height * 0.85,
+          ),
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -162,7 +165,11 @@ class _CreateDisputeScreenState extends State<CreateDisputeScreen> {
                   style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                 ),
                 const SizedBox(height: 14),
-                ..._categories.map((cat) {
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: _categories.map((cat) {
                   final isSel = _selectedCategory == cat;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -234,7 +241,10 @@ class _CreateDisputeScreenState extends State<CreateDisputeScreen> {
                       ),
                     ),
                   );
-                }),
+                }).toList(),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),

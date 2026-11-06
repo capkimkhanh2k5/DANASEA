@@ -21,6 +21,7 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   addItem: (item: Omit<CartItem, 'id'>) => void;
+  updateCartItem: (id: string, updatedData: Partial<Omit<CartItem, 'id'>>) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
@@ -30,12 +31,21 @@ interface CartState {
   getTotalPrice: () => number;
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isLegacyMockId = (id?: string) => !id || !UUID_REGEX.test(id) || id.startsWith('d0000001');
+
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
       
       addItem: (itemData) => set((state) => {
+        // Guardrail: reject legacy non-UUID items from polluting the cart
+        if (isLegacyMockId(itemData.serviceId) || isLegacyMockId(itemData.slotId)) {
+          console.warn('[useCartStore] Bỏ qua thêm item vì ID không phải UUID chuẩn:', itemData);
+          return state;
+        }
+
         // Check if item already exists (same service & slot)
         const existingItem = state.items.find(
           (item) => item.serviceId === itemData.serviceId && item.slotId === itemData.slotId
@@ -54,10 +64,16 @@ export const useCartStore = create<CartState>()(
         // Create new item
         const newItem: CartItem = {
           ...itemData,
-          id: Math.random().toString(36).substring(2, 11),
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 11),
         };
         return { items: [...state.items, newItem] };
       }),
+      
+      updateCartItem: (id, updatedData) => set((state) => ({
+        items: state.items.map((item) =>
+          item.id === id ? { ...item, ...updatedData } : item
+        )
+      })),
       
       removeItem: (id) => set((state) => ({
         items: state.items.filter((item) => item.id !== id)
@@ -76,11 +92,23 @@ export const useCartStore = create<CartState>()(
       },
       
       getTotalPrice: () => {
-        return get().items.reduce((total, item) => total + (item.quantity * item.unitPrice), 0);
+        return get().items.reduce((total, item) => total + (item.unitPrice * item.quantity), 0);
       }
     }),
     {
       name: 'danasea_cart_storage',
+      onRehydrateStorage: () => (state) => {
+        if (state && Array.isArray(state.items)) {
+          // Auto-clean any legacy mock items stored in user's browser localStorage
+          const cleanItems = state.items.filter(
+            (i) => !isLegacyMockId(i.serviceId) && !isLegacyMockId(i.slotId)
+          );
+          if (cleanItems.length !== state.items.length) {
+            console.log(`[useCartStore] Đã tự động dọn dẹp ${state.items.length - cleanItems.length} item mock cũ khỏi giỏ hàng.`);
+            state.items = cleanItems;
+          }
+        }
+      },
     }
   )
 );

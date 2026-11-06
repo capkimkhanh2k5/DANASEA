@@ -55,6 +55,7 @@ export function VendorApproval() {
   const [decisionOpen, setDecisionOpen] = useState(false);
   const [note, setNote] = useState('');
   const [documentName, setDocumentName] = useState('');
+  const [previewUrl, setPreviewUrl] = useState('');
   const [documentOpen, setDocumentOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -102,12 +103,73 @@ export function VendorApproval() {
     const start = (activePage - 1) * PAGE_SIZE;
     return filtered.slice(start, start + PAGE_SIZE);
   }, [filtered, activePage]);
-  const openProfile = (vendor: VendorRecord) => {
+  const openProfile = async (vendor: VendorRecord) => {
     setSelectedId(vendor.id);
     setTier(vendor.badgeTier);
     setNote('');
     setNotice(null);
     setDrawerOpen(true);
+
+    if (!demo) {
+      try {
+        const full = await adminVendorService.getVendor(vendor.id);
+        if (full) {
+          setReview(prev => ({
+            ...prev,
+            vendors: prev.vendors.map(v => v.id === vendor.id ? {
+              ...v,
+              documents: full.documents || [],
+              bankName: full.bankName || v.bankName,
+              bankAccountNumber: full.bankAccountNumber || v.bankAccountNumber,
+              bankAccountHolder: full.bankAccountHolder || v.bankAccountHolder,
+              address: full.address || v.address,
+            } : v)
+          }));
+        }
+      } catch (err) {
+        console.error('Không thể tải chi tiết chứng từ đối tác:', err);
+      }
+    }
+  };
+
+  const handleApproveDoc = async (docId: string) => {
+    if (!selected) return;
+    try {
+      setIsSubmitting(true);
+      await adminVendorService.approveVendorDocument(selected.id, docId);
+      setReview(prev => ({
+        ...prev,
+        vendors: prev.vendors.map(v => v.id === selected.id ? {
+          ...v,
+          documents: v.documents?.map(d => d.id === docId ? { ...d, status: 'APPROVED' } : d)
+        } : v)
+      }));
+      setNotice('Đã phê duyệt chứng từ.');
+    } catch (err) {
+      setNotice(getAdminVendorError(err, 'Lỗi khi phê duyệt chứng từ.'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRejectDoc = async (docId: string, reason: string) => {
+    if (!selected) return;
+    try {
+      setIsSubmitting(true);
+      await adminVendorService.rejectVendorDocument(selected.id, docId, reason || 'Chứng từ chưa đạt yêu cầu');
+      setReview(prev => ({
+        ...prev,
+        vendors: prev.vendors.map(v => v.id === selected.id ? {
+          ...v,
+          documents: v.documents?.map(d => d.id === docId ? { ...d, status: 'REJECTED' } : d)
+        } : v)
+      }));
+      setNotice('Đã từ chối chứng từ và yêu cầu bổ sung.');
+    } catch (err) {
+      setNotice(getAdminVendorError(err, 'Lỗi khi từ chối chứng từ.'));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   const confirmDecision = async () => {
     if (!selected || !decisionOpen) return;
@@ -259,7 +321,19 @@ export function VendorApproval() {
         <div><AdminButton disabled={isSubmitting} variant="danger" onClick={() => { setNote(''); setDecision('reject'); setDecisionOpen(true); }}>Từ chối</AdminButton>
           <AdminButton disabled={isSubmitting} variant="primary" onClick={() => { setNote(''); setDecision('approve'); setDecisionOpen(true); }}>{selected.verificationStatus === 'VERIFIED' ? 'Cập nhật phê duyệt' : 'Phê duyệt đối tác'}</AdminButton></div></div>}>
       {selected && <><VendorProfile key={selected.id} vendor={selected} timeline={demo ? review.timeline.filter(event => event.vendorId === selected.id) : []} tier={tier} onTierChange={setTier} demo={demo}
-        onPreview={name => { setDocumentName(name); setDocumentOpen(true); }} />
+        onPreview={(urlOrName, name) => {
+          if (urlOrName.startsWith('http')) {
+            setPreviewUrl(urlOrName);
+            setDocumentName(name || 'Bản scan chứng từ');
+          } else {
+            setPreviewUrl('');
+            setDocumentName(urlOrName);
+          }
+          setDocumentOpen(true);
+        }}
+        onApproveDoc={handleApproveDoc}
+        onRejectDoc={handleRejectDoc}
+        isSubmitting={isSubmitting} />
         {drawerOpen && <AdminNotice message={notice} onDismiss={() => setNotice(null)} />}</>}
     </AdminDialog>
 
@@ -274,10 +348,34 @@ export function VendorApproval() {
         <p className="admin-detail-note">Xác minh đầy đủ giấy phép kinh doanh và chứng nhận an toàn trước khi duyệt.</p></div>
     </AdminDialog>
 
-    <AdminDialog open={documentOpen} onClose={() => setDocumentOpen(false)} title="Xem trước tài liệu mẫu" description={documentName}
+    <AdminDialog open={documentOpen} onClose={() => setDocumentOpen(false)} title={documentName} description="Hồ sơ chứng từ pháp lý đối tác"
       footer={<AdminButton onClick={() => setDocumentOpen(false)}>Đóng bản xem trước</AdminButton>}>
-      <div className="admin-vendors-document-preview"><span className="material-symbols-outlined" aria-hidden="true">description</span><h3>Khung xem trước minh họa</h3>
-        <p>{documentName}</p><p>Đây là tên tệp cố định trong giao diện mẫu. Không có nội dung PDF được tải từ hồ sơ đối tác và chưa có xác minh tính xác thực, chữ ký số hay hiệu lực chứng nhận.</p></div>
+      <div className="admin-vendors-document-preview">
+        {previewUrl ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', width: '100%' }}>
+            <img
+              src={previewUrl}
+              alt={documentName}
+              style={{ maxHeight: '65vh', maxWidth: '100%', objectFit: 'contain', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+            />
+            <a
+              href={previewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#0284c7', fontSize: '13px', textDecoration: 'underline', fontWeight: 600 }}
+            >
+              Mở ảnh gốc trong tab mới ↗
+            </a>
+          </div>
+        ) : (
+          <>
+            <span className="material-symbols-outlined" aria-hidden="true">description</span>
+            <h3>Khung xem trước minh họa</h3>
+            <p>{documentName}</p>
+            <p>Đây là tên tệp cố định trong giao diện mẫu. Không có nội dung PDF được tải từ hồ sơ đối tác và chưa có xác minh tính xác thực, chữ ký số hay hiệu lực chứng nhận.</p>
+          </>
+        )}
+      </div>
     </AdminDialog>
   </div>;
 }

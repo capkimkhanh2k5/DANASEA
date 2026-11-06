@@ -61,22 +61,24 @@ html, body {
   --color-emerald-500: #10b981;
   --color-emerald-600: #059669;
 
-  --font-sans: 'Inter', sans-serif;
-  --font-heading: 'Inter', sans-serif;
-  --font-outfit: 'Inter', sans-serif;
-  --font-label-md: 'Inter', sans-serif;
-  --font-headline-sm: 'Inter', sans-serif;
-  --font-label-lg: 'Inter', sans-serif;
-  --font-headline-md: 'Inter', sans-serif;
-  --font-body-sm: 'Inter', sans-serif;
-  --font-body-md: 'Inter', sans-serif;
-  --font-display-xl: 'Inter', sans-serif;
-  --font-headline-xl: 'Inter', sans-serif;
-  --font-body-xl: 'Inter', sans-serif;
-  --font-headline-lg: 'Inter', sans-serif;
-  --font-display-lg: 'Inter', sans-serif;
-  --font-body-lg: 'Inter', sans-serif;
-  --font-label-sm: 'Inter', sans-serif;
+  --font-sans: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Public Sans', sans-serif;
+  --font-outfit: 'Public Sans', sans-serif;
+  --font-display: 'Public Sans', sans-serif;
+  --font-headline-sm: 'Public Sans', sans-serif;
+  --font-headline-md: 'Public Sans', sans-serif;
+  --font-headline-lg: 'Public Sans', sans-serif;
+  --font-headline-xl: 'Public Sans', sans-serif;
+  --font-display-lg: 'Public Sans', sans-serif;
+  --font-display-xl: 'Public Sans', sans-serif;
+  --font-body-sm: 'Public Sans', sans-serif;
+  --font-body-md: 'Public Sans', sans-serif;
+  --font-body-lg: 'Public Sans', sans-serif;
+  --font-body-xl: 'Public Sans', sans-serif;
+  --font-label-sm: 'Public Sans', sans-serif;
+  --font-label-md: 'Public Sans', sans-serif;
+  --font-label-lg: 'Public Sans', sans-serif;
+  --font-mono: 'Inter', 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   --spacing-space-md: 1rem;
   --spacing-space-sm: 0.5rem;
@@ -159,10 +161,12 @@ html, body {
   html, body {
     margin: 0;
     padding: 0;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: -0.01em;
   }
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    letter-spacing: -0.02em;
   }
   html {
     scroll-behavior: smooth;
@@ -179,6 +183,11 @@ html, body {
     margin-bottom: 0 !important;
   }
 }
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'zero' 0;
+}
+
 /* Modern slim transparent scrollbars across the application */
 ::-webkit-scrollbar {
   width: 7px;

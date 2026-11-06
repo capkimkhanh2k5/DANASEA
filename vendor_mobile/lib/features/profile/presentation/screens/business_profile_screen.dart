@@ -1,3 +1,4 @@
+import '../../../../core/widgets/symbolic_vendor_avatar.dart';
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -92,16 +93,10 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                   children: [
                     Row(
                       children: [
-                        Container(
-                          width: 58,
-                          height: 58,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.secondaryContainer,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: AppShapes.shadowSm,
-                          ),
-                          child: const Icon(Icons.sailing, color: AppColors.secondary, size: 30),
+                        const SymbolicVendorAvatar(
+                          radius: 29,
+                          animate: false,
+                          showVerifiedBadge: true,
                         ),
                         const SizedBox(width: 12),
                         Expanded(

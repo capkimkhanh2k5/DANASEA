@@ -1,3 +1,4 @@
+import { BookingStepper } from "../../../components/customer/BookingStepper";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { AlertCircle, ArrowRight, CheckCircle2, Clock } from "lucide-react";
@@ -6,7 +7,7 @@ import { paymentService } from "../../../services/paymentService";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useCartStore } from "../../../store/useCartStore";
 import type { PaymentResponse } from "../../../types/order";
-import { takePurchasedItems } from "./checkoutPaymentSession";
+import { takePurchasedItems } from "../../../utils/checkoutPaymentSession";
 
 const paymentIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const providerNames = { VNPAY: "VNPAY", PAYPAL: "PayPal", PAYOS: "payOS", ZALOPAY: "ZaloPay", MOMO: "MoMo", SEPAY: "SePay" };
@@ -137,8 +138,11 @@ export function PaymentResult({ cancelled = false }: { cancelled?: boolean }) {
   }
 
   return (
-    <main className="min-h-[calc(100vh-80px)] bg-slate-50 px-4 pb-16 pt-28">
-      <div className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+    <main className="min-h-[calc(100vh-80px)] bg-white pb-16 pt-24">
+      <section className="border-b border-slate-200/80 bg-slate-50/70">
+        <BookingStepper currentStep={3} />
+      </section>
+      <div className="mx-4 mt-8 max-w-lg sm:mx-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <section aria-live="polite">
           <div className={`mb-5 flex h-12 w-12 items-center justify-center rounded-xl ${iconClass}`}>
             <Icon className="h-6 w-6" aria-hidden="true" />

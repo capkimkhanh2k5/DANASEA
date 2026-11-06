@@ -1,4 +1,4 @@
-import type { PaymentProviderType } from "../../../types/order";
+import type { PaymentProviderType } from "../types/order";
 
 interface PendingOrder {
   id: string;

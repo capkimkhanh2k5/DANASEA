@@ -1,23 +1,23 @@
+import { BookingStepper } from "../../../components/customer/BookingStepper";
 import { useNavigate } from "react-router-dom";
 import { useCartStore } from "../../../store/useCartStore";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { bookingService } from "../../../services/bookingService";
 import { orderService } from "../../../services/orderService";
+import { customerDiscountService } from "../../../services/customerDiscountService";
+import type { DiscountCodeResponse } from "../../../types/adminDiscountCode";
 import { paymentService } from "../../../services/paymentService";
 import type { BookingHoldResponse } from "../../../types/booking";
 import type { DiscountPreviewResponse, PaymentProviderType } from "../../../types/order";
 import { useState, useEffect, useRef } from "react";
 import {
-  clearPaymentIntentKey,
-  getPaymentIntentKey,
   getPendingOrder,
   savePendingOrder,
   savePurchasedItems,
-} from "./checkoutPaymentSession";
+} from "../../../utils/checkoutPaymentSession";
 import {
   Timer,
   ShieldCheck,
-  ChevronRight,
   QrCode,
   CreditCard,
   CheckCircle2,
@@ -25,7 +25,11 @@ import {
   ArrowLeft,
   Loader2,
   Wallet,
+  Tag,
+  X,
 } from "lucide-react";
+
+const VALID_UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const paymentMethods = [
   {
@@ -72,6 +76,7 @@ export function Checkout() {
   const navigate = useNavigate();
   const { items, getTotalPrice } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
+
   const cartFingerprint = items.map(({ id, slotId, optionId, quantity }) =>
     JSON.stringify([id, slotId, optionId, quantity])).sort();
   const pendingOrderKey = `danasea_checkout_order:${JSON.stringify([user?.id, cartFingerprint])}`;
@@ -115,30 +120,21 @@ export function Checkout() {
   const [discountPreview, setDiscountPreview] = useState<DiscountPreviewResponse | null>(null);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [promoError, setPromoError] = useState<string>("");
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
   const [isApplyingPromo, setIsApplyingPromo] = useState<boolean>(false);
+  const [availableVouchers, setAvailableVouchers] = useState<DiscountCodeResponse[]>([]);
+  const [isLoadingVouchers, setIsLoadingVouchers] = useState<boolean>(false);
 
   // Payment processing state
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  // Seed demo item if opened directly with empty cart
+  // Redirect to cart if empty
   useEffect(() => {
     if (items.length === 0 && !isProcessingPayment) {
-      useCartStore.getState().addItem({
-        serviceId: 'tour-1',
-        slotId: 'slot-tour-1-today-1400',
-        serviceName: 'Tour lặn ngắm san hô Bán đảo Sơn Trà',
-        thumbnailUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
-        date: new Date().toISOString().split('T')[0],
-        timeSlot: '14:00 - 16:30',
-        selectedDate: new Date().toISOString().split('T')[0],
-        locationName: 'Bán đảo Sơn Trà, Đà Nẵng',
-        vendorName: 'DANASEA Marine Partner',
-        quantity: 2,
-        unitPrice: 550000,
-      });
+      navigate('/cart');
     }
-  }, [items.length, isProcessingPayment]);
+  }, [items.length, isProcessingPayment, navigate]);
 
   // Update editable defaults only when the authenticated user object changes.
   const [previousUser, setPreviousUser] = useState(user);
@@ -153,11 +149,9 @@ export function Checkout() {
   const holdRequestedRef = useRef<boolean>(false);
   const holdRequest = useRef<Promise<BookingHoldResponse> | null>(null);
   useEffect(() => {
-    if (items.length === 0 || holdRequestedRef.current || getPendingOrder(pendingOrderKey)) return;
+    if (!isAuthenticated || items.length === 0 || holdRequestedRef.current || getPendingOrder(pendingOrderKey)) return;
     holdRequestedRef.current = true;
 
-    // Check if slot IDs look like real UUIDs
-    const validUuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const holdItems = items.map((i) => ({
       slotId: i.slotId,
       quantity: i.quantity,
@@ -166,30 +160,32 @@ export function Checkout() {
       allowSplit: false,
     }));
 
-    const allUuids = holdItems.every((item) => validUuidRegex.test(item.slotId));
-
-    if (allUuids && isAuthenticated) {
-      const request = bookingService.holdBooking({ items: holdItems });
-      holdRequest.current = request;
-      request
-        .then((res) => {
-          setBookingHold(res);
-          const expireTime = res.holdExpiresAt || res.expiresAt;
-          if (expireTime) {
-            const expireDate = new Date(expireTime).getTime();
-            const now = Date.now();
-            const diffSec = Math.max(0, Math.floor((expireDate - now) / 1000));
-            if (diffSec > 0) setCountdown(diffSec);
-          }
-        })
-        .catch((err) => {
-          console.warn('[Checkout] Không thể giữ chỗ qua API, dùng chế độ giữ chỗ cục bộ:', err);
-        })
-        .finally(() => {
-          if (holdRequest.current === request) holdRequest.current = null;
-        });
+    if (!items.every((item) => VALID_UUID_REGEX.test(item.slotId) && VALID_UUID_REGEX.test(item.serviceId))) {
+      useCartStore.getState().clearCart();
+      navigate('/cart');
+      return;
     }
-  }, [items, isAuthenticated, pendingOrderKey]);
+
+    const request = bookingService.holdBooking({ items: holdItems });
+    holdRequest.current = request;
+    request
+      .then((res) => {
+        setBookingHold(res);
+        const expireTime = res.holdExpiresAt || res.expiresAt;
+        if (expireTime) {
+          const expireDate = new Date(expireTime).getTime();
+          const now = Date.now();
+          const diffSec = Math.max(0, Math.floor((expireDate - now) / 1000));
+          setCountdown(diffSec);
+        }
+      })
+      .catch((err) => {
+        console.warn('[Checkout] Không thể giữ chỗ qua API:', err);
+      })
+      .finally(() => {
+        if (holdRequest.current === request) holdRequest.current = null;
+      });
+  }, [items, isAuthenticated, navigate, pendingOrderKey]);
 
   // 15-minute countdown timer
   useEffect(() => {
@@ -212,6 +208,35 @@ export function Checkout() {
   };
 
   // Promo Code Handler
+  // Load real available vouchers for customer
+  useEffect(() => {
+    if (!isVoucherModalOpen) return;
+    let isMounted = true;
+    setIsLoadingVouchers(true);
+    customerDiscountService
+      .getMyDiscountCodes({ size: 50 })
+      .then((res) => {
+        if (isMounted) {
+          setAvailableVouchers(res.content || []);
+        }
+      })
+      .catch((err) => {
+        console.warn('[Checkout] Lỗi tải danh sách voucher thực tế:', err);
+        if (isMounted) {
+          setAvailableVouchers([]);
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingVouchers(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isVoucherModalOpen]);
+
   const handleApplyPromo = async () => {
     setPromoError("");
     const code = promoInput.trim().toUpperCase();
@@ -229,44 +254,19 @@ export function Checkout() {
         if (preview.valid) {
           setDiscountPreview(preview);
           setAppliedPromoCode(code);
-          setIsApplyingPromo(false);
-          return;
         } else {
           setPromoError(preview.message || "Mã khuyến mãi không hợp lệ hoặc không áp dụng cho đơn này.");
-          setIsApplyingPromo(false);
-          return;
         }
-      } catch (err) {
-        console.warn('[Checkout] Lỗi xác thực voucher từ server, kiểm tra mã dự phòng:', err);
+      } catch (err: unknown) {
+        console.warn('[Checkout] Lỗi áp dụng voucher từ hệ thống:', err);
+        setPromoError("Mã khuyến mãi không tồn tại hoặc đã hết hạn.");
+      } finally {
+        setIsApplyingPromo(false);
       }
-    }
-
-    // Client-side fallback voucher codes
-    if (code === "DANASEA10" || code === "HE2024") {
-      const discount = Math.round(getTotalPrice() * 0.1);
-      setDiscountPreview({
-        valid: true,
-        code,
-        originalTotalAmount: getTotalPrice(),
-        totalDiscountAmount: discount,
-        finalPayableAmount: Math.max(0, getTotalPrice() - discount),
-      });
-      setAppliedPromoCode(code);
-    } else if (code === "BIENXANH") {
-      const discount = 50000;
-      setDiscountPreview({
-        valid: true,
-        code,
-        originalTotalAmount: getTotalPrice(),
-        totalDiscountAmount: discount,
-        finalPayableAmount: Math.max(0, getTotalPrice() - discount),
-      });
-      setAppliedPromoCode(code);
     } else {
-      setPromoError("Mã khuyến mãi không hợp lệ hoặc đã hết lượt dùng.");
+      setPromoError("Chưa có phiên giữ chỗ hợp lệ để áp dụng mã.");
+      setIsApplyingPromo(false);
     }
-
-    setIsApplyingPromo(false);
   };
 
   const handleRemovePromo = () => {
@@ -353,31 +353,14 @@ export function Checkout() {
         }
 
         // 3. Create Payment Intent
-        const idempotencyKey = getPaymentIntentKey(orderId, paymentProvider);
-        const submitIntent = async () => {
-          try {
-            return await paymentService.createPaymentIntent(orderId, { provider: paymentProvider }, idempotencyKey);
-          } catch (error) {
-            const { status, data } = (error as CheckoutPaymentError).response ?? {};
-            const code = data?.code ?? data?.errorCode;
-            if (code === "PAYMENT_WINDOW_EXPIRED") {
-              savePendingOrder(pendingOrderKey, null);
-              setBookingHold(null);
-            }
-            if (code === "PAYMENT_ATTEMPT_CLOSED" || code === "PAYMENT_WINDOW_EXPIRED"
-                || (status && status >= 400 && status < 500 && ![401, 408, 409, 425, 429].includes(status))) {
-              clearPaymentIntentKey(orderId, paymentProvider, idempotencyKey);
-            }
-            throw error;
-          }
-        };
+        const submitIntent = () => paymentService.createPaymentIntent(orderId, { provider: paymentProvider });
 
         let payRes;
         try {
           payRes = await submitIntent();
         } catch (error) {
           const data = (error as CheckoutPaymentError).response?.data;
-          if (data?.errorCode === "WAIVER_ACCEPTANCE_REQUIRED" && Array.isArray(data.missingWaivers)) {
+          if ((data?.errorCode ?? data?.code) === "WAIVER_ACCEPTANCE_REQUIRED" && Array.isArray(data?.missingWaivers)) {
             await Promise.all(
               data.missingWaivers.map((m) =>
                 orderService.acceptSubOrderWaiver(m.subOrderId, {
@@ -396,7 +379,6 @@ export function Checkout() {
         // 4. Backend returns paymentReference (which contains the gateway redirect URL)
         const gatewayUrl = payRes.paymentUrl || payRes.paymentReference;
         if (gatewayUrl && (gatewayUrl.startsWith("http://") || gatewayUrl.startsWith("https://"))) {
-          clearPaymentIntentKey(orderId, paymentProvider, idempotencyKey);
           savePurchasedItems(payRes.paymentId, items.map(({ id, quantity }) => ({ id, quantity })));
           window.location.assign(gatewayUrl);
           return;
@@ -407,7 +389,11 @@ export function Checkout() {
         }
       } catch (err) {
         const error = err as CheckoutPaymentError;
-        console.error('[Checkout] Lỗi khi tạo đơn hàng:', err);
+        const code = error.response?.data?.code ?? error.response?.data?.errorCode;
+        if (code === "PAYMENT_WINDOW_EXPIRED") {
+          savePendingOrder(pendingOrderKey, null);
+          setBookingHold(null);
+        }
         setIsProcessingPayment(false);
         setPaymentError(error.response?.data?.message || "Không thể khởi tạo giao dịch thanh toán. Vui lòng kiểm tra lại kết nối và thử lại.");
         return;
@@ -424,59 +410,9 @@ export function Checkout() {
   return (
     <main className="w-full pt-20 bg-white min-h-[calc(100vh-80px)] flex-1">
       <div className="flex flex-col w-full">
-        {/* Sub-Header Progress Stepper Bar - Airbnb Style */}
-        <section className="w-full bg-slate-50 border-b border-slate-200/80">
-          <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            {/* Breadcrumb Navigation */}
-            <div className="flex items-center gap-2 text-xs text-slate-500 mb-3">
-              <span 
-                className="hover:text-slate-900 cursor-pointer transition-colors" 
-                onClick={() => navigate('/')}
-              >
-                DANASEA
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              <span 
-                className="hover:text-slate-900 cursor-pointer transition-colors" 
-                onClick={() => navigate('/cart')}
-              >
-                Giỏ hàng
-              </span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-slate-900 font-semibold">Thông tin &amp; Thanh toán</span>
-            </div>
-
-            {/* Stepper Component */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
-              <div 
-                onClick={() => navigate('/cart')}
-                className="flex items-center gap-3 rounded-xl bg-slate-100/70 border border-slate-200/70 p-3 cursor-pointer hover:bg-slate-100 transition-colors"
-                title="Quay lại Giỏ hàng"
-              >
-                <span className="text-sm font-semibold text-emerald-700">01.</span>
-                <div className="min-w-0">
-                  <p className="text-xs text-emerald-700 font-medium">Bước 1 (Đã chọn)</p>
-                  <p className="text-sm font-bold text-slate-900 truncate">Giỏ hàng</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 rounded-xl bg-white border border-slate-300 p-3 shadow-xs">
-                <span className="text-sm font-bold text-slate-900">02.</span>
-                <div className="min-w-0">
-                  <p className="text-xs text-slate-500 font-medium">Bước 2</p>
-                  <p className="text-sm font-bold text-slate-900 truncate">Thông tin &amp; Thanh toán</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 rounded-xl bg-slate-100/70 border border-slate-200/70 p-3 opacity-60">
-                <span className="text-sm font-semibold text-slate-600">03.</span>
-                <div className="min-w-0">
-                  <p className="text-xs text-slate-600 font-medium">Bước 3</p>
-                  <p className="text-sm font-medium text-slate-700 truncate">Nhận vé điện tử QR</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Sub-Header Progress Stepper Bar */}
+        <section className="w-full bg-slate-50/70 border-b border-slate-200/80">
+          <BookingStepper currentStep={2} />
         </section>
 
         {/* Main Checkout Area */}
@@ -606,7 +542,7 @@ export function Checkout() {
                           <input
                             checked={paymentProvider === provider}
                             onChange={() => setSelectedProvider(provider)}
-                            disabled={isProcessingPayment}
+                            disabled={isProcessingPayment || !paymentProvider}
                             className="w-4 h-4 accent-slate-900 cursor-pointer"
                             name="payment_method"
                             type="radio"
@@ -627,6 +563,7 @@ export function Checkout() {
                         <Icon className="w-5 h-5 text-slate-700 shrink-0" aria-hidden="true" />
                       </label>
                     ))}
+                    {!paymentProvider && <p className="text-sm text-slate-600">Hiện chưa có phương thức thanh toán khả dụng.</p>}
                   </div>
                 </div>
 
@@ -691,7 +628,16 @@ export function Checkout() {
                 
                 {/* Promo Code Input */}
                 <div className="pt-3 border-t border-slate-100">
-                  <label className="text-xs font-semibold text-slate-700 block mb-1.5">Mã ưu đãi chuyến đi</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-700">Mã ưu đãi chuyến đi</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsVoucherModalOpen(true)}
+                      className="text-xs text-[#0284c7] hover:text-[#0369a1] font-semibold underline underline-offset-4 cursor-pointer transition-colors"
+                    >
+                      Xem mã ưu đãi
+                    </button>
+                  </div>
                   {appliedPromoCode ? (
                     <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
@@ -714,7 +660,7 @@ export function Checkout() {
                           type="text"
                           value={promoInput}
                           onChange={(e) => setPromoInput(e.target.value)}
-                          placeholder="DANASEA10 hoặc HE2024"
+                          placeholder="Nhập mã ưu đãi..."
                           className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 uppercase focus:outline-none focus:border-slate-400 bg-slate-50"
                         />
                         <button
@@ -758,7 +704,7 @@ export function Checkout() {
                       <span className="text-xs text-slate-700 font-semibold">Tổng thanh toán:</span>
                       <p className="text-xs text-slate-500">Đã gồm thuế &amp; bảo hiểm</p>
                     </div>
-                    <span className="text-2xl sm:text-3xl leading-tight text-slate-900 font-extrabold tracking-tight tabular-nums">
+                    <span className="text-2xl sm:text-3xl leading-tight text-[#991b1b] font-extrabold tracking-tight tabular-nums">
                       {finalTotal.toLocaleString('vi-VN')}₫
                     </span>
                   </div>
@@ -777,7 +723,7 @@ export function Checkout() {
                       onClick={handlePayment} 
                       disabled={isProcessingPayment || !paymentProvider}
                       className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-xs transition-colors flex items-center justify-center cursor-pointer ${
-                        !isProcessingPayment && paymentProvider
+                        !isProcessingPayment
                           ? 'bg-[#0284c7] hover:bg-[#0369a1] text-white active:scale-95'
                           : 'bg-slate-100 text-slate-600 border border-slate-300 cursor-not-allowed'
                       }`} 
@@ -799,6 +745,94 @@ export function Checkout() {
           </div>
         </div>
       </div>
+      {/* Voucher Selection Modal */}
+      {isVoucherModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Tag className="w-5 h-5 text-[#0284c7]" />
+                <h3 className="text-base font-bold text-slate-900">Mã ưu đãi DANASEA khả dụng</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsVoucherModalOpen(false)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-500 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3 max-h-[60vh] overflow-y-auto">
+              {isLoadingVouchers ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  Đang kiểm tra mã ưu đãi khả dụng...
+                </div>
+              ) : availableVouchers.length > 0 ? (
+                availableVouchers.map((voucher) => (
+                  <div
+                    key={voucher.id}
+                    className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-100 transition-all flex items-center justify-between gap-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-800 font-mono font-bold text-xs">
+                          {voucher.code}
+                        </span>
+                        <span className="text-xs font-bold text-[#991b1b]">
+                          {voucher.discountType === 'PERCENTAGE'
+                            ? `Giảm ${voucher.discountValue}%`
+                            : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}₫`}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                        {voucher.minOrderAmount
+                          ? `Đơn tối thiểu ${voucher.minOrderAmount.toLocaleString('vi-VN')}₫`
+                          : 'Áp dụng cho đơn dịch vụ biển'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromoInput(voucher.code);
+                        setIsVoucherModalOpen(false);
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors shadow-xs"
+                    >
+                      Áp dụng
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center flex flex-col items-center justify-center space-y-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400">
+                    <Tag className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-bold text-slate-800">
+                      Chưa có mã ưu đãi cá nhân
+                    </p>
+                    <p className="text-[11px] text-slate-500 max-w-xs leading-relaxed">
+                      Bạn hiện chưa có mã giảm giá cá nhân hoặc voucher đền bù nào khả dụng. Nếu có mã từ chương trình ưu đãi, bạn có thể nhập trực tiếp tại ô bên ngoài.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsVoucherModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

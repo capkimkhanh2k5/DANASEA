@@ -70,4 +70,26 @@ export const reviewService = {
     });
     return response.data;
   },
+
+  /**
+   * Get reviews received by the authenticated vendor
+   * GET /api/vendor/reviews
+   */
+  async getVendorReviews(page = 0, size = 10): Promise<PageResponse<ReviewResponse>> {
+    const response = await apiClient.get<PageResponse<ReviewResponse>>('/vendor/reviews', {
+      params: { page, size },
+    });
+    return response.data;
+  },
+
+  /**
+   * Reply to a review as a vendor
+   * POST /api/vendor/reviews/{id}/reply
+   */
+  async replyVendorReview(reviewId: string, reply: string): Promise<ReviewResponse> {
+    const response = await apiClient.post<ReviewResponse>(`/vendor/reviews/${reviewId}/reply`, {
+      reply,
+    });
+    return response.data;
+  },
 };

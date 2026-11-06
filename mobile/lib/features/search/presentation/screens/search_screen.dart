@@ -207,19 +207,17 @@ class _SearchScreenState extends State<SearchScreen> {
                     'Lướt ván',
                   ].map((c) => {'id': c, 'label': c}).toList();
 
+            final maxHeight = MediaQuery.of(context).size.height * 0.85;
             return Container(
+              constraints: BoxConstraints(maxHeight: maxHeight),
               decoration: const BoxDecoration(
                 color: AppColors.surfaceContainerLowest,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).padding.bottom + 16,
-                top: 12,
-              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const SizedBox(height: 12),
                   Center(
                     child: Container(
                       width: 40,
@@ -266,181 +264,189 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                   ),
                   const Divider(height: 1),
-                  Padding(
-                    padding: const EdgeInsets.all(AppShapes.gutterMobile),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // VÙNG BIỂN
-                        LocalizedText(
-                          'Vùng biển',
-                          style: AppTypography.labelLg(
-                            color: AppColors.onSurface,
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(AppShapes.gutterMobile),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // VÙNG BIỂN
+                          LocalizedText(
+                            'Vùng biển',
+                            style: AppTypography.labelLg(
+                              color: AppColors.onSurface,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: ['Mỹ Khê', 'Sơn Trà', 'Non Nước'].map((
-                            loc,
-                          ) {
-                            final isSel = _selectedLocation == loc;
-                            return ChoiceChip(
-                              label: LocalizedText(loc),
-                              selected: isSel,
-                              onSelected: (val) {
-                                setModalState(() {
-                                  _selectedLocation = val ? loc : null;
-                                });
-                                setState(() {});
-                              },
-                              backgroundColor: const Color(0xFFF0F9FA),
-                              selectedColor: AppColors.secondary,
-                              side: BorderSide(
-                                color: isSel
-                                    ? AppColors.secondary
-                                    : const Color(0xFFB4E3E8),
-                                width: 1,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              labelStyle: TextStyle(
-                                color: isSel
-                                    ? Colors.white
-                                    : AppColors.onSurface,
-                                fontWeight: isSel
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: ['Mỹ Khê', 'Sơn Trà', 'Non Nước'].map((
+                              loc,
+                            ) {
+                              final isSel = _selectedLocation == loc;
+                              return ChoiceChip(
+                                label: LocalizedText(loc),
+                                selected: isSel,
+                                onSelected: (val) {
+                                  setModalState(() {
+                                    _selectedLocation = val ? loc : null;
+                                  });
+                                  setState(() {});
+                                },
+                                backgroundColor: const Color(0xFFF0F9FA),
+                                selectedColor: AppColors.secondary,
+                                side: BorderSide(
+                                  color: isSel
+                                      ? AppColors.secondary
+                                      : const Color(0xFFB4E3E8),
+                                  width: 1,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                labelStyle: TextStyle(
+                                  color: isSel
+                                      ? Colors.white
+                                      : AppColors.onSurface,
+                                  fontWeight: isSel
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 16),
 
-                        // DANH MỤC
-                        LocalizedText(
-                          'Loại hoạt động',
-                          style: AppTypography.labelLg(
-                            color: AppColors.onSurface,
+                          // DANH MỤC
+                          LocalizedText(
+                            'Loại hoạt động',
+                            style: AppTypography.labelLg(
+                              color: AppColors.onSurface,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: categoryOptions.map((cat) {
-                            final catId = cat['id']!;
-                            final catLabel = cat['label']!;
-                            final isSel =
-                                _selectedCategory == catId ||
-                                _selectedCategory == catLabel;
-                            return ChoiceChip(
-                              label: LocalizedText(catLabel),
-                              selected: isSel,
-                              onSelected: (val) {
-                                setModalState(() {
-                                  _selectedCategory = val ? catId : null;
-                                });
-                                setState(() {});
-                                _search();
-                              },
-                              backgroundColor: const Color(0xFFF0F9FA),
-                              selectedColor: AppColors.secondary,
-                              side: BorderSide(
-                                color: isSel
-                                    ? AppColors.secondary
-                                    : const Color(0xFFB4E3E8),
-                                width: 1,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              labelStyle: TextStyle(
-                                color: isSel
-                                    ? Colors.white
-                                    : AppColors.onSurface,
-                                fontWeight: isSel
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 16),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: categoryOptions.map((cat) {
+                              final catId = cat['id']!;
+                              final catLabel = cat['label']!;
+                              final isSel =
+                                  _selectedCategory == catId ||
+                                  _selectedCategory == catLabel;
+                              return ChoiceChip(
+                                label: LocalizedText(catLabel),
+                                selected: isSel,
+                                onSelected: (val) {
+                                  setModalState(() {
+                                    _selectedCategory = val ? catId : null;
+                                  });
+                                  setState(() {});
+                                  _search();
+                                },
+                                backgroundColor: const Color(0xFFF0F9FA),
+                                selectedColor: AppColors.secondary,
+                                side: BorderSide(
+                                  color: isSel
+                                      ? AppColors.secondary
+                                      : const Color(0xFFB4E3E8),
+                                  width: 1,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                labelStyle: TextStyle(
+                                  color: isSel
+                                      ? Colors.white
+                                      : AppColors.onSurface,
+                                  fontWeight: isSel
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 16),
 
-                        // GIÁ TỐI ĐA
-                        LocalizedText(
-                          'Mức giá',
-                          style: AppTypography.labelLg(
-                            color: AppColors.onSurface,
+                          // GIÁ TỐI ĐA
+                          LocalizedText(
+                            'Mức giá',
+                            style: AppTypography.labelLg(
+                              color: AppColors.onSurface,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            {'label': 'Dưới 300k', 'val': 300000},
-                            {'label': 'Dưới 500k', 'val': 500000},
-                            {'label': 'Dưới 1 triệu', 'val': 1000000},
-                          ].map((item) {
-                            final val = item['val'] as int;
-                            final isSel = _maxPrice == val;
-                            return ChoiceChip(
-                              label: LocalizedText(item['label'] as String),
-                              selected: isSel,
-                              onSelected: (selected) {
-                                setModalState(() {
-                                  _maxPrice = selected ? val : null;
-                                });
-                                setState(() {});
-                                _search();
-                              },
-                              backgroundColor: const Color(0xFFF0F9FA),
-                              selectedColor: AppColors.secondary,
-                              side: BorderSide(
-                                color: isSel
-                                    ? AppColors.secondary
-                                    : const Color(0xFFB4E3E8),
-                                width: 1,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              labelStyle: TextStyle(
-                                color: isSel
-                                    ? Colors.white
-                                    : AppColors.onSurface,
-                                fontWeight: isSel
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              {'label': 'Dưới 300k', 'val': 300000},
+                              {'label': 'Dưới 500k', 'val': 500000},
+                              {'label': 'Dưới 1 triệu', 'val': 1000000},
+                            ].map((item) {
+                              final val = item['val'] as int;
+                              final isSel = _maxPrice == val;
+                              return ChoiceChip(
+                                label: LocalizedText(item['label'] as String),
+                                selected: isSel,
+                                onSelected: (selected) {
+                                  setModalState(() {
+                                    _maxPrice = selected ? val : null;
+                                  });
+                                  setState(() {});
+                                  _search();
+                                },
+                                backgroundColor: const Color(0xFFF0F9FA),
+                                selectedColor: AppColors.secondary,
+                                side: BorderSide(
+                                  color: isSel
+                                      ? AppColors.secondary
+                                      : const Color(0xFFB4E3E8),
+                                  width: 1,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                labelStyle: TextStyle(
+                                  color: isSel
+                                      ? Colors.white
+                                      : AppColors.onSurface,
+                                  fontWeight: isSel
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppShapes.gutterMobile,
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        left: AppShapes.gutterMobile,
+                        right: AppShapes.gutterMobile,
+                        top: 12,
+                        bottom: 16,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(24),
+                            ),
                           ),
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                        child: LocalizedText(
-                          'Áp dụng kết quả (${_filteredServices.length})',
-                          style: AppTypography.labelLg(color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
+                          child: LocalizedText(
+                            'Áp dụng kết quả (${_filteredServices.length})',
+                            style: AppTypography.labelLg(color: Colors.white),
+                          ),
                         ),
                       ),
                     ),
@@ -612,13 +618,16 @@ class _SearchScreenState extends State<SearchScreen> {
                           color: AppColors.onSurface,
                         ),
                       ),
-                      LocalizedText(
-                        'Phù hợp điều kiện sóng biển hôm nay',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.bodySm(
-                          color: AppColors.onSurfaceVariant,
-                        ).copyWith(fontSize: 11),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: LocalizedText(
+                          'Phù hợp sóng biển hôm nay',
+                          maxLines: 1,
+                          style: AppTypography.bodySm(
+                            color: AppColors.onSurfaceVariant,
+                          ).copyWith(fontSize: 11),
+                        ),
                       ),
                     ],
                   ),
@@ -949,7 +958,11 @@ class _SearchScreenState extends State<SearchScreen> {
                       const SizedBox(width: 6),
                       Flexible(
                         child: LocalizedText(
-                          'Khởi hành 05:00',
+                          srv.availableSlots.isNotEmpty
+                              ? 'Khởi hành ${srv.availableSlots.first}'
+                              : (srv.catalogSlots.isNotEmpty
+                                  ? 'Khởi hành ${srv.catalogSlots.first.startTime}'
+                                  : 'Mở theo ca'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: AppTypography.labelSm(
@@ -978,9 +991,11 @@ class _SearchScreenState extends State<SearchScreen> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: LocalizedText(
-                          srv.locationName.isNotEmpty
-                              ? srv.locationName
-                              : srv.address,
+                          srv.locationName.trim().isNotEmpty
+                              ? srv.locationName.trim()
+                              : (srv.address.trim().isNotEmpty
+                                  ? srv.address.trim()
+                                  : 'Bãi biển Đà Nẵng'),
                           style: AppTypography.bodySm(
                             color: AppColors.onSurfaceVariant,
                           ),
@@ -988,6 +1003,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       const Icon(
                         Icons.schedule,
                         size: 14,
@@ -995,7 +1011,11 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                       const SizedBox(width: 4),
                       LocalizedText(
-                        '${srv.durationMinutes}p',
+                        srv.durationMinutes > 0
+                            ? (srv.durationMinutes >= 60
+                                ? '${srv.durationMinutes ~/ 60}h${srv.durationMinutes % 60 > 0 ? '${srv.durationMinutes % 60}p' : ''}'
+                                : '${srv.durationMinutes}p')
+                            : 'Theo ca',
                         style: AppTypography.bodySm(
                           color: AppColors.onSurfaceVariant,
                         ),

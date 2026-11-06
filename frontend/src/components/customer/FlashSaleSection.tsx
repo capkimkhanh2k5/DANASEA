@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { FLASH_SALE_EXPERIENCES } from '../../data/customerHomeData';
 import type { FlashSaleExperience } from '../../data/customerHomeData';
 import { useWishlistStore } from '../../store/useWishlistStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
@@ -11,12 +10,12 @@ interface FlashSaleSectionProps {
   experiences?: FlashSaleExperience[];
 }
 
-export function FlashSaleSection({ experiences = FLASH_SALE_EXPERIENCES }: FlashSaleSectionProps = {}) {
+export function FlashSaleSection({ experiences = [] }: FlashSaleSectionProps = {}) {
   const { toggleWishlist, isInWishlist } = useWishlistStore();
   const { language, t } = useLanguageStore();
 
   const sectionRef = useRef<HTMLDivElement>(null);
-  const [isRevealed, setIsRevealed] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(true);
   const [hoveredCardId, setHoveredCardId] = useState<string | number | null>(null);
 
   useEffect(() => {
@@ -33,36 +32,33 @@ export function FlashSaleSection({ experiences = FLASH_SALE_EXPERIENCES }: Flash
     return () => observer.disconnect();
   }, []);
 
-  // Stable persistent countdown: Target is 23:59:59 of current day
-  const [timeLeft, setTimeLeft] = useState(() => {
-    const now = new Date();
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-    const diff = Math.max(0, Math.floor((endOfDay.getTime() - now.getTime()) / 1000));
+  // Real-time backend-synchronized countdown: derives from active flash sale endTime
+  const calculateTimeLeft = useCallback(() => {
+    const targetTime = experiences[0]?.endTime ? new Date(experiences[0].endTime).getTime() : 0;
+    const now = Date.now();
+    const diff = Math.max(0, Math.floor((targetTime - now) / 1000));
     return {
       hours: Math.floor(diff / 3600),
       minutes: Math.floor((diff % 3600) / 60),
       seconds: diff % 60,
     };
-  });
+  }, [experiences]);
+
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft);
 
   useEffect(() => {
+    setTimeLeft(calculateTimeLeft());
     const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev.seconds > 0) {
-          return { ...prev, seconds: prev.seconds - 1 };
-        } else if (prev.minutes > 0) {
-          return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
-        } else if (prev.hours > 0) {
-          return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
-        }
-        return { hours: 0, minutes: 0, seconds: 0 };
-      });
+      setTimeLeft(calculateTimeLeft());
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [calculateTimeLeft]);
 
   const formatNumber = (num: number) => String(num).padStart(2, '0');
+
+  if (!experiences || experiences.length === 0) {
+    return null;
+  }
 
   return (
     <div ref={sectionRef} className="py-2">
@@ -92,7 +88,21 @@ export function FlashSaleSection({ experiences = FLASH_SALE_EXPERIENCES }: Flash
 
       {/* Flash Sale Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 pt-6">
-        {experiences.map((item, idx) => {
+        {experiences.length === 0 ? (
+          Array.from({ length: 4 }).map((_, idx) => (
+            <div key={`flash-skeleton-${idx}`} className="bg-white rounded-2xl overflow-hidden border border-slate-200/80 animate-pulse flex flex-col">
+              <div className="aspect-[4/3] bg-slate-200" />
+              <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">
+                <div className="space-y-2">
+                  <div className="h-4 bg-slate-200 rounded w-3/4" />
+                  <div className="h-3 bg-slate-200 rounded w-1/2" />
+                </div>
+                <div className="h-5 bg-slate-200 rounded w-1/3" />
+              </div>
+            </div>
+          ))
+        ) : (
+          experiences.map((item, idx) => {
           const isSaved = isInWishlist(item.id);
           const title = language === 'en' ? item.titleEn : item.title;
           const category = language === 'en' ? item.categoryEn : item.category;
@@ -111,9 +121,7 @@ export function FlashSaleSection({ experiences = FLASH_SALE_EXPERIENCES }: Flash
                 transitionDelay: isRevealed ? `${idx * 70}ms` : '0ms',
               }}
               className={`group bg-white rounded-2xl overflow-hidden border transition-all duration-300 ease-out flex flex-col cursor-pointer ${
-                !isRevealed
-                  ? 'opacity-0 translate-y-6'
-                  : isThisHovered
+                isThisHovered
                   ? 'border-slate-300 shadow-md -translate-y-0.5'
                   : 'border-slate-200/80 hover:border-slate-300 hover:shadow-md'
               }`}
@@ -200,7 +208,7 @@ export function FlashSaleSection({ experiences = FLASH_SALE_EXPERIENCES }: Flash
                       <span className="text-[13px] text-slate-500 line-through block tabular-nums">
                         {item.originalPrice.toLocaleString('vi-VN')}₫
                       </span>
-                      <span className="text-base font-bold text-rose-600 tabular-nums">
+                      <span className="text-base font-bold text-[#991b1b] tabular-nums">
                         {item.salePrice.toLocaleString('vi-VN')}₫
                         <span className="text-[13px] font-normal text-slate-600"> / {t.sections.perGuest}</span>
                       </span>
@@ -217,7 +225,7 @@ export function FlashSaleSection({ experiences = FLASH_SALE_EXPERIENCES }: Flash
               </div>
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );

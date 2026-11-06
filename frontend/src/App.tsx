@@ -22,10 +22,13 @@ const Profile = lazy(() => import("./pages/customer/Profile/Profile").then((m) =
 const Orders = lazy(() => import("./pages/customer/Profile/Orders").then((m) => ({ default: m.Orders })));
 const ChangePassword = lazy(() => import("./pages/customer/Profile/ChangePassword").then((m) => ({ default: m.ChangePassword })));
 const Wishlist = lazy(() => import("./pages/customer/Profile/Wishlist").then((m) => ({ default: m.Wishlist })));
+const Inbox = lazy(() => import("./pages/customer/Inbox/Inbox").then((m) => ({ default: m.Inbox })));
 
 // Vendor Phase 4
 const VendorDashboard = lazy(() => import("./pages/vendor/Dashboard/Dashboard").then((m) => ({ default: m.Dashboard })));
+const AnalyticsDashboard = lazy(() => import("./pages/vendor/Analytics/AnalyticsDashboard").then((m) => ({ default: m.AnalyticsDashboard })));
 const Services = lazy(() => import("./pages/vendor/Services/Services").then((m) => ({ default: m.Services })));
+const Equipment = lazy(() => import("./pages/vendor/Equipment/Equipment").then((m) => ({ default: m.Equipment })));
 const ServiceForm = lazy(() => import("./pages/vendor/Services/ServiceForm").then((m) => ({ default: m.ServiceForm })));
 const Schedule = lazy(() => import("./pages/vendor/Schedule/Schedule").then((m) => ({ default: m.Schedule })));
 const VendorOrders = lazy(() => import("./pages/vendor/Orders/VendorOrders").then((m) => ({ default: m.VendorOrders })));
@@ -36,6 +39,7 @@ const Payouts = lazy(() => import("./pages/vendor/Revenue/Payouts").then((m) => 
 const VendorDisputes = lazy(() => import("./pages/vendor/Disputes/Disputes").then((m) => ({ default: m.Disputes })));
 const VendorDisputeDetail = lazy(() => import("./pages/vendor/Disputes/DisputeDetail").then((m) => ({ default: m.DisputeDetail })));
 const VendorProfile = lazy(() => import("./pages/vendor/Profile/Profile").then((m) => ({ default: m.Profile })));
+const VendorMessages = lazy(() => import("./pages/vendor/Messages/VendorMessages").then((m) => ({ default: m.VendorMessages })));
 
 // Admin Phase 5
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard/AdminDashboard").then((m) => ({ default: m.AdminDashboard })));
@@ -66,6 +70,7 @@ function App() {
           <Route path="explore" element={<Explore />} />
           <Route path="search" element={<Search />} />
           <Route path="tour/:id" element={<ExperienceDetail />} />
+          <Route path="tours/:id" element={<ExperienceDetail />} />
           <Route path="experience/:id" element={<ExperienceDetail />} />
           
           {/* Phase 3 */}
@@ -80,18 +85,21 @@ function App() {
           <Route path="profile/ai-assistant" element={<Navigate to="/profile" replace />} />
           <Route path="profile/change-password" element={<ChangePassword />} />
           <Route path="profile/wishlist" element={<Wishlist />} />
-          <Route path="inbox" element={<Navigate to="/profile" replace />} />
+          <Route path="inbox" element={<Inbox />} />
         </Route>
 
         {/* NHÀ CUNG CẤP */}
         <Route path="/vendor" element={<VendorLayout />}>
           <Route index element={<VendorDashboard />} />
+          <Route path="analytics" element={<AnalyticsDashboard />} />
           <Route path="profile" element={<VendorProfile />} />
           <Route path="services" element={<Services />} />
+          <Route path="equipment" element={<Equipment />} />
           <Route path="services/new" element={<ServiceForm />} />
           <Route path="services/:serviceId/edit" element={<ServiceForm />} />
           <Route path="services/:serviceId" element={<ServiceForm />} />
           <Route path="schedule" element={<Schedule />} />
+          <Route path="messages" element={<VendorMessages />} />
           <Route path="orders" element={<VendorOrders />} />
           <Route path="promotions" element={<Promotions />} />
           <Route path="reviews" element={<VendorReviews />} />

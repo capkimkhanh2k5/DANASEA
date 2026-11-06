@@ -21,6 +21,8 @@ class FakeCatalog extends CatalogRepository {
     String? categoryId,
     int? maxPrice,
     int page = 0,
+    int size = 10,
+    String? sortBy,
   }) {
     pages.add(page);
     final completer = Completer<CatalogPage>();

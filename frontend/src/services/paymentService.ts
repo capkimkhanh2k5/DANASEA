@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { clearPaymentIntentKey, getPaymentIntentKey } from '../utils/checkoutPaymentSession';
 import type {
   CreatePaymentIntentRequest,
   PaymentIntentResponse,
@@ -19,19 +20,32 @@ export const paymentService = {
    */
   async createPaymentIntent(
     orderId: string,
-    request: CreatePaymentIntentRequest,
-    idempotencyKey: string
+    request: CreatePaymentIntentRequest
   ): Promise<PaymentIntentResponse> {
-    const response = await apiClient.post<PaymentIntentResponse>(
-      `/payments/${orderId}/create-intent`,
-      request,
-      {
-        headers: {
-          'Idempotency-Key': idempotencyKey,
-        },
+    const { provider } = request;
+    const key = getPaymentIntentKey(orderId, provider);
+    try {
+      const response = await apiClient.post<PaymentIntentResponse>(
+        `/payments/${orderId}/create-intent`,
+        request,
+        { headers: { 'Idempotency-Key': key } }
+      );
+      if (response.data.paymentUrl || response.data.paymentReference) {
+        clearPaymentIntentKey(orderId, provider, key);
       }
-    );
-    return response.data;
+      return response.data;
+    } catch (error) {
+      const { status, data } = (error as {
+        response?: { status?: number; data?: { code?: string; errorCode?: string } };
+      }).response ?? {};
+      const code = data?.code ?? data?.errorCode;
+      if (code === 'PAYMENT_ATTEMPT_CLOSED' || code === 'PAYMENT_WINDOW_EXPIRED'
+          || (code !== 'WAIVER_ACCEPTANCE_REQUIRED' && status && status >= 400 && status < 500
+              && ![401, 408, 409, 425, 429].includes(status))) {
+        clearPaymentIntentKey(orderId, provider, key);
+      }
+      throw error;
+    }
   },
 
   async getPaymentDetail(paymentId: string, signal?: AbortSignal): Promise<PaymentResponse> {

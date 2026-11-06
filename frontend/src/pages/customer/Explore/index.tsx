@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { ExploreCarouselDeck } from '../../../components/customer/ExploreCarouselDeck';
 import {
   TOP_RATED_DESTINATIONS,
@@ -12,10 +12,11 @@ import type { ServiceSummaryDto } from '../../../types/service';
 import {
   getHeroImageUrl,
   getCardThumbnailUrl,
+  getStageCardImageUrl,
   FALLBACK_HERO_IMAGE,
   FALLBACK_CARD_IMAGE,
 } from '../../../utils/imageOptimizer';
-import { Star, ArrowRight, Clock } from 'lucide-react';
+import { Star, ArrowRight, ChevronLeft, ChevronRight, MapPin, Clock } from 'lucide-react';
 import { SEOHead } from '../../../components/common/SEOHead';
 import { getTourUrl } from '../../../utils/seo';
 
@@ -39,6 +40,19 @@ interface HeroFeaturedSpot {
   link?: string;
 }
 
+interface CuratedItinerary {
+  id: string;
+  title: string;
+  titleEn: string;
+  duration: string;
+  durationEn: string;
+  imageUrl: string;
+  highlights: string[];
+  highlightsEn: string[];
+  estimatedCost: string;
+  targetCategory: string;
+}
+
 const HERO_FEATURED_SPOTS: HeroFeaturedSpot[] = [
   {
     id: 'hero-1',
@@ -53,7 +67,7 @@ const HERO_FEATURED_SPOTS: HeroFeaturedSpot[] = [
     category: 'Lặn san hô',
     price: '450.000 ₫',
     imageUrl: '/images/hero/01-lan-ngam-san-ho-sontra.jpg',
-    searchFilter: 'lan-ngam-san-ho'
+    searchFilter: 'lan-ngam-san-ho',
   },
   {
     id: 'hero-2',
@@ -68,7 +82,7 @@ const HERO_FEATURED_SPOTS: HeroFeaturedSpot[] = [
     category: 'Chèo SUP',
     price: '200.000 ₫',
     imageUrl: '/images/hero/02-cheo-sup-binh-minh-my-khe.jpg',
-    searchFilter: 'cheo-sup-kayak'
+    searchFilter: 'cheo-sup-kayak',
   },
   {
     id: 'hero-3',
@@ -83,7 +97,7 @@ const HERO_FEATURED_SPOTS: HeroFeaturedSpot[] = [
     category: 'Dù bay cano',
     price: '650.000 ₫',
     imageUrl: '/images/hero/03-du-bay-cano-vinh-da-nang.jpg',
-    searchFilter: 'cano-du-bay'
+    searchFilter: 'cano-du-bay',
   },
   {
     id: 'hero-4',
@@ -92,154 +106,15 @@ const HERO_FEATURED_SPOTS: HeroFeaturedSpot[] = [
     shortDesc: 'Chinh phục từng ngọn sóng biển với mô tô nước thế hệ mới và phao cứu hộ theo sát.',
     shortDescEn: 'Command the waves with modern high-speed jet skis and maritime safety escort.',
     rating: 4.8,
-    reviewCount: 65,
+    reviewCount: 64,
     location: 'Bãi biển Non Nước',
     locationEn: 'Non Nuoc Beach',
     category: 'Mô tô nước',
     price: '550.000 ₫',
     imageUrl: '/images/hero/04-mo-to-nuoc-jetski-bien-non-nuoc.jpg',
-    searchFilter: 'cano-du-bay'
-  }
+    searchFilter: 'jetski-mo-to-nuoc',
+  },
 ];
-
-interface TopExperience {
-  link?: string;
-  name: string;
-  nameEn: string;
-  location: string;
-  category: string;
-  rating: number;
-  reviewCount: number;
-  price: string;
-  imageUrl: string;
-  searchFilter: string;
-}
-
-const TOP_10_EXPERIENCES: TopExperience[] = [
-  {
-    name: 'Lặn Ngắm San Hô Hòn Sụp Bán Đảo Sơn Trà',
-    nameEn: 'Hon Sup Coral Reef Snorkeling Speedboat Tour',
-    location: 'Bán đảo Sơn Trà',
-    category: 'Lặn san hô',
-    rating: 5.0,
-    reviewCount: 142,
-    price: '450.000 ₫',
-    imageUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80',
-    searchFilter: 'lan-ngam-san-ho'
-  },
-  {
-    name: 'Chèo Ván SUP Đón Bình Minh Biển Mỹ Khê',
-    nameEn: 'Sunrise SUP Paddleboarding at My Khe Beach',
-    location: 'Bãi biển Mỹ Khê',
-    category: 'Chèo SUP',
-    rating: 4.9,
-    reviewCount: 98,
-    price: '200.000 ₫',
-    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
-    searchFilter: 'cheo-sup-kayak'
-  },
-  {
-    name: 'Cano Cao Tốc Kéo Dù Bay Vịnh Đà Nẵng',
-    nameEn: 'Tandem Parasailing Over Da Nang Bay',
-    location: 'Vịnh Mỹ Khê',
-    category: 'Dù bay cano',
-    rating: 4.9,
-    reviewCount: 86,
-    price: '650.000 ₫',
-    imageUrl: 'https://images.unsplash.com/photo-1519046904884-53103b34b206?auto=format&fit=crop&w=600&q=80',
-    searchFilter: 'cano-du-bay'
-  },
-  {
-    name: 'Mô Tô Nước Jetski Yamaha 150HP Lướt Sóng',
-    nameEn: 'Yamaha High-Speed Sea Jet Ski Experience',
-    location: 'Mỹ Khê & Non Nước',
-    category: 'Mô tô nước',
-    rating: 4.8,
-    reviewCount: 65,
-    price: '550.000 ₫',
-    imageUrl: 'https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?auto=format&fit=crop&w=600&q=80',
-    searchFilter: 'cano-du-bay'
-  },
-  {
-    name: 'Lặn Bình Khí Scuba Diving Bãi Bụt Sơn Trà',
-    nameEn: 'PADI Certified Scuba Diving at Bai But',
-    location: 'Bãi Bụt Sơn Trà',
-    category: 'Lặn Scuba',
-    rating: 5.0,
-    reviewCount: 52,
-    price: '850.000 ₫',
-    imageUrl: 'https://images.unsplash.com/photo-1682687220063-4742bd7fd538?auto=format&fit=crop&w=600&q=80',
-    searchFilter: 'lan-ngam-san-ho'
-  },
-  {
-    name: 'Du Thuyền Hạng Sang Ngắm Hoàng Hôn Vịnh Biển',
-    nameEn: 'Luxury Catamaran Sunset Cruise & Tea',
-    location: 'Bến DHC Marina',
-    category: 'Du thuyền',
-    rating: 4.9,
-    reviewCount: 77,
-    price: '1.200.000 ₫',
-    imageUrl: 'https://images.unsplash.com/photo-1569263979104-865ab7cd8d13?auto=format&fit=crop&w=600&q=80',
-    searchFilter: 'du-thuyen-hoang-hon'
-  },
-  {
-    name: 'Chèo Thuyền Kayak Vượt Sóng Vịnh Bãi Rạng',
-    nameEn: 'Sea Kayaking Expedition at Bai Rang Cove',
-    location: 'Bãi Rạng Sơn Trà',
-    category: 'Kayak biển',
-    rating: 4.8,
-    reviewCount: 43,
-    price: '250.000 ₫',
-    imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=600&q=80',
-    searchFilter: 'cheo-sup-kayak'
-  },
-  {
-    name: 'Tour Trải Nghiệm Câu Mực Đêm Biển Non Nước',
-    nameEn: 'Night Squid Fishing with Local Fishermen',
-    location: 'Bãi biển Non Nước',
-    category: 'Câu mực đêm',
-    rating: 4.7,
-    reviewCount: 39,
-    price: '400.000 ₫',
-    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80',
-    searchFilter: 'du-thuyen-hoang-hon'
-  },
-  {
-    name: 'Khóa Học Lướt Ván Sóng Surfboard Căn Bản',
-    nameEn: 'Beginner Surfing Class with Certified Coach',
-    location: 'Bãi biển Mỹ Khê',
-    category: 'Lướt sóng',
-    rating: 4.9,
-    reviewCount: 31,
-    price: '500.000 ₫',
-    imageUrl: 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=600&q=80',
-    searchFilter: 'cheo-sup-kayak'
-  },
-  {
-    name: 'Phao Chuối Kéo Cano Tốc Độ Cho Nhóm Bạn',
-    nameEn: 'High-Speed Banana Boat Group Ride',
-    location: 'Bãi biển Mỹ Khê',
-    category: 'Cảm giác mạnh',
-    rating: 4.8,
-    reviewCount: 58,
-    price: '150.000 ₫',
-    imageUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80',
-    searchFilter: 'cano-du-bay'
-  }
-];
-
-interface CuratedItinerary {
-  id: string;
-  title: string;
-  titleEn: string;
-  duration: string;
-  durationEn: string;
-  imageUrl: string;
-  highlights: string[];
-  highlightsEn: string[];
-  estimatedCost: string;
-  targetCategory: string;
-}
 
 const CURATED_ITINERARIES: CuratedItinerary[] = [
   {
@@ -253,16 +128,16 @@ const CURATED_ITINERARIES: CuratedItinerary[] = [
       'Chèo ván SUP đón bình minh biển Mỹ Khê',
       'Điểm tâm hải sản và giải khát ven bờ',
       'Cano cao tốc ra Hòn Sụp lặn ngắm san hô',
-      'Cập bến Bãi Bụt và tắm tráng nước ngọt'
+      'Cập bến Bãi Bụt và tắm tráng nước ngọt',
     ],
     highlightsEn: [
       'Sunrise SUP paddleboarding at My Khe Beach',
       'Coastal seafood breakfast & refreshments',
       'Speedboat to Hon Sup for coral snorkeling',
-      'Dock at Bai But with freshwater rinse'
+      'Dock at Bai But with freshwater rinse',
     ],
     estimatedCost: '750.000 ₫/khách',
-    targetCategory: 'lan-ngam-san-ho'
+    targetCategory: 'lan-ngam-san-ho',
   },
   {
     id: 'itin-2',
@@ -275,16 +150,16 @@ const CURATED_ITINERARIES: CuratedItinerary[] = [
       'Cano kéo dù bay ngắm vịnh biển từ trên cao',
       'Mô tô nước Jetski Yamaha 150HP lướt sóng',
       'Bữa trưa hải sản tươi tại nhà hàng ven vịnh',
-      'Lướt ván cano Wakeboarding tại Bãi Rạng'
+      'Lướt ván cano Wakeboarding tại Bãi Rạng',
     ],
     highlightsEn: [
       'Tandem parasailing above Da Nang Bay',
       'High-speed Yamaha Jet Ski wave riding',
       'Fresh local coastal seafood lunch',
-      'Wakeboarding session in calm Bai Rang waters'
+      'Wakeboarding session in calm Bai Rang waters',
     ],
     estimatedCost: '1.450.000 ₫/khách',
-    targetCategory: 'cano-du-bay'
+    targetCategory: 'cano-du-bay',
   },
   {
     id: 'itin-3',
@@ -297,37 +172,61 @@ const CURATED_ITINERARIES: CuratedItinerary[] = [
       'Chèo SUP thư giãn đón gió mát chiều Non Nước',
       'Lên du thuyền ngắm hoàng hôn & tiệc trà nhẹ',
       'Trải nghiệm câu mực đêm giải trí cùng ngư dân',
-      'Thưởng thức hải sản tươi nướng trên tàu'
+      'Thưởng thức hải sản tươi nướng trên tàu',
     ],
     highlightsEn: [
       'Gentle sunset paddleboarding on calm waters',
       'Board catamaran for golden-hour sunset tea',
       'Night squid angling experience with fishermen',
-      'Fresh catch prepared and served on board'
+      'Fresh catch prepared and served on board',
     ],
     estimatedCost: '1.200.000 ₫/khách',
-    targetCategory: 'du-thuyen-hoang-hon'
-  }
+    targetCategory: 'du-thuyen-hoang-hon',
+  },
+];
+
+// Priority IDs of high-resolution, landscape-ratio (4:3 / 3:2) marine activities
+const HIGH_RES_STAGE_SERVICE_IDS = [
+  '5943ecd7-6480-5b4a-b42b-43abc0988776', // Học lướt sóng – Surf Shack (2560x1920, 2K 4:3)
+  '1dd26db5-f863-5b03-b562-ac46f43df9d2', // Lớp học lướt sóng Mỹ Khê – DNOA (1920x1436, Full HD 4:3)
+  '3758c297-54ff-5887-89bd-62220227570b', // Dù bay trên biển – Danabeach (1375x867, 16:10)
+  'a6f4ab9c-4794-542b-a443-e3013e6bbe47', // Câu cá biển Sơn Trà – DaNaFi (1280x960, 4:3)
+  '9f4eb04d-9ec6-5295-8de6-475b728e5cfc', // Surf tour tìm điểm sóng – Surf Shack (1235x824, 3:2)
+  '2cdfabcf-13a2-550a-8f9e-283aad7053c9', // Mô tô nước – Kajin Vina (1200x800, 3:2)
+  '5536f743-3b6d-518e-af2b-05634a218195', // Câu cá chuyên nghiệp Sơn Trà – DaNaFi (1200x900, 4:3)
+  'c4c56ae2-5f9b-555c-81f1-f0d4c8dd7c1b', // Dù bay trên biển – DNOA (1170x879, 4:3)
+  '088d874c-a61e-5b58-a7a9-497f32a56901', // Mô tô nước – Danabeach (910x607, 3:2)
+  '4190046d-112a-5b93-beb2-bcc8b1cd16d4', // Dù bay trên biển – Kajin Vina (900x600, 3:2)
 ];
 
 export function Explore() {
   const { language } = useLanguageStore();
-  const [activeHeroIndex, setActiveHeroIndex] = useState<number>(0);
-  const [isHeroPaused, setIsHeroPaused] = useState<boolean>(false);
+  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
+  const [isHeroPaused, setIsHeroPaused] = useState(false);
   const [liveServices, setLiveServices] = useState<ServiceSummaryDto[]>([]);
+  const navigate = useNavigate();
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 640 : false));
 
-  // Fetch real services from Backend API
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     serviceCatalogService
-      .getServices({ size: 40 })
+      .getServices({ size: 50 })
       .then((res) => {
         if (isMounted && res.content && res.content.length > 0) {
           setLiveServices(res.content);
         }
       })
       .catch((err) => {
-        console.warn('[Explore] Không thể nạp live services từ BE, dùng fallback:', err);
+        console.warn('[Explore] Không thể nạp live services từ BE:', err);
       });
     return () => {
       isMounted = false;
@@ -340,129 +239,197 @@ export function Explore() {
   };
 
   const formatRating = (rating?: number | null, fallback = 4.9) => {
-    const num = Number(rating);
-    return num > 0 ? num : fallback;
+    if (rating === undefined || rating === null || isNaN(Number(rating))) return fallback;
+    return Number(rating);
   };
 
-  // 1. Live Hero Spots (Curated High-Res Ocean Photography with Live Backend Linkage)
-  const heroSpots: HeroFeaturedSpot[] = HERO_FEATURED_SPOTS.map((spot) => {
-    // Find matching real service from Backend by keyword if available
-    const matchedService = liveServices.find((s) => {
-      const name = s.name.toLowerCase();
-      if (spot.id === 'hero-1') return name.includes('lặn') || name.includes('san hô');
-      if (spot.id === 'hero-2') return name.includes('sup') || name.includes('bình minh');
-      if (spot.id === 'hero-3') return name.includes('dù') || name.includes('parasail');
-      if (spot.id === 'hero-4') return name.includes('mô tô') || name.includes('jetski') || name.includes('cano');
-      return false;
+  const heroSpots = useMemo(() => {
+    return HERO_FEATURED_SPOTS.map((spot) => {
+      const matchedService = liveServices.find((s) => {
+        const name = s.name.toLowerCase();
+        if (spot.id === 'hero-1') return name.includes('lặn') || name.includes('san hô');
+        if (spot.id === 'hero-2') return name.includes('sup') || name.includes('bình minh');
+        if (spot.id === 'hero-3') return name.includes('dù') || name.includes('parasail');
+        if (spot.id === 'hero-4') return name.includes('mô tô') || name.includes('jetski') || name.includes('cano');
+        return false;
+      });
+
+      return {
+        ...spot,
+        targetServiceId: matchedService ? matchedService.id : spot.id,
+        imageUrl: spot.imageUrl,
+        price: matchedService ? formatPrice(matchedService.price, spot.price) : spot.price,
+        rating: matchedService ? formatRating(matchedService.averageRating, spot.rating) : spot.rating,
+        reviewCount: matchedService?.reviewCount || spot.reviewCount,
+        link: matchedService ? getTourUrl(matchedService) : `/search?category=${spot.searchFilter}`,
+      };
     });
+  }, [liveServices]);
 
-    return {
-      ...spot,
-      id: matchedService ? matchedService.id : spot.id,
-      name: spot.name,
-      nameEn: spot.nameEn,
-      price: matchedService ? formatPrice(matchedService.price, spot.price) : spot.price,
-      rating: matchedService ? formatRating(matchedService.averageRating, spot.rating) : spot.rating,
-      reviewCount: matchedService?.reviewCount || spot.reviewCount,
-      link: matchedService ? getTourUrl(matchedService) : `/search?category=${spot.searchFilter}`,
-    };
-  });
+  const allExperiences = useMemo(() => {
+    if (!liveServices || liveServices.length === 0) {
+      return HERO_FEATURED_SPOTS.map((s) => ({
+        id: s.id,
+        name: s.name,
+        nameEn: s.nameEn,
+        location: s.location,
+        rating: s.rating,
+        reviewCount: s.reviewCount,
+        price: s.price,
+        imageUrl: s.imageUrl,
+        link: '/search',
+      }));
+    }
 
-  // Auto-play interval for Hero: 4 seconds per slide
+    // Curate sharpest high-resolution activities with consistent landscape 4:3 / 3:2 ratio
+    const featuredServices = [...liveServices].sort((a, b) => {
+      const aRank = HIGH_RES_STAGE_SERVICE_IDS.indexOf(a.id);
+      const bRank = HIGH_RES_STAGE_SERVICE_IDS.indexOf(b.id);
+      if (aRank !== -1 && bRank !== -1) return aRank - bRank;
+      if (aRank !== -1) return -1;
+      if (bRank !== -1) return 1;
+      return 0;
+    }).slice(0, 10);
+
+    return featuredServices.map((svc) => ({
+      id: svc.id,
+      name: svc.name,
+      nameEn: svc.name,
+      location: svc.address || 'Đà Nẵng',
+      rating: formatRating(svc.averageRating, 4.9),
+      reviewCount: svc.reviewCount || 24,
+      price: formatPrice(svc.price, '400.000 ₫'),
+      imageUrl: getStageCardImageUrl(svc.primaryImageUrl || FALLBACK_HERO_IMAGE),
+      link: getTourUrl(svc),
+    }));
+  }, [liveServices]);
+
+  // Derived curated lists for section decks
+  const topVisitedList = useMemo(() => {
+    if (liveServices.length === 0) return TOP_VISITED_EXPERIENCES;
+    return [...liveServices]
+      .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
+      .slice(0, 8)
+      .map((s, idx) => {
+        const fallback = TOP_VISITED_EXPERIENCES[idx % TOP_VISITED_EXPERIENCES.length];
+        const views = s.viewCount && s.viewCount > 0 ? s.viewCount : 450 + idx * 170;
+        return {
+          id: s.id,
+          name: s.name,
+          nameEn: s.name,
+          location: s.address || fallback.location,
+          visitorsText: `${views}+ du khách quan tâm`,
+          visitorsTextEn: `${views}+ travelers viewed`,
+          rating: formatRating(s.averageRating, fallback.rating),
+          price: formatPrice(s.price, fallback.price),
+          imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallback.imageUrl),
+          searchFilter: fallback.searchFilter,
+          link: getTourUrl(s),
+        };
+      });
+  }, [liveServices]);
+
+  const weatherRecommendedList = useMemo(() => {
+    if (liveServices.length === 0) return WEATHER_RECOMMENDED_EXPERIENCES;
+    const filtered = liveServices.filter((s) => {
+      const n = s.name.toLowerCase();
+      return n.includes('san hô') || n.includes('sup') || n.includes('kayak') || n.includes('lặn') || n.includes('biển');
+    });
+    const pool = filtered.length > 0 ? filtered : liveServices;
+    return pool.slice(0, 8).map((s, idx) => {
+      const fallback = WEATHER_RECOMMENDED_EXPERIENCES[idx % WEATHER_RECOMMENDED_EXPERIENCES.length];
+      return {
+        id: s.id,
+        name: s.name,
+        nameEn: s.name,
+        location: s.address || fallback.location,
+        conditionReason: fallback.conditionReason,
+        conditionReasonEn: fallback.conditionReasonEn,
+        rating: formatRating(s.averageRating, fallback.rating),
+        price: formatPrice(s.price, fallback.price),
+        imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallback.imageUrl),
+        searchFilter: fallback.searchFilter,
+        link: getTourUrl(s),
+      };
+    });
+  }, [liveServices]);
+
+  // Auto-advance hero carousel
   useEffect(() => {
-    if (isHeroPaused) return;
+    if (isHeroPaused || heroSpots.length === 0) return;
     const timer = setInterval(() => {
       setActiveHeroIndex((prev) => (prev + 1) % heroSpots.length);
-    }, 4000);
+    }, 5500);
     return () => clearInterval(timer);
   }, [isHeroPaused, heroSpots.length]);
 
   const currentHero = heroSpots[activeHeroIndex] || heroSpots[0];
 
-  // 2. Live Top 10 Featured Activities
-  const top10Activities = liveServices.length > 0
-    ? liveServices.slice(0, 10).map((s, idx) => {
-        const fallback = TOP_10_EXPERIENCES[idx % TOP_10_EXPERIENCES.length];
-        return {
-          id: s.id,
-          name: s.name,
-          nameEn: s.name,
-          location: s.address || fallback.location,
-          category: fallback.category,
-          rating: formatRating(s.averageRating, fallback.rating),
-          reviewCount: s.reviewCount || fallback.reviewCount,
-          price: formatPrice(s.price, fallback.price),
-          imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallback.imageUrl),
-          searchFilter: fallback.searchFilter,
-          link: getTourUrl(s),
-        };
-      })
-    : TOP_10_EXPERIENCES;
+  // Auto-advance coverflow carousel
+  useEffect(() => {
+    if (isCarouselPaused || allExperiences.length === 0) return;
+    const timer = setInterval(() => {
+      setCarouselIndex((prev) => (prev + 1) % allExperiences.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [isCarouselPaused, allExperiences.length]);
 
-  // 3. Live Most Visited (Sorted by viewCount)
-  const topVisitedList = liveServices.length > 0
-    ? [...liveServices]
-        .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
-        .slice(0, 8)
-        .map((s, idx) => {
-          const fallback = TOP_VISITED_EXPERIENCES[idx % TOP_VISITED_EXPERIENCES.length];
-          const views = s.viewCount && s.viewCount > 0 ? s.viewCount : 450 + idx * 170;
-          return {
-            id: s.id,
-            name: s.name,
-            nameEn: s.name,
-            location: s.address || fallback.location,
-            visitorsText: `${views}+ du khách quan tâm`,
-            visitorsTextEn: `${views}+ travelers viewed`,
-            rating: formatRating(s.averageRating, fallback.rating),
-            price: formatPrice(s.price, fallback.price),
-            imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallback.imageUrl),
-            searchFilter: fallback.searchFilter,
-            link: getTourUrl(s),
-          };
-        })
-    : TOP_VISITED_EXPERIENCES;
+  const handlePrevExperience = () => {
+    if (allExperiences.length === 0) return;
+    setCarouselIndex((prev) => (prev - 1 + allExperiences.length) % allExperiences.length);
+  };
 
-  // 4. Live Weather Recommended (Calm waters, coral & paddle sports)
-  const weatherRecommendedList = liveServices.length > 0
-    ? (liveServices.filter((s) => {
-        const n = s.name.toLowerCase();
-        return n.includes('san hô') || n.includes('sup') || n.includes('kayak') || n.includes('lặn') || n.includes('biển');
-      }).concat(liveServices)).slice(0, 8).map((s, idx) => {
-        const fallback = WEATHER_RECOMMENDED_EXPERIENCES[idx % WEATHER_RECOMMENDED_EXPERIENCES.length];
-        return {
-          id: s.id,
-          name: s.name,
-          nameEn: s.name,
-          location: s.address || fallback.location,
-          conditionReason: fallback.conditionReason,
-          conditionReasonEn: fallback.conditionReasonEn,
-          rating: formatRating(s.averageRating, fallback.rating),
-          price: formatPrice(s.price, fallback.price),
-          imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallback.imageUrl),
-          searchFilter: fallback.searchFilter,
-          link: getTourUrl(s),
-        };
-      })
-    : WEATHER_RECOMMENDED_EXPERIENCES;
+  const handleNextExperience = () => {
+    if (allExperiences.length === 0) return;
+    setCarouselIndex((prev) => (prev + 1) % allExperiences.length);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX;
+    if (deltaX > 45) {
+      handlePrevExperience();
+    } else if (deltaX < -45) {
+      handleNextExperience();
+    }
+    setTouchStartX(null);
+  };
+
+  const getOffset = (index: number, current: number, total: number) => {
+    if (total === 0) return 0;
+    let diff = index - current;
+    while (diff > total / 2) diff -= total;
+    while (diff < -total / 2) diff += total;
+    return diff;
+  };
 
   return (
     <main className="w-full min-h-screen bg-white text-slate-900 pb-20">
       <SEOHead
-        title={language === 'en' ? 'Explore Ocean Adventures in Da Nang' : 'Khám Phá Các Hoạt Động Biển Đà Nẵng'}
+        title={
+          language === 'en'
+            ? 'Explore Marine Experiences & Coastal Watersports | DANASEA'
+            : 'Khám Phá Trải Nghiệm Biển & Thể Thao Nước Tuyển Chọn | DANASEA'
+        }
         description={
           language === 'en'
-            ? 'Discover top-rated coastal destinations, snorkeling tours, paddleboarding, and water sports in Da Nang. Plan your seaside getaway with DANASEA.'
-            : 'Khám phá các điểm đến biển hàng đầu, tour lặn ngắm san hô, chèo SUP, kayak và các hoạt động thể thao biển hấp dẫn tại Đà Nẵng cùng DANASEA.'
+            ? 'Discover certified coral reef snorkeling, sunrise SUP, parasailing and high-speed water sports across Da Nang coastal bays.'
+            : 'Khám phá tour lặn ngắm san hô Sơn Trà, chèo SUP đón bình minh Mỹ Khê, dù bay cano và trải nghiệm thể thao nước tiêu chuẩn quốc tế tại Đà Nẵng.'
         }
         canonicalUrl="/explore"
+        ogType="website"
       />
-      
-      {/* 1. Cinematic Split Hero Carousel (Nền ảnh chuyển động mượt mà tương ứng từng Card) */}
+
+      {/* 1. Cinematic Split Hero Carousel */}
       <section
-        className="relative w-full overflow-hidden min-h-[560px] sm:min-h-[620px] lg:min-h-[680px] max-h-[740px] flex flex-col justify-end mb-16 select-none"
+        className="relative w-full overflow-hidden min-h-[560px] sm:min-h-[620px] lg:min-h-[680px] max-h-[740px] flex flex-col justify-end mb-14 select-none"
+        onMouseEnter={() => setIsHeroPaused(true)}
+        onMouseLeave={() => setIsHeroPaused(false)}
       >
-        {/* Full-width Responsive Hero Background Layers (Tương ứng theo từng Card) */}
         <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden">
           {heroSpots.map((spot, idx) => {
             const isCurrent = activeHeroIndex === idx;
@@ -476,36 +443,33 @@ export function Explore() {
                 <img
                   src={getHeroImageUrl(spot.bgImageUrl || spot.imageUrl)}
                   alt={spot.name}
-                  loading={idx === 0 ? "eager" : "lazy"}
+                  loading={idx === 0 ? 'eager' : 'lazy'}
                   decoding="async"
                   onError={(e) => {
-                    // Safe graceful fallback to local 2K scenic image if CDN fails
                     e.currentTarget.src = FALLBACK_HERO_IMAGE;
                   }}
                   className={`w-full h-full object-cover object-center transition-transform duration-[7000ms] ease-out ${
                     isCurrent ? 'scale-[1.02]' : 'scale-100'
                   }`}
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/50 to-slate-950/30" />
               </div>
             );
           })}
         </div>
 
-        {/* 2-Column Split Content Container (Pinned to bottom) */}
-        <div className="relative z-10 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-4 sm:pb-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-end">
-          
-          {/* Nửa bên trái: Tên, Mô tả ngắn 1 dòng, Đánh giá sao, Nút hành động */}
+        {/* Hero Content */}
+        <div className="relative z-10 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-end">
+          {/* Left Column: Title & Metadata */}
           <div className="lg:col-span-5 flex flex-col justify-end text-white pb-2 lg:pb-3 animate-fadeInUp">
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
               {language === 'en' ? currentHero.nameEn : currentHero.name}
             </h1>
 
-            {/* Mô tả ngắn cỡ 1 dòng */}
-            <p className="text-sm sm:text-base text-white leading-relaxed font-medium mb-3 max-w-xl line-clamp-1 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+            <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-medium mb-3 max-w-xl line-clamp-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
               {language === 'en' ? currentHero.shortDescEn : currentHero.shortDesc}
             </p>
 
-            {/* Dòng đánh giá sao & Địa danh */}
             <div className="flex items-center gap-2.5 mb-6 flex-wrap drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
               <div className="flex items-center gap-1">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -515,10 +479,11 @@ export function Explore() {
               <span className="font-extrabold text-white text-[13px]">{currentHero.rating.toFixed(1)}</span>
               <span className="text-white/90 text-[13px]">({currentHero.reviewCount} {language === 'en' ? 'reviews' : 'đánh giá'})</span>
               <span className="text-white/70 text-[13px]">•</span>
-              <span className="text-sky-300 text-[13px] font-semibold">{currentHero.location}</span>
+              <span className="text-sky-300 text-[13px] font-semibold">{language === 'en' ? currentHero.locationEn : currentHero.location}</span>
+              <span className="text-white/70 text-[13px]">•</span>
+              <span className="text-amber-300 font-extrabold text-[14px]">{currentHero.price}</span>
             </div>
 
-            {/* Action CTA Button */}
             <div>
               <Link
                 to={currentHero.link || `/search?category=${currentHero.searchFilter}`}
@@ -530,7 +495,7 @@ export function Explore() {
             </div>
           </div>
 
-          {/* Nửa bên phải ở dưới: 4 Thẻ nổi bật lớn hơn, nền kính trong suốt (Ocean Glass) */}
+          {/* Right Column: 4-Card Horizontal Row */}
           <div
             className="lg:col-span-7 flex flex-col justify-end pb-1"
             onMouseEnter={() => setIsHeroPaused(true)}
@@ -544,14 +509,14 @@ export function Explore() {
                   <div
                     key={spot.id}
                     onClick={() => setActiveHeroIndex(idx)}
-                    className={`rounded-2xl p-3.5 sm:p-4 transition-all duration-300 ease-out cursor-pointer flex flex-col justify-between backdrop-blur-md ${
+                    className={`rounded-2xl p-3 sm:p-3.5 transition-all duration-300 ease-out cursor-pointer flex flex-col justify-between backdrop-blur-md ${
                       isActive
-                        ? 'scale-105 z-10 bg-black/45 border border-white/40 shadow-2xl opacity-100 -translate-y-1'
-                        : 'scale-100 opacity-75 hover:opacity-100 hover:scale-[1.02] bg-black/25 hover:bg-black/40 border border-white/15 hover:border-white/30 shadow-md'
+                        ? 'scale-105 z-10 bg-black/60 border border-sky-400/90 shadow-2xl opacity-100 -translate-y-1'
+                        : 'scale-100 opacity-75 hover:opacity-100 hover:scale-[1.02] bg-black/35 hover:bg-black/50 border border-white/15 hover:border-white/30 shadow-md'
                     }`}
                   >
                     <div>
-                      <div className="relative w-full h-24 sm:h-28 md:h-32 rounded-xl overflow-hidden mb-3 bg-white/5">
+                      <div className="relative w-full h-24 sm:h-28 md:h-32 rounded-xl overflow-hidden mb-2.5 bg-white/5">
                         <img
                           src={getCardThumbnailUrl(spot.imageUrl)}
                           alt={spot.name}
@@ -562,7 +527,7 @@ export function Explore() {
                           className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                         />
                       </div>
-                      <h4 className="text-sm sm:text-base font-bold text-white line-clamp-2 leading-snug">
+                      <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-2 leading-snug">
                         {language === 'en' ? spot.nameEn : spot.name}
                       </h4>
                     </div>
@@ -571,55 +536,272 @@ export function Explore() {
               })}
             </div>
           </div>
-
         </div>
       </section>
 
-      {/* 2. Top 10 Hoạt Động Nổi Bật */}
-      <ExploreCarouselDeck
-        title={language === 'en' ? 'Top 10 Featured Activities' : 'Top 10 Hoạt Động Nổi Bật'}
-        subtitle={language === 'en' ? 'Highest rated water sports and island tours voted by travelers' : 'Bảng xếp hạng các hoạt động thể thao nước và tour biển được du khách đánh giá cao nhất'}
-        viewAllLink="/search"
-        items={top10Activities}
-        renderItem={(item) => (
-          <Link
-            to={item.link || `/search?category=${item.searchFilter}`}
-            className="group flex-1 flex flex-col bg-slate-50 hover:bg-slate-100/90 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-0.5 justify-between border border-slate-200/60 hover:border-slate-300"
-          >
-            <div className="relative aspect-[16/11] overflow-hidden bg-slate-100">
-              <img
-                src={item.imageUrl}
-                alt={item.name}
-                loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.src = FALLBACK_CARD_IMAGE;
-                }}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-              />
+      {/* 2. Single-Row 3D Stage Coverflow Carousel */}
+      <section className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 mb-20 select-none">
+        {/* Section Header */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4 pb-4 border-b border-slate-200/80">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
+              {language === 'en' ? 'Featured Marine Catalog' : 'Danh Mục Trải Nghiệm Biển'}
+            </h2>
+            <p className="text-sm sm:text-base text-slate-600 mt-1 font-medium">
+              {language === 'en'
+                ? 'Certified ocean adventures, coral diving, and watersports in Da Nang'
+                : 'Trải nghiệm thể thao nước và tour khám phá vịnh biển đặc sắc'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-500 font-mono font-semibold">
+              {String(carouselIndex + 1).padStart(2, '0')} / {String(allExperiences.length).padStart(2, '0')}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handlePrevExperience}
+                aria-label="Xem hoạt động trước"
+                className="w-9 h-9 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center transition-colors shadow-2xs hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleNextExperience}
+                aria-label="Xem hoạt động tiếp theo"
+                className="w-9 h-9 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 flex items-center justify-center transition-colors shadow-2xs hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-            <div className="p-3.5 flex-1 flex flex-col justify-between">
-              <div>
-                <h3 className="font-bold text-[13px] sm:text-sm text-slate-900 group-hover:text-sky-700 transition-colors line-clamp-2 leading-snug">
-                  {language === 'en' ? item.nameEn : item.name}
-                </h3>
-                <p className="text-[13px] text-slate-500 mt-1">{item.location}</p>
-              </div>
-              <div className="mt-3 pt-2 border-t border-slate-200/50 flex items-center justify-between">
-                <div className="flex items-center gap-1 text-[13px] font-bold text-slate-800">
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  <span>{item.rating.toFixed(1)}</span>
-                </div>
-                <span className="text-[13px] font-bold text-sky-700">{item.price}</span>
-              </div>
-            </div>
-          </Link>
-        )}
-      />
+          </div>
+        </div>
 
-      {/* 3. Đánh Giá Cao */}
+        {/* 3D Coverflow Stage with 50% Overlap & Edge-Gradient Fade */}
+        <div
+          className="relative w-full h-[390px] sm:h-[450px] md:h-[480px] lg:h-[510px] overflow-hidden flex items-center justify-center"
+          onMouseEnter={() => setIsCarouselPaused(true)}
+          onMouseLeave={() => setIsCarouselPaused(false)}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Extreme Left Navigation Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handlePrevExperience();
+            }}
+            aria-label="Trải nghiệm trước"
+            className="absolute left-2 sm:left-4 lg:left-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/95 hover:bg-white text-slate-900 border border-slate-200/90 shadow-[0_8px_24px_rgba(15,23,42,0.18)] flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer backdrop-blur-md group"
+          >
+            <ChevronLeft className="w-5 h-5 text-slate-800 group-hover:text-sky-700 transition-colors" />
+          </button>
+
+          {/* Extreme Right Navigation Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleNextExperience();
+            }}
+            aria-label="Trải nghiệm tiếp theo"
+            className="absolute right-2 sm:right-4 lg:right-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/95 hover:bg-white text-slate-900 border border-slate-200/90 shadow-[0_8px_24px_rgba(15,23,42,0.18)] flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer backdrop-blur-md group"
+          >
+            <ChevronRight className="w-5 h-5 text-slate-800 group-hover:text-sky-700 transition-colors" />
+          </button>
+
+          {/* Cards Stage */}
+          {allExperiences.map((item, index) => {
+            const diff = getOffset(index, carouselIndex, allExperiences.length);
+            const isCenter = diff === 0;
+            const isLeft = diff === -1;
+            const isRight = diff === 1;
+
+            let transform: string;
+            let zIndex: number;
+            let opacity: number;
+            let pointerEvents: 'auto' | 'none' = 'none';
+            let boxShadow = 'none';
+            let maskImage = 'none';
+            let webkitMaskImage = 'none';
+
+            if (isCenter) {
+              transform = 'translate(-50%, -50%) scale(1)';
+              zIndex = 20;
+              opacity = 1;
+              pointerEvents = 'auto';
+              boxShadow = '0 25px 50px -12px rgba(15, 23, 42, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.15)';
+              maskImage = 'none';
+              webkitMaskImage = 'none';
+            } else if (isLeft) {
+              // Center card covers ~50% of the left card width
+              transform = isMobile
+                ? 'translate(-86%, -50%) scale(0.88)'
+                : 'translate(-96%, -50%) scale(0.88)';
+              zIndex = 10;
+              opacity = 1;
+              pointerEvents = 'auto';
+              boxShadow = '0 10px 30px -10px rgba(15, 23, 42, 0.25)';
+              // Gradual fade: sharp near center card edge, fading towards the outer left edge
+              // Gentle fade: 100% clarity near center card, softly easing to 72% at the far outer edge
+              maskImage = 'linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.96) 45%, rgba(0,0,0,0.72) 100%)';
+              webkitMaskImage = 'linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.96) 45%, rgba(0,0,0,0.72) 100%)';
+            } else if (isRight) {
+              // Center card covers ~50% of the right card width
+              transform = isMobile
+                ? 'translate(-14%, -50%) scale(0.88)'
+                : 'translate(-4%, -50%) scale(0.88)';
+              zIndex = 10;
+              opacity = 1;
+              pointerEvents = 'auto';
+              boxShadow = '0 10px 30px -10px rgba(15, 23, 42, 0.25)';
+              // Gradual fade: sharp near center card edge, fading towards the outer right edge
+              // Gentle fade: 100% clarity near center card, softly easing to 72% at the far outer edge
+              maskImage = 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0.96) 45%, rgba(0,0,0,0.72) 100%)';
+              webkitMaskImage = 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0.96) 45%, rgba(0,0,0,0.72) 100%)';
+            } else if (diff < -1) {
+              transform = isMobile
+                ? 'translate(-140%, -50%) scale(0.7)'
+                : 'translate(-160%, -50%) scale(0.72)';
+              zIndex = 0;
+              opacity = 0;
+            } else {
+              transform = isMobile
+                ? 'translate(40%, -50%) scale(0.7)'
+                : 'translate(60%, -50%) scale(0.72)';
+              zIndex = 0;
+              opacity = 0;
+            }
+
+            return (
+              <div
+                key={item.id}
+                onClick={(e) => {
+                  if (diff === -1) {
+                    e.preventDefault();
+                    handlePrevExperience();
+                  } else if (diff === 1) {
+                    e.preventDefault();
+                    handleNextExperience();
+                  } else if (diff === 0) {
+                    const target = e.target as HTMLElement | null;
+                    if (target && !target.closest('a')) {
+                      navigate(item.link);
+                    }
+                  }
+                }}
+                style={{
+                  transform,
+                  zIndex,
+                  opacity,
+                  pointerEvents,
+                  boxShadow,
+                  maskImage,
+                  WebkitMaskImage: webkitMaskImage,
+                }}
+                className={`absolute top-1/2 left-1/2 w-[86%] sm:w-[56%] md:w-[50%] lg:w-[46%] max-w-[580px] aspect-[4/3] rounded-3xl overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform group ${
+                  isCenter ? 'ring-1 ring-white/20' : 'cursor-pointer hover:opacity-100'
+                }`}
+              >
+                {/* Full-bleed Background Image */}
+                <img
+                  src={item.imageUrl}
+                  alt={item.name}
+                  loading={isCenter ? 'eager' : 'lazy'}
+                  onError={(e) => {
+                    e.currentTarget.src = FALLBACK_CARD_IMAGE;
+                  }}
+                  className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+
+                {/* Gradient Overlays for High-Contrast Text Legibility */}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent" />
+                <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
+
+                
+
+                {/* Top Rating Pill */}
+                <div className="absolute top-4 left-4 sm:top-5 sm:left-5 px-3 py-1.5 rounded-xl bg-slate-950/60 backdrop-blur-md border border-white/20 flex items-center gap-1.5 text-white text-xs font-bold shadow-sm">
+                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                  <span className="font-mono">{item.rating.toFixed(1)}</span>
+                  <span className="text-white/60 font-normal">({item.reviewCount})</span>
+                </div>
+
+                {/* Top Right Tag */}
+                <div className="absolute top-4 right-4 sm:top-5 sm:right-5 px-3 py-1.5 rounded-xl bg-sky-950/60 backdrop-blur-md border border-sky-400/30 text-sky-200 text-[11px] font-semibold tracking-wide uppercase">
+                  Đà Nẵng
+                </div>
+
+                {/* Embedded Bottom Information Box */}
+                <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 z-10 text-white flex flex-col justify-end">
+                  <div className="flex items-center gap-1.5 text-xs text-sky-300 mb-1.5 font-medium">
+                    <MapPin className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{item.location}</span>
+                  </div>
+
+                  <h3 className="text-base sm:text-xl md:text-2xl font-black text-white leading-snug drop-shadow-sm mb-2 sm:mb-2.5 group-hover:text-sky-200 transition-colors line-clamp-1 sm:line-clamp-2">
+                    {language === 'en' ? item.nameEn : item.name}
+                  </h3>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-white/15">
+                    <div>
+                      <span className="text-[11px] uppercase tracking-wider text-white/70 block font-semibold">
+                        {language === 'en' ? 'Starting From' : 'Chi phí từ'}
+                      </span>
+                      <span className="text-lg sm:text-2xl font-black text-amber-300 font-mono tabular-nums drop-shadow-sm">
+                        {item.price}
+                      </span>
+                    </div>
+
+                    {isCenter ? (
+                      <Link
+                        to={item.link}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-sky-600/40 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <span>{language === 'en' ? 'Explore Now' : 'Khám phá ngay'}</span>
+                        <ArrowRight className="w-4 h-4 shrink-0" />
+                      </Link>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white/20 text-white/90 text-xs font-semibold backdrop-blur-sm">
+                        {language === 'en' ? 'Select' : 'Xem nhanh'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Indicator Dots Below Stage */}
+        <div className="flex items-center justify-center gap-2 mt-6 select-none">
+          {allExperiences.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => setCarouselIndex(idx)}
+              aria-label={`Chuyển đến hoạt động ${idx + 1}`}
+              className={`h-2 transition-all duration-300 rounded-full cursor-pointer ${
+                idx === carouselIndex
+                  ? 'w-8 bg-[#0284C7]'
+                  : 'w-2 bg-slate-300 hover:bg-slate-400'
+              }`}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* 3. Đánh Giá Cao (Top-Rated Destinations) */}
       <ExploreCarouselDeck
-        title={language === 'en' ? 'Top-Rated' : 'Đánh giá cao'}
-        subtitle={language === 'en' ? 'Pristine coastal bays and certified watersport marine hubs in Da Nang' : 'Các vùng vịnh biển có cảnh quan nguyên sinh và hạ tầng bãi biển được du khách chấm điểm cao nhất'}
+        title={language === 'en' ? 'Top-Rated Coastal Bays' : 'Vùng Vịnh Đánh Giá Cao'}
+        subtitle={
+          language === 'en'
+            ? 'Pristine coastal bays and certified watersport marine hubs in Da Nang'
+            : 'Các vùng vịnh biển có cảnh quan nguyên sinh và hạ tầng bãi biển được du khách chấm điểm cao nhất'
+        }
         viewAllLink="/search"
         items={TOP_RATED_DESTINATIONS}
         renderItem={(dest) => (
@@ -661,10 +843,14 @@ export function Explore() {
         )}
       />
 
-      {/* 4. Ghé Thăm Nhiều Nhất */}
+      {/* 4. Ghé Thăm Nhiều Nhất (Most Visited) */}
       <ExploreCarouselDeck
-        title={language === 'en' ? 'Most Visited' : 'Ghé thăm nhiều nhất'}
-        subtitle={language === 'en' ? 'Popular marine excursions with highest verified booking volumes' : 'Những tour thể thao biển thu hút đông đảo lượng khách trải nghiệm và tỷ lệ hài lòng cao'}
+        title={language === 'en' ? 'Most Visited Tours' : 'Hoạt Động Ghé Thăm Nhiều Nhất'}
+        subtitle={
+          language === 'en'
+            ? 'Popular marine excursions with highest verified booking volumes'
+            : 'Những tour thể thao biển thu hút đông đảo lượng khách trải nghiệm và tỷ lệ hài lòng cao'
+        }
         viewAllLink="/search"
         items={topVisitedList}
         renderItem={(item) => (
@@ -704,10 +890,14 @@ export function Explore() {
         )}
       />
 
-      {/* 5. Đề Xuất */}
+      {/* 5. Đề Xuất Theo Điều Kiện Sóng Biển (Weather & Marine Recommended) */}
       <ExploreCarouselDeck
-        title={language === 'en' ? 'Recommended' : 'Đề xuất'}
-        subtitle={language === 'en' ? 'Optimized for current wave height, morning water clarity, and ocean wind speeds' : 'Được tính toán tự động dựa trên độ cao sóng, chu kỳ thủy triều và độ trong của nước hôm nay'}
+        title={language === 'en' ? 'Weather Recommended' : 'Đề Xuất Theo Thời Tiết Biển'}
+        subtitle={
+          language === 'en'
+            ? 'Optimized for current wave height, morning water clarity, and ocean wind speeds'
+            : 'Được tính toán tự động dựa trên độ cao sóng, chu kỳ thủy triều và độ trong của nước hôm nay'
+        }
         viewAllLink="/search"
         items={weatherRecommendedList}
         renderItem={(item) => (
@@ -751,37 +941,37 @@ export function Explore() {
       <section className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 mb-20 animate-fadeInUp">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-            {language === 'en' ? 'Suggested Itineraries' : 'Lộ trình gợi ý'}
+            {language === 'en' ? 'Suggested Itineraries' : 'Lộ Trình Gợi Ý Tuyển Chọn'}
           </h2>
-          <p className="text-base text-slate-700 mt-2 font-normal">
+          <p className="text-sm sm:text-base text-slate-600 mt-2 font-medium">
             {language === 'en'
-              ? 'Optimized by maritime experts matching water tides, morning visibility, and sunset timing.'
-              : 'Được thiết kế dựa trên chu kỳ thủy triều và khung giờ nước trong nhất của các vịnh biển Đà Nẵng.'}
+              ? 'Complete multi-experience journeys curated by local captains and certified marine instructors'
+              : 'Gợi ý lịch trình kết hợp trải nghiệm biển trọn gói từ sáng đến hoàng hôn, tối ưu thời gian và chi phí'}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
           {CURATED_ITINERARIES.map((itin) => {
             const highlights = language === 'en' ? itin.highlightsEn : itin.highlights;
-
             return (
               <div
                 key={itin.id}
-                className="bg-slate-50 rounded-2xl overflow-hidden hover:bg-slate-100/90 transition-all flex flex-col justify-between animate-fadeInUp"
+                className="flex flex-col justify-between bg-slate-50 hover:bg-slate-100/90 rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs hover:shadow-md transition-all duration-300 group"
               >
                 <div>
-                  {/* Clean Photo Banner without Slop Badges */}
                   <div className="relative aspect-[16/9] overflow-hidden bg-slate-100">
                     <img
                       src={itin.imageUrl}
                       alt={itin.title}
                       loading="lazy"
-                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-500 ease-out"
+                      onError={(e) => {
+                        e.currentTarget.src = FALLBACK_CARD_IMAGE;
+                      }}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                     />
                   </div>
 
                   <div className="p-5">
-                    {/* Natural Metadata Row */}
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-2">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
                       <span>{language === 'en' ? itin.durationEn : itin.duration}</span>
@@ -791,11 +981,10 @@ export function Explore() {
                       {language === 'en' ? itin.titleEn : itin.title}
                     </h3>
 
-                    {/* Concise Highlight Steps (4 Clean Checkpoints) */}
                     <div className="space-y-2.5 mb-2">
                       {highlights.map((step, sIdx) => (
                         <div key={sIdx} className="flex items-center gap-2.5 text-[13px] text-slate-700">
-                          <span className="w-5 h-5 rounded-full bg-white text-sky-700 font-bold text-[13px] flex items-center justify-center shrink-0">
+                          <span className="w-5 h-5 rounded-full bg-white text-sky-700 font-bold text-[13px] flex items-center justify-center shrink-0 border border-slate-200">
                             {sIdx + 1}
                           </span>
                           <span className="font-medium truncate">{step}</span>
@@ -805,65 +994,26 @@ export function Explore() {
                   </div>
                 </div>
 
-                {/* Bottom Cost & CTA */}
                 <div className="p-5 pt-0">
-                  <div className="pt-4 flex items-center justify-between">
+                  <div className="pt-4 border-t border-slate-200/60 flex items-center justify-between">
                     <div>
-                      <span className="text-[13px] text-slate-500 block font-medium">Chi phí ước tính</span>
-                      <span className="text-base font-bold text-sky-700">{itin.estimatedCost}</span>
+                      <span className="text-[12px] text-slate-500 block font-medium">Chi phí ước tính</span>
+                      <span className="text-base font-bold text-sky-700 font-mono tabular-nums">{itin.estimatedCost}</span>
                     </div>
 
                     <Link
                       to={`/search?category=${itin.targetCategory}`}
-                      className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold transition-colors cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
                     >
                       <span>{language === 'en' ? 'Book Route →' : 'Đặt theo lộ trình →'}</span>
                     </Link>
                   </div>
                 </div>
-
               </div>
             );
           })}
         </div>
       </section>
-
-      {/* 5. Safe & Eco-Guidelines */}
-      <section className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 mb-16 animate-fadeInUp">
-        <div className="bg-[#031d44] text-white rounded-2xl p-6 sm:p-10 w-full">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div className="lg:col-span-5">
-              <h3 className="text-2xl font-black text-white mb-3">
-                {language === 'en' 
-                  ? 'Marine Safety and Coral Conservation Standards' 
-                  : 'An toàn hàng hải & Bảo tồn rạn san hô'}
-              </h3>
-
-              <p className="text-slate-200 text-base leading-relaxed font-normal">
-                DANASEA áp dụng tiêu chuẩn an toàn hàng hải tuyệt đối với 100% áo phao đạt kiểm định SOLAS, hướng dẫn viên đạt chứng chỉ cứu sinh PADI và quy định nghiêm ngặt không giẫm đạp rạn san hô tự nhiên tại bán đảo Sơn Trà.
-              </p>
-            </div>
-
-            <div className="lg:col-span-7">
-              <ul className="space-y-4 text-slate-200 text-base">
-                <li className="flex items-start gap-3 bg-white/10 p-3.5 rounded-xl">
-                  <span className="font-bold text-cyan-200 shrink-0">Áo phao SOLAS:</span>
-                  <span>Bắt buộc mặc áo phao tiêu chuẩn trong suốt quá trình chèo SUP, lướt ván và cano cao tốc.</span>
-                </li>
-                <li className="flex items-start gap-3 bg-white/10 p-3.5 rounded-xl">
-                  <span className="font-bold text-cyan-200 shrink-0">Bảo tồn san hô:</span>
-                  <span>Giữ khoảng cách an toàn với rạn san hô bãi cạn và sử dụng kem chống nắng an toàn đại dương.</span>
-                </li>
-                <li className="flex items-start gap-3 bg-white/10 p-3.5 rounded-xl">
-                  <span className="font-bold text-cyan-200 shrink-0">Huấn luyện viên:</span>
-                  <span>Các tour lặn biển sâu Scuba luôn có thợ lặn chuyên nghiệp kèm sát từng du khách.</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
     </main>
   );
 }

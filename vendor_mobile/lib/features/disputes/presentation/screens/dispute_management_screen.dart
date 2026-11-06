@@ -171,110 +171,6 @@ class _DisputeManagementScreenState extends State<DisputeManagementScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Atmosphere Indicator
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(AppShapes.rMd),
-                border: Border.all(color: AppColors.outlineVariant),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: const BoxDecoration(
-                            color: AppColors.secondary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.waves, color: Colors.white, size: 18),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              LocalizedText(
-                                'ĐỐI TÁC CHÍNH THỨC',
-                                style: AppTypography.labelSm.copyWith(
-                                  color: AppColors.secondary,
-                                  letterSpacing: 0.5,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              LocalizedText(
-                                _db.currentVendor.businessName,
-                                style: AppTypography.labelLg.copyWith(color: AppColors.onSurface),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondaryFixed,
-                      borderRadius: BorderRadius.circular(AppShapes.rFull),
-                    ),
-                    child: LocalizedText(
-                      'Cổng đối tác',
-                      style: AppTypography.labelSm.copyWith(
-                        color: AppColors.onSecondaryFixedVariant,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Mediation Policy Notice (Read-only Governance)
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(AppShapes.rMd),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.gavel, color: AppColors.primary, size: 22),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        LocalizedText(
-                          'Cơ chế trọng tài độc lập DANASEA',
-                          style: AppTypography.labelLg.copyWith(
-                            color: AppColors.onSurface,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        LocalizedText(
-                          'Toàn bộ quyền phán quyết và xử lý bồi hoàn do Ban quản trị DANASEA trực tiếp thực hiện. Đối tác theo dõi tiến độ và nộp tài liệu giải trình bổ sung tại đây.',
-                          style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
             // Horizontal Filter Tabs
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -282,13 +178,11 @@ class _DisputeManagementScreenState extends State<DisputeManagementScreen> {
                 children: [
                   _buildFilterTab('ALL', 'Tất cả (${allDisputes.length})'),
                   const SizedBox(width: 8),
-                  _buildFilterTab('IN_REVIEW', 'Đang giải quyết (1)'),
+                  _buildFilterTab('IN_REVIEW', 'Đang xử lý (${allDisputes.where((d) => d.status == DisputeStatus.inReview).length})'),
                   const SizedBox(width: 8),
-                  _buildFilterTab('RESOLVED', 'Đã giải quyết (1)'),
+                  _buildFilterTab('RESOLVED', 'Đã giải quyết (${allDisputes.where((d) => d.status == DisputeStatus.resolved).length})'),
                   const SizedBox(width: 8),
-                  _buildFilterTab('OPEN', 'Chờ xử lý (0)'),
-                  const SizedBox(width: 8),
-                  _buildFilterTab('REJECTED', 'Đã từ chối (0)'),
+                  _buildFilterTab('OPEN', 'Chờ xử lý (${allDisputes.where((d) => d.status == DisputeStatus.open).length})'),
                 ],
               ),
             ),
@@ -412,7 +306,7 @@ class _DisputeManagementScreenState extends State<DisputeManagementScreen> {
                     LocalizedText(
                       dispute.serviceName,
                       style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -567,27 +461,7 @@ class _DisputeManagementScreenState extends State<DisputeManagementScreen> {
             const SizedBox(height: 12),
           ],
 
-          // Regulatory Notice Box
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainer,
-              borderRadius: BorderRadius.circular(AppShapes.rMd),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.lock, size: 14, color: AppColors.secondary),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: LocalizedText(
-                    'Quyền phán quyết thuộc Admin DANASEA. Đối tác không có thẩm quyền tự hoàn tiền hay đơn phương đóng khiếu nại.',
-                    style: AppTypography.bodySm.copyWith(color: AppColors.tertiary, fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
+
 
           // Actions
           Row(
