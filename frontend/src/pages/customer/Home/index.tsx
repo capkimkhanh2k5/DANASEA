@@ -11,8 +11,6 @@ import { DanaseaAppShowcase } from "../../../components/customer/DanaseaAppShowc
 import { GuestGalleryMarquee } from "../../../components/customer/GuestGalleryMarquee";
 import { CoastalVideoSpotlights } from "../../../components/customer/CoastalVideoSpotlights";
 import { CinematicSceneBackdrop } from "../../../components/customer/CinematicSceneBackdrop";
-import { ExpandingBaysSection } from "../../../components/customer/ExpandingBaysSection";
-import { OceanSportsShowcase } from "../../../components/customer/OceanSportsShowcase";
 import { flashSaleService } from "../../../services/flashSaleService";
 import type { ActiveFlashSaleItem } from "../../../services/flashSaleService";
 
@@ -1257,6 +1255,10 @@ export function Home() {
           {/* 1. Flash Sale Section (Ưu đãi giờ vàng giới hạn) */}
           <FlashSaleSection experiences={flashSaleList} />
 
+
+          {/* Signature Alternating Video Spotlights with Curving Dashed Connectors */}
+          <CoastalVideoSpotlights />
+
           {/* 2. Hoạt Động Biển Nổi Bật (Dải card hoạt động nổi bật duy nhất) */}
           <CategoryExperienceCarousel
             title={language === 'en' ? 'Featured Marine Activities' : 'Hoạt Động Biển Nổi Bật'}
@@ -1265,12 +1267,7 @@ export function Home() {
             experiences={featuredActivities}
           />
 
-          {/* Signature Alternating Video Spotlights with Curving Dashed Connectors */}
-          <CoastalVideoSpotlights />
 
-          {/* 2 Card Strips: Coastal Bays & Ocean Sports (Positioned after Video Spotlights & before App Showcase) */}
-          <ExpandingBaysSection />
-          <OceanSportsShowcase />
 
           {/* 9. DANASEA Official Mobile App Showcase */}
           <DanaseaAppShowcase />

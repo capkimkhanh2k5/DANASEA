@@ -132,7 +132,7 @@ export function Footer() {
 
           </div>
 
-          {/* Cột 2: Hỗ trợ & Chính sách lữ hành (chiếm 3 cột - Không trùng lặp danh mục tour) */}
+          {/* Cột 2: Hỗ trợ & Chính sách lữ hành (chiếm 3 cột) */}
           <div className="lg:col-span-3 flex flex-col gap-3">
             <h3 className="font-bold text-sm text-white tracking-tight">
               Hỗ trợ &amp; Pháp lý
@@ -157,6 +157,25 @@ export function Footer() {
                 Về chúng tôi &amp; Giấy phép lữ hành
               </li>
             </ul>
+
+            {/* Ảnh hồ sơ pháp lý & chứng nhận đặt gọn gàng ngay dưới cột 2 */}
+            <div className="mt-2 pt-3 border-t border-white/10 flex flex-col gap-2">
+              <span className="text-[11px] font-semibold text-white/80 tracking-wide">
+                Hồ sơ pháp lý số hóa
+              </span>
+              <div className="flex flex-col gap-2">
+                <img
+                  src="/images/legal/business_license_preview.png"
+                  alt="Đăng ký kinh doanh và lữ hành quốc tế"
+                  className="w-full max-w-[220px] h-auto rounded-lg border border-white/20 bg-white/5 object-contain hover:border-white/40 transition-colors"
+                />
+                <img
+                  src="/images/legal/safety_cert_preview.png"
+                  alt="Chứng nhận an toàn giao thông đường thủy"
+                  className="w-full max-w-[220px] h-auto rounded-lg border border-white/20 bg-white/5 object-contain hover:border-white/40 transition-colors"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Cột 3: Mạng xã hội, Hotline & Cứu hộ bờ biển (chiếm 3 cột) */}
@@ -231,63 +250,7 @@ export function Footer() {
 
         </div>
 
-        {/* Hồ sơ pháp lý & Chứng nhận thực tế từ hệ thống (Authentic Legal Documents & Official Seals) */}
-        <div className="py-6 border-b border-white/10 flex flex-col lg:flex-row items-center justify-between gap-6">
-          {/* Chứng từ pháp lý số hóa thực tế từ dự án */}
-          <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4">
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-white/25 transition-colors">
-              <img
-                src="/images/legal/maritime_inspection_cert.png"
-                alt="Đăng kiểm VR và cấp phép luồng tuyến hàng hải"
-                className="h-10 w-12 object-cover rounded border border-white/20 shrink-0"
-              />
-              <div className="flex flex-col text-left">
-                <span className="text-xs font-semibold text-white">Đăng kiểm VR &amp; Luồng tuyến</span>
-                <span className="text-[11px] text-white/70">Biên bản kiểm định phương tiện thủy</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-white/25 transition-colors">
-              <img
-                src="/images/legal/business_license_preview.png"
-                alt="Giấy phép đăng ký kinh doanh lữ hành"
-                className="h-10 w-14 object-cover rounded border border-white/20 shrink-0"
-              />
-              <div className="flex flex-col text-left">
-                <span className="text-xs font-semibold text-white">ĐKKD &amp; Lữ hành quốc tế</span>
-                <span className="text-[11px] text-white/70">Sở Kế hoạch &amp; Đầu tư Đà Nẵng</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/5 border border-white/10 hover:border-white/25 transition-colors">
-              <img
-                src="/images/legal/safety_cert_preview.png"
-                alt="Chứng nhận an toàn giao thông đường thủy nội địa"
-                className="h-10 w-14 object-cover rounded border border-white/20 shrink-0"
-              />
-              <div className="flex flex-col text-left">
-                <span className="text-xs font-semibold text-white">Chứng nhận ATGT đường thủy</span>
-                <span className="text-[11px] text-white/70">Quy chuẩn cứu hộ &amp; PCCC đường biển</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Huy hiệu Bộ Công Thương & Chứng chỉ bảo mật SSL (Con dấu chuẩn đồ họa) */}
-          <div className="flex items-center gap-4 shrink-0">
-            <img
-              src="/images/legal/bo-cong-thuong.svg"
-              alt="Đã thông báo Bộ Công Thương"
-              className="h-10 w-auto object-contain drop-shadow-sm hover:opacity-95 transition-opacity"
-            />
-            <img
-              src="/images/legal/ssl-secure.svg"
-              alt="Chứng chỉ bảo mật SSL 256-Bit"
-              className="h-9 w-auto object-contain drop-shadow-sm hover:opacity-95 transition-opacity"
-            />
-          </div>
-        </div>
-
-        {/* Chân trang bản quyền (Bottom Bar) */}
+{/* Chân trang bản quyền (Bottom Bar) */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/90 font-normal">
           <p>© 2026 DANASEA Marine Experiences. Bảo lưu mọi quyền.</p>
           <div className="flex items-center gap-3 text-xs text-white/90 font-normal">
