@@ -12,6 +12,7 @@ import type { ServiceSummaryDto } from '../../../types/service';
 import {
   getHeroImageUrl,
   getCardThumbnailUrl,
+  getStageCardImageUrl,
   FALLBACK_HERO_IMAGE,
   FALLBACK_CARD_IMAGE,
 } from '../../../utils/imageOptimizer';
@@ -184,6 +185,20 @@ const CURATED_ITINERARIES: CuratedItinerary[] = [
   },
 ];
 
+// Priority IDs of high-resolution, landscape-ratio (4:3 / 3:2) marine activities
+const HIGH_RES_STAGE_SERVICE_IDS = [
+  '5943ecd7-6480-5b4a-b42b-43abc0988776', // Học lướt sóng – Surf Shack (2560x1920, 2K 4:3)
+  '1dd26db5-f863-5b03-b562-ac46f43df9d2', // Lớp học lướt sóng Mỹ Khê – DNOA (1920x1436, Full HD 4:3)
+  '3758c297-54ff-5887-89bd-62220227570b', // Dù bay trên biển – Danabeach (1375x867, 16:10)
+  'a6f4ab9c-4794-542b-a443-e3013e6bbe47', // Câu cá biển Sơn Trà – DaNaFi (1280x960, 4:3)
+  '9f4eb04d-9ec6-5295-8de6-475b728e5cfc', // Surf tour tìm điểm sóng – Surf Shack (1235x824, 3:2)
+  '2cdfabcf-13a2-550a-8f9e-283aad7053c9', // Mô tô nước – Kajin Vina (1200x800, 3:2)
+  '5536f743-3b6d-518e-af2b-05634a218195', // Câu cá chuyên nghiệp Sơn Trà – DaNaFi (1200x900, 4:3)
+  'c4c56ae2-5f9b-555c-81f1-f0d4c8dd7c1b', // Dù bay trên biển – DNOA (1170x879, 4:3)
+  '088d874c-a61e-5b58-a7a9-497f32a56901', // Mô tô nước – Danabeach (910x607, 3:2)
+  '4190046d-112a-5b93-beb2-bcc8b1cd16d4', // Dù bay trên biển – Kajin Vina (900x600, 3:2)
+];
+
 export function Explore() {
   const { language } = useLanguageStore();
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
@@ -265,15 +280,26 @@ export function Explore() {
         link: '/search',
       }));
     }
-    return liveServices.map((svc) => ({
+
+    // Curate sharpest high-resolution activities with consistent landscape 4:3 / 3:2 ratio
+    const featuredServices = [...liveServices].sort((a, b) => {
+      const aRank = HIGH_RES_STAGE_SERVICE_IDS.indexOf(a.id);
+      const bRank = HIGH_RES_STAGE_SERVICE_IDS.indexOf(b.id);
+      if (aRank !== -1 && bRank !== -1) return aRank - bRank;
+      if (aRank !== -1) return -1;
+      if (bRank !== -1) return 1;
+      return 0;
+    }).slice(0, 10);
+
+    return featuredServices.map((svc) => ({
       id: svc.id,
       name: svc.name,
       nameEn: svc.name,
       location: svc.address || 'Đà Nẵng',
       rating: formatRating(svc.averageRating, 4.9),
-      reviewCount: svc.reviewCount || 12,
+      reviewCount: svc.reviewCount || 24,
       price: formatPrice(svc.price, '400.000 ₫'),
-      imageUrl: getCardThumbnailUrl(svc.primaryImageUrl || FALLBACK_CARD_IMAGE),
+      imageUrl: getStageCardImageUrl(svc.primaryImageUrl || FALLBACK_HERO_IMAGE),
       link: getTourUrl(svc),
     }));
   }, [liveServices]);
@@ -554,7 +580,7 @@ export function Explore() {
 
         {/* 3D Coverflow Stage with 50% Overlap & Edge-Gradient Fade */}
         <div
-          className="relative w-full h-[470px] sm:h-[530px] lg:h-[560px] overflow-hidden flex items-center justify-center"
+          className="relative w-full h-[390px] sm:h-[450px] md:h-[480px] lg:h-[510px] overflow-hidden flex items-center justify-center"
           onMouseEnter={() => setIsCarouselPaused(true)}
           onMouseLeave={() => setIsCarouselPaused(false)}
           onTouchStart={handleTouchStart}
@@ -675,7 +701,7 @@ export function Explore() {
                   maskImage,
                   WebkitMaskImage: webkitMaskImage,
                 }}
-                className={`absolute top-1/2 left-1/2 w-[84%] sm:w-[50%] md:w-[46%] lg:w-[42%] max-w-[540px] h-[450px] sm:h-[510px] lg:h-[530px] rounded-3xl overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform group ${
+                className={`absolute top-1/2 left-1/2 w-[86%] sm:w-[56%] md:w-[50%] lg:w-[46%] max-w-[580px] aspect-[4/3] rounded-3xl overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform group ${
                   isCenter ? 'ring-1 ring-white/20' : 'cursor-pointer hover:opacity-100'
                 }`}
               >
@@ -709,13 +735,13 @@ export function Explore() {
                 </div>
 
                 {/* Embedded Bottom Information Box */}
-                <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7 z-10 text-white flex flex-col justify-end">
+                <div className="absolute inset-x-0 bottom-0 p-4 sm:p-6 z-10 text-white flex flex-col justify-end">
                   <div className="flex items-center gap-1.5 text-xs text-sky-300 mb-1.5 font-medium">
                     <MapPin className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{item.location}</span>
                   </div>
 
-                  <h3 className="text-lg sm:text-2xl font-black text-white leading-snug drop-shadow-sm mb-3 group-hover:text-sky-200 transition-colors line-clamp-2">
+                  <h3 className="text-base sm:text-xl md:text-2xl font-black text-white leading-snug drop-shadow-sm mb-2 sm:mb-2.5 group-hover:text-sky-200 transition-colors line-clamp-1 sm:line-clamp-2">
                     {language === 'en' ? item.nameEn : item.name}
                   </h3>
 
