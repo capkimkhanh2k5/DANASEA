@@ -433,32 +433,6 @@ export function Explore() {
         </div>
       </section>
 
-      {/* 3. Maritime Safety Storytelling Banner (No dry bullet points, ocean backdrop) */}
-      <section className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 mb-16 animate-fadeInUp">
-        <div className="relative rounded-2xl overflow-hidden shadow-xl border border-sky-900/60">
-          <div 
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url('/images/hero/08-cano-cao-toc-luot-vinh-da-nang.jpg')` }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/75 to-slate-950/20" />
-          <div className="relative z-10 p-8 sm:p-12 max-w-2xl text-white space-y-4">
-            <span className="text-xs uppercase tracking-wider font-bold text-sky-400 block">
-              {language === 'en' ? 'Maritime Safety Assurance' : 'Quy Chuẩn An Toàn Hàng Hải'}
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-snug">
-              {language === 'en' 
-                ? 'Marine Safety and Coral Conservation Standards' 
-                : 'An Toàn Hàng Hải & Bảo Tồn Rạn San Hô Tự Nhiên'}
-            </h2>
-            <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-normal">
-              {language === 'en'
-                ? 'DANASEA enforces strict maritime safety standards with 100% SOLAS-certified life jackets, certified PADI rescue instructors, and strict coral conservation protocols. High-speed vessels and diving equipment undergo regular technical inspections, with emergency patrol teams stationed across Da Nang bays.'
-                : 'DANASEA áp dụng tiêu chuẩn an toàn hàng hải tuyệt đối với 100% áo phao đạt kiểm định SOLAS quốc tế, hướng dẫn viên đạt chứng chỉ cứu sinh PADI và quy định nghiêm ngặt bảo vệ rạn san hô tự nhiên tại bán đảo Sơn Trà. Toàn bộ cano cao tốc, thiết bị lặn biển được kiểm định kỹ thuật định kỳ cùng đội tuần tra cứu hộ thường trực, bảo đảm mọi du khách an tâm trọn vẹn trong suốt hành trình.'}
-            </p>
-          </div>
-        </div>
-      </section>
-
     </main>
   );
 }

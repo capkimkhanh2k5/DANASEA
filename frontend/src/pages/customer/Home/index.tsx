@@ -1334,30 +1334,6 @@ export function Home() {
             </div>
           </div>
 
-          {/* Maritime Safety Storytelling Banner */}
-          <div className="relative rounded-2xl overflow-hidden shadow-xl border border-sky-900/40 my-6">
-            <div 
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url('/images/hero/08-cano-cao-toc-luot-vinh-da-nang.jpg')` }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/75 to-slate-950/20" />
-            <div className="relative z-10 p-7 sm:p-10 max-w-2xl text-white space-y-3">
-              <span className="text-xs uppercase tracking-wider font-bold text-sky-400 block">
-                {language === 'en' ? 'Maritime Safety Assurance' : 'Quy Chuẩn An Toàn Hàng Hải'}
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-snug">
-                {language === 'en' 
-                  ? 'Safe Ocean Journeys Grounded in SOLAS Certification' 
-                  : 'Hải Trình Biển Trọn Vẹn Dưới Chuẩn An Toàn Hàng Hải Quốc Tế'}
-              </h2>
-              <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-normal">
-                {language === 'en'
-                  ? 'Every marine journey with DANASEA is protected by strict maritime safety standards: 100% verified vessels, SOLAS-grade life jackets, dedicated rescue teams stationed at Da Nang bays, and comprehensive passenger insurance on every voyage.'
-                  : 'Mỗi hải trình du ngoạn biển cùng DANASEA đều được bảo chứng bởi quy chuẩn an toàn hàng hải nghiêm ngặt: 100% cano cao tốc và thiết bị lặn biển được kiểm định định kỳ, áo phao đạt chuẩn SOLAS quốc tế, đội cứu hộ chuyên trách thường trực tại các bến vịnh Mỹ Khê và Sơn Trà, cùng hợp đồng bảo hiểm du lịch toàn diện bảo vệ trọn vẹn từng khoảnh khắc khám phá đại dương của bạn.'}
-              </p>
-            </div>
-          </div>
-
           {/* 13. Final Call to Action */}
           <div className="rounded-2xl p-6 sm:p-8 bg-[#031d44] border border-sky-950 flex flex-col sm:flex-row items-center justify-between gap-6 text-white shadow-xl shadow-sky-950/20">
             <div>
