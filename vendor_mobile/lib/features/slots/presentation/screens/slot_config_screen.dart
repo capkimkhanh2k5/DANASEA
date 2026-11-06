@@ -1,3 +1,4 @@
+import '../../../../core/data/vendor_mock_repositories.dart';
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -6,6 +7,7 @@ import '../../../../core/data/vendor_mock_database.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/vendor_button.dart';
 import '../../../../core/widgets/toast_notification.dart';
+import '../../../../core/widgets/alarm_wheel_picker.dart';
 
 class SlotConfigScreen extends StatefulWidget {
   final ServiceSlotModel? slot;
@@ -25,6 +27,8 @@ class SlotConfigScreen extends StatefulWidget {
 
 class _SlotConfigScreenState extends State<SlotConfigScreen> {
   final _db = VendorMockDatabase.instance;
+  final _slotRepo = VendorSlotRepository();
+  bool _isSaving = false;
 
   late TextEditingController _dateController;
   late TextEditingController _startTimeController;
@@ -80,7 +84,47 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
     });
   }
 
-  void _saveSlot() {
+  Future<void> _pickDate() async {
+    final currentDt = DateTime.tryParse(_dateController.text) ?? DateTime.now();
+    final picked = await AlarmWheelDateDialog.show(
+      context,
+      initialDate: currentDt,
+      title: 'Chọn ngày áp dụng',
+    );
+    if (picked != null) {
+      setState(() {
+        _dateController.text =
+            '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      });
+    }
+  }
+
+  Future<void> _pickTime({required bool isStart}) async {
+    final currentStr = isStart ? _startTimeController.text : _endTimeController.text;
+    final parts = currentStr.split(':');
+    final initialHour = parts.isNotEmpty ? (int.tryParse(parts[0]) ?? (isStart ? 5 : 7)) : (isStart ? 5 : 7);
+    final initialMinute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+
+    final picked = await AlarmWheelTimeDialog.show(
+      context,
+      initialTime: TimeOfDay(hour: initialHour, minute: initialMinute),
+      title: isStart ? 'Chọn giờ bắt đầu' : 'Chọn giờ kết thúc',
+      subtitle: isStart ? 'Khung giờ bắt đầu ca chạy trải nghiệm' : 'Khung giờ kết thúc ca chạy trải nghiệm',
+    );
+
+    if (picked != null) {
+      final formatted = '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+      setState(() {
+        if (isStart) {
+          _startTimeController.text = formatted;
+        } else {
+          _endTimeController.text = formatted;
+        }
+      });
+    }
+  }
+
+  Future<void> _saveSlot() async {
     final date = _dateController.text.trim();
     final start = _startTimeController.text.trim();
     final end = _endTimeController.text.trim();
@@ -93,12 +137,17 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
       return;
     }
 
+    setState(() => _isSaving = true);
+
+    DateTime parsedDate = DateTime.tryParse(date) ?? DateTime.now();
+
     final newSlot = ServiceSlotModel(
       slotId: widget.slot?.slotId ?? 'slt-${DateTime.now().millisecondsSinceEpoch % 10000}',
       serviceId: widget.serviceId,
+      date: parsedDate,
       slotDate: date,
-      startTime: '$start:00',
-      endTime: '$end:00',
+      startTime: start.length == 5 ? '$start:00' : start,
+      endTime: end.length == 5 ? '$end:00' : end,
       capacity: _capacity,
       bookedCount: _bookedCount,
       heldCount: _heldCount,
@@ -107,9 +156,19 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
       updatedAt: DateTime.now(),
     );
 
-    _db.saveSlot(newSlot);
-    ToastNotification.showSuccess(context, 'Đã lưu cấu hình khung giờ thành công');
-    Navigator.of(context).maybePop();
+    try {
+      await _slotRepo.saveSlot(newSlot);
+      if (mounted) {
+        ToastNotification.showSuccess(context, 'Đã lưu ca chạy thành công');
+        Navigator.of(context).maybePop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastNotification.showError(context, 'Lỗi lưu ca chạy: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -129,7 +188,7 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         title: LocalizedText(
-          _isEdit ? 'Cấu hình khung giờ' : 'Thêm khung giờ mới',
+          _isEdit ? 'Chỉnh sửa ca chạy' : 'Thêm ca chạy mới',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.onSurface),
         ),
       ),
@@ -226,20 +285,8 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                     ),
                     const SizedBox(height: 10),
                     InkWell(
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: DateTime.tryParse(_dateController.text) ?? DateTime(2025, 5, 4),
-                          firstDate: DateTime(2025, 1, 1),
-                          lastDate: DateTime(2026, 12, 31),
-                        );
-                        if (picked != null) {
-                          setState(() {
-                            _dateController.text =
-                                '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-                          });
-                        }
-                      },
+                      onTap: _pickDate,
+                      borderRadius: BorderRadius.circular(24),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
@@ -323,16 +370,29 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                             children: [
                               const LocalizedText('Giờ bắt đầu', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
                               const SizedBox(height: 4),
-                              TextField(
-                                controller: _startTimeController,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: AppColors.surfaceContainerLow,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                                  prefixIcon: const Icon(Icons.wb_twilight, size: 18, color: AppColors.secondary),
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                              InkWell(
+                                onTap: () => _pickTime(isStart: true),
+                                borderRadius: BorderRadius.circular(24),
+                                child: Container(
+                                  height: 48,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceContainerLow,
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.wb_twilight, size: 18, color: AppColors.secondary),
+                                      Expanded(
+                                        child: Text(
+                                          _startTimeController.text,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                                        ),
+                                      ),
+                                      const Icon(Icons.unfold_more, size: 16, color: AppColors.outline),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
@@ -345,36 +405,35 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                             children: [
                               const LocalizedText('Giờ kết thúc', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
                               const SizedBox(height: 4),
-                              TextField(
-                                controller: _endTimeController,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: AppColors.surfaceContainerLow,
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                                  prefixIcon: const Icon(Icons.wb_sunny, size: 18, color: AppColors.primaryContainer),
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                              InkWell(
+                                onTap: () => _pickTime(isStart: false),
+                                borderRadius: BorderRadius.circular(24),
+                                child: Container(
+                                  height: 48,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceContainerLow,
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.wb_sunny, size: 18, color: AppColors.primaryContainer),
+                                      Expanded(
+                                        child: Text(
+                                          _endTimeController.text,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                                        ),
+                                      ),
+                                      const Icon(Icons.unfold_more, size: 16, color: AppColors.outline),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: BorderRadius.circular(8)),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.tsunami, size: 14, color: AppColors.secondary),
-                          SizedBox(width: 6),
-                          Expanded(
-                            child: LocalizedText('Thời điểm lý tưởng: Mặt biển phẳng lặng, độ cao sóng 0.3m', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
-                          ),
-                        ],
-                      ),
                     ),
                   ],
                 ),
@@ -393,26 +452,17 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        Icon(Icons.groups, size: 18, color: AppColors.primary),
+                        SizedBox(width: 6),
                         Expanded(
-                          child: Row(
-                            children: [
-                              Icon(Icons.groups, size: 18, color: AppColors.primary),
-                              SizedBox(width: 6),
-                              Expanded(
-                                child: LocalizedText(
-                                  'Sức chứa tối đa (Capacity)',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
+                          child: LocalizedText(
+                            'Sức chứa tối đa',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        SizedBox(width: 8),
-                        LocalizedText('Sức chứa thiết lập', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -482,7 +532,7 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                                     SizedBox(width: 4),
                                     Expanded(
                                       child: LocalizedText(
-                                        'Số khách đã đặt (Booked):',
+                                        'Số khách đã đặt:',
                                         style: TextStyle(fontSize: 12, color: AppColors.tertiary),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
@@ -511,7 +561,7 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                                       SizedBox(width: 4),
                                       Expanded(
                                         child: LocalizedText(
-                                          'Tạm giữ thanh toán (Held):',
+                                          'Tạm giữ thanh toán:',
                                           style: TextStyle(fontSize: 12, color: AppColors.tertiary),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
@@ -560,7 +610,7 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const LocalizedText('Chặn nhận thêm khách (BLOCKED)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
+                                const LocalizedText('Chặn nhận thêm khách', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
                                 LocalizedText(
                                   'Ngừng mở bán mới trên ứng dụng mà không ảnh hưởng tới $_bookedCount khách đã đặt thành công.',
                                   style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
@@ -570,7 +620,8 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                           ),
                           Switch.adaptive(
                             value: _isBlocked,
-                            activeColor: AppColors.primary,
+                            activeThumbColor: AppColors.primary,
+                            activeTrackColor: AppColors.primaryFixed,
                             onChanged: (val) => setState(() => _isBlocked = val),
                           ),
                         ],
@@ -585,7 +636,8 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
               VendorButton(
                 text: 'Lưu cấu hình khung giờ',
                 icon: Icons.save,
-                onPressed: _saveSlot,
+                isLoading: _isSaving,
+                onPressed: _isSaving ? null : _saveSlot,
               ),
               const SizedBox(height: 10),
               if (_isEdit && _bookedCount == 0)

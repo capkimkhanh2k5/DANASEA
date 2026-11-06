@@ -526,7 +526,7 @@ enum SlotStatus {
       case SlotStatus.closed:
         return 'Đã đóng';
       case SlotStatus.blocked:
-        return 'Chặn nhận thêm (BLOCKED)';
+        return 'Chặn nhận thêm';
       case SlotStatus.cancelled:
         return 'Đã hủy';
     }
