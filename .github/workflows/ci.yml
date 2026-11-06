@@ -142,7 +142,7 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/quality-venv"
           "$RUNNER_TEMP/quality-venv/bin/pip" install ruff==0.16.10 PyYAML==6.0.3 bcrypt==4.3.0
           "$RUNNER_TEMP/quality-venv/bin/python" scripts/governance/check_dependabot.py
-          "$RUNNER_TEMP/quality-venv/bin/ruff" check --isolated --select E4,E7,E9,F,I scripts ai-decision/scripts/build_runtime.py ai-decision/scripts/container_entrypoint.py ai-decision/scripts/install_dependencies.py
+          "$RUNNER_TEMP/quality-venv/bin/ruff" check --isolated --select E4,E7,E9,F,I scripts ai-decision/scripts/check_runtime.py ai-decision/scripts/container_entrypoint.py ai-decision/scripts/install_dependencies.py
       - name: Validate workflows and deploy entrypoints
         env:
           RUN_DEMO_DATABASE_TESTS: '1'

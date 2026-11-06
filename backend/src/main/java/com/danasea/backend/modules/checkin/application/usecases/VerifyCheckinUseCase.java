@@ -22,6 +22,10 @@ import com.danasea.backend.modules.order.infrastructure.persistence.entities.Sub
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
+import com.danasea.backend.modules.communication.application.email.EmailRequest;
+import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
+import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
+import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -30,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -44,6 +49,8 @@ public class VerifyCheckinUseCase {
     private final QrTokenSigner qrTokenSigner;
     private final JpaServiceSlotRepository slotRepository;
     private final CheckinWindowPolicy checkinWindowPolicy;
+    private final JpaMasterOrderRepository masterOrderRepository;
+    private final TransactionalEmailPort transactionalEmailPort;
 
     @Autowired
     public VerifyCheckinUseCase(
@@ -52,13 +59,27 @@ public class VerifyCheckinUseCase {
             VendorLookupPort vendorLookupPort,
             QrTokenSigner qrTokenSigner,
             JpaServiceSlotRepository slotRepository,
-            CheckinWindowPolicy checkinWindowPolicy) {
+            CheckinWindowPolicy checkinWindowPolicy,
+            @Autowired(required = false) JpaMasterOrderRepository masterOrderRepository,
+            @Autowired(required = false) TransactionalEmailPort transactionalEmailPort) {
         this.checkinTokenRepository = checkinTokenRepository;
         this.subOrderRepository = subOrderRepository;
         this.vendorLookupPort = vendorLookupPort;
         this.qrTokenSigner = qrTokenSigner;
         this.slotRepository = slotRepository;
         this.checkinWindowPolicy = checkinWindowPolicy;
+        this.masterOrderRepository = masterOrderRepository;
+        this.transactionalEmailPort = transactionalEmailPort;
+    }
+
+    public VerifyCheckinUseCase(
+            JpaCheckinTokenRepository checkinTokenRepository,
+            JpaSubOrderRepository subOrderRepository,
+            VendorLookupPort vendorLookupPort,
+            QrTokenSigner qrTokenSigner,
+            JpaServiceSlotRepository slotRepository,
+            CheckinWindowPolicy checkinWindowPolicy) {
+        this(checkinTokenRepository, subOrderRepository, vendorLookupPort, qrTokenSigner, slotRepository, checkinWindowPolicy, null, null);
     }
 
     public VerifyCheckinUseCase(
@@ -66,7 +87,7 @@ public class VerifyCheckinUseCase {
             JpaSubOrderRepository subOrderRepository,
             VendorLookupPort vendorLookupPort,
             QrTokenSigner qrTokenSigner) {
-        this(checkinTokenRepository, subOrderRepository, vendorLookupPort, qrTokenSigner, null, null);
+        this(checkinTokenRepository, subOrderRepository, vendorLookupPort, qrTokenSigner, null, null, null, null);
     }
 
     @Transactional
@@ -184,6 +205,9 @@ public class VerifyCheckinUseCase {
         subOrder.setCheckedInAt(now);
         subOrderRepository.save(subOrder);
 
+        // 12. Gửi email giao dịch mời đánh giá sau 24h
+        enqueueReviewInvitationEmail(subOrder, now);
+
         log.info("CHECKIN_SUCCESS: Sub-order {} checked in by staff member {}", subOrder.getId(), staffId);
 
         return VerifyCheckinResponse.builder()
@@ -214,5 +238,45 @@ public class VerifyCheckinUseCase {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth != null && auth.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    }
+
+    private void enqueueReviewInvitationEmail(SubOrderJpaEntity subOrder, OffsetDateTime checkedInAt) {
+        if (transactionalEmailPort == null || masterOrderRepository == null) {
+            return;
+        }
+        try {
+            masterOrderRepository.findById(subOrder.getMasterOrderId()).ifPresent(masterOrder -> {
+                if (masterOrder.getCustomerId() == null) {
+                    return;
+                }
+                String businessKey = "review:suborder:" + subOrder.getId() + ":invite";
+                String recipientKey = "USER:" + masterOrder.getCustomerId();
+                OffsetDateTime dueAt = checkedInAt.plusHours(24);
+                OffsetDateTime expiresAt = checkedInAt.plusDays(14);
+
+                Map<String, Object> payload = Map.of(
+                        "subOrderId", subOrder.getId().toString(),
+                        "masterOrderId", masterOrder.getId().toString(),
+                        "serviceId", subOrder.getServiceId().toString(),
+                        "vendorId", subOrder.getVendorId().toString(),
+                        "checkedInAt", checkedInAt.toString()
+                );
+
+                transactionalEmailPort.enqueue(new EmailRequest(
+                        TransactionalEmailType.TRIP_REVIEW_INVITATION,
+                        businessKey,
+                        recipientKey,
+                        checkedInAt,
+                        dueAt,
+                        expiresAt,
+                        1,
+                        payload
+                ));
+                log.info("Enqueued TRIP_REVIEW_INVITATION for subOrder={}, customerId={}",
+                        subOrder.getId(), masterOrder.getCustomerId());
+            });
+        } catch (Exception e) {
+            log.error("Failed to enqueue TRIP_REVIEW_INVITATION for subOrder={}", subOrder.getId(), e);
+        }
     }
 }

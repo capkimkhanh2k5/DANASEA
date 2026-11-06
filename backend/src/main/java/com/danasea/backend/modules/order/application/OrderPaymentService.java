@@ -20,6 +20,7 @@ import com.danasea.backend.modules.order.infrastructure.adapters.PaymentGatewayR
 import com.danasea.backend.modules.order.application.services.WaiverAcceptanceGuard;
 import com.danasea.backend.modules.order.application.usecases.CreatePaymentIntentUseCase;
 import com.danasea.backend.modules.order.domain.events.PaymentSuccessEvent;
+import com.danasea.backend.modules.order.domain.events.RefundCompletedEvent;
 import com.danasea.backend.modules.order.application.services.DepartureCheckoutGuard;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidWebhookException;
@@ -1257,6 +1258,20 @@ public class OrderPaymentService {
                 MasterOrderJpaEntity refundedOrder = lockPaymentOrder(originalPayment);
                 refundedOrder.setPaymentStatus(PaymentOrderStatus.REFUNDED);
                 masterOrderRepository.save(refundedOrder);
+            }
+
+            UUID customerId = masterOrderRepository.findById(subOrder.getMasterOrderId())
+                    .map(MasterOrderJpaEntity::getCustomerId)
+                    .orElse(null);
+            if (eventPublisher != null && customerId != null) {
+                eventPublisher.publishEvent(new RefundCompletedEvent(
+                        refund.getId(),
+                        subOrder.getId(),
+                        subOrder.getMasterOrderId(),
+                        customerId,
+                        refund.getAmount(),
+                        refund.getStatus()
+                ));
             }
         }
 

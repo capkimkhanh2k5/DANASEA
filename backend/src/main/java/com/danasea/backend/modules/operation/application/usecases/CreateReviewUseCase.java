@@ -51,8 +51,8 @@ public class CreateReviewUseCase {
         SubOrderJpaEntity subOrder = subOrderRepository.findById(subOrderId)
                 .orElseThrow(() -> new OrderNotFoundException("Sub-order not found with id: " + subOrderId));
 
-        // 2. Kiểm tra trạng thái đơn: chỉ đơn hoàn thành (COMPLETED) mới được đánh giá
-        if (subOrder.getStatus() != SubOrderStatus.COMPLETED) {
+        // 2. Kiểm tra trạng thái đơn: chỉ đơn hoàn thành (COMPLETED) hoặc đã check-in (CHECKED_IN) mới được đánh giá
+        if (subOrder.getStatus() != SubOrderStatus.COMPLETED && subOrder.getStatus() != SubOrderStatus.CHECKED_IN) {
             throw new InvalidReviewSubOrderStateException(
                     "Only completed sub-orders can be reviewed. Current status: " + subOrder.getStatus());
         }
