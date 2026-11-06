@@ -344,8 +344,11 @@ class VendorServiceRepository implements IVendorServiceRepository {
     final imagesList = <String>[];
     if (json['images'] is List) {
       for (final img in json['images']) {
-        if (img is Map && img['imageUrl'] != null) {
-          imagesList.add(img['imageUrl'].toString());
+        if (img is Map) {
+          final url = img['url'] ?? img['imageUrl'];
+          if (url != null && url.toString().isNotEmpty) {
+            imagesList.add(url.toString());
+          }
         } else if (img is String && img.isNotEmpty) {
           imagesList.add(img);
         }
@@ -627,18 +630,23 @@ class VendorSlotRepository implements IVendorSlotRepository {
   @override
   Future<ServiceSlotModel> saveSlot(ServiceSlotModel slot) async {
     try {
+      final dateStr = slot.date.toIso8601String().split('T').first;
+      final start = slot.startTime.length == 5 ? '${slot.startTime}:00' : slot.startTime;
+      final end = slot.endTime.length == 5 ? '${slot.endTime}:00' : slot.endTime;
+
       final res = await _session.request(
         '/api/vendor/services/${slot.serviceId}/slots',
         method: 'POST',
         data: {
-          'startTime': slot.startTime,
-          'endTime': slot.endTime,
+          'date': dateStr,
+          'startTime': start,
+          'endTime': end,
           'capacity': slot.capacity,
-          'date': slot.date.toIso8601String().split('T').first,
+          'inventoryType': 'PERSON_LIMIT',
         },
       );
       final saved = parseSlot(res);
-      final index = _db.slots.indexWhere((s) => s.id == slot.id);
+      final index = _db.slots.indexWhere((s) => s.id == slot.id || s.slotId == slot.slotId);
       if (index != -1) {
         _db.slots[index] = saved;
       } else {
@@ -647,7 +655,7 @@ class VendorSlotRepository implements IVendorSlotRepository {
       _db.notifyStoreChanged();
       return saved;
     } catch (_) {
-      final index = _db.slots.indexWhere((s) => s.id == slot.id);
+      final index = _db.slots.indexWhere((s) => s.id == slot.id || s.slotId == slot.slotId);
       if (index != -1) {
         _db.slots[index] = slot;
       } else {

@@ -9,6 +9,12 @@ interface GoogleLoginButtonProps {
   mode?: 'login' | 'register';
 }
 
+declare global {
+  interface Window {
+    __danasea_gsi_initialized?: boolean;
+  }
+}
+
 export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   onSuccess,
   onError,
@@ -56,7 +62,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
     if (!isGsiLoaded || !googleClientId || !buttonContainerRef.current) return;
 
     try {
-      if (!isInitializedRef.current) {
+      if (!window.__danasea_gsi_initialized) {
         console.log('[GoogleLoginButton] Initializing Google Identity Services with Client ID:', googleClientId);
         window.google!.accounts.id.initialize({
           client_id: googleClientId,
@@ -72,6 +78,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           cancel_on_tap_outside: true,
           use_fedcm_for_prompt: true,
         });
+        window.__danasea_gsi_initialized = true;
         isInitializedRef.current = true;
       }
 

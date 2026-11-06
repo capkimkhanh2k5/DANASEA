@@ -38,3 +38,5 @@ DESIGN.md
 
 # Local GitHub production credential archive (never commit)
 /private/github-production-secrets*
+
+graphify-out/

@@ -93,7 +93,8 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
     return Promise.all([
       vendorService.getServiceDetail(id),
       vendorService.getOptions(id).catch(() => []),
-    ]).then(([svc, opts]) => {
+      vendorService.getSafetyDocuments(id).catch(() => []),
+    ]).then(([svc, opts, docs]) => {
       setCurrentServiceId(svc.id);
       setServiceStatus(svc.status);
       setRejectionReason(svc.rejectionReason);
@@ -117,6 +118,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
       setMaxWaveM(svc.maxWaveM);
       setImages(svc.images || []);
       setOptions(opts || []);
+      setSafetyDocs(docs || []);
     }).catch((err: unknown) => {
       console.error('[ServiceForm] Lỗi nạp thông tin dịch vụ:', err);
       const msg = extractErrorMessage(err, 'Không thể tải thông tin chi tiết dịch vụ');
@@ -398,54 +400,60 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
   };
 
   return (
-    <div className="w-full bg-background flex-1">
+    <div className="w-full bg-surface min-h-screen">
       <div className="flex flex-col w-full">
-        {/* Header Bar */}
-        <div className="w-full bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4 shadow-xs sticky top-0 z-20">
+        {/* Top Utility Header (Atlas Business Suite Standard) */}
+        <div className="w-full bg-white/95 backdrop-blur-sm border-b border-slate-200/80 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 shadow-xs sticky top-0 z-20">
           <div className="flex flex-col">
-            <nav className="flex items-center gap-1.5 text-xs text-slate-500 mb-1">
+            <nav className="flex items-center gap-1.5 text-xs text-slate-400 mb-0.5">
               <span 
                 onClick={() => navigate('/vendor/services')} 
-                className="hover:text-primary transition-colors cursor-pointer"
+                className="hover:text-slate-800 transition-colors cursor-pointer"
               >
                 Dịch vụ &amp; Trải nghiệm
               </span>
               <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="text-black font-semibold">
+              <span className="text-slate-700 font-medium">
                 {isEditMode ? 'Chỉnh sửa dịch vụ' : 'Soạn dịch vụ mới'}
               </span>
             </nav>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg md:text-xl font-bold text-black tracking-tight">
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight font-display">
                 {nameVi || 'Chưa đặt tên dịch vụ'}
               </h1>
               {serviceStatus === 'PUBLISHED' && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   Đang mở bán
                 </span>
               )}
               {serviceStatus === 'PENDING_REVIEW' && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-300">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200/70">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                   Chờ duyệt
                 </span>
               )}
               {serviceStatus === 'APPROVED' && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-sky-50 text-sky-800 border border-sky-300">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-sky-50 text-sky-700 border border-sky-200/70">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
                   Đã duyệt
                 </span>
               )}
               {serviceStatus === 'REJECTED' && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-rose-50 text-rose-800 border border-rose-300">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/70">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                   Bị từ chối
                 </span>
               )}
               {serviceStatus === 'DRAFT' && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-800 border border-slate-200">
-                  Bản nháp (DRAFT)
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                  Bản nháp
                 </span>
               )}
               {serviceStatus === 'PAUSED' && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-300">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                   Tạm ngưng
                 </span>
               )}
@@ -457,7 +465,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
             <button 
               onClick={() => handleSaveService(false)}
               disabled={isSaving}
-              className="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-black text-xs font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-50" 
+              className="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors flex items-center gap-1.5 disabled:opacity-50 shadow-xs cursor-pointer" 
               type="button"
             >
               <span className="material-symbols-outlined text-[16px]">save</span>
@@ -466,7 +474,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
 
             <button 
               onClick={() => setPreviewOpen(true)}
-              className="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors flex items-center gap-1.5" 
+              className="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer" 
               type="button"
             >
               <span className="material-symbols-outlined text-[16px]">visibility</span>
@@ -474,15 +482,15 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
             </button>
 
             {serviceStatus === 'PENDING_REVIEW' ? (
-              <div className="px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-300 text-amber-800 text-xs font-semibold flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-[16px] text-amber-600">hourglass_top</span>
+              <div className="px-3.5 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px] text-amber-600 animate-pulse">hourglass_top</span>
                 <span>Đang chờ duyệt</span>
               </div>
             ) : serviceStatus === 'PUBLISHED' ? (
               <button 
                 onClick={() => handleSaveService(false)}
                 disabled={isSaving}
-                className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50" 
+                className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer" 
                 type="button"
               >
                 <span className="material-symbols-outlined text-[16px]">save</span>
@@ -492,7 +500,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
               <button 
                 onClick={() => handleSaveService(true)}
                 disabled={isSaving}
-                className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-on-primary text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50" 
+                className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold transition-colors flex items-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer" 
                 type="button"
               >
                 <span className="material-symbols-outlined text-[16px]">send</span>
@@ -504,7 +512,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
 
         {/* Rejection Alert if REJECTED */}
         {serviceStatus === 'REJECTED' && rejectionReason && (
-          <div className="mx-6 mt-4 p-4 rounded-xl bg-rose-50 border border-rose-300 flex items-start gap-3">
+          <div className="mx-6 mt-4 p-4 rounded-xl bg-rose-50 border border-rose-200 flex items-start gap-3">
             <span className="material-symbols-outlined text-rose-600 mt-0.5">report_problem</span>
             <div>
               <h4 className="font-bold text-xs text-rose-800">Dịch vụ bị Quản trị viên từ chối duyệt</h4>
@@ -514,66 +522,66 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
           </div>
         )}
 
-        {/* 4 Mandatory Tabs Navigation */}
+        {/* 4 Mandatory Tabs Navigation (Atlas Segmented Control) */}
         <div className="px-6 pt-4">
-          <div className="flex border-b border-slate-200 gap-6 text-sm font-semibold">
+          <div className="bg-slate-100 p-1 rounded-xl inline-flex border border-slate-200/70 text-xs">
             <button
               onClick={() => setActiveTab('CONTENT_SAFETY')}
-              className={`pb-3 flex items-center gap-1.5 border-b-2 transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'CONTENT_SAFETY'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-slate-500 hover:text-black'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 font-medium'
               }`}
               type="button"
             >
-              <span className="material-symbols-outlined text-[18px]">description</span>
+              <span className="material-symbols-outlined text-[15px]">description</span>
               <span>1. Nội dung &amp; An toàn</span>
             </button>
 
             <button
               onClick={() => setActiveTab('IMAGES')}
-              className={`pb-3 flex items-center gap-1.5 border-b-2 transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'IMAGES'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-slate-500 hover:text-black'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 font-medium'
               }`}
               type="button"
             >
-              <span className="material-symbols-outlined text-[18px]">photo_library</span>
+              <span className="material-symbols-outlined text-[15px]">photo_library</span>
               <span>2. Ảnh dịch vụ</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600">
+              <span className="px-1.5 py-0.2 rounded font-mono tabular-nums text-[10px] bg-slate-200/70 text-slate-700">
                 {images.length}
               </span>
             </button>
 
             <button
               onClick={() => setActiveTab('OPTIONS')}
-              className={`pb-3 flex items-center gap-1.5 border-b-2 transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'OPTIONS'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-slate-500 hover:text-black'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 font-medium'
               }`}
               type="button"
             >
-              <span className="material-symbols-outlined text-[18px]">sell</span>
+              <span className="material-symbols-outlined text-[15px]">sell</span>
               <span>3. Lựa chọn bán (Options)</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600">
+              <span className="px-1.5 py-0.2 rounded font-mono tabular-nums text-[10px] bg-slate-200/70 text-slate-700">
                 {options.length}
               </span>
             </button>
 
             <button
               onClick={() => setActiveTab('SAFETY_DOCS')}
-              className={`pb-3 flex items-center gap-1.5 border-b-2 transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'SAFETY_DOCS'
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-slate-500 hover:text-black'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 font-medium'
               }`}
               type="button"
             >
-              <span className="material-symbols-outlined text-[18px]">verified_user</span>
+              <span className="material-symbols-outlined text-[15px]">verified_user</span>
               <span>4. Chứng từ an toàn</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600">
+              <span className="px-1.5 py-0.2 rounded font-mono tabular-nums text-[10px] bg-slate-200/70 text-slate-700">
                 {safetyDocs.length}
               </span>
             </button>
@@ -1112,8 +1120,8 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
 
         {/* Modal: Add Option */}
         {isAddOptionModalOpen && createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-            <div className="bg-white rounded-xl shadow-lg border border-slate-200 w-full max-w-md p-5 space-y-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="bg-white rounded-xl shadow-md border border-slate-200/90 w-full max-w-md p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <h3 className="font-bold text-sm text-black">Thêm lựa chọn bán / Gói dịch vụ</h3>
                 <button onClick={() => setIsAddOptionModalOpen(false)} className="text-slate-400 hover:text-black">
@@ -1229,8 +1237,8 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
 
         {/* Modal: Preview */}
         {previewOpen && createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-            <div className="bg-white rounded-xl shadow-lg border border-slate-200 w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="bg-white rounded-xl shadow-md border border-slate-200/90 w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                 <h3 className="font-bold text-sm text-black">Bản xem trước dịch vụ</h3>
                 <button onClick={() => setPreviewOpen(false)} className="text-slate-400 hover:text-black">

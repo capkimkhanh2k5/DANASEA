@@ -1,19 +1,50 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { vendorSettlementService } from '../../../services/vendorSettlementService';
+import { vendorProfileService, type VendorProfileDto } from '../../../services/vendorProfileService';
+import { vendorOrderService } from '../../../services/vendorOrderService';
+import type { VendorSubOrderDto } from '../../../types/vendorOrder';
+import { 
+  Printer, 
+  Download, 
+  Search, 
+  RotateCcw, 
+  X, 
+  Wallet, 
+  ArrowUpRight, 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle
+} from 'lucide-react';
+import { SettlementStatementDocument } from './SettlementStatementDocument';
+import { 
+  AtlasPageHeader, 
+  AtlasMetricCard, 
+  AtlasSegmentedTabs,
+  AtlasBadge, 
+  AtlasButton,
+  AtlasPagination
+} from '../../../components/vendor/atlas/AtlasDesignSystem';
+import { toast } from '../../../store/useToastStore';
 
-interface SettlementPeriod {
+export type TimeRangeFilter = 'TODAY' | 'THIS_WEEK' | 'THIS_MONTH' | 'ALL_TIME';
+
+export interface CashflowTransaction {
+  id: string;
   code: string;
-  dateRange: string;
+  dateStr: string;
+  timestamp: number;
+  serviceName: string;
+  customerName: string;
+  quantity: number;
   grossAmount: number;
-  commissionRate: number; // 0.10
+  commissionRate: number;
   commissionAmount: number;
   netAmount: number;
-  payoutDate: string;
-  status: 'PAID' | 'PENDING';
-  itemsCount: number;
-  items: SettlementItem[];
+  status: 'AVAILABLE' | 'ESCROW' | 'REFUNDED';
+  orderStatus: string;
 }
 
-interface SettlementItem {
+export interface SettlementItem {
   id: string;
   subOrderCode: string;
   serviceName: string;
@@ -27,476 +58,577 @@ interface SettlementItem {
   net: number;
 }
 
-const SETTLEMENT_PERIODS: SettlementPeriod[] = [
-  {
-    code: '#SET-202410-01',
-    dateRange: '01/10/2024 – 15/10/2024',
-    grossAmount: 10000000,
-    commissionRate: 0.10,
-    commissionAmount: 1000000,
-    netAmount: 9000000,
-    payoutDate: '18/10/2024 14:30',
-    status: 'PAID',
-    itemsCount: 18,
-    items: [
-      {
-        id: '1',
-        subOrderCode: '#SUB-89412-01',
-        serviceName: 'Chèo SUP ngắm bình minh Mỹ Khê',
-        slotTime: '05:30 14/10/2024 • Bãi biển Phạm Văn Đồng',
-        customerName: 'Nguyễn Văn An',
-        quantity: 2,
-        unitPrice: 280000,
-        gross: 560000,
-        rate: '10%',
-        commission: 56000,
-        net: 504000
-      },
-      {
-        id: '2',
-        subOrderCode: '#SUB-89380-02',
-        serviceName: 'Tour SUP Bãi Bụt ngắm san hô',
-        slotTime: '08:30 12/10/2024 • Bán đảo Sơn Trà',
-        customerName: 'Lê Quốc Bảo',
-        quantity: 4,
-        unitPrice: 350000,
-        gross: 1400000,
-        rate: '10%',
-        commission: 140000,
-        net: 1260000
-      },
-      {
-        id: '3',
-        subOrderCode: '#SUB-89345-01',
-        serviceName: 'Chèo SUP ngắm bình minh Mỹ Khê',
-        slotTime: '05:30 11/10/2024 • Bãi biển Phạm Văn Đồng',
-        customerName: 'Trần Minh Tuấn',
-        quantity: 6,
-        unitPrice: 280000,
-        gross: 1680000,
-        rate: '10%',
-        commission: 168000,
-        net: 1512000
-      },
-      {
-        id: '4',
-        subOrderCode: '#SUB-89311-03',
-        serviceName: 'Lướt ván chèo SUP ban đêm có đèn LED',
-        slotTime: '19:00 09/10/2024 • Biển Non Nước',
-        customerName: 'Phạm Thu Hằng',
-        quantity: 2,
-        unitPrice: 320000,
-        gross: 640000,
-        rate: '10%',
-        commission: 64000,
-        net: 576000
-      }
-    ]
-  },
-  {
-    code: '#SET-202410-02',
-    dateRange: '16/10/2024 – 31/10/2024',
-    grossAmount: 14800000,
-    commissionRate: 0.10,
-    commissionAmount: 1480000,
-    netAmount: 13320000,
-    payoutDate: 'Dự kiến 03/11/2024',
-    status: 'PENDING',
-    itemsCount: 24,
-    items: [
-      {
-        id: '5',
-        subOrderCode: '#SUB-89502-01',
-        serviceName: 'Khóa lặn biển PADI Open Water',
-        slotTime: '08:00 18/10/2024 • Hòn Chảo',
-        customerName: 'Võ Minh Quân',
-        quantity: 2,
-        unitPrice: 4500000,
-        gross: 9000000,
-        rate: '12%',
-        commission: 1080000,
-        net: 7920000
-      },
-      {
-        id: '6',
-        subOrderCode: '#SUB-89555-02',
-        serviceName: 'Chèo SUP hoàng hôn Tiên Sa',
-        slotTime: '16:30 19/10/2024 • Vịnh Tiên Sa',
-        customerName: 'Đặng Thảo Linh',
-        quantity: 4,
-        unitPrice: 350000,
-        gross: 1400000,
-        rate: '10%',
-        commission: 140000,
-        net: 1260000
-      }
-    ]
-  },
-  {
-    code: '#SET-202409-02',
-    dateRange: '16/09/2024 – 30/09/2024',
-    grossAmount: 22500000,
-    commissionRate: 0.10,
-    commissionAmount: 2250000,
-    netAmount: 20250000,
-    payoutDate: '01/10/2024 10:15',
-    status: 'PAID',
-    itemsCount: 38,
-    items: [
-      {
-        id: '7',
-        subOrderCode: '#SUB-88120-01',
-        serviceName: 'Cano cao tốc tham quan Cù Lao Chàm',
-        slotTime: '07:30 25/09/2024 • Cảng Sông Hàn',
-        customerName: 'Bùi Gia Huy',
-        quantity: 10,
-        unitPrice: 650000,
-        gross: 6500000,
-        rate: '10%',
-        commission: 650000,
-        net: 5850000
-      }
-    ]
-  }
-];
+export interface SettlementPeriod {
+  id: string;
+  code: string;
+  dateRange: string;
+  grossAmount: number;
+  commissionRate: number;
+  commissionAmount: number;
+  netAmount: number;
+  payoutDate: string;
+  status: 'PAID' | 'PENDING';
+  itemsCount: number;
+}
 
 export function Revenue() {
-  const [selectedCycleCode, setSelectedCycleCode] = useState<string>('#SET-202410-01');
+  const [timeRange, setTimeRange] = useState<TimeRangeFilter>('THIS_MONTH');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'AVAILABLE' | 'ESCROW' | 'REFUNDED' | 'SETTLEMENTS'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  // Raw DB data
+  const [orders, setOrders] = useState<VendorSubOrderDto[]>([]);
+  const [settlementPeriods, setSettlementPeriods] = useState<SettlementPeriod[]>([]);
+  const [vendorProfile, setVendorProfile] = useState<VendorProfileDto | null>(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
-  const currentCycle = SETTLEMENT_PERIODS.find(p => p.code === selectedCycleCode) || SETTLEMENT_PERIODS[0];
+  useEffect(() => {
+    vendorProfileService.getProfile().then((p) => {
+      setVendorProfile(p);
+    }).catch(() => {});
+  }, []);
 
-  const filteredItems = currentCycle.items.filter(item => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return item.subOrderCode.toLowerCase().includes(q) ||
-           item.customerName.toLowerCase().includes(q) ||
-           item.serviceName.toLowerCase().includes(q);
-  });
+  // Fetch live orders & settlements from DB
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [ordersRes, settleRes] = await Promise.allSettled([
+        vendorOrderService.getVendorOrders(0, 100),
+        vendorSettlementService.getSettlements({ size: 20 })
+      ]);
+
+      if (ordersRes.status === 'fulfilled' && ordersRes.value?.content) {
+        setOrders(ordersRes.value.content);
+      } else {
+        setOrders([]);
+      }
+
+      if (settleRes.status === 'fulfilled' && settleRes.value?.content) {
+        const mapped: SettlementPeriod[] = settleRes.value.content.map((s) => ({
+          id: s.id,
+          code: `#SET-${s.periodStart.replace(/-/g, '').substring(0, 6)}-${s.id.substring(0, 4)}`,
+          dateRange: `${s.periodStart} – ${s.periodEnd}`,
+          grossAmount: Number(s.grossAmount) || 0,
+          commissionRate: 0.1,
+          commissionAmount: Number(s.commissionAmount) || 0,
+          netAmount: Number(s.netPayableAmount) || 0,
+          payoutDate: (s.status === 'PAID' || s.status === 'FINALIZED') ? 'Đã thanh toán ngân hàng' : 'Đang xử lý đối soát',
+          status: (s.status === 'PAID' || s.status === 'FINALIZED') ? 'PAID' : 'PENDING',
+          itemsCount: 0,
+        }));
+        setSettlementPeriods(mapped);
+      } else {
+        setSettlementPeriods([]);
+      }
+    } catch {
+      // Keep empty lists
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Map sub_orders to live cashflow transactions
+  const transactions: CashflowTransaction[] = useMemo(() => {
+    return orders.map((o) => {
+      const gross = Number(o.finalAmount ?? o.subtotalAmount ?? (o.unitPrice * (o.quantity || 1))) || 0;
+      const commission = Math.round(gross * 0.1);
+      const net = gross - commission;
+      const createdDate = new Date();
+
+      let cashStatus: CashflowTransaction['status'] = 'ESCROW';
+      if (o.status === 'CHECKED_IN' || o.status === 'COMPLETED') {
+        cashStatus = 'AVAILABLE';
+      } else if (o.status === 'CANCELLED' || o.status === 'REFUNDED') {
+        cashStatus = 'REFUNDED';
+      }
+
+      return {
+        id: o.id,
+        code: `#VE-${o.id.substring(0, 8).toUpperCase()}`,
+        dateStr: o.checkedInAt ? o.checkedInAt.slice(0, 10) : 'Hôm nay',
+        timestamp: createdDate.getTime(),
+        serviceName: 'Dịch vụ trải nghiệm biển',
+        customerName: o.customerName || 'Khách đặt chỗ',
+        quantity: o.quantity || 1,
+        grossAmount: gross,
+        commissionRate: 0.1,
+        commissionAmount: commission,
+        netAmount: net,
+        status: cashStatus,
+        orderStatus: o.status,
+      };
+    });
+  }, [orders]);
+
+  // Filter transactions by time range
+  const timeFilteredTransactions = useMemo(() => {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const dayOfWeek = now.getDay() || 7;
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek + 1).getTime();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+    return transactions.filter((t) => {
+      if (timeRange === 'TODAY') return t.timestamp >= startOfToday;
+      if (timeRange === 'THIS_WEEK') return t.timestamp >= startOfWeek;
+      if (timeRange === 'THIS_MONTH') return t.timestamp >= startOfMonth;
+      return true;
+    });
+  }, [transactions, timeRange]);
+
+  // Aggregate financial metrics based on selected time range
+  const metrics = useMemo(() => {
+    const valid = timeFilteredTransactions.filter((t) => t.status !== 'REFUNDED');
+    const gross = valid.reduce((acc, t) => acc + t.grossAmount, 0);
+    const net = valid.reduce((acc, t) => acc + t.netAmount, 0);
+    const commission = valid.reduce((acc, t) => acc + t.commissionAmount, 0);
+
+    const available = timeFilteredTransactions
+      .filter((t) => t.status === 'AVAILABLE')
+      .reduce((acc, t) => acc + t.netAmount, 0);
+
+    const inEscrow = timeFilteredTransactions
+      .filter((t) => t.status === 'ESCROW')
+      .reduce((acc, t) => acc + t.netAmount, 0);
+
+    return {
+      gross,
+      net,
+      commission,
+      available,
+      inEscrow,
+    };
+  }, [timeFilteredTransactions]);
+
+  // Filtered table rows based on activeTab and searchQuery
+  const filteredRows = useMemo(() => {
+    if (activeTab === 'SETTLEMENTS') return [];
+
+    return timeFilteredTransactions.filter((t) => {
+      if (activeTab !== 'ALL' && t.status !== activeTab) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        return (
+          t.code.toLowerCase().includes(q) ||
+          t.serviceName.toLowerCase().includes(q) ||
+          t.customerName.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [timeFilteredTransactions, activeTab, searchQuery]);
+
+  // Tab counts
+  const countAvailable = timeFilteredTransactions.filter((t) => t.status === 'AVAILABLE').length;
+  const countEscrow = timeFilteredTransactions.filter((t) => t.status === 'ESCROW').length;
+  const countRefunded = timeFilteredTransactions.filter((t) => t.status === 'REFUNDED').length;
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const paginatedRows = filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const handleExportCSV = () => {
+    if (filteredRows.length === 0) {
+      toast.error('Không có dữ liệu giao dịch để xuất file CSV.');
+      return;
+    }
+
     const csvRows = [
-      ['Mã SubOrder', 'Dịch vụ', 'Thời gian', 'Khách hàng', 'Số lượng', 'Đơn giá (VND)', 'Doanh thu gộp (VND)', 'Tỷ lệ sàn', 'Khấu trừ sàn (VND)', 'Thực nhận (VND)'],
-      ...currentCycle.items.map(item => [
-        item.subOrderCode,
+      ['Mã Giao Dịch', 'Thời Gian', 'Dịch Vụ', 'Khách Hàng', 'Số Lượng', 'Doanh Thu Gộp', 'Khấu Trừ Sàn', 'Thực Nhận', 'Trạng Thái Dòng Tiền'],
+      ...filteredRows.map((item) => [
+        `"${item.code}"`,
+        `"${item.dateStr}"`,
         `"${item.serviceName}"`,
-        `"${item.slotTime}"`,
         `"${item.customerName}"`,
         item.quantity.toString(),
-        item.unitPrice.toString(),
-        item.gross.toString(),
-        item.rate,
-        item.commission.toString(),
-        item.net.toString()
-      ])
+        item.grossAmount.toString(),
+        item.commissionAmount.toString(),
+        item.netAmount.toString(),
+        `"${item.status === 'AVAILABLE' ? 'Khả dụng' : item.status === 'ESCROW' ? 'Đang ký quỹ' : 'Đã hoàn tiền'}"`,
+      ]),
     ];
 
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + csvRows.map(e => e.join(',')).join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvString = '\uFEFF' + csvRows.map((e) => e.join(',')).join('\r\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `DANASEA_REVENUE_${currentCycle.code.replace('#', '')}.csv`);
+    link.href = url;
+    link.download = `DANASEA_DONG_TIEN_${timeRange}_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-    showToast(`Đã xuất bảng kê ${currentCycle.code} thành công!`);
-  };
-
-  const handlePrint = () => {
-    window.print();
+    link.remove();
+    URL.revokeObjectURL(url);
+    toast.success(`Đã xuất ${filteredRows.length} dòng giao dịch thành công!`);
   };
 
   return (
-    <div className="w-full bg-surface min-h-screen">
-      <div className="flex flex-col w-full">
-        <div className="px-6 py-4 space-y-3.5 w-full">
-          {/* Top Utility Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">
-                Doanh thu
-              </h1>
-            </div>
+    <>
+      <div className="w-full max-w-[1400px] mx-auto px-6 py-5 space-y-5 print:hidden">
+        {/* 1. Header Toolbar with Time Range Switcher */}
+        <AtlasPageHeader
+          title="Doanh thu & Dòng tiền đối tác"
+          actions={
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Time Range Selector */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/70 text-xs font-medium text-slate-600">
+                {(
+                  [
+                    { id: 'TODAY', label: 'Hôm nay' },
+                    { id: 'THIS_WEEK', label: 'Tuần này' },
+                    { id: 'THIS_MONTH', label: 'Tháng này' },
+                    { id: 'ALL_TIME', label: 'Tất cả' },
+                  ] as const
+                ).map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => {
+                      setTimeRange(r.id);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+                      timeRange === r.id
+                        ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                        : 'hover:text-slate-900'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
 
-            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-              <button 
-                onClick={handlePrint}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-medium hover:bg-slate-50 transition-all shadow-xs cursor-pointer" 
-                type="button"
+              <AtlasButton
+                variant="outline"
+                size="md"
+                onClick={() => setShowPrintModal(true)}
+                icon={<Printer className="w-4 h-4 text-slate-500" />}
               >
-                <span className="material-symbols-outlined text-[18px]">print</span>
-                <span>In biên bản</span>
-              </button>
-              <button 
+                In biên bản
+              </AtlasButton>
+
+              <AtlasButton
+                variant="primary"
+                size="md"
                 onClick={handleExportCSV}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary-container transition-all shadow-xs cursor-pointer" 
-                type="button"
+                icon={<Download className="w-4 h-4" />}
               >
-                <span className="material-symbols-outlined text-[18px]">download</span>
-                <span>Xuất CSV</span>
-              </button>
+                Xuất CSV
+              </AtlasButton>
             </div>
+          }
+        />
+
+        {/* 2. Atlas 4-Card Cashflow & Revenue Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <AtlasMetricCard
+            label="Doanh thu thực nhận (Net)"
+            value={`${metrics.net.toLocaleString('vi-VN')} đ`}
+            accent="emerald"
+            icon={<Wallet className="w-5 h-5 text-emerald-600" />}
+          />
+
+          <AtlasMetricCard
+            label="Số dư khả dụng rút"
+            value={`${metrics.available.toLocaleString('vi-VN')} đ`}
+            accent="sky"
+            icon={<CheckCircle2 className="w-5 h-5 text-sky-600" />}
+          />
+
+          <AtlasMetricCard
+            label="Đang ký quỹ / Giữ chỗ"
+            value={`${metrics.inEscrow.toLocaleString('vi-VN')} đ`}
+            accent="amber"
+            icon={<Clock className="w-5 h-5 text-amber-600" />}
+          />
+
+          <AtlasMetricCard
+            label="Khấu trừ hoa hồng sàn"
+            value={`-${metrics.commission.toLocaleString('vi-VN')} đ`}
+            accent="rose"
+            icon={<ArrowUpRight className="w-5 h-5 text-rose-600" />}
+          />
+        </div>
+
+        {/* 3. Unified Card Container: Cashflow Ledger (Atlas Standard Table Layout) */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
+          {/* Card Head: Segmented Tabs */}
+          <div className="p-4 sm:p-5 border-b border-slate-100">
+            <AtlasSegmentedTabs<typeof activeTab>
+              activeTab={activeTab}
+              onChange={(tab) => {
+                setActiveTab(tab);
+                setCurrentPage(1);
+              }}
+              tabs={[
+                { id: 'ALL', label: 'Tất cả dòng tiền', count: timeFilteredTransactions.length },
+                { id: 'AVAILABLE', label: 'Khả dụng (Đã soát vé)', count: countAvailable },
+                { id: 'ESCROW', label: 'Đang ký quỹ (Chờ chạy)', count: countEscrow },
+                { id: 'REFUNDED', label: 'Đã hoàn tiền', count: countRefunded },
+                { id: 'SETTLEMENTS', label: 'Kỳ đối soát định kỳ', count: settlementPeriods.length },
+              ]}
+            />
           </div>
 
-          {/* Active Settlement Period Summary Card Banner */}
-          <div className="rounded-xl bg-white shadow-xs p-4 relative overflow-hidden border border-slate-200">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-primary shrink-0">
-                  <span className="material-symbols-outlined text-[24px]">account_balance_wallet</span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-bold text-slate-900">
-                      Kỳ đối soát: {currentCycle.code}
-                    </span>
-                    {currentCycle.status === 'PAID' ? (
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-                        Đã thanh toán
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
-                        Đang đối soát
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Thời gian: <span className="font-medium text-slate-700">{currentCycle.dateRange}</span> • {currentCycle.payoutDate}
-                  </p>
-                </div>
-              </div>
-
-              {/* Inline Visual Settlement Ratio Bar */}
-              <div className="flex flex-col gap-1.5 w-full lg:w-72 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-600 font-medium">Tỷ lệ thực nhận</span>
-                  <span className="font-bold text-primary">90% Net / 10% Sàn</span>
-                </div>
-                <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden flex">
-                  <div className="h-full bg-primary" style={{ width: '90%' }} title="Thực nhận đối tác: 90%"></div>
-                  <div className="h-full bg-amber-500" style={{ width: '10%' }} title="Phí dịch vụ sàn: 10%"></div>
-                </div>
-                <div className="flex justify-between text-[11px] text-slate-500">
-                  <span>Đối tác: {currentCycle.netAmount.toLocaleString('vi-VN')} đ</span>
-                  <span>Hoa hồng: {currentCycle.commissionAmount.toLocaleString('vi-VN')} đ</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Inline Financial Summary Strip */}
-            <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 shadow-xs mt-3">
-              <div className="flex flex-wrap items-center gap-6 text-xs">
-                <div>
-                  <span className="text-slate-500 text-[11px] block font-medium">Doanh thu gộp (Gross)</span>
-                  <span className="font-mono font-bold text-base text-slate-900">
-                    {currentCycle.grossAmount.toLocaleString('vi-VN')} <span className="text-xs font-normal">đ</span>
-                  </span>
-                  <span className="text-[10px] text-slate-500 block">{currentCycle.itemsCount} đơn hoàn tất</span>
-                </div>
-                <span className="text-slate-300 self-center">•</span>
-                <div>
-                  <span className="text-slate-500 text-[11px] block font-medium">Phí sàn &amp; Cảng vụ (10%)</span>
-                  <span className="font-mono font-bold text-base text-amber-600">
-                    -{currentCycle.commissionAmount.toLocaleString('vi-VN')} <span className="text-xs font-normal">đ</span>
-                  </span>
-                </div>
-                <span className="text-slate-300 self-center">•</span>
-                <div>
-                  <span className="text-slate-500 text-[11px] block font-medium">Thực nhận đối tác (Net)</span>
-                  <span className="font-mono font-bold text-base text-primary">
-                    {currentCycle.netAmount.toLocaleString('vi-VN')} <span className="text-xs font-normal">đ</span>
-                  </span>
-                  <span className="text-[10px] text-primary block font-medium">
-                    {currentCycle.status === 'PAID' ? 'Đã chi trả' : 'Đang xử lý thanh toán'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-600 font-medium">
-                <span className="material-symbols-outlined text-[16px] text-slate-400">account_balance</span>
-                <span>VCB: <strong className="font-mono text-slate-800">0041000332891</strong></span>
-              </div>
-            </div>
-          </div>
-
-          {/* Section: Period Selection Table */}
-          <div className="flex flex-col gap-2">
-            <h2 className="text-sm font-bold text-slate-900">
-              Lịch sử các kỳ đối soát
-            </h2>
-            <div className="rounded-xl bg-white shadow-xs overflow-hidden border border-slate-200">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-100 text-slate-900 font-bold border-b border-slate-200">
-                    <th className="py-3 px-4 font-bold border-r border-slate-200">Mã kỳ đối soát</th>
-                    <th className="py-3 px-3 font-bold border-r border-slate-200">Khoảng thời gian</th>
-                    <th className="py-3 px-3 text-right font-bold border-r border-slate-200">Doanh thu gộp</th>
-                    <th className="py-3 px-3 text-right font-bold border-r border-slate-200">Khấu trừ (10%)</th>
-                    <th className="py-3 px-3 text-right font-bold border-r border-slate-200">Thực nhận</th>
-                    <th className="py-3 px-3 font-bold border-r border-slate-200">Trạng thái</th>
-                    <th className="py-3 px-4 text-center font-bold">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 text-sm text-slate-800">
-                  {SETTLEMENT_PERIODS.map(period => (
-                    <tr 
-                      key={period.code} 
-                      className={`hover:bg-slate-50 transition-colors ${selectedCycleCode === period.code ? 'bg-slate-50 font-medium' : ''}`}
+          {/* Conditional Rendering: Cashflow Ledger vs Period History Table */}
+          {activeTab !== 'SETTLEMENTS' ? (
+            <>
+              {/* Card Toolbar */}
+              <div className="p-3.5 border-b border-slate-100 bg-[#fbfcfd] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                <div className="relative flex-1 min-w-[260px]">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    placeholder="Tìm theo mã đơn, tên tour, khách hàng..."
+                    className="w-full h-10 pl-10 pr-9 py-2 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 shadow-xs"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
-                      <td className="py-3 px-4 font-bold font-mono text-slate-900 border-r border-slate-200">{period.code}</td>
-                      <td className="py-3 px-3 text-slate-600 text-xs border-r border-slate-200">{period.dateRange}</td>
-                      <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 border-r border-slate-200">{period.grossAmount.toLocaleString('vi-VN')} đ</td>
-                      <td className="py-3 px-3 text-right font-mono text-amber-600 border-r border-slate-200">-{period.commissionAmount.toLocaleString('vi-VN')} đ</td>
-                      <td className="py-3 px-3 text-right font-mono font-bold text-primary border-r border-slate-200">{period.netAmount.toLocaleString('vi-VN')} đ</td>
-                      <td className="py-3 px-3 border-r border-slate-200">
-                        {period.status === 'PAID' ? (
-                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            ĐÃ THANH TOÁN
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                            CHỜ ĐỐI SOÁT
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <button 
-                          onClick={() => {
-                            setSelectedCycleCode(period.code);
-                            showToast(`Đã chuyển xem chi tiết kỳ ${period.code}`);
-                          }}
-                          className={`px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer shadow-xs ${
-                            selectedCycleCode === period.code 
-                              ? 'bg-primary text-white' 
-                              : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-                          }`}
-                        >
-                          {selectedCycleCode === period.code ? 'Đang xem' : 'Xem'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Section: Sub-orders Breakdown of Current Settlement */}
-          <div className="flex flex-col gap-2 mt-2">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-bold text-slate-900">
-                    Bảng kê chi tiết đơn trong kỳ
-                  </h2>
-                  <span className="text-xs font-bold text-slate-700 px-2 py-0.5 rounded bg-slate-100 border border-slate-200">
-                    {currentCycle.code}
-                  </span>
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
+
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setActiveTab('ALL');
+                    setCurrentPage(1);
+                    loadData();
+                    toast.success('Đã đồng bộ lại sổ cái dòng tiền!');
+                  }}
+                  className="h-10 w-10 flex items-center justify-center rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 shadow-xs transition-colors cursor-pointer shrink-0"
+                  title="Làm mới sổ cái"
+                >
+                  <RotateCcw className="w-4 h-4 text-slate-600" />
+                </button>
               </div>
 
-              <div className="relative w-full sm:w-64">
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
-                <input 
-                  type="text"
-                  placeholder="Tìm mã đơn hoặc khách..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-800 text-xs focus:outline-none focus:ring-1 focus:ring-primary shadow-xs"
-                />
+              {/* Table Body */}
+              <div className="overflow-x-auto flex-1 scrollbar-thin">
+                <table className="w-full text-left text-sm border-collapse table-auto">
+                  <thead>
+                    <tr className="bg-[#f8f9fa] text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200/80">
+                      <th className="py-3.5 px-4 w-[130px]">MÃ GIAO DỊCH</th>
+                      <th className="py-3.5 px-4 w-[160px]">THỜI GIAN</th>
+                      <th className="py-3.5 px-4">DỊCH VỤ & KHÁCH HÀNG</th>
+                      <th className="py-3.5 px-4 text-right w-[140px]">DOANH THU GỘP</th>
+                      <th className="py-3.5 px-4 text-right w-[130px]">KHẤU TRỪ SÀN</th>
+                      <th className="py-3.5 px-4 text-right w-[140px]">THỰC NHẬN</th>
+                      <th className="py-3.5 px-4 text-center w-[150px]">TRẠNG THÁI</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {isLoading ? (
+                      Array.from({ length: 4 }).map((_, idx) => (
+                        <tr key={`sk-${idx}`} className="animate-pulse">
+                          <td className="py-4 px-4"><div className="h-4 w-20 bg-slate-200 rounded" /></td>
+                          <td className="py-4 px-4"><div className="h-4 w-28 bg-slate-200 rounded" /></td>
+                          <td className="py-4 px-4"><div className="h-4 w-40 bg-slate-200 rounded" /></td>
+                          <td className="py-4 px-4 text-right"><div className="h-4 w-24 bg-slate-200 rounded ml-auto" /></td>
+                          <td className="py-4 px-4 text-right"><div className="h-4 w-20 bg-slate-200 rounded ml-auto" /></td>
+                          <td className="py-4 px-4 text-right"><div className="h-4 w-24 bg-slate-200 rounded ml-auto" /></td>
+                          <td className="py-4 px-4 text-center"><div className="h-6 w-20 bg-slate-200 rounded-full mx-auto" /></td>
+                        </tr>
+                      ))
+                    ) : paginatedRows.length > 0 ? (
+                      paginatedRows.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-4 px-4 font-mono font-semibold text-slate-900 text-xs">
+                            {tx.code}
+                          </td>
+                          <td className="py-4 px-4 text-slate-500 font-mono text-xs">
+                            {tx.dateStr}
+                          </td>
+                          <td className="py-4 px-4">
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-slate-900 text-sm">{tx.serviceName}</span>
+                              <span className="text-xs text-slate-400 mt-0.5">
+                                {tx.customerName} • {tx.quantity} vé
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 text-right font-mono font-medium text-slate-900 tabular-nums">
+                            +{tx.grossAmount.toLocaleString('vi-VN')} đ
+                          </td>
+                          <td className="py-4 px-4 text-right font-mono text-rose-600 tabular-nums text-xs">
+                            -{tx.commissionAmount.toLocaleString('vi-VN')} đ
+                          </td>
+                          <td className="py-4 px-4 text-right font-mono font-bold text-slate-900 tabular-nums">
+                            +{tx.netAmount.toLocaleString('vi-VN')} đ
+                          </td>
+                          <td className="py-4 px-4 text-center">
+                            {tx.status === 'AVAILABLE' && (
+                              <AtlasBadge label="Khả dụng rút" variant="success" dot />
+                            )}
+                            {tx.status === 'ESCROW' && (
+                              <AtlasBadge label="Đang ký quỹ" variant="warning" dot />
+                            )}
+                            {tx.status === 'REFUNDED' && (
+                              <AtlasBadge label="Đã hoàn tiền" variant="neutral" dot />
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">
+                          Chưa phát sinh giao dịch dòng tiền trong khoảng thời gian này
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </div>
 
-            <div
-              key={selectedCycleCode}
-              className="rounded-xl bg-white shadow-xs overflow-hidden border border-slate-200"
-            >
-              <table className="w-full text-left border-collapse text-xs">
+              {/* Pagination */}
+              <AtlasPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredRows.length}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+                onPageChange={setCurrentPage}
+              />
+            </>
+          ) : (
+            /* Period History Table (Kỳ đối soát định kỳ) */
+            <div className="overflow-x-auto flex-1 scrollbar-thin">
+              <table className="w-full text-left text-sm border-collapse table-auto">
                 <thead>
-                  <tr className="bg-slate-100 text-slate-900 font-bold border-b border-slate-200">
-                    <th className="py-3 px-4 font-bold border-r border-slate-200">Mã Sub-order</th>
-                    <th className="py-3 px-3 font-bold border-r border-slate-200">Dịch vụ</th>
-                    <th className="py-3 px-3 font-bold border-r border-slate-200">Khách hàng</th>
-                    <th className="py-3 px-2 text-center font-bold border-r border-slate-200">Số lượng</th>
-                    <th className="py-3 px-3 text-right font-bold border-r border-slate-200">Đơn giá</th>
-                    <th className="py-3 px-3 text-right font-bold border-r border-slate-200">Tổng tiền</th>
-                    <th className="py-3 px-2 text-center font-bold border-r border-slate-200">Tỷ lệ</th>
-                    <th className="py-3 px-3 text-right font-bold border-r border-slate-200">Khấu trừ sàn</th>
-                    <th className="py-3 px-4 text-right font-bold">Thực nhận</th>
+                  <tr className="bg-[#f8f9fa] text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200/80">
+                    <th className="py-3.5 px-4 w-[160px]">MÃ KỲ ĐỐI SOÁT</th>
+                    <th className="py-3.5 px-4">KHOẢNG THỜI GIAN</th>
+                    <th className="py-3.5 px-4 text-right w-[150px]">DOANH THU GỘP</th>
+                    <th className="py-3.5 px-4 text-right w-[130px]">KHẤU TRỪ</th>
+                    <th className="py-3.5 px-4 text-right w-[150px]">THỰC NHẬN</th>
+                    <th className="py-3.5 px-4 text-center w-[150px]">TRẠNG THÁI</th>
+                    <th className="py-3.5 px-4 text-center w-[120px]">THAO TÁC</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 text-sm text-slate-800">
-                  {filteredItems.map(item => (
-                    <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-4 font-bold font-mono text-slate-900 border-r border-slate-200">{item.subOrderCode}</td>
-                      <td className="py-3 px-3 border-r border-slate-200">
-                        <div className="font-bold text-slate-900 text-xs">{item.serviceName}</div>
-                        <div className="text-slate-500 text-[11px] flex items-center gap-1 mt-0.5">
-                          <span className="material-symbols-outlined text-[13px]">schedule</span>
-                          {item.slotTime}
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {settlementPeriods.length > 0 ? (
+                    settlementPeriods.map((period) => (
+                      <tr key={period.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-4 px-4 font-mono font-bold text-slate-900 text-xs">
+                          {period.code}
+                        </td>
+                        <td className="py-4 px-4 text-slate-600 font-mono text-xs">
+                          {period.dateRange}
+                        </td>
+                        <td className="py-4 px-4 text-right font-mono font-medium text-slate-900 tabular-nums">
+                          {period.grossAmount.toLocaleString('vi-VN')} đ
+                        </td>
+                        <td className="py-4 px-4 text-right font-mono text-rose-600 tabular-nums text-xs">
+                          -{period.commissionAmount.toLocaleString('vi-VN')} đ
+                        </td>
+                        <td className="py-4 px-4 text-right font-mono font-bold text-slate-900 tabular-nums">
+                          {period.netAmount.toLocaleString('vi-VN')} đ
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <AtlasBadge
+                            label={period.status === 'PAID' ? 'Đã quyết toán' : 'Chờ đối soát'}
+                            variant={period.status === 'PAID' ? 'success' : 'warning'}
+                            dot
+                          />
+                        </td>
+                        <td className="py-4 px-4 text-center">
+                          <button
+                            onClick={() => setShowPrintModal(true)}
+                            className="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+                          >
+                            In biên bản
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400 text-sm">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <AlertCircle className="w-6 h-6 text-slate-300" />
+                          <span>Chưa có kỳ đối soát định kỳ nào được chốt trong hệ thống</span>
                         </div>
                       </td>
-                      <td className="py-3 px-3 font-medium text-slate-800 text-xs border-r border-slate-200">{item.customerName}</td>
-                      <td className="py-3 px-2 text-center border-r border-slate-200">
-                        <span className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700">
-                          {item.quantity} người
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right font-mono text-xs text-slate-700 border-r border-slate-200">{item.unitPrice.toLocaleString('vi-VN')} đ</td>
-                      <td className="py-3 px-3 text-right font-mono font-bold text-xs text-slate-900 border-r border-slate-200">{item.gross.toLocaleString('vi-VN')} đ</td>
-                      <td className="py-3 px-2 text-center text-xs text-slate-600 border-r border-slate-200">{item.rate}</td>
-                      <td className="py-3 px-3 text-right font-mono text-xs text-amber-600 border-r border-slate-200">-{item.commission.toLocaleString('vi-VN')} đ</td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-xs text-primary">{item.net.toLocaleString('vi-VN')} đ</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      </div>
 
-              {/* Minimal Clean Pagination Bar */}
-              <div className="px-4 py-2 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-xs select-none">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-600 font-medium">Số dòng:</span>
-                  <select
-                    defaultValue={10}
-                    className="px-2 py-1 rounded bg-white border border-slate-200 text-xs font-semibold text-slate-800 cursor-pointer focus:outline-none"
-                  >
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button className="px-2 py-1 rounded text-slate-500 hover:bg-slate-200 font-medium cursor-pointer" disabled>
-                    Trước
-                  </button>
-                  <span className="w-7 h-7 rounded bg-primary text-white flex items-center justify-center font-bold text-xs">
-                    1
-                  </span>
-                  <button className="px-2 py-1 rounded text-slate-500 hover:bg-slate-200 font-medium cursor-pointer" disabled>
-                    Sau
-                  </button>
-                </div>
-              </div>
+      {/* Print Statement Modal */}
+      {showPrintModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-slate-200 flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200/80">
+              <h3 className="text-base font-bold text-slate-900">
+                Biên bản đối soát & Quyết toán tài chính
+              </h3>
+              <button
+                onClick={() => setShowPrintModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <SettlementStatementDocument
+              cycle={{
+                code: settlementPeriods[0]?.code || '#SET-CURRENT',
+                dateRange: settlementPeriods[0]?.dateRange || '2026-11-01 – 2026-11-30',
+                grossAmount: metrics.gross,
+                commissionAmount: metrics.commission,
+                netAmount: metrics.net,
+                status: 'PENDING',
+                itemsCount: filteredRows.length,
+              }}
+              items={filteredRows.map((r) => ({
+                id: r.id,
+                subOrderCode: r.code,
+                serviceName: r.serviceName,
+                slotTime: r.dateStr,
+                customerName: r.customerName,
+                quantity: r.quantity,
+                unitPrice: r.grossAmount,
+                gross: r.grossAmount,
+                rate: '10%',
+                commission: r.commissionAmount,
+                net: r.netAmount,
+              }))}
+              bankInfo={{
+                bankName: vendorProfile?.bankName || 'Techcombank',
+                accountNumber: vendorProfile?.bankAccountNumber || 'Chưa cập nhật',
+              }}
+              vendorProfile={vendorProfile}
+              onClose={() => setShowPrintModal(false)}
+            />
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <AtlasButton variant="outline" size="md" onClick={() => setShowPrintModal(false)}>
+                Đóng
+              </AtlasButton>
+              <AtlasButton variant="primary" size="md" onClick={() => window.print()} icon={<Printer className="w-4 h-4" />}>
+                In tài liệu ngay
+              </AtlasButton>
             </div>
           </div>
         </div>
-
-        {/* Toast Notification */}
-        {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-50 p-space-md rounded-xl bg-on-surface text-surface shadow-xl flex items-center gap-space-sm animate-in fade-in slide-in-from-bottom-4 duration-200">
-            <span className="material-symbols-outlined text-emerald-400 text-[20px]">task_alt</span>
-            <span className="font-label-md text-label-md">{toastMessage}</span>
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    </>
   );
 }

@@ -2,14 +2,6 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLanguageStore } from "../../../store/useLanguageStore";
 
-// Rich Customer Home Data
-import {
-  SUP_KAYAK_EXPERIENCES,
-  DIVING_EXPERIENCES,
-  THRILL_EXPERIENCES,
-  COMBO_SUNSET_EXPERIENCES,
-  FLASH_SALE_EXPERIENCES,
-} from "../../../data/customerHomeData";
 import type { ActivityCardData, FlashSaleExperience } from "../../../data/customerHomeData";
 
 // Customer Home Subcomponents
@@ -19,11 +11,13 @@ import { DanaseaAppShowcase } from "../../../components/customer/DanaseaAppShowc
 import { GuestGalleryMarquee } from "../../../components/customer/GuestGalleryMarquee";
 import { CoastalVideoSpotlights } from "../../../components/customer/CoastalVideoSpotlights";
 import { CinematicSceneBackdrop } from "../../../components/customer/CinematicSceneBackdrop";
+import { flashSaleService } from "../../../services/flashSaleService";
+import type { ActiveFlashSaleItem } from "../../../services/flashSaleService";
 
 import { Search, ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import type { ServiceSummaryDto } from "../../../types/service";
-import { getCardThumbnailUrl } from "../../../utils/imageOptimizer";
+import { getCardThumbnailUrl, FALLBACK_CARD_IMAGE } from "../../../utils/imageOptimizer";
 import { SEOHead } from "../../../components/common/SEOHead";
 
 interface ChatMessage {
@@ -183,8 +177,9 @@ export function Home() {
   // Helper to infer realistic duration from activity title
   const inferDuration = (name: string, fallback: string = '2 giờ') => {
     const n = name.toLowerCase();
+    if (n.includes('phao chuối')) return '20 phút';
     if (n.includes('jetski') || n.includes('mô tô') || n.includes('moto')) return '30 phút';
-    if (n.includes('phao chuối') || n.includes('flyboard')) return '45 phút';
+    if (n.includes('flyboard')) return '45 phút';
     if (n.includes('lặn') || n.includes('diving') || n.includes('scuba')) return '3.5 giờ';
     if (n.includes('dù') || n.includes('parasailing')) return '1.5 giờ';
     if (n.includes('câu cá') || n.includes('tour đảo')) return '4 giờ';
@@ -192,70 +187,55 @@ export function Home() {
     return fallback;
   };
 
-  // Curated Featured Activities from Live Backend Catalog with fallback
-  const featuredActivities: ActivityCardData[] = liveServices.length > 0
-    ? liveServices.slice(0, 10).map((s, idx) => {
-        const fallbacks = [
-          ...DIVING_EXPERIENCES,
-          ...THRILL_EXPERIENCES,
-          ...SUP_KAYAK_EXPERIENCES,
-          ...COMBO_SUNSET_EXPERIENCES,
-        ];
-        const fallbackExp = fallbacks[idx % fallbacks.length];
-        return {
-          id: s.id,
-          title: s.name,
-          titleEn: s.name,
-          category: fallbackExp.category,
-          categoryEn: fallbackExp.categoryEn,
-          location: s.address || fallbackExp.location,
-          duration: inferDuration(s.name, fallbackExp.duration),
-          durationEn: inferDuration(s.name, fallbackExp.durationEn),
-          price: Number(s.price) || fallbackExp.price,
-          rating: Number(s.averageRating) || (4.91 + (idx % 5) * 0.02),
-          reviewCount: s.reviewCount || (80 + (idx * 37) % 150),
-          imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallbackExp.imageUrl),
-        };
-      })
-    : [
-        DIVING_EXPERIENCES[0],
-        THRILL_EXPERIENCES[0],
-        SUP_KAYAK_EXPERIENCES[0],
-        COMBO_SUNSET_EXPERIENCES[0],
-        DIVING_EXPERIENCES[1],
-        THRILL_EXPERIENCES[1],
-        SUP_KAYAK_EXPERIENCES[1],
-        COMBO_SUNSET_EXPERIENCES[1],
-      ];
+  // Curated Featured Activities exclusively from Live Backend Catalog (Zero Mock Data)
+  const featuredActivities: ActivityCardData[] = liveServices.map((s, _idx) => {
+    return {
+      id: s.id,
+      title: s.name,
+      titleEn: s.name,
+      category: 'Trải nghiệm biển',
+      categoryEn: 'Marine Experience',
+      location: s.address || 'Đà Nẵng',
+      duration: inferDuration(s.name, '2 giờ'),
+      durationEn: inferDuration(s.name, '2 hours'),
+      price: Number(s.price) || 0,
+      rating: Number(s.averageRating) || 5.0,
+      reviewCount: s.reviewCount || 0,
+      imageUrl: getCardThumbnailUrl(s.primaryImageUrl || FALLBACK_CARD_IMAGE),
+    };
+  });
 
-  // Flash Sale Experiences derived from live services or fallback data
-  const flashSaleList: FlashSaleExperience[] = liveServices.length > 0
-    ? liveServices.slice(0, 4).map((s, idx) => {
-        const discounts = [33, 28, 22, 25];
-        const discountPct = discounts[idx % discounts.length];
-        const numPrice = Number(s.price) || 350000;
-        const fallbackExp = FLASH_SALE_EXPERIENCES[idx % FLASH_SALE_EXPERIENCES.length];
-        return {
-          id: s.id,
-          title: s.name,
-          titleEn: s.name,
-          category: 'Ưu đãi biển',
-          categoryEn: 'Marine Special',
-          location: s.address || fallbackExp.location,
-          locationEn: s.address || fallbackExp.locationEn,
-          duration: inferDuration(s.name, fallbackExp.duration),
-          durationEn: inferDuration(s.name, fallbackExp.durationEn),
-          originalPrice: Math.round((numPrice / (1 - discountPct / 100)) / 10000) * 10000,
-          salePrice: numPrice,
-          discountPercent: discountPct,
-          rating: Number(s.averageRating) || (4.92 + (idx % 4) * 0.02),
-          reviewCount: s.reviewCount || (120 + (idx * 47) % 180),
-          slotsLeft: 2 + (idx % 3),
-          totalSlots: 10 + (idx % 5),
-          imageUrl: getCardThumbnailUrl(s.primaryImageUrl || fallbackExp.imageUrl),
-        };
-      })
-    : FLASH_SALE_EXPERIENCES;
+  // Active Flash Sales loaded from real API GET /api/flash-sales/active
+  const [activeFlashSales, setActiveFlashSales] = useState<ActiveFlashSaleItem[]>([]);
+
+  useEffect(() => {
+    flashSaleService.getActiveFlashSales()
+      .then((items) => setActiveFlashSales(items || []))
+      .catch(() => setActiveFlashSales([]));
+  }, []);
+
+  const flashSaleList: FlashSaleExperience[] = useMemo(() => {
+    return activeFlashSales.map((fs) => ({
+      id: fs.serviceId || fs.id,
+      title: fs.serviceName,
+      titleEn: fs.serviceName,
+      category: 'Ưu đãi biển',
+      categoryEn: 'Marine Special',
+      location: fs.location || 'Đà Nẵng',
+      locationEn: fs.location || 'Da Nang',
+      duration: '2 giờ',
+      durationEn: '2 hours',
+      originalPrice: fs.originalPrice,
+      salePrice: fs.salePrice,
+      discountPercent: fs.discountPercentage,
+      rating: 5.0,
+      reviewCount: 0,
+      slotsLeft: Math.max(0, fs.stockAllocated - fs.stockSold),
+      totalSlots: fs.stockAllocated || 10,
+      imageUrl: getCardThumbnailUrl(fs.imageUrl || FALLBACK_CARD_IMAGE),
+      endTime: fs.endTime,
+    }));
+  }, [activeFlashSales]);
 
   const baseMessage = activeCustomPrompt ? CUSTOM_PROMPT_DATA[activeCustomPrompt] : AI_BEACH_DATA[activeAIBeach];
   const displayMessages = useMemo(() => [baseMessage, ...chatHistory], [baseMessage, chatHistory]);
@@ -548,7 +528,7 @@ export function Home() {
 
                 {/* Popover: Rich Bay Cards (2x2 Grid) */}
                 {activeDropdown === 'region' && (
-                  <div className="animate-popover-in absolute top-full left-0 mt-3 w-[520px] p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
+                  <div className="animate-popover-in absolute top-full left-0 mt-3 w-[440px] p-3.5 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
                     <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
                       <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                         {language === 'en' ? 'Explore Coastal Bays' : 'Khám phá các vịnh biển'}
@@ -801,7 +781,7 @@ export function Home() {
 
                 {/* Popover: Guests Stepper */}
                 {activeDropdown === 'guests' && (
-                  <div className="animate-popover-in absolute top-full right-0 mt-3 w-72 p-4 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
+                  <div className="animate-popover-in absolute top-full right-0 mt-3 w-64 p-3 bg-white border border-slate-200/90 rounded-2xl shadow-xl z-50 text-left">
                     <div className="pb-2 mb-3 border-b border-slate-100">
                       <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                         {language === 'en' ? 'Number of Guests' : 'Số lượng thành viên'}
@@ -1276,6 +1256,10 @@ export function Home() {
           {/* 1. Flash Sale Section (Ưu đãi giờ vàng giới hạn) */}
           <FlashSaleSection experiences={flashSaleList} />
 
+
+          {/* Signature Alternating Video Spotlights with Curving Dashed Connectors */}
+          <CoastalVideoSpotlights />
+
           {/* 2. Hoạt Động Biển Nổi Bật (Dải card hoạt động nổi bật duy nhất) */}
           <CategoryExperienceCarousel
             title={language === 'en' ? 'Featured Marine Activities' : 'Hoạt Động Biển Nổi Bật'}
@@ -1284,8 +1268,7 @@ export function Home() {
             experiences={featuredActivities}
           />
 
-          {/* Signature Alternating Video Spotlights with Curving Dashed Connectors */}
-          <CoastalVideoSpotlights />
+
 
           {/* 9. DANASEA Official Mobile App Showcase */}
           <DanaseaAppShowcase />
@@ -1352,26 +1335,33 @@ export function Home() {
             </div>
           </div>
 
-          {/* 13. Final Call to Action */}
-          <div className="rounded-2xl p-6 sm:p-8 bg-[#031d44] border border-sky-950 flex flex-col sm:flex-row items-center justify-between gap-6 text-white shadow-xl shadow-sky-950/20">
-            <div>
-              <h3 className="text-lg sm:text-xl font-bold mb-1 text-white drop-shadow-sm">
-                {language === 'en' ? 'Ready to Explore Da Nang Waters?' : 'Sẵn sàng trải nghiệm biển Đà Nẵng ngay hôm nay?'}
-              </h3>
-              <p className="text-base text-slate-200 max-w-xl font-normal drop-shadow-sm">
-                {language === 'en'
-                  ? 'Explore 20+ certified water sports and marine expeditions tailored for you.'
-                  : 'Hơn 20+ trải nghiệm thể thao biển chuẩn quốc tế với đầy đủ bảo hiểm và thiết bị chuyên nghiệp.'}
-              </p>
-            </div>
+          {/* 13. Final Call to Action with Ocean Backdrop */}
+          <div className="relative rounded-2xl overflow-hidden shadow-xl border border-sky-900/40 my-6">
+            <div 
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url('/images/hero/08-cano-cao-toc-luot-vinh-da-nang.jpg')` }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-950/75 to-slate-950/50" />
+            <div className="relative z-10 p-7 sm:p-10 flex flex-col sm:flex-row items-center justify-between gap-6 text-white">
+              <div>
+                <h3 className="text-xl sm:text-2xl font-bold mb-2 text-white drop-shadow-sm">
+                  {language === 'en' ? 'Ready to Explore Da Nang Waters?' : 'Sẵn sàng trải nghiệm biển Đà Nẵng ngay hôm nay?'}
+                </h3>
+                <p className="text-sm sm:text-base text-slate-200 max-w-xl font-normal drop-shadow-sm leading-relaxed">
+                  {language === 'en'
+                    ? 'Explore 20+ certified water sports and marine expeditions tailored for you.'
+                    : 'Hơn 20+ trải nghiệm thể thao biển chuẩn quốc tế với đầy đủ bảo hiểm và thiết bị chuyên nghiệp.'}
+                </p>
+              </div>
 
-            <Link
-              to="/search"
-              className="px-6 py-3.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs sm:text-sm transition-colors shrink-0 flex items-center gap-1.5 shadow-md shadow-sky-900/20"
-            >
-              <span>{language === 'en' ? 'Explore All Tours' : 'Xem toàn bộ tour'}</span>
-              <ArrowRight className="w-4 h-4 shrink-0" />
-            </Link>
+              <Link
+                to="/search"
+                className="px-6 py-3.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-xs sm:text-sm transition-all shrink-0 flex items-center gap-2 shadow-lg shadow-black/30 hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <span>{language === 'en' ? 'Explore All Tours' : 'Xem toàn bộ tour'}</span>
+                <ArrowRight className="w-4 h-4 shrink-0" />
+              </Link>
+            </div>
           </div>
 
         </div>

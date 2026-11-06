@@ -58,6 +58,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     });
   }
 
+  bool _isMyMessage(MessageModel msg) {
+    final s = msg.senderId.trim().toLowerCase();
+    return s == 'vnd-001' ||
+        s == 'usr-vnd-001' ||
+        s.contains('vnd') ||
+        s == _db.currentVendor.id ||
+        s == _db.currentUser.id;
+  }
+
   void _sendMessage(String text) {
     if (text.trim().isEmpty) return;
     _db.sendMessage(widget.conversationId, 'vnd-001', text.trim());
@@ -192,7 +201,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     },
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      backgroundColor: AppColors.secondaryContainer.withOpacity(0.5),
+                      backgroundColor: AppColors.secondaryContainer.withValues(alpha: 0.5),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     child: const Row(
@@ -211,15 +220,32 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 itemCount: messages.length + 1, // +1 for initial payment banner
                 itemBuilder: (context, index) {
                   if (index == 0) {
                     return _buildPaymentNoticeBubble(subOrder);
                   }
-                  final msg = messages[index - 1];
-                  final isMe = msg.senderId == 'vnd-001';
-                  return _buildMessageBubble(msg, isMe);
+                  final msgIndex = index - 1;
+                  final msg = messages[msgIndex];
+                  final isMe = _isMyMessage(msg);
+
+                  final prevMsg = msgIndex > 0 ? messages[msgIndex - 1] : null;
+                  final nextMsg = msgIndex < messages.length - 1
+                      ? messages[msgIndex + 1]
+                      : null;
+
+                  final isSameSenderAsPrev =
+                      prevMsg != null && (_isMyMessage(prevMsg) == isMe);
+                  final isLastOfGroup =
+                      nextMsg == null || (_isMyMessage(nextMsg) != isMe);
+
+                  return _buildMessageBubble(
+                    msg: msg,
+                    isMe: isMe,
+                    isSameSenderAsPrev: isSameSenderAsPrev,
+                    isLastOfGroup: isLastOfGroup,
+                  );
                 },
               ),
             ),
@@ -245,7 +271,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerLowest,
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, -2)),
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, -2)),
                 ],
               ),
               child: Row(
@@ -301,33 +327,57 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   Widget _buildPaymentNoticeBubble(SubOrderModel order) {
     return Center(
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 10),
-        padding: const EdgeInsets.all(12),
-        constraints: const BoxConstraints(maxWidth: 320),
+        margin: const EdgeInsets.only(top: 4, bottom: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        constraints: const BoxConstraints(maxWidth: 330),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainer,
-          borderRadius: AppShapes.radiusSm,
-          boxShadow: AppShapes.shadowSm,
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.2),
+            width: 0.8,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 32,
-              height: 32,
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primaryFixed),
-              child: const Icon(Icons.verified, color: AppColors.primary, size: 18),
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primaryContainer.withValues(alpha: 0.6),
+              ),
+              child: const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 18),
             ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const LocalizedText('Khách đã thanh toán', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
+                  const LocalizedText(
+                    'Khách đã thanh toán',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
                   const SizedBox(height: 2),
                   LocalizedText(
                     '${order.customerName} đã đặt dịch vụ #${order.subOrderCode} • Tổng ${order.totalPrice.toStringAsFixed(0)} đ',
-                    style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.onSurfaceVariant,
+                      height: 1.3,
+                    ),
                   ),
                 ],
               ),
@@ -338,60 +388,112 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
-  Widget _buildMessageBubble(MessageModel msg, bool isMe) {
+  Widget _buildMessageBubble({
+    required MessageModel msg,
+    required bool isMe,
+    required bool isSameSenderAsPrev,
+    required bool isLastOfGroup,
+  }) {
+    // Tách biệt rõ ràng: tin nhắn cùng người nói giãn 4px, đổi người nói giãn 14px
+    final topSpacing = isSameSenderAsPrev ? 4.0 : 14.0;
+    final customerInitial = widget.customerName.isNotEmpty
+        ? widget.customerName[0].toUpperCase()
+        : 'K';
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.only(top: topSpacing, bottom: 2),
       child: Row(
         mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (!isMe)
-            Container(
-              width: 28,
-              height: 28,
-              margin: const EdgeInsets.only(right: 6, bottom: 2),
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.surfaceContainerHigh),
-              child: const Icon(Icons.person, size: 16, color: AppColors.onSurfaceVariant),
-            ),
+          if (!isMe) ...[
+            if (isLastOfGroup)
+              Container(
+                width: 28,
+                height: 28,
+                margin: const EdgeInsets.only(right: 8, bottom: 2),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.secondaryContainer,
+                ),
+                child: Center(
+                  child: LocalizedText(
+                    customerInitial,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+              )
+            else
+              const SizedBox(width: 36),
+          ],
           Flexible(
             child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.74,
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: isMe ? AppColors.secondary : AppColors.surfaceContainerLowest,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isMe ? 16 : 4),
-                  bottomRight: Radius.circular(isMe ? 4 : 16),
+                  topLeft: Radius.circular(isMe ? 18 : (isSameSenderAsPrev ? 6 : 18)),
+                  topRight: Radius.circular(isMe ? (isSameSenderAsPrev ? 6 : 18) : 18),
+                  bottomLeft: Radius.circular(isMe ? 18 : (isLastOfGroup ? 4 : 6)),
+                  bottomRight: Radius.circular(isMe ? (isLastOfGroup ? 4 : 6) : 18),
                 ),
-                boxShadow: AppShapes.shadowSm,
+                border: isMe
+                    ? null
+                    : Border.all(
+                        color: AppColors.outlineVariant.withValues(alpha: 0.35),
+                        width: 0.8,
+                      ),
+                boxShadow: [
+                  BoxShadow(
+                    color: isMe
+                        ? AppColors.secondary.withValues(alpha: 0.18)
+                        : Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Column(
-                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   LocalizedText(
                     msg.content,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 13.5,
                       color: isMe ? Colors.white : AppColors.onSurface,
-                      height: 1.4,
+                      height: 1.42,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 5),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       LocalizedText(
-                        '${msg.sentAt.hour}:${msg.sentAt.minute.toString().padLeft(2, '0')}',
+                        '${msg.sentAt.hour.toString().padLeft(2, '0')}:${msg.sentAt.minute.toString().padLeft(2, '0')}',
                         style: TextStyle(
                           fontSize: 10,
-                          color: isMe ? Colors.white70 : AppColors.tertiary,
+                          color: isMe
+                              ? Colors.white.withValues(alpha: 0.75)
+                              : AppColors.outline,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       if (isMe) ...[
                         const SizedBox(width: 4),
-                        const Icon(Icons.done_all, size: 12, color: Colors.white70),
+                        const Icon(
+                          Icons.done_all,
+                          size: 13,
+                          color: Colors.white70,
+                        ),
                       ],
                     ],
                   ),
@@ -399,16 +501,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               ),
             ),
           ),
-          if (isMe)
-            Container(
-              width: 28,
-              height: 28,
-              margin: const EdgeInsets.only(left: 6, bottom: 2),
-              decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.secondary),
-              child: const Center(
-                child: LocalizedText('DO', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white)),
-              ),
-            ),
         ],
       ),
     );

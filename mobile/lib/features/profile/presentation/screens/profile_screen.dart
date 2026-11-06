@@ -245,7 +245,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(width: 14),
                         Expanded(
                           child: LocalizedText(
-                            'Ngôn ngữ ứng dụng',
+                            'Ngôn ngữ',
                             style: AppTypography.labelMd(
                               color: AppColors.onSurface,
                               fontWeight: FontWeight.w600,

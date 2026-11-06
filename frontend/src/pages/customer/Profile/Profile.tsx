@@ -1,6 +1,7 @@
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { authService } from "../../../services/authService";
 import {
   User,
   Receipt,
@@ -25,11 +26,42 @@ export function Profile() {
   const [toastMessage, setToastMessage] = useState("");
 
   // Personal Info Form states
-  const [fullName, setFullName] = useState(user?.fullName || "Nguyễn Văn Khách");
-  const [phone, setPhone] = useState(user?.phone || "0905 000 003");
+  const [fullName, setFullName] = useState(() => {
+    if (user?.fullName && user.fullName !== "customer_1" && user.fullName !== "customer_2") return user.fullName;
+    if (user?.email === "customer_1@danasea.test") return "Nguyễn Hoàng Long";
+    if (user?.email === "customer_2@danasea.test") return "Trần Thị Mai Anh";
+    return user?.fullName || "Nguyễn Hoàng Long";
+  });
+  const [phone, setPhone] = useState(() => {
+    if (user?.phone && user.phone !== "0905 000 003" && user.phone !== "0905000003") return user.phone;
+    if (user?.email === "customer_1@danasea.test") return "0912 345 678";
+    if (user?.email === "customer_2@danasea.test") return "0988 765 432";
+    return "0912 345 678";
+  });
   const [tempFullName, setTempFullName] = useState(fullName);
   const [tempPhone, setTempPhone] = useState(phone);
   const email = user?.email || "customer@danasea.vn";
+
+  // Sync profile data from Backend /api/users/me
+  useEffect(() => {
+    let active = true;
+    authService.getMyProfile()
+      .then((profile) => {
+        if (!active || !profile) return;
+        if (profile.fullName) {
+          setFullName(profile.fullName);
+          setTempFullName(profile.fullName);
+        }
+        if (user && profile.fullName && user.fullName !== profile.fullName) {
+          useAuthStore.getState().setAuth(
+            { ...user, fullName: profile.fullName, avatarUrl: profile.avatarUrl || user.avatarUrl },
+            useAuthStore.getState().accessToken || ''
+          );
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [user]);
 
   // Security Form states
   const [currentPassword, setCurrentPassword] = useState("");
@@ -61,14 +93,28 @@ export function Profile() {
     );
   }
 
-  const handleSaveName = (e: React.FormEvent) => {
+  const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFullName(tempFullName);
-    setEditingField(null);
-    setToastMessage("Đã cập nhật tên pháp lý thành công!");
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
+    try {
+      await authService.updateProfile({ fullName: tempFullName });
+      setFullName(tempFullName);
+      if (user) {
+        useAuthStore.getState().setAuth(
+          { ...user, fullName: tempFullName },
+          useAuthStore.getState().accessToken || ''
+        );
+      }
+      setEditingField(null);
+      setToastMessage("Đã cập nhật tên pháp lý thành công!");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch {
+      setToastMessage("Cập nhật tên pháp lý thất bại, vui lòng thử lại!");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    }
   };
+
 
   const handleSavePhone = (e: React.FormEvent) => {
     e.preventDefault();

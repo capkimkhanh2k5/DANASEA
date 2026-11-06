@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Building2,
@@ -12,9 +12,14 @@ import {
   Calendar,
   Check,
   Copy,
+  Plus,
+  RefreshCw,
 } from 'lucide-react';
 import { MOCK_ADMIN_PAYOUTS } from '../../../data/adminMockData';
 import { adminSettlementService, getAdminSettlementError } from '../../../services/adminSettlementService';
+import { adminVendorService } from '../../../services/adminVendorService';
+import type { SettlementDetailResponse } from '../../../types/adminSettlement';
+import type { AdminVendorResponse } from '../../../types/adminVendor';
 import {
   AdminBadge,
   AdminState,
@@ -50,6 +55,11 @@ export function AdminPayouts() {
   const [statusFilter, setStatusFilter] = useState<PayoutStatusFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Vendors & Settlement Detail State
+  const [vendors, setVendors] = useState<AdminVendorResponse[]>([]);
+  const [selectedDetail, setSelectedDetail] = useState<SettlementDetailResponse | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
   // Modals State
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -57,45 +67,92 @@ export function AdminPayouts() {
   const [rejectReason, setRejectReason] = useState('Thông tin đối soát số tài khoản không trùng khớp');
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (demo) return;
+  // Generate Settlement Modal State
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+  const [genVendorId, setGenVendorId] = useState('');
+  const [genPeriodStart, setGenPeriodStart] = useState('2026-11-01');
+  const [genPeriodEnd, setGenPeriodEnd] = useState('2026-11-05');
+  const [isGenerating, setIsGenerating] = useState(false);
 
-    let isMounted = true;
-    adminSettlementService.getSettlements({ page: 0, size: 50 })
-      .then(res => {
-        if (!isMounted) return;
-        const mapped: PayoutExtended[] = (res.content || []).map(s => ({
-          id: s.id,
-          vendorId: s.vendorId,
-          settlementId: s.id,
-          amount: s.netPayableAmount,
-          status: (s.status === 'PAID' ? 'PAID' : 'REQUESTED') as unknown as PayoutExtended['status'],
-          processedBy: '',
-          processedAt: s.updatedAt,
-          vendorName: `Đối tác ${s.vendorId.substring(0, 8)}`,
-          bankName: 'Vietcombank',
-          bankAccountNumber: '****',
-          bankAccountHolder: 'Vendor',
-          periodText: `Kỳ đối soát ${s.periodStart.slice(0, 10)} - ${s.periodEnd.slice(0, 10)}`,
-          totalOrdersCount: 0,
-          createdAt: s.createdAt,
-          updatedAt: s.updatedAt,
-        }));
+  // Load Settlements and Vendors
+  const loadSettlementsData = useCallback(() => {
+    if (demo) return;
+    setLoading(true);
+    setErrorMessage(null);
+
+    Promise.all([
+      adminSettlementService.getSettlements({ page: 0, size: 50 }),
+      adminVendorService.getVendors({ size: 100 }).catch(() => ({ content: [] as AdminVendorResponse[] })),
+    ])
+      .then(([res, vRes]) => {
+        const vList = (vRes as { content?: AdminVendorResponse[] }).content || [];
+        setVendors(vList);
+        const vMap = new Map(vList.map(v => [v.id, v]));
+
+        const mapped: PayoutExtended[] = (res.content || []).map(s => {
+          const v = vMap.get(s.vendorId);
+          return {
+            id: s.id,
+            vendorId: s.vendorId,
+            settlementId: s.id,
+            amount: s.netPayableAmount,
+            status: (s.status === 'PAID' || s.status === 'FINALIZED' ? 'PAID' : 'REQUESTED') as unknown as PayoutExtended['status'],
+            processedBy: s.status === 'FINALIZED' ? 'Ban Quản trị DANASEA' : '',
+            processedAt: s.updatedAt,
+            vendorName: v?.businessName || `Đối tác ${s.vendorId.substring(0, 8)}`,
+            bankName: v?.bankName || 'Vietcombank',
+            bankAccountNumber: v?.bankAccountNumber || '****',
+            bankAccountHolder: v?.bankAccountHolder || v?.businessName || 'Chủ tài khoản đối tác',
+            periodText: `Kỳ đối soát ${s.periodStart.slice(0, 10)} - ${s.periodEnd.slice(0, 10)}`,
+            totalOrdersCount: 0,
+            createdAt: s.createdAt,
+            updatedAt: s.updatedAt,
+          };
+        });
+
         setPayouts(mapped);
-        if (mapped.length > 0) setSelectedPayoutId(mapped[0].id);
+        if (mapped.length > 0) {
+          setSelectedPayoutId(prev => prev && mapped.some(p => p.id === prev) ? prev : mapped[0].id);
+        }
+        if (vList.length > 0) {
+          setGenVendorId(prev => prev || vList[0].id);
+        }
         setLoading(false);
       })
       .catch(err => {
-        if (!isMounted) return;
         const msg = getAdminSettlementError(err, 'Không thể tải danh sách quyết toán.');
         setErrorMessage(msg);
         setLoading(false);
+      });
+  }, [demo]);
+
+  useEffect(() => {
+    loadSettlementsData();
+  }, [loadSettlementsData]);
+
+  // Load Line Items for Selected Settlement
+  useEffect(() => {
+    if (demo || !selectedPayoutId) return;
+    let isMounted = true;
+    setLoadingDetail(true);
+
+    adminSettlementService.getSettlementDetail(selectedPayoutId)
+      .then(detail => {
+        if (!isMounted) return;
+        setSelectedDetail(detail);
+        setPayouts(prev => prev.map(p => p.id === selectedPayoutId ? { ...p, totalOrdersCount: detail.lineItems?.length || 0 } : p));
+        setLoadingDetail(false);
+      })
+      .catch(err => {
+        if (!isMounted) return;
+        console.debug('Failed to load settlement detail:', err);
+        setLoadingDetail(false);
       });
 
     return () => {
       isMounted = false;
     };
-  }, [demo]);
+  }, [demo, selectedPayoutId]);
 
   // Metrics
   const metrics = useMemo(() => calculatePayoutMetrics(payouts), [payouts]);
@@ -143,7 +200,7 @@ export function AdminPayouts() {
 
     try {
       await adminSettlementService.finalizeSettlement(selectedPayout.id);
-      setPayouts(prev => prev.map(p => p.id === selectedPayout.id ? { ...p, status: 'PAID' as unknown as PayoutExtended['status'] } : p));
+      setPayouts(prev => prev.map(p => p.id === selectedPayout.id ? { ...p, status: 'PAID' as unknown as PayoutExtended['status'], processedBy: 'Ban Quản trị DANASEA', processedAt: new Date().toISOString() } : p));
       setIsApproveModalOpen(false);
       setNotice(`Đã chốt sổ và giải ngân kỳ đối soát #${selectedPayout.id}.`);
     } catch (err) {
@@ -172,6 +229,31 @@ export function AdminPayouts() {
     setPayouts(updatedList);
     setIsRejectModalOpen(false);
     setNotice(`Đã từ chối lệnh chi trả #${targetPayout?.id}`);
+  };
+
+  const handleGenerateSettlementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!genVendorId) {
+      setNotice('Vui lòng chọn đối tác vận hành');
+      return;
+    }
+    try {
+      setIsGenerating(true);
+      const newSettlement = await adminSettlementService.generateSettlement({
+        vendorId: genVendorId,
+        periodStart: genPeriodStart,
+        periodEnd: genPeriodEnd,
+      });
+      setIsGenerating(false);
+      setIsGenerateModalOpen(false);
+      setNotice(`Khởi tạo kỳ đối soát #${newSettlement.id.substring(0, 8)} thành công!`);
+      loadSettlementsData();
+      setSelectedPayoutId(newSettlement.id);
+    } catch (err) {
+      setIsGenerating(false);
+      const msg = getAdminSettlementError(err, 'Lỗi khi khởi tạo kỳ đối soát.');
+      setNotice(msg);
+    }
   };
 
   const handleExportStatement = () => {
@@ -233,9 +315,27 @@ export function AdminPayouts() {
                 <CreditCard size={18} style={{ color: 'var(--admin-primary, #0B5D6F)' }} />
                 Danh sách lệnh chi trả
               </span>
-              <span style={{ fontSize: 12, color: 'var(--admin-muted, #595959)', fontWeight: 600 }}>
-                {filteredPayouts.length} / {payouts.length} lệnh
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--admin-muted, #595959)', fontWeight: 600 }}>
+                  {filteredPayouts.length} / {payouts.length} lệnh
+                </span>
+                <AdminButton
+                  variant="primary"
+                  onClick={() => setIsGenerateModalOpen(true)}
+                  style={{ fontSize: 12, padding: '4px 8px' }}
+                  title="Khởi tạo kỳ đối soát mới"
+                >
+                  <Plus size={13} />
+                  Đối soát mới
+                </AdminButton>
+                <AdminButton
+                  onClick={loadSettlementsData}
+                  style={{ fontSize: 12, padding: '4px 8px' }}
+                  title="Làm mới dữ liệu"
+                >
+                  <RefreshCw size={13} />
+                </AdminButton>
+              </div>
             </div>
 
             {/* Filter Tabs */}
@@ -249,84 +349,97 @@ export function AdminPayouts() {
               items={[
                 { value: 'all', label: 'Tất cả', count: metrics.totalCount },
                 { value: 'REQUESTED', label: 'Chờ duyệt', count: metrics.pendingCount },
-                { value: 'PAID', label: 'Đã chi', count: metrics.paidCount },
+                { value: 'PAID', label: 'Đã giải ngân', count: metrics.paidCount },
                 { value: 'REJECTED', label: 'Từ chối', count: metrics.rejectedCount },
               ]}
             />
 
-            {/* Search Input & Export Action */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <div className="admin-payouts__search-box" style={{ flex: 1 }}>
-                <Search size={16} className="admin-payouts__search-icon" aria-hidden="true" />
+            {/* Action Bar: Search & Export */}
+            <div className="admin-payouts__action-bar">
+              <div className="admin-payouts__search-box">
+                <Search size={14} className="admin-payouts__search-icon" aria-hidden="true" />
                 <input
                   type="text"
-                  className="admin-payouts__search-input"
-                  placeholder="Tìm theo mã lệnh, tên đối tác hoặc số tài khoản..."
+                  placeholder="Tìm theo mã lệnh, đối tác, số TK..."
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
+                  className="admin-payouts__search-input"
                   aria-label="Tìm kiếm lệnh chi trả"
                 />
               </div>
+
               <AdminButton
+                variant="secondary"
                 onClick={handleExportStatement}
-                title="Xuất bảng đối soát ra file CSV"
+                disabled={filteredPayouts.length === 0}
+                title="Xuất bảng kê chi trả ra file CSV"
               >
-                <Download size={16} aria-hidden="true" />
-                Xuất CSV đối soát
+                <Download size={14} aria-hidden="true" />
+                Xuất CSV
               </AdminButton>
             </div>
           </div>
 
-          {/* Master Items List */}
-          <div className="admin-payouts__list" role="listbox" aria-label="Danh sách lệnh chi trả">
-            <div key={statusFilter} className="admin-tab-pane">
+          {/* List Body with Skeleton / Empty / Error */}
+          <div className="admin-payouts__list-viewport">
+            <div className="admin-payouts__list" role="list" aria-label="Danh sách các lệnh chi">
             {loading ? (
-              <div style={{ padding: '32px 16px' }}>
+              <div style={{ padding: 16 }}>
                 <AdminState
-                  kind="empty"
-                  title="Đang tải danh sách quyết toán..."
-                  description="Vui lòng đợi trong giây lát khi hệ thống kết nối máy chủ."
+                  kind="loading"
+                  title="Đang tải dữ liệu lệnh chi..."
+                  description="Hệ thống đang đồng bộ dữ liệu quyết toán từ đối tác và ngân hàng."
                 />
               </div>
             ) : errorMessage ? (
-              <div style={{ padding: '32px 16px' }}>
+              <div style={{ padding: 16 }}>
                 <AdminState
                   kind="error"
-                  title="Không thể tải quyết toán"
+                  title="Không thể tải dữ liệu"
                   description={errorMessage}
-                />
-              </div>
-            ) : filteredPayouts.length === 0 ? (
-              <div style={{ padding: '32px 16px' }}>
-                <AdminState
-                  kind="empty"
-                  title="Không có lệnh chi nào"
-                  description={payouts.length === 0 ? "Hiện tại chưa có đợt quyết toán tài chính nào cần xử lý." : "Không tìm thấy yêu cầu chi trả phù hợp với bộ lọc hiện tại."}
                   action={
-                    <AdminButton
-                      onClick={() => {
-                        setSearchQuery('');
-                        setStatusFilter('all');
-                      }}
-                    >
-                      Xóa bộ lọc
+                    <AdminButton variant="primary" onClick={loadSettlementsData}>
+                      Thử lại
                     </AdminButton>
                   }
                 />
               </div>
+            ) : paginatedPayouts.length === 0 ? (
+              <div style={{ padding: 16 }}>
+                <AdminState
+                  kind="empty"
+                  title="Không có lệnh chi nào phù hợp"
+                  description={
+                    searchQuery
+                      ? 'Thử thay đổi từ khóa tìm kiếm hoặc bỏ lọc trạng thái.'
+                      : 'Hiện chưa có lệnh chi trả nào trong hệ thống.'
+                  }
+                  action={
+                    searchQuery ? (
+                      <AdminButton
+                        onClick={() => {
+                          setSearchQuery('');
+                          setStatusFilter('all');
+                        }}
+                      >
+                        Xóa bộ lọc
+                      </AdminButton>
+                    ) : undefined
+                  }
+                />
+              </div>
             ) : (
-              paginatedPayouts.map(p => {
+              paginatedPayouts.map((p) => {
                 const isSelected = p.id === selectedPayout?.id;
                 return (
                   <div
                     key={p.id}
-                    role="option"
-                    aria-selected={isSelected}
+                    role="listitem"
                     tabIndex={0}
-                    className={`admin-payouts__item ${isSelected ? 'admin-payouts__item--active' : ''}`}
+                    className={`admin-payouts__item ${isSelected ? 'admin-payouts__item--selected' : ''}`}
                     onClick={() => setSelectedPayoutId(p.id)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -334,9 +447,10 @@ export function AdminPayouts() {
                         setSelectedPayoutId(p.id);
                       }
                     }}
+                    aria-selected={isSelected}
                   >
                     <div className="admin-payouts__item-top">
-                      <span className="admin-payouts__item-id">{p.id}</span>
+                      <span className="admin-payouts__item-id">#{p.id.substring(0, 12)}...</span>
                       <AdminBadge
                         tone={
                           p.status === 'PAID'
@@ -346,7 +460,7 @@ export function AdminPayouts() {
                             : 'neutral'
                         }
                       >
-                        {p.status === 'PAID' ? 'ĐÃ CHI TRẢ' : p.status === 'REQUESTED' ? 'CHỜ DUYỆT' : 'TỪ CHỐI'}
+                        {p.status === 'PAID' ? 'Đã chi trả' : p.status === 'REQUESTED' ? 'Chờ duyệt' : 'Từ chối'}
                       </AdminBadge>
                     </div>
 
@@ -415,7 +529,7 @@ export function AdminPayouts() {
                 </div>
               </div>
               <div style={{ padding: '8px 12px', background: '#ffffff', borderRadius: 8, border: '1px solid #ccfbf1', fontSize: 12, color: 'var(--admin-primary, #0B5D6F)', fontWeight: 600 }}>
-                {selectedPayout.totalOrdersCount} đơn tour hoàn tất
+                {selectedDetail?.lineItems?.length ?? selectedPayout.totalOrdersCount} đơn tour hoàn tất
               </div>
             </div>
 
@@ -486,20 +600,37 @@ export function AdminPayouts() {
 
             {/* Constituent Orders Breakdown (Collapsible) */}
             <AdminDisclosure
-              title={`Danh sách đơn tour cấu thành (${selectedPayout.totalOrdersCount ?? 0} đơn)`}
+              title={`Danh sách đơn tour cấu thành (${selectedDetail?.lineItems?.length ?? selectedPayout.totalOrdersCount ?? 0} đơn)`}
               description="Các dịch vụ trải nghiệm biển đã hoàn thành và đối soát trong kỳ"
             >
               <div className="admin-payouts__orders-breakdown">
-                <div className="admin-payouts__orders-row">
-                  <span>Dịch vụ lặn biển & thể thao nước (Demo)</span>
-                  <strong>{Math.round((selectedPayout.totalOrdersCount ?? 0) * 0.6)} đơn</strong>
-                </div>
-                <div className="admin-payouts__orders-row">
-                  <span>Tour cano & tham quan vịnh biển (Demo)</span>
-                  <strong>{Math.round((selectedPayout.totalOrdersCount ?? 0) * 0.4)} đơn</strong>
-                </div>
+                {loadingDetail ? (
+                  <div style={{ padding: '12px', textAlign: 'center', fontSize: 12, color: 'var(--admin-muted, #737373)' }}>
+                    Đang tải chi tiết các đơn hàng cấu thành...
+                  </div>
+                ) : selectedDetail && selectedDetail.lineItems && selectedDetail.lineItems.length > 0 ? (
+                  selectedDetail.lineItems.map(item => (
+                    <div key={item.id} className="admin-payouts__orders-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
+                      <div>
+                        <div style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--admin-ink, #171717)', fontSize: 13 }}>
+                          #VE-{item.subOrderId.substring(0, 8).toUpperCase()}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--admin-muted, #64748b)' }}>
+                          Doanh thu: {item.grossAmount.toLocaleString('vi-VN')} đ • Phí sàn: -{item.commissionAmount.toLocaleString('vi-VN')} đ ({Math.round(item.commissionRate * 100)}%)
+                        </div>
+                      </div>
+                      <strong style={{ color: 'var(--admin-primary, #0B5D6F)', fontSize: 13 }}>
+                        {item.netAmount.toLocaleString('vi-VN')} đ
+                      </strong>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ padding: '12px', textAlign: 'center', fontSize: 12, color: 'var(--admin-muted, #737373)' }}>
+                    Chưa có đơn hàng con nào trong kỳ đối soát này.
+                  </div>
+                )}
                 <div className="admin-payouts__orders-footer">
-                  <span>Tổng số tiền quyết toán:</span>
+                  <span>Tổng số tiền thực nhận (Net):</span>
                   <strong>{selectedPayout.amount.toLocaleString('vi-VN')} đ</strong>
                 </div>
               </div>
@@ -581,21 +712,18 @@ export function AdminPayouts() {
             </div>
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-ink, #171717)', marginBottom: 4 }}>
-              MÃ THAM CHIẾU GIAO DỊCH (BANK REF CODE):
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label htmlFor="payout-bank-ref" style={{ fontWeight: 600, fontSize: 12, color: 'var(--admin-secondary, #525252)' }}>
+              Mã giao dịch ngân hàng / Ref Code:
             </label>
             <input
+              id="payout-bank-ref"
               type="text"
-              className="admin-payouts__search-input"
               value={bankRefCode}
               onChange={(e) => setBankRefCode(e.target.value)}
-              style={{ fontFamily: 'monospace', fontWeight: 700 }}
+              className="admin-payouts__search-input"
+              style={{ width: '100%', padding: '8px 12px' }}
             />
-          </div>
-
-          <div style={{ fontSize: 11, color: 'var(--admin-muted, #737373)', fontStyle: 'italic' }}>
-            * Lưu ý an toàn: Đây là môi trường Demo. Hệ thống không gửi lệnh chuyển tiền thật tới Napas hay cổng ngân hàng.
           </div>
         </div>
       </AdminDialog>
@@ -605,38 +733,108 @@ export function AdminPayouts() {
         open={isRejectModalOpen}
         onClose={() => setIsRejectModalOpen(false)}
         variant="modal"
-        title="Từ chối yêu cầu chi trả"
-        description="Ghi nhận lý do từ chối để đối tác cập nhật lại thông tin đối soát hoặc tài khoản ngân hàng."
+        title="Từ chối lệnh chi trả"
+        description="Gửi thông báo yêu cầu làm rõ hồ sơ đối soát lại cho đối tác."
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, width: '100%' }}>
-            <AdminButton onClick={() => setIsRejectModalOpen(false)}>Hủy</AdminButton>
-            <AdminButton variant="danger" onClick={handleRejectPayoutSubmit}>
+            <AdminButton onClick={() => setIsRejectModalOpen(false)}>Hủy bỏ</AdminButton>
+            <AdminButton variant="primary" onClick={handleRejectPayoutSubmit} style={{ background: '#b91c1c' }}>
               Xác nhận từ chối
             </AdminButton>
           </div>
         }
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13, color: 'var(--admin-body, #262626)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 13, color: 'var(--admin-body, #262626)' }}>
           <p>
-            Bạn sắp từ chối lệnh chi <strong>#{selectedPayout?.id}</strong> của <strong>{selectedPayout?.vendorName}</strong>.
+            Bạn có chắc chắn muốn từ chối lệnh chi{' '}
+            <strong style={{ fontFamily: 'monospace' }}>#{selectedPayout?.id}</strong> không?
           </p>
 
-          <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-ink, #171717)', marginBottom: 4 }}>
-              LÝ DO TỪ CHỐI DUYỆT CHI *
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label htmlFor="reject-payout-reason" style={{ fontWeight: 600, fontSize: 12, color: 'var(--admin-secondary, #525252)' }}>
+              Lý do từ chối:
             </label>
             <textarea
+              id="reject-payout-reason"
               rows={3}
-              className="admin-payouts__search-input"
-              style={{ height: 'auto', padding: 10 }}
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
+              className="admin-payouts__search-input"
+              style={{ width: '100%', padding: '8px 12px', resize: 'vertical' }}
             />
           </div>
         </div>
       </AdminDialog>
+
+      {/* Generate Settlement Modal */}
+      <AdminDialog
+        open={isGenerateModalOpen}
+        onClose={() => !isGenerating && setIsGenerateModalOpen(false)}
+        variant="modal"
+        title="Khởi tạo kỳ đối soát tài chính mới"
+        description="Quét toàn bộ các đơn hàng con hoàn tất trong khoảng thời gian để kết chuyển doanh thu và tính phí hoa hồng sàn."
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, width: '100%' }}>
+            <AdminButton disabled={isGenerating} onClick={() => setIsGenerateModalOpen(false)}>
+              Hủy
+            </AdminButton>
+            <AdminButton variant="primary" disabled={isGenerating} onClick={handleGenerateSettlementSubmit}>
+              {isGenerating ? 'Đang khởi tạo...' : 'Khởi tạo đối soát'}
+            </AdminButton>
+          </div>
+        }
+      >
+        <form onSubmit={handleGenerateSettlementSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 13 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontWeight: 600, fontSize: 12, color: 'var(--admin-secondary, #525252)' }}>
+              Đối tác vận hành (Vendor):
+            </label>
+            <select
+              value={genVendorId}
+              onChange={(e) => setGenVendorId(e.target.value)}
+              className="admin-payouts__search-input"
+              style={{ width: '100%', padding: '8px 12px', background: '#fff' }}
+              required
+            >
+              <option value="">-- Chọn đối tác --</option>
+              {vendors.map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.businessName || v.id}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontWeight: 600, fontSize: 12, color: 'var(--admin-secondary, #525252)' }}>
+                Từ ngày (Period Start):
+              </label>
+              <input
+                type="date"
+                value={genPeriodStart}
+                onChange={(e) => setGenPeriodStart(e.target.value)}
+                className="admin-payouts__search-input"
+                style={{ width: '100%', padding: '8px 12px' }}
+                required
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontWeight: 600, fontSize: 12, color: 'var(--admin-secondary, #525252)' }}>
+                Đến ngày (Period End):
+              </label>
+              <input
+                type="date"
+                value={genPeriodEnd}
+                onChange={(e) => setGenPeriodEnd(e.target.value)}
+                className="admin-payouts__search-input"
+                style={{ width: '100%', padding: '8px 12px' }}
+                required
+              />
+            </div>
+          </div>
+        </form>
+      </AdminDialog>
     </div>
   );
 }
-
-export default AdminPayouts;

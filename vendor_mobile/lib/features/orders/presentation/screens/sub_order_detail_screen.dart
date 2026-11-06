@@ -325,7 +325,7 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
                       children: [
                         Expanded(
                           child: LocalizedText(
-                            'Hoa hồng sàn DANASEA (${(_order.commissionRate * 100).toStringAsFixed(0)}%)',
+                            'Hoa hồng sàn DANASEA (${(_order.commissionRate > 1 ? _order.commissionRate : _order.commissionRate * 100).toStringAsFixed(0)}%)',
                             style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
                             overflow: TextOverflow.ellipsis,
                           ),

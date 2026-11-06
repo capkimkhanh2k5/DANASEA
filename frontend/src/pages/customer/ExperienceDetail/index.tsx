@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   Home,
   Clock,
@@ -14,7 +14,6 @@ import {
   Star,
   Minus,
   Plus,
-  Grid,
   MessageSquare,
   MessageCircle,
   User,
@@ -27,7 +26,6 @@ import { reviewService, type ReviewResponse } from '../../../services/reviewServ
 import { SEOHead } from '../../../components/common/SEOHead';
 import { getSiteOrigin } from '../../../utils/seo';
 import type { ServiceDetailDto, ServiceOptionDto, StructuredSlotDto } from '../../../types/service';
-import { FEATURED_SERVICES, MOCK_SLOTS, MOCK_IMAGES } from '../../../mockData';
 
 export function ExperienceDetail() {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +35,8 @@ export function ExperienceDetail() {
 function ExperienceDetailPage({ id }: { id: string | undefined }) {
   const { language } = useLanguageStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editCartItemId = searchParams.get('editCartItemId');
 
   const [service, setService] = useState<ServiceDetailDto | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(Boolean(id));
@@ -52,7 +52,25 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
   const [showAddSuccess, setShowAddSuccess] = useState<boolean>(false);
 
   const addItem = useCartStore((state) => state.addItem);
+  const updateCartItem = useCartStore((state) => state.updateCartItem);
   const cartItems = useCartStore((state) => state.items);
+
+  const editingCartItem = useMemo(() => {
+    return editCartItemId ? cartItems.find((i) => i.id === editCartItemId) || null : null;
+  }, [editCartItemId, cartItems]);
+
+  useEffect(() => {
+    if (editingCartItem) {
+      if (editingCartItem.quantity > 0) setQty(editingCartItem.quantity);
+      if (editingCartItem.optionId) setSelectedOptionId(editingCartItem.optionId);
+      if (editingCartItem.selectedDate || editingCartItem.date) {
+        setSelectedDate(editingCartItem.selectedDate || editingCartItem.date);
+      }
+      if (editingCartItem.slotId) {
+        setSelectedSlotId(editingCartItem.slotId);
+      }
+    }
+  }, [editingCartItem]);
 
   const { toggleWishlist, isInWishlist } = useWishlistStore();
 
@@ -70,203 +88,51 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
     setIsLightboxOpen(true);
   };
 
-  // Fetch Service Detail from Backend API (with graceful fallback to mock if legacy ID)
+  // Fetch Service Detail from Backend API (Zero Mock Data)
   useEffect(() => {
     if (!id) return;
 
     let isMounted = true;
+    setIsLoading(true);
+    setLoadError(false);
 
     serviceCatalogService
       .getServiceDetail(id)
       .then((data) => {
         if (!isMounted) return;
 
+        setService(data);
+
         // Auto-select first option
-        if (data.options && data.options.length > 0) {
-          setSelectedOptionId(data.options[0].id);
+        const firstOptionId = data.options && data.options.length > 0 ? data.options[0].id : null;
+        if (firstOptionId) {
+          setSelectedOptionId(firstOptionId);
         }
 
-        // Auto-select first available date and slot with defensive fallback (Rule 3)
-        let normalizedData = data;
-        if (!data.slots || data.slots.length === 0) {
-          const today = new Date();
-          const todayStr = today.toISOString().split('T')[0];
-          const tomorrow = new Date(today);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
-          const fallbackUpcomingSlots: StructuredSlotDto[] = [
-            {
-              slotId: `slot-${data.id}-today-1400`,
-              date: todayStr,
-              startTime: '14:00:00',
-              endTime: '16:00:00',
-              capacity: 15,
-              availableCapacity: 12,
-              price: data.price,
-              bookable: true,
-            },
-            {
-              slotId: `slot-${data.id}-today-1630`,
-              date: todayStr,
-              startTime: '16:30:00',
-              endTime: '18:30:00',
-              capacity: 15,
-              availableCapacity: 15,
-              price: data.price,
-              bookable: true,
-            },
-            {
-              slotId: `slot-${data.id}-tomorrow-0830`,
-              date: tomorrowStr,
-              startTime: '08:30:00',
-              endTime: '10:30:00',
-              capacity: 15,
-              availableCapacity: 10,
-              price: data.price,
-              bookable: true,
-            },
-            {
-              slotId: `slot-${data.id}-tomorrow-1430`,
-              date: tomorrowStr,
-              startTime: '14:30:00',
-              endTime: '16:30:00',
-              capacity: 15,
-              availableCapacity: 8,
-              price: data.price,
-              bookable: true,
-            },
-          ];
-
-          normalizedData = { ...data, slots: fallbackUpcomingSlots };
-          setSelectedDate(todayStr);
-          setSelectedSlotId(fallbackUpcomingSlots[0].slotId);
-        } else {
-          const firstBookable = data.slots.find((s) => s.bookable && s.availableCapacity > 0) || data.slots[0];
-          setSelectedDate(firstBookable.date);
-          setSelectedSlotId(firstBookable.slotId);
-        }
-
-        setService(normalizedData);
+        // Fetch real slots from Backend for this service
+        serviceCatalogService
+          .getServiceSlots(data.id, { optionId: firstOptionId || undefined })
+          .then((slots) => {
+            if (!isMounted) return;
+            setService((prev) => (prev ? { ...prev, slots } : prev));
+            if (slots && slots.length > 0) {
+              const firstBookable = slots.find((s) => s.bookable && s.availableCapacity > 0) || slots[0];
+              setSelectedDate(firstBookable.date);
+              setSelectedSlotId(firstBookable.slotId);
+            } else {
+              setSelectedDate('');
+              setSelectedSlotId(null);
+            }
+          })
+          .catch((slotErr) => {
+            console.warn('[ExperienceDetail] Không thể tải danh sách ca giờ từ BE:', slotErr);
+          });
       })
       .catch((err) => {
-        console.warn('[ExperienceDetail] Lỗi nạp dịch vụ từ BE, kiểm tra mock fallback:', err);
+        console.warn('[ExperienceDetail] Lỗi nạp dịch vụ từ BE:', err);
         if (!isMounted) return;
-
-        const fallback = FEATURED_SERVICES.find(
-          (s) => s.id === id || s.id === `tour-${id}` || (s.slug && s.slug === id) || (id && id.includes(s.id))
-        );
-        if (fallback) {
-          const today = new Date();
-          const todayStr = today.toISOString().split('T')[0];
-          const tomorrow = new Date(today);
-          tomorrow.setDate(tomorrow.getDate() + 1);
-          const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
-          const fallbackSlots: StructuredSlotDto[] = MOCK_SLOTS.filter(
-            (slot) => slot.serviceId === fallback.id
-          ).map((slot) => ({
-            slotId: slot.id,
-            date: slot.date || todayStr,
-            startTime: slot.startTime || '08:00:00',
-            endTime: slot.endTime || '10:00:00',
-            capacity: slot.capacity || 15,
-            availableCapacity: Math.max(0, (slot.capacity || 15) - (slot.bookedCount || 0)),
-            price: fallback.basePrice,
-            bookable: slot.status === 'OPEN',
-          }));
-
-          if (fallbackSlots.length === 0) {
-            fallbackSlots.push(
-              {
-                slotId: `slot-${fallback.id}-today-1400`,
-                date: todayStr,
-                startTime: '14:00:00',
-                endTime: '16:00:00',
-                capacity: 15,
-                availableCapacity: 12,
-                price: fallback.basePrice,
-                bookable: true,
-              },
-              {
-                slotId: `slot-${fallback.id}-today-1630`,
-                date: todayStr,
-                startTime: '16:30:00',
-                endTime: '18:30:00',
-                capacity: 15,
-                availableCapacity: 15,
-                price: fallback.basePrice,
-                bookable: true,
-              },
-              {
-                slotId: `slot-${fallback.id}-tomorrow-0830`,
-                date: tomorrowStr,
-                startTime: '08:30:00',
-                endTime: '10:30:00',
-                capacity: 15,
-                availableCapacity: 10,
-                price: fallback.basePrice,
-                bookable: true,
-              }
-            );
-          }
-
-          const fallbackImages = MOCK_IMAGES
-            .filter((img) => img.serviceId === fallback.id)
-            .map((mi) => mi.imageUrl || mi.url || '')
-            .filter((url): url is string => Boolean(url));
-
-          const mappedFallback: ServiceDetailDto = {
-            id: fallback.id,
-            name: fallback.name,
-            slug: fallback.slug,
-            description: fallback.description || '',
-            price: fallback.basePrice,
-            address: fallback.locationName,
-            averageRating: 4.95,
-            reviewCount: 128,
-            viewCount: 1250,
-            categoryId: 'a0000001-0000-0000-0000-000000000001',
-            categoryName: 'Thể thao biển',
-            imageUrls: fallbackImages.length > 0 ? fallbackImages : [
-              'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800',
-              'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
-              'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
-              'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=800',
-            ],
-            options: [
-              {
-                id: `opt-${fallback.id}`,
-                serviceId: fallback.id,
-                name: 'Vé Tiêu Chuẩn',
-                optionType: 'SHARED',
-                pricingUnit: 'PER_PERSON',
-                price: fallback.basePrice,
-                maxPaxPerPackage: 1,
-                benefits: 'Áo phao SOLAS, người hướng dẫn PADI, nước uống, bảo hiểm du lịch 100 triệu.',
-                status: 'ACTIVE',
-              },
-            ],
-            slots: fallbackSlots,
-            vendorId: '22222222-2222-2222-2222-222222222221',
-            businessName: 'DANASEA Official Partner',
-            badgeTier: 'VERIFIED',
-            duration: fallback.durationMinutes || 120,
-            capacity: fallback.capacityPerSlot || 15,
-            waiverRequired: true,
-            waiverContent: fallback.waiverContent || 'Khách hàng cam kết đủ sức khỏe tham gia, bắt buộc mặc áo phao và tuân thủ hướng dẫn an toàn biển.',
-            cancellationPolicy: 'Hoàn tiền 100% trước 24 giờ. Hoàn tiền 100% nếu biển động theo quy định cảng vụ.',
-          };
-
-          setService(mappedFallback);
-          if (mappedFallback.options.length > 0) setSelectedOptionId(mappedFallback.options[0].id);
-          if (mappedFallback.slots.length > 0) {
-            setSelectedDate(mappedFallback.slots[0].date);
-            setSelectedSlotId(mappedFallback.slots[0].slotId);
-          }
-        } else {
-          setLoadError(true);
-        }
+        setService(null);
+        setLoadError(true);
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
@@ -276,6 +142,35 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
       isMounted = false;
     };
   }, [id, language]);
+
+  // Fetch slots whenever user changes selected option
+  useEffect(() => {
+    const targetServiceId = service?.id || id;
+    if (!targetServiceId || !selectedOptionId) return;
+
+    let isMounted = true;
+    serviceCatalogService
+      .getServiceSlots(targetServiceId, { optionId: selectedOptionId })
+      .then((slots) => {
+        if (!isMounted) return;
+        setService((prev) => (prev ? { ...prev, slots } : prev));
+        if (slots && slots.length > 0) {
+          const firstBookable = slots.find((s) => s.bookable && s.availableCapacity > 0) || slots[0];
+          setSelectedDate(firstBookable.date);
+          setSelectedSlotId(firstBookable.slotId);
+        } else {
+          setSelectedDate('');
+          setSelectedSlotId(null);
+        }
+      })
+      .catch((err) => {
+        console.warn('[ExperienceDetail] Lỗi cập nhật slot theo option:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, service?.id, selectedOptionId]);
 
   // Customer Reviews state & fetch effect using resolved service.id (UUID)
   const [reviews, setReviews] = useState<ReviewResponse[]>([]);
@@ -439,6 +334,20 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
     return slotsForSelectedDate.find((s) => s.slotId === selectedSlotId) || slotsForSelectedDate[0];
   }, [slotsForSelectedDate, selectedSlotId]);
 
+  // Activity duration in minutes: Authoritative from service.duration (configured by vendor)
+  const activeSlotDuration = useMemo(() => {
+    if (service?.duration && service.duration > 0) {
+      return service.duration;
+    }
+    if (activeSlot?.startTime && activeSlot?.endTime) {
+      const [startH, startM] = activeSlot.startTime.split(':').map(Number);
+      const [endH, endM] = activeSlot.endTime.split(':').map(Number);
+      const diff = (endH * 60 + endM) - (startH * 60 + startM);
+      if (diff > 0) return diff;
+    }
+    return 60;
+  }, [activeSlot, service]);
+
   // Pricing calculation
   const unitPrice = selectedOption ? selectedOption.price : (service?.price || 0);
   const totalPrice = qty * unitPrice;
@@ -448,11 +357,12 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
   const isSoldOut = activeSlot ? activeSlot.availableCapacity <= 0 : false;
 
   const isItemInCart = useMemo(() => {
+    if (editingCartItem) return false;
     if (!service || !activeSlot) return false;
     return cartItems.some(
       (item) => item.serviceId === service.id && item.slotId === activeSlot.slotId
     );
-  }, [cartItems, service, activeSlot]);
+  }, [cartItems, service, activeSlot, editingCartItem]);
 
   // Pure Vietnamese normalizers for demo/seed data
   const localizedSafetyRules = useMemo(() => {
@@ -477,36 +387,13 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
 
   const imageUrls = service?.imageUrls;
   const allImages: string[] = useMemo(() => {
-    if (imageUrls && imageUrls.length >= 4) {
-      return imageUrls;
-    }
     if (imageUrls && imageUrls.length > 0) {
-      const defaults = [
-        'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800',
-        'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
-        'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
-        'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=800',
-      ];
-      return Array.from(new Set([...imageUrls, ...defaults])).slice(0, 6);
+      return imageUrls;
     }
     return [
       'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800',
-      'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
-      'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=800',
     ];
   }, [imageUrls]);
-
-  const mosaicImages: string[] = useMemo(() => {
-    const fallbacks = [
-      'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=1200',
-      'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
-      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800',
-      'https://images.unsplash.com/photo-1510414842594-a61c69b5ae57?w=800',
-      'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800',
-    ];
-    return Array.from(new Set([...allImages, ...fallbacks])).slice(0, 5);
-  }, [allImages]);
 
   // Infinite Carousel Slides Track: [cloneLast, ...allImages, cloneFirst]
   const slides = useMemo(() => {
@@ -596,6 +483,23 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
 
     setIsAdding(true);
     setTimeout(() => {
+      if (editingCartItem) {
+        updateCartItem(editingCartItem.id, {
+          slotId: activeSlot.slotId,
+          optionId: selectedOption?.id || activeSlot.optionId,
+          quantity: qty,
+          unitPrice: unitPrice,
+          serviceName: `${service.name}${selectedOption ? ` (${selectedOption.name})` : ''}`,
+          thumbnailUrl: (service.imageUrls && service.imageUrls.length > 0) ? service.imageUrls[0] : 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800',
+          date: activeSlot.date,
+          timeSlot: `${activeSlot.startTime} - ${activeSlot.endTime}`,
+          selectedDate: activeSlot.date,
+        });
+        setIsAdding(false);
+        navigate('/cart');
+        return;
+      }
+
       addItem({
         serviceId: service.id,
         slotId: activeSlot.slotId,
@@ -715,20 +619,26 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                 {service.name}
               </h1>
               <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-sm text-slate-700">
-                <div className="flex items-center gap-1.5 text-slate-900 font-bold">
-                  <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
-                  <span className="tabular-nums">{service.averageRating ? service.averageRating.toFixed(2) : '5.0'}</span>
-                  <span className="text-slate-500 font-normal tabular-nums">({service.reviewCount || 100})</span>
-                </div>
+                {service.reviewCount && service.reviewCount > 0 ? (
+                  <div className="flex items-center gap-1.5 text-slate-900 font-bold">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+                    <span className="tabular-nums">{service.averageRating ? service.averageRating.toFixed(1) : '5.0'}</span>
+                    <span className="text-slate-500 font-normal tabular-nums">({service.reviewCount})</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-slate-600 font-medium text-xs">
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold">Chưa có đánh giá</span>
+                  </div>
+                )}
                 <span className="text-slate-300">•</span>
                 <div className="flex items-center gap-1.5 text-slate-700 font-medium">
                   <Clock className="w-4 h-4 text-sky-600" />
-                  <span className="tabular-nums">{service.duration || 120} phút</span>
+                  <span className="tabular-nums">{activeSlotDuration} phút</span>
                 </div>
                 <span className="text-slate-300">•</span>
                 <div className="flex items-center gap-1.5 text-slate-700 font-medium">
                   <Eye className="w-4 h-4 text-sky-600" />
-                  <span className="tabular-nums">{service.viewCount || 1500} lượt xem</span>
+                  <span className="tabular-nums">{service.viewCount ?? 0} lượt xem</span>
                 </div>
               </div>
             </div>
@@ -754,86 +664,94 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
               AIRBNB SIGNATURE PHOTO GALLERY: Mosaic 5-Photo Grid (Desktop) & Carousel (Mobile)
              ========================================================================= */}
           <section data-ui="gallery" className="w-full">
-            {/* Desktop / Tablet: Signature Airbnb 5-Photo Mosaic Grid */}
-            <div className="hidden md:grid grid-cols-4 grid-rows-2 gap-2.5 h-[420px] rounded-2xl overflow-hidden relative shadow-xs border border-slate-200/80 bg-slate-100">
-              {/* Photo 1: Large Main Image (Left 50%) */}
+            {/* Desktop / Tablet: Adaptive Real Photo Grid */}
+            {allImages.length <= 1 ? (
               <div
                 onClick={() => handleOpenLightbox(0)}
-                className="col-span-2 row-span-2 relative group overflow-hidden cursor-pointer select-none"
+                className="hidden md:block h-[420px] rounded-2xl overflow-hidden relative shadow-xs border border-slate-200/80 bg-slate-100 cursor-pointer group select-none"
               >
                 <img
-                  src={mosaicImages[0]}
+                  src={allImages[0]}
                   alt={`${service.name} - Ảnh chính`}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                 />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
               </div>
-
-              {/* Photo 2: Top Mid */}
-              <div
-                onClick={() => handleOpenLightbox(1)}
-                className="relative group overflow-hidden cursor-pointer select-none"
-              >
-                <img
-                  src={mosaicImages[1]}
-                  alt={`${service.name} - Ảnh 2`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+            ) : allImages.length === 2 ? (
+              <div className="hidden md:grid grid-cols-2 gap-2.5 h-[420px] rounded-2xl overflow-hidden relative shadow-xs border border-slate-200/80 bg-slate-100 select-none">
+                {allImages.slice(0, 2).map((img, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleOpenLightbox(idx)}
+                    className="relative group overflow-hidden cursor-pointer"
+                  >
+                    <img
+                      src={img}
+                      alt={`${service.name} - Ảnh ${idx + 1}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                  </div>
+                ))}
               </div>
-
-              {/* Photo 3: Top Right */}
-              <div
-                onClick={() => handleOpenLightbox(2)}
-                className="relative group overflow-hidden cursor-pointer select-none"
-              >
-                <img
-                  src={mosaicImages[2]}
-                  alt={`${service.name} - Ảnh 3`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-              </div>
-
-              {/* Photo 4: Bottom Mid */}
-              <div
-                onClick={() => handleOpenLightbox(3)}
-                className="relative group overflow-hidden cursor-pointer select-none"
-              >
-                <img
-                  src={mosaicImages[3]}
-                  alt={`${service.name} - Ảnh 4`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-              </div>
-
-              {/* Photo 5: Bottom Right with Floating "Show all photos" Button */}
-              <div
-                onClick={() => handleOpenLightbox(4)}
-                className="relative group overflow-hidden cursor-pointer select-none"
-              >
-                <img
-                  src={mosaicImages[4]}
-                  alt={`${service.name} - Ảnh 5`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-
-                {/* Floating "Show all photos" Pill */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenLightbox(0);
-                  }}
-                  className="absolute bottom-3 right-3 px-3.5 py-2 rounded-xl bg-white/95 backdrop-blur-md text-slate-900 border border-slate-200 text-xs font-semibold shadow-xs flex items-center gap-1.5 hover:bg-white transition-all cursor-pointer z-10 active:scale-95"
+            ) : allImages.length === 3 ? (
+              <div className="hidden md:grid grid-cols-4 grid-rows-2 gap-2.5 h-[420px] rounded-2xl overflow-hidden relative shadow-xs border border-slate-200/80 bg-slate-100 select-none">
+                <div
+                  onClick={() => handleOpenLightbox(0)}
+                  className="col-span-2 row-span-2 relative group overflow-hidden cursor-pointer"
                 >
-                  <Grid className="w-3.5 h-3.5" />
-                  <span>Hiển thị tất cả {allImages.length} ảnh</span>
-                </button>
+                  <img
+                    src={allImages[0]}
+                    alt={`${service.name} - Ảnh chính`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                </div>
+                {allImages.slice(1, 3).map((img, idx) => (
+                  <div
+                    key={idx + 1}
+                    onClick={() => handleOpenLightbox(idx + 1)}
+                    className="col-span-2 row-span-1 relative group overflow-hidden cursor-pointer"
+                  >
+                    <img
+                      src={img}
+                      alt={`${service.name} - Ảnh ${idx + 2}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                  </div>
+                ))}
+                
               </div>
-            </div>
+            ) : (
+              <div className="hidden md:grid grid-cols-4 grid-rows-2 gap-2.5 h-[420px] rounded-2xl overflow-hidden relative shadow-xs border border-slate-200/80 bg-slate-100 select-none">
+                <div
+                  onClick={() => handleOpenLightbox(0)}
+                  className="col-span-2 row-span-2 relative group overflow-hidden cursor-pointer select-none"
+                >
+                  <img
+                    src={allImages[0]}
+                    alt={`${service.name} - Ảnh chính`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                </div>
+                {allImages.slice(1, 5).map((img, idx) => (
+                  <div
+                    key={idx + 1}
+                    onClick={() => handleOpenLightbox(idx + 1)}
+                    className="relative group overflow-hidden cursor-pointer select-none"
+                  >
+                    <img
+                      src={img}
+                      alt={`${service.name} - Ảnh ${idx + 2}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                  </div>
+                ))}
+                
+              </div>
+            )}
 
             {/* Mobile: Swiper Carousel */}
             <div className="block md:hidden">
@@ -922,7 +840,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5 text-sm">
                     <div className="flex items-baseline gap-2 text-slate-700">
                       <span className="text-slate-500 whitespace-nowrap shrink-0">Thời lượng:</span>
-                      <span className="font-semibold text-slate-900">{service.duration || 120} phút / ca</span>
+                      <span className="font-semibold text-slate-900">{activeSlotDuration} phút / ca</span>
                     </div>
                     <div className="flex items-baseline gap-2 text-slate-700">
                       <span className="text-slate-500 whitespace-nowrap shrink-0">Sức chứa:</span>
@@ -976,7 +894,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                             )}
                           </div>
                           <div className="flex items-baseline gap-1.5 sm:justify-end shrink-0 whitespace-nowrap">
-                            <span className="font-black text-lg text-sky-700 tabular-nums">
+                            <span className="font-black text-lg text-[#991b1b] tabular-nums">
                               {opt.price.toLocaleString('vi-VN')}₫
                             </span>
                             <span className="text-[13px] text-slate-500 font-medium">
@@ -999,7 +917,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                 <div className="flex flex-col gap-4">
                   {/* Price Display */}
                   <div className="border-b border-slate-100 pb-3 flex items-baseline gap-1.5 flex-wrap">
-                    <span className="text-3xl font-black text-sky-700 tabular-nums tracking-tight">
+                    <span className="text-3xl font-black text-[#991b1b] tabular-nums tracking-tight">
                       {unitPrice.toLocaleString('vi-VN')}₫
                     </span>
                     <span className="text-[13px] text-slate-500 font-medium whitespace-nowrap">
@@ -1129,9 +1047,22 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
 
                 {/* Lower Summary & Actions */}
                 <div className="flex flex-col gap-3 pt-4 border-t border-slate-100 mt-2">
+                  {editingCartItem && (
+                    <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium flex items-center justify-between gap-2">
+                      <span>Đang cập nhật lịch cho mục trong giỏ hàng</span>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/cart')}
+                        className="text-amber-700 underline font-semibold hover:text-amber-900 cursor-pointer"
+                      >
+                        Quay lại giỏ
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex items-baseline justify-between">
                     <span className="text-sm font-semibold text-slate-600">Tổng tạm tính:</span>
-                    <span className="text-2xl font-black text-sky-700 tabular-nums">
+                    <span className="text-2xl font-black text-[#991b1b] tabular-nums">
                       {totalPrice.toLocaleString('vi-VN')}₫
                     </span>
                   </div>
@@ -1166,7 +1097,9 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                           : 'bg-[#0284c7] hover:bg-[#0369a1] text-white active:scale-98'
                       }`}
                     >
-                      {isAdding ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}
+                      {isAdding
+                        ? (editingCartItem ? 'Đang cập nhật...' : 'Đang thêm...')
+                        : (editingCartItem ? 'Cập nhật giỏ hàng' : 'Thêm vào giỏ hàng')}
                     </button>
                   )}
 
@@ -1187,16 +1120,24 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
             {/* Header: Star rating & Total review count & Verification badge */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <div className="flex items-center gap-3 flex-wrap">
-                <div className="flex items-center gap-1.5 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                  <Star className="w-7 h-7 fill-amber-400 text-amber-400" />
-                  <span className="tabular-nums">
-                    {service.averageRating && service.averageRating > 0 ? service.averageRating.toFixed(2) : '5.00'}
-                  </span>
-                </div>
-                <span className="text-slate-300 text-2xl font-light">·</span>
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                  {reviewsTotal > 0 ? `${reviewsTotal} đánh giá từ du khách` : 'Đánh giá từ khách hàng'}
-                </h2>
+                {reviewsTotal > 0 ? (
+                  <>
+                    <div className="flex items-center gap-1.5 text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                      <Star className="w-7 h-7 fill-amber-400 text-amber-400" />
+                      <span className="tabular-nums">
+                        {service.averageRating ? service.averageRating.toFixed(2) : '5.00'}
+                      </span>
+                    </div>
+                    <span className="text-slate-300 text-2xl font-light">·</span>
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                      {reviewsTotal} đánh giá từ du khách
+                    </h2>
+                  </>
+                ) : (
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                    Đánh giá từ khách hàng
+                  </h2>
+                )}
               </div>
 
               {/* Verified Guest Badge */}
