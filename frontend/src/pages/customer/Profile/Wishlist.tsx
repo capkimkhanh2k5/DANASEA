@@ -252,20 +252,17 @@ export function Wishlist() {
                 <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight">
                   Danh sách yêu thích
                 </h1>
-                <p className="text-sm text-slate-600 mt-1">
-                  {wishlist.length} trải nghiệm đã lưu vào bộ sưu tập
-                </p>
               </div>
 
               {wishlist.length > 0 && (
                 <button
                   type="button"
                   onClick={handleAddAllToCart}
-                  className="px-4 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-xs self-start sm:self-auto"
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-xs self-start sm:self-auto"
                 >
-                  <ShoppingCart className="w-4 h-4" />
+                  <ShoppingCart className="w-4 h-4 text-white" />
                   <span>Thêm tất cả vào giỏ hàng</span>
-                  <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-white font-mono text-[11px] font-bold">
+                  <span className="px-1.5 py-0.5 rounded-md bg-white/20 text-white font-mono text-[11px] font-bold tabular-nums">
                     {wishlist.length}
                   </span>
                 </button>
