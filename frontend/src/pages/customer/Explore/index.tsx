@@ -616,8 +616,9 @@ export function Explore() {
               pointerEvents = 'auto';
               boxShadow = '0 10px 30px -10px rgba(15, 23, 42, 0.25)';
               // Gradual fade: sharp near center card edge, fading towards the outer left edge
-              maskImage = 'linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 35%, rgba(0,0,0,0.3) 75%, rgba(0,0,0,0) 100%)';
-              webkitMaskImage = 'linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 35%, rgba(0,0,0,0.3) 75%, rgba(0,0,0,0) 100%)';
+              // Gentle fade: 100% clarity near center card, softly easing to 72% at the far outer edge
+              maskImage = 'linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.96) 45%, rgba(0,0,0,0.72) 100%)';
+              webkitMaskImage = 'linear-gradient(to left, rgba(0,0,0,1) 0%, rgba(0,0,0,0.96) 45%, rgba(0,0,0,0.72) 100%)';
             } else if (isRight) {
               // Center card covers ~50% of the right card width
               transform = isMobile
@@ -628,8 +629,9 @@ export function Explore() {
               pointerEvents = 'auto';
               boxShadow = '0 10px 30px -10px rgba(15, 23, 42, 0.25)';
               // Gradual fade: sharp near center card edge, fading towards the outer right edge
-              maskImage = 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 35%, rgba(0,0,0,0.3) 75%, rgba(0,0,0,0) 100%)';
-              webkitMaskImage = 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 35%, rgba(0,0,0,0.3) 75%, rgba(0,0,0,0) 100%)';
+              // Gentle fade: 100% clarity near center card, softly easing to 72% at the far outer edge
+              maskImage = 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0.96) 45%, rgba(0,0,0,0.72) 100%)';
+              webkitMaskImage = 'linear-gradient(to right, rgba(0,0,0,1) 0%, rgba(0,0,0,0.96) 45%, rgba(0,0,0,0.72) 100%)';
             } else if (diff < -1) {
               transform = isMobile
                 ? 'translate(-140%, -50%) scale(0.7)'
@@ -671,7 +673,7 @@ export function Explore() {
                   WebkitMaskImage: webkitMaskImage,
                 }}
                 className={`absolute top-1/2 left-1/2 w-[84%] sm:w-[50%] md:w-[46%] lg:w-[42%] max-w-[540px] h-[450px] sm:h-[510px] lg:h-[530px] rounded-3xl overflow-hidden transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] will-change-transform group ${
-                  isCenter ? 'ring-1 ring-white/20' : 'cursor-pointer hover:opacity-90'
+                  isCenter ? 'ring-1 ring-white/20' : 'cursor-pointer hover:opacity-100'
                 }`}
               >
                 {/* Full-bleed Background Image */}
@@ -689,13 +691,7 @@ export function Explore() {
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent" />
                 <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
 
-                {/* Subtle Edge-Fade Gradient Layer for Left/Right Flanking Cards */}
-                {isLeft && (
-                  <div className="absolute inset-0 bg-gradient-to-l from-transparent via-slate-950/20 to-slate-950/60 pointer-events-none" />
-                )}
-                {isRight && (
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-950/20 to-slate-950/60 pointer-events-none" />
-                )}
+                
 
                 {/* Top Rating Pill */}
                 <div className="absolute top-4 left-4 sm:top-5 sm:left-5 px-3 py-1.5 rounded-xl bg-slate-950/60 backdrop-blur-md border border-white/20 flex items-center gap-1.5 text-white text-xs font-bold shadow-sm">
