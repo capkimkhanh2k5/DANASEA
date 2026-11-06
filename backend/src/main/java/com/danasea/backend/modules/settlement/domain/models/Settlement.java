@@ -29,6 +29,13 @@ public class Settlement {
     private BigDecimal totalNetPayout;
     @Builder.Default
     private BigDecimal vendorFaultCompensationDeductedAmount = BigDecimal.ZERO;
+    @Builder.Default
+    private BigDecimal safetyRebateRate = BigDecimal.ZERO;
+    @Builder.Default
+    private BigDecimal safetyRebateAmount = BigDecimal.ZERO;
+    @Builder.Default
+    private Boolean safetyRebateQualified = false;
+    private String safetyRebateNote;
     private SettlementStatus status;
     private OffsetDateTime generatedAt;
     private OffsetDateTime createdAt;

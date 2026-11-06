@@ -116,7 +116,7 @@ public class DiscountPreviewUseCase {
         // 4. Chuẩn bị danh sách CandidateItem
         List<CandidateItem> candidateItems = new ArrayList<>();
         for (BookingOrderView.BookingItemOrderView item : booking.items()) {
-            BigDecimal rate = commissionPolicyPort != null ? commissionPolicyPort.getCommissionRate(item.vendorId()) : null;
+            BigDecimal rate = commissionPolicyPort != null ? commissionPolicyPort.resolveCommissionRate(item.vendorId(), item.serviceId(), null) : null;
             if (rate == null) {
                 throw new FlashSaleException("COMMISSION_POLICY_MISSING");
             }

@@ -1,8 +1,10 @@
 package com.danasea.backend.modules.admin.presentation;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -10,7 +12,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaCategoryRepository;
+import com.danasea.backend.modules.systemconfig.infrastructure.persistence.entities.CommissionRuleJpaEntity;
 import com.danasea.backend.modules.systemconfig.infrastructure.persistence.entities.SystemConfigJpaEntity;
+import com.danasea.backend.modules.systemconfig.infrastructure.persistence.repositories.JpaCommissionRuleRepository;
 import com.danasea.backend.modules.systemconfig.infrastructure.persistence.repositories.JpaSystemConfigRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
 
@@ -23,6 +28,12 @@ import lombok.RequiredArgsConstructor;
 public class AdminSystemConfigController {
 
     private final JpaSystemConfigRepository repository;
+    private final JpaCommissionRuleRepository commissionRuleRepository;
+    private final JpaCategoryRepository categoryRepository;
+
+    public AdminSystemConfigController(JpaSystemConfigRepository repository) {
+        this(repository, null, null);
+    }
 
     public record ConfigDto(String key, String value, String description, OffsetDateTime updatedAt, UUID updatedBy) {
         public static ConfigDto fromEntity(SystemConfigJpaEntity entity) {
@@ -31,6 +42,61 @@ public class AdminSystemConfigController {
     }
 
     public record UpdateConfigRequest(String value, String description) {}
+
+    public record CommissionRuleDto(
+            UUID id,
+            String ruleCode,
+            String ruleName,
+            String targetType,
+            UUID categoryId,
+            String categoryName,
+            String categorySlug,
+            UUID vendorId,
+            BigDecimal commissionRate,
+            BigDecimal commissionRatePercent,
+            Integer durationDays,
+            Integer priority,
+            Boolean isActive,
+            String description,
+            OffsetDateTime updatedAt,
+            UUID updatedBy
+    ) {
+        public static CommissionRuleDto fromEntity(
+                CommissionRuleJpaEntity entity,
+                Map<UUID, String> categoryNames,
+                Map<UUID, String> categorySlugs) {
+            BigDecimal percent = entity.getCommissionRate() != null
+                    ? entity.getCommissionRate().multiply(new BigDecimal("100")).stripTrailingZeros()
+                    : BigDecimal.ZERO;
+            String catName = entity.getCategoryId() != null ? categoryNames.get(entity.getCategoryId()) : null;
+            String catSlug = entity.getCategoryId() != null ? categorySlugs.get(entity.getCategoryId()) : null;
+            return new CommissionRuleDto(
+                    entity.getId(),
+                    entity.getRuleCode(),
+                    entity.getRuleName(),
+                    entity.getTargetType(),
+                    entity.getCategoryId(),
+                    catName,
+                    catSlug,
+                    entity.getVendorId(),
+                    entity.getCommissionRate(),
+                    percent,
+                    entity.getDurationDays(),
+                    entity.getPriority(),
+                    entity.getIsActive(),
+                    entity.getDescription(),
+                    entity.getUpdatedAt(),
+                    entity.getUpdatedBy()
+            );
+        }
+    }
+
+    public record UpdateCommissionRuleRequest(
+            BigDecimal commissionRatePercent,
+            Integer durationDays,
+            Boolean isActive,
+            String description
+    ) {}
 
     @GetMapping
     public ResponseEntity<List<ConfigDto>> getAllConfigs() {
@@ -80,6 +146,72 @@ public class AdminSystemConfigController {
 
         SystemConfigJpaEntity saved = repository.save(entity);
         return ResponseEntity.ok(ConfigDto.fromEntity(saved));
+    }
+
+    @GetMapping("/commission-rules")
+    public ResponseEntity<List<CommissionRuleDto>> getCommissionRules() {
+        Map<UUID, String> categoryNames = new HashMap<>();
+        Map<UUID, String> categorySlugs = new HashMap<>();
+        if (categoryRepository != null) {
+            categoryRepository.findAll().forEach(cat -> {
+                categoryNames.put(cat.getId(), cat.getName());
+                categorySlugs.put(cat.getId(), cat.getSlug());
+            });
+        }
+
+        List<CommissionRuleDto> rules = commissionRuleRepository.findAllByOrderByPriorityDescCreatedAtAsc().stream()
+                .map(r -> CommissionRuleDto.fromEntity(r, categoryNames, categorySlugs))
+                .toList();
+        return ResponseEntity.ok(rules);
+    }
+
+    @PutMapping("/commission-rules/{id}")
+    @Transactional
+    public ResponseEntity<CommissionRuleDto> updateCommissionRule(
+            @PathVariable UUID id,
+            @RequestBody UpdateCommissionRuleRequest request) {
+        UUID actorId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new AccessDeniedException("Admin identity required"));
+
+        CommissionRuleJpaEntity entity = commissionRuleRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Commission rule not found with ID: " + id));
+
+        if (request.commissionRatePercent() != null) {
+            BigDecimal percent = request.commissionRatePercent();
+            if (percent.compareTo(BigDecimal.ZERO) < 0 || percent.compareTo(new BigDecimal("100")) > 0) {
+                throw new IllegalArgumentException("Commission rate percent must be between 0 and 100");
+            }
+            entity.setCommissionRate(percent.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP));
+        }
+
+        if (request.durationDays() != null) {
+            if (request.durationDays() <= 0) {
+                throw new IllegalArgumentException("Duration days must be positive");
+            }
+            entity.setDurationDays(request.durationDays());
+        }
+
+        if (request.isActive() != null) {
+            entity.setIsActive(request.isActive());
+        }
+
+        if (request.description() != null) {
+            entity.setDescription(request.description().trim());
+        }
+
+        entity.setUpdatedBy(actorId);
+        CommissionRuleJpaEntity saved = commissionRuleRepository.save(entity);
+
+        Map<UUID, String> categoryNames = new HashMap<>();
+        Map<UUID, String> categorySlugs = new HashMap<>();
+        if (categoryRepository != null && saved.getCategoryId() != null) {
+            categoryRepository.findById(saved.getCategoryId()).ifPresent(cat -> {
+                categoryNames.put(cat.getId(), cat.getName());
+                categorySlugs.put(cat.getId(), cat.getSlug());
+            });
+        }
+
+        return ResponseEntity.ok(CommissionRuleDto.fromEntity(saved, categoryNames, categorySlugs));
     }
 
     private void validateCommissionRate(String val) {

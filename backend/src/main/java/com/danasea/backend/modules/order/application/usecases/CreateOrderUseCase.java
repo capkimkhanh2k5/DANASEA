@@ -229,7 +229,7 @@ public class CreateOrderUseCase {
 
             List<CandidateItem> candidateItems = new ArrayList<>();
             for (BookingOrderView.BookingItemOrderView item : booking.items()) {
-                BigDecimal rate = commissionPolicyPort != null ? commissionPolicyPort.getCommissionRate(item.vendorId()) : null;
+                BigDecimal rate = commissionPolicyPort != null ? commissionPolicyPort.resolveCommissionRate(item.vendorId(), item.serviceId(), null) : null;
                 if (rate == null) {
                     throw new FlashSaleException("COMMISSION_POLICY_MISSING");
                 }
@@ -289,7 +289,7 @@ public class CreateOrderUseCase {
         List<SubOrder> subOrders = new ArrayList<>();
         for (BookingOrderView.BookingItemOrderView item : booking.items()) {
             var promotion=flashSale!=null?flashSale.snapshot(item.bookingItemId()).orElse(null):null;
-            BigDecimal rate = promotion!=null?promotion.commissionRate():commissionPolicyPort != null ? commissionPolicyPort.getCommissionRate(item.vendorId()) : null;
+            BigDecimal rate = promotion!=null?promotion.commissionRate():commissionPolicyPort != null ? commissionPolicyPort.resolveCommissionRate(item.vendorId(), item.serviceId(), null) : null;
             if (rate == null) {
                 throw new FlashSaleException("COMMISSION_POLICY_MISSING");
             }

@@ -1,11 +1,14 @@
 package com.danasea.backend.modules.settlement.application.usecases;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +38,7 @@ import com.danasea.backend.modules.settlement.infrastructure.persistence.entitie
 import com.danasea.backend.modules.settlement.infrastructure.persistence.mappers.SettlementMapper;
 import com.danasea.backend.modules.settlement.infrastructure.persistence.repositories.JpaSettlementLineItemRepository;
 import com.danasea.backend.modules.settlement.infrastructure.persistence.repositories.JpaSettlementRepository;
+import com.danasea.backend.modules.systemconfig.infrastructure.persistence.repositories.JpaSystemConfigRepository;
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
 
 @Service
@@ -49,6 +53,20 @@ public class GenerateSettlementUseCase {
     private final SettlementCalculationEngine calculationEngine;
     private final SettlementMapper mapper;
     private final VendorInternalApi vendorInternalApi;
+
+    @Autowired(required = false)
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired(required = false)
+    private JpaSystemConfigRepository systemConfigRepository;
+
+    public void setJdbcTemplate(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public void setSystemConfigRepository(JpaSystemConfigRepository systemConfigRepository) {
+        this.systemConfigRepository = systemConfigRepository;
+    }
 
     @Autowired
     public GenerateSettlementUseCase(
@@ -213,6 +231,78 @@ public class GenerateSettlementUseCase {
             }
         }
 
+        // 5.1. Đánh giá Quỹ thưởng An toàn Biển (Safety Rebate 2.0% tiền mặt)
+        BigDecimal rebateRate = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+        BigDecimal rebateAmount = BigDecimal.ZERO.setScale(SettlementCalculationEngine.SCALE, SettlementCalculationEngine.ROUNDING);
+        boolean rebateQualified = false;
+        String rebateNote = null;
+
+        boolean rebateEnabled = true;
+        if (systemConfigRepository != null) {
+            var enabledOpt = systemConfigRepository.findByKey("SAFETY_REBATE_ENABLED");
+            if (enabledOpt.isPresent() && "false".equalsIgnoreCase(enabledOpt.get().getValue())) {
+                rebateEnabled = false;
+            }
+        }
+
+        if (rebateEnabled && totalGross.signum() > 0) {
+            BigDecimal configRate = new BigDecimal("0.0200");
+            if (systemConfigRepository != null) {
+                var rateOpt = systemConfigRepository.findByKey("SAFETY_REBATE_RATE");
+                if (rateOpt.isPresent() && rateOpt.get().getValue() != null && !rateOpt.get().getValue().isBlank()) {
+                    try {
+                        BigDecimal parsed = new BigDecimal(rateOpt.get().getValue().trim());
+                        if (parsed.compareTo(BigDecimal.ONE) > 0) {
+                            parsed = parsed.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
+                        }
+                        if (parsed.signum() >= 0 && parsed.compareTo(BigDecimal.ONE) <= 0) {
+                            configRate = parsed;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            boolean hasNoActiveDisputes = activeDisputeSubOrderIds.isEmpty();
+            boolean hasNoVendorFault = true;
+            if (jdbcTemplate != null) {
+                try {
+                    Integer faultCount = jdbcTemplate.queryForObject(
+                            "SELECT count(*) FROM vendor_fault_compensations WHERE vendor_id = ? AND created_at >= ? AND created_at <= ?",
+                            Integer.class,
+                            vendorId,
+                            periodStart.atStartOfDay(ZoneId.of("Asia/Ho_Chi_Minh")).toOffsetDateTime(),
+                            periodEnd.atTime(java.time.LocalTime.MAX).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toOffsetDateTime()
+                    );
+                    if (faultCount != null && faultCount > 0) {
+                        hasNoVendorFault = false;
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            boolean highRating = false;
+            var vendorOpt = vendorInternalApi.findById(vendorId);
+            if (vendorOpt.isPresent()) {
+                var vendor = vendorOpt.get();
+                if (vendor.getRatingAvg() != null && vendor.getRatingCount() != null && vendor.getRatingCount() >= 5) {
+                    highRating = vendor.getRatingAvg().compareTo(new BigDecimal("4.80")) >= 0;
+                }
+            }
+
+            if (hasNoActiveDisputes && hasNoVendorFault && highRating) {
+                rebateQualified = true;
+                rebateRate = configRate;
+                rebateAmount = totalGross.multiply(rebateRate).setScale(SettlementCalculationEngine.SCALE, SettlementCalculationEngine.ROUNDING);
+                totalNetPayout = totalNetPayout.add(rebateAmount);
+                rebateNote = "Đủ điều kiện nhận Quỹ thưởng An toàn Biển & Vận hành xuất sắc (+" + rebateRate.multiply(new BigDecimal("100")).stripTrailingZeros().toPlainString() + "%)";
+            } else {
+                List<String> reasons = new ArrayList<>();
+                if (!hasNoActiveDisputes) reasons.add("Có khiếu nại chưa đóng");
+                if (!hasNoVendorFault) reasons.add("Có lỗi phạt hủy chuyến");
+                if (!highRating) reasons.add("Điểm đánh giá chưa đạt 4.8*");
+                rebateNote = "Không đủ điều kiện thưởng An toàn: " + String.join(", ", reasons);
+            }
+        }
+
         // 6. Lưu hoặc cập nhật Settlement
         SettlementJpaEntity settlementEntity;
         if (existingOpt.isPresent()) {
@@ -221,6 +311,10 @@ public class GenerateSettlementUseCase {
             settlementEntity.setGrossAmount(totalGross);
             settlementEntity.setCommissionAmount(totalCommission);
             settlementEntity.setNetPayableAmount(totalNetPayout);
+            settlementEntity.setSafetyRebateRate(rebateRate);
+            settlementEntity.setSafetyRebateAmount(rebateAmount);
+            settlementEntity.setSafetyRebateQualified(rebateQualified);
+            settlementEntity.setSafetyRebateNote(rebateNote);
             settlementEntity.setGeneratedAt(OffsetDateTime.now());
             settlementEntity = settlementRepository.save(settlementEntity);
         } else {
@@ -231,6 +325,10 @@ public class GenerateSettlementUseCase {
                     .grossAmount(totalGross)
                     .commissionAmount(totalCommission)
                     .netPayableAmount(totalNetPayout)
+                    .safetyRebateRate(rebateRate)
+                    .safetyRebateAmount(rebateAmount)
+                    .safetyRebateQualified(rebateQualified)
+                    .safetyRebateNote(rebateNote)
                     .status(SettlementStatus.DRAFT)
                     .generatedAt(OffsetDateTime.now())
                     .build();
