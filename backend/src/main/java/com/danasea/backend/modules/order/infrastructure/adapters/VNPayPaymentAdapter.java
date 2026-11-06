@@ -68,6 +68,11 @@ public class VNPayPaymentAdapter implements PaymentGatewayPort {
                 .build();
     }
 
+    @Override
+    public boolean supportsProvider(PaymentProvider provider) {
+        return provider == PaymentProvider.VNPAY;
+    }
+
     public VNPayPaymentAdapter(VNPayProperties vnpayProperties) {
         this(vnpayProperties, RestClient.builder(), new ObjectMapper());
     }

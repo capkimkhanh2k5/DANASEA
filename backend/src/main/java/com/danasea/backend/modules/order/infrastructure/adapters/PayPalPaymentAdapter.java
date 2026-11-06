@@ -88,6 +88,11 @@ public class PayPalPaymentAdapter implements PaymentGatewayPort {
         });
     }
 
+    @Override
+    public boolean supportsProvider(PaymentProvider provider) {
+        return provider == PaymentProvider.PAYPAL;
+    }
+
     /**
      * Lấy OAuth2 Access Token từ PayPal Client Credentials.
      */

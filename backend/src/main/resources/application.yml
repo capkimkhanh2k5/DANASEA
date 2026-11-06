@@ -185,3 +185,20 @@ ai:
     max-input-tokens: ${AI_CLIPROXY_MAX_INPUT_TOKENS:1048576}
     fallback-context-tokens: ${AI_CLIPROXY_FALLBACK_CONTEXT_TOKENS:131072}
     input-safety-tokens: ${AI_CLIPROXY_INPUT_SAFETY_TOKENS:8192}
+
+danasea:
+  payment:
+    payos:
+      client-id: ${PAYOS_CLIENT_ID:}
+      api-key: ${PAYOS_API_KEY:}
+      checksum-key: ${PAYOS_CHECKSUM_KEY:}
+      base-url: ${PAYOS_BASE_URL:https://api-merchant.payos.vn}
+      return-url: ${PAYOS_RETURN_URL:http://localhost:3000/payment/success}
+      cancel-url: ${PAYOS_CANCEL_URL:http://localhost:3000/payment/cancel}
+    zalopay:
+      app-id: ${ZALOPAY_APP_ID:2554}
+      key1: ${ZALOPAY_KEY1:}
+      key2: ${ZALOPAY_KEY2:}
+      endpoint: ${ZALOPAY_ENDPOINT:https://sb-openapi.zalopay.vn/v2}
+      return-url: ${ZALOPAY_RETURN_URL:http://localhost:3000/payment/success}
+      cancel-url: ${ZALOPAY_CANCEL_URL:http://localhost:3000/payment/cancel}

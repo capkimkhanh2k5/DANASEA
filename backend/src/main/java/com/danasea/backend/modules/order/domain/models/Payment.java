@@ -27,4 +27,15 @@ public class Payment extends BaseDomainModel {
     private BigDecimal exchangeRate;
     private LocalDate exchangeRateDate;
     private String exchangeRateSource;
+
+    // 5+5 Multi-Attempt Tracking
+    private Integer attemptNumber = 1;
+    private PaymentAttemptState attemptState = PaymentAttemptState.PENDING;
+    private OffsetDateTime danaseaDeadlineAt;
+    private OffsetDateTime providerExpiresAt;
+    private OffsetDateTime canceledAt;
+    private PaymentCancelStatus cancelStatus = PaymentCancelStatus.NONE;
+    private Boolean isActive = false;
+    private Boolean isCanonical = false;
+    private Long payosOrderCode;
 }

@@ -14,6 +14,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.danasea.backend.modules.order.domain.models.PaymentAttemptState;
 import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.models.PaymentStatus;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.PaymentJpaEntity;
@@ -53,6 +54,29 @@ public interface JpaPaymentRepository extends JpaRepository<PaymentJpaEntity, UU
             @Param("providerOrderId") String providerOrderId);
 
     Optional<PaymentJpaEntity> findByProviderOrderId(String providerOrderId);
+
+    Optional<PaymentJpaEntity> findByMasterOrderIdAndIsActiveTrue(UUID masterOrderId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM PaymentJpaEntity p WHERE p.masterOrderId = :masterOrderId AND p.isActive = true")
+    Optional<PaymentJpaEntity> findActiveAttemptForUpdate(@Param("masterOrderId") UUID masterOrderId);
+
+    @Query("SELECT COALESCE(MAX(p.attemptNumber), 0) FROM PaymentJpaEntity p WHERE p.masterOrderId = :masterOrderId")
+    int findMaxAttemptNumberByMasterOrderId(@Param("masterOrderId") UUID masterOrderId);
+
+    @Query("SELECT p FROM PaymentJpaEntity p WHERE p.masterOrderId = :masterOrderId AND p.attemptState IN :states")
+    List<PaymentJpaEntity> findInFlightAttempts(
+            @Param("masterOrderId") UUID masterOrderId,
+            @Param("states") List<PaymentAttemptState> states);
+
+    Optional<PaymentJpaEntity> findByPayosOrderCode(Long payosOrderCode);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM PaymentJpaEntity p WHERE p.payosOrderCode = :code")
+    Optional<PaymentJpaEntity> findByPayosOrderCodeForUpdate(@Param("code") Long payosOrderCode);
+
+    @Query(value = "SELECT nextval('payos_order_code_seq')", nativeQuery = true)
+    Long getNextPayOSOrderCode();
 
     List<PaymentJpaEntity> findByMasterOrderIdOrderByCreatedAtDesc(UUID masterOrderId);
 

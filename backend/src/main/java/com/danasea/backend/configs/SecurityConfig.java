@@ -67,6 +67,7 @@ public class SecurityConfig {
 								"/api/auth/reset-password",
 								"/api/auth/oauth2/**",
 								"/api/payments/webhook/**",
+								"/api/v1/payments/webhooks/**",
 								"/api/v1/weather/**",
 								"/api/weather/**",
 								"/actuator/health",

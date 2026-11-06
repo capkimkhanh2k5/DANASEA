@@ -320,6 +320,11 @@ Hai item phải nhận hai đơn vị khác nhau và tính giá hai gói. Nhóm 
 - [x] GET /api/orders
 - [x] GET /api/vendor/orders
 - [x] POST /api/payments/{orderId}/create-intent (thanh toán toàn bộ Master Order 1 lần)
+- [x] POST /api/payments/{orderId}/start-payment (khởi tạo thanh toán 5+5 với payOS/ZaloPay/PayPal/VNPay)
+- [x] POST /api/payments/{orderId}/switch-provider (đổi cổng thanh toán an toàn, hủy link cũ và tạo link mới)
+- [x] GET /api/payments/{orderId}/payment-status (truy vấn tiến trình countdown 5+5 và trạng thái thanh toán)
+- [x] POST /api/payments/webhook/payos (webhook xử lý thanh toán từ payOS có xác thực HMAC)
+- [x] POST /api/payments/webhook/zalopay (callback xử lý thanh toán từ ZaloPay có xác thực HMAC Key2)
 - [x] POST /api/payments/paypal/capture (capture đơn PayPal sau khi khách duyệt thanh toán)
 - [x] GET /api/payments/webhook/vnpay (IPN callback dạng GET từ VNPay)
 - [x] POST /api/payments/webhook/vnpay (IPN callback dạng POST từ VNPay)

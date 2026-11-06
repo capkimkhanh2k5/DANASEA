@@ -26,6 +26,9 @@ public class RedisInventoryLockAdapter implements InventoryLockPort {
     private final StringRedisTemplate redisTemplate;
     private final RedisScript<List> acquireScript;
     private final RedisScript<String> releaseScript;
+    private final RedisScript<List> extendScript;
+    private final RedisScript<List> revertScript;
+    private final RedisScript<List> markClosingScript;
 
     private static final String KEY_PREFIX = "inventory:slot:";
 
@@ -41,6 +44,21 @@ public class RedisInventoryLockAdapter implements InventoryLockPort {
         release.setLocation(new ClassPathResource("lua/release_hold.lua"));
         release.setResultType(String.class);
         this.releaseScript = release;
+
+        DefaultRedisScript<List> extend = new DefaultRedisScript<>();
+        extend.setLocation(new ClassPathResource("lua/extend_hold.lua"));
+        extend.setResultType(List.class);
+        this.extendScript = extend;
+
+        DefaultRedisScript<List> revert = new DefaultRedisScript<>();
+        revert.setLocation(new ClassPathResource("lua/revert_hold_expiry.lua"));
+        revert.setResultType(List.class);
+        this.revertScript = revert;
+
+        DefaultRedisScript<List> markClosing = new DefaultRedisScript<>();
+        markClosing.setLocation(new ClassPathResource("lua/mark_hold_closing.lua"));
+        markClosing.setResultType(List.class);
+        this.markClosingScript = markClosing;
     }
 
     private String buildSlotKey(UUID slotId) {
@@ -145,6 +163,85 @@ public class RedisInventoryLockAdapter implements InventoryLockPort {
             redisTemplate.execute(releaseScript, keys, holdId.toString());
         } catch (Exception e) {
             log.error("Failed to release Redis holds for holdId {}", holdId, e);
+        }
+    }
+
+    @Override
+    public boolean extendHolds(UUID holdId, List<InventoryLockItem> items, Duration extendedDuration) {
+        if (items == null || items.isEmpty()) {
+            return true;
+        }
+
+        List<String> keys = items.stream()
+                .map(item -> buildSlotKey(item.getSlotId()))
+                .toList();
+
+        long nowMillis = System.currentTimeMillis();
+        long newExpireAtMillis = nowMillis + extendedDuration.toMillis();
+
+        try {
+            @SuppressWarnings("unchecked")
+            List<Object> result = redisTemplate.execute(extendScript, keys,
+                    String.valueOf(nowMillis), holdId.toString(), String.valueOf(newExpireAtMillis));
+
+            if (result != null && !result.isEmpty() && "OK".equalsIgnoreCase(String.valueOf(result.get(0)))) {
+                return true;
+            }
+            log.warn("Failed to extend Redis holds for holdId {}: result={}", holdId, result);
+            return false;
+        } catch (Exception e) {
+            log.error("Exception extending Redis holds for holdId {}", holdId, e);
+            return false;
+        }
+    }
+
+    @Override
+    public boolean revertHoldExpiry(UUID holdId, List<InventoryLockItem> items, long expectedExtendedExpiryMillis, long originalHoldExpiryMillis) {
+        if (items == null || items.isEmpty()) {
+            return true;
+        }
+
+        List<String> keys = items.stream()
+                .map(item -> buildSlotKey(item.getSlotId()))
+                .toList();
+
+        try {
+            @SuppressWarnings("unchecked")
+            List<Object> result = redisTemplate.execute(revertScript, keys,
+                    holdId.toString(), String.valueOf(expectedExtendedExpiryMillis), String.valueOf(originalHoldExpiryMillis));
+
+            if (result != null && !result.isEmpty() && "OK".equalsIgnoreCase(String.valueOf(result.get(0)))) {
+                return true;
+            }
+            log.warn("Failed to revert Redis hold expiry for holdId {}: result={}", holdId, result);
+            return false;
+        } catch (Exception e) {
+            log.error("Exception reverting Redis hold expiry for holdId {}", holdId, e);
+            return false;
+        }
+    }
+
+    @Override
+    public boolean markHoldsClosing(UUID holdId, List<InventoryLockItem> items, Duration closingGraceDuration) {
+        if (items == null || items.isEmpty()) {
+            return true;
+        }
+
+        List<String> keys = items.stream()
+                .map(item -> buildSlotKey(item.getSlotId()))
+                .toList();
+
+        long closingGraceExpiry = System.currentTimeMillis() + closingGraceDuration.toMillis();
+
+        try {
+            @SuppressWarnings("unchecked")
+            List<Object> result = redisTemplate.execute(markClosingScript, keys,
+                    holdId.toString(), String.valueOf(closingGraceExpiry));
+
+            return result != null && !result.isEmpty() && "OK".equalsIgnoreCase(String.valueOf(result.get(0)));
+        } catch (Exception e) {
+            log.error("Exception marking Redis holds closing for holdId {}", holdId, e);
+            return false;
         }
     }
 

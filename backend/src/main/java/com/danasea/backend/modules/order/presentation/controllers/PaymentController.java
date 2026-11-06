@@ -19,6 +19,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.danasea.backend.modules.order.application.OrderPaymentService;
+import com.danasea.backend.modules.order.application.services.PaymentCoordinator;
+import com.danasea.backend.modules.order.presentation.dtos.PaymentWindowResponse;
+import com.danasea.backend.modules.order.presentation.dtos.PaymentStatusResponse;
 import com.danasea.backend.modules.order.application.dtos.CreatePaymentIntentCommand;
 import com.danasea.backend.modules.order.application.usecases.CreatePaymentIntentUseCase;
 import com.danasea.backend.modules.order.application.usecases.HandleWebhookUseCase;
@@ -43,6 +46,12 @@ public class PaymentController {
     private final OrderPaymentService orderPaymentService;
     private final CreatePaymentIntentUseCase createPaymentIntentUseCase;
     private final HandleWebhookUseCase handleWebhookUseCase;
+    private PaymentCoordinator paymentCoordinator;
+
+    @Autowired
+    public void setPaymentCoordinator(@Autowired(required = false) PaymentCoordinator paymentCoordinator) {
+        this.paymentCoordinator = paymentCoordinator;
+    }
 
     @Autowired
     public PaymentController(
@@ -87,6 +96,49 @@ public class PaymentController {
                 reference,
                 result.expiresAt() != null ? result.expiresAt() : OffsetDateTime.now()
         ));
+    }
+
+    @PostMapping("/{orderId}/start-payment")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<PaymentWindowResponse> startPayment(
+            @PathVariable UUID orderId,
+            @Valid @RequestBody CreatePaymentIntentRequest request,
+            @RequestHeader("Idempotency-Key") String idempotencyKey) {
+        UUID userId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new AccessDeniedException("User is not authenticated"));
+        if (paymentCoordinator != null) {
+            return ResponseEntity.ok(paymentCoordinator.startPayment(userId, orderId, request.provider(), idempotencyKey));
+        }
+        var res = orderPaymentService.createPaymentIntent(userId, orderId, request.provider(), idempotencyKey);
+        return ResponseEntity.ok(new PaymentWindowResponse(
+                res.paymentId(), res.orderId(), res.provider(), res.amount(),
+                res.status(), null, 1, res.paymentReference(), null,
+                res.createdAt(), 300L, null));
+    }
+
+    @PostMapping("/{orderId}/switch-provider")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<PaymentWindowResponse> switchProvider(
+            @PathVariable UUID orderId,
+            @Valid @RequestBody CreatePaymentIntentRequest request,
+            @RequestHeader("Idempotency-Key") String idempotencyKey) {
+        UUID userId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new AccessDeniedException("User is not authenticated"));
+        if (paymentCoordinator != null) {
+            return ResponseEntity.ok(paymentCoordinator.switchProvider(userId, orderId, request.provider(), idempotencyKey));
+        }
+        return startPayment(orderId, request, idempotencyKey);
+    }
+
+    @GetMapping("/{orderId}/payment-status")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<PaymentStatusResponse> getPaymentStatus(@PathVariable UUID orderId) {
+        UUID userId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new AccessDeniedException("User is not authenticated"));
+        if (paymentCoordinator != null) {
+            return ResponseEntity.ok(paymentCoordinator.getPaymentStatus(userId, orderId));
+        }
+        return ResponseEntity.notFound().build();
     }
 
     @GetMapping("/{orderId}/status")
@@ -154,6 +206,18 @@ public class PaymentController {
                 signature != null ? signature : "",
                 certUrl != null ? certUrl : "",
                 authAlgo != null ? authAlgo : ""));
+    }
+
+    @PostMapping("/webhook/payos")
+    public ResponseEntity<Map<String, Object>> payosWebhook(
+            @RequestBody String rawPayload,
+            @RequestHeader(name = "x-signature", required = false) String signature) {
+        return ResponseEntity.ok(orderPaymentService.processPayOSWebhook(rawPayload, signature));
+    }
+
+    @PostMapping("/webhook/zalopay")
+    public ResponseEntity<Map<String, Object>> zaloPayWebhook(@RequestBody String rawPayload) {
+        return ResponseEntity.ok(orderPaymentService.processZaloPayCallback(rawPayload));
     }
 
     @PostMapping("/webhook/paypal/refund")

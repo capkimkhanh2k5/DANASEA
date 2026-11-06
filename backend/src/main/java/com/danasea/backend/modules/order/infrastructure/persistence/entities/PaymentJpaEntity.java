@@ -5,6 +5,8 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import com.danasea.backend.modules.order.domain.models.PaymentAttemptState;
+import com.danasea.backend.modules.order.domain.models.PaymentCancelStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.models.PaymentStatus;
 import com.danasea.backend.shared.core.infrastructure.persistence.entities.BaseJpaEntity;
@@ -85,4 +87,46 @@ public class PaymentJpaEntity extends BaseJpaEntity {
 
     @Column(name = "expires_at")
     private OffsetDateTime expiresAt;
+
+    // --- 5+5 Multi-Attempt Tracking Fields ---
+    @Column(name = "attempt_number", nullable = false)
+    private Integer attemptNumber = 1;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "attempt_state", nullable = false, length = 30)
+    private PaymentAttemptState attemptState = PaymentAttemptState.PENDING;
+
+    @Column(name = "danasea_deadline_at")
+    private OffsetDateTime danaseaDeadlineAt;
+
+    @Column(name = "provider_expires_at")
+    private OffsetDateTime providerExpiresAt;
+
+    @Column(name = "canceled_at")
+    private OffsetDateTime canceledAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "cancel_status", nullable = false, length = 30)
+    private PaymentCancelStatus cancelStatus = PaymentCancelStatus.NONE;
+
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = false;
+
+    @Column(name = "is_canonical", nullable = false)
+    private Boolean isCanonical = false;
+
+    @Column(name = "payos_order_code", unique = true)
+    private Long payosOrderCode;
+
+    @PrePersist
+    @PreUpdate
+    public void syncAttemptStateWithStatus() {
+        if (this.attemptState == null || this.attemptState == PaymentAttemptState.PENDING) {
+            if (this.status == PaymentStatus.FAILED) {
+                this.attemptState = PaymentAttemptState.FAILED;
+            } else if (this.status == PaymentStatus.SUCCESS) {
+                this.attemptState = PaymentAttemptState.COMPLETED;
+            }
+        }
+    }
 }
