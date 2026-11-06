@@ -130,8 +130,18 @@ class CatalogRepository {
 
   static ServiceModel serviceFromJson(Map<String, dynamic> json) {
     num number(String key) => json[key] is num ? json[key] as num : 0;
-    final address = json['address'] as String? ?? '';
+    final rawAddress = (json['address'] as String? ?? '').trim();
+    final rawLocation = (json['locationName'] as String? ??
+            json['locationDisplay'] as String? ??
+            rawAddress)
+        .trim();
+    final address = rawAddress.isNotEmpty ? rawAddress : (rawLocation.isNotEmpty ? rawLocation : 'Bãi biển Đà Nẵng');
+    final location = rawLocation.isNotEmpty ? rawLocation : address;
     final primary = json['primaryImageUrl'] as String?;
+    final duration = (json['duration'] as num? ??
+            json['durationMinutes'] as num? ??
+            0)
+        .toInt();
     return ServiceModel(
       id: json['id'] as String,
       options: (json['options'] as List? ?? [])
@@ -158,9 +168,9 @@ class CatalogRepository {
       description:
           (json['description'] ?? json['shortDescription'] ?? '') as String,
       price: (json['promotionalPrice'] as num? ?? number('price')).round(),
-      durationMinutes: number('duration').toInt(),
+      durationMinutes: duration,
       capacityPerSlot: number('capacity').toInt(),
-      locationName: address,
+      locationName: location,
       address: address,
       latitude: number('latitude').toDouble(),
       longitude: number('longitude').toDouble(),

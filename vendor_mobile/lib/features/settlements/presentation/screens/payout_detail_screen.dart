@@ -25,8 +25,6 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
   final VendorMockDatabase _db = VendorMockDatabase.instance;
 
   late String _currentSettlementId;
-  bool _isCombined = false;
-  late TextEditingController _amountController;
   bool _isSubmitting = false;
 
   @override
@@ -34,21 +32,11 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
     super.initState();
     _currentSettlementId = widget.initialSettlementId ??
         (_db.settlements.isNotEmpty ? _db.settlements.first.id : 'SETTLE-202410-01');
-
-    final currentSettlement = _db.settlements.firstWhere(
-      (s) => s.id == _currentSettlementId,
-      orElse: () => _db.settlements.first,
-    );
-    _amountController = TextEditingController(
-      text: currentSettlement.netPayableAmount.toInt().toString(),
-    );
-
     _db.addListener(_onDbChanged);
   }
 
   @override
   void dispose() {
-    _amountController.dispose();
     _db.removeListener(_onDbChanged);
     super.dispose();
   }
@@ -72,55 +60,381 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
     return '${buffer.toString().split('').reversed.join()} đ';
   }
 
-  double _getEligibleMaxAmount() {
-    if (_isCombined) {
-      return _db.settlements
-          .where((s) => s.status == SettlementStatus.pending)
-          .fold(0.0, (acc, item) => acc + item.netPayableAmount);
-    }
-    final current = _db.settlements.firstWhere(
-      (s) => s.id == _currentSettlementId,
-      orElse: () => _db.settlements.first,
+  void _openPayoutRequestSheet(SettlementModel settlement) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        final vendor = _db.currentVendor;
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 14,
+                bottom: MediaQuery.of(ctx).padding.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.outlineVariant,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Yêu cầu nhận tiền',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.navyAnchor,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20, color: AppColors.tertiary),
+                        onPressed: () => Navigator.pop(sheetCtx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Settlement Info pill
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Kỳ #${settlement.id}',
+                          style: const TextStyle(fontSize: 12, color: AppColors.tertiary, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '${settlement.periodStart.day}/${settlement.periodStart.month} - ${settlement.periodEnd.day}/${settlement.periodEnd.month}/${settlement.periodEnd.year}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.onSurface),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Amount Card
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondaryContainer.withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'SỐ TIỀN THỰC NHẬN KỲ NÀY',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.secondary,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatVnd(settlement.netPayableAmount),
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Bank Beneficiary Card
+                  InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const EditProfileBankScreen()),
+                      ).then((_) {
+                        if (mounted) setState(() {});
+                        setSheetState(() {});
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.outlineVariant),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 38,
+                            height: 38,
+                            decoration: const BoxDecoration(
+                              color: AppColors.surfaceContainerHighest,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'VCB',
+                              style: TextStyle(
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  vendor.bankAccountNumber ?? '0041000889988',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: AppColors.onSurface,
+                                  ),
+                                ),
+                                Text(
+                                  '${vendor.bankAccountHolder ?? "TRAN HAI DANG"} • ${vendor.bankName ?? "Vietcombank"} CN Đà Nẵng',
+                                  style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Thay đổi',
+                              style: TextStyle(fontSize: 11, color: AppColors.secondary, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Notice
+                  const Text(
+                    'Ban tài chính DANASEA sẽ rà soát tính hợp lệ của tour và chuyển khoản theo số tài khoản thụ hưởng trong vòng 24–48h làm việc.',
+                    style: TextStyle(fontSize: 11, color: AppColors.tertiary, height: 1.4),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Submit Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _isSubmitting
+                          ? null
+                          : () async {
+                              setSheetState(() => _isSubmitting = true);
+                              setState(() => _isSubmitting = true);
+                              try {
+                                await _settlementRepo.requestPayout(
+                                  settlementId: settlement.id,
+                                  amount: settlement.netPayableAmount,
+                                );
+                                if (mounted) {
+                                  Navigator.pop(sheetCtx);
+                                  setState(() => _isSubmitting = false);
+                                  ToastNotification.show(
+                                    context,
+                                    message: 'Yêu cầu nhận tiền ${_formatVnd(settlement.netPayableAmount)} đã được gửi thành công!',
+                                    type: ToastType.success,
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  setSheetState(() => _isSubmitting = false);
+                                  setState(() => _isSubmitting = false);
+                                  ToastNotification.show(context, message: 'Lỗi: $e', type: ToastType.error);
+                                }
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        elevation: 0,
+                      ),
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(
+                              'Xác nhận nhận tiền (${_formatVnd(settlement.netPayableAmount)})',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
-    return current.netPayableAmount;
   }
 
-  Future<void> _handleSubmitPayout() async {
-    final amount = double.tryParse(_amountController.text.trim()) ?? 0;
-    final maxAmount = _getEligibleMaxAmount();
-
-    if (amount <= 0) {
-      ToastNotification.show(context, message: 'Vui lòng nhập số tiền hợp lệ.', type: ToastType.error);
-      return;
-    }
-    if (amount > maxAmount) {
-      ToastNotification.show(
-        context,
-        message: 'Số tiền rút (${_formatVnd(amount)}) vượt quá hạn mức khả dụng (${_formatVnd(maxAmount)}).',
-        type: ToastType.error,
-      );
-      return;
-    }
-
-    setState(() => _isSubmitting = true);
-    try {
-      await _settlementRepo.requestPayout(
-        settlementId: _isCombined ? null : _currentSettlementId,
-        amount: amount,
-      );
-
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      ToastNotification.show(
-        context,
-        message: 'Yêu cầu nhận tiền ${_formatVnd(amount)} đã được gửi tới ban tài chính DANASEA!',
-        type: ToastType.success,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      ToastNotification.show(context, message: 'Lỗi gửi yêu cầu: $e', type: ToastType.error);
-    }
+  void _openPayoutHistorySheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final payoutRequests = _db.payoutRequests;
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+          ),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 14,
+            bottom: MediaQuery.of(ctx).padding.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Lịch sử yêu cầu nhận tiền',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.navyAnchor,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20, color: AppColors.tertiary),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (payoutRequests.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: Center(
+                    child: Text(
+                      'Chưa có yêu cầu nhận tiền nào.',
+                      style: TextStyle(fontSize: 13, color: AppColors.tertiary),
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: payoutRequests.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, idx) {
+                      final p = payoutRequests[idx];
+                      return Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.outlineVariant),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '#${p.id}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.onSurface),
+                                ),
+                                StatusBadge(status: p.status.toBadgeStatus()),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Yêu cầu rút: ${_formatVnd(p.amount)}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.secondary),
+                                ),
+                                Text(
+                                  '${p.createdAt.day}/${p.createdAt.month}/${p.createdAt.year}',
+                                  style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Tài khoản: ${p.bankName} ${p.bankAccountNumber}',
+                              style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -129,24 +443,52 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
       (s) => s.id == _currentSettlementId,
       orElse: () => _db.settlements.first,
     );
-    final vendor = _db.currentVendor;
-    final maxEligible = _getEligibleMaxAmount();
-    final payoutRequests = _db.payoutRequests;
-
-    // Sub-orders associated with vendor for sample breakdown in period
+    final isPending = currentSettlement.status == SettlementStatus.pending;
     final sampleSubOrders = _db.subOrders.take(3).toList();
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const LocalizedText('Chi tiết đối soát & Nhận tiền'),
+        title: const LocalizedText('Chi tiết kỳ đối soát'),
         backgroundColor: AppColors.surface,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.maybePop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history, color: AppColors.secondary),
+            tooltip: 'Lịch sử nhận tiền',
+            onPressed: _openPayoutHistorySheet,
+          ),
+        ],
       ),
+      bottomNavigationBar: isPending
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _openPayoutRequestSheet(currentSettlement),
+                    icon: const Icon(Icons.payments_outlined, size: 18),
+                    label: Text(
+                      'Yêu cầu nhận tiền: ${_formatVnd(currentSettlement.netPayableAmount)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    ),
+                  ),
+                ),
+              ),
+            )
+          : null,
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         child: Column(
@@ -225,7 +567,7 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             LocalizedText(
-                              'THỰC NHẬN KHẢ DỤNG',
+                              'THỰC NHẬN KỲ NÀY',
                               style: AppTypography.labelSm.copyWith(color: AppColors.tertiary),
                             ),
                             const SizedBox(height: 2),
@@ -361,6 +703,31 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
             ),
             const SizedBox(height: 20),
 
+            // Settlement Status info if paid
+            if (!isPending) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryContainer.withOpacity(0.35),
+                  borderRadius: BorderRadius.circular(AppShapes.rMd),
+                  border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: AppColors.secondary, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Kỳ đối soát này đã được chi trả thành công ngày ${currentSettlement.generatedAt.day}/${currentSettlement.generatedAt.month}/${currentSettlement.generatedAt.year}.',
+                        style: const TextStyle(fontSize: 12, color: AppColors.onSurface, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
             // Detailed Service Bookings in Cycle
             LocalizedText('Đơn dịch vụ trong kỳ', style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface)),
             const SizedBox(height: 4),
@@ -450,333 +817,7 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                 );
               },
             ),
-            const SizedBox(height: 24),
-
-            // Payout Request Form
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(AppShapes.rXl),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2)),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryContainer.withAlpha(35),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.payments, color: AppColors.primary, size: 18),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: LocalizedText(
-                          'Gửi yêu cầu nhận tiền',
-                          style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Beneficiary Card
-                  Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const EditProfileBankScreen()),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(AppShapes.rMd),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(AppShapes.rMd),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: const BoxDecoration(
-                                color: AppColors.surfaceContainerHighest,
-                                shape: BoxShape.circle,
-                              ),
-                              alignment: Alignment.center,
-                              child: LocalizedText(
-                                'VCB',
-                                style: AppTypography.labelMd.copyWith(
-                                  color: AppColors.secondary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  LocalizedText(
-                                    vendor.bankAccountNumber ?? '0041000889988',
-                                    style: AppTypography.labelLg.copyWith(
-                                      color: AppColors.onSurface,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.0,
-                                    ),
-                                  ),
-                                  LocalizedText(
-                                    '${vendor.bankAccountHolder ?? "TRAN HAI DANG"} • ${vendor.bankName ?? "Vietcombank"} CN Đà Nẵng',
-                                    style: AppTypography.bodySm.copyWith(color: AppColors.tertiary),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.secondaryFixed.withAlpha(80),
-                                borderRadius: BorderRadius.circular(AppShapes.rFull),
-                              ),
-                              child: LocalizedText(
-                                'Thay đổi',
-                                style: AppTypography.labelSm.copyWith(
-                                  color: AppColors.onSecondaryFixedVariant,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.chevron_right, size: 18, color: AppColors.outlineVariant),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Combined payout option toggle
-                  Material(
-                    color: Colors.transparent,
-                    child: CheckboxListTile(
-                      value: _isCombined,
-                      onChanged: (val) {
-                        setState(() {
-                          _isCombined = val ?? false;
-                          _amountController.text = _getEligibleMaxAmount().toInt().toString();
-                        });
-                      },
-                      title: LocalizedText(
-                        'Rút gộp tất cả các kỳ chờ đối soát (${_formatVnd(_getEligibleMaxAmount())})',
-                        style: AppTypography.labelMd.copyWith(color: AppColors.onSurface),
-                      ),
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: AppColors.secondary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Amount Input
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: LocalizedText(
-                          'Số tiền yêu cầu rút',
-                          style: AppTypography.labelMd.copyWith(color: AppColors.tertiary),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: LocalizedText(
-                          'Tối đa: ${_formatVnd(maxEligible)}',
-                          style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _amountController,
-                    keyboardType: TextInputType.number,
-                    style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
-                    decoration: InputDecoration(
-                      suffixText: 'đ',
-                      suffixStyle: AppTypography.headlineSm.copyWith(color: AppColors.primary),
-                      filled: true,
-                      fillColor: AppColors.surfaceContainerLow,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppShapes.rFull),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _amountController.text = maxEligible.toInt().toString();
-                        });
-                      },
-                      child: const LocalizedText('Điền số tiền tối đa', overflow: TextOverflow.ellipsis),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Honest Platform Notice Box
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(AppShapes.rMd),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.verified_user, size: 16, color: AppColors.primaryContainer),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: LocalizedText(
-                                'Chính sách thanh toán DANASEA',
-                                style: AppTypography.labelSm.copyWith(
-                                  color: AppColors.onSurface,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        LocalizedText(
-                          'Đối tác gửi yêu cầu nhận tiền trực tiếp đến ban tài chính DANASEA. Hệ thống không tự động phê duyệt tức thì nhằm rà soát tính hợp lệ của tour đã hoàn tất. Thời gian xử lý được cập nhật theo tiến độ yêu cầu thanh toán.',
-                          style: AppTypography.bodySm.copyWith(color: AppColors.tertiary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Submit Payout Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      onPressed: _isSubmitting ? null : _handleSubmitPayout,
-                      icon: const Icon(Icons.send, size: 18),
-                      label: const LocalizedText('Gửi yêu cầu nhận tiền', overflow: TextOverflow.ellipsis),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppShapes.rFull),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Payout Cycle History & Request Audit Trail
-            LocalizedText('Lịch sử yêu cầu nhận tiền', style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface)),
-            const SizedBox(height: 4),
-            LocalizedText('Trạng thái thẩm định và chi trả qua các kỳ', style: AppTypography.bodySm.copyWith(color: AppColors.tertiary)),
-            const SizedBox(height: 12),
-
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: payoutRequests.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, idx) {
-                final p = payoutRequests[idx];
-                return Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLowest,
-                    borderRadius: BorderRadius.circular(AppShapes.rLg),
-                    boxShadow: const [
-                      BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: LocalizedText(
-                              '#${p.id}',
-                              style: AppTypography.labelLg.copyWith(
-                                color: AppColors.onSurface,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: StatusBadge(status: p.status.toBadgeStatus()),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: LocalizedText(
-                              'Yêu cầu rút: ${_formatVnd(p.amount)}',
-                              style: AppTypography.headlineSm.copyWith(
-                                color: AppColors.secondary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          LocalizedText(
-                            '${p.createdAt.day}/${p.createdAt.month}/${p.createdAt.year}',
-                            style: AppTypography.bodySm.copyWith(color: AppColors.tertiary),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      LocalizedText(
-                        'Tài khoản thụ hưởng: ${p.bankName} ${p.bankAccountNumber}',
-                        style: AppTypography.bodySm.copyWith(color: AppColors.tertiary),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 32),
           ],
         ),
       ),

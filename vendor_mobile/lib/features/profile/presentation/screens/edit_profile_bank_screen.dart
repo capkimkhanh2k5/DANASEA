@@ -18,8 +18,6 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
   final VendorProfileRepository _profileRepo = VendorProfileRepository();
   final VendorMockDatabase _db = VendorMockDatabase.instance;
 
-  late TextEditingController _fullNameController;
-  late TextEditingController _phoneController;
   late TextEditingController _bankAccountController;
   late TextEditingController _bankHolderController;
   String _selectedBank = 'Vietcombank';
@@ -40,11 +38,7 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
   @override
   void initState() {
     super.initState();
-    final user = _db.currentUser;
     final vendor = _db.currentVendor;
-
-    _fullNameController = TextEditingController(text: user.fullName);
-    _phoneController = TextEditingController(text: user.phone ?? '');
     _bankAccountController = TextEditingController(text: vendor.bankAccountNumber ?? '0041000889988');
     _bankHolderController = TextEditingController(text: vendor.bankAccountHolder ?? 'TRAN HAI DANG');
     if (vendor.bankName != null && _bankOptions.contains(vendor.bankName)) {
@@ -54,22 +48,132 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
 
   @override
   void dispose() {
-    _fullNameController.dispose();
-    _phoneController.dispose();
     _bankAccountController.dispose();
     _bankHolderController.dispose();
     super.dispose();
   }
 
+  void _openBankSelectorBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 14,
+            bottom: MediaQuery.of(ctx).padding.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  LocalizedText(
+                    'Chọn ngân hàng thụ hưởng',
+                    style: AppTypography.headlineSm.copyWith(
+                      color: AppColors.onSurface,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20, color: AppColors.tertiary),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: _bankOptions.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final bank = _bankOptions[index];
+                    final isSelected = bank == _selectedBank;
+                    return InkWell(
+                      onTap: () {
+                        setState(() => _selectedBank = bank);
+                        Navigator.pop(ctx);
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppColors.secondaryContainer
+                                    : AppColors.surfaceContainerLow,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.account_balance,
+                                size: 18,
+                                color: isSelected
+                                    ? AppColors.secondary
+                                    : AppColors.tertiary,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: LocalizedText(
+                                bank,
+                                style: AppTypography.bodyMd.copyWith(
+                                  color: isSelected ? AppColors.secondary : AppColors.onSurface,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            if (isSelected)
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: AppColors.secondary,
+                                size: 22,
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _handleSave() async {
-    final fullName = _fullNameController.text.trim();
     final bankAccount = _bankAccountController.text.trim();
     final bankHolder = _bankHolderController.text.trim();
 
-    if (fullName.isEmpty) {
-      ToastNotification.show(context, message: 'Vui lòng nhập họ và tên đại diện.', type: ToastType.error);
-      return;
-    }
     if (bankAccount.isEmpty || bankHolder.isEmpty) {
       ToastNotification.show(context, message: 'Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng.', type: ToastType.error);
       return;
@@ -77,10 +181,6 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
 
     setState(() => _isSaving = true);
     try {
-      await _profileRepo.updateVendorProfile(
-        fullName: fullName,
-        phone: _phoneController.text.trim(),
-      );
       await _profileRepo.updateBankProfile(
         bankName: _selectedBank,
         bankAccountNumber: bankAccount,
@@ -95,7 +195,7 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
 
       ToastNotification.show(
         context,
-        message: 'Cập nhật thông tin hồ sơ và tài khoản thành công!',
+        message: 'Cập nhật tài khoản ngân hàng thành công!',
         type: ToastType.success,
       );
     } catch (e) {
@@ -107,23 +207,37 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = _db.currentUser;
-    final vendor = _db.currentVendor;
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const LocalizedText('Hồ sơ & Ngân hàng'),
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.maybePop(context),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        child: Column(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        FocusManager.instance.primaryFocus?.unfocus();
+      },
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            title: LocalizedText(
+              'Tài khoản ngân hàng',
+              style: AppTypography.headlineSm.copyWith(
+                color: AppColors.onSurface,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            backgroundColor: AppColors.surface,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                FocusScope.of(context).unfocus();
+                Navigator.maybePop(context);
+              },
+            ),
+          ),
+          body: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Success alert if triggered
@@ -132,46 +246,36 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                 margin: const EdgeInsets.only(bottom: 16),
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.secondaryContainer,
+                  color: const Color(0xFFE8F5E9),
                   borderRadius: BorderRadius.circular(AppShapes.rLg),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x0F000000), blurRadius: 6, offset: Offset(0, 2)),
-                  ],
+                  border: Border.all(color: const Color(0xFFA5D6A7)),
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: AppColors.secondary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.verified, color: AppColors.onSecondary, size: 18),
-                    ),
+                    const Icon(Icons.check_circle_rounded, color: Color(0xFF2E7D32), size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           LocalizedText(
-                            'Hồ sơ đối soát đã cập nhật!',
+                            'Đã cập nhật tài khoản nhận tiền!',
                             style: AppTypography.labelLg.copyWith(
-                              color: AppColors.onSecondaryContainer,
+                              color: const Color(0xFF1B5E20),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           LocalizedText(
-                            'Thông tin ngân hàng đã được cập nhật trong bản xem trước.',
+                            'Các khoản thanh toán đối soát tiếp theo sẽ chuyển vào tài khoản này.',
                             style: AppTypography.bodySm.copyWith(
-                              color: AppColors.onSecondaryContainer.withAlpha(220),
+                              color: const Color(0xFF2E7D32),
                             ),
                           ),
                         ],
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, size: 18, color: AppColors.onSecondaryContainer),
+                      icon: const Icon(Icons.close, size: 18, color: Color(0xFF2E7D32)),
                       onPressed: () => setState(() => _showSuccessAlert = false),
                     ),
                   ],
@@ -179,288 +283,7 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
               ),
             ],
 
-            // Ocean Partner Identity Header Badge
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.surfaceContainer, AppColors.surfaceContainerLow],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(AppShapes.rLg),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x08000000), blurRadius: 6, offset: Offset(0, 2)),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primaryContainer,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: LocalizedText(
-                            'ĐỐI TÁC ${vendor.businessName.toUpperCase()}',
-                            style: AppTypography.labelSm.copyWith(
-                              color: AppColors.secondary,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLowest,
-                      borderRadius: BorderRadius.circular(AppShapes.rFull),
-                    ),
-                    child: LocalizedText(
-                      'Mã: ${vendor.id}',
-                      style: AppTypography.labelSm.copyWith(
-                        color: AppColors.secondary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // SECTION 1: Personal Representative Profile
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(AppShapes.rLg),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x0A000000), blurRadius: 8, offset: Offset(0, 2)),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 32,
-                              height: 32,
-                              decoration: const BoxDecoration(
-                                color: AppColors.secondaryContainer,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.badge_outlined, color: AppColors.secondary, size: 18),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: LocalizedText(
-                                'Đại diện pháp lý',
-                                style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceContainer,
-                          borderRadius: BorderRadius.circular(AppShapes.rFull),
-                        ),
-                        child: LocalizedText(
-                          'Đã xác minh',
-                          style: AppTypography.labelSm.copyWith(color: AppColors.secondary),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Avatar Zone
-                  Row(
-                    children: [
-                      Stack(
-                        children: [
-                          CircleAvatar(
-                            radius: 36,
-                            backgroundColor: AppColors.surfaceContainer,
-                            backgroundImage: user.avatarUrl != null
-                                ? NetworkImage(user.avatarUrl!)
-                                : null,
-                            child: user.avatarUrl == null
-                                ? const Icon(Icons.person, size: 36, color: AppColors.primary)
-                                : null,
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              width: 26,
-                              height: 26,
-                              decoration: const BoxDecoration(
-                                color: AppColors.secondary,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.photo_camera, size: 15, color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            OutlinedButton.icon(
-                              onPressed: () {
-                                ToastNotification.show(
-                                  context,
-                                  message: 'Mô phỏng: Đã chọn ảnh chân dung mới.',
-                                  type: ToastType.info,
-                                );
-                              },
-                              icon: const Icon(Icons.cloud_upload_outlined, size: 16),
-                              label: const LocalizedText('Thay đổi ảnh'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.onSurface,
-                                side: const BorderSide(color: AppColors.outlineVariant),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(AppShapes.rFull),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            LocalizedText(
-                              'Định dạng JPG, PNG dưới 5MB. Khuyên dùng ảnh chân dung rõ mặt.',
-                              style: AppTypography.bodySm.copyWith(color: AppColors.tertiary),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Full Name
-                  LocalizedText('Họ và tên người đại diện *', style: AppTypography.labelMd.copyWith(color: AppColors.tertiary)),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _fullNameController,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.person_outline, color: AppColors.tertiary),
-                      filled: true,
-                      fillColor: AppColors.surfaceContainerLow,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppShapes.rFull),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Phone Number
-                  LocalizedText('Số điện thoại liên hệ (tùy chọn)', style: AppTypography.labelMd.copyWith(color: AppColors.tertiary)),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.phone_iphone, color: AppColors.tertiary),
-                      filled: true,
-                      fillColor: AppColors.surfaceContainerLow,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppShapes.rFull),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Email (Read-only)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: LocalizedText(
-                          'Hộp thư nhận quyết toán',
-                          style: AppTypography.labelMd.copyWith(color: AppColors.tertiary),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Row(
-                        children: [
-                          const Icon(Icons.lock, size: 13, color: AppColors.secondary),
-                          const SizedBox(width: 4),
-                          LocalizedText('Được mã hóa', style: AppTypography.labelSm.copyWith(color: AppColors.secondary)),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    readOnly: true,
-                    controller: TextEditingController(text: user.email),
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.mark_email_read, color: AppColors.tertiary),
-                      filled: true,
-                      fillColor: AppColors.surfaceContainer,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppShapes.rFull),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(AppShapes.rMd),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.verified_user, color: AppColors.secondary, size: 16),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: LocalizedText(
-                            'Email bảo mật xác minh không thể sửa trực tiếp. Vui lòng liên hệ Hotline quản trị nếu cần đổi.',
-                            style: AppTypography.bodySm.copyWith(color: AppColors.tertiary, fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // SECTION 2: Bank Account for Payout
+            // SECTION: Bank Account for Payout
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -491,7 +314,7 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: LocalizedText(
-                                'Tài khoản nhận tiền',
+                                'Tài khoản nhận tiền quyết toán',
                                 style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -503,13 +326,13 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryFixed,
+                          color: AppColors.surfaceContainerHigh,
                           borderRadius: BorderRadius.circular(AppShapes.rFull),
                         ),
                         child: LocalizedText(
-                          'Kỳ hạn Payout',
+                          'Chu kỳ: Tuần/Tháng',
                           style: AppTypography.labelSm.copyWith(
-                            color: AppColors.primary,
+                            color: AppColors.secondary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -521,7 +344,7 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                   // Visual Payout Card
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [AppColors.secondary, Color(0xFF004F57)],
@@ -542,14 +365,22 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                             Expanded(
                               child: Row(
                                 children: [
-                                  const Icon(Icons.waves, color: AppColors.secondaryFixed, size: 20),
+                                  ClipOval(
+                                    child: Image.asset(
+                                      'assets/danasea-logo.png',
+                                      width: 22,
+                                      height: 22,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: LocalizedText(
-                                      'DANASEA VENDOR PASS',
+                                      'DANASEA PAYOUT',
                                       style: AppTypography.labelSm.copyWith(
                                         color: AppColors.secondaryFixed,
                                         letterSpacing: 1.0,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -561,7 +392,7 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                             Icon(Icons.contactless, color: Colors.white.withAlpha(180), size: 22),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 18),
                         LocalizedText(
                           'SỐ TÀI KHOẢN THỤ HƯỞNG',
                           style: AppTypography.labelSm.copyWith(color: AppColors.secondaryFixed),
@@ -577,7 +408,7 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 18),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -592,7 +423,7 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   LocalizedText(
-                                    _bankHolderController.text.isNotEmpty ? _bankHolderController.text.toUpperCase() : 'TRAN HAI DANG',
+                                    _bankHolderController.text.isNotEmpty ? _bankHolderController.text.toUpperCase() : 'CHƯA NHẬP',
                                     style: AppTypography.labelLg.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
@@ -605,9 +436,9 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                             ),
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(50),
+                                color: Colors.white.withAlpha(40),
                                 borderRadius: BorderRadius.circular(AppShapes.rFull),
                               ),
                               child: LocalizedText(
@@ -628,31 +459,30 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                   // Bank selector
                   LocalizedText('Ngân hàng thụ hưởng *', style: AppTypography.labelMd.copyWith(color: AppColors.tertiary)),
                   const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(AppShapes.rFull),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: _selectedBank,
-                        items: _bankOptions.map((bank) {
-                          return DropdownMenuItem<String>(
-                            value: bank,
-                            child: Row(
-                              children: [
-                                const Icon(Icons.account_balance, size: 18, color: AppColors.secondary),
-                                const SizedBox(width: 10),
-                                LocalizedText(bank, style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
-                              ],
+                  InkWell(
+                    onTap: _openBankSelectorBottomSheet,
+                    borderRadius: BorderRadius.circular(AppShapes.rFull),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(AppShapes.rFull),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.account_balance, size: 20, color: AppColors.secondary),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: LocalizedText(
+                              _selectedBank,
+                              style: AppTypography.bodyMd.copyWith(
+                                color: AppColors.onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) setState(() => _selectedBank = val);
-                        },
+                          ),
+                          const Icon(Icons.keyboard_arrow_down, color: AppColors.tertiary),
+                        ],
                       ),
                     ),
                   ),
@@ -696,6 +526,29 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                     ),
                   ),
+                  const SizedBox(height: 14),
+
+                  // Info Note
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(AppShapes.rMd),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.info_outline, size: 16, color: AppColors.secondary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: LocalizedText(
+                            'Doanh thu dịch vụ sau khi đối soát thành công sẽ được chuyển tự động vào tài khoản này theo chu kỳ quyết toán.',
+                            style: AppTypography.bodySm.copyWith(color: AppColors.tertiary, fontSize: 11),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -727,7 +580,7 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                           const SizedBox(width: 8),
                           Flexible(
                             child: LocalizedText(
-                              'Lưu thay đổi hồ sơ',
+                              'Lưu tài khoản ngân hàng',
                               style: AppTypography.labelLg.copyWith(color: Colors.white),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -738,6 +591,8 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
             ),
             const SizedBox(height: 40),
           ],
+        ),
+          ),
         ),
       ),
     );
