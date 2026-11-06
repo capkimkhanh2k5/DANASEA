@@ -9,9 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,6 +34,7 @@ import com.danasea.backend.modules.account.domain.models.Role;
 import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.account.infrastructure.persistence.entities.UserJpaEntity;
 import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository;
+import com.danasea.backend.modules.booking.domain.models.Booking;
 import com.danasea.backend.modules.booking.domain.ports.VendorLookupPort;
 import com.danasea.backend.modules.checkin.application.usecases.VerifyCheckinUseCase;
 import com.danasea.backend.modules.checkin.domain.services.QrTokenSigner;
@@ -447,13 +447,14 @@ public class TripReviewEmailIntegrationTest extends BaseEmailIntegrationTest {
             svc.markNew();
             serviceRepository.saveAndFlush(svc);
 
+            ZonedDateTime now = ZonedDateTime.now(Booking.VIETNAM_ZONE);
+            ZonedDateTime departure = now.minusHours(1);
             ServiceSlotJpaEntity slot = new ServiceSlotJpaEntity();
             slot.setId(UUID.randomUUID());
             slot.setServiceId(svc.getId());
-            slot.setDate(LocalDate.now());
-            LocalTime nowTime = LocalTime.now();
-            slot.setStartTime(nowTime.minusHours(1));
-            slot.setEndTime(nowTime.plusHours(2));
+            slot.setDate(departure.toLocalDate());
+            slot.setStartTime(departure.toLocalTime());
+            slot.setEndTime(now.plusHours(2).toLocalTime());
             slot.setCapacity(20);
             slot.setStatus(SlotStatus.OPEN);
             slot.markNew();
