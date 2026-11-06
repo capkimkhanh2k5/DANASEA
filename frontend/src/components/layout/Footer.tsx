@@ -158,23 +158,24 @@ export function Footer() {
               </li>
             </ul>
 
-            {/* Ảnh hồ sơ pháp lý & chứng nhận đặt gọn gàng ngay dưới cột 2 */}
+            {/* Giấy chứng nhận pháp lý số hóa chính thức từ Cloudinary */}
             <div className="mt-2 pt-3 border-t border-white/10 flex flex-col gap-2">
               <span className="text-[11px] font-semibold text-white/80 tracking-wide">
                 Hồ sơ pháp lý số hóa
               </span>
-              <div className="flex flex-col gap-2">
+              <a
+                href="https://res.cloudinary.com/xmxguqpi/image/authenticated/s--87pVT0lZ--/v1793625552/danasea_demo_data_package/vendor_documents/e2681ab1f16042a553303d0da9192b66c0ab21cf2492a35d72b5cfc512cd2bba.png"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Xem bản gốc Giấy phép đăng ký kinh doanh & thể thao biển số hóa Đà Nẵng"
+                className="group block relative w-full max-w-[240px] rounded-xl overflow-hidden border border-white/25 bg-white shadow-md hover:border-white/60 hover:shadow-lg transition-all"
+              >
                 <img
-                  src="/images/legal/business_license_preview.png"
-                  alt="Đăng ký kinh doanh và lữ hành quốc tế"
-                  className="w-full max-w-[220px] h-auto rounded-lg border border-white/20 bg-white/5 object-contain hover:border-white/40 transition-colors"
+                  src="/images/legal/legal_certificate.png"
+                  alt="Giấy chứng nhận đăng ký kinh doanh & thể thao biển số hóa Đà Nẵng"
+                  className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                 />
-                <img
-                  src="/images/legal/safety_cert_preview.png"
-                  alt="Chứng nhận an toàn giao thông đường thủy"
-                  className="w-full max-w-[220px] h-auto rounded-lg border border-white/20 bg-white/5 object-contain hover:border-white/40 transition-colors"
-                />
-              </div>
+              </a>
             </div>
           </div>
 
