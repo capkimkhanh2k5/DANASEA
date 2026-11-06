@@ -56,7 +56,7 @@ public class TransactionalEmailWorker {
 
     @Scheduled(fixedDelayString = "${app.transactional-email.worker.poll-interval-ms:15000}")
     public void runWorkerCycle() {
-        if (!properties.isWorkerEnabled()) {
+        if (!properties.shouldRunWorker()) {
             return;
         }
 
