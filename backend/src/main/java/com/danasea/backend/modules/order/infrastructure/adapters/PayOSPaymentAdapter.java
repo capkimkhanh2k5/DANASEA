@@ -57,7 +57,8 @@ public class PayOSPaymentAdapter implements PaymentGatewayPort {
     }
 
     @Override
-    public PaymentIntentResult createPaymentIntent(UUID paymentId, UUID orderId, BigDecimal amount, PaymentProvider provider) {
+    public PaymentIntentResult createPaymentIntent(UUID paymentId, UUID orderId, BigDecimal amount,
+            PaymentProvider provider) {
         return createPaymentIntent(paymentId, orderId, amount, provider, null, null);
     }
 
@@ -81,8 +82,14 @@ public class PayOSPaymentAdapter implements PaymentGatewayPort {
             description = description.substring(0, 25);
         }
 
-        String returnUrl = payOSProperties.returnUrl() + "?orderId=" + orderId + "&paymentId=" + paymentId;
-        String cancelUrl = payOSProperties.cancelUrl() + "?orderId=" + orderId + "&paymentId=" + paymentId;
+        String baseReturnUrl = PaymentUrlHelper.resolveRedirectUrl(payOSProperties.returnUrl(), "/checkout/result");
+        String baseCancelUrl = PaymentUrlHelper.resolveRedirectUrl(payOSProperties.cancelUrl(), "/checkout/result");
+
+        String returnUrl = PaymentUrlHelper.appendQueryParams(baseReturnUrl,
+                Map.of("orderId", String.valueOf(orderId), "paymentId", String.valueOf(paymentId)));
+        String cancelUrl = PaymentUrlHelper.appendQueryParams(baseCancelUrl,
+                Map.of("orderId", String.valueOf(orderId), "paymentId", String.valueOf(paymentId), "status",
+                        "cancelled"));
 
         String signature = PayOSSignatureHelper.createRequestSignature(
                 amountLong,
@@ -90,8 +97,7 @@ public class PayOSPaymentAdapter implements PaymentGatewayPort {
                 description,
                 orderCode,
                 returnUrl,
-                payOSProperties.checksumKey()
-        );
+                payOSProperties.checksumKey());
 
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("orderCode", orderCode);
@@ -137,8 +143,7 @@ public class PayOSPaymentAdapter implements PaymentGatewayPort {
                     String.valueOf(orderCode),
                     amount,
                     "VND",
-                    null
-            );
+                    null);
         } catch (PaymentGatewayException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -164,7 +169,8 @@ public class PayOSPaymentAdapter implements PaymentGatewayPort {
         }
 
         try {
-            Map<String, String> body = Map.of("cancellationReason", reason != null ? reason : "Order canceled or window expired");
+            Map<String, String> body = Map.of("cancellationReason",
+                    reason != null ? reason : "Order canceled or window expired");
             String response = restClient.post()
                     .uri("/v2/payment-requests/{orderCode}/cancel", providerOrderId)
                     .header("x-client-id", payOSProperties.clientId())
@@ -180,16 +186,20 @@ public class PayOSPaymentAdapter implements PaymentGatewayPort {
                 return PaymentCancelResult.success("payOS link canceled successfully");
             }
             String desc = root.path("desc").asText("");
-            if ("20".equals(code) || "118".equals(code) || desc.toLowerCase().contains("paid") || desc.toLowerCase().contains("already")) {
+            if ("20".equals(code) || "118".equals(code) || desc.toLowerCase().contains("paid")
+                    || desc.toLowerCase().contains("already")) {
                 return PaymentCancelResult.alreadyCaptured("payOS order was already captured");
             }
             return PaymentCancelResult.failed(root.path("desc").asText("Cancel failed"), code);
         } catch (RestClientResponseException ex) {
-            log.warn("payOS cancel responded with error: status={}, body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            return PaymentCancelResult.unknown("payOS cancel HTTP error: " + ex.getMessage(), String.valueOf(ex.getStatusCode().value()));
+            log.warn("payOS cancel responded with error: status={}, body={}", ex.getStatusCode(),
+                    ex.getResponseBodyAsString());
+            return PaymentCancelResult.unknown("payOS cancel HTTP error: " + ex.getMessage(),
+                    String.valueOf(ex.getStatusCode().value()));
         } catch (Exception ex) {
             log.error("Exception calling payOS cancel for orderCode={}", providerOrderId, ex);
-            return PaymentCancelResult.unknown("Network exception calling payOS cancel: " + ex.getMessage(), "NETWORK_ERROR");
+            return PaymentCancelResult.unknown("Network exception calling payOS cancel: " + ex.getMessage(),
+                    "NETWORK_ERROR");
         }
     }
 
@@ -210,13 +220,18 @@ public class PayOSPaymentAdapter implements PaymentGatewayPort {
 
             JsonNode data = root.path("data");
             String status = data.path("status").asText();
-            BigDecimal amount = data.has("amount") && !data.path("amount").isNull() ? new BigDecimal(data.path("amount").asText()) : null;
+            BigDecimal amount = data.has("amount") && !data.path("amount").isNull()
+                    ? new BigDecimal(data.path("amount").asText())
+                    : null;
             if ("PAID".equalsIgnoreCase(status)) {
-                return new PaymentCaptureResult(true, providerOrderId, amount, "VND", "COMPLETED", "Payment completed on payOS");
+                return new PaymentCaptureResult(true, providerOrderId, amount, "VND", "COMPLETED",
+                        "Payment completed on payOS");
             } else if ("CANCELLED".equalsIgnoreCase(status)) {
-                return new PaymentCaptureResult(false, providerOrderId, amount, "VND", "CANCELLED", "Payment cancelled on payOS");
+                return new PaymentCaptureResult(false, providerOrderId, amount, "VND", "CANCELLED",
+                        "Payment cancelled on payOS");
             }
-            return new PaymentCaptureResult(false, providerOrderId, amount, "VND", "PENDING", "Payment pending on payOS");
+            return new PaymentCaptureResult(false, providerOrderId, amount, "VND", "PENDING",
+                    "Payment pending on payOS");
         } catch (Exception ex) {
             log.error("Failed to query payOS payment for orderCode={}", providerOrderId, ex);
             return new PaymentCaptureResult(false, null, null, "VND", "UNKNOWN", ex.getMessage());

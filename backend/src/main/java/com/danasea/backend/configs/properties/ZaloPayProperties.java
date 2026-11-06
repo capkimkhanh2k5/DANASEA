@@ -9,8 +9,7 @@ public record ZaloPayProperties(
         String key2,
         String endpoint,
         String returnUrl,
-        String cancelUrl
-) {
+        String cancelUrl) {
     public ZaloPayProperties {
         if (appId == null) {
             appId = 2554;
@@ -19,10 +18,10 @@ public record ZaloPayProperties(
             endpoint = "https://sb-openapi.zalopay.vn/v2";
         }
         if (returnUrl == null || returnUrl.isBlank()) {
-            returnUrl = "http://localhost:3000/payment/success";
+            returnUrl = "http://localhost:3000/checkout/result";
         }
         if (cancelUrl == null || cancelUrl.isBlank()) {
-            cancelUrl = "http://localhost:3000/payment/cancel";
+            cancelUrl = "http://localhost:3000/checkout/result";
         }
     }
 }

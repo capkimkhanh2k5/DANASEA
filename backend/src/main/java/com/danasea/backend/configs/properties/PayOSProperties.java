@@ -9,17 +9,16 @@ public record PayOSProperties(
         String checksumKey,
         String baseUrl,
         String returnUrl,
-        String cancelUrl
-) {
+        String cancelUrl) {
     public PayOSProperties {
         if (baseUrl == null || baseUrl.isBlank()) {
             baseUrl = "https://api-merchant.payos.vn";
         }
         if (returnUrl == null || returnUrl.isBlank()) {
-            returnUrl = "http://localhost:3000/payment/success";
+            returnUrl = "http://localhost:3000/checkout/result";
         }
         if (cancelUrl == null || cancelUrl.isBlank()) {
-            cancelUrl = "http://localhost:3000/payment/cancel";
+            cancelUrl = "http://localhost:3000/checkout/result";
         }
     }
 }

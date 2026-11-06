@@ -210,12 +210,12 @@ danasea:
       api-key: ${PAYOS_API_KEY:}
       checksum-key: ${PAYOS_CHECKSUM_KEY:}
       base-url: ${PAYOS_BASE_URL:https://api-merchant.payos.vn}
-      return-url: ${PAYOS_RETURN_URL:http://localhost:3000/payment/success}
-      cancel-url: ${PAYOS_CANCEL_URL:http://localhost:3000/payment/cancel}
+      return-url: ${PAYOS_RETURN_URL:http://localhost:3000/checkout/result}
+      cancel-url: ${PAYOS_CANCEL_URL:http://localhost:3000/checkout/result}
     zalopay:
       app-id: ${ZALOPAY_APP_ID:2554}
       key1: ${ZALOPAY_KEY1:}
       key2: ${ZALOPAY_KEY2:}
       endpoint: ${ZALOPAY_ENDPOINT:https://sb-openapi.zalopay.vn/v2}
-      return-url: ${ZALOPAY_RETURN_URL:http://localhost:3000/payment/success}
-      cancel-url: ${ZALOPAY_CANCEL_URL:http://localhost:3000/payment/cancel}
+      return-url: ${ZALOPAY_RETURN_URL:http://localhost:3000/checkout/result}
+      cancel-url: ${ZALOPAY_CANCEL_URL:http://localhost:3000/checkout/result}

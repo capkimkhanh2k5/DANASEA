@@ -73,6 +73,8 @@ function App() {
           <Route path="checkout" element={<Checkout />} />
           <Route path="checkout/result" element={<PaymentResult />} />
           <Route path="payment/vnpay-return" element={<PaymentResult />} />
+          <Route path="payment/success" element={<PaymentResult />} />
+          <Route path="payment/cancel" element={<PaymentResult />} />
           <Route path="profile" element={<Profile />} />
           <Route path="profile/orders" element={<Orders />} />
           <Route path="profile/ai-assistant" element={<Navigate to="/profile" replace />} />
