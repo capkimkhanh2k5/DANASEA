@@ -110,7 +110,7 @@ const HERO_FEATURED_SPOTS: HeroFeaturedSpot[] = [
     locationEn: 'Non Nuoc Beach',
     category: 'Mô tô nước',
     price: '550.000 ₫',
-    imageUrl: '/images/hero/04-jetski-toc-do-non-nuoc.jpg',
+    imageUrl: '/images/hero/04-mo-to-nuoc-jetski-bien-non-nuoc.jpg',
     searchFilter: 'jetski-mo-to-nuoc',
   },
 ];
@@ -229,21 +229,24 @@ export function Explore() {
   };
 
   const heroSpots = useMemo(() => {
-    if (!liveServices || liveServices.length === 0) return HERO_FEATURED_SPOTS;
-    return HERO_FEATURED_SPOTS.map((spot, idx) => {
-      const match = liveServices[idx % liveServices.length];
-      if (!match) return spot;
+    return HERO_FEATURED_SPOTS.map((spot) => {
+      const matchedService = liveServices.find((s) => {
+        const name = s.name.toLowerCase();
+        if (spot.id === 'hero-1') return name.includes('lặn') || name.includes('san hô');
+        if (spot.id === 'hero-2') return name.includes('sup') || name.includes('bình minh');
+        if (spot.id === 'hero-3') return name.includes('dù') || name.includes('parasail');
+        if (spot.id === 'hero-4') return name.includes('mô tô') || name.includes('jetski') || name.includes('cano');
+        return false;
+      });
+
       return {
         ...spot,
-        targetServiceId: match.id,
-        name: match.name || spot.name,
-        nameEn: match.name || spot.nameEn,
-        rating: formatRating(match.averageRating, spot.rating),
-        reviewCount: match.reviewCount || spot.reviewCount,
-        price: formatPrice(match.price, spot.price),
-        location: match.address || spot.location,
-        imageUrl: getHeroImageUrl(match.primaryImageUrl || spot.imageUrl),
-        link: getTourUrl(match),
+        targetServiceId: matchedService ? matchedService.id : spot.id,
+        imageUrl: spot.imageUrl,
+        price: matchedService ? formatPrice(matchedService.price, spot.price) : spot.price,
+        rating: matchedService ? formatRating(matchedService.averageRating, spot.rating) : spot.rating,
+        reviewCount: matchedService?.reviewCount || spot.reviewCount,
+        link: matchedService ? getTourUrl(matchedService) : `/search?category=${spot.searchFilter}`,
       };
     });
   }, [liveServices]);
