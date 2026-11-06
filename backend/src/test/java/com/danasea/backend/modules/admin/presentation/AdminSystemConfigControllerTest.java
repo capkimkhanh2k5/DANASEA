@@ -3,10 +3,15 @@ package com.danasea.backend.modules.admin.presentation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,15 +23,26 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import com.danasea.backend.modules.admin.presentation.AdminSystemConfigController.CommissionRuleDto;
 import com.danasea.backend.modules.admin.presentation.AdminSystemConfigController.ConfigDto;
+import com.danasea.backend.modules.admin.presentation.AdminSystemConfigController.UpdateCommissionRuleRequest;
 import com.danasea.backend.modules.admin.presentation.AdminSystemConfigController.UpdateConfigRequest;
+import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaCategoryRepository;
+import com.danasea.backend.modules.systemconfig.infrastructure.persistence.entities.CommissionRuleJpaEntity;
 import com.danasea.backend.modules.systemconfig.infrastructure.persistence.entities.SystemConfigJpaEntity;
+import com.danasea.backend.modules.systemconfig.infrastructure.persistence.repositories.JpaCommissionRuleRepository;
 import com.danasea.backend.modules.systemconfig.infrastructure.persistence.repositories.JpaSystemConfigRepository;
 
 class AdminSystemConfigControllerTest {
 
     private final JpaSystemConfigRepository repository = mock(JpaSystemConfigRepository.class);
-    private final AdminSystemConfigController controller = new AdminSystemConfigController(repository);
+    private final JpaCommissionRuleRepository commissionRuleRepository = mock(JpaCommissionRuleRepository.class);
+    private final JpaCategoryRepository categoryRepository = mock(JpaCategoryRepository.class);
+    private final AdminSystemConfigController controller = new AdminSystemConfigController(
+            repository,
+            commissionRuleRepository,
+            categoryRepository
+    );
     private final UUID adminId = UUID.randomUUID();
 
     @BeforeEach
@@ -98,5 +114,56 @@ class AdminSystemConfigControllerTest {
                 new UpdateConfigRequest("105", "Invalid")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("between 0% and 100%");
+    }
+
+    @Test
+    @DisplayName("Admin can retrieve all dynamic commission rules")
+    void getCommissionRulesReturnsOrderedList() {
+        CommissionRuleJpaEntity rule = new CommissionRuleJpaEntity();
+        rule.setId(UUID.randomUUID());
+        rule.setRuleCode("ONBOARDING_NEW_VENDOR_90D");
+        rule.setRuleName("Ưu đãi Đối tác mới (3 tháng đầu)");
+        rule.setTargetType("ONBOARDING");
+        rule.setCommissionRate(new BigDecimal("0.0500"));
+        rule.setDurationDays(90);
+        rule.setPriority(100);
+        rule.setIsActive(true);
+
+        when(categoryRepository.findAll()).thenReturn(List.of());
+        when(commissionRuleRepository.findAllByOrderByPriorityDescCreatedAtAsc()).thenReturn(List.of(rule));
+
+        ResponseEntity<List<CommissionRuleDto>> response = controller.getCommissionRules();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).hasSize(1);
+        assertThat(response.getBody().get(0).ruleCode()).isEqualTo("ONBOARDING_NEW_VENDOR_90D");
+        assertThat(response.getBody().get(0).commissionRatePercent()).isEqualByComparingTo("5");
+    }
+
+    @Test
+    @DisplayName("Admin can update commission rule rate, duration, and active status")
+    void updateCommissionRuleSuccess() {
+        UUID ruleId = UUID.randomUUID();
+        CommissionRuleJpaEntity rule = new CommissionRuleJpaEntity();
+        rule.setId(ruleId);
+        rule.setRuleCode("CATEGORY_THUE_SUP");
+        rule.setRuleName("Thuê ván SUP");
+        rule.setTargetType("CATEGORY");
+        rule.setCommissionRate(new BigDecimal("0.0700"));
+        rule.setPriority(50);
+        rule.setIsActive(true);
+
+        when(commissionRuleRepository.findById(ruleId)).thenReturn(Optional.of(rule));
+        when(commissionRuleRepository.save(any(CommissionRuleJpaEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ResponseEntity<CommissionRuleDto> response = controller.updateCommissionRule(
+                ruleId,
+                new UpdateCommissionRuleRequest(new BigDecimal("8.5"), null, false, "Điều chỉnh phí mùa cao điểm")
+        );
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().commissionRate()).isEqualByComparingTo("0.0850");
+        assertThat(response.getBody().commissionRatePercent()).isEqualByComparingTo("8.5");
+        assertThat(response.getBody().isActive()).isFalse();
+        assertThat(response.getBody().description()).isEqualTo("Điều chỉnh phí mùa cao điểm");
     }
 }

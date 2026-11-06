@@ -21,7 +21,6 @@ import com.danasea.backend.modules.settlement.domain.exceptions.InvalidSettlemen
 import com.danasea.backend.modules.settlement.domain.exceptions.SettlementAlreadyFinalizedException;
 import com.danasea.backend.modules.settlement.domain.exceptions.SettlementNotFoundException;
 import com.danasea.backend.modules.settlement.domain.exceptions.UnauthorizedSettlementAccessException;
-import com.danasea.backend.modules.settlement.domain.models.LineItemExclusionReason;
 import com.danasea.backend.modules.settlement.domain.models.SettlementStatus;
 import com.danasea.backend.modules.settlement.domain.services.SettlementCalculationEngine;
 import com.danasea.backend.modules.settlement.infrastructure.persistence.entities.SettlementJpaEntity;
@@ -30,8 +29,8 @@ import com.danasea.backend.modules.settlement.infrastructure.persistence.mappers
 import com.danasea.backend.modules.settlement.infrastructure.persistence.repositories.JpaSettlementLineItemRepository;
 import com.danasea.backend.modules.settlement.infrastructure.persistence.repositories.JpaSettlementRepository;
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
+import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import com.danasea.backend.security.authorization.domain.models.AuthorizationSubject;
-import com.danasea.backend.security.infrastructure.SecurityUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,14 +38,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -54,6 +48,7 @@ import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +57,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -153,7 +149,7 @@ class SettlementUseCaseTest {
 
     @AfterEach
     void tearDown() {
-        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        SecurityContextHolder.clearContext();
     }
 
     @Nested
@@ -207,8 +203,51 @@ class SettlementUseCaseTest {
             // Gross: 1,000,000 + (2,000,000 - 500,000) = 2,500,000.00
             assertThat(response.grossAmount()).isEqualByComparingTo("2500000.00");
             assertThat(response.commissionAmount()).isEqualByComparingTo("250000.00");
+            assertThat(response.safetyRebateQualified()).isFalse();
+            assertThat(response.safetyRebateAmount()).isEqualByComparingTo("0.00");
             assertThat(response.netPayableAmount()).isEqualByComparingTo("2250000.00");
-            verify(lineItemRepository, org.mockito.Mockito.times(2)).save(any());
+            verify(lineItemRepository, times(2)).save(any());
+        }
+
+        @Test
+        @DisplayName("Safety & SLA Rebate: Cộng trực tiếp 2% tiền mặt vào Net Payable khi Vendor đạt chuẩn an toàn và rating >= 4.8")
+        void testGenerateSettlementWithSafetyRebateQualified() {
+            UUID subOrderId = UUID.randomUUID();
+            SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
+            subOrder.setId(subOrderId);
+            subOrder.setVendorId(vendorId);
+            subOrder.setSubtotalAmount(new BigDecimal("2500000.00"));
+            subOrder.setCommissionRate(new BigDecimal("0.1000"));
+            subOrder.setStatus(SubOrderStatus.COMPLETED);
+            subOrder.setCreatedAt(periodStart.atTime(12, 0).atOffset(OffsetDateTime.now().getOffset()));
+
+            Vendor qualifiedVendor = new Vendor();
+            qualifiedVendor.setId(vendorId);
+            qualifiedVendor.setRatingAvg(new BigDecimal("4.90"));
+            qualifiedVendor.setRatingCount(10);
+
+            when(settlementRepository.findByVendorIdAndPeriodStartAndPeriodEnd(vendorId, periodStart, periodEnd))
+                    .thenReturn(Optional.empty());
+            when(subOrderRepository.findByVendorIdAndStatusIn(eq(vendorId), any()))
+                    .thenReturn(List.of(subOrder));
+            when(refundRepository.findBySubOrderIdIn(any()))
+                    .thenReturn(Collections.emptyList());
+            when(disputeRepository.findBySubOrderIdInAndStatusIn(any(), any()))
+                    .thenReturn(Collections.emptyList());
+            when(vendorInternalApi.findById(vendorId))
+                    .thenReturn(Optional.of(qualifiedVendor));
+
+            when(settlementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(lineItemRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            GenerateSettlementRequest request = new GenerateSettlementRequest(vendorId, periodStart, periodEnd);
+            SettlementResponse response = generateSettlementUseCase.execute(request);
+
+            assertThat(response.grossAmount()).isEqualByComparingTo("2500000.00");
+            assertThat(response.commissionAmount()).isEqualByComparingTo("250000.00");
+            assertThat(response.safetyRebateQualified()).isTrue();
+            assertThat(response.safetyRebateAmount()).isEqualByComparingTo("50000.00");
+            assertThat(response.netPayableAmount()).isEqualByComparingTo("2300000.00");
         }
 
         @Test
@@ -343,12 +382,12 @@ class SettlementUseCaseTest {
             UUID userId = UUID.randomUUID();
             AuthorizationSubject subject =
                     new AuthorizationSubject(
-                            userId, "vendor@example.com", java.util.Set.of("VENDOR"), java.util.Set.of("READ")
+                            userId, "vendor@example.com", Set.of("VENDOR"), Set.of("READ")
                     );
-            org.springframework.security.authentication.UsernamePasswordAuthenticationToken auth =
-                    new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(subject.email(), null, Collections.emptyList());
+            UsernamePasswordAuthenticationToken auth =
+                    new UsernamePasswordAuthenticationToken(subject.email(), null, Collections.emptyList());
             auth.setDetails(subject);
-            org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+            SecurityContextHolder.getContext().setAuthentication(auth);
 
             when(vendorLookupPort.findVendorIdByUserId(userId)).thenReturn(Optional.of(vendorId));
 
@@ -374,12 +413,12 @@ class SettlementUseCaseTest {
             UUID userId = UUID.randomUUID();
             AuthorizationSubject subject =
                     new AuthorizationSubject(
-                            userId, "vendorA@example.com", java.util.Set.of("VENDOR"), java.util.Set.of("READ")
+                            userId, "vendorA@example.com", Set.of("VENDOR"), Set.of("READ")
                     );
-            org.springframework.security.authentication.UsernamePasswordAuthenticationToken auth =
-                    new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(subject.email(), null, Collections.emptyList());
+            UsernamePasswordAuthenticationToken auth =
+                    new UsernamePasswordAuthenticationToken(subject.email(), null, Collections.emptyList());
             auth.setDetails(subject);
-            org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+            SecurityContextHolder.getContext().setAuthentication(auth);
 
             UUID vendorAId = UUID.randomUUID();
             UUID vendorBId = UUID.randomUUID();

@@ -1,8 +1,8 @@
 # DANASEA — Master API & Test Checklist (EPIC-01 → EPIC-08)
 
-**Cập nhật:** 11/10/2026 — chuẩn hóa checklist 212 HTTP method/path, cập nhật bằng chứng kiểm thử và tách các hạng mục triển khai sau.
+**Cập nhật:** 06/11/2026 — chuẩn hóa checklist 256 HTTP method/path, bổ sung hệ thống Cấu hình Hoa hồng Động (Dynamic Commission) & Quỹ thưởng An toàn Biển (Safety Rebate), cập nhật bằng chứng kiểm thử.
 
-**Phạm vi kiểm kê:** Đối chiếu 212 tổ hợp HTTP method/path từ 67 controller
+**Phạm vi kiểm kê:** Đối chiếu 256 tổ hợp HTTP method/path từ 94 controller
 
 **Quy ước:** Với mục API, `[x]` nghĩa là endpoint đã có trong controller; không đồng nghĩa đã kiểm chứng toàn bộ nghiệp vụ hoặc tích hợp cổng thanh toán thật. Với mục Test, chỉ đánh dấu `[x]` khi có bằng chứng kiểm thử; ghi rõ phạm vi mock, test bị bỏ qua và snapshot kiểm chứng. `[ ]` là việc còn thiếu/chưa xác nhận hoặc chính sách đang chờ thống nhất. Các hạng mục chi trả/hoa hồng và vận hành vendor được người dùng hoãn sang đợt sau, không thuộc phạm vi bổ sung API hiện tại.
 
@@ -637,9 +637,13 @@ Chính sách hiện tại: khách sửa review trong 7 ngày; chưa cung cấp A
 - [x] GET /api/admin/system-configs
 - [x] GET /api/admin/system-configs/{key}
 - [x] PUT /api/admin/system-configs/{key}
+- [x] GET /api/admin/system-configs/commission-rules (danh sách quy tắc hoa hồng động theo thứ tự ưu tiên)
+- [x] PUT /api/admin/system-configs/commission-rules/{id} (cập nhật tỷ lệ hoa hồng, thời hạn ưu đãi, trạng thái quy tắc)
 - [x] GET /api/admin/settings
 - [x] GET /api/admin/settings/{key}
 - [x] PUT /api/admin/settings/{key}
+- [x] GET /api/admin/settings/commission-rules (alias danh sách quy tắc hoa hồng động cho trang Admin Settings)
+- [x] PUT /api/admin/settings/commission-rules/{id} (alias cập nhật quy tắc hoa hồng động cho trang Admin Settings)
 
 ### Thông báo — API
 - [x] GET /api/notifications (danh sách thông báo của user hiện tại, có phân trang, `isRead`/`readAt`)
@@ -695,14 +699,14 @@ Nếu DB dev đã áp dụng migration notification V25 cũ, cần kiểm tra ch
 
 # TODO 
 
-### P1 Chi trả vendor và cấu hình hoa hồng -> ĐANG THẢO LUẬN, CHƯA THỐNG NHẤT VÀ TRIỂN KHAI.
+### P1 Chi trả vendor và cấu hình hoa hồng -> ĐÃ HOÀN THÀNH CẤU HÌNH HOA HỒNG ĐỘNG & SAFETY REBATE (V51); CÒN LUỒNG RÚT TIỀN.
 
-Settlement đã có generate/list/detail/finalize. Finalize chỉ chốt kỳ, chưa đánh dấu PAID; PayoutRequest mới có model/entity/repository. Chưa có luồng rút tiền và xác nhận chi trả. `CommissionPolicyAdapter` hiện trả mặc định 10%, chưa đọc cấu hình.
+Settlement đã có generate/list/detail/finalize + cộng trực tiếp 2% Safety & SLA Cash Rebate (`safetyRebateAmount`, `safetyRebateQualified`). `CommissionPolicyAdapter` đã áp dụng chuỗi thác nước (Cascading Waterfall): Onboarding 5% (90 ngày đầu từ `approvedAt`) -> Category (MOTORIZED 7%, NON_MOTORIZED 10%, ALL_INCLUSIVE 12%) -> Platform Default (10%), lưu snapshot tại lúc tạo sub-order. Finalize chỉ chốt kỳ, chưa đánh dấu PAID; PayoutRequest mới có model/entity/repository. Chưa có luồng rút tiền và xác nhận chi trả.
 
 - `POST /api/vendor/payout-requests`, `GET /api/vendor/payout-requests`.
 - `GET /api/admin/payout-requests`; approve/reject và xác nhận paid, hoặc luồng admin trực tiếp chi trả settlement nếu muốn thu gọn MVP.
 - `PATCH /api/admin/settlements/{id}/mark-paid` kèm tham chiếu giao dịch/chứng từ, nếu chọn cách chi trả thủ công mô phỏng.
-- API cấu hình commission theo category/vendor/gói; lưu tỷ lệ tại lúc tạo sub-order để thay đổi sau không sửa giao dịch cũ.
+- [x] API cấu hình commission theo bậc ưu đãi Onboarding / Category / Mặc định (`GET/PUT /api/admin/system-configs/commission-rules`); lưu tỷ lệ tại lúc tạo sub-order để thay đổi sau không sửa giao dịch cũ.
 
 Đảm bảo một settlement không chi trả hai lần, không rút quá số được nhận, lưu audit log. Thông tin ngân hàng riêng tư chỉ dùng cho vendor/admin có quyền.
 

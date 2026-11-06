@@ -3,9 +3,19 @@ package com.danasea.backend.modules.settlement.application.usecases;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,7 +38,6 @@ import com.danasea.backend.modules.settlement.application.dtos.SettlementRespons
 import com.danasea.backend.modules.settlement.domain.exceptions.InvalidCommissionRateException;
 import com.danasea.backend.modules.settlement.domain.exceptions.InvalidSettlementPeriodException;
 import com.danasea.backend.modules.settlement.domain.exceptions.SettlementAlreadyFinalizedException;
-import com.danasea.backend.modules.settlement.domain.models.LineItemExclusionReason;
 import com.danasea.backend.modules.settlement.domain.models.SettlementLineItem;
 import com.danasea.backend.modules.settlement.domain.models.SettlementStatus;
 import com.danasea.backend.modules.settlement.domain.models.SubOrderCalculationContext;
@@ -271,7 +280,7 @@ public class GenerateSettlementUseCase {
                             Integer.class,
                             vendorId,
                             periodStart.atStartOfDay(ZoneId.of("Asia/Ho_Chi_Minh")).toOffsetDateTime(),
-                            periodEnd.atTime(java.time.LocalTime.MAX).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toOffsetDateTime()
+                            periodEnd.atTime(LocalTime.MAX).atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toOffsetDateTime()
                     );
                     if (faultCount != null && faultCount > 0) {
                         hasNoVendorFault = false;

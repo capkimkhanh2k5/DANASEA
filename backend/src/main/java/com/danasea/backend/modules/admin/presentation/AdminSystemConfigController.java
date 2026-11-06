@@ -3,14 +3,22 @@ package com.danasea.backend.modules.admin.presentation;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaCategoryRepository;
 import com.danasea.backend.modules.systemconfig.infrastructure.persistence.entities.CommissionRuleJpaEntity;
@@ -122,7 +130,7 @@ public class AdminSystemConfigController {
         UUID actorId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new AccessDeniedException("Admin identity required"));
 
-        if ("PLATFORM_COMMISSION_RATE".equalsIgnoreCase(key)) {
+        if ("PLATFORM_COMMISSION_RATE".equalsIgnoreCase(key) || "SAFETY_REBATE_RATE".equalsIgnoreCase(key)) {
             validateCommissionRate(request.value());
         } else if ("FLASH_SALE_MAX_SUBSIDY_RATIO".equalsIgnoreCase(key)) {
             validateRatio(request.value());
