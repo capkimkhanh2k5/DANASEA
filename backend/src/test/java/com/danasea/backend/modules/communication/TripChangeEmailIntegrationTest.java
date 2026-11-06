@@ -25,7 +25,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -39,7 +38,6 @@ import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.account.infrastructure.persistence.entities.UserJpaEntity;
 import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository;
 import com.danasea.backend.modules.booking.application.usecases.CancelBookingUseCase;
-import com.danasea.backend.modules.booking.domain.ports.BookingRepositoryPort;
 import com.danasea.backend.modules.communication.application.email.EmailRequest;
 import com.danasea.backend.modules.communication.application.email.EmailSendResult;
 import com.danasea.backend.modules.communication.application.email.RenderedEmail;
@@ -52,7 +50,6 @@ import com.danasea.backend.modules.communication.infrastructure.email.Transactio
 import com.danasea.backend.modules.communication.infrastructure.email.TransactionalEmailWorker;
 import com.danasea.backend.modules.communication.infrastructure.email.entities.TransactionalEmailDeliveryJpaEntity;
 import com.danasea.backend.modules.communication.infrastructure.email.repositories.JpaTransactionalEmailDeliveryRepository;
-import com.danasea.backend.modules.dispute.infrastructure.persistence.repositories.JpaDisputeRepository;
 import com.danasea.backend.modules.order.application.services.DisruptionDecisionService;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
@@ -65,7 +62,6 @@ import com.danasea.backend.modules.order.infrastructure.persistence.entities.Sub
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaRefundRepository;
-import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderDisruptionRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.CategoryJpaEntity;
@@ -77,12 +73,9 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
 import com.danasea.backend.modules.weather.infrastructure.jobs.SlotWeatherMonitoringJob;
-import com.danasea.backend.modules.weather.infrastructure.persistence.repositories.JpaSafetyRuleEvaluationRepository;
-import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 
-@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @ActiveProfiles("test")
-public class TripChangeEmailIntegrationTest extends BaseSecurityIntegrationTest {
+public class TripChangeEmailIntegrationTest extends BaseEmailIntegrationTest {
 
     @Autowired private TransactionalEmailPort transactionalEmailPort;
     @Autowired private TransactionalEmailWorker worker;
@@ -96,13 +89,9 @@ public class TripChangeEmailIntegrationTest extends BaseSecurityIntegrationTest 
     @Autowired private JpaMasterOrderRepository masterOrderRepository;
     @Autowired private JpaSubOrderRepository subOrderRepository;
     @Autowired private JpaRefundRepository refundRepository;
-    @Autowired private JpaSubOrderDisruptionRepository disruptionRepository;
-    @Autowired private JpaSafetyRuleEvaluationRepository evaluationRepository;
-    @Autowired private JpaDisputeRepository disputeRepository;
     @Autowired private DisruptionDecisionService disruptionDecisionService;
     @Autowired private SlotWeatherMonitoringJob slotWeatherMonitoringJob;
     @Autowired private CancelBookingUseCase cancelBookingUseCase;
-    @Autowired private BookingRepositoryPort bookingRepositoryPort;
     @Autowired private PlatformTransactionManager transactionManager;
 
     @MockitoBean(name = "captureTransactionalEmailSender")
@@ -118,6 +107,7 @@ public class TripChangeEmailIntegrationTest extends BaseSecurityIntegrationTest 
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
+        registerEmailDatabase(registry, "trip_change");
         registry.add("app.transactional-email.mode", () -> "capture");
         registry.add("app.transactional-email.worker.enabled", () -> "false");
         registry.add("app.transactional-email.enabled-families", () -> "DISRUPTION,OPS,BOOKING");
@@ -125,21 +115,6 @@ public class TripChangeEmailIntegrationTest extends BaseSecurityIntegrationTest 
 
     @BeforeEach
     void setUp() {
-        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            emailRepository.deleteAll();
-            disputeRepository.deleteAll();
-            disruptionRepository.deleteAll();
-            refundRepository.deleteAll();
-            subOrderRepository.deleteAll();
-            masterOrderRepository.deleteAll();
-            evaluationRepository.deleteAll();
-            slotRepository.deleteAll();
-            serviceRepository.deleteAll();
-            categoryRepository.deleteAll();
-            vendorRepository.deleteAll();
-            userRepository.deleteAll();
-        });
-
         reset(captureSender);
         when(captureSender.send(any())).thenReturn(EmailSendResult.accepted());
 

@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,7 +30,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -57,7 +57,6 @@ import com.danasea.backend.modules.communication.infrastructure.email.entities.T
 import com.danasea.backend.modules.communication.infrastructure.email.renderers.TripReminderEmailRenderer;
 import com.danasea.backend.modules.communication.infrastructure.email.repositories.JpaTransactionalEmailDeliveryRepository;
 import com.danasea.backend.modules.communication.infrastructure.jobs.TripReminderJob;
-import com.danasea.backend.modules.dispute.infrastructure.persistence.repositories.JpaDisputeRepository;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
@@ -72,11 +71,11 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
-import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 
-@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @ActiveProfiles("test")
-class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
+class TripReminderEmailIntegrationTest extends BaseEmailIntegrationTest {
+
+    private static final String SUPPORT_PHONE = "1900-6868";
 
     @Autowired private TripReminderJob tripReminderJob;
     @Autowired private TripReminderEmailRenderer tripReminderEmailRenderer;
@@ -85,7 +84,6 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
     @Autowired private JpaTransactionalEmailDeliveryRepository emailRepository;
     @Autowired private JpaMasterOrderRepository masterOrderRepository;
     @Autowired private JpaSubOrderRepository subOrderRepository;
-    @Autowired private JpaDisputeRepository disputeRepository;
     @Autowired private JpaVendorRepository vendorRepository;
     @Autowired private JpaUserRepository userRepository;
     @Autowired private JpaServiceRepository serviceRepository;
@@ -100,44 +98,38 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
     private AccountInternalApi accountInternalApi;
 
     private TransactionTemplate transactionTemplate;
+    private LocalDate tripDate;
+    private Instant scanTime;
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
+        registerEmailDatabase(registry, "trip_reminder");
         registry.add("app.transactional-email.mode", () -> "capture");
         registry.add("app.transactional-email.worker.enabled", () -> "true");
         registry.add("app.transactional-email.enabled-families", () -> "BOOKING,TRIP,DISRUPTION,REFUND");
-        registry.add("app.transactional-email.support-phone", () -> "1900-6868");
+        registry.add("app.transactional-email.support-phone", () -> SUPPORT_PHONE);
     }
 
     @BeforeEach
     void setUp() {
         transactionTemplate = new TransactionTemplate(transactionManager);
+        properties.setSupportPhone(SUPPORT_PHONE);
+
+        // The worker uses wall time for expiry. Simulate a midnight scan before its cutoff.
+        tripDate = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(2);
+        scanTime = tripDate.atStartOfDay(Booking.VIETNAM_ZONE).toInstant();
+        Clock fixedClock = Clock.fixed(scanTime, Booking.VIETNAM_ZONE);
+        tripReminderJob.setClock(fixedClock);
+        tripReminderEmailRenderer.setClock(fixedClock);
+
         reset(captureSender);
         when(captureSender.send(any())).thenReturn(EmailSendResult.accepted());
-
-        transactionTemplate.executeWithoutResult(status -> {
-            emailRepository.deleteAll();
-            disputeRepository.deleteAll();
-            subOrderRepository.deleteAll();
-            masterOrderRepository.deleteAll();
-            slotRepository.deleteAll();
-            serviceRepository.deleteAll();
-            vendorRepository.deleteAll();
-            userRepository.deleteAll();
-        });
     }
 
     @Test
     @DisplayName("Quét trễ khi còn 10 giờ: gửi bù 1 lần với giờ khởi hành thực tế và đầy đủ thông tin điểm hẹn, hotline")
     void lateBatchScanRemaining10Hours_sendsReminderWithActualDeparture() {
-        // Given: Giờ cố định hiện tại: 2026-11-06T00:00:00+07:00
-        Instant now = Instant.parse("2026-11-05T17:00:00Z"); // 00:00 +07:00
-        Clock fixedClock = Clock.fixed(now, Booking.VIETNAM_ZONE);
-        tripReminderJob.setClock(fixedClock);
-        tripReminderEmailRenderer.setClock(fixedClock);
-
         // Ca khởi hành vào lúc 10:00 sáng cùng ngày (sau đúng 10 tiếng)
-        LocalDate tripDate = LocalDate.of(2026, 11, 6);
         LocalTime tripTime = LocalTime.of(10, 0);
 
         UUID customerId = UUID.randomUUID();
@@ -176,10 +168,11 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
         RenderedEmail sent = captor.getValue();
         assertEquals("customer@test.com", sent.to());
         assertTrue(sent.subject().contains("Lặn ngắm san hô Bán Đảo Sơn Trà"));
-        assertTrue(sent.subject().contains("10:00 06/11/2026"));
+        String expectedDeparture = "10:00 " + tripDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        assertTrue(sent.subject().contains(expectedDeparture));
 
         String body = sent.textBody();
-        assertTrue(body.contains("10:00 06/11/2026"));
+        assertTrue(body.contains(expectedDeparture));
         assertTrue(body.contains("Bến tàu du lịch Sơn Trà"));
         assertTrue(body.contains("16.1001, 108.2501"));
         assertTrue(body.contains("0905123456")); // Ưu tiên số hotline đối tác
@@ -195,12 +188,6 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
     @DisplayName("Đúng biên 2 giờ hoặc ít hơn: bỏ qua cả lúc enqueue và ngay trước lúc gửi")
     void exactBoundary2HoursOrLess_skipsReminderBothAtEnqueueAndBeforeSend() {
         // Ca 1: Lúc enqueue, thời gian còn lại đúng 2 tiếng hoặc ít hơn -> không enqueue
-        Instant now = Instant.parse("2026-11-05T17:00:00Z"); // 00:00 +07:00
-        Clock fixedClock = Clock.fixed(now, Booking.VIETNAM_ZONE);
-        tripReminderJob.setClock(fixedClock);
-        tripReminderEmailRenderer.setClock(fixedClock);
-
-        LocalDate tripDate = LocalDate.of(2026, 11, 6);
         LocalTime tripTime = LocalTime.of(2, 0); // Khởi hành lúc 02:00 -> cách đúng 2 tiếng
 
         UUID customerId = UUID.randomUUID();
@@ -223,7 +210,7 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
         assertEquals(0, emailRepository.count());
 
         // Ca 2: Đã enqueue trước đó khi còn nhiều giờ, nhưng khi worker xử lý thì thời gian chỉ còn <= 2 giờ
-        Instant scheduledInstant = now.plus(Duration.ofHours(5)); // khởi hành lúc 05:00 sáng
+        Instant scheduledInstant = scanTime.plus(Duration.ofHours(5)); // khởi hành lúc 05:00 sáng
         UUID slotId2 = createSlot(serviceId, tripDate, LocalTime.of(5, 0), SlotStatus.OPEN);
         createSubOrder(orderId, slotId2, vendorId, SubOrderStatus.CONFIRMED, new BigDecimal("500000"));
 
@@ -234,8 +221,8 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
                     .type(TransactionalEmailType.TRIP_REMINDER_24H)
                     .businessKey(businessKey)
                     .recipientKey("USER:" + customerId)
-                    .occurredAt(OffsetDateTime.ofInstant(now, ZoneOffset.UTC))
-                    .dueAt(OffsetDateTime.ofInstant(now, ZoneOffset.UTC))
+                    .occurredAt(OffsetDateTime.ofInstant(scanTime, ZoneOffset.UTC))
+                    .dueAt(OffsetDateTime.ofInstant(scanTime, ZoneOffset.UTC))
                     .expiresAt(OffsetDateTime.ofInstant(scheduledInstant.minus(Duration.ofHours(2)), ZoneOffset.UTC))
                     .payloadVersion(1)
                     .payload(Map.of("slotId", slotId2.toString()))
@@ -261,12 +248,6 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
     @Test
     @DisplayName("Nhiều đơn con trong cùng 1 slot của 1 khách: chỉ tạo duy nhất 1 bản ghi outbox (idempotency/gom theo slot + start)")
     void multipleSubOrdersSameSlotSameCustomer_createsOnlyOneOutboxEmail() {
-        Instant now = Instant.parse("2026-11-05T17:00:00Z");
-        Clock fixedClock = Clock.fixed(now, Booking.VIETNAM_ZONE);
-        tripReminderJob.setClock(fixedClock);
-        tripReminderEmailRenderer.setClock(fixedClock);
-
-        LocalDate tripDate = LocalDate.of(2026, 11, 6);
         LocalTime tripTime = LocalTime.of(15, 0); // Sau 15 tiếng
 
         UUID customerId = UUID.randomUUID();
@@ -302,12 +283,6 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
     @Test
     @DisplayName("Hai tour khác nhau trùng giờ khởi hành: gửi 2 email riêng biệt với đúng điểm hẹn của từng tour")
     void twoSlotsSameTimeSameCustomer_createsTwoSeparateEmails() {
-        Instant now = Instant.parse("2026-11-05T17:00:00Z");
-        Clock fixedClock = Clock.fixed(now, Booking.VIETNAM_ZONE);
-        tripReminderJob.setClock(fixedClock);
-        tripReminderEmailRenderer.setClock(fixedClock);
-
-        LocalDate tripDate = LocalDate.of(2026, 11, 6);
         LocalTime tripTime = LocalTime.of(8, 0); // Khởi hành cùng 08:00
 
         UUID customerId = UUID.randomUUID();
@@ -353,12 +328,6 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
     @Test
     @DisplayName("Ca đã đổi, hủy hoặc đã check-in trước khi gửi: worker kiểm tra và đánh dấu SKIPPED, không gọi sender")
     void rescheduledOrCancelledOrCheckedInBeforeWorkerSends_marksSkipped() {
-        Instant now = Instant.parse("2026-11-05T17:00:00Z");
-        Clock fixedClock = Clock.fixed(now, Booking.VIETNAM_ZONE);
-        tripReminderJob.setClock(fixedClock);
-        tripReminderEmailRenderer.setClock(fixedClock);
-
-        LocalDate tripDate = LocalDate.of(2026, 11, 6);
         LocalTime tripTime = LocalTime.of(14, 0);
 
         UUID customerId = UUID.randomUUID();
@@ -398,12 +367,6 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
     @Test
     @DisplayName("Thư xác nhận cho đúng ca đã được SMTP chấp nhận trong 2 giờ vừa qua: bỏ qua lời nhắc trùng")
     void recentlyAcceptedBookingConfirmedWithin2Hours_skipsReminder() {
-        Instant now = Instant.parse("2026-11-05T17:00:00Z");
-        Clock fixedClock = Clock.fixed(now, Booking.VIETNAM_ZONE);
-        tripReminderJob.setClock(fixedClock);
-        tripReminderEmailRenderer.setClock(fixedClock);
-
-        LocalDate tripDate = LocalDate.of(2026, 11, 6);
         LocalTime tripTime = LocalTime.of(12, 0); // Sau 12 tiếng
 
         UUID customerId = UUID.randomUUID();
@@ -428,9 +391,9 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
                     .family(TransactionalEmailType.BOOKING_CONFIRMED.getFamily())
                     .mode(EmailDeliveryMode.CAPTURE)
                     .status(EmailDeliveryStatus.ACCEPTED)
-                    .acceptedAt(OffsetDateTime.ofInstant(now.minus(Duration.ofMinutes(30)), ZoneOffset.UTC))
-                    .occurredAt(OffsetDateTime.ofInstant(now.minus(Duration.ofMinutes(30)), ZoneOffset.UTC))
-                    .dueAt(OffsetDateTime.ofInstant(now.minus(Duration.ofMinutes(30)), ZoneOffset.UTC))
+                    .acceptedAt(OffsetDateTime.ofInstant(scanTime.minus(Duration.ofMinutes(30)), ZoneOffset.UTC))
+                    .occurredAt(OffsetDateTime.ofInstant(scanTime.minus(Duration.ofMinutes(30)), ZoneOffset.UTC))
+                    .dueAt(OffsetDateTime.ofInstant(scanTime.minus(Duration.ofMinutes(30)), ZoneOffset.UTC))
                     .attemptCount(1)
                     .payload("{}")
                     .build();
@@ -448,12 +411,6 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
     @Test
     @DisplayName("Xác minh fallback số điện thoại liên hệ: ưu tiên đối tác -> hotline Danasea -> thiếu cả hai thì bỏ dòng số điện thoại")
     void phoneFallbackVerification() {
-        Instant now = Instant.parse("2026-11-05T17:00:00Z");
-        Clock fixedClock = Clock.fixed(now, Booking.VIETNAM_ZONE);
-        tripReminderJob.setClock(fixedClock);
-        tripReminderEmailRenderer.setClock(fixedClock);
-
-        LocalDate tripDate = LocalDate.of(2026, 11, 6);
         LocalTime tripTime = LocalTime.of(16, 0);
 
         UUID customerId = UUID.randomUUID();
@@ -468,7 +425,7 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
         UUID slotId = createSlot(serviceId, tripDate, tripTime, SlotStatus.OPEN);
 
         UUID orderId = createMasterOrder(customerId, MasterOrderStatus.PAID, PaymentOrderStatus.PAID, new BigDecimal("900000"));
-        createSubOrder(orderId, slotId, vendorId, SubOrderStatus.CONFIRMED, new BigDecimal("900000"));
+        UUID subOrderId = createSubOrder(orderId, slotId, vendorId, SubOrderStatus.CONFIRMED, new BigDecimal("900000"));
 
         transactionTemplate.executeWithoutResult(s -> tripReminderJob.scanAndSendReminders());
         processPendingEmails();
@@ -481,12 +438,7 @@ class TripReminderEmailIntegrationTest extends BaseSecurityIntegrationTest {
         reset(captureSender);
         when(captureSender.send(any())).thenReturn(EmailSendResult.accepted());
         properties.setSupportPhone(null); // Xóa hotline Danasea
-        transactionTemplate.executeWithoutResult(s -> {
-            emailRepository.deleteAll();
-            disputeRepository.deleteAll();
-            subOrderRepository.deleteAll();
-            slotRepository.deleteAll();
-        });
+        subOrderRepository.deleteById(subOrderId);
 
         // Tạo slot mới 17:00 để quét lại
         UUID slotId2 = createSlot(serviceId, tripDate, LocalTime.of(17, 0), SlotStatus.OPEN);

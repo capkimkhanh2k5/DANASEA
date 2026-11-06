@@ -19,13 +19,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -89,15 +87,14 @@ import com.danasea.backend.security.authentication.application.usecases.ResetPas
 import com.danasea.backend.security.authentication.domain.models.Authentication;
 import com.danasea.backend.security.authentication.infrastructure.security.HashUtils;
 import com.danasea.backend.security.authentication.infrastructure.security.JwtTokenProvider;
-import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 
-@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-public class CaseAndAccountEmailIntegrationTest extends BaseSecurityIntegrationTest {
+public class CaseAndAccountEmailIntegrationTest extends BaseEmailIntegrationTest {
 
     @DynamicPropertySource
     static void configureCaseEmailProperties(DynamicPropertyRegistry registry) {
+        registerEmailDatabase(registry, "case_account");
         registry.add("app.transactional-email.mode", () -> "capture");
         registry.add("app.transactional-email.worker.enabled", () -> "false");
         registry.add("app.transactional-email.worker.batch-size", () -> "20");
@@ -142,7 +139,6 @@ public class CaseAndAccountEmailIntegrationTest extends BaseSecurityIntegrationT
     @BeforeEach
     void setUp() {
         tx = new TransactionTemplate(transactionManager);
-        cleanDatabase();
         reset(sender);
 
         when(sender.send(any(RenderedEmail.class)))
@@ -152,27 +148,6 @@ public class CaseAndAccountEmailIntegrationTest extends BaseSecurityIntegrationT
         properties.setEnabledFamilies("CASES,ACCOUNT,SETTLEMENT,REFUND,OPS");
         properties.getOpsEmails().put("finance", "finance-test@danasea.vn");
         properties.getOpsEmails().put("operations", "operations-test@danasea.vn");
-    }
-
-    @AfterEach
-    void tearDown() {
-        cleanDatabase();
-    }
-
-    private void cleanDatabase() {
-        tx.executeWithoutResult(status -> {
-            deliveryRepository.deleteAll();
-            disputeRepository.deleteAll();
-            settlementRepository.deleteAll();
-            refundRepository.deleteAll();
-            subOrderRepository.deleteAll();
-            masterOrderRepository.deleteAll();
-            serviceSlotRepository.deleteAll();
-            serviceRepository.deleteAll();
-            categoryRepository.deleteAll();
-            vendorRepository.deleteAll();
-            userRepository.deleteAll();
-        });
     }
 
     private void processPendingEmails() {

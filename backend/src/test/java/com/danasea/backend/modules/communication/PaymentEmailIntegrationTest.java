@@ -23,7 +23,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -63,11 +62,9 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
-import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 
-@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @ActiveProfiles("test")
-class PaymentEmailIntegrationTest extends BaseSecurityIntegrationTest {
+class PaymentEmailIntegrationTest extends BaseEmailIntegrationTest {
 
     @Autowired private PaymentNotificationEventListener listener;
     @Autowired private TransactionalEmailWorker worker;
@@ -91,6 +88,7 @@ class PaymentEmailIntegrationTest extends BaseSecurityIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
+        registerEmailDatabase(registry, "payment");
         registry.add("app.transactional-email.mode", () -> "capture");
         registry.add("app.transactional-email.worker.enabled", () -> "true");
         registry.add("app.transactional-email.enabled-families", () -> "BOOKING,TRIP,DISRUPTION,REFUND");
@@ -99,7 +97,6 @@ class PaymentEmailIntegrationTest extends BaseSecurityIntegrationTest {
     @BeforeEach
     void setUp() {
         transactionTemplate = new TransactionTemplate(transactionManager);
-        emailRepository.deleteAll();
         reset(captureSender);
         when(captureSender.send(any())).thenReturn(EmailSendResult.accepted());
     }

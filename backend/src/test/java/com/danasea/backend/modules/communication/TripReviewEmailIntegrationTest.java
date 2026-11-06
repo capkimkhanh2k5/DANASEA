@@ -17,13 +17,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -81,15 +79,14 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.vendor.domain.models.VerificationStatus;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
-import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 
-@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-public class TripReviewEmailIntegrationTest extends BaseSecurityIntegrationTest {
+public class TripReviewEmailIntegrationTest extends BaseEmailIntegrationTest {
 
     @DynamicPropertySource
     static void configureReviewEmailProperties(DynamicPropertyRegistry registry) {
+        registerEmailDatabase(registry, "trip_review");
         registry.add("app.transactional-email.mode", () -> "capture");
         registry.add("app.transactional-email.worker.enabled", () -> "false");
         registry.add("app.transactional-email.worker.batch-size", () -> "20");
@@ -129,7 +126,6 @@ public class TripReviewEmailIntegrationTest extends BaseSecurityIntegrationTest 
     void setUp() {
         tx = new TransactionTemplate(transactionManager);
         qrSigner = new QrTokenSigner(QR_SECRET);
-        cleanDatabase();
         reset(sender);
 
         when(sender.send(any(RenderedEmail.class)))
@@ -137,27 +133,6 @@ public class TripReviewEmailIntegrationTest extends BaseSecurityIntegrationTest 
 
         properties.setMode("capture");
         properties.setEnabledFamilies("TRIP,BOOKING");
-    }
-
-    @AfterEach
-    void tearDown() {
-        cleanDatabase();
-    }
-
-    private void cleanDatabase() {
-        tx.executeWithoutResult(status -> {
-            deliveryRepository.deleteAll();
-            reviewRepository.deleteAll();
-            disputeRepository.deleteAll();
-            checkinTokenRepository.deleteAll();
-            subOrderRepository.deleteAll();
-            masterOrderRepository.deleteAll();
-            serviceSlotRepository.deleteAll();
-            serviceRepository.deleteAll();
-            categoryRepository.deleteAll();
-            vendorRepository.deleteAll();
-            userRepository.deleteAll();
-        });
     }
 
     private void processPendingEmails() {

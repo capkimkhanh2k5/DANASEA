@@ -26,7 +26,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -53,7 +52,6 @@ import com.danasea.backend.modules.communication.infrastructure.email.Transactio
 import com.danasea.backend.modules.communication.infrastructure.email.TransactionalEmailWorker;
 import com.danasea.backend.modules.communication.infrastructure.email.entities.TransactionalEmailDeliveryJpaEntity;
 import com.danasea.backend.modules.communication.infrastructure.email.repositories.JpaTransactionalEmailDeliveryRepository;
-import com.danasea.backend.modules.dispute.infrastructure.persistence.repositories.JpaDisputeRepository;
 import com.danasea.backend.modules.order.domain.models.DiscountScope;
 import com.danasea.backend.modules.order.domain.models.DiscountSponsorType;
 import com.danasea.backend.modules.order.domain.models.DiscountType;
@@ -74,7 +72,6 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaPaymentRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaRefundRepository;
-import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderDisruptionRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.CategoryJpaEntity;
@@ -87,12 +84,10 @@ import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.Ve
 import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
 import com.danasea.backend.security.authentication.domain.models.Authentication;
 import com.danasea.backend.security.authentication.infrastructure.security.JwtTokenProvider;
-import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 
-@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-public class RefundVoucherEmailIntegrationTest extends BaseSecurityIntegrationTest {
+public class RefundVoucherEmailIntegrationTest extends BaseEmailIntegrationTest {
 
     @Autowired private TransactionalEmailPort transactionalEmailPort;
     @Autowired private TransactionalEmailWorker worker;
@@ -108,8 +103,6 @@ public class RefundVoucherEmailIntegrationTest extends BaseSecurityIntegrationTe
     @Autowired private JpaRefundRepository refundRepository;
     @Autowired private JpaPaymentRepository paymentRepository;
     @Autowired private JpaDiscountCodeRepository discountCodeRepository;
-    @Autowired private JpaSubOrderDisruptionRepository disruptionRepository;
-    @Autowired private JpaDisputeRepository disputeRepository;
     @Autowired private JwtTokenProvider jwtTokenProvider;
     @Autowired private MockMvc mockMvc;
     @Autowired private PlatformTransactionManager transactionManager;
@@ -131,6 +124,7 @@ public class RefundVoucherEmailIntegrationTest extends BaseSecurityIntegrationTe
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
+        registerEmailDatabase(registry, "refund_voucher");
         registry.add("app.transactional-email.mode", () -> "capture");
         registry.add("app.transactional-email.worker.enabled", () -> "false");
         registry.add("app.transactional-email.enabled-families", () -> "REFUND,VOUCHER,DISRUPTION,OPS,BOOKING");
@@ -148,20 +142,6 @@ public class RefundVoucherEmailIntegrationTest extends BaseSecurityIntegrationTe
         categoryId = UUID.randomUUID();
 
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            emailRepository.deleteAll();
-            disputeRepository.deleteAll();
-            disruptionRepository.deleteAll();
-            discountCodeRepository.deleteAll();
-            refundRepository.deleteAll();
-            paymentRepository.deleteAll();
-            subOrderRepository.deleteAll();
-            masterOrderRepository.deleteAll();
-            slotRepository.deleteAll();
-            serviceRepository.deleteAll();
-            categoryRepository.deleteAll();
-            vendorRepository.deleteAll();
-            userRepository.deleteAll();
-
             customerUser = new UserJpaEntity();
             customerUser.setId(customerId);
             customerUser.setEmail("customer.refund@danasea.vn");

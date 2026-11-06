@@ -12,7 +12,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -26,10 +25,8 @@ import com.danasea.backend.modules.communication.domain.models.TransactionalEmai
 import com.danasea.backend.modules.communication.infrastructure.email.TransactionalEmailProperties;
 import com.danasea.backend.modules.communication.infrastructure.email.entities.TransactionalEmailDeliveryJpaEntity;
 import com.danasea.backend.modules.communication.infrastructure.email.repositories.JpaTransactionalEmailDeliveryRepository;
-import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 
-@SpringBootTest
-class TransactionalEmailOutboxIntegrationTest extends BaseSecurityIntegrationTest {
+class TransactionalEmailOutboxIntegrationTest extends BaseEmailIntegrationTest {
 
     @Autowired
     private TransactionalEmailPort emailPort;
@@ -47,6 +44,7 @@ class TransactionalEmailOutboxIntegrationTest extends BaseSecurityIntegrationTes
 
     @DynamicPropertySource
     static void configureEmailProperties(DynamicPropertyRegistry registry) {
+        registerEmailDatabase(registry, "outbox");
         registry.add("app.transactional-email.mode", () -> "capture");
         registry.add("app.transactional-email.worker.enabled", () -> "false");
     }
@@ -54,7 +52,6 @@ class TransactionalEmailOutboxIntegrationTest extends BaseSecurityIntegrationTes
     @BeforeEach
     void setUp() {
         transactionTemplate = new TransactionTemplate(transactionManager);
-        repository.deleteAll();
     }
 
     @Test
