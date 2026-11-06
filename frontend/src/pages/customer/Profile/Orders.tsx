@@ -798,9 +798,6 @@ export function Orders() {
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                 Quản lý vé &amp; Đơn trải nghiệm
               </h1>
-              <p className="text-base text-slate-700 mt-1 leading-relaxed">
-                Theo dõi tình trạng đơn đặt, xuất mã QR check-in tại cầu tàu và gửi đánh giá chất lượng dịch vụ biển.
-              </p>
             </div>
 
             {/* Airbnb Signature Underline Tabs */}
