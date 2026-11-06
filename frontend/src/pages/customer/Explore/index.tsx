@@ -985,45 +985,6 @@ export function Explore() {
           })}
         </div>
       </section>
-
-      {/* 7. Safe & Eco-Guidelines */}
-      <section className="w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 mb-16 animate-fadeInUp">
-        <div className="bg-[#031d44] text-white rounded-2xl p-6 sm:p-10 w-full shadow-xl">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div className="lg:col-span-5">
-              <h3 className="text-2xl font-black text-white mb-3">
-                {language === 'en'
-                  ? 'Marine Safety and Coral Conservation Standards'
-                  : 'An Toàn Hàng Hải & Bảo Tồn Rạn San Hô'}
-              </h3>
-
-              <p className="text-slate-200 text-sm sm:text-base leading-relaxed font-normal">
-                {language === 'en'
-                  ? 'DANASEA enforces strict maritime safety standards with 100% SOLAS-certified life jackets, certified PADI rescue instructors, and strict coral conservation protocols in Son Tra Peninsula.'
-                  : 'DANASEA áp dụng tiêu chuẩn an toàn hàng hải tuyệt đối với 100% áo phao đạt kiểm định SOLAS, hướng dẫn viên đạt chứng chỉ cứu sinh PADI và quy định nghiêm ngặt không giẫm đạp rạn san hô tự nhiên tại bán đảo Sơn Trà.'}
-              </p>
-            </div>
-
-            <div className="lg:col-span-7">
-              <ul className="space-y-3.5 text-slate-200 text-sm sm:text-base">
-                <li className="flex items-start gap-3 bg-white/10 p-3.5 rounded-xl border border-white/10">
-                  <span className="font-bold text-cyan-200 shrink-0">Áo phao SOLAS:</span>
-                  <span>Bắt buộc mặc áo phao tiêu chuẩn trong suốt quá trình chèo SUP, lướt ván và cano cao tốc.</span>
-                </li>
-                <li className="flex items-start gap-3 bg-white/10 p-3.5 rounded-xl border border-white/10">
-                  <span className="font-bold text-cyan-200 shrink-0">Bảo tồn san hô:</span>
-                  <span>Giữ khoảng cách an toàn với rạn san hô bãi cạn và sử dụng kem chống nắng an toàn đại dương.</span>
-                </li>
-                <li className="flex items-start gap-3 bg-white/10 p-3.5 rounded-xl border border-white/10">
-                  <span className="font-bold text-cyan-200 shrink-0">Huấn luyện viên:</span>
-                  <span>Các tour lặn biển sâu Scuba luôn có thợ lặn chuyên nghiệp kèm sát từng du khách 1:1.</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
     </main>
   );
 }
