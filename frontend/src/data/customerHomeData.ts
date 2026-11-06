@@ -18,6 +18,7 @@ export interface FlashSaleExperience {
   badge?: string;
   badgeEn?: string;
   imageUrl: string;
+  endTime?: string;
 }
 
 export interface ActivityCardData {
