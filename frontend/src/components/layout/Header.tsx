@@ -18,39 +18,173 @@ import {
   ChevronRight,
   ChevronLeft,
   Ticket,
-  CreditCard,
   Anchor,
   Tag,
   ShieldCheck,
+  RotateCcw,
+  CalendarClock,
+  Calendar,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import type { NotificationResponse } from "../../types/notification";
 
-const getNotificationMeta = (type?: string | null, title?: string | null, relatedEntityType?: string | null) => {
-  const t = (type || '').toUpperCase();
-  const h = (title || '').toUpperCase();
-  const r = (relatedEntityType || '').toUpperCase();
-
-  if (t.includes('ORDER') || t.includes('BOOK') || t.includes('TICKET') || r === 'ORDER' || r === 'SUB_ORDER') {
-    return { icon: <Ticket className="w-4 h-4 text-sky-600" />, bg: 'bg-sky-50' };
-  }
-  if (t.includes('PAY') || t.includes('REFUND') || t.includes('MONEY') || h.includes('HOÀN TIỀN') || h.includes('THANH TOÁN')) {
-    return { icon: <CreditCard className="w-4 h-4 text-emerald-600" />, bg: 'bg-emerald-50' };
-  }
-  if (t.includes('PORT') || t.includes('HARBOR') || t.includes('WEATHER') || h.includes('CẢNG') || h.includes('SÓNG')) {
-    return { icon: <Anchor className="w-4 h-4 text-cyan-600" />, bg: 'bg-cyan-50' };
-  }
-  if (t.includes('VOUCHER') || t.includes('PROMO') || h.includes('ƯU ĐÃI') || h.includes('GIẢM')) {
-    return { icon: <Tag className="w-4 h-4 text-amber-600" />, bg: 'bg-amber-50' };
-  }
-  if (t.includes('SECURITY') || t.includes('SAFETY') || t.includes('ACCOUNT') || h.includes('BẢO MẬT')) {
-    return { icon: <ShieldCheck className="w-4 h-4 text-indigo-600" />, bg: 'bg-indigo-50' };
-  }
-  if (t.includes('RESCHEDULE') || h.includes('ĐỔI CA')) {
-    return { icon: <CalendarCheck className="w-4 h-4 text-amber-600" />, bg: 'bg-amber-50' };
-  }
-  return { icon: <Ticket className="w-4 h-4 text-slate-600" />, bg: 'bg-slate-100' };
+const normalizeText = (str?: string | null) => {
+  return (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd');
 };
 
+const getNotificationMeta = (type?: string | null, title?: string | null, relatedEntityType?: string | null) => {
+  const t = (type || '').toUpperCase();
+  const r = (relatedEntityType || '').toUpperCase();
+  const normTitle = normalizeText(title);
+
+  // 1. Hoàn tiền / Yêu cầu hoàn tiền / Hủy đơn (Refund / Cancellation) -> Đỏ hồng (Rose) + RotateCcw
+  if (
+    normTitle.includes('hoan tien') ||
+    normTitle.includes('hoan toan bo tien') ||
+    normTitle.includes('yeu cau hoan') ||
+    normTitle.includes('huy don') ||
+    normTitle.includes('da huy') ||
+    t.includes('REFUND') ||
+    t.includes('CANCEL')
+  ) {
+    return {
+      icon: <RotateCcw className="w-4 h-4 text-rose-600" />,
+      bg: 'bg-rose-50 border border-rose-200/80',
+    };
+  }
+
+  // 2. Yêu cầu chọn phương án / Sự cố dịch vụ (Action Required / Incident / Choice) -> Cam cảnh báo (Orange) + AlertCircle
+  if (
+    normTitle.includes('chon doi ca') ||
+    normTitle.includes('hoac hoan') ||
+    normTitle.includes('su co') ||
+    normTitle.includes('can xu ly') ||
+    t.includes('INCIDENT') ||
+    t.includes('ACTION_REQUIRED')
+  ) {
+    return {
+      icon: <AlertCircle className="w-4 h-4 text-orange-600" />,
+      bg: 'bg-orange-50 border border-orange-200/80',
+    };
+  }
+
+  // 3. Đề xuất đổi ca / Lịch vận hành mới (Reschedule / Shift Proposal) -> Vàng hổ phách (Amber) + CalendarClock
+  if (
+    normTitle.includes('doi ca') ||
+    normTitle.includes('de xuat doi') ||
+    normTitle.includes('doi gio') ||
+    normTitle.includes('doi ngay') ||
+    t.includes('RESCHEDULE') ||
+    t.includes('SHIFT')
+  ) {
+    return {
+      icon: <CalendarClock className="w-4 h-4 text-amber-600" />,
+      bg: 'bg-amber-50 border border-amber-200/80',
+    };
+  }
+
+  // 4. Nhắc lịch chuyến đi / Giờ khởi hành sắp tới (Trip Reminder / Upcoming Departure) -> Tím chàm (Indigo) + Calendar
+  if (
+    normTitle.includes('nhac lich') ||
+    normTitle.includes('chuyen di sap toi') ||
+    normTitle.includes('sap toi') ||
+    normTitle.includes('khoi hanh') ||
+    normTitle.includes('gio tap trung') ||
+    t.includes('REMINDER') ||
+    t.includes('UPCOMING')
+  ) {
+    return {
+      icon: <Calendar className="w-4 h-4 text-indigo-600" />,
+      bg: 'bg-indigo-50 border border-indigo-200/80',
+    };
+  }
+
+  // 5. Thanh toán thành công / Đặt vé xác nhận (Payment Success / Booking Confirmed) -> Xanh lục (Emerald) + CheckCircle2
+  if (
+    normTitle.includes('thanh toan thanh cong') ||
+    normTitle.includes('xac nhan dat ve') ||
+    normTitle.includes('dat ve thanh cong') ||
+    normTitle.includes('thanh toan') ||
+    t.includes('CONFIRMED') ||
+    t.includes('PAYMENT_SUCCESS') ||
+    t.includes('PAYMENT')
+  ) {
+    return {
+      icon: <CheckCircle2 className="w-4 h-4 text-emerald-600" />,
+      bg: 'bg-emerald-50 border border-emerald-200/80',
+    };
+  }
+
+  // 6. Cảnh báo thời tiết / Hải văn / An toàn cảng biển (Weather / Maritime Safety) -> Xanh biển (Sky) + Anchor
+  if (
+    normTitle.includes('thoi tiet') ||
+    normTitle.includes('song bien') ||
+    normTitle.includes('luong gio') ||
+    normTitle.includes('an toan bien') ||
+    normTitle.includes('cang vu') ||
+    normTitle.includes('hai van') ||
+    t.includes('WEATHER') ||
+    t.includes('SAFETY') ||
+    t.includes('PORT')
+  ) {
+    return {
+      icon: <Anchor className="w-4 h-4 text-sky-600" />,
+      bg: 'bg-sky-50 border border-sky-200/80',
+    };
+  }
+
+  // 7. Hợp đồng bảo hiểm điện tử (Insurance) -> Xanh ngọc (Teal) + ShieldCheck
+  if (
+    normTitle.includes('bao hiem') ||
+    t.includes('INSURANCE') ||
+    r === 'INSURANCE'
+  ) {
+    return {
+      icon: <ShieldCheck className="w-4 h-4 text-teal-600" />,
+      bg: 'bg-teal-50 border border-teal-200/80',
+    };
+  }
+
+  // 8. Ưu đãi / Voucher / Khuyến mãi (Voucher / Promotion) -> Tím (Purple) + Tag
+  if (
+    normTitle.includes('uu dai') ||
+    normTitle.includes('voucher') ||
+    normTitle.includes('khuyen mai') ||
+    normTitle.includes('giam gia') ||
+    t.includes('VOUCHER') ||
+    t.includes('PROMO')
+  ) {
+    return {
+      icon: <Tag className="w-4 h-4 text-purple-600" />,
+      bg: 'bg-purple-50 border border-purple-200/80',
+    };
+  }
+
+  // 9. Thông tin đơn hàng / Vé thông thường (General Order / Ticket) -> Xanh dương slate (Slate) + Ticket
+  if (
+    t.includes('ORDER') ||
+    t.includes('BOOK') ||
+    t.includes('TICKET') ||
+    r === 'ORDER' ||
+    r === 'SUB_ORDER'
+  ) {
+    return {
+      icon: <Ticket className="w-4 h-4 text-slate-700" />,
+      bg: 'bg-slate-100 border border-slate-200',
+    };
+  }
+
+  return {
+    icon: <Ticket className="w-4 h-4 text-slate-600" />,
+    bg: 'bg-slate-100 border border-slate-200',
+  };
+};
+
 export function Header() {
   const location = useLocation();
 
