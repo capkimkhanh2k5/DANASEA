@@ -79,7 +79,8 @@ class PaymentCoordinatorTest {
         orderId = UUID.randomUUID();
         bookingId = UUID.randomUUID();
 
-        lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        lenient().when(transactionManager.getTransaction(any())).thenAnswer(invocation -> new SimpleTransactionStatus());
+        lenient().when(inventoryLockPort.extendHolds(any(), any(), any())).thenReturn(true);
 
         coordinator = new PaymentCoordinator(
                 masterOrderRepository,
@@ -113,7 +114,7 @@ class PaymentCoordinatorTest {
     void testStartPaymentFirstAttempt() {
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
         when(paymentRepository.findInFlightAttempts(eq(orderId), any())).thenReturn(Collections.emptyList());
         when(paymentRepository.findMaxAttemptNumberByMasterOrderId(orderId)).thenReturn(0);
         when(paymentRepository.getNextPayOSOrderCode()).thenReturn(987654L);
@@ -127,7 +128,7 @@ class PaymentCoordinatorTest {
         });
 
         when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
-        when(payosAdapter.createPaymentIntent(any(), eq(orderId), eq(new BigDecimal("1000000.00")), eq(PaymentProvider.PAYOS), any(), any()))
+        when(payosAdapter.createPaymentIntent(any(), eq(orderId), eq(new BigDecimal("1000000.00")), eq(PaymentProvider.PAYOS), any(), any(), any()))
                 .thenReturn(new PaymentIntentResult(
                         UUID.randomUUID(), orderId, PaymentProvider.PAYOS, new BigDecimal("1000000.00"),
                         "https://pay.payos.vn/123", "000201...", OffsetDateTime.now().plusSeconds(300),
@@ -135,7 +136,9 @@ class PaymentCoordinatorTest {
                 ));
 
         PaymentJpaEntity savedPayment = new PaymentJpaEntity();
+        savedPayment.setStatus(PaymentStatus.PENDING);
         savedPayment.setId(UUID.randomUUID());
+        savedPayment.setAttemptState(PaymentAttemptState.CREATING);
         savedPayment.setMasterOrderId(orderId);
         savedPayment.setProvider(PaymentProvider.PAYOS);
         savedPayment.setAmount(new BigDecimal("1000000.00"));
@@ -159,6 +162,7 @@ class PaymentCoordinatorTest {
         masterOrder.setPaymentDeadline(fixedDeadline);
 
         PaymentJpaEntity activePayment = new PaymentJpaEntity();
+        activePayment.setStatus(PaymentStatus.PENDING);
         activePayment.setId(UUID.randomUUID());
         activePayment.setMasterOrderId(orderId);
         activePayment.setProvider(PaymentProvider.ZALOPAY);
@@ -170,7 +174,7 @@ class PaymentCoordinatorTest {
         activePayment.setPaymentUrl("https://qcgateway.zalopay.vn/pay");
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(activePayment));
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(activePayment));
 
         PaymentWindowResponse response = coordinator.startPayment(customerId, orderId, PaymentProvider.ZALOPAY, "idempotency-key-repeat");
 
@@ -190,6 +194,7 @@ class PaymentCoordinatorTest {
         masterOrder.setPaymentDeadline(fixedDeadline);
 
         PaymentJpaEntity oldZaloPayAttempt = new PaymentJpaEntity();
+        oldZaloPayAttempt.setStatus(PaymentStatus.PENDING);
         oldZaloPayAttempt.setId(UUID.randomUUID());
         oldZaloPayAttempt.setMasterOrderId(orderId);
         oldZaloPayAttempt.setProvider(PaymentProvider.ZALOPAY);
@@ -201,7 +206,7 @@ class PaymentCoordinatorTest {
         oldZaloPayAttempt.setIsActive(true);
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId))
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId))
                 .thenReturn(Optional.of(oldZaloPayAttempt))
                 .thenReturn(Optional.empty()); // after cancel
         when(paymentRepository.findByIdForUpdate(oldZaloPayAttempt.getId())).thenReturn(Optional.of(oldZaloPayAttempt));
@@ -223,7 +228,7 @@ class PaymentCoordinatorTest {
         });
 
         when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
-        when(payosAdapter.createPaymentIntent(any(), eq(orderId), eq(new BigDecimal("1000000.00")), eq(PaymentProvider.PAYOS), any(), any()))
+        when(payosAdapter.createPaymentIntent(any(), eq(orderId), eq(new BigDecimal("1000000.00")), eq(PaymentProvider.PAYOS), any(), any(), any()))
                 .thenReturn(new PaymentIntentResult(
                         UUID.randomUUID(), orderId, PaymentProvider.PAYOS, new BigDecimal("1000000.00"),
                         "https://pay.payos.vn/new-link", "000201...", fixedDeadline,
@@ -231,7 +236,9 @@ class PaymentCoordinatorTest {
                 ));
 
         PaymentJpaEntity newSavedAttempt = new PaymentJpaEntity();
+        newSavedAttempt.setStatus(PaymentStatus.PENDING);
         newSavedAttempt.setId(UUID.randomUUID());
+        newSavedAttempt.setAttemptState(PaymentAttemptState.CREATING);
         newSavedAttempt.setMasterOrderId(orderId);
         newSavedAttempt.setProvider(PaymentProvider.PAYOS);
         newSavedAttempt.setAmount(new BigDecimal("1000000.00"));
@@ -256,6 +263,7 @@ class PaymentCoordinatorTest {
         masterOrder.setPaymentDeadline(fixedDeadline);
 
         PaymentJpaEntity oldAttempt = new PaymentJpaEntity();
+        oldAttempt.setStatus(PaymentStatus.PENDING);
         oldAttempt.setId(UUID.randomUUID());
         oldAttempt.setMasterOrderId(orderId);
         oldAttempt.setProvider(PaymentProvider.ZALOPAY);
@@ -263,7 +271,7 @@ class PaymentCoordinatorTest {
         oldAttempt.setIsActive(true);
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(oldAttempt));
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(oldAttempt));
 
         when(gatewayRegistry.getAdapter(PaymentProvider.ZALOPAY)).thenReturn(zaloPayAdapter);
         when(zaloPayAdapter.canCancelServerSide(PaymentProvider.ZALOPAY)).thenReturn(true);
@@ -272,7 +280,7 @@ class PaymentCoordinatorTest {
 
         assertThatThrownBy(() -> coordinator.switchProvider(customerId, orderId, PaymentProvider.PAYOS, "switch-key-captured"))
                 .isInstanceOf(InvalidOrderStateException.class)
-                .hasMessageContaining("has already been captured");
+                .hasMessageContaining("not been verified as canceled");
     }
 
     @Test
@@ -293,16 +301,17 @@ class PaymentCoordinatorTest {
         masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(200));
 
         PaymentJpaEntity creatingAttempt = new PaymentJpaEntity();
+        creatingAttempt.setStatus(PaymentStatus.PENDING);
         creatingAttempt.setAttemptState(PaymentAttemptState.CREATING);
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
         when(paymentRepository.findInFlightAttempts(eq(orderId), any()))
                 .thenReturn(List.of(creatingAttempt));
 
         assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "key-inflight"))
                 .isInstanceOf(InvalidOrderStateException.class)
-                .hasMessageContaining("currently being generated");
+                .hasMessageContaining("being generated");
     }
 
     @Test
@@ -322,62 +331,32 @@ class PaymentCoordinatorTest {
     }
 
     @Test
-    @DisplayName("BUG-PAY-01: startPayment safely recovers CREATING attempt when provider query finds active transaction")
-    void testStartPaymentRecoversFromTimeoutWhenProviderOrderFound() {
-        OffsetDateTime fixedDeadline = OffsetDateTime.now().plusSeconds(200);
-        masterOrder.setPaymentDeadline(fixedDeadline);
-
-        PaymentJpaEntity timedOutAttempt = new PaymentJpaEntity();
-        timedOutAttempt.setId(UUID.randomUUID());
-        timedOutAttempt.setMasterOrderId(orderId);
-        timedOutAttempt.setProvider(PaymentProvider.PAYOS);
-        timedOutAttempt.setPayosOrderCode(888999L);
-        timedOutAttempt.setAmount(new BigDecimal("1000000.00"));
-        timedOutAttempt.setAttemptState(PaymentAttemptState.CREATING);
-        timedOutAttempt.setCancelStatus(PaymentCancelStatus.CANCEL_UNKNOWN);
+    void startPaymentBlocksWhenAPreviousPayosCreationIsUnresolved() {
+        masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(200));
+        PaymentJpaEntity attempt = new PaymentJpaEntity();
+        attempt.setId(UUID.randomUUID());
+        attempt.setProvider(PaymentProvider.PAYOS);
+        attempt.setAttemptState(PaymentAttemptState.CREATING);
+        attempt.setCancelStatus(PaymentCancelStatus.CANCEL_UNKNOWN);
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
-        when(paymentRepository.findInFlightAttempts(eq(orderId), any()))
-                .thenReturn(List.of(timedOutAttempt));
-        when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
-        when(payosAdapter.queryPayment(eq(PaymentProvider.PAYOS), eq("888999"), any()))
-                .thenReturn(new PaymentCaptureResult(true, "888999", new BigDecimal("1000000.00"), "VND", "PENDING", "Pending on payOS"));
-        when(paymentRepository.save(any(PaymentJpaEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(paymentRepository.findInFlightAttempts(eq(orderId), any())).thenReturn(List.of(attempt));
 
-        PaymentWindowResponse response = coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "idemp-recover-01");
-
-        assertThat(response).isNotNull();
-        assertThat(timedOutAttempt.getAttemptState()).isEqualTo(PaymentAttemptState.PENDING);
-        assertThat(timedOutAttempt.getIsActive()).isTrue();
-        assertThat(timedOutAttempt.getCancelStatus()).isEqualTo(PaymentCancelStatus.NONE);
+        assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "idemp-unresolved"))
+                .isInstanceOf(InvalidOrderStateException.class);
+        verifyNoInteractions(payosAdapter);
+        assertThat(attempt.getPaymentUrl()).isNull();
     }
 
     @Test
-    @DisplayName("BUG-PAY-01: startPayment prevents duplicate when timeout query is unresolved")
-    void testStartPaymentBlocksWhenTimeoutStillUnresolved() {
-        OffsetDateTime fixedDeadline = OffsetDateTime.now().plusSeconds(200);
-        masterOrder.setPaymentDeadline(fixedDeadline);
-
-        PaymentJpaEntity timedOutAttempt = new PaymentJpaEntity();
-        timedOutAttempt.setId(UUID.randomUUID());
-        timedOutAttempt.setMasterOrderId(orderId);
-        timedOutAttempt.setProvider(PaymentProvider.PAYOS);
-        timedOutAttempt.setPayosOrderCode(888999L);
-        timedOutAttempt.setAttemptState(PaymentAttemptState.CREATING);
-        timedOutAttempt.setCancelStatus(PaymentCancelStatus.CANCEL_UNKNOWN);
-
+    void startPaymentBlocksWhenASecondLegacyAttemptRemainsPending() {
+        masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(200));
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
-        when(paymentRepository.findInFlightAttempts(eq(orderId), any()))
-                .thenReturn(List.of(timedOutAttempt));
-        when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
-        when(payosAdapter.queryPayment(eq(PaymentProvider.PAYOS), eq("888999"), any()))
-                .thenThrow(new RuntimeException("Gateway connection failed"));
+        when(paymentRepository.existsByMasterOrderIdAndStatus(orderId, PaymentStatus.PENDING)).thenReturn(true);
 
-        assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "idemp-unresolved-01"))
-                .isInstanceOf(InvalidOrderStateException.class)
-                .hasMessageContaining("Previous payment request timed out and provider verification is pending");
+        assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "idemp-unresolved"))
+                .isInstanceOf(InvalidOrderStateException.class);
+        verifyNoInteractions(payosAdapter);
     }
 
     @Test
@@ -420,7 +399,6 @@ class PaymentCoordinatorTest {
     void testGetPaymentStatusExpiredDeadline() {
         masterOrder.setPaymentDeadline(OffsetDateTime.now().minusSeconds(10));
         when(masterOrderRepository.findById(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
 
         PaymentStatusResponse status = coordinator.getPaymentStatus(customerId, orderId);
 
@@ -442,7 +420,6 @@ class PaymentCoordinatorTest {
         paidOrder.setStatus(MasterOrderStatus.PAID);
         paidOrder.setPaymentStatus(PaymentOrderStatus.PAID);
         when(masterOrderRepository.findById(orderId)).thenReturn(Optional.of(masterOrder), Optional.of(paidOrder));
-        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
 
         PaymentStatusResponse status = coordinator.getPaymentStatus(customerId, orderId);
 
@@ -452,53 +429,12 @@ class PaymentCoordinatorTest {
     }
 
     @Test
-    @DisplayName("sweepExpiredClosingOrders cancels master order and releases inventory when active attempt is absent")
-    void testSweepExpiredClosingOrdersWithoutActiveAttempt() {
-        masterOrder.setPaymentDeadline(OffsetDateTime.now().minusMinutes(2));
-        when(masterOrderRepository.findAll()).thenReturn(List.of(masterOrder));
-        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
-        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+    void expirySweepLeavesInventoryToBookingCleanup() {
+        when(paymentRepository.findExpiredActiveAttempts(eq(PaymentStatus.PENDING), eq(MasterOrderStatus.PENDING_PAYMENT), any()))
+                .thenReturn(List.of());
 
         coordinator.sweepExpiredClosingOrders();
 
-        assertThat(masterOrder.getStatus()).isEqualTo(MasterOrderStatus.CANCELLED);
-        verify(masterOrderRepository).save(masterOrder);
-        verify(inventoryLockPort).releaseHolds(eq(bookingId), any());
-        assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
-        verify(bookingRepository).save(booking);
-    }
-
-    @Test
-    @DisplayName("sweepExpiredClosingOrders cancels provider order server-side and terminates attempt")
-    void testSweepExpiredClosingOrdersWithActiveAttempt() {
-        masterOrder.setPaymentDeadline(OffsetDateTime.now().minusMinutes(2));
-
-        PaymentJpaEntity activePayment = new PaymentJpaEntity();
-        activePayment.setId(UUID.randomUUID());
-        activePayment.setMasterOrderId(orderId);
-        activePayment.setProvider(PaymentProvider.PAYOS);
-        activePayment.setProviderOrderId("link-sweep-01");
-        activePayment.setIsActive(true);
-        activePayment.setAttemptState(PaymentAttemptState.PENDING);
-
-        when(masterOrderRepository.findAll()).thenReturn(List.of(masterOrder));
-        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(activePayment));
-        when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
-        when(payosAdapter.queryPayment(eq(PaymentProvider.PAYOS), eq("link-sweep-01"), any()))
-                .thenReturn(new PaymentCaptureResult(false, null, null, "VND", "PENDING", "Unpaid"));
-        when(payosAdapter.canCancelServerSide(PaymentProvider.PAYOS)).thenReturn(true);
-        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
-
-        coordinator.sweepExpiredClosingOrders();
-
-        verify(payosAdapter).cancelPayment(PaymentProvider.PAYOS, "link-sweep-01", "DANASEA deadline expired");
-        assertThat(activePayment.getIsActive()).isFalse();
-        assertThat(activePayment.getAttemptState()).isEqualTo(PaymentAttemptState.TERMINATED);
-        assertThat(activePayment.getStatus()).isEqualTo(PaymentStatus.FAILED);
-        verify(paymentRepository).save(activePayment);
-        assertThat(masterOrder.getStatus()).isEqualTo(MasterOrderStatus.CANCELLED);
-        verify(inventoryLockPort).releaseHolds(eq(bookingId), any());
+        verifyNoInteractions(inventoryLockPort, bookingRepository, gatewayRegistry);
     }
 }

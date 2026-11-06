@@ -132,6 +132,7 @@ class PayOSPaymentAdapterTest {
                     "desc": "success",
                     "data": {
                         "id": "link-uuid-1234",
+                        "amountPaid": 0,
                         "status": "CANCELLED"
                     }
                 }
@@ -182,6 +183,8 @@ class PayOSPaymentAdapterTest {
                     "data": {
                         "orderCode": 123456,
                         "amount": 250000,
+                        "amountPaid": 250000,
+                        "transactions": [{"reference":"BANK-REF-123","transactionDateTime":"2026-11-06 10:15:00"}],
                         "status": "PAID"
                     }
                 }
@@ -196,6 +199,7 @@ class PayOSPaymentAdapterTest {
         assertThat(captureResult.success()).isTrue();
         assertThat(captureResult.status()).isEqualTo("COMPLETED");
         assertThat(captureResult.amount()).isEqualByComparingTo("250000");
+        assertThat(captureResult.captureId()).isEqualTo("BANK-REF-123");
     }
 
     @Test

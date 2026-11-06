@@ -22,13 +22,9 @@ import com.danasea.backend.modules.order.application.OrderPaymentService;
 import com.danasea.backend.modules.order.application.services.PaymentCoordinator;
 import com.danasea.backend.modules.order.presentation.dtos.PaymentWindowResponse;
 import com.danasea.backend.modules.order.presentation.dtos.PaymentStatusResponse;
-import com.danasea.backend.modules.order.application.dtos.CreatePaymentIntentCommand;
-import com.danasea.backend.modules.order.application.usecases.CreatePaymentIntentUseCase;
-import com.danasea.backend.modules.order.application.usecases.HandleWebhookUseCase;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidWebhookException;
 import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.models.PaymentStatus;
-import com.danasea.backend.modules.order.domain.ports.PaymentIntentResult;
 import com.danasea.backend.modules.order.presentation.dtos.CreatePaymentIntentRequest;
 import com.danasea.backend.modules.order.presentation.dtos.PayPalCaptureRequest;
 import com.danasea.backend.modules.order.presentation.dtos.PaymentIntentResponse;
@@ -44,8 +40,6 @@ import jakarta.validation.Valid;
 public class PaymentController {
 
     private final OrderPaymentService orderPaymentService;
-    private final CreatePaymentIntentUseCase createPaymentIntentUseCase;
-    private final HandleWebhookUseCase handleWebhookUseCase;
     private PaymentCoordinator paymentCoordinator;
 
     @Autowired
@@ -53,24 +47,8 @@ public class PaymentController {
         this.paymentCoordinator = paymentCoordinator;
     }
 
-    @Autowired
-    public PaymentController(
-            OrderPaymentService orderPaymentService,
-            CreatePaymentIntentUseCase createPaymentIntentUseCase,
-            @Autowired(required = false) HandleWebhookUseCase handleWebhookUseCase) {
-        this.orderPaymentService = orderPaymentService;
-        this.createPaymentIntentUseCase = createPaymentIntentUseCase;
-        this.handleWebhookUseCase = handleWebhookUseCase;
-    }
-
-    public PaymentController(
-            OrderPaymentService orderPaymentService,
-            CreatePaymentIntentUseCase createPaymentIntentUseCase) {
-        this(orderPaymentService, createPaymentIntentUseCase, null);
-    }
-
     public PaymentController(OrderPaymentService orderPaymentService) {
-        this(orderPaymentService, null, null);
+        this.orderPaymentService = orderPaymentService;
     }
 
     @PostMapping("/{orderId}/create-intent")
@@ -82,20 +60,7 @@ public class PaymentController {
         UUID userId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new AccessDeniedException("User is not authenticated"));
 
-        PaymentIntentResult result = createPaymentIntentUseCase.execute(
-                new CreatePaymentIntentCommand(userId, orderId, request.provider(), idempotencyKey));
-        String reference = result.paymentUrl() != null && !result.paymentUrl().isBlank()
-                ? result.paymentUrl()
-                : (result.paymentId() != null ? result.paymentId().toString() : "");
-        return ResponseEntity.ok(new PaymentIntentResponse(
-                result.paymentId(),
-                result.orderId(),
-                result.provider(),
-                result.amount(),
-                PaymentStatus.PENDING,
-                reference,
-                result.expiresAt() != null ? result.expiresAt() : OffsetDateTime.now()
-        ));
+        return ResponseEntity.ok(orderPaymentService.createPaymentIntent(userId, orderId, request.provider(), idempotencyKey));
     }
 
     @PostMapping("/{orderId}/start-payment")
@@ -212,12 +177,19 @@ public class PaymentController {
     public ResponseEntity<Map<String, Object>> payosWebhook(
             @RequestBody String rawPayload,
             @RequestHeader(name = "x-signature", required = false) String signature) {
-        return ResponseEntity.ok(orderPaymentService.processPayOSWebhook(rawPayload, signature));
+        Map<String, Object> result = orderPaymentService.processPayOSWebhook(rawPayload, signature);
+        return switch (result.get("code").toString()) {
+            case "00" -> ResponseEntity.ok(result);
+            case "01", "99" -> ResponseEntity.status(503).body(result);
+            default -> ResponseEntity.badRequest().body(result);
+        };
     }
 
     @PostMapping("/webhook/zalopay")
     public ResponseEntity<Map<String, Object>> zaloPayWebhook(@RequestBody String rawPayload) {
-        return ResponseEntity.ok(orderPaymentService.processZaloPayCallback(rawPayload));
+        Map<String, Object> result = orderPaymentService.processZaloPayCallback(rawPayload);
+        return Integer.valueOf(0).equals(result.get("return_code"))
+                ? ResponseEntity.status(503).body(result) : ResponseEntity.ok(result);
     }
 
     @PostMapping("/webhook/paypal/refund")

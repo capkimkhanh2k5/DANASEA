@@ -257,10 +257,9 @@ class OrderPaymentServiceTest {
         PayOSPaymentAdapter payosAdapter = mock(PayOSPaymentAdapter.class);
         when(registry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
         when(payosAdapter.verifyWebhookData(any(), any())).thenReturn(false);
-        when(payosAdapter.verifyWebhookSignature(any(), any())).thenReturn(false);
         service.setPaymentGatewayRegistry(registry);
 
-        String payload = "{\"data\":{\"orderCode\":123456,\"amount\":250000},\"signature\":\"bad-sig\"}";
+        String payload = "{\"data\":{\"orderCode\":123456,\"code\":\"00\",\"currency\":\"VND\",\"reference\":\"REF-123456\",\"amount\":250000},\"signature\":\"bad-sig\"}";
         Map<String, Object> res = service.processPayOSWebhook(payload, "bad-sig");
 
         assertThat(res).containsEntry("code", "02").containsEntry("desc", "Invalid signature");
@@ -276,7 +275,7 @@ class OrderPaymentServiceTest {
 
         when(paymentRepository.findByPayosOrderCodeForUpdate(123456L)).thenReturn(Optional.empty());
 
-        String payload = "{\"data\":{\"orderCode\":123456,\"amount\":250000},\"signature\":\"valid-sig\"}";
+        String payload = "{\"data\":{\"orderCode\":123456,\"code\":\"00\",\"currency\":\"VND\",\"reference\":\"REF-123456\",\"amount\":250000},\"signature\":\"valid-sig\"}";
         Map<String, Object> res = service.processPayOSWebhook(payload, "valid-sig");
 
         assertThat(res).containsEntry("code", "01").containsEntry("desc", "Order not found");
@@ -296,7 +295,7 @@ class OrderPaymentServiceTest {
         when(paymentRepository.findByPayosOrderCodeForUpdate(123456L)).thenReturn(Optional.of(payment));
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.empty());
 
-        String payload = "{\"data\":{\"orderCode\":123456,\"amount\":250000},\"signature\":\"valid-sig\"}";
+        String payload = "{\"data\":{\"orderCode\":123456,\"code\":\"00\",\"currency\":\"VND\",\"reference\":\"REF-123456\",\"amount\":250000},\"signature\":\"valid-sig\"}";
         Map<String, Object> res = service.processPayOSWebhook(payload, "valid-sig");
 
         assertThat(res).containsEntry("code", "01").containsEntry("desc", "MasterOrder not found");
@@ -319,7 +318,7 @@ class OrderPaymentServiceTest {
         when(paymentRepository.findByPayosOrderCodeForUpdate(123456L)).thenReturn(Optional.of(payment));
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
 
-        String payload = "{\"data\":{\"orderCode\":123456,\"amount\":250000},\"signature\":\"valid-sig\"}";
+        String payload = "{\"data\":{\"orderCode\":123456,\"code\":\"00\",\"currency\":\"VND\",\"reference\":\"REF-123456\",\"amount\":250000},\"signature\":\"valid-sig\"}";
         Map<String, Object> res = service.processPayOSWebhook(payload, "valid-sig");
 
         assertThat(res).containsEntry("code", "00").containsEntry("desc", "Success");
@@ -342,7 +341,7 @@ class OrderPaymentServiceTest {
         when(paymentRepository.findByPayosOrderCodeForUpdate(123456L)).thenReturn(Optional.of(payment));
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
 
-        String payload = "{\"data\":{\"orderCode\":123456,\"amount\":100000},\"signature\":\"valid-sig\"}";
+        String payload = "{\"data\":{\"orderCode\":123456,\"code\":\"00\",\"currency\":\"VND\",\"reference\":\"REF-123456\",\"amount\":100000},\"signature\":\"valid-sig\"}";
         Map<String, Object> res = service.processPayOSWebhook(payload, "valid-sig");
 
         assertThat(res).containsEntry("code", "04").containsEntry("desc", "Invalid amount");
@@ -375,7 +374,7 @@ class OrderPaymentServiceTest {
         when(subOrderRepository.findByMasterOrderId(orderId)).thenReturn(List.of(subOrder));
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
 
-        String payload = "{\"data\":{\"orderCode\":123456,\"amount\":250000,\"transactionDateTime\":\"2026-11-06 10:15:00\",\"reference\":\"REF-123456\"},\"signature\":\"valid-sig\"}";
+        String payload = "{\"data\":{\"orderCode\":123456,\"code\":\"00\",\"currency\":\"VND\",\"reference\":\"REF-123456\",\"amount\":250000,\"transactionDateTime\":\"2026-11-06 10:15:00\"},\"signature\":\"valid-sig\"}";
         Map<String, Object> res = service.processPayOSWebhook(payload, "valid-sig");
 
         assertThat(res).containsEntry("code", "00").containsEntry("desc", "Success");
@@ -388,13 +387,11 @@ class OrderPaymentServiceTest {
     }
 
     @Test
-    void processPayOSWebhook_validSuccess_fallbackQueryWhenTxDateTimeNull() {
+    void processPayOSWebhook_usesReceiptTimeWhenGatewayTimestampIsAbsent() {
         PaymentGatewayRegistry registry = mock(PaymentGatewayRegistry.class);
         PayOSPaymentAdapter payosAdapter = mock(PayOSPaymentAdapter.class);
         when(registry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
         when(payosAdapter.verifyWebhookData(any(), any())).thenReturn(true);
-        when(payosAdapter.queryPayment(eq(PaymentProvider.PAYOS), eq("123456"), any()))
-                .thenReturn(new PaymentCaptureResult(true, "tx-999", new BigDecimal("250000"), "VND", "COMPLETED", "Success"));
         service.setPaymentGatewayRegistry(registry);
 
         UUID customerId = UUID.randomUUID();
@@ -416,7 +413,7 @@ class OrderPaymentServiceTest {
         when(subOrderRepository.findByMasterOrderId(orderId)).thenReturn(List.of(subOrder));
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
 
-        String payload = "{\"data\":{\"orderCode\":123456,\"amount\":250000},\"signature\":\"valid-sig\"}";
+        String payload = "{\"data\":{\"orderCode\":123456,\"code\":\"00\",\"currency\":\"VND\",\"reference\":\"REF-123456\",\"amount\":250000},\"signature\":\"valid-sig\"}";
         Map<String, Object> res = service.processPayOSWebhook(payload, "valid-sig");
 
         assertThat(res).containsEntry("code", "00").containsEntry("desc", "Success");
@@ -610,112 +607,77 @@ class OrderPaymentServiceTest {
     // ==========================================
 
     @Test
-    void reconcilePaymentWithGateway_orderNotFoundOrNotPending_returnsFalse() {
+    void statusReconciliationIgnoresAnOrderWithoutAnActivePendingPayment() {
         UUID orderId = UUID.randomUUID();
-        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.empty());
-        assertThat(service.reconcilePaymentWithGateway(orderId)).isFalse();
-
-        MasterOrderJpaEntity order = order(orderId, UUID.randomUUID(), UUID.randomUUID());
-        order.setStatus(MasterOrderStatus.PAID);
-        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
-        assertThat(service.reconcilePaymentWithGateway(orderId)).isFalse();
-    }
-
-    @Test
-    void reconcilePaymentWithGateway_activePaymentNotFoundOrNotPending_returnsFalse() {
-        UUID orderId = UUID.randomUUID();
-        MasterOrderJpaEntity order = order(orderId, UUID.randomUUID(), UUID.randomUUID());
-        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
         when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
+
         assertThat(service.reconcilePaymentWithGateway(orderId)).isFalse();
 
         PaymentJpaEntity payment = payment(UUID.randomUUID(), orderId);
-        payment.setAttemptState(PaymentAttemptState.FAILED);
+        payment.setStatus(PaymentStatus.FAILED);
         when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(payment));
         assertThat(service.reconcilePaymentWithGateway(orderId)).isFalse();
     }
 
     @Test
-    void reconcilePaymentWithGateway_adapterNullOrQueryIdBlank_returnsFalse() {
+    void reconcilePaymentWithGatewayRejectsMismatchedGatewayMoney() {
         UUID orderId = UUID.randomUUID();
         MasterOrderJpaEntity order = order(orderId, UUID.randomUUID(), UUID.randomUUID());
         PaymentJpaEntity payment = payment(UUID.randomUUID(), orderId);
-        payment.setAttemptState(PaymentAttemptState.PENDING);
-        payment.setProvider(PaymentProvider.PAYPAL);
-        payment.setProviderOrderId(null);
+        PaymentGatewayPort adapter = prepareStatusReconciliation(order, payment);
+        when(adapter.queryPayment(PaymentProvider.ZALOPAY, "merchant-ref", null))
+                .thenReturn(new PaymentCaptureResult(true, "capture-ref", BigDecimal.ONE, "USD", "COMPLETED", null));
 
-        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
-        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(payment));
-
-        service.setPaymentGatewayRegistry(null);
-        service.setPaymentGatewayPort(null);
         assertThat(service.reconcilePaymentWithGateway(orderId)).isFalse();
-
-        PaymentGatewayRegistry registry = mock(PaymentGatewayRegistry.class);
-        PaymentGatewayPort adapter = mock(PaymentGatewayPort.class);
-        when(registry.getAdapter(PaymentProvider.PAYPAL)).thenReturn(adapter);
-        service.setPaymentGatewayRegistry(registry);
-        assertThat(service.reconcilePaymentWithGateway(orderId)).isFalse();
+        assertThat(order.getStatus()).isEqualTo(MasterOrderStatus.PENDING_PAYMENT);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
     }
 
     @Test
-    void reconcilePaymentWithGateway_gatewaySuccess_appliesPaymentSuccess() {
+    void reconcilePaymentWithGatewayUsesVerifiedCaptureReference() {
         UUID customerId = UUID.randomUUID();
         UUID bookingId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
-        UUID paymentId = UUID.randomUUID();
-
         MasterOrderJpaEntity order = order(orderId, bookingId, customerId);
-        PaymentJpaEntity payment = payment(paymentId, orderId);
-        payment.setAttemptState(PaymentAttemptState.PENDING);
-        payment.setProvider(PaymentProvider.PAYOS);
-        payment.setPayosOrderCode(123456L);
-        payment.setProviderOrderId("123456");
+        PaymentJpaEntity payment = payment(UUID.randomUUID(), orderId);
+        PaymentGatewayPort adapter = prepareStatusReconciliation(order, payment);
+        when(adapter.queryPayment(PaymentProvider.ZALOPAY, "merchant-ref", null))
+                .thenReturn(new PaymentCaptureResult(true, "capture-ref", order.getTotalAmount(), "VND", "COMPLETED", null));
 
         SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
         subOrder.setId(UUID.randomUUID());
         subOrder.setStatus(SubOrderStatus.PENDING);
-        BookingJpaEntity booking = booking(customerId, bookingId);
-
-        PaymentGatewayRegistry registry = mock(PaymentGatewayRegistry.class);
-        PaymentGatewayPort adapter = mock(PaymentGatewayPort.class);
-        when(registry.getAdapter(PaymentProvider.PAYOS)).thenReturn(adapter);
-        when(adapter.queryPayment(eq(PaymentProvider.PAYOS), eq("123456"), any()))
-                .thenReturn(new PaymentCaptureResult(true, "tx-payos", new BigDecimal("250000"), "VND", "COMPLETED", "Success"));
-        service.setPaymentGatewayRegistry(registry);
-
-        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
-        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(payment));
         when(subOrderRepository.findByMasterOrderId(orderId)).thenReturn(List.of(subOrder));
-        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking(customerId, bookingId)));
 
-        boolean reconciled = service.reconcilePaymentWithGateway(orderId);
-
-        assertThat(reconciled).isTrue();
+        assertThat(service.reconcilePaymentWithGateway(orderId)).isTrue();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(payment.getProviderTransactionId()).isEqualTo("capture-ref");
         assertThat(order.getStatus()).isEqualTo(MasterOrderStatus.PAID);
         assertThat(subOrder.getStatus()).isEqualTo(SubOrderStatus.CONFIRMED);
     }
 
-    @Test
-    void reconcilePaymentWithGateway_gatewayThrows_returnsFalse() {
-        UUID orderId = UUID.randomUUID();
-        MasterOrderJpaEntity order = order(orderId, UUID.randomUUID(), UUID.randomUUID());
-        PaymentJpaEntity payment = payment(UUID.randomUUID(), orderId);
-        payment.setAttemptState(PaymentAttemptState.PENDING);
-        payment.setProvider(PaymentProvider.PAYPAL);
-        payment.setProviderOrderId("order-pp-123");
+    private PaymentGatewayPort prepareStatusReconciliation(MasterOrderJpaEntity order, PaymentJpaEntity payment) {
+        var transactionManager = mock(org.springframework.transaction.PlatformTransactionManager.class);
+        when(transactionManager.getTransaction(any()))
+                .thenAnswer(invocation -> new org.springframework.transaction.support.SimpleTransactionStatus());
+        service = new OrderPaymentService(bookingRepository, masterOrderRepository, subOrderRepository,
+                paymentRepository, refundRepository, serviceSlotRepository, vendorInternalApi,
+                new RefundPolicyEngine(), signer, confirmBookingUseCase, new ObjectMapper(),
+                createPaymentIntentUseCase, null, null, transactionManager);
 
+        payment.setProvider(PaymentProvider.ZALOPAY);
+        payment.setProviderOrderId("merchant-ref");
+        payment.setProviderAmount(order.getTotalAmount());
+        payment.setProviderCurrency("VND");
         PaymentGatewayRegistry registry = mock(PaymentGatewayRegistry.class);
         PaymentGatewayPort adapter = mock(PaymentGatewayPort.class);
-        when(registry.getAdapter(PaymentProvider.PAYPAL)).thenReturn(adapter);
-        when(adapter.queryPayment(any(), any(), any())).thenThrow(new RuntimeException("Network error"));
+        when(registry.getAdapter(PaymentProvider.ZALOPAY)).thenReturn(adapter);
         service.setPaymentGatewayRegistry(registry);
-
-        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(order));
-        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(payment));
-
-        assertThat(service.reconcilePaymentWithGateway(orderId)).isFalse();
+        when(masterOrderRepository.findByIdForUpdate(order.getId())).thenReturn(Optional.of(order));
+        when(paymentRepository.findByIdForUpdate(payment.getId())).thenReturn(Optional.of(payment));
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(order.getId())).thenReturn(Optional.of(payment));
+        return adapter;
     }
 
     private BookingJpaEntity booking(UUID customerId, UUID bookingId) {

@@ -319,7 +319,8 @@ Hai item phải nhận hai đơn vị khác nhau và tính giá hai gói. Nhóm 
 - [x] GET /api/orders/{id}/cancellation-preview (xem trước số tiền hoàn theo policy)
 - [x] GET /api/orders
 - [x] GET /api/vendor/orders
-- [x] POST /api/payments/{orderId}/create-intent (thanh toán toàn bộ Master Order 1 lần)
+- [x] GET /api/payments/providers (danh sách cổng đang bật cho khách hàng)
+- [x] POST /api/payments/{orderId}/create-intent (mở hoặc dùng lại payment attempt trong cùng cửa sổ thanh toán)
 - [x] POST /api/payments/{orderId}/start-payment (khởi tạo thanh toán 5+5 với payOS/ZaloPay/PayPal/VNPay)
 - [x] POST /api/payments/{orderId}/switch-provider (đổi cổng thanh toán an toàn, hủy link cũ và tạo link mới)
 - [x] GET /api/payments/{orderId}/payment-status (truy vấn tiến trình countdown 5+5 và trạng thái thanh toán)
@@ -347,6 +348,9 @@ Hai item phải nhận hai đơn vị khác nhau và tính giá hai gói. Nhóm 
 - [x] GET /api/admin/payments/{id} (chi tiết giao dịch thanh toán cho admin)
 - [x] GET /api/admin/refunds (danh sách yêu cầu hoàn tiền toàn sàn cho admin, lọc theo status/reason/subOrderId/orderId/provider/vendorId/customerId/thời gian, có phân trang)
 - [x] GET /api/admin/refunds/{id} (chi tiết yêu cầu hoàn tiền cho admin)
+- [x] POST /api/admin/refunds/{id}/manual-completion (admin ghi nhận khoản hoàn payOS hoặc ZaloPay đã đối chiếu bên ngoài)
+
+Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi đối chiếu với giao dịch hoàn tiền thực tế. API ghi audit và chấp nhận gửi lại cùng bộ dữ liệu.
 - [x] GET /api/admin/discount-codes (danh sách mã khuyến mãi toàn sàn cho admin, lọc theo code/scope/vendorId/isActive)
 - [x] GET /api/admin/discount-codes/{id} (chi tiết mã giảm giá cho admin)
 - [x] POST /api/admin/discount-codes (admin tạo mã giảm giá toàn sàn hoặc tài trợ)

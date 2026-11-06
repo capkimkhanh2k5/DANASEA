@@ -152,6 +152,7 @@ public class PayPalPaymentAdapter implements PaymentGatewayPort {
         try {
             String token = fetchAccessToken();
             if (token != null && !token.isBlank()) {
+                Map<String, String> returnParams = Map.of("orderId", orderId.toString(), "paymentId", effectivePaymentId.toString());
                 Map<String, Object> orderPayload = Map.of(
                         "intent", "CAPTURE",
                         "purchase_units", List.of(
@@ -168,8 +169,8 @@ public class PayPalPaymentAdapter implements PaymentGatewayPort {
                         "application_context", Map.of(
                                 "brand_name", "DANASea Experience",
                                 "user_action", "PAY_NOW",
-                                "return_url", payPalProperties.returnUrl() + "?orderId=" + orderId + "&paymentId=" + effectivePaymentId,
-                                "cancel_url", payPalProperties.cancelUrl() + "?orderId=" + orderId + "&paymentId=" + effectivePaymentId
+                                "return_url", PaymentUrlHelper.appendQueryParams(payPalProperties.returnUrl(), returnParams),
+                                "cancel_url", PaymentUrlHelper.appendQueryParams(payPalProperties.cancelUrl(), returnParams)
                         )
                 );
 
@@ -340,7 +341,15 @@ public class PayPalPaymentAdapter implements PaymentGatewayPort {
                 ? new BigDecimal(capture.path("amount").path("value").asText()) : null;
         return new PaymentCaptureResult("COMPLETED".equals(status) && id != null && !id.isBlank(), id,
                 amount, capture.path("amount").path("currency_code").asText(null), status,
-                "PayPal capture status: " + status);
+                "PayPal capture status: " + status, parsePaymentTime(capture.path("create_time").asText()));
+    }
+
+    public static OffsetDateTime parsePaymentTime(String value) {
+        try {
+            return OffsetDateTime.parse(value);
+        } catch (java.time.format.DateTimeParseException ex) {
+            return null;
+        }
     }
 
     @Override

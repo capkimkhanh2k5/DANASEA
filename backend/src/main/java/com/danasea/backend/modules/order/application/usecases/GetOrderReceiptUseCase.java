@@ -2,6 +2,7 @@ package com.danasea.backend.modules.order.application.usecases;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import com.danasea.backend.shared.i18n.LocalizedContentSelector;
@@ -70,7 +71,8 @@ public class GetOrderReceiptUseCase {
         List<SubOrder> subOrders = subOrderRepository.findByMasterOrderId(order.getId());
         PaymentJpaEntity payment = paymentRepository.findByMasterOrderIdOrderByCreatedAtDesc(order.getId()).stream()
                 .filter(p -> p.getStatus() == PaymentStatus.SUCCESS || p.getStatus() == PaymentStatus.REFUNDED)
-                .findFirst().orElseThrow(() -> new UnpaidOrderReceiptException("Receipt requires a successful payment record."));
+                .min(Comparator.comparing(p -> !Boolean.TRUE.equals(p.getIsCanonical())))
+                .orElseThrow(() -> new UnpaidOrderReceiptException("Receipt requires a successful payment record."));
         if (order.getPaymentStatus() == PaymentOrderStatus.UNPAID) {
             throw new UnpaidOrderReceiptException("Receipt is only available for paid orders.");
         }

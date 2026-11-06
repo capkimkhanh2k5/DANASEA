@@ -5,6 +5,7 @@ import com.danasea.backend.modules.order.domain.exceptions.InvalidDiscountExcept
 import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidWebhookException;
 import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
+import com.danasea.backend.modules.order.domain.exceptions.PaymentAttemptConflictException;
 import com.danasea.backend.modules.order.domain.exceptions.PaymentGatewayException;
 import com.danasea.backend.modules.order.domain.exceptions.PaymentVerificationException;
 import com.danasea.backend.modules.order.domain.exceptions.RefundNotFoundException;
@@ -65,6 +66,11 @@ public class OrderExceptionHandler extends LocalizedExceptionHandlerSupport {
     public ResponseEntity<ErrorResponse> handleInvalidOrderState(InvalidOrderStateException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(error("INVALID_ORDER_STATE"));
+    }
+
+    @ExceptionHandler(PaymentAttemptConflictException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentAttemptConflict(PaymentAttemptConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error(ex.getCode()));
     }
 
     @ExceptionHandler(PaymentGatewayException.class)

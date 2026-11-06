@@ -1,6 +1,7 @@
 package com.danasea.backend.modules.order.infrastructure.adapters;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -73,8 +74,7 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
     }
 
     @Override
-    public PaymentIntentResult createPaymentIntent(UUID paymentId, UUID orderId, BigDecimal amount,
-            PaymentProvider provider) {
+    public PaymentIntentResult createPaymentIntent(UUID paymentId, UUID orderId, BigDecimal amount, PaymentProvider provider) {
         return createPaymentIntent(paymentId, orderId, amount, provider, (String) null, null);
     }
 
@@ -92,6 +92,13 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
         return createPaymentIntent(paymentId, orderId, amount, provider, customAppTransId, expiresAt);
     }
 
+    @Override
+    public PaymentIntentResult createPaymentIntent(
+            UUID paymentId, UUID orderId, BigDecimal amount, PaymentProvider provider,
+            Long specificOrderCode, OffsetDateTime expiresAt, String providerReference) {
+        return createPaymentIntent(paymentId, orderId, amount, provider, providerReference, expiresAt);
+    }
+
     public PaymentIntentResult createPaymentIntent(
             UUID paymentId,
             UUID orderId,
@@ -106,13 +113,12 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
 
         String appTransId = customAppTransId != null ? customAppTransId : generateAppTransId();
         long appTime = System.currentTimeMillis();
-        long amountLong = amount.longValue();
+        long amountLong = amount.longValueExact();
         String appUser = "DANASEA_CUSTOMER";
 
-        String baseReturnUrl = PaymentUrlHelper.resolveRedirectUrl(zaloPayProperties.returnUrl(), "/checkout/result");
-        String returnUrl = PaymentUrlHelper.appendQueryParams(baseReturnUrl,
-                Map.of("orderId", String.valueOf(orderId), "paymentId", String.valueOf(paymentId)));
-        String embedData = "{\"redirecturl\":\"" + returnUrl + "\"}";
+        String returnUrl = PaymentUrlHelper.appendQueryParams(zaloPayProperties.returnUrl(),
+                Map.of("orderId", orderId.toString(), "paymentId", paymentId.toString()));
+        String embedData = objectMapper.createObjectNode().put("redirecturl", returnUrl).toString();
         String item = "[]";
 
         String mac = ZaloPaySignatureHelper.createOrderMac(
@@ -123,7 +129,8 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
                 appTime,
                 embedData,
                 item,
-                zaloPayProperties.key1());
+                zaloPayProperties.key1()
+        );
 
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("app_id", zaloPayProperties.appId());
@@ -135,6 +142,9 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
         requestBody.put("description", "DANASEA Order " + appTransId);
         requestBody.put("embed_data", embedData);
         requestBody.put("bank_code", "");
+        if (zaloPayProperties.callbackUrl() != null && !zaloPayProperties.callbackUrl().isBlank()) {
+            requestBody.put("callback_url", zaloPayProperties.callbackUrl());
+        }
         requestBody.put("expire_duration_seconds", 300);
         requestBody.put("mac", mac);
 
@@ -154,7 +164,6 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
             }
 
             String orderUrl = root.path("order_url").asText();
-            String zpTransToken = root.path("zp_trans_token").asText(null);
 
             return new PaymentIntentResult(
                     paymentId,
@@ -163,11 +172,12 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
                     amount,
                     orderUrl,
                     orderUrl,
-                    expiresAt,
+                    Instant.ofEpochMilli(appTime).atZone(VIETNAM_ZONE).toOffsetDateTime().plusSeconds(300),
                     appTransId,
                     amount,
                     "VND",
-                    null);
+                    null
+            );
         } catch (PaymentGatewayException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -196,12 +206,14 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
         String mac = ZaloPaySignatureHelper.cancelOrderMac(
                 zaloPayProperties.appId(),
                 providerOrderId,
-                zaloPayProperties.key1());
+                zaloPayProperties.key1()
+        );
 
         Map<String, Object> body = Map.of(
                 "app_id", zaloPayProperties.appId(),
                 "app_trans_id", providerOrderId,
-                "mac", mac);
+                "mac", mac
+        );
 
         try {
             String response = restClient.post()
@@ -219,13 +231,11 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
                 return PaymentCancelResult.success("ZaloPay order canceled successfully");
             }
 
-            // In ZaloPay, sub_return_code = -403 or already captured indicates payment
-            // completed
+            // In ZaloPay, sub_return_code = -403 or already captured indicates payment completed
             String returnMsg = root.path("return_message").asText("");
             String subMsg = root.path("sub_return_message").asText("");
             if (subReturnCode == -403 || "ORDER_ALREADY_CAPTURED".equalsIgnoreCase(subMsg)
-                    || returnMsg.toLowerCase().contains("thanh toan")
-                    || returnMsg.toLowerCase().contains("already captured")) {
+                    || returnMsg.toLowerCase().contains("thanh toan") || returnMsg.toLowerCase().contains("already captured")) {
                 return PaymentCancelResult.alreadyCaptured("ZaloPay order was already captured");
             }
 
@@ -235,16 +245,13 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
                 return PaymentCancelResult.alreadyCaptured("ZaloPay order captured prior to cancel");
             }
 
-            return PaymentCancelResult.failed(root.path("return_message").asText("Cancel failed"),
-                    String.valueOf(returnCode));
+            return PaymentCancelResult.failed(root.path("return_message").asText("Cancel failed"), String.valueOf(returnCode));
         } catch (RestClientResponseException ex) {
             log.warn("ZaloPay cancel HTTP error: status={}, body={}", ex.getStatusCode(), ex.getResponseBodyAsString());
-            return PaymentCancelResult.unknown("ZaloPay cancel HTTP error: " + ex.getMessage(),
-                    String.valueOf(ex.getStatusCode().value()));
+            return PaymentCancelResult.unknown("ZaloPay cancel HTTP error: " + ex.getMessage(), String.valueOf(ex.getStatusCode().value()));
         } catch (Exception ex) {
             log.error("Exception calling ZaloPay cancel for appTransId={}", providerOrderId, ex);
-            return PaymentCancelResult.unknown("Network exception calling ZaloPay cancel: " + ex.getMessage(),
-                    "NETWORK_ERROR");
+            return PaymentCancelResult.unknown("Network exception calling ZaloPay cancel: " + ex.getMessage(), "NETWORK_ERROR");
         }
     }
 
@@ -253,12 +260,14 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
         String mac = ZaloPaySignatureHelper.queryOrderMac(
                 zaloPayProperties.appId(),
                 providerOrderId,
-                zaloPayProperties.key1());
+                zaloPayProperties.key1()
+        );
 
         Map<String, Object> body = Map.of(
                 "app_id", zaloPayProperties.appId(),
                 "app_trans_id", providerOrderId,
-                "mac", mac);
+                "mac", mac
+        );
 
         try {
             String response = restClient.post()
@@ -274,17 +283,15 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
                     ? new BigDecimal(root.path("amount").asText())
                     : null;
             if (returnCode == 1) {
-                return new PaymentCaptureResult(true, providerOrderId, amount, "VND", "COMPLETED",
-                        "Payment captured on ZaloPay");
-            } else if (returnCode == 2) {
-                return new PaymentCaptureResult(false, providerOrderId, amount, "VND", "FAILED",
-                        root.path("return_message").asText("Payment failed"));
-            } else if (returnCode == 4) {
-                return new PaymentCaptureResult(false, providerOrderId, amount, "VND", "CANCELLED",
-                        root.path("return_message").asText("Payment cancelled"));
+                String transactionId = root.path("zp_trans_id").asText(null);
+                long timestamp = root.path("server_time").asLong();
+                OffsetDateTime paidAt = timestamp > 0
+                        ? Instant.ofEpochMilli(timestamp).atZone(VIETNAM_ZONE).toOffsetDateTime() : null;
+                return new PaymentCaptureResult(true, transactionId, amount, "VND", "COMPLETED",
+                        "Payment captured on ZaloPay", paidAt);
             }
-            return new PaymentCaptureResult(false, providerOrderId, amount, "VND", "PENDING",
-                    "Payment pending on ZaloPay");
+            String status = returnCode == 3 ? "PENDING" : "UNKNOWN";
+            return new PaymentCaptureResult(false, null, amount, "VND", status, root.path("return_message").asText());
         } catch (Exception ex) {
             log.error("Failed to query ZaloPay order for appTransId={}", providerOrderId, ex);
             return new PaymentCaptureResult(false, null, null, "VND", "UNKNOWN", ex.getMessage());
@@ -293,8 +300,7 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
 
     @Override
     public RefundResult requestRefund(String providerTransactionId, BigDecimal amount) {
-        return new RefundResult(false, "MANUAL_REVIEW_REQUIRED", amount,
-                "ZaloPay automated API refund requires full context/manual review in sandbox");
+        return new RefundResult(false, "MANUAL_REVIEW_REQUIRED", amount, "ZaloPay automated API refund requires full context/manual review in sandbox");
     }
 
     public String generateAppTransId() {
@@ -307,8 +313,7 @@ public class ZaloPayPaymentAdapter implements PaymentGatewayPort {
             if (seq != null) {
                 return date.format(DATE_FORMATTER) + "_" + seq;
             }
-            throw new IllegalStateException(
-                    "PostgreSQL sequence payos_order_code_seq returned null for ZaloPay app_trans_id");
+            throw new IllegalStateException("PostgreSQL sequence payos_order_code_seq returned null for ZaloPay app_trans_id");
         }
         long nextVal = transCounter.incrementAndGet();
         long suffix = 100000L + Math.floorMod(nextVal, 900000L);

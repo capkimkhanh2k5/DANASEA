@@ -115,7 +115,7 @@ export interface DiscountPreviewResponse {
   itemBreakdown?: ItemDiscountPreviewResponse[];
 }
 
-export type PaymentProviderType = 'VNPAY' | 'MOMO' | 'SEPAY' | 'PAYPAL';
+export type PaymentProviderType = 'VNPAY' | 'MOMO' | 'SEPAY' | 'PAYPAL' | 'PAYOS' | 'ZALOPAY';
 
 export interface CreatePaymentIntentRequest {
   provider: PaymentProviderType;
@@ -134,12 +134,18 @@ export interface PaymentIntentResponse {
 }
 
 export interface PaymentResponse {
-  paymentId: string;
-  orderId: string;
-  provider: string;
+  id: string;
+  masterOrderId: string;
+  provider: PaymentProviderType;
+  providerOrderId?: string;
   amount: number;
   status: string;
   createdAt: string;
+  reconciliationNextAttemptAt?: string | null;
+}
+
+export interface OrderPaymentStatusResponse {
+  paymentStatus: 'UNPAID' | 'PAID' | 'REFUNDED' | 'NO_REFUND';
 }
 
 export interface SubOrderCancellationPreview {

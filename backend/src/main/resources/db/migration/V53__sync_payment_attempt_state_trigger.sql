@@ -1,18 +1,16 @@
 -- ==============================================================================
--- V52__sync_payment_attempt_state_trigger.sql
--- Mục đích: Trigger tự động đồng bộ attempt_state cho các thao tác insert/update
---          legacy khi không truyền attempt_state (bảo vệ uq_payments_in_flight).
+-- V53__sync_payment_attempt_state_trigger.sql
+-- Normalize legacy writes that change payment status without updating attempt fields.
 -- ==============================================================================
 
 CREATE OR REPLACE FUNCTION trg_sync_payment_attempt_state()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.status = 'FAILED' AND (NEW.attempt_state IS NULL OR NEW.attempt_state = 'PENDING') THEN
-        NEW.attempt_state := 'FAILED';
-    ELSIF NEW.status = 'SUCCESS' AND (NEW.attempt_state IS NULL OR NEW.attempt_state = 'PENDING') THEN
-        NEW.attempt_state := 'COMPLETED';
-    ELSIF NEW.status = 'CANCELLED' AND (NEW.attempt_state IS NULL OR NEW.attempt_state = 'PENDING') THEN
-        NEW.attempt_state := 'TERMINATED';
+    IF NEW.status IN ('SUCCESS', 'REFUNDED', 'FAILED') THEN
+        NEW.is_active := false;
+        IF NEW.attempt_state IS NULL OR NEW.attempt_state IN ('CREATING', 'PENDING', 'ACTIVE') THEN
+            NEW.attempt_state := CASE WHEN NEW.status = 'FAILED' THEN 'FAILED' ELSE 'COMPLETED' END;
+        END IF;
     END IF;
     RETURN NEW;
 END;

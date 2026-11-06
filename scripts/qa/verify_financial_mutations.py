@@ -32,8 +32,16 @@ MUTATIONS = [
         "mutation": "capture-currency-guard-removed",
         "production_source": "src/main/java/com/danasea/backend/modules/order/application/OrderPaymentService.java",
         "test_class": "com.danasea.backend.modules.order.application.PaymentGatewaySafetyTest",
-        "target": "|| result.currency() == null || !expectedCurrency.equalsIgnoreCase(result.currency())",
+        "target": "|| expectedCurrency == null || result.currency() == null || !expectedCurrency.equalsIgnoreCase(result.currency())",
         "replacement": "|| false",
+    },
+    {
+        "mutation": "reconciliation-capture-guard-bypassed",
+        "production_source": "src/main/java/com/danasea/backend/modules/order/application/OrderPaymentService.java",
+        "test_class": "com.danasea.backend.modules.order.application.OrderPaymentServiceTest",
+        "target": "                    validateCaptureResult(payment, result);\n"
+                  "                    payment.setPaidAt(result.paidAt());",
+        "replacement": "                    payment.setPaidAt(result.paidAt());",
     },
     {
         "mutation": "refund-currency-guard-removed",

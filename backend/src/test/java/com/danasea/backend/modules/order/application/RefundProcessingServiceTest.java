@@ -93,6 +93,59 @@ class RefundProcessingServiceTest {
     }
 
     @Test
+    void completedDuplicateCaptureRefundUpdatesOnlyTheExtraPayment() {
+        order.setPaymentStatus(PaymentOrderStatus.PAID);
+        refund.setSubOrderId(null);
+        refund.setPaymentId(payment.getId());
+        refund.setReason(RefundReason.SYSTEM_FAULT);
+        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> {
+            GatewayRefundRequest request = inv.getArgument(0);
+            assertThat(request.fullRefund()).isTrue();
+            assertThat(request.amount()).isEqualByComparingTo("19.31");
+            assertThat(request.transactionId()).isEqualTo("CAPTURE-ORIGINAL");
+            return result(GatewayRefundStatus.COMPLETED);
+        });
+
+        assertThat(service.processRefund(refund.getId())).isTrue();
+        assertThat(service.processRefund(refund.getId())).isTrue();
+        assertThat(refund.getStatus()).isEqualTo(RefundStatus.PROCESSED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(order.getStatus()).isEqualTo(MasterOrderStatus.PAID);
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentOrderStatus.PAID);
+        assertThat(sub.getStatus()).isEqualTo(SubOrderStatus.CONFIRMED);
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        verifyNoInteractions(slots);
+        verify(gateway).requestRefund(any(GatewayRefundRequest.class));
+    }
+
+    @Test
+    void refundAllocationIgnoresOtherAttemptsAndCountsLegacySubOrderRefunds() {
+        refund.setPaymentId(payment.getId());
+        refund.setAmount(new BigDecimal("400000"));
+        RefundJpaEntity otherAttempt = new RefundJpaEntity();
+        otherAttempt.setId(UUID.randomUUID());
+        otherAttempt.setPaymentId(UUID.randomUUID());
+        otherAttempt.setStatus(RefundStatus.PROCESSED);
+        otherAttempt.setAmount(new BigDecimal("500000"));
+        RefundJpaEntity legacy = new RefundJpaEntity();
+        legacy.setId(UUID.randomUUID());
+        legacy.setStatus(RefundStatus.PROCESSED);
+        legacy.setAmount(new BigDecimal("100000"));
+        legacy.setProviderAmount(new BigDecimal("3.86"));
+        when(refunds.findBySubOrderIdIn(List.of(sub.getId()))).thenReturn(List.of(otherAttempt, legacy));
+        when(refunds.findBySubOrderIdInAndStatus(List.of(sub.getId()), RefundStatus.PROCESSED))
+                .thenReturn(List.of(refund, otherAttempt, legacy));
+        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> {
+            GatewayRefundRequest request = inv.getArgument(0);
+            assertThat(request.amount()).isEqualByComparingTo("15.45");
+            return result(GatewayRefundStatus.COMPLETED);
+        });
+
+        assertThat(service.processRefund(refund.getId())).isTrue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+    }
+
+    @Test
     void completedAllocatedRefundReleasesTheBookingItemOnce() {
         sub.setBookingItemId(UUID.randomUUID());
         when(gateway.requestRefund(any(GatewayRefundRequest.class)))

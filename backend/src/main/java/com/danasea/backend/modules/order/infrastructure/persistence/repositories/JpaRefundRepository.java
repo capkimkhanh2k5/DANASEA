@@ -26,7 +26,10 @@ import jakarta.persistence.LockModeType;
 @Repository
 public interface JpaRefundRepository extends JpaRepository<RefundJpaEntity, UUID>, JpaSpecificationExecutor<RefundJpaEntity> {
     Optional<RefundJpaEntity> findByProviderAndProviderRefundId(PaymentProvider provider, String providerRefundId);
+    Optional<RefundJpaEntity> findByProviderRefundId(String providerRefundId);
     Optional<RefundJpaEntity> findByGatewayRequestId(String gatewayRequestId);
+    List<RefundJpaEntity> findByPaymentId(UUID paymentId);
+    boolean existsByPaymentIdAndSubOrderIdIsNullAndReason(UUID paymentId, RefundReason reason);
 
     List<RefundJpaEntity> findBySubOrderId(UUID subOrderId);
     List<RefundJpaEntity> findBySubOrderIdIn(Collection<UUID> subOrderIds);
@@ -36,7 +39,14 @@ public interface JpaRefundRepository extends JpaRepository<RefundJpaEntity, UUID
     List<RefundJpaEntity> findBySubOrderIdInAndStatus(
             Collection<UUID> subOrderIds, RefundStatus status);
 
-    List<RefundJpaEntity> findByStatusAndRetryCountLessThanOrderByCreatedAtAsc(RefundStatus status, int maxRetryCount);
+    @Query("""
+            SELECT r FROM RefundJpaEntity r
+            WHERE r.status = :status AND r.retryCount < :maxRetryCount
+              AND (r.lastError IS NULL OR r.lastError <> :manualReviewMarker)
+            ORDER BY r.createdAt ASC
+            """)
+    List<RefundJpaEntity> findForAutomaticProcessing(@Param("status") RefundStatus status,
+            @Param("maxRetryCount") int maxRetryCount, @Param("manualReviewMarker") String manualReviewMarker);
 
     List<RefundJpaEntity> findByStatusAndCreatedAtLessThanOrderByCreatedAtAsc(RefundStatus status, OffsetDateTime threshold);
 

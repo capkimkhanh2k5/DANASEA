@@ -1,6 +1,7 @@
 package com.danasea.backend.modules.order.domain.ports;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 
@@ -20,8 +21,14 @@ public interface PaymentGatewayPort {
             BigDecimal amount,
             PaymentProvider provider,
             Long specificOrderCode,
-            java.time.OffsetDateTime expiresAt) {
+            OffsetDateTime expiresAt) {
         return createPaymentIntent(paymentId, orderId, amount, provider);
+    }
+
+    default PaymentIntentResult createPaymentIntent(
+            UUID paymentId, UUID orderId, BigDecimal amount, PaymentProvider provider,
+            Long specificOrderCode, OffsetDateTime expiresAt, String providerReference) {
+        return createPaymentIntent(paymentId, orderId, amount, provider, specificOrderCode, expiresAt);
     }
 
     default PaymentIntentResult createPaymentIntent(UUID orderId, BigDecimal amount, PaymentProvider provider) {

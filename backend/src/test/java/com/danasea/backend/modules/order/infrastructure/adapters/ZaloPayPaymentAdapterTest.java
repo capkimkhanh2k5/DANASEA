@@ -162,6 +162,7 @@ class ZaloPayPaymentAdapterTest {
                     "sub_return_code": 1,
                     "is_processing": false,
                     "amount": 500000,
+                    "zp_trans_id": 123456789,
                     "zp_trans_id": 26110500001
                 }
                 """;

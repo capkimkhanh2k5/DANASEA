@@ -6701,7 +6701,7 @@
         "name": "trg_payments_sync_attempt_state",
         "enabled": "O",
         "definition": "CREATE TRIGGER trg_payments_sync_attempt_state BEFORE INSERT OR UPDATE ON public.payments FOR EACH ROW EXECUTE FUNCTION trg_sync_payment_attempt_state()",
-        "function_md5": "cecd9329d3420697f50622ba532c1e94"
+        "function_md5": "beb5b1a32fa01e0407fb1bfd0ddb3e73"
       },
       {
         "table_name": "public.vendor_commission_policies",

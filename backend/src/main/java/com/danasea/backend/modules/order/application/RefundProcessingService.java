@@ -3,8 +3,10 @@ package com.danasea.backend.modules.order.application;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -14,6 +16,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.booking.domain.models.BookingStatus;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
 import com.danasea.backend.modules.communication.application.email.EmailRequest;
@@ -21,6 +24,8 @@ import com.danasea.backend.modules.communication.application.email.Transactional
 import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.order.domain.events.RefundCompletedEvent;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidWebhookException;
+import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
+import com.danasea.backend.modules.order.domain.exceptions.RefundNotFoundException;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentProvider;
@@ -42,10 +47,13 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.order.presentation.dtos.RefundWebhookResponse;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class RefundProcessingService {
     public static final int MAX_RETRIES = 3;
+    public static final String MANUAL_REVIEW_REQUIRED = "MANUAL_REFUND_REVIEW_REQUIRED";
     private static final String AWAITING = "GATEWAY_TIMEOUT_AWAITING_VERIFICATION";
     private enum Preparation { CREATE, RECONCILE, BLOCKED }
 
@@ -58,6 +66,12 @@ public class RefundProcessingService {
 
     @Autowired(required = false)
     private TransactionalEmailPort transactionalEmailPort;
+
+    @Autowired
+    private AuditLogInternalApi auditLog;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     public void setTransactionalEmailPort(TransactionalEmailPort transactionalEmailPort) {
         this.transactionalEmailPort = transactionalEmailPort;
@@ -108,8 +122,20 @@ public class RefundProcessingService {
             if (refund == null || refund.getStatus() != RefundStatus.PENDING) {
                 return Preparation.RECONCILE;
             }
+            if (MANUAL_REVIEW_REQUIRED.equals(refund.getLastError())) {
+                return Preparation.BLOCKED;
+            }
             try {
                 RefundContext context = lockContext(refund);
+                if (requiresManualCompletion(context.payment().getProvider())) {
+                    refund.setPaymentId(context.payment().getId());
+                    refund.setProvider(context.payment().getProvider());
+                    refund.setProviderTransactionId(context.payment().getProviderTransactionId());
+                    refund.setLastError(MANUAL_REVIEW_REQUIRED);
+                    refund.setNextAttemptAt(null);
+                    refundRepository.saveAndFlush(refund);
+                    return Preparation.BLOCKED;
+                }
                 initializeContext(refund, context.payment());
                 if (refund.getGatewayRequestedAt() != null || (refund.getLastError() != null
                         && !refund.getLastError().startsWith("REFUND_CONTEXT_REQUIRES_REVIEW"))) {
@@ -140,7 +166,8 @@ public class RefundProcessingService {
             if (refund.getStatus() != RefundStatus.PENDING) {
                 return refund.getStatus() == RefundStatus.PROCESSED;
             }
-            if (refund.getGatewayRequestId() == null || refund.getProviderAmount() == null) {
+            if (refund.getGatewayRequestId() == null || refund.getProviderAmount() == null
+                    || MANUAL_REVIEW_REQUIRED.equals(refund.getLastError())) {
                 return false;
             }
             RefundContext context;
@@ -190,28 +217,111 @@ public class RefundProcessingService {
         return new RefundWebhookResponse(eventId, refund.getId(), refund.getStatus(), false);
     }
 
+    @Transactional
+    public RefundJpaEntity completeManualRefund(UUID refundId, UUID actorId, String providerRefundId,
+            BigDecimal providerAmount, String providerCurrency) {
+        Objects.requireNonNull(actorId, "The authenticated operator is required.");
+        if (providerRefundId == null || providerRefundId.isBlank() || providerRefundId.length() > 150
+                || providerRefundId.chars().anyMatch(Character::isISOControl) || providerAmount == null
+                || providerAmount.signum() <= 0 || providerCurrency == null) {
+            throw new IllegalArgumentException("A valid provider refund reference, amount and currency are required.");
+        }
+        String reference = providerRefundId.strip();
+        RefundJpaEntity refund = refundRepository.findByIdForUpdate(refundId)
+                .orElseThrow(() -> new RefundNotFoundException(refundId));
+        if (refund.getStatus() == RefundStatus.PROCESSED) {
+            if (requiresManualCompletion(refund.getProvider()) && reference.equals(refund.getProviderRefundId())
+                    && providerCurrency.equals(refund.getProviderCurrency()) && refund.getProviderAmount() != null
+                    && providerAmount.compareTo(refund.getProviderAmount()) == 0) {
+                return refund;
+            }
+            throw new InvalidOrderStateException("Refund already completed with different provider evidence.");
+        }
+        if (refund.getStatus() != RefundStatus.PENDING) {
+            throw new InvalidOrderStateException("Only a pending refund can be completed manually.");
+        }
+        RefundContext context;
+        try {
+            context = lockContext(refund);
+            if (!requiresManualCompletion(context.payment().getProvider())) {
+                throw new InvalidOrderStateException("This refund provider requires gateway verification.");
+            }
+            initializeContext(refund, context.payment());
+        } catch (IllegalStateException ex) {
+            throw new InvalidOrderStateException(ex.getMessage());
+        }
+        if (!providerCurrency.equals(refund.getProviderCurrency()) || refund.getProviderAmount() == null
+                || providerAmount.compareTo(refund.getProviderAmount()) != 0
+                || (refund.getProviderRefundId() != null && !reference.equals(refund.getProviderRefundId()))) {
+            throw new InvalidOrderStateException("Verified provider reference, amount or currency does not match the refund.");
+        }
+        if (refundRepository.findByProviderRefundId(reference).filter(other -> !refundId.equals(other.getId())).isPresent()) {
+            throw new InvalidOrderStateException("The provider refund reference is already assigned to another refund.");
+        }
+        var confirmed = new RefundResult(true, reference, providerAmount, "Verified by administrator",
+                GatewayRefundStatus.COMPLETED, providerCurrency);
+        acceptResult(refund, context, confirmed);
+        try {
+            auditLog.recordTransactionalAuditLog(actorId, "REFUND_MANUALLY_COMPLETED", "REFUND", refundId,
+                    objectMapper.writeValueAsString(Map.of(
+                            "paymentId", context.payment().getId(), "provider", context.payment().getProvider(),
+                            "providerTransactionId", context.payment().getProviderTransactionId(), "providerRefundId", reference,
+                            "providerAmount", providerAmount, "providerCurrency", providerCurrency)));
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Manual refund audit could not be serialized.", ex);
+        }
+        return refund;
+    }
+
     private record RefundContext(SubOrderJpaEntity subOrder, MasterOrderJpaEntity order, PaymentJpaEntity payment) { }
 
     private RefundContext lockContext(RefundJpaEntity refund) {
-        SubOrderJpaEntity subOrder = subOrderRepository.findById(refund.getSubOrderId())
-                .orElseThrow(() -> new IllegalStateException("Refund sub-order not found."));
+        SubOrderJpaEntity subOrder = refund.getSubOrderId() == null ? null
+                : subOrderRepository.findById(refund.getSubOrderId())
+                        .orElseThrow(() -> new IllegalStateException("Refund sub-order not found."));
         UUID paymentId = refund.getPaymentId();
+        if (subOrder == null && (paymentId == null || refund.getReason() != RefundReason.SYSTEM_FAULT)) {
+            throw new IllegalStateException("A payment-level refund must identify a duplicate capture.");
+        }
         if (paymentId == null) {
             paymentId = paymentRepository.findByMasterOrderIdOrderByCreatedAtDesc(subOrder.getMasterOrderId()).stream()
                     .filter(p -> p.getStatus() == PaymentStatus.SUCCESS || p.getStatus() == PaymentStatus.REFUNDED)
-                    .map(PaymentJpaEntity::getId).findFirst()
+                    .min(Comparator.comparing(p -> !Boolean.TRUE.equals(p.getIsCanonical())))
+                    .map(PaymentJpaEntity::getId)
                     .orElseThrow(() -> new IllegalStateException("No successful original payment found."));
         }
         PaymentJpaEntity payment = paymentRepository.findByIdForUpdate(paymentId)
                 .orElseThrow(() -> new IllegalStateException("Original payment not found."));
-        MasterOrderJpaEntity order = masterOrderRepository.findByIdForUpdate(subOrder.getMasterOrderId())
+        UUID orderId = subOrder == null ? payment.getMasterOrderId() : subOrder.getMasterOrderId();
+        MasterOrderJpaEntity order = masterOrderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new IllegalStateException("Refund master order not found."));
         if (!order.getId().equals(payment.getMasterOrderId())
                 || (payment.getStatus() != PaymentStatus.SUCCESS && payment.getStatus() != PaymentStatus.REFUNDED)
                 || (refund.getProvider() != null && refund.getProvider() != payment.getProvider())) {
             throw new IllegalStateException("Refund does not match the original successful payment.");
         }
+        if (subOrder == null) {
+            if (!Boolean.FALSE.equals(payment.getIsCanonical()) || payment.getStatus() != PaymentStatus.SUCCESS
+                    || refund.getAmount() == null || payment.getAmount() == null
+                    || refund.getAmount().compareTo(payment.getAmount()) != 0) {
+                throw new IllegalStateException("A duplicate-capture refund must fully refund a noncanonical payment.");
+            }
+        } else if (!Boolean.TRUE.equals(payment.getIsCanonical())
+                && (refundRepository.existsByPaymentIdAndSubOrderIdIsNullAndReason(payment.getId(), RefundReason.SYSTEM_FAULT)
+                        || paymentRepository.findByMasterOrderIdOrderByCreatedAtDesc(orderId).stream()
+                                .anyMatch(p -> Boolean.TRUE.equals(p.getIsCanonical())))) {
+            throw new IllegalStateException("A sub-order refund must use the canonical payment.");
+        }
         return new RefundContext(subOrder, order, payment);
+    }
+
+    private boolean requiresManualCompletion(PaymentProvider provider) {
+        return provider == PaymentProvider.PAYOS || provider == PaymentProvider.ZALOPAY;
+    }
+
+    private boolean matchesSubOrderPayment(RefundJpaEntity refund, PaymentJpaEntity payment) {
+        return payment.getId().equals(refund.getPaymentId()) || (refund.getPaymentId() == null
+                && (refund.getProvider() == null || refund.getProvider() == payment.getProvider()));
     }
 
     private void initializeContext(RefundJpaEntity refund, PaymentJpaEntity payment) {
@@ -221,16 +331,24 @@ public class RefundProcessingService {
                 || payment.getProviderCurrency() == null || refund.getAmount() == null || refund.getAmount().signum() <= 0) {
             throw new IllegalStateException("Original gateway transaction, amount, and currency are required.");
         }
-        if (payment.getProvider() != PaymentProvider.PAYPAL && payment.getProvider() != PaymentProvider.VNPAY) {
+        if (payment.getProvider() != PaymentProvider.PAYPAL && payment.getProvider() != PaymentProvider.VNPAY
+                && !requiresManualCompletion(payment.getProvider())) {
             throw new IllegalStateException("Refund provider is not supported.");
         }
         if (payment.getProvider() == PaymentProvider.VNPAY
                 && (payment.getProviderOrderId() == null || payment.getProviderTransactionDate() == null)) {
             throw new IllegalStateException("Original VNPay reference and transaction date are required.");
         }
-        List<UUID> subOrderIds = subOrderRepository.findByMasterOrderId(payment.getMasterOrderId()).stream()
-                .map(SubOrderJpaEntity::getId).toList();
-        List<RefundJpaEntity> others = refundRepository.findBySubOrderIdIn(subOrderIds).stream()
+        List<RefundJpaEntity> reservations;
+        if (refund.getSubOrderId() == null) {
+            reservations = refundRepository.findByPaymentId(payment.getId());
+        } else {
+            List<UUID> subOrderIds = subOrderRepository.findByMasterOrderId(payment.getMasterOrderId()).stream()
+                    .map(SubOrderJpaEntity::getId).toList();
+            reservations = refundRepository.findBySubOrderIdIn(subOrderIds).stream()
+                    .filter(r -> matchesSubOrderPayment(r, payment)).toList();
+        }
+        List<RefundJpaEntity> others = reservations.stream()
                 .filter(r -> !r.getId().equals(refund.getId()) && r.getStatus() != RefundStatus.FAILED).toList();
         BigDecimal otherAmount = others.stream().map(RefundJpaEntity::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (otherAmount.add(refund.getAmount()).compareTo(payment.getAmount()) > 0) {
@@ -239,8 +357,9 @@ public class RefundProcessingService {
         if (refund.getGatewayRequestId() != null) {
             return;
         }
+        int providerScale = requiresManualCompletion(payment.getProvider()) && "VND".equals(payment.getProviderCurrency()) ? 0 : 2;
         BigDecimal providerAmount = payment.getProviderAmount().multiply(refund.getAmount())
-                .divide(payment.getAmount(), 2, RoundingMode.HALF_UP);
+                .divide(payment.getAmount(), providerScale, RoundingMode.HALF_UP);
         BigDecimal allocated = others.stream().filter(r -> r.getProviderAmount() != null)
                 .map(RefundJpaEntity::getProviderAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (otherAmount.add(refund.getAmount()).compareTo(payment.getAmount()) == 0
@@ -284,9 +403,14 @@ public class RefundProcessingService {
             refund.setLastError(null);
             refund.setNextAttemptAt(null);
             refundRepository.saveAndFlush(refund);
-            applyRefundSuccess(refund, context.subOrder(), context.order(), context.payment());
+            if (context.subOrder() == null) {
+                context.payment().setStatus(PaymentStatus.REFUNDED);
+                paymentRepository.save(context.payment());
+            } else {
+                applyRefundSuccess(refund, context.subOrder(), context.order(), context.payment());
+            }
             if (eventPublisher != null) {
-                eventPublisher.publishEvent(new RefundCompletedEvent(refund.getId(), context.subOrder().getId(),
+                eventPublisher.publishEvent(new RefundCompletedEvent(refund.getId(), refund.getSubOrderId(),
                         context.order().getId(), context.order().getCustomerId(), refund.getAmount(), refund.getStatus()));
             }
             return true;
@@ -359,7 +483,7 @@ public class RefundProcessingService {
         List<SubOrderJpaEntity> allSubOrders = subOrderRepository.findByMasterOrderId(masterOrder.getId());
         List<UUID> subOrderIds = allSubOrders.stream().map(SubOrderJpaEntity::getId).toList();
         BigDecimal processedTotal = refundRepository.findBySubOrderIdInAndStatus(subOrderIds, RefundStatus.PROCESSED).stream()
-                .filter(r -> originalPayment.getId().equals(r.getPaymentId()))
+                .filter(r -> matchesSubOrderPayment(r, originalPayment))
                 .map(RefundJpaEntity::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (processedTotal.compareTo(originalPayment.getAmount()) >= 0) {
             originalPayment.setStatus(PaymentStatus.REFUNDED);

@@ -2,34 +2,55 @@ import { apiClient } from './apiClient';
 import type {
   CreatePaymentIntentRequest,
   PaymentIntentResponse,
+  OrderPaymentStatusResponse,
+  PaymentProviderType,
   PaymentResponse,
 } from '../types/order';
 
 export const paymentService = {
+  async getAvailableProviders(signal?: AbortSignal): Promise<PaymentProviderType[]> {
+    const response = await apiClient.get<PaymentProviderType[]>('/payments/providers', { signal });
+    return response.data;
+  },
+
   /**
-   * Create payment intent with selected provider (VNPAY, MOMO, SEPAY, PAYPAL)
+   * Create a payment intent for the selected provider.
    * POST /api/payments/{orderId}/create-intent
    */
   async createPaymentIntent(
     orderId: string,
     request: CreatePaymentIntentRequest,
-    idempotencyKey?: string
+    idempotencyKey: string
   ): Promise<PaymentIntentResponse> {
-    const key =
-      idempotencyKey ||
-      (typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `pay-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
-
     const response = await apiClient.post<PaymentIntentResponse>(
       `/payments/${orderId}/create-intent`,
       request,
       {
         headers: {
-          'Idempotency-Key': key,
+          'Idempotency-Key': idempotencyKey,
         },
       }
     );
+    return response.data;
+  },
+
+  async getPaymentDetail(paymentId: string, signal?: AbortSignal): Promise<PaymentResponse> {
+    const response = await apiClient.get<PaymentResponse>(`/payments/detail/${paymentId}`, { signal });
+    return response.data;
+  },
+
+  async getOrderPaymentStatus(orderId: string, signal?: AbortSignal): Promise<OrderPaymentStatusResponse> {
+    const response = await apiClient.get<OrderPaymentStatusResponse>(`/payments/${orderId}/payment-status`, { signal });
+    return response.data;
+  },
+
+  async capturePayPalOrder(paymentId: string, paypalOrderId: string): Promise<PaymentResponse> {
+    const response = await apiClient.post<PaymentResponse>('/payments/paypal/capture', {
+      paymentId,
+      paypalOrderId,
+    }, {
+      headers: { 'Idempotency-Key': `paypal-return-${paymentId}` },
+    });
     return response.data;
   },
 

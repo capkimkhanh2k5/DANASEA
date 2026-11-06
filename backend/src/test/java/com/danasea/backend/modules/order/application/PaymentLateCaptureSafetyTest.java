@@ -129,6 +129,8 @@ class PaymentLateCaptureSafetyTest {
                     "desc": "success",
                     "data": {
                         "orderCode": 123456,
+                        "code": "00",
+                        "currency": "VND",
                         "amount": 500000.00,
                         "reference": "PAYOS_REF_999",
                         "paymentLinkId": "link-123"
@@ -263,6 +265,8 @@ class PaymentLateCaptureSafetyTest {
                     "desc": "success",
                     "data": {
                         "orderCode": 888999,
+                        "code": "00",
+                        "currency": "VND",
                         "amount": 500000.00,
                         "reference": "REF_DUP_123"
                     },

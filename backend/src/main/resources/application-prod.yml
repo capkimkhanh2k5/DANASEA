@@ -12,17 +12,13 @@ app:
     qr-secret: ${APP_CHECKIN_QR_SECRET}
   payment:
     webhook-secret: ${APP_PAYMENT_WEBHOOK_SECRET}
+    paypal:
+      return-url: ${APP_PAYPAL_RETURN_URL:${APP_PAYMENT_PUBLIC_BASE_URL:https://danasea.tailfc3563.ts.net}/payment/success}
+      cancel-url: ${APP_PAYPAL_CANCEL_URL:${APP_PAYMENT_PUBLIC_BASE_URL:https://danasea.tailfc3563.ts.net}/payment/cancel}
+    vnpay:
+      return-url: ${VNPAY_RETURN_URL:${APP_PAYMENT_PUBLIC_BASE_URL:https://danasea.tailfc3563.ts.net}/payment/vnpay-return}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}
-
-danasea:
-  payment:
-    payos:
-      return-url: ${PAYOS_RETURN_URL:}
-      cancel-url: ${PAYOS_CANCEL_URL:}
-    zalopay:
-      return-url: ${ZALOPAY_RETURN_URL:}
-      cancel-url: ${ZALOPAY_CANCEL_URL:}
 
 server:
   tomcat:
@@ -39,3 +35,14 @@ logging:
   structured:
     format:
       console: ecs
+
+danasea:
+  payment:
+    payos:
+      return-url: ${PAYOS_RETURN_URL:${APP_PAYMENT_PUBLIC_BASE_URL:https://danasea.tailfc3563.ts.net}/payment/success}
+      cancel-url: ${PAYOS_CANCEL_URL:${APP_PAYMENT_PUBLIC_BASE_URL:https://danasea.tailfc3563.ts.net}/payment/cancel}
+    zalopay:
+      endpoint: ${ZALOPAY_ENDPOINT:https://openapi.zalopay.vn/v2}
+      return-url: ${ZALOPAY_RETURN_URL:${APP_PAYMENT_PUBLIC_BASE_URL:https://danasea.tailfc3563.ts.net}/payment/success}
+      cancel-url: ${ZALOPAY_CANCEL_URL:${APP_PAYMENT_PUBLIC_BASE_URL:https://danasea.tailfc3563.ts.net}/payment/cancel}
+      callback-url: ${ZALOPAY_CALLBACK_URL:${APP_PAYMENT_PUBLIC_BASE_URL:https://danasea.tailfc3563.ts.net}/api/payments/webhook/zalopay}

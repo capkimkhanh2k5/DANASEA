@@ -1,6 +1,6 @@
 import type { HttpRequestError } from "../../../types/http";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { authService } from "../../../services/authService";
 import { AuthCinematicBackdrop } from "../../../components/customer/AuthCinematicBackdrop";
@@ -30,7 +30,19 @@ const DEFAULT_AVATARS: Record<Role, string> = {
   CUSTOMER: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
 };
 
+function getLoginDestination(role: Role, paymentReturnTo: unknown) {
+  if (role === 'ADMIN') return '/admin';
+  if (role === 'VENDOR') return '/vendor';
+  if (typeof paymentReturnTo === 'string'
+      && /^\/(?:payment\/(?:success|cancel|vnpay-return)|checkout\/result)\/?(?:\?.*)?$/.test(paymentReturnTo)) {
+    return paymentReturnTo;
+  }
+  return '/';
+}
+
 export function Auth() {
+  const { state } = useLocation();
+  const paymentReturnTo: unknown = state?.paymentReturnTo;
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
   
   // Login Form States
@@ -143,11 +155,11 @@ export function Auth() {
       });
       setAuth(userModel, authRes.accessToken);
 
-      const destination = role === 'ADMIN' ? '/admin' : role === 'VENDOR' ? '/vendor' : '/';
+      const destination = getLoginDestination(role, paymentReturnTo);
       setToastMessage("Đăng nhập thành công");
       setShowSuccessToast(true);
 
-      console.log(`[Bước 5/5] Hoàn tất đăng nhập! Chuẩn bị điều hướng tới: ${destination}`);
+      console.log(`[Bước 5/5] Hoàn tất đăng nhập! Chuẩn bị điều hướng tới: ${destination.split('?')[0]}`);
       console.groupEnd();
 
       navigate(destination);
@@ -279,11 +291,11 @@ export function Auth() {
       console.log('[Bước 3/4] Lưu trữ Token và User vào Zustand Store');
       setAuth(userModel, authRes.accessToken);
 
-      const destination = userModel.role === 'ADMIN' ? '/admin' : userModel.role === 'VENDOR' ? '/vendor' : '/';
+      const destination = getLoginDestination(userModel.role, paymentReturnTo);
       setToastMessage("Đăng nhập Google thành công");
       setShowSuccessToast(true);
 
-      console.log(`[Bước 4/4] Điều hướng tới: ${destination}`);
+      console.log(`[Bước 4/4] Điều hướng tới: ${destination.split('?')[0]}`);
       console.groupEnd();
 
       setTimeout(() => {

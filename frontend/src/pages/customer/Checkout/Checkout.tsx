@@ -8,6 +8,13 @@ import type { BookingHoldResponse } from "../../../types/booking";
 import type { DiscountPreviewResponse, PaymentProviderType } from "../../../types/order";
 import { useState, useEffect, useRef } from "react";
 import {
+  clearPaymentIntentKey,
+  getPaymentIntentKey,
+  getPendingOrder,
+  savePendingOrder,
+  savePurchasedItems,
+} from "./checkoutPaymentSession";
+import {
   Timer,
   ShieldCheck,
   ChevronRight,
@@ -17,12 +24,58 @@ import {
   AlertCircle,
   ArrowLeft,
   Loader2,
+  Wallet,
 } from "lucide-react";
+
+const paymentMethods = [
+  {
+    provider: "VNPAY",
+    name: "Cổng VNPAY (QR Pay / Thẻ ATM & Quốc tế)",
+    description: "Hỗ trợ quét mã QR qua 30+ ứng dụng ngân hàng",
+    icon: QrCode,
+  },
+  {
+    provider: "PAYPAL",
+    name: "Cổng PayPal (Thẻ quốc tế Visa, MasterCard)",
+    description: "Dành cho du khách quốc tế hoặc thanh toán ngoại tệ",
+    icon: CreditCard,
+  },
+  {
+    provider: "PAYOS",
+    name: "payOS (VietQR)",
+    description: "Quét mã VietQR bằng ứng dụng ngân hàng",
+    icon: QrCode,
+  },
+  {
+    provider: "ZALOPAY",
+    name: "ZaloPay",
+    description: "Thanh toán qua ví điện tử ZaloPay",
+    icon: Wallet,
+  },
+] as const;
+
+const defaultPaymentProviders: PaymentProviderType[] = ["VNPAY", "PAYPAL"];
+
+interface CheckoutPaymentError {
+  response?: {
+    status?: number;
+    data?: {
+      code?: string;
+      errorCode?: string;
+      message?: string;
+      missingWaivers?: Array<{ subOrderId: string; waiverVersion?: number; contentLanguage?: string }>;
+    };
+  };
+}
 
 export function Checkout() {
   const navigate = useNavigate();
   const { items, getTotalPrice } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
+  const cartFingerprint = items.map(({ id, slotId, optionId, quantity }) =>
+    JSON.stringify([id, slotId, optionId, quantity])).sort();
+  const pendingOrderKey = `danasea_checkout_order:${JSON.stringify([user?.id, cartFingerprint])}`;
+  const pendingOrder = getPendingOrder(pendingOrderKey);
 
   // Booking Hold State
   const [bookingHold, setBookingHold] = useState<BookingHoldResponse | null>(null);
@@ -36,10 +89,26 @@ export function Checkout() {
   const [notes, setNotes] = useState<string>("");
 
   // Payment Method
-  const [paymentProvider, setPaymentProvider] = useState<PaymentProviderType>("VNPAY");
+  const [selectedProvider, setSelectedProvider] = useState<PaymentProviderType>(() => pendingOrder?.provider ?? "VNPAY");
+  const [availableProviders, setAvailableProviders] = useState(defaultPaymentProviders);
+  const visiblePaymentMethods = paymentMethods.filter(({ provider }) =>
+    (isAuthenticated ? availableProviders : defaultPaymentProviders).includes(provider));
+  const paymentProvider = visiblePaymentMethods.find(({ provider }) => provider === selectedProvider)?.provider
+    ?? visiblePaymentMethods[0]?.provider;
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const controller = new AbortController();
+    paymentService.getAvailableProviders(controller.signal).then((providers) => {
+      if (!controller.signal.aborted) setAvailableProviders(providers);
+    }).catch(() => {
+      if (!controller.signal.aborted) setAvailableProviders(defaultPaymentProviders);
+    });
+    return () => controller.abort();
+  }, [isAuthenticated]);
 
   // Slot Holding Status (15-minute slot timeout)
-  const isHoldExpired = countdown <= 0;
+  const isHoldExpired = countdown <= 0 && !pendingOrder;
 
   // Promo Code State
   const [promoInput, setPromoInput] = useState<string>("");
@@ -82,8 +151,9 @@ export function Checkout() {
 
   // Request backend slot hold on mount
   const holdRequestedRef = useRef<boolean>(false);
+  const holdRequest = useRef<Promise<BookingHoldResponse> | null>(null);
   useEffect(() => {
-    if (items.length === 0 || holdRequestedRef.current) return;
+    if (items.length === 0 || holdRequestedRef.current || getPendingOrder(pendingOrderKey)) return;
     holdRequestedRef.current = true;
 
     // Check if slot IDs look like real UUIDs
@@ -99,8 +169,9 @@ export function Checkout() {
     const allUuids = holdItems.every((item) => validUuidRegex.test(item.slotId));
 
     if (allUuids && isAuthenticated) {
-      bookingService
-        .holdBooking({ items: holdItems })
+      const request = bookingService.holdBooking({ items: holdItems });
+      holdRequest.current = request;
+      request
         .then((res) => {
           setBookingHold(res);
           const expireTime = res.holdExpiresAt || res.expiresAt;
@@ -113,9 +184,12 @@ export function Checkout() {
         })
         .catch((err) => {
           console.warn('[Checkout] Không thể giữ chỗ qua API, dùng chế độ giữ chỗ cục bộ:', err);
+        })
+        .finally(() => {
+          if (holdRequest.current === request) holdRequest.current = null;
         });
     }
-  }, [items, isAuthenticated]);
+  }, [items, isAuthenticated, pendingOrderKey]);
 
   // 15-minute countdown timer
   useEffect(() => {
@@ -213,6 +287,7 @@ export function Checkout() {
       setPaymentError("Thời gian giữ chỗ 15 phút đã kết thúc. Vui lòng quay lại giỏ hàng để cập nhật lại suất trống.");
       return;
     }
+    if (!paymentProvider || isProcessingPayment) return;
 
     setIsProcessingPayment(true);
     setPaymentError(null);
@@ -220,24 +295,42 @@ export function Checkout() {
     if (isAuthenticated) {
       try {
 
-        let activeHold = bookingHold;
-        if (!activeHold?.bookingId) {
-          const holdItems = items.map((i) => ({
-            slotId: i.slotId,
-            quantity: i.quantity,
-            optionId: i.optionId,
-            participantsCount: i.quantity,
-            allowSplit: false,
-          }));
-          activeHold = await bookingService.holdBooking({ items: holdItems });
-          setBookingHold(activeHold);
+        // Resume the same order after an uncertain payment submission or browser refresh.
+        let orderRes;
+        if (pendingOrder) {
+          try {
+            orderRes = await orderService.getOrderDetail(pendingOrder.id);
+          } catch (error) {
+            const { status } = (error as CheckoutPaymentError).response ?? {};
+            if (status === 403 || status === 404) savePendingOrder(pendingOrderKey, null);
+            throw error;
+          }
+          if (orderRes.status !== "PENDING_PAYMENT") {
+            savePendingOrder(pendingOrderKey, null);
+            setBookingHold(null);
+            setIsProcessingPayment(false);
+            setPaymentError("Đơn hàng này đã được xử lý. Vui lòng kiểm tra trạng thái trong mục Đơn hàng.");
+            return;
+          }
+        } else {
+          let activeHold = bookingHold ?? await holdRequest.current;
+          if (!activeHold?.bookingId) {
+            activeHold = await bookingService.holdBooking({ items: items.map((item) => ({
+              slotId: item.slotId,
+              quantity: item.quantity,
+              optionId: item.optionId,
+              participantsCount: item.quantity,
+              allowSplit: false,
+            })) });
+            setBookingHold(activeHold);
+          }
+          orderRes = await orderService.createOrder({
+            bookingId: activeHold.bookingId,
+            discountCode: appliedPromoCode || undefined,
+          });
         }
-
-        // 1. Create Master Order
-        const orderRes = await orderService.createOrder({
-          bookingId: activeHold.bookingId,
-          discountCode: appliedPromoCode || undefined,
-        });
+        const orderId = orderRes.id;
+        savePendingOrder(pendingOrderKey, { id: orderId, provider: paymentProvider });
 
         // 2. Synchronize safety waiver acceptance for all sub-orders requiring it
         const orderSubOrders = orderRes.items || orderRes.subOrders || [];
@@ -260,31 +353,33 @@ export function Checkout() {
         }
 
         // 3. Create Payment Intent
+        const idempotencyKey = getPaymentIntentKey(orderId, paymentProvider);
+        const submitIntent = async () => {
+          try {
+            return await paymentService.createPaymentIntent(orderId, { provider: paymentProvider }, idempotencyKey);
+          } catch (error) {
+            const { status, data } = (error as CheckoutPaymentError).response ?? {};
+            const code = data?.code ?? data?.errorCode;
+            if (code === "PAYMENT_WINDOW_EXPIRED") {
+              savePendingOrder(pendingOrderKey, null);
+              setBookingHold(null);
+            }
+            if (code === "PAYMENT_ATTEMPT_CLOSED" || code === "PAYMENT_WINDOW_EXPIRED"
+                || (status && status >= 400 && status < 500 && ![401, 408, 409, 425, 429].includes(status))) {
+              clearPaymentIntentKey(orderId, paymentProvider, idempotencyKey);
+            }
+            throw error;
+          }
+        };
+
         let payRes;
         try {
-          payRes = await paymentService.createPaymentIntent(orderRes.id, {
-            provider: paymentProvider,
-          });
-        } catch (paymentErr) {
-          const apiErr = paymentErr as {
-            response?: {
-              data?: {
-                errorCode?: string;
-                missingWaivers?: Array<{
-                  subOrderId: string;
-                  waiverVersion?: number;
-                  contentLanguage?: string;
-                }>;
-              };
-            };
-          };
-          if (
-            apiErr.response?.data?.errorCode === 'WAIVER_ACCEPTANCE_REQUIRED' &&
-            Array.isArray(apiErr.response?.data?.missingWaivers)
-          ) {
-            const missing = apiErr.response.data.missingWaivers;
+          payRes = await submitIntent();
+        } catch (error) {
+          const data = (error as CheckoutPaymentError).response?.data;
+          if (data?.errorCode === "WAIVER_ACCEPTANCE_REQUIRED" && Array.isArray(data.missingWaivers)) {
             await Promise.all(
-              missing.map((m: { subOrderId: string; waiverVersion?: number; contentLanguage?: string }) =>
+              data.missingWaivers.map((m) =>
                 orderService.acceptSubOrderWaiver(m.subOrderId, {
                   accepted: true,
                   version: m.waiverVersion || 1,
@@ -292,47 +387,17 @@ export function Checkout() {
                 })
               )
             );
-            payRes = await paymentService.createPaymentIntent(orderRes.id, {
-              provider: paymentProvider,
-            });
+            payRes = await submitIntent();
           } else {
-            throw paymentErr;
+            throw error;
           }
         }
 
         // 4. Backend returns paymentReference (which contains the gateway redirect URL)
-        const gatewayUrl = payRes.paymentReference || payRes.paymentUrl;
+        const gatewayUrl = payRes.paymentUrl || payRes.paymentReference;
         if (gatewayUrl && (gatewayUrl.startsWith("http://") || gatewayUrl.startsWith("https://"))) {
-          
-          // Save order snapshot for Step 3 (PaymentResult) when returning from VNPay gateway
-          const orderSnapshot = {
-            orderCode: `DNS-${sessionCode}`,
-            customerName: fullName.trim() || "Khách Hàng DANASEA",
-            customerPhone: phone.trim() || "0912 345 678",
-            customerEmail: email.trim() || "khachhang@danasea.vn",
-            specialRequest: notes.trim(),
-            paymentProvider: paymentProvider,
-            items: items.map((item, idx) => ({
-              id: item.id || `item-${idx}`,
-              serviceId: item.serviceId,
-              slotId: item.slotId,
-              serviceName: item.serviceName || 'Trải nghiệm biển Đà Nẵng',
-              thumbnailUrl: item.thumbnailUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5',
-              unitPrice: item.unitPrice,
-              quantity: item.quantity,
-              date: item.selectedDate || item.date || 'Hôm nay',
-              timeSlot: item.timeSlot || '08:00 - 10:00',
-              locationName: item.locationName || 'Bán đảo Sơn Trà, Đà Nẵng',
-              vendorName: item.vendorName || 'DanaSea Marine Club',
-              ticketCode: `TKT-${sessionCode || '89412'}-0${idx + 1}`
-            })),
-            rawTotal: rawTotal,
-            discountAmount: discountAmount,
-            appliedPromoCode: appliedPromoCode,
-            finalTotal: finalTotal,
-            paidAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' • ' + new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-          };
-          sessionStorage.setItem('danasea_last_order', JSON.stringify(orderSnapshot));
+          clearPaymentIntentKey(orderId, paymentProvider, idempotencyKey);
+          savePurchasedItems(payRes.paymentId, items.map(({ id, quantity }) => ({ id, quantity })));
           window.location.assign(gatewayUrl);
           return;
         } else {
@@ -341,7 +406,7 @@ export function Checkout() {
           return;
         }
       } catch (err) {
-        const error = err as { response?: { data?: { message?: string } } };
+        const error = err as CheckoutPaymentError;
         console.error('[Checkout] Lỗi khi tạo đơn hàng:', err);
         setIsProcessingPayment(false);
         setPaymentError(error.response?.data?.message || "Không thể khởi tạo giao dịch thanh toán. Vui lòng kiểm tra lại kết nối và thử lại.");
@@ -528,60 +593,40 @@ export function Checkout() {
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    <label 
-                      onClick={() => setPaymentProvider("VNPAY")}
-                      className={`p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                        paymentProvider === "VNPAY" 
-                          ? "border-slate-900 bg-slate-50/80 shadow-xs" 
-                          : "border-slate-200 bg-white hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <input 
-                          checked={paymentProvider === "VNPAY"} 
-                          onChange={() => setPaymentProvider("VNPAY")}
-                          className="w-4 h-4 accent-slate-900 cursor-pointer" 
-                          name="payment_method" 
-                          type="radio" 
-                          value="VNPAY"
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-slate-900">Cổng VNPAY (QR Pay / Thẻ ATM &amp; Quốc tế)</span>
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
-                              Phổ biến
-                            </span>
+                    {visiblePaymentMethods.map(({ provider, name, description, icon: Icon }) => (
+                      <label
+                        key={provider}
+                        className={`p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                          paymentProvider === provider
+                            ? "border-slate-900 bg-slate-50/80 shadow-xs"
+                            : "border-slate-200 bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            checked={paymentProvider === provider}
+                            onChange={() => setSelectedProvider(provider)}
+                            disabled={isProcessingPayment}
+                            className="w-4 h-4 accent-slate-900 cursor-pointer"
+                            name="payment_method"
+                            type="radio"
+                            value={provider}
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-slate-900">{name}</span>
+                              {provider === "VNPAY" && (
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                                  Phổ biến
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">{description}</p>
                           </div>
-                          <p className="text-xs text-slate-500 mt-0.5">Hỗ trợ quét mã QR qua 30+ ứng dụng ngân hàng</p>
                         </div>
-                      </div>
-                      <QrCode className="w-5 h-5 text-slate-700 shrink-0" />
-                    </label>
-
-                    <label 
-                      onClick={() => setPaymentProvider("PAYPAL")}
-                      className={`p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                        paymentProvider === "PAYPAL" 
-                          ? "border-slate-900 bg-slate-50/80 shadow-xs" 
-                          : "border-slate-200 bg-white hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <input 
-                          checked={paymentProvider === "PAYPAL"} 
-                          onChange={() => setPaymentProvider("PAYPAL")}
-                          className="w-4 h-4 accent-slate-900 cursor-pointer" 
-                          name="payment_method" 
-                          type="radio" 
-                          value="PAYPAL"
-                        />
-                        <div>
-                          <span className="text-sm font-bold text-slate-900">Cổng PayPal (Thẻ quốc tế Visa, MasterCard)</span>
-                          <p className="text-xs text-slate-500 mt-0.5">Dành cho du khách quốc tế hoặc thanh toán ngoại tệ</p>
-                        </div>
-                      </div>
-                      <CreditCard className="w-5 h-5 text-slate-700 shrink-0" />
-                    </label>
+                        <Icon className="w-5 h-5 text-slate-700 shrink-0" aria-hidden="true" />
+                      </label>
+                    ))}
                   </div>
                 </div>
 
@@ -730,9 +775,9 @@ export function Checkout() {
                   ) : (
                     <button 
                       onClick={handlePayment} 
-                      disabled={isProcessingPayment}
+                      disabled={isProcessingPayment || !paymentProvider}
                       className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-xs transition-colors flex items-center justify-center cursor-pointer ${
-                        !isProcessingPayment
+                        !isProcessingPayment && paymentProvider
                           ? 'bg-[#0284c7] hover:bg-[#0369a1] text-white active:scale-95'
                           : 'bg-slate-100 text-slate-600 border border-slate-300 cursor-not-allowed'
                       }`} 

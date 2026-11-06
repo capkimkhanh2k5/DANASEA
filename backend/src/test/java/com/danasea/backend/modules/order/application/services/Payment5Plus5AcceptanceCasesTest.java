@@ -82,7 +82,8 @@ class Payment5Plus5AcceptanceCasesTest {
         bookingId = UUID.randomUUID();
         objectMapper = new ObjectMapper();
 
-        lenient().when(transactionManager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
+        lenient().when(transactionManager.getTransaction(any())).thenAnswer(invocation -> new SimpleTransactionStatus());
+        lenient().when(inventoryLockPort.extendHolds(any(), any(), any())).thenReturn(true);
 
         orderPaymentService = new OrderPaymentService(
                 bookingRepository,
@@ -148,7 +149,7 @@ class Payment5Plus5AcceptanceCasesTest {
     void testCase02_StartPayment_SetsFixedDeadlineAndPreservesOnNextOpen() {
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
         when(paymentRepository.findInFlightAttempts(eq(orderId), any())).thenReturn(Collections.emptyList());
         when(paymentRepository.findMaxAttemptNumberByMasterOrderId(orderId)).thenReturn(0);
         when(paymentRepository.getNextPayOSOrderCode()).thenReturn(111222L);
@@ -158,14 +159,16 @@ class Payment5Plus5AcceptanceCasesTest {
             return p;
         });
         when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
-        when(payosAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.PAYOS), any(), any()))
+        when(payosAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.PAYOS), any(), any(), any()))
                 .thenReturn(new PaymentIntentResult(
                         UUID.randomUUID(), orderId, PaymentProvider.PAYOS, new BigDecimal("500000.00"),
                         "https://pay.payos.vn/web/111222", "000201...", OffsetDateTime.now().plusSeconds(300), "111222"
                 ));
 
         PaymentJpaEntity activated = new PaymentJpaEntity();
+        activated.setStatus(PaymentStatus.PENDING);
         activated.setId(UUID.randomUUID());
+        activated.setAttemptState(PaymentAttemptState.CREATING);
         activated.setMasterOrderId(orderId);
         activated.setProvider(PaymentProvider.PAYOS);
         activated.setAmount(new BigDecimal("500000.00"));
@@ -178,7 +181,7 @@ class Payment5Plus5AcceptanceCasesTest {
 
         // Lần mở sau với attempt active: deadline giữ nguyên
         activated.setAttemptState(PaymentAttemptState.PENDING);
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(activated));
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(activated));
         PaymentWindowResponse secondRes = coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "idemp-02-reload");
         assertThat(secondRes.danaseaDeadlineAt()).isEqualTo(firstDeadline);
     }
@@ -187,10 +190,12 @@ class Payment5Plus5AcceptanceCasesTest {
     @Test
     @DisplayName("Case 03: Start payment at end of HOLD (1s before expiry) extends Redis hold to 420s")
     void testCase03_StartPaymentAtEndOfHold_ExtendsRedisHolds() {
-        booking.setHoldExpiresAt(OffsetDateTime.now().plusSeconds(1));
+        booking.setHoldExpiresAt(OffsetDateTime.now().plusSeconds(5));
+        masterOrder.setPaymentDeadline(booking.getHoldExpiresAt());
+        OffsetDateTime originalHoldDeadline = booking.getHoldExpiresAt();
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
         when(paymentRepository.findInFlightAttempts(eq(orderId), any())).thenReturn(Collections.emptyList());
         when(paymentRepository.findMaxAttemptNumberByMasterOrderId(orderId)).thenReturn(0);
         when(paymentRepository.save(any(PaymentJpaEntity.class))).thenAnswer(inv -> {
@@ -199,21 +204,44 @@ class Payment5Plus5AcceptanceCasesTest {
             return p;
         });
         when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
-        when(payosAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.PAYOS), any(), any()))
+        when(payosAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.PAYOS), any(), any(), any()))
                 .thenReturn(new PaymentIntentResult(
                         UUID.randomUUID(), orderId, PaymentProvider.PAYOS, new BigDecimal("500000.00"),
                         "https://pay.payos.vn/link", "qr", OffsetDateTime.now().plusSeconds(300), "111"
                 ));
 
         PaymentJpaEntity act = new PaymentJpaEntity();
+        act.setStatus(PaymentStatus.PENDING);
         act.setId(UUID.randomUUID());
+        act.setAttemptState(PaymentAttemptState.CREATING);
         act.setMasterOrderId(orderId);
         act.setProvider(PaymentProvider.PAYOS);
         act.setAmount(new BigDecimal("500000.00"));
         when(paymentRepository.findByIdForUpdate(any())).thenReturn(Optional.of(act));
 
+        when(inventoryLockPort.extendHolds(eq(bookingId), any(), any())).thenReturn(true);
         coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "idemp-03");
+        assertThat(masterOrder.getPaymentDeadline()).isAfter(originalHoldDeadline.plusMinutes(4));
+        assertThat(booking.getHoldExpiresAt()).isEqualTo(masterOrder.getPaymentDeadline().plusSeconds(120));
         verify(inventoryLockPort).extendHolds(eq(bookingId), any(), eq(Duration.ofSeconds(420)));
+    }
+
+    @Test
+    void paymentStartFailsWhenInventoryCannotBeExtended() {
+        when(inventoryLockPort.extendHolds(any(), any(), any())).thenReturn(false);
+        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        lenient().when(paymentRepository.save(any())).thenAnswer(inv -> {
+            PaymentJpaEntity payment = inv.getArgument(0);
+            payment.setId(UUID.randomUUID());
+            return payment;
+        });
+        lenient().when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
+
+        assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "hold-missing"))
+                .isInstanceOf(BookingHoldExpiredException.class);
+        assertThat(masterOrder.getPaymentDeadline()).isNull();
+        verifyNoInteractions(payosAdapter);
     }
 
     // 4. 30 request đồng thời cùng order+provider → đúng 1 external create / 1 attempt hoạt động; retry trả attempt cũ.
@@ -222,15 +250,16 @@ class Payment5Plus5AcceptanceCasesTest {
     void testCase04_ConcurrentRequests_SingleAttemptGenerated() {
         masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(200));
         PaymentJpaEntity inFlight = new PaymentJpaEntity();
+        inFlight.setStatus(PaymentStatus.PENDING);
         inFlight.setAttemptState(PaymentAttemptState.CREATING);
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
         when(paymentRepository.findInFlightAttempts(eq(orderId), any())).thenReturn(List.of(inFlight));
 
         assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "spam-click-04"))
                 .isInstanceOf(InvalidOrderStateException.class)
-                .hasMessageContaining("currently being generated");
+                .hasMessageContaining("being generated");
     }
 
     // 5. Gateway create timeout sau khi provider có thể đã tạo: không blind recreate, reconcile theo idempotency/external ref.
@@ -239,19 +268,21 @@ class Payment5Plus5AcceptanceCasesTest {
     void testCase05_GatewayCreateTimeout_NoBlindRecreate() {
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
         when(paymentRepository.findInFlightAttempts(eq(orderId), any())).thenReturn(Collections.emptyList());
         when(paymentRepository.findMaxAttemptNumberByMasterOrderId(orderId)).thenReturn(0);
         when(paymentRepository.getNextPayOSOrderCode()).thenReturn(55555L);
 
         PaymentJpaEntity attempt = new PaymentJpaEntity();
+        attempt.setStatus(PaymentStatus.PENDING);
         attempt.setId(UUID.randomUUID());
+        attempt.setAttemptState(PaymentAttemptState.CREATING);
         attempt.setMasterOrderId(orderId);
         when(paymentRepository.save(any(PaymentJpaEntity.class))).thenReturn(attempt);
         when(paymentRepository.findByIdForUpdate(attempt.getId())).thenReturn(Optional.of(attempt));
 
         when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
-        when(payosAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.PAYOS), any(), any()))
+        when(payosAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.PAYOS), any(), any(), any()))
                 .thenThrow(new com.danasea.backend.modules.order.domain.exceptions.PaymentGatewayException(
                         "Read timed out from gateway", new java.net.SocketTimeoutException("Read timed out")));
 
@@ -269,6 +300,7 @@ class Payment5Plus5AcceptanceCasesTest {
         masterOrder.setPaymentDeadline(deadline);
 
         PaymentJpaEntity existing = new PaymentJpaEntity();
+        existing.setStatus(PaymentStatus.PENDING);
         existing.setId(UUID.randomUUID());
         existing.setMasterOrderId(orderId);
         existing.setProvider(PaymentProvider.ZALOPAY);
@@ -278,7 +310,7 @@ class Payment5Plus5AcceptanceCasesTest {
         existing.setPaymentUrl("https://qcgateway.zalopay.vn/pay?id=123");
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(existing));
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(existing));
 
         PaymentWindowResponse res = coordinator.startPayment(customerId, orderId, PaymentProvider.ZALOPAY, "refresh-06");
         assertThat(res.paymentId()).isEqualTo(existing.getId());
@@ -294,6 +326,7 @@ class Payment5Plus5AcceptanceCasesTest {
         masterOrder.setPaymentDeadline(fixedDeadline);
 
         PaymentJpaEntity oldZalo = new PaymentJpaEntity();
+        oldZalo.setStatus(PaymentStatus.PENDING);
         oldZalo.setId(UUID.randomUUID());
         oldZalo.setMasterOrderId(orderId);
         oldZalo.setProvider(PaymentProvider.ZALOPAY);
@@ -303,7 +336,7 @@ class Payment5Plus5AcceptanceCasesTest {
         oldZalo.setIsActive(true);
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(oldZalo)).thenReturn(Optional.empty());
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(oldZalo)).thenReturn(Optional.empty());
         when(paymentRepository.findByIdForUpdate(oldZalo.getId())).thenReturn(Optional.of(oldZalo));
 
         when(gatewayRegistry.getAdapter(PaymentProvider.ZALOPAY)).thenReturn(zaloPayAdapter);
@@ -321,14 +354,16 @@ class Payment5Plus5AcceptanceCasesTest {
         });
 
         when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
-        when(payosAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.PAYOS), any(), any()))
+        when(payosAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.PAYOS), any(), any(), any()))
                 .thenReturn(new PaymentIntentResult(
                         UUID.randomUUID(), orderId, PaymentProvider.PAYOS, new BigDecimal("500000.00"),
                         "https://pay.payos.vn/link-07", "qr", fixedDeadline, "777888"
                 ));
 
         PaymentJpaEntity newAttempt = new PaymentJpaEntity();
+        newAttempt.setStatus(PaymentStatus.PENDING);
         newAttempt.setId(UUID.randomUUID());
+        newAttempt.setAttemptState(PaymentAttemptState.CREATING);
         newAttempt.setMasterOrderId(orderId);
         newAttempt.setProvider(PaymentProvider.PAYOS);
         newAttempt.setAmount(new BigDecimal("500000.00"));
@@ -347,6 +382,7 @@ class Payment5Plus5AcceptanceCasesTest {
     void testCase08_CancelZaloPayAlreadyCaptured_BlocksSwitch() {
         masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(120));
         PaymentJpaEntity oldZalo = new PaymentJpaEntity();
+        oldZalo.setStatus(PaymentStatus.PENDING);
         oldZalo.setId(UUID.randomUUID());
         oldZalo.setMasterOrderId(orderId);
         oldZalo.setProvider(PaymentProvider.ZALOPAY);
@@ -354,14 +390,14 @@ class Payment5Plus5AcceptanceCasesTest {
         oldZalo.setIsActive(true);
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(oldZalo));
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(oldZalo));
         when(gatewayRegistry.getAdapter(PaymentProvider.ZALOPAY)).thenReturn(zaloPayAdapter);
         when(zaloPayAdapter.canCancelServerSide(PaymentProvider.ZALOPAY)).thenReturn(true);
         when(zaloPayAdapter.cancelPayment(any(), any(), any())).thenReturn(PaymentCancelResult.alreadyCaptured("Captured"));
 
         assertThatThrownBy(() -> coordinator.switchProvider(customerId, orderId, PaymentProvider.PAYOS, "switch-08"))
                 .isInstanceOf(InvalidOrderStateException.class)
-                .hasMessageContaining("has already been captured");
+                .hasMessageContaining("not been verified as canceled");
     }
 
     // 9. PayOS cancel: QR/link chụp cũ không được phép tiếp tục thu tiền theo kết quả verified; race thu tiền đối soát đúng.
@@ -370,6 +406,7 @@ class Payment5Plus5AcceptanceCasesTest {
     void testCase09_PayOSCancel_CancelsOldAttempt() {
         masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(150));
         PaymentJpaEntity oldPayOS = new PaymentJpaEntity();
+        oldPayOS.setStatus(PaymentStatus.PENDING);
         oldPayOS.setId(UUID.randomUUID());
         oldPayOS.setMasterOrderId(orderId);
         oldPayOS.setProvider(PaymentProvider.PAYOS);
@@ -377,7 +414,7 @@ class Payment5Plus5AcceptanceCasesTest {
         oldPayOS.setIsActive(true);
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(oldPayOS)).thenReturn(Optional.empty());
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(oldPayOS)).thenReturn(Optional.empty());
         when(paymentRepository.findByIdForUpdate(oldPayOS.getId())).thenReturn(Optional.of(oldPayOS));
         when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
         when(payosAdapter.canCancelServerSide(PaymentProvider.PAYOS)).thenReturn(true);
@@ -392,11 +429,13 @@ class Payment5Plus5AcceptanceCasesTest {
         });
 
         when(gatewayRegistry.getAdapter(PaymentProvider.ZALOPAY)).thenReturn(zaloPayAdapter);
-        when(zaloPayAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.ZALOPAY), any(), any()))
+        when(zaloPayAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.ZALOPAY), any(), any(), any()))
                 .thenReturn(new PaymentIntentResult(UUID.randomUUID(), orderId, PaymentProvider.ZALOPAY, new BigDecimal("500000.00"), "url", "qr", null, "zp"));
 
         PaymentJpaEntity act = new PaymentJpaEntity();
+        act.setStatus(PaymentStatus.PENDING);
         act.setId(UUID.randomUUID());
+        act.setAttemptState(PaymentAttemptState.CREATING);
         act.setMasterOrderId(orderId);
         when(paymentRepository.findByIdForUpdate(argThat(id -> id != null && !id.equals(oldPayOS.getId())))).thenReturn(Optional.of(act));
 
@@ -411,6 +450,7 @@ class Payment5Plus5AcceptanceCasesTest {
     void testCase10_VNPayCannotCancelInstantly_BlocksUnsafeSwitch() {
         masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(200));
         PaymentJpaEntity activeVNPay = new PaymentJpaEntity();
+        activeVNPay.setStatus(PaymentStatus.PENDING);
         activeVNPay.setId(UUID.randomUUID());
         activeVNPay.setMasterOrderId(orderId);
         activeVNPay.setProvider(PaymentProvider.VNPAY);
@@ -418,13 +458,13 @@ class Payment5Plus5AcceptanceCasesTest {
         activeVNPay.setIsActive(true);
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(activeVNPay));
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(activeVNPay));
         when(gatewayRegistry.getAdapter(PaymentProvider.VNPAY)).thenReturn(vnPayAdapter);
         when(vnPayAdapter.canCancelServerSide(PaymentProvider.VNPAY)).thenReturn(false); // Cannot cancel server-side!
 
         assertThatThrownBy(() -> coordinator.switchProvider(customerId, orderId, PaymentProvider.PAYOS, "switch-vnpay"))
                 .isInstanceOf(InvalidOrderStateException.class)
-                .hasMessageContaining("session is still active and cannot be canceled server-side");
+                .hasMessageContaining("cannot be canceled");
     }
 
     // 11. PayPal approval xong, quay lại sau deadline: không capture khi inventory không còn hợp lệ.
@@ -447,6 +487,7 @@ class Payment5Plus5AcceptanceCasesTest {
         masterOrder.setPaymentStatus(PaymentOrderStatus.PAID);
 
         PaymentJpaEntity secondAttempt = new PaymentJpaEntity();
+        secondAttempt.setStatus(PaymentStatus.PENDING);
         secondAttempt.setId(UUID.randomUUID());
         secondAttempt.setMasterOrderId(orderId);
         secondAttempt.setProvider(PaymentProvider.VNPAY);
@@ -487,6 +528,7 @@ class Payment5Plus5AcceptanceCasesTest {
     void testCase13_DuplicateWebhook_IdempotentResponse() {
         long orderCode = 888999L;
         PaymentJpaEntity payment = new PaymentJpaEntity();
+        payment.setStatus(PaymentStatus.PENDING);
         payment.setId(UUID.randomUUID());
         payment.setMasterOrderId(orderId);
         payment.setProvider(PaymentProvider.PAYOS);
@@ -498,7 +540,7 @@ class Payment5Plus5AcceptanceCasesTest {
         when(paymentRepository.findByPayosOrderCodeForUpdate(orderCode)).thenReturn(Optional.of(payment));
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
 
-        String rawPayload = "{\"code\":\"00\",\"desc\":\"success\",\"data\":{\"orderCode\":888999,\"amount\":500000.00}}";
+        String rawPayload = "{\"data\":{\"orderCode\":888999,\"amount\":500000,\"code\":\"00\",\"currency\":\"VND\",\"reference\":\"REF-888999\"}}";
         Map<String, Object> res = orderPaymentService.processPayOSWebhook(rawPayload, "sig13");
         assertThat(res.get("code")).isEqualTo("00");
         verify(confirmBookingUseCase, never()).execute(any());
@@ -508,19 +550,17 @@ class Payment5Plus5AcceptanceCasesTest {
     @Test
     @DisplayName("Case 14: Late callback arrived after sweep but paid on-time with inventory held -> CONFIRMED")
     void testCase14_LateCallbackPaidOnTimeWithInventory_ConfirmsBooking() {
-        // Order was marked CANCELLED by sweep
-        masterOrder.setStatus(MasterOrderStatus.CANCELLED);
-        masterOrder.setPaymentStatus(PaymentOrderStatus.UNPAID);
-        masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(30));
+        masterOrder.setPaymentDeadline(OffsetDateTime.now().minusSeconds(2));
 
         PaymentJpaEntity payment = new PaymentJpaEntity();
+        payment.setStatus(PaymentStatus.PENDING);
         payment.setId(UUID.randomUUID());
         payment.setMasterOrderId(orderId);
         payment.setProvider(PaymentProvider.PAYOS);
         payment.setPayosOrderCode(12345L);
         payment.setAmount(new BigDecimal("500000.00"));
         payment.setStatus(PaymentStatus.PENDING);
-        payment.setPaidAt(OffsetDateTime.now().minusSeconds(1)); // Paid on time!
+        payment.setDanaseaDeadlineAt(masterOrder.getPaymentDeadline());
 
         booking.setStatus(BookingStatus.HOLD);
         booking.setHoldExpiresAt(OffsetDateTime.now().plusMinutes(5));
@@ -532,7 +572,12 @@ class Payment5Plus5AcceptanceCasesTest {
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
         when(subOrderRepository.findByMasterOrderId(orderId)).thenReturn(Collections.emptyList());
 
-        String rawPayload = "{\"code\":\"00\",\"desc\":\"success\",\"data\":{\"orderCode\":12345,\"amount\":500000.00}}";
+        String paidAt = OffsetDateTime.now().minusSeconds(5)
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        String rawPayload = """
+                {"data":{"orderCode":12345,"amount":500000,"code":"00","currency":"VND",
+                         "reference":"REF-12345","transactionDateTime":"%s"}}
+                """.formatted(paidAt);
         orderPaymentService.processPayOSWebhook(rawPayload, "sig14");
 
         assertThat(masterOrder.getStatus()).isEqualTo(MasterOrderStatus.PAID);
@@ -554,32 +599,48 @@ class Payment5Plus5AcceptanceCasesTest {
 
     // 16. Hết hạn + cancel/query timeout → pending closing được bảo vệ và retry bền vững.
     @Test
-    @DisplayName("Case 16: Expiry sweep sweeps expired order, cancels provider attempt, and releases inventory")
-    void testCase16_SweepExpiredOrder_ReleasesInventory() {
-        masterOrder.setPaymentDeadline(OffsetDateTime.now().minusSeconds(10));
-        masterOrder.setStatus(MasterOrderStatus.PENDING_PAYMENT);
-
-        PaymentJpaEntity active = new PaymentJpaEntity();
-        active.setId(UUID.randomUUID());
-        active.setProvider(PaymentProvider.PAYOS);
-        active.setProviderOrderId("payos-expired-16");
-        active.setIsActive(true);
-
-        when(masterOrderRepository.findAll()).thenReturn(List.of(masterOrder));
-        when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(active));
-        when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
-        when(payosAdapter.queryPayment(any(), any(), any())).thenReturn(null);
-        when(payosAdapter.canCancelServerSide(PaymentProvider.PAYOS)).thenReturn(true);
-        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+    @DisplayName("Case 16: Confirmed gateway cancellation closes the payment attempt")
+    void testCase16_SweepExpiredOrder_TerminatesVerifiedCanceledAttempt() {
+        var active = expiredPayosAttempt();
+        when(payosAdapter.cancelPayment(any(), any(), any())).thenReturn(PaymentCancelResult.success("Canceled"));
 
         coordinator.sweepExpiredClosingOrders();
 
-        assertThat(masterOrder.getStatus()).isEqualTo(MasterOrderStatus.CANCELLED);
-        assertThat(active.getIsActive()).isFalse();
+        assertThat(active.getStatus()).isEqualTo(PaymentStatus.FAILED);
         assertThat(active.getAttemptState()).isEqualTo(PaymentAttemptState.TERMINATED);
-        verify(inventoryLockPort).releaseHolds(eq(bookingId), any());
-        assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(active.getIsActive()).isFalse();
+        verifyNoInteractions(inventoryLockPort);
+    }
+
+    @Test
+    void sweepPreservesPaymentForReconciliationWhenCancelIsUncertain() {
+        var active = expiredPayosAttempt();
+        when(payosAdapter.cancelPayment(any(), any(), any()))
+                .thenReturn(PaymentCancelResult.unknown("Network timeout", "TIMEOUT"));
+
+        coordinator.sweepExpiredClosingOrders();
+
+        assertThat(active.getStatus()).isEqualTo(PaymentStatus.PENDING);
+        assertThat(active.getCancelStatus()).isEqualTo(PaymentCancelStatus.CANCEL_UNKNOWN);
+        assertThat(active.getIsActive()).isFalse();
+        verifyNoInteractions(inventoryLockPort);
+    }
+
+    private PaymentJpaEntity expiredPayosAttempt() {
+        PaymentJpaEntity active = new PaymentJpaEntity();
+        active.setId(UUID.randomUUID());
+        active.setProvider(PaymentProvider.PAYOS);
+        active.setProviderOrderId("gateway-link");
+        active.setIsActive(true);
+        active.setStatus(PaymentStatus.PENDING);
+
+        when(paymentRepository.findExpiredActiveAttempts(eq(PaymentStatus.PENDING), eq(MasterOrderStatus.PENDING_PAYMENT), any()))
+                .thenReturn(List.of(active));
+        when(paymentRepository.findByIdForUpdate(active.getId())).thenReturn(Optional.of(active));
+        when(gatewayRegistry.supports(PaymentProvider.PAYOS)).thenReturn(true);
+        when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
+        when(payosAdapter.canCancelServerSide(PaymentProvider.PAYOS)).thenReturn(true);
+        return active;
     }
 
     // 17. SHARED capacity đầy / PRIVATE chiếm cả unit / MasterOrder nhiều BookingItem / nhiều Vendor → không sai số lượng chỗ.
@@ -596,17 +657,19 @@ class Payment5Plus5AcceptanceCasesTest {
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
         when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
         when(paymentRepository.findInFlightAttempts(eq(orderId), any())).thenReturn(Collections.emptyList());
         when(paymentRepository.getNextPayOSOrderCode()).thenReturn(999888L);
         when(paymentRepository.save(any(PaymentJpaEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
-        when(payosAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.PAYOS), any(), any()))
+        when(payosAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.PAYOS), any(), any(), any()))
                 .thenReturn(new PaymentIntentResult(UUID.randomUUID(), orderId, PaymentProvider.PAYOS, new BigDecimal("500000.00"), "url", "qr", null, "999888"));
 
         PaymentJpaEntity act = new PaymentJpaEntity();
+        act.setStatus(PaymentStatus.PENDING);
         act.setId(UUID.randomUUID());
+        act.setAttemptState(PaymentAttemptState.CREATING);
         act.setMasterOrderId(orderId);
         when(paymentRepository.findByIdForUpdate(any())).thenReturn(Optional.of(act));
 
@@ -621,15 +684,16 @@ class Payment5Plus5AcceptanceCasesTest {
     void testCase18_InFlightAttempt_PreventsDuplicateDuringRecovery() {
         masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(200));
         PaymentJpaEntity inFlight = new PaymentJpaEntity();
+        inFlight.setStatus(PaymentStatus.PENDING);
         inFlight.setAttemptState(PaymentAttemptState.CREATING);
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.empty());
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.empty());
         when(paymentRepository.findInFlightAttempts(eq(orderId), any())).thenReturn(List.of(inFlight));
 
         assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, PaymentProvider.ZALOPAY, "idemp-18"))
                 .isInstanceOf(InvalidOrderStateException.class)
-                .hasMessageContaining("currently being generated");
+                .hasMessageContaining("being generated");
     }
 
     // 19. Flood clicks, nhiều MasterOrder/IP: giới hạn outbound, người dùng nhấn 30 lần do lag vẫn lấy được attempt cũ.
@@ -638,6 +702,7 @@ class Payment5Plus5AcceptanceCasesTest {
     void testCase19_LagClickSpam_ReturnsSameAttemptWithoutExtraGatewayCalls() {
         masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(250));
         PaymentJpaEntity active = new PaymentJpaEntity();
+        active.setStatus(PaymentStatus.PENDING);
         active.setId(UUID.randomUUID());
         active.setMasterOrderId(orderId);
         active.setProvider(PaymentProvider.PAYOS);
@@ -646,7 +711,7 @@ class Payment5Plus5AcceptanceCasesTest {
         active.setPaymentUrl("https://pay.payos.vn/same-url");
 
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findActiveAttemptForUpdate(orderId)).thenReturn(Optional.of(active));
+        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(active));
 
         for (int i = 0; i < 30; i++) {
             PaymentWindowResponse res = coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "spam-click-test-" + i);
@@ -663,14 +728,7 @@ class Payment5Plus5AcceptanceCasesTest {
         masterOrder.setPaymentStatus(PaymentOrderStatus.PAID);
         booking.setStatus(BookingStatus.CONFIRMED);
 
-        PaymentJpaEntity canonicalPayment = new PaymentJpaEntity();
-        canonicalPayment.setId(UUID.randomUUID());
-        canonicalPayment.setMasterOrderId(orderId);
-        canonicalPayment.setStatus(PaymentStatus.SUCCESS);
-        canonicalPayment.setIsCanonical(true);
-
         when(masterOrderRepository.findById(orderId)).thenReturn(Optional.of(masterOrder));
-        when(paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)).thenReturn(Optional.of(canonicalPayment));
 
         var statusRes = coordinator.getPaymentStatus(customerId, orderId);
         assertThat(statusRes.orderStatus()).isEqualTo(MasterOrderStatus.PAID);

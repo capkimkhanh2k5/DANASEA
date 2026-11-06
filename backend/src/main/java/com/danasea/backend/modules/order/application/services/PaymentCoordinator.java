@@ -3,6 +3,8 @@ package com.danasea.backend.modules.order.application.services;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -20,15 +22,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.danasea.backend.modules.booking.domain.exceptions.BookingHoldExpiredException;
 import com.danasea.backend.modules.booking.domain.exceptions.BookingNotFoundException;
-import com.danasea.backend.modules.booking.domain.models.BookingStatus;
 import com.danasea.backend.modules.booking.domain.models.InventoryLockItem;
 import com.danasea.backend.modules.booking.domain.ports.InventoryLockPort;
-import com.danasea.backend.modules.booking.infrastructure.persistence.entities.BookingItemJpaEntity;
 import com.danasea.backend.modules.booking.infrastructure.persistence.entities.BookingJpaEntity;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
 import com.danasea.backend.modules.order.application.OrderPaymentService;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
 import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
+import com.danasea.backend.modules.order.domain.exceptions.PaymentAttemptConflictException;
 import com.danasea.backend.modules.order.domain.exceptions.PaymentGatewayException;
 import com.danasea.backend.modules.order.domain.exceptions.UnauthorizedOrderAccessException;
 import com.danasea.backend.modules.order.domain.exceptions.WaiverAcceptanceRequiredException;
@@ -36,12 +37,10 @@ import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
 import com.danasea.backend.modules.order.domain.models.MissingWaiverItem;
 import com.danasea.backend.modules.order.domain.models.PaymentAttemptState;
 import com.danasea.backend.modules.order.domain.models.PaymentCancelStatus;
-import com.danasea.backend.modules.order.domain.models.PaymentOrderStatus;
 import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.models.PaymentStatus;
 import com.danasea.backend.modules.order.domain.models.SubOrder;
 import com.danasea.backend.modules.order.domain.ports.PaymentCancelResult;
-import com.danasea.backend.modules.order.domain.ports.PaymentCaptureResult;
 import com.danasea.backend.modules.order.domain.ports.PaymentGatewayPort;
 import com.danasea.backend.modules.order.domain.ports.PaymentIntentResult;
 import com.danasea.backend.modules.order.domain.ports.ServiceWaiverLookupPort;
@@ -84,6 +83,12 @@ public class PaymentCoordinator {
     private final LocalizedContentSelector localizedContentSelector;
     private final OrderPaymentService orderPaymentService;
     private DepartureCheckoutGuard departureCheckout;
+    private PaymentProviderAvailability providerAvailability;
+
+    @Autowired
+    public void setProviderAvailability(PaymentProviderAvailability providerAvailability) {
+        this.providerAvailability = providerAvailability;
+    }
 
     @Autowired
     public void setDepartureCheckout(DepartureCheckoutGuard departureCheckout) {
@@ -120,6 +125,7 @@ public class PaymentCoordinator {
      */
     public PaymentWindowResponse startPayment(UUID customerId, UUID orderId, PaymentProvider provider, String idempotencyKey) {
         validateInputs(customerId, orderId, provider, idempotencyKey);
+        requireEnabledProvider(provider);
 
         // Phase 1 (DB transaction): Khởi tạo hoặc tái sử dụng attempt, cố định payment_deadline
         PrepareResult prepareResult = Objects.requireNonNull(transaction.execute(status -> prepareAttempt(customerId, orderId, provider, idempotencyKey)));
@@ -141,35 +147,37 @@ public class PaymentCoordinator {
                     prepareResult.payment().getAmount(),
                     provider,
                     prepareResult.gatewayOrderCode(),
-                    fixedDeadline
+                    fixedDeadline,
+                    prepareResult.payment().getProviderOrderId()
             );
             if (gatewayResult == null || gatewayResult.paymentUrl() == null || gatewayResult.paymentUrl().isBlank()) {
                 throw new PaymentGatewayException("Gateway returned empty payment URL.");
             }
         } catch (Exception ex) {
-            log.error("Failed to create payment intent with provider {} for paymentId={}", provider, paymentId, ex);
-            transaction.executeWithoutResult(status -> {
-                paymentRepository.findByIdForUpdate(paymentId).ifPresent(p -> {
-                    p.setLastError(ex.getMessage());
-                    // Nếu là exception mạng hoặc timeout, giữ attempt ở CREATING với CANCEL_UNKNOWN
-                    // để không tạo attempt thứ 2 trùng lặp khi chưa kiểm chứng được trạng thái gateway
-                    if (ex instanceof java.net.SocketTimeoutException
-                            || ex instanceof java.util.concurrent.TimeoutException
-                            || (ex.getCause() instanceof java.net.SocketTimeoutException)) {
-                        p.setCancelStatus(PaymentCancelStatus.CANCEL_UNKNOWN);
-                    } else {
-                        p.setAttemptState(PaymentAttemptState.FAILED);
-                        p.setStatus(PaymentStatus.FAILED);
-                    }
-                    paymentRepository.save(p);
-                });
-            });
+            log.warn("Could not confirm creation of {} payment {}", provider, paymentId, ex);
+            transaction.executeWithoutResult(status -> paymentRepository.findByIdForUpdate(paymentId)
+                    .filter(payment -> payment.getStatus() == PaymentStatus.PENDING
+                            && payment.getAttemptState() == PaymentAttemptState.CREATING)
+                    .ifPresent(payment -> {
+                        payment.setLastError(ex.getMessage());
+                        if (ex instanceof InvalidOrderStateException || ex instanceof IllegalArgumentException
+                                || ex instanceof com.danasea.backend.modules.order.domain.exceptions.ExchangeRateUnavailableException) {
+                            payment.setStatus(PaymentStatus.FAILED);
+                            payment.setAttemptState(PaymentAttemptState.FAILED);
+                        } else {
+                            payment.setCancelStatus(PaymentCancelStatus.CANCEL_UNKNOWN);
+                        }
+                        paymentRepository.save(payment);
+                    }));
             throw (ex instanceof RuntimeException re) ? re : new PaymentGatewayException(ex.getMessage(), ex);
         }
 
         // Phase 3 (DB transaction): Kích hoạt attempt thành công
         PaymentJpaEntity activatedPayment = Objects.requireNonNull(transaction.execute(status -> activateAttempt(paymentId, gatewayResult, fixedDeadline)));
 
+        if (!Boolean.TRUE.equals(activatedPayment.getIsActive()) || !fixedDeadline.isAfter(OffsetDateTime.now())) {
+            throw PaymentAttemptConflictException.expiredWindow();
+        }
         return toPaymentWindowResponse(activatedPayment, fixedDeadline);
     }
 
@@ -179,69 +187,30 @@ public class PaymentCoordinator {
      */
     public PaymentWindowResponse switchProvider(UUID customerId, UUID orderId, PaymentProvider targetProvider, String idempotencyKey) {
         validateInputs(customerId, orderId, targetProvider, idempotencyKey);
+        requireEnabledProvider(targetProvider);
 
         // Bước 1: Khóa MasterOrder và kiểm tra attempt hiện tại
-        AttemptSwitchContext switchCtx = Objects.requireNonNull(transaction.execute(status -> prepareSwitchContext(customerId, orderId, targetProvider)));
-
-        if (switchCtx.sameProviderActive()) {
-            return toPaymentWindowResponse(switchCtx.activePayment(), switchCtx.deadline());
-        }
+        AttemptSwitchContext switchCtx = Objects.requireNonNull(transaction.execute(status -> prepareSwitchContext(customerId, orderId, targetProvider, idempotencyKey)));
 
         // Bước 2: Hủy server-side cổng cũ (ngoài DB transaction nếu có thể)
         if (switchCtx.hasActiveToCancel()) {
             PaymentJpaEntity oldPayment = switchCtx.activePayment();
             PaymentGatewayPort oldAdapter = gatewayRegistry.getAdapter(oldPayment.getProvider());
 
-            if (oldAdapter.canCancelServerSide(oldPayment.getProvider())) {
-                PaymentCancelResult cancelResult = oldAdapter.cancelPayment(
-                        oldPayment.getProvider(),
-                        oldPayment.getProviderOrderId(),
-                        "User switched provider to " + targetProvider
-                );
-
-                if (cancelResult.status() == PaymentCancelStatus.ALREADY_CAPTURED) {
-                    throw new InvalidOrderStateException("Previous payment on " + oldPayment.getProvider()
-                            + " has already been captured. Please wait for confirmation.");
-                }
-
-                if (!cancelResult.success() && cancelResult.status() == PaymentCancelStatus.CANCEL_UNKNOWN) {
-                    throw new InvalidOrderStateException("Unable to verify cancellation on " + oldPayment.getProvider()
-                            + " (" + cancelResult.message() + "). Please try switching again shortly.");
-                }
-
-                // Cập nhật kết quả hủy attempt cũ trong DB
-                transaction.executeWithoutResult(status -> {
-                    paymentRepository.findByIdForUpdate(oldPayment.getId()).ifPresent(p -> {
-                        p.setIsActive(false);
-                        p.setAttemptState(PaymentAttemptState.TERMINATED);
-                        p.setCanceledAt(OffsetDateTime.now());
-                        p.setCancelStatus(cancelResult.status());
-                        paymentRepository.save(p);
-                    });
-                });
-            } else {
-                // Provider không hỗ trợ hủy API (như VNPay) -> Kiểm tra xem attempt đã hết hiệu lực tự nhiên chưa
-                OffsetDateTime providerExpiresAt = oldPayment.getProviderExpiresAt();
-                boolean naturalExpired = providerExpiresAt != null && providerExpiresAt.isBefore(OffsetDateTime.now());
-
-                if (!naturalExpired) {
-                    // Nếu attempt chưa hết hạn và không thể hủy server-side: TỪ CHỐI CHUYỂN CỔNG AN TOÀN
-                    throw new InvalidOrderStateException("Cannot switch payment provider: " + oldPayment.getProvider()
-                            + " session is still active and cannot be canceled server-side. Please complete payment using "
-                            + oldPayment.getProvider() + " or wait until the session expires.");
-                }
-
-                // Đã hết hiệu lực tự nhiên an toàn -> cập nhật attempt cũ
-                transaction.executeWithoutResult(status -> {
-                    paymentRepository.findByIdForUpdate(oldPayment.getId()).ifPresent(p -> {
-                        p.setIsActive(false);
-                        p.setAttemptState(PaymentAttemptState.TERMINATED);
-                        p.setCanceledAt(OffsetDateTime.now());
-                        p.setCancelStatus(PaymentCancelStatus.CANCELED);
-                        paymentRepository.save(p);
-                    });
-                });
+            if (!oldAdapter.canCancelServerSide(oldPayment.getProvider())) {
+                throw new InvalidOrderStateException("The previous payment link cannot be canceled by DANASEA.");
             }
+            PaymentCancelResult cancellation = oldAdapter.cancelPayment(
+                    oldPayment.getProvider(), oldPayment.getProviderOrderId(), "User switched provider to " + targetProvider);
+            if (cancellation == null || !cancellation.success() || cancellation.status() != PaymentCancelStatus.CANCELED) {
+                throw new InvalidOrderStateException("The previous payment has not been verified as canceled. Check its status first.");
+            }
+            transaction.executeWithoutResult(status -> paymentRepository.findByIdForUpdate(oldPayment.getId())
+                    .filter(payment -> payment.getStatus() == PaymentStatus.PENDING && Boolean.TRUE.equals(payment.getIsActive()))
+                    .ifPresent(payment -> {
+                        markCanceled(payment);
+                        paymentRepository.save(payment);
+                    }));
         }
 
         // Bước 3: Tạo attempt mới cho targetProvider
@@ -270,18 +239,11 @@ public class PaymentCoordinator {
         }
 
         OffsetDateTime deadline = order.getPaymentDeadline();
-        long remainingSeconds = 0;
-        boolean isExpired = false;
-
-        if (deadline != null) {
-            remainingSeconds = Duration.between(OffsetDateTime.now(), deadline).toSeconds();
-            if (remainingSeconds < 0) {
-                remainingSeconds = 0;
-                isExpired = true;
-            }
-        }
-
-        PaymentJpaEntity activePayment = paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId).orElse(null);
+        OffsetDateTime now = OffsetDateTime.now();
+        long remainingSeconds = deadline == null ? 0 : Math.max(0, Duration.between(now, deadline).toSeconds());
+        boolean isExpired = deadline != null && !deadline.isAfter(now);
+        PaymentJpaEntity activePayment = isExpired || order.getStatus() != MasterOrderStatus.PENDING_PAYMENT
+                ? null : paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId).orElse(null);
 
         return new PaymentStatusResponse(
                 order.getId(),
@@ -299,82 +261,57 @@ public class PaymentCoordinator {
         );
     }
 
-    /**
-     * Quét các đơn hàng PENDING_PAYMENT đã vượt quá payment_deadline để đóng an toàn.
-     */
     @Scheduled(fixedDelay = 30000)
     public void sweepExpiredClosingOrders() {
         OffsetDateTime now = OffsetDateTime.now();
-        List<MasterOrderJpaEntity> candidates = masterOrderRepository.findAll().stream()
-                .filter(o -> o.getStatus() == MasterOrderStatus.PENDING_PAYMENT
-                        && o.getPaymentDeadline() != null
-                        && o.getPaymentDeadline().isBefore(now))
-                .toList();
-
-        for (MasterOrderJpaEntity order : candidates) {
+        var attempts = paymentRepository.findExpiredActiveAttempts(PaymentStatus.PENDING,
+                MasterOrderStatus.PENDING_PAYMENT, now);
+        for (PaymentJpaEntity attempt : attempts) {
             try {
-                processClosingOrder(order.getId());
-            } catch (Exception ex) {
-                log.error("Error sweeping expired order {}", order.getId(), ex);
+                closeExpiredAttempt(attempt);
+            } catch (RuntimeException ex) {
+                log.warn("Could not close expired payment {}", attempt.getId(), ex);
             }
         }
     }
 
-    private void processClosingOrder(UUID orderId) {
-        transaction.executeWithoutResult(status -> {
-            MasterOrderJpaEntity order = masterOrderRepository.findByIdForUpdate(orderId).orElse(null);
-            if (order == null || order.getStatus() != MasterOrderStatus.PENDING_PAYMENT) {
-                return;
-            }
-
-            var activeOpt = paymentRepository.findActiveAttemptForUpdate(orderId);
-            if (activeOpt.isPresent()) {
-                PaymentJpaEntity active = activeOpt.get();
-                PaymentGatewayPort adapter = gatewayRegistry.getAdapter(active.getProvider());
-
-                // Kiểm tra xem khách có kịp thanh toán sát giây cuối không
-                try {
-                    PaymentCaptureResult captureResult = adapter.queryPayment(
-                            active.getProvider(),
-                            active.getProviderOrderId(),
-                            active.getProviderTransactionDate()
-                    );
-                    if (captureResult != null && captureResult.success()) {
-                        log.info("Order {} captured at gateway {} right at deadline expiry.", orderId, active.getProvider());
-                        return; // Sẽ được webhook hoặc capture flow xử lý
-                    }
-                } catch (Exception ignored) {
+    private void closeExpiredAttempt(PaymentJpaEntity snapshot) {
+        PaymentCancelStatus outcome = PaymentCancelStatus.CANCEL_UNKNOWN;
+        if (gatewayRegistry.supports(snapshot.getProvider())) {
+            PaymentGatewayPort adapter = gatewayRegistry.getAdapter(snapshot.getProvider());
+            if (adapter.canCancelServerSide(snapshot.getProvider()) && snapshot.getProviderOrderId() != null) {
+                PaymentCancelResult cancellation = adapter.cancelPayment(
+                        snapshot.getProvider(), snapshot.getProviderOrderId(), "DANASEA deadline expired");
+                if (cancellation != null && cancellation.success() && cancellation.status() == PaymentCancelStatus.CANCELED) {
+                    outcome = PaymentCancelStatus.CANCELED;
+                } else if (cancellation != null && cancellation.status() == PaymentCancelStatus.ALREADY_CAPTURED) {
+                    outcome = PaymentCancelStatus.ALREADY_CAPTURED;
                 }
+            }
+        }
 
-                // Nếu chưa thanh toán, thực hiện hủy server-side nếu hỗ trợ
-                if (adapter.canCancelServerSide(active.getProvider())) {
-                    try {
-                        adapter.cancelPayment(active.getProvider(), active.getProviderOrderId(), "DANASEA deadline expired");
-                    } catch (Exception e) {
-                        log.warn("Failed to cancel provider order {} on expiry: {}", active.getProviderOrderId(), e.getMessage());
+        PaymentCancelStatus verifiedOutcome = outcome;
+        transaction.executeWithoutResult(status -> paymentRepository.findByIdForUpdate(snapshot.getId())
+                .filter(payment -> payment.getStatus() == PaymentStatus.PENDING && Boolean.TRUE.equals(payment.getIsActive()))
+                .ifPresent(payment -> {
+                    if (verifiedOutcome == PaymentCancelStatus.CANCELED) {
+                        markCanceled(payment);
+                    } else {
+                        payment.setIsActive(false);
+                        payment.setCancelStatus(verifiedOutcome);
+                        payment.setReconciliationNextAttemptAt(null);
                     }
-                }
+                    paymentRepository.save(payment);
+                }));
+        // BookingHoldCleanupJob owns inventory release and order cancellation after the hold grace.
+    }
 
-                active.setIsActive(false);
-                active.setAttemptState(PaymentAttemptState.TERMINATED);
-                active.setStatus(PaymentStatus.FAILED);
-                paymentRepository.save(active);
-            }
-
-            order.setStatus(MasterOrderStatus.CANCELLED);
-            masterOrderRepository.save(order);
-
-            // Giải phóng Redis inventory holds
-            if (order.getBookingId() != null) {
-                bookingRepository.findById(order.getBookingId()).ifPresent(booking -> {
-                    List<InventoryLockItem> lockItems = toLockItems(booking);
-                    inventoryLockPort.releaseHolds(booking.getId(), lockItems);
-                    booking.setStatus(BookingStatus.CANCELLED);
-                    bookingRepository.save(booking);
-                });
-            }
-            log.info("Expired order {} successfully swept and inventory released.", orderId);
-        });
+    private void markCanceled(PaymentJpaEntity payment) {
+        payment.setIsActive(false);
+        payment.setAttemptState(PaymentAttemptState.TERMINATED);
+        payment.setStatus(PaymentStatus.FAILED);
+        payment.setCancelStatus(PaymentCancelStatus.CANCELED);
+        payment.setCanceledAt(OffsetDateTime.now());
     }
 
     private PrepareResult prepareAttempt(UUID customerId, UUID orderId, PaymentProvider provider, String idempotencyKey) {
@@ -385,6 +322,10 @@ public class PaymentCoordinator {
             throw new UnauthorizedOrderAccessException(orderId, customerId);
         }
 
+        if (order.getStatus() == MasterOrderStatus.CANCELLED
+                && order.getPaymentDeadline() != null && !order.getPaymentDeadline().isAfter(OffsetDateTime.now())) {
+            throw PaymentAttemptConflictException.expiredWindow();
+        }
         if (order.getStatus() != MasterOrderStatus.PENDING_PAYMENT) {
             throw new InvalidOrderStateException("Payment can only be initiated for orders in PENDING_PAYMENT status; current: " + order.getStatus());
         }
@@ -404,96 +345,72 @@ public class PaymentCoordinator {
 
         OffsetDateTime now = OffsetDateTime.now();
         OffsetDateTime fixedDeadline = order.getPaymentDeadline();
-
-        if (fixedDeadline == null) {
-            // Lần đầu tiên kích hoạt PAYMENT: kiểm tra HOLD còn hạn và cố định deadline 300s
-            if (order.getBookingId() != null) {
-                BookingJpaEntity booking = bookingRepository.findById(order.getBookingId())
-                        .orElseThrow(() -> new BookingNotFoundException(order.getBookingId()));
-
-                if (booking.getHoldExpiresAt() != null && now.isAfter(booking.getHoldExpiresAt())) {
-                    throw new BookingHoldExpiredException(order.getBookingId());
-                }
-
-                // Gia hạn Redis Hold thêm 420 giây (300s payment + 120s grace)
-                List<InventoryLockItem> lockItems = toLockItems(booking);
-                inventoryLockPort.extendHolds(booking.getId(), lockItems, Duration.ofSeconds(PAYMENT_WINDOW_SECONDS + REDIS_PAYMENT_GRACE_SECONDS));
-            }
-
-            fixedDeadline = now.plusSeconds(PAYMENT_WINDOW_SECONDS);
-            order.setPaymentDeadline(fixedDeadline);
-            masterOrderRepository.save(order);
-        } else {
-            // Các lần gọi sau: DEADLINE KHÔNG THAY ĐỔI
-            if (now.isAfter(fixedDeadline)) {
-                throw new InvalidOrderStateException("The payment deadline has expired.");
-            }
+        if (fixedDeadline != null && !fixedDeadline.isAfter(now)) {
+            throw PaymentAttemptConflictException.expiredWindow();
         }
 
-        // Kiểm tra active attempt hiện tại
-        var activeOpt = paymentRepository.findActiveAttemptForUpdate(orderId);
+        PaymentJpaEntity previous = paymentRepository.findByMasterOrderIdAndIdempotencyKey(orderId, idempotencyKey.trim())
+                .orElse(null);
+        if (previous != null && (previous.getProvider() != provider || previous.getStatus() != PaymentStatus.PENDING)) {
+            throw PaymentAttemptConflictException.closedAttempt();
+        }
+
+        var activeOpt = paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId);
         if (activeOpt.isPresent()) {
             PaymentJpaEntity active = activeOpt.get();
-            if (active.getProvider() == provider && active.getAttemptState() == PaymentAttemptState.PENDING) {
-                return new PrepareResult(active, fixedDeadline, true, active.getPayosOrderCode());
-            }
             if (active.getProvider() != provider) {
                 throw new InvalidOrderStateException("An active payment attempt exists for provider "
                         + active.getProvider() + ". Use switch-provider to change gateways.");
             }
+            if (active.getStatus() == PaymentStatus.PENDING && active.getAttemptState() == PaymentAttemptState.PENDING
+                    && active.getPaymentUrl() != null && !active.getPaymentUrl().isBlank()
+                    && fixedDeadline != null && (active.getExpiresAt() == null || active.getExpiresAt().isAfter(now))) {
+                return new PrepareResult(active, fixedDeadline, true, active.getPayosOrderCode());
+            }
+            throw new InvalidOrderStateException("The previous payment is awaiting verification.");
         }
 
-        // Kiểm tra in-flight attempt đang tạo
         var inFlight = paymentRepository.findInFlightAttempts(orderId, List.of(PaymentAttemptState.CREATING));
         if (!inFlight.isEmpty()) {
-            PaymentJpaEntity pendingCreation = inFlight.get(0);
-            if (pendingCreation.getCancelStatus() == PaymentCancelStatus.CANCEL_UNKNOWN) {
-                // BUG-PAY-01 Recovery: Gateway timeout trước đó để lại attempt ở trạng thái CREATING + CANCEL_UNKNOWN
-                PaymentGatewayPort adapter = gatewayRegistry.getAdapter(pendingCreation.getProvider());
-                String queryRef = (pendingCreation.getProvider() == PaymentProvider.PAYOS && pendingCreation.getPayosOrderCode() != null)
-                        ? String.valueOf(pendingCreation.getPayosOrderCode())
-                        : pendingCreation.getProviderOrderId();
-                boolean resolved = false;
-                if (queryRef != null && !queryRef.isBlank()) {
-                    try {
-                        PaymentCaptureResult query = adapter.queryPayment(pendingCreation.getProvider(), queryRef, null);
-                        if (query != null && (query.success() || "PENDING".equalsIgnoreCase(query.status()))) {
-                            // Cổng đã tạo thành công giao dịch! Khôi phục và tái sử dụng attempt
-                            pendingCreation.setAttemptState(PaymentAttemptState.PENDING);
-                            pendingCreation.setIsActive(true);
-                            pendingCreation.setCancelStatus(PaymentCancelStatus.NONE);
-                            if (query.captureId() != null && pendingCreation.getPaymentUrl() == null) {
-                                pendingCreation.setPaymentUrl(query.captureId());
-                            }
-                            paymentRepository.save(pendingCreation);
-                            return new PrepareResult(pendingCreation, fixedDeadline, true, pendingCreation.getPayosOrderCode());
-                        } else if (query != null && ("FAILED".equalsIgnoreCase(query.status()) || "CANCELLED".equalsIgnoreCase(query.status()))) {
-                            pendingCreation.setAttemptState(PaymentAttemptState.TERMINATED);
-                            pendingCreation.setCancelStatus(PaymentCancelStatus.CANCELED);
-                            pendingCreation.setStatus(PaymentStatus.FAILED);
-                            paymentRepository.save(pendingCreation);
-                            resolved = true;
-                        }
-                    } catch (Exception qEx) {
-                        log.warn("Recovery query for timed out attempt {} failed: {}", pendingCreation.getId(), qEx.getMessage());
-                    }
-                } else {
-                    // Chưa có provider reference nghĩa là network timeout xảy ra trước khi request tới gateway
-                    pendingCreation.setAttemptState(PaymentAttemptState.TERMINATED);
-                    pendingCreation.setCancelStatus(PaymentCancelStatus.CANCELED);
-                    pendingCreation.setStatus(PaymentStatus.FAILED);
-                    paymentRepository.save(pendingCreation);
-                    resolved = true;
-                }
-                if (!resolved) {
-                    throw new InvalidOrderStateException("Previous payment request timed out and provider verification is pending. Please retry in a few moments.");
-                }
-            } else {
-                throw new InvalidOrderStateException("A payment link is currently being generated. Please wait a moment.");
+            PaymentJpaEntity pendingCreation = inFlight.getFirst();
+            if (previous != null && previous.getId().equals(pendingCreation.getId()) && fixedDeadline != null
+                    && pendingCreation.getCancelStatus() == PaymentCancelStatus.CANCEL_UNKNOWN
+                    && (provider == PaymentProvider.PAYPAL || provider == PaymentProvider.VNPAY)) {
+                // Both adapters reuse the persisted payment ID as the gateway idempotency key/reference.
+                pendingCreation.setCancelStatus(PaymentCancelStatus.NONE);
+                paymentRepository.save(pendingCreation);
+                return new PrepareResult(pendingCreation, fixedDeadline, false, null);
             }
+            throw new InvalidOrderStateException("A payment link is being generated or awaiting verification.");
+        }
+        if (paymentRepository.existsByMasterOrderIdAndStatus(orderId, PaymentStatus.PENDING)) {
+            throw new InvalidOrderStateException("A previous payment is still awaiting verification.");
         }
 
-        int nextAttemptNumber = paymentRepository.findMaxAttemptNumberByMasterOrderId(orderId) + 1;
+        int previousAttempts = paymentRepository.findMaxAttemptNumberByMasterOrderId(orderId);
+        // A new order initially stores its booking hold deadline. The first payment opens a separate window.
+        if (previousAttempts == 0 || fixedDeadline == null) {
+            fixedDeadline = now.plusSeconds(PAYMENT_WINDOW_SECONDS);
+            if (order.getBookingId() != null) {
+                BookingJpaEntity booking = bookingRepository.findById(order.getBookingId())
+                        .orElseThrow(() -> new BookingNotFoundException(order.getBookingId()));
+                if (booking.getHoldExpiresAt() != null && !booking.getHoldExpiresAt().isAfter(now)) {
+                    throw new BookingHoldExpiredException(order.getBookingId());
+                }
+
+                List<InventoryLockItem> lockItems = toLockItems(booking);
+                if (!inventoryLockPort.extendHolds(booking.getId(), lockItems,
+                        Duration.ofSeconds(PAYMENT_WINDOW_SECONDS + REDIS_PAYMENT_GRACE_SECONDS))) {
+                    throw new BookingHoldExpiredException(booking.getId());
+                }
+                booking.setHoldExpiresAt(fixedDeadline.plusSeconds(REDIS_PAYMENT_GRACE_SECONDS));
+                bookingRepository.save(booking);
+            }
+            order.setPaymentDeadline(fixedDeadline);
+            masterOrderRepository.save(order);
+        }
+
+        int nextAttemptNumber = previousAttempts + 1;
         Long gatewayOrderCode = (provider == PaymentProvider.PAYOS || provider == PaymentProvider.ZALOPAY)
                 ? paymentRepository.getNextPayOSOrderCode()
                 : null;
@@ -509,7 +426,18 @@ public class PaymentCoordinator {
         payment.setIsCanonical(false);
         payment.setDanaseaDeadlineAt(fixedDeadline);
         payment.setIdempotencyKey(idempotencyKey.trim());
-        payment.setPayosOrderCode(provider == PaymentProvider.PAYOS ? gatewayOrderCode : null);
+        if (provider == PaymentProvider.PAYOS) {
+            payment.setPayosOrderCode(gatewayOrderCode);
+            payment.setProviderOrderId(String.valueOf(gatewayOrderCode));
+        } else if (provider == PaymentProvider.ZALOPAY) {
+            String merchantDate = now.atZoneSameInstant(ZoneId.of("Asia/Ho_Chi_Minh"))
+                    .format(DateTimeFormatter.ofPattern("yyMMdd"));
+            payment.setProviderOrderId(merchantDate + "_" + gatewayOrderCode);
+        }
+        if (provider != PaymentProvider.PAYPAL) {
+            payment.setProviderAmount(payment.getAmount());
+            payment.setProviderCurrency("VND");
+        }
         payment.setExpiresAt(fixedDeadline);
 
         payment = paymentRepository.save(payment);
@@ -520,11 +448,25 @@ public class PaymentCoordinator {
         PaymentJpaEntity payment = paymentRepository.findByIdForUpdate(paymentId)
                 .orElseThrow(() -> new InvalidOrderStateException("Payment record not found: " + paymentId));
 
+        if (payment.getStatus() != PaymentStatus.PENDING || payment.getAttemptState() != PaymentAttemptState.CREATING) {
+            return payment;
+        }
+        MasterOrderJpaEntity order = masterOrderRepository.findByIdForUpdate(payment.getMasterOrderId())
+                .orElseThrow(() -> new OrderNotFoundException(payment.getMasterOrderId()));
         payment.setPaymentUrl(result.paymentUrl());
         payment.setQrCodeUrl(result.qrCodeUrl());
-        payment.setProviderOrderId(result.providerOrderId());
-        payment.setProviderAmount(result.providerAmount());
-        payment.setProviderCurrency(result.providerCurrency());
+        if (result.providerOrderId() != null) {
+            payment.setProviderOrderId(result.providerOrderId());
+        }
+        if (result.providerAmount() != null) {
+            payment.setProviderAmount(result.providerAmount());
+        }
+        if (result.providerCurrency() != null) {
+            payment.setProviderCurrency(result.providerCurrency());
+        }
+        payment.setExchangeRate(result.exchangeRate());
+        payment.setExchangeRateDate(result.exchangeRateDate());
+        payment.setExchangeRateSource(result.exchangeRateSource());
         payment.setProviderTransactionDate(result.providerTransactionDate());
 
         OffsetDateTime providerExpiresAt = result.expiresAt();
@@ -538,12 +480,14 @@ public class PaymentCoordinator {
         }
 
         payment.setAttemptState(PaymentAttemptState.PENDING);
-        payment.setIsActive(true);
+        payment.setLastError(null);
+        payment.setIsActive(order.getStatus() == MasterOrderStatus.PENDING_PAYMENT
+                && fixedDeadline.isAfter(OffsetDateTime.now()));
 
         return paymentRepository.save(payment);
     }
 
-    private AttemptSwitchContext prepareSwitchContext(UUID customerId, UUID orderId, PaymentProvider targetProvider) {
+    private AttemptSwitchContext prepareSwitchContext(UUID customerId, UUID orderId, PaymentProvider targetProvider, String idempotencyKey) {
         MasterOrderJpaEntity order = masterOrderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
 
@@ -557,7 +501,7 @@ public class PaymentCoordinator {
 
         OffsetDateTime deadline = order.getPaymentDeadline();
         if (deadline == null || OffsetDateTime.now().isAfter(deadline)) {
-            throw new InvalidOrderStateException("The payment deadline has expired.");
+            throw PaymentAttemptConflictException.expiredWindow();
         }
 
         long remainingSeconds = Duration.between(OffsetDateTime.now(), deadline).toSeconds();
@@ -565,13 +509,19 @@ public class PaymentCoordinator {
             throw new InvalidOrderStateException("Insufficient time remaining (" + remainingSeconds + "s) to switch payment provider.");
         }
 
-        PaymentJpaEntity activePayment = paymentRepository.findActiveAttemptForUpdate(orderId).orElse(null);
-
-        if (activePayment != null && activePayment.getProvider() == targetProvider) {
-            return new AttemptSwitchContext(activePayment, deadline, true, false);
+        PaymentJpaEntity previous = paymentRepository.findByMasterOrderIdAndIdempotencyKey(orderId, idempotencyKey.trim())
+                .orElse(null);
+        if (previous != null && (previous.getProvider() != targetProvider || previous.getStatus() != PaymentStatus.PENDING)) {
+            throw PaymentAttemptConflictException.closedAttempt();
         }
+        PaymentJpaEntity activePayment = paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId).orElse(null);
+        return new AttemptSwitchContext(activePayment, activePayment != null && activePayment.getProvider() != targetProvider);
+    }
 
-        return new AttemptSwitchContext(activePayment, deadline, false, activePayment != null);
+    private void requireEnabledProvider(PaymentProvider provider) {
+        if (providerAvailability != null && !providerAvailability.isEnabled(provider)) {
+            throw new InvalidOrderStateException("The selected payment provider is unavailable.");
+        }
     }
 
     private void validateInputs(UUID customerId, UUID orderId, PaymentProvider provider, String idempotencyKey) {
@@ -626,5 +576,5 @@ public class PaymentCoordinator {
     }
 
     private record PrepareResult(PaymentJpaEntity payment, OffsetDateTime deadline, boolean isReused, Long gatewayOrderCode) {}
-    private record AttemptSwitchContext(PaymentJpaEntity activePayment, OffsetDateTime deadline, boolean sameProviderActive, boolean hasActiveToCancel) {}
+    private record AttemptSwitchContext(PaymentJpaEntity activePayment, boolean hasActiveToCancel) {}
 }
