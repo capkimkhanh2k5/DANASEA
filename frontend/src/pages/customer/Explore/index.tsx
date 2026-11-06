@@ -12,6 +12,7 @@ import type { ServiceSummaryDto } from '../../../types/service';
 import {
   getHeroImageUrl,
   getCardThumbnailUrl,
+  FALLBACK_HERO_IMAGE,
   FALLBACK_CARD_IMAGE,
 } from '../../../utils/imageOptimizer';
 import { Star, ArrowRight, ChevronLeft, ChevronRight, MapPin, Clock } from 'lucide-react';
@@ -396,105 +397,108 @@ export function Explore() {
 
       {/* 1. Cinematic Split Hero Carousel */}
       <section
-        className="relative w-full overflow-hidden min-h-[560px] sm:min-h-[620px] lg:min-h-[660px] flex items-center justify-center bg-slate-950 mb-16"
+        className="relative w-full overflow-hidden min-h-[560px] sm:min-h-[620px] lg:min-h-[680px] max-h-[740px] flex flex-col justify-end mb-14 select-none"
         onMouseEnter={() => setIsHeroPaused(true)}
         onMouseLeave={() => setIsHeroPaused(false)}
       >
-        {/* Full-bleed Dynamic Background Image */}
-        {heroSpots.map((spot, idx) => (
-          <div
-            key={spot.id}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-              idx === activeHeroIndex ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
-          >
-            <img
-              src={spot.imageUrl}
-              alt={spot.name}
-              className="w-full h-full object-cover transform scale-105 transition-transform duration-10000 ease-out"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/75 to-slate-950/40" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-slate-950/40" />
-          </div>
-        ))}
+        <div className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden">
+          {heroSpots.map((spot, idx) => {
+            const isCurrent = activeHeroIndex === idx;
+            return (
+              <div
+                key={spot.id}
+                className={`absolute inset-0 w-full h-full transition-opacity duration-700 ease-in-out ${
+                  isCurrent ? 'opacity-100 z-1' : 'opacity-0 z-0 pointer-events-none'
+                }`}
+              >
+                <img
+                  src={getHeroImageUrl(spot.bgImageUrl || spot.imageUrl)}
+                  alt={spot.name}
+                  loading={idx === 0 ? 'eager' : 'lazy'}
+                  decoding="async"
+                  onError={(e) => {
+                    e.currentTarget.src = FALLBACK_HERO_IMAGE;
+                  }}
+                  className={`w-full h-full object-cover object-center transition-transform duration-[7000ms] ease-out ${
+                    isCurrent ? 'scale-[1.02]' : 'scale-100'
+                  }`}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/50 to-slate-950/30" />
+              </div>
+            );
+          })}
+        </div>
 
         {/* Hero Content */}
-        <div className="relative z-10 w-full max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-            {/* Left Column: Big Editorial Focus */}
-            <div className="lg:col-span-7 flex flex-col items-start text-white space-y-4 sm:space-y-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-500/20 border border-sky-400/40 backdrop-blur-md text-sky-200 text-xs sm:text-sm font-semibold">
-                <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-                <span>{language === 'en' ? 'Signature Marine Journey' : 'Hải Trình Biển Nổi Bật'}</span>
+        <div className="relative z-10 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-8 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-end">
+          {/* Left Column: Title & Metadata */}
+          <div className="lg:col-span-5 flex flex-col justify-end text-white pb-2 lg:pb-3 animate-fadeInUp">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight mb-3 drop-shadow-[0_2px_12px_rgba(0,0,0,0.9)]">
+              {language === 'en' ? currentHero.nameEn : currentHero.name}
+            </h1>
+
+            <p className="text-sm sm:text-base text-slate-200 leading-relaxed font-medium mb-3 max-w-xl line-clamp-2 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">
+              {language === 'en' ? currentHero.shortDescEn : currentHero.shortDesc}
+            </p>
+
+            <div className="flex items-center gap-2.5 mb-6 flex-wrap drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
+              <div className="flex items-center gap-1">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400 shrink-0" />
+                ))}
               </div>
-
-              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.15]">
-                {language === 'en' ? currentHero.nameEn : currentHero.name}
-              </h1>
-
-              <p className="text-base sm:text-lg text-slate-200 max-w-xl font-normal leading-relaxed">
-                {language === 'en' ? currentHero.shortDescEn : currentHero.shortDesc}
-              </p>
-
-              <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
-                <div className="flex items-center gap-1.5 font-bold text-amber-300">
-                  <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                  <span>{currentHero.rating.toFixed(1)}</span>
-                  <span className="text-slate-400 font-normal">({currentHero.reviewCount} đánh giá)</span>
-                </div>
-                <span>•</span>
-                <div className="flex items-center gap-1">
-                  <MapPin className="w-4 h-4 text-sky-400" />
-                  <span>{language === 'en' ? currentHero.locationEn : currentHero.location}</span>
-                </div>
-                <span>•</span>
-                <span className="font-bold text-white text-base">{currentHero.price}</span>
-              </div>
-
-              <div className="pt-2 flex flex-wrap items-center gap-4">
-                <Link
-                  to={currentHero.link || `/search?category=${currentHero.searchFilter}`}
-                  className="px-6 py-3.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm transition-all flex items-center gap-2 shadow-lg shadow-sky-600/30 hover:scale-105 active:scale-95 cursor-pointer"
-                >
-                  <span>{language === 'en' ? 'Book Experience Now' : 'Đặt trải nghiệm ngay'}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-
-                <Link
-                  to="/search"
-                  className="px-6 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition-colors border border-white/20 backdrop-blur-md cursor-pointer"
-                >
-                  {language === 'en' ? 'Browse Catalog' : 'Xem toàn bộ tour'}
-                </Link>
-              </div>
+              <span className="font-extrabold text-white text-[13px]">{currentHero.rating.toFixed(1)}</span>
+              <span className="text-white/90 text-[13px]">({currentHero.reviewCount} {language === 'en' ? 'reviews' : 'đánh giá'})</span>
+              <span className="text-white/70 text-[13px]">•</span>
+              <span className="text-sky-300 text-[13px] font-semibold">{language === 'en' ? currentHero.locationEn : currentHero.location}</span>
+              <span className="text-white/70 text-[13px]">•</span>
+              <span className="text-amber-300 font-extrabold text-[14px]">{currentHero.price}</span>
             </div>
 
-            {/* Right Column: Hero Spotlight Cards */}
-            <div className="lg:col-span-5 grid grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <Link
+                to={currentHero.link || `/search?category=${currentHero.searchFilter}`}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm transition-all w-fit active:scale-95 cursor-pointer shadow-md shadow-sky-950/20"
+              >
+                <span>{language === 'en' ? 'Explore This Experience' : 'Khám phá trải nghiệm này'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Right Column: 4-Card Horizontal Row */}
+          <div
+            className="lg:col-span-7 flex flex-col justify-end pb-1"
+            onMouseEnter={() => setIsHeroPaused(true)}
+            onMouseLeave={() => setIsHeroPaused(false)}
+          >
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               {heroSpots.map((spot, idx) => {
-                const isActive = idx === activeHeroIndex;
+                const isActive = activeHeroIndex === idx;
+
                 return (
                   <div
                     key={spot.id}
                     onClick={() => setActiveHeroIndex(idx)}
-                    className={`group relative p-3 sm:p-4 rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 border backdrop-blur-md text-left ${
+                    className={`rounded-2xl p-3 sm:p-3.5 transition-all duration-300 ease-out cursor-pointer flex flex-col justify-between backdrop-blur-md ${
                       isActive
-                        ? 'bg-white/20 border-sky-400 shadow-xl ring-2 ring-sky-400/50 scale-[1.02]'
-                        : 'bg-white/10 border-white/15 hover:bg-white/15 hover:border-white/30 opacity-75 hover:opacity-100'
+                        ? 'scale-105 z-10 bg-black/60 border border-sky-400/90 shadow-2xl opacity-100 -translate-y-1'
+                        : 'scale-100 opacity-75 hover:opacity-100 hover:scale-[1.02] bg-black/35 hover:bg-black/50 border border-white/15 hover:border-white/30 shadow-md'
                     }`}
                   >
-                    <div className="relative z-10 flex flex-col justify-between h-full">
-                      <div className="aspect-[16/10] rounded-xl overflow-hidden mb-2.5 bg-slate-900/60">
+                    <div>
+                      <div className="relative w-full h-24 sm:h-28 md:h-32 rounded-xl overflow-hidden mb-2.5 bg-white/5">
                         <img
-                          src={spot.imageUrl}
+                          src={getCardThumbnailUrl(spot.imageUrl)}
                           alt={spot.name}
+                          loading="lazy"
                           onError={(e) => {
                             e.currentTarget.src = FALLBACK_CARD_IMAGE;
                           }}
                           className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                         />
                       </div>
-                      <h4 className="text-sm sm:text-base font-bold text-white line-clamp-2 leading-snug">
+                      <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-2 leading-snug">
                         {language === 'en' ? spot.nameEn : spot.name}
                       </h4>
                     </div>
