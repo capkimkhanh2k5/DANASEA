@@ -12,6 +12,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
@@ -77,9 +79,27 @@ class RefundProcessingServiceTest {
                 status.name(), status, refund.getProviderCurrency());
     }
 
+    @ParameterizedTest
+    @EnumSource(value = PaymentProvider.class, names = {"PAYPAL", "VNPAY", "PAYOS", "ZALOPAY"})
+    void newRefundWaitsForAnAdministratorWithoutSendingMoney(PaymentProvider provider) {
+        payment.setProvider(provider);
+        if (provider != PaymentProvider.PAYPAL) {
+            payment.setProviderCurrency("VND");
+            payment.setProviderAmount(payment.getAmount());
+        }
+        assertThat(service.processRefund(refund.getId())).isFalse();
+        assertThat(refund.getStatus()).isEqualTo(RefundStatus.PENDING);
+        assertThat(refund.getLastError()).isEqualTo(RefundProcessingService.MANUAL_REVIEW_REQUIRED);
+        assertThat(refund.getGatewayRequestedAt()).isNull();
+        assertThat(refund.getProviderAmount()).isEqualByComparingTo(payment.getProviderAmount());
+        assertThat(refund.getProviderCurrency()).isEqualTo(payment.getProviderCurrency());
+        verifyNoInteractions(gateway);
+    }
+
     @Test
     void completedRefundUpdatesAllStatesOnce() {
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> result(GatewayRefundStatus.COMPLETED));
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> result(GatewayRefundStatus.COMPLETED));
         assertThat(service.processRefund(refund.getId())).isTrue();
         assertThat(refund.getStatus()).isEqualTo(RefundStatus.PROCESSED);
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
@@ -88,14 +108,70 @@ class RefundProcessingServiceTest {
         assertThat(booking.getStatus()).isEqualTo(BookingStatus.CANCELLED);
         assertThat(refund.getGatewayRequestId()).isNotEqualTo(refund.getIdempotencyKey());
         assertThat(service.processRefund(refund.getId())).isTrue();
-        verify(gateway, times(1)).requestRefund(any(GatewayRefundRequest.class));
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
         verify(slots, times(1)).decrementBookedCount(sub.getSlotId(), 2);
     }
 
     @Test
+    void completedDuplicateCaptureRefundUpdatesOnlyTheExtraPayment() {
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
+        order.setPaymentStatus(PaymentOrderStatus.PAID);
+        refund.setSubOrderId(null);
+        refund.setPaymentId(payment.getId());
+        refund.setReason(RefundReason.SYSTEM_FAULT);
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> {
+            GatewayRefundRequest request = inv.getArgument(0);
+            assertThat(request.fullRefund()).isTrue();
+            assertThat(request.amount()).isEqualByComparingTo("19.31");
+            assertThat(request.transactionId()).isEqualTo("CAPTURE-ORIGINAL");
+            return result(GatewayRefundStatus.COMPLETED);
+        });
+
+        assertThat(service.processRefund(refund.getId())).isTrue();
+        assertThat(service.processRefund(refund.getId())).isTrue();
+        assertThat(refund.getStatus()).isEqualTo(RefundStatus.PROCESSED);
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(order.getStatus()).isEqualTo(MasterOrderStatus.PAID);
+        assertThat(order.getPaymentStatus()).isEqualTo(PaymentOrderStatus.PAID);
+        assertThat(sub.getStatus()).isEqualTo(SubOrderStatus.CONFIRMED);
+        assertThat(booking.getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        verifyNoInteractions(slots);
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
+    }
+
+    @Test
+    void refundAllocationIgnoresOtherAttemptsAndCountsLegacySubOrderRefunds() {
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
+        refund.setPaymentId(payment.getId());
+        refund.setAmount(new BigDecimal("400000"));
+        RefundJpaEntity otherAttempt = new RefundJpaEntity();
+        otherAttempt.setId(UUID.randomUUID());
+        otherAttempt.setPaymentId(UUID.randomUUID());
+        otherAttempt.setStatus(RefundStatus.PROCESSED);
+        otherAttempt.setAmount(new BigDecimal("500000"));
+        RefundJpaEntity legacy = new RefundJpaEntity();
+        legacy.setId(UUID.randomUUID());
+        legacy.setStatus(RefundStatus.PROCESSED);
+        legacy.setAmount(new BigDecimal("100000"));
+        legacy.setProviderAmount(new BigDecimal("3.86"));
+        when(refunds.findBySubOrderIdIn(List.of(sub.getId()))).thenReturn(List.of(otherAttempt, legacy));
+        when(refunds.findBySubOrderIdInAndStatus(List.of(sub.getId()), RefundStatus.PROCESSED))
+                .thenReturn(List.of(refund, otherAttempt, legacy));
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> {
+            GatewayRefundRequest request = inv.getArgument(0);
+            assertThat(request.amount()).isEqualByComparingTo("15.45");
+            return result(GatewayRefundStatus.COMPLETED);
+        });
+
+        assertThat(service.processRefund(refund.getId())).isTrue();
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+    }
+
+    @Test
     void completedAllocatedRefundReleasesTheBookingItemOnce() {
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
         sub.setBookingItemId(UUID.randomUUID());
-        when(gateway.requestRefund(any(GatewayRefundRequest.class)))
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any()))
                 .thenAnswer(inv -> result(GatewayRefundStatus.COMPLETED));
         assertThat(service.processRefund(refund.getId())).isTrue();
         assertThat(service.processRefund(refund.getId())).isTrue();
@@ -105,7 +181,8 @@ class RefundProcessingServiceTest {
 
     @Test
     void gatewayPendingRemainsPendingAndReconcilesUsingTheSameOperation() {
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> result(GatewayRefundStatus.PENDING));
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> result(GatewayRefundStatus.PENDING));
         assertThat(service.processRefund(refund.getId())).isFalse();
         String operation = refund.getGatewayRequestId();
         assertThat(refund.getProviderRefundId()).isEqualTo("REFUND-ORIGINAL");
@@ -118,13 +195,14 @@ class RefundProcessingServiceTest {
             return result(GatewayRefundStatus.COMPLETED);
         });
         assertThat(service.processRefund(refund.getId())).isTrue();
-        verify(gateway, times(1)).requestRefund(any(GatewayRefundRequest.class));
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
         verify(gateway).queryRefund(any(GatewayRefundRequest.class), eq("REFUND-ORIGINAL"));
     }
 
     @Test
     void queryFailureNeverResendsOrLosesTheTimeoutMarker() {
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenThrow(new PaymentGatewayException("Read timeout"));
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenThrow(new PaymentGatewayException("Read timeout"));
         assertThat(service.processRefund(refund.getId())).isFalse();
         when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenThrow(new PaymentGatewayException("Lookup unavailable"));
         for (int i = 0; i < 6; i++) {
@@ -134,8 +212,8 @@ class RefundProcessingServiceTest {
         assertThat(refund.getLastError()).contains("GATEWAY_TIMEOUT_AWAITING_VERIFICATION");
         assertThat(refund.getRetryCount()).isZero();
         assertThat(refund.getNextAttemptAt()).isAfter(OffsetDateTime.now());
-        verify(gateway, times(1)).requestRefund(any(GatewayRefundRequest.class));
-        verify(gateway, times(6)).queryRefund(any(GatewayRefundRequest.class), any());
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
+        verify(gateway, times(7)).queryRefund(any(GatewayRefundRequest.class), any());
     }
 
     @Test
@@ -152,7 +230,8 @@ class RefundProcessingServiceTest {
 
     @Test
     void definitiveProviderFailureDoesNotBecomeProcessed() {
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> result(GatewayRefundStatus.FAILED));
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> result(GatewayRefundStatus.FAILED));
         assertThat(service.processRefund(refund.getId())).isFalse();
         assertThat(refund.getStatus()).isEqualTo(RefundStatus.FAILED);
         assertThat(sub.getStatus()).isEqualTo(SubOrderStatus.CONFIRMED);
@@ -161,7 +240,8 @@ class RefundProcessingServiceTest {
 
     @Test
     void mismatchedProviderMoneyRemainsPendingForReview() {
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenReturn(
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenReturn(
                 new RefundResult(true, "REFUND-WRONG", new BigDecimal("0.01"), "Completed", GatewayRefundStatus.COMPLETED, "EUR"));
         assertThat(service.processRefund(refund.getId())).isFalse();
         assertThat(refund.getStatus()).isEqualTo(RefundStatus.PENDING);
@@ -171,8 +251,9 @@ class RefundProcessingServiceTest {
 
     @Test
     void partialRefundUsesStoredExchangeSnapshotWithoutOneDollarMinimum() {
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
         refund.setAmount(new BigDecimal("1000")); refund.setRefundPercentage(new BigDecimal("0.2"));
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> {
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> {
             GatewayRefundRequest request = inv.getArgument(0);
             assertThat(request.amount()).isEqualByComparingTo("0.04");
             assertThat(request.currency()).isEqualTo("USD");
@@ -186,9 +267,10 @@ class RefundProcessingServiceTest {
 
     @Test
     void vnPayUsesOriginalReferenceDateAndSeparatelyPersistedRequestId() {
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
         payment.setProvider(PaymentProvider.VNPAY); payment.setProviderAmount(payment.getAmount()); payment.setProviderCurrency("VND");
         payment.setProviderTransactionDate("20261005123045");
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> {
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> {
             GatewayRefundRequest request = inv.getArgument(0);
             assertThat(request.orderId()).isEqualTo("ORDER-ORIGINAL");
             assertThat(request.transactionDate()).isEqualTo("20261005123045");
@@ -220,15 +302,17 @@ class RefundProcessingServiceTest {
 
     @Test
     void refundDoesNotReleaseInventoryTwiceAfterCancellation() {
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
         sub.setStatus(SubOrderStatus.CANCELLED);
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> result(GatewayRefundStatus.COMPLETED));
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> result(GatewayRefundStatus.COMPLETED));
         assertThat(service.processRefund(refund.getId())).isTrue();
         verifyNoInteractions(slots);
     }
 
     @Test
     void verifiedRefundNotificationQueriesTheProviderAndIsIdempotent() {
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> result(GatewayRefundStatus.PENDING));
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> result(GatewayRefundStatus.PENDING));
         service.processRefund(refund.getId());
         when(refunds.findByProviderAndProviderRefundId(PaymentProvider.PAYPAL, "REFUND-ORIGINAL")).thenReturn(Optional.of(refund));
         when(gateway.queryRefund(any(GatewayRefundRequest.class), eq("REFUND-ORIGINAL")))

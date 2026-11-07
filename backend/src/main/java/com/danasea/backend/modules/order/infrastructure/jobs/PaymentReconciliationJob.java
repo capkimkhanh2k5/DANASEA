@@ -27,7 +27,7 @@ public class PaymentReconciliationJob {
     public void reconcilePendingCaptures() {
         OffsetDateTime now = OffsetDateTime.now();
         List<PaymentJpaEntity> pendingPayments = paymentRepository.findReconciliationCandidates(
-                PaymentStatus.PENDING, List.of(PaymentProvider.PAYPAL, PaymentProvider.VNPAY),
+                PaymentStatus.PENDING, List.of(PaymentProvider.PAYPAL, PaymentProvider.VNPAY, PaymentProvider.PAYOS, PaymentProvider.ZALOPAY),
                 now.minusMinutes(2), now, PageRequest.of(0, 50));
         for (var payment : pendingPayments) {
             try {

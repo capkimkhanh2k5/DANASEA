@@ -1,5 +1,5 @@
 {
-  "reviewedMigrations": "V1-V49",
+  "reviewedMigrations": "V1-V53",
   "classification": {
     "ai_assessment_cases": "replace",
     "ai_chat_requests": "replace",
@@ -30,6 +30,7 @@
     "equipment_maintenance": "replace",
     "equipment_maintenance_impacts": "replace",
     "equipment_maintenance_moves": "replace",
+    "exchange_rates": "preserve",
     "flash_sale_allocations": "replace",
     "flash_sale_hold_requests": "replace",
     "flash_sales": "replace",
@@ -2007,6 +2008,72 @@
         ]
       },
       {
+        "name": "public.exchange_rates",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "base_currency",
+            "character varying(3)",
+            true,
+            ""
+          ],
+          [
+            "target_currency",
+            "character varying(3)",
+            true,
+            ""
+          ],
+          [
+            "rate",
+            "numeric(15,6)",
+            true,
+            ""
+          ],
+          [
+            "effective_date",
+            "date",
+            true,
+            ""
+          ],
+          [
+            "source",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "status",
+            "character varying(30)",
+            true,
+            ""
+          ],
+          [
+            "fetched_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
         "name": "public.flash_sale_allocations",
         "kind": "r",
         "columns": [
@@ -2811,6 +2878,78 @@
           [
             "last_reconciled_at",
             "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "exchange_rate",
+            "numeric(15,6)",
+            false,
+            ""
+          ],
+          [
+            "exchange_rate_date",
+            "date",
+            false,
+            ""
+          ],
+          [
+            "exchange_rate_source",
+            "character varying(50)",
+            false,
+            ""
+          ],
+          [
+            "attempt_number",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "attempt_state",
+            "character varying(30)",
+            true,
+            ""
+          ],
+          [
+            "danasea_deadline_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "provider_expires_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "canceled_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "cancel_status",
+            "character varying(30)",
+            true,
+            ""
+          ],
+          [
+            "is_active",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "is_canonical",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "payos_order_code",
+            "bigint",
             false,
             ""
           ]
@@ -6556,6 +6695,13 @@
         "enabled": "O",
         "definition": "CREATE TRIGGER flash_sale_terms_immutable BEFORE DELETE OR UPDATE ON public.flash_sales FOR EACH ROW EXECUTE FUNCTION protect_enabled_flash_sale()",
         "function_md5": "063f1fce36888ea993803d966aa7d642"
+      },
+      {
+        "table_name": "public.payments",
+        "name": "trg_payments_sync_attempt_state",
+        "enabled": "O",
+        "definition": "CREATE TRIGGER trg_payments_sync_attempt_state BEFORE INSERT OR UPDATE ON public.payments FOR EACH ROW EXECUTE FUNCTION trg_sync_payment_attempt_state()",
+        "function_md5": "beb5b1a32fa01e0407fb1bfd0ddb3e73"
       },
       {
         "table_name": "public.vendor_commission_policies",

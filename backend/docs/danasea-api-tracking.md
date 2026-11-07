@@ -319,7 +319,13 @@ Hai item phải nhận hai đơn vị khác nhau và tính giá hai gói. Nhóm 
 - [x] GET /api/orders/{id}/cancellation-preview (xem trước số tiền hoàn theo policy)
 - [x] GET /api/orders
 - [x] GET /api/vendor/orders
-- [x] POST /api/payments/{orderId}/create-intent (thanh toán toàn bộ Master Order 1 lần)
+- [x] GET /api/payments/providers (danh sách cổng đang bật cho khách hàng)
+- [x] POST /api/payments/{orderId}/create-intent (mở hoặc dùng lại payment attempt trong cùng cửa sổ thanh toán)
+- [x] POST /api/payments/{orderId}/start-payment (khởi tạo thanh toán 5+5 với payOS/ZaloPay/PayPal/VNPay)
+- [x] POST /api/payments/{orderId}/switch-provider (đổi cổng thanh toán an toàn, hủy link cũ và tạo link mới)
+- [x] GET /api/payments/{orderId}/payment-status (truy vấn tiến trình countdown 5+5 và trạng thái thanh toán)
+- [x] POST /api/payments/webhook/payos (webhook xử lý thanh toán từ payOS có xác thực HMAC)
+- [x] POST /api/payments/webhook/zalopay (callback xử lý thanh toán từ ZaloPay có xác thực HMAC Key2)
 - [x] POST /api/payments/paypal/capture (capture đơn PayPal sau khi khách duyệt thanh toán)
 - [x] GET /api/payments/webhook/vnpay (IPN callback dạng GET từ VNPay)
 - [x] POST /api/payments/webhook/vnpay (IPN callback dạng POST từ VNPay)
@@ -342,6 +348,9 @@ Hai item phải nhận hai đơn vị khác nhau và tính giá hai gói. Nhóm 
 - [x] GET /api/admin/payments/{id} (chi tiết giao dịch thanh toán cho admin)
 - [x] GET /api/admin/refunds (danh sách yêu cầu hoàn tiền toàn sàn cho admin, lọc theo status/reason/subOrderId/orderId/provider/vendorId/customerId/thời gian, có phân trang)
 - [x] GET /api/admin/refunds/{id} (chi tiết yêu cầu hoàn tiền cho admin)
+- [x] POST /api/admin/refunds/{id}/manual-completion (admin ghi nhận khoản hoàn payOS hoặc ZaloPay đã đối chiếu bên ngoài)
+
+Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi đối chiếu với giao dịch hoàn tiền thực tế. API ghi audit và chấp nhận gửi lại cùng bộ dữ liệu.
 - [x] GET /api/admin/discount-codes (danh sách mã khuyến mãi toàn sàn cho admin, lọc theo code/scope/vendorId/isActive)
 - [x] GET /api/admin/discount-codes/{id} (chi tiết mã giảm giá cho admin)
 - [x] POST /api/admin/discount-codes (admin tạo mã giảm giá toàn sàn hoặc tài trợ)
@@ -364,7 +373,7 @@ Hai item phải nhận hai đơn vị khác nhau và tính giá hai gói. Nhóm 
 - Tổng thực trả phải >0; voucher làm toàn đơn miễn phí bị từ chối với DISCOUNT_ZERO_PAYABLE_UNSUPPORTED trước khi giữ lượt. Checkout miễn phí nằm ngoài phạm vi hiện tại.
 - Flyway V24 bổ sung schema, backfill finalAmount/commissionBasis và customerId của redemption; không dùng V21 vì phiên bản đó đã được các tính năng khác sử dụng.
 
-**Thay đổi callback:** bỏ hai endpoint mô phỏng `/webhook/vnpay/refund` và `/webhook/momo/refund`. VNPay refund được worker xác minh qua response API/querydr có checksum; PayPal refund dùng callback chuẩn có chữ ký. Hợp đồng cổng được đối chiếu với [PayPal Payments v2](https://developer.paypal.com/api/payments/v2/captures-refund) và [VNPay querydr/refund](https://sandbox.vnpayment.vn/apis/docs/truy-van-hoan-tien/querydr%26refund.html).
+**Thay đổi callback:** bỏ hai endpoint mô phỏng `/webhook/vnpay/refund` và `/webhook/momo/refund`. Các lệnh hoàn đã gửi trước khi chuyển sang quy trình thủ công vẫn được đối soát bằng VNPay querydr có checksum hoặc PayPal callback có chữ ký. Hợp đồng cổng được đối chiếu với [PayPal Payments v2](https://developer.paypal.com/api/payments/v2/captures-refund) và [VNPay querydr/refund](https://sandbox.vnpayment.vn/apis/docs/truy-van-hoan-tien/querydr%26refund.html).
 
 ### Order & Payment — Việc cần hoàn thiện
 - [x] Nối API create-intent với payment lưu trong DB và xử lý lặp theo Idempotency-Key để webhook tra cứu được
@@ -374,13 +383,13 @@ Hai item phải nhận hai đơn vị khác nhau và tính giá hai gói. Nhóm 
 - [x] PayPal create-intent không trả token/URL mô phỏng khi API thật lỗi; trả HTTP 502
 - [x] Kiểm tra sandbox ngày 06/10/2026: PayPal OAuth/order/replay thành công, VNPay mở được trang chọn ngân hàng; chưa chứng minh giao dịch hoàn tất và callback thật
 - [x] Docker Compose dev truyền cấu hình PayPal/VNPay vào backend; rebuild ngày 07/10/2026, Flyway đến V17, health UP; refund PayPal thiếu header trả 400, callback refund mô phỏng đã bỏ trả 404
-- [x] Lưu refund PENDING trước; worker chỉ gọi cổng sau commit, dùng provider/capture ID gốc và mã thao tác riêng cho mỗi refund
+- [x] Lưu refund PENDING và chuẩn bị số tiền theo giao dịch gốc. Admin tự chuyển tiền, sau đó xác nhận mã giao dịch, số tiền và loại tiền qua `POST /api/admin/refunds/{id}/manual-completion`.
 - [x] Kiểm tra hợp đồng callback bằng test: PayPal xác minh transmission headers, order/capture ID, số tiền/tiền tệ và trạng thái; VNPay IPN xác minh HMAC SHA512, provider và số tiền. Chưa có bằng chứng callback sandbox thật
 - [x] Hoàn thiện PayPal capture (POST /api/payments/paypal/capture) với pessimistic locking Payment -> MasterOrder, tách biệt provider_order_id (Flyway V16) và capture_id
 - [x] Flyway V17 lưu số tiền/tiền tệ cổng gốc, ngày VNPay gốc, mã thao tác capture/refund và thời điểm gửi; commit mã thao tác trước khi gọi cổng
 - [x] Timeout capture/refund giữ PENDING và marker GATEWAY_TIMEOUT_AWAITING_VERIFICATION; retry/worker truy vấn cổng, không gửi lại lệnh tài chính khi kết quả chưa rõ hoặc query thất bại
 - [x] PayPal refund PENDING không chuyển PROCESSED; callback chuẩn /webhook/paypal cũng nhận refund và đối chiếu API refund trước khi cập nhật
-- [x] VNPay refund dùng TxnRef/ngày giao dịch gốc, loại 02/03 đúng full/partial và kiểm tra checksum response; querydr loại 01 không được coi là hoàn tiền thành công
+- [x] Đối soát lệnh hoàn VNPay đã gửi dựa trên TxnRef, ngày giao dịch và checksum; querydr loại 01 không được coi là hoàn tiền thành công.
 - [x] Worker capture tự đối soát các thao tác đã gửi; worker refund có backoff, timeout không tiêu hao retry để chuyển FAILED sai
 - [x] Refund thành công không nhả inventory lần nữa nếu cancellation/vendor rejection đã nhả chỗ
 - [ ] Đăng ký URL HTTPS callback PayPal và APP_PAYPAL_WEBHOOK_ID; nghiệm thu capture/refund và callback trên sandbox thật

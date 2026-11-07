@@ -7,6 +7,7 @@ are strictly detected and killed by our test suites, without modifying the works
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -24,15 +25,23 @@ MUTATIONS = [
         "mutation": "capture-amount-guard-removed",
         "production_source": "src/main/java/com/danasea/backend/modules/order/application/OrderPaymentService.java",
         "test_class": "com.danasea.backend.modules.order.application.PaymentGatewaySafetyTest",
-        "target": "|| payment.getProviderAmount().compareTo(result.amount()) != 0",
+        "target": "|| expectedAmount.compareTo(result.amount()) != 0",
         "replacement": "|| false",
     },
     {
         "mutation": "capture-currency-guard-removed",
         "production_source": "src/main/java/com/danasea/backend/modules/order/application/OrderPaymentService.java",
         "test_class": "com.danasea.backend.modules.order.application.PaymentGatewaySafetyTest",
-        "target": "|| payment.getProviderCurrency() == null || !payment.getProviderCurrency().equals(result.currency())",
+        "target": "|| expectedCurrency == null || result.currency() == null || !expectedCurrency.equalsIgnoreCase(result.currency())",
         "replacement": "|| false",
+    },
+    {
+        "mutation": "reconciliation-capture-guard-bypassed",
+        "production_source": "src/main/java/com/danasea/backend/modules/order/application/OrderPaymentService.java",
+        "test_class": "com.danasea.backend.modules.order.application.OrderPaymentServiceTest",
+        "target": "                    validateCaptureResult(payment, result);\n"
+                  "                    payment.setPaidAt(result.paidAt());",
+        "replacement": "                    payment.setPaidAt(result.paidAt());",
     },
     {
         "mutation": "refund-currency-guard-removed",
@@ -48,14 +57,14 @@ def resolve_classpath(backend_dir: Path) -> str:
     target_dir = backend_dir / "target"
     cp_file = target_dir / "test-cp.txt"
     if not cp_file.is_file():
-        mvnw = backend_dir / "mvnw"
+        mvnw = backend_dir / ("mvnw.cmd" if sys.platform == "win32" else "mvnw")
         cmd = [str(mvnw), "-B", "-q", "dependency:build-classpath", f"-Dmdep.outputFile={cp_file}"]
         subprocess.run(cmd, cwd=str(backend_dir), check=True)
 
     dependency_cp = cp_file.read_text(encoding="utf-8").strip()
     test_classes = str(target_dir / "test-classes")
     classes = str(target_dir / "classes")
-    return f"{test_classes}:{classes}:{dependency_cp}"
+    return os.pathsep.join([test_classes, classes, dependency_cp])
 
 
 def run_launcher(classpath: str, test_class: str, backend_dir: Path) -> dict:
@@ -70,9 +79,18 @@ def run_launcher(classpath: str, test_class: str, backend_dir: Path) -> dict:
         line = line.strip()
         if line.startswith("{") and line.endswith("}"):
             try:
-                return json.loads(line)
+                return json.loads(line, strict=False)
             except json.JSONDecodeError:
                 continue
+
+    # Fallback if launcher JSON was split by platform newline translation
+    start = stdout.find("{")
+    end = stdout.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        try:
+            return json.loads(stdout[start : end + 1], strict=False)
+        except json.JSONDecodeError:
+            pass
 
     raise RuntimeError(
         f"Launcher failed to output valid JSON for {test_class}. Exit: {result.returncode}. Stderr: {result.stderr.strip()}"
@@ -82,7 +100,6 @@ def run_launcher(classpath: str, test_class: str, backend_dir: Path) -> dict:
 def compile_mutant(mutant_source: Path, output_classes_dir: Path, classpath: str, backend_dir: Path):
     cmd = [
         "javac",
-        "-proc:none",
         "-d",
         str(output_classes_dir),
         "-cp",
@@ -169,7 +186,7 @@ def execute_mutation_proof(mutation_spec: dict, backend_dir: Path, base_classpat
             }
 
         # 5. Run test with mutated class prepended to classpath
-        mutant_cp = f"{mutant_classes}:{base_classpath}"
+        mutant_cp = f"{mutant_classes}{os.pathsep}{base_classpath}"
         mutant_result = run_launcher(mutant_cp, test_class, backend_dir)
 
         # 6. Assess whether mutant was killed by assertion failure

@@ -42,7 +42,8 @@ class PaymentReconciliationJobTest {
         job.reconcilePendingCaptures();
         var page = ArgumentCaptor.forClass(Pageable.class);
         verify(repository).findReconciliationCandidates(eq(PaymentStatus.PENDING),
-                eq(List.of(PaymentProvider.PAYPAL, PaymentProvider.VNPAY)), any(OffsetDateTime.class), any(OffsetDateTime.class), page.capture());
+                eq(List.of(PaymentProvider.PAYPAL, PaymentProvider.VNPAY, PaymentProvider.PAYOS, PaymentProvider.ZALOPAY)),
+                any(OffsetDateTime.class), any(OffsetDateTime.class), page.capture());
         assertThat(page.getValue().getPageSize()).isEqualTo(50);
         verify(service).reconcilePayment(first.getId());
         verify(service).reconcilePayment(second.getId());

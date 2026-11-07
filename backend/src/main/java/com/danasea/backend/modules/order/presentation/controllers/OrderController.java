@@ -257,7 +257,8 @@ public class OrderController {
                 r.discountAmount(),
                 items,
                 r.createdAt(),
-                r.createdAt()
+                r.createdAt(),
+                r.paymentDeadline()
         );
     }
 

@@ -92,7 +92,22 @@ public final class AdminTransactionSpecifications {
                     related.add(cb.equal(order.get("customerId"), customerId));
                 }
                 exists.select(cb.literal(1)).where(related.toArray(Predicate[]::new));
-                filters.add(cb.exists(exists));
+                if (vendorId == null) {
+                    var paymentExists = query.subquery(Integer.class);
+                    var payment = paymentExists.from(PaymentJpaEntity.class);
+                    List<Predicate> paymentFilters = new ArrayList<>();
+                    paymentFilters.add(cb.equal(payment.get("id"), root.get("paymentId")));
+                    equal(paymentFilters, cb, payment.get("masterOrderId"), orderId);
+                    if (customerId != null) {
+                        var order = paymentExists.from(MasterOrderJpaEntity.class);
+                        paymentFilters.add(cb.equal(order.get("id"), payment.get("masterOrderId")));
+                        paymentFilters.add(cb.equal(order.get("customerId"), customerId));
+                    }
+                    paymentExists.select(cb.literal(1)).where(paymentFilters.toArray(Predicate[]::new));
+                    filters.add(cb.or(cb.exists(exists), cb.and(cb.isNull(root.get("subOrderId")), cb.exists(paymentExists))));
+                } else {
+                    filters.add(cb.exists(exists));
+                }
             }
             return cb.and(filters.toArray(Predicate[]::new));
         };

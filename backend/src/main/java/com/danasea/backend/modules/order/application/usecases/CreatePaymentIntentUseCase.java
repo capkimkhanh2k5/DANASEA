@@ -19,6 +19,7 @@ import com.danasea.backend.modules.order.domain.ports.PaymentGatewayPort;
 import com.danasea.backend.modules.order.domain.ports.PaymentIntentResult;
 import com.danasea.backend.modules.order.domain.ports.ServiceWaiverLookupPort;
 import com.danasea.backend.modules.order.domain.ports.SubOrderRepositoryPort;
+import com.danasea.backend.modules.order.infrastructure.adapters.PaymentGatewayRegistry;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.PaymentJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaPaymentRepository;
 import com.danasea.backend.shared.i18n.LocalizedContentSelector;
@@ -51,6 +52,12 @@ public class CreatePaymentIntentUseCase {
     private final LocalizedContentSelector localizedContentSelector;
 
     private DepartureCheckoutGuard departureCheckout;
+    private PaymentGatewayRegistry paymentGatewayRegistry;
+
+    @Autowired
+    public void setPaymentGatewayRegistry(@Autowired(required = false) PaymentGatewayRegistry paymentGatewayRegistry) {
+        this.paymentGatewayRegistry = paymentGatewayRegistry;
+    }
 
     @Autowired
     public void setDepartureCheckout(DepartureCheckoutGuard departureCheckout) {
@@ -93,7 +100,8 @@ public class CreatePaymentIntentUseCase {
             throw new IllegalArgumentException(
                     "Idempotency-Key must contain 8 to 100 letters, digits, dots, underscores, colons, or hyphens.");
         }
-        if (command.provider() != PaymentProvider.VNPAY && command.provider() != PaymentProvider.PAYPAL) {
+        if (command.provider() != PaymentProvider.VNPAY && command.provider() != PaymentProvider.PAYPAL
+                && command.provider() != PaymentProvider.PAYOS && command.provider() != PaymentProvider.ZALOPAY) {
             throw new InvalidOrderStateException("The selected payment provider is not supported.");
         }
 
@@ -166,7 +174,10 @@ public class CreatePaymentIntentUseCase {
             throw new InvalidOrderStateException("The payment amount no longer matches the order amount.");
         }
         if (payment.getPaymentUrl() == null || payment.getPaymentUrl().isBlank()) {
-            PaymentIntentResult result = paymentGatewayPort.createPaymentIntent(
+            PaymentGatewayPort adapter = (payment.getProvider() == PaymentProvider.PAYOS || payment.getProvider() == PaymentProvider.ZALOPAY)
+                    ? (paymentGatewayRegistry != null ? paymentGatewayRegistry.getAdapter(payment.getProvider()) : paymentGatewayPort)
+                    : (paymentGatewayPort != null ? paymentGatewayPort : (paymentGatewayRegistry != null ? paymentGatewayRegistry.getAdapter(payment.getProvider()) : null));
+            PaymentIntentResult result = adapter.createPaymentIntent(
                     payment.getId(), order.getId(), payment.getAmount(), payment.getProvider());
             if (result == null || !payment.getId().equals(result.paymentId())
                     || !order.getId().equals(result.orderId()) || payment.getProvider() != result.provider()
@@ -182,6 +193,11 @@ public class CreatePaymentIntentUseCase {
             if (result.providerOrderId() != null) {
                 payment.setProviderOrderId(result.providerOrderId());
             }
+            if (result.exchangeRate() != null) {
+                payment.setExchangeRate(result.exchangeRate());
+                payment.setExchangeRateDate(result.exchangeRateDate());
+                payment.setExchangeRateSource(result.exchangeRateSource());
+            }
             if (result.expiresAt() != null && result.expiresAt().isBefore(payment.getExpiresAt())) {
                 payment.setExpiresAt(result.expiresAt());
             }
@@ -190,7 +206,8 @@ public class CreatePaymentIntentUseCase {
         return new IntentOutcome(new PaymentIntentResult(payment.getId(), payment.getMasterOrderId(),
                 payment.getProvider(), payment.getAmount(), payment.getPaymentUrl(), payment.getQrCodeUrl(),
                 payment.getExpiresAt(), payment.getProviderOrderId(), payment.getProviderAmount(),
-                payment.getProviderCurrency(), payment.getProviderTransactionDate()), false);
+                payment.getProviderCurrency(), payment.getProviderTransactionDate(),
+                payment.getExchangeRate(), payment.getExchangeRateDate(), payment.getExchangeRateSource()), false);
     }
 
     private MasterOrder requirePayableOrder(CreatePaymentIntentCommand command) {

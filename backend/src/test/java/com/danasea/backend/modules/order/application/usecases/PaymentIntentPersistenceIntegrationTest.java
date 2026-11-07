@@ -3,6 +3,9 @@ package com.danasea.backend.modules.order.application.usecases;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -32,6 +35,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.danasea.backend.modules.booking.application.usecases.ConfirmBookingUseCase;
@@ -45,6 +49,9 @@ import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.models.PaymentStatus;
 import com.danasea.backend.modules.order.domain.ports.PaymentGatewayPort;
 import com.danasea.backend.modules.order.domain.ports.PaymentIntentResult;
+import com.danasea.backend.modules.order.infrastructure.adapters.VNPayPaymentAdapter;
+import com.danasea.backend.modules.order.infrastructure.adapters.payos.PayOSSignatureHelper;
+import com.danasea.backend.configs.properties.PayOSProperties;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.PaymentJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
@@ -66,8 +73,10 @@ class PaymentIntentPersistenceIntegrationTest extends BaseSecurityIntegrationTes
     @Autowired private PaymentWebhookSigner signer;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private MockMvc mockMvc;
+    @Autowired private PayOSProperties payOSProperties;
 
     @MockitoBean(name = "payPalPaymentAdapter") private PaymentGatewayPort gateway;
+    @MockitoSpyBean private VNPayPaymentAdapter vnPay;
     @MockitoBean private ConfirmBookingUseCase bookingConfirmation;
 
     @BeforeEach
@@ -179,8 +188,8 @@ class PaymentIntentPersistenceIntegrationTest extends BaseSecurityIntegrationTes
     @Test
     void gatewayFailureReturns502AndPreservesThePaymentForRetry() throws Exception {
         var order = newOrder();
-        when(gateway.createPaymentIntent(any(), any(), any(), any()))
-                .thenThrow(new PaymentGatewayException("Sandbox gateway timed out."));
+        doThrow(new PaymentGatewayException("Sandbox gateway timed out.")).doCallRealMethod()
+                .when(vnPay).createPaymentIntent(any(), any(), any(), eq(PaymentProvider.VNPAY), isNull(), any(), isNull());
         mockMvc.perform(post("/api/payments/{id}/create-intent", order.getId())
                         .with(user(order.getCustomerId().toString()).roles("CUSTOMER"))
                         .header("Idempotency-Key", "http-timeout-key")
@@ -190,6 +199,15 @@ class PaymentIntentPersistenceIntegrationTest extends BaseSecurityIntegrationTes
         var payment = payments.findByMasterOrderIdAndIdempotencyKey(order.getId(), "http-timeout-key").orElseThrow();
         assertThat(payment.getStatus()).isEqualTo(PaymentStatus.PENDING);
         assertThat(payment.getPaymentUrl()).isNull();
+
+        mockMvc.perform(post("/api/payments/{id}/create-intent", order.getId())
+                        .with(user(order.getCustomerId().toString()).roles("CUSTOMER"))
+                        .header("Idempotency-Key", "http-timeout-key")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"VNPAY\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.paymentId").value(payment.getId().toString()));
+        assertThat(payments.findByMasterOrderIdOrderByCreatedAtDesc(order.getId())).hasSize(1);
+        assertThat(payments.findById(payment.getId()).orElseThrow().getIsActive()).isTrue();
     }
 
     @Test
@@ -201,8 +219,33 @@ class PaymentIntentPersistenceIntegrationTest extends BaseSecurityIntegrationTes
                         .header("Idempotency-Key", "http-failed-key")
                         .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"VNPAY\"}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("INVALID_ORDER_STATE"));
+                .andExpect(jsonPath("$.code").value("PAYMENT_ATTEMPT_CLOSED"));
         verify(gateway, never()).createPaymentIntent(any(), any(), any(), any());
+    }
+
+    @Test
+    void newGatewayMustBeEnabledToCreateAnIntent() throws Exception {
+        var order = newOrder();
+        mockMvc.perform(post("/api/payments/{id}/create-intent", order.getId())
+                        .with(user(order.getCustomerId().toString()).roles("CUSTOMER"))
+                        .header("Idempotency-Key", "http-disabled-key")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"provider\":\"PAYOS\"}"))
+                .andExpect(status().isConflict());
+        assertThat(payments.findByMasterOrderIdOrderByCreatedAtDesc(order.getId())).isEmpty();
+    }
+
+    @Test
+    void validButUnmatchedPayosCallbackIsNotAcknowledgedAsProcessed() throws Exception {
+        String signature = PayOSSignatureHelper.hmacSha256(payOSProperties.checksumKey(),
+                "amount=500000&code=00&currency=VND&orderCode=929292&reference=bank-reference");
+        mockMvc.perform(post("/api/payments/webhook/payos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"signature":"%s","data":{"amount":500000,"code":"00","currency":"VND",
+                                "orderCode":929292,"reference":"bank-reference"}}
+                                """.formatted(signature)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("01"));
     }
 
     private MasterOrderJpaEntity newOrder() {

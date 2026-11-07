@@ -1,7 +1,9 @@
 package com.danasea.backend;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.flywaydb.core.Flyway;
@@ -16,13 +18,95 @@ import org.testcontainers.utility.DockerImageName;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Objects;
 
 @Testcontainers(disabledWithoutDocker = true)
 class PostgreSqlMigrationIntegrationTest {
+
+    @Test
+    void paymentAttemptUpgradePreservesEveryUnresolvedIntentAndOneActiveBlocker() throws Exception {
+        String url = "jdbc:postgresql://" + POSTGRES.getHost() + ":"
+                + POSTGRES.getFirstMappedPort() + "/migration_test";
+        String schema = "payment_attempt_upgrade";
+        waitForPostgres(url, "migration_user", "migration_password");
+        Flyway.configure().dataSource(url, "migration_user", "migration_password")
+                .schemas(schema).defaultSchema(schema).target("51").load().migrate();
+
+        try (var connection = DriverManager.getConnection(url, "migration_user", "migration_password");
+             var statement = connection.createStatement()) {
+            connection.setSchema(schema);
+            statement.executeUpdate("""
+                    INSERT INTO master_orders(id,status,payment_deadline,created_at,updated_at) VALUES
+                        ('00000000-0000-0000-0000-000000000001','PENDING_PAYMENT','2026-10-24 10:15:00+00',now(),now()),
+                        ('00000000-0000-0000-0000-000000000002','PENDING_PAYMENT',NULL,now(),now()),
+                        ('00000000-0000-0000-0000-000000000003','CANCELLED',NULL,now(),now());
+                    INSERT INTO payments(id,master_order_id,status,provider,provider_order_id,provider_transaction_date,
+                                         idempotency_key,expires_at,created_at,updated_at) VALUES
+                        ('00000000-0000-0000-0000-000000000011','00000000-0000-0000-0000-000000000001','PENDING',
+                         'VNPAY','legacy-vnpay','20261024100000','old-vnpay-key','2026-10-24 10:08:00+00','2026-10-24 10:00:00+00',now()),
+                        ('00000000-0000-0000-0000-000000000012','00000000-0000-0000-0000-000000000001','PENDING',
+                         'PAYPAL',NULL,NULL,'old-paypal-key','2026-10-24 10:12:00+00','2026-10-24 10:00:00+00',now()),
+                        ('00000000-0000-0000-0000-000000000013','00000000-0000-0000-0000-000000000002','PENDING',
+                         'PAYPAL','legacy-paypal',NULL,'other-paypal-key','2026-10-24 11:00:00+00',now(),now()),
+                        ('00000000-0000-0000-0000-000000000014','00000000-0000-0000-0000-000000000003','PENDING',
+                         'VNPAY','cancelled-order-vnpay',NULL,'late-vnpay-key',NULL,now(),now());
+                    """);
+            Flyway.configure().dataSource(url, "migration_user", "migration_password")
+                    .schemas(schema).defaultSchema(schema).load().migrate();
+
+            try (var rows = statement.executeQuery("""
+                    SELECT p.status, p.attempt_state, p.is_active, p.provider_order_id, p.provider_transaction_date,
+                           p.idempotency_key, p.expires_at, p.danasea_deadline_at, o.payment_deadline
+                    FROM payments p JOIN master_orders o ON p.master_order_id = o.id ORDER BY p.id
+                    """)) {
+                OffsetDateTime existingDeadline = OffsetDateTime.parse("2026-10-24T10:15:00Z");
+                assertTrue(rows.next());
+                assertEquals("PENDING", rows.getString("status"));
+                assertEquals("PENDING", rows.getString("attempt_state"));
+                assertFalse(rows.getBoolean("is_active"));
+                assertEquals("legacy-vnpay", rows.getString("provider_order_id"));
+                assertEquals("20261024100000", rows.getString("provider_transaction_date"));
+                assertEquals("old-vnpay-key", rows.getString("idempotency_key"));
+                assertEquals(OffsetDateTime.parse("2026-10-24T10:08:00Z"), rows.getObject("expires_at", OffsetDateTime.class));
+                assertEquals(existingDeadline, rows.getObject("danasea_deadline_at", OffsetDateTime.class));
+                assertEquals(existingDeadline, rows.getObject("payment_deadline", OffsetDateTime.class));
+                assertTrue(rows.next());
+                assertEquals("PENDING", rows.getString("attempt_state"));
+                assertTrue(rows.getBoolean("is_active"), "Even a pending attempt with an unknown gateway ID must block new links");
+                assertTrue(rows.next());
+                assertTrue(rows.getBoolean("is_active"));
+                assertEquals(rows.getObject("expires_at", OffsetDateTime.class), rows.getObject("payment_deadline", OffsetDateTime.class));
+                assertEquals(rows.getObject("payment_deadline", OffsetDateTime.class), rows.getObject("danasea_deadline_at", OffsetDateTime.class));
+                assertTrue(rows.next());
+                assertEquals("PENDING", rows.getString("attempt_state"), "The cancelled order's attempt still needs reconciliation");
+                assertFalse(rows.getBoolean("is_active"));
+                assertFalse(rows.next());
+            }
+
+            var duplicate = assertThrows(SQLException.class, () -> statement.executeUpdate("""
+                    INSERT INTO payments(id,master_order_id,status,provider,attempt_state,created_at,updated_at)
+                    VALUES (gen_random_uuid(),'00000000-0000-0000-0000-000000000001','PENDING','PAYOS','CREATING',now(),now())
+                    """));
+            assertEquals("23505", duplicate.getSQLState());
+            statement.executeUpdate("UPDATE payments SET status = 'FAILED' WHERE id = '00000000-0000-0000-0000-000000000012'");
+            try (var rows = statement.executeQuery("""
+                    SELECT attempt_state, is_active FROM payments
+                    WHERE master_order_id = '00000000-0000-0000-0000-000000000001' ORDER BY id
+                    """)) {
+                assertTrue(rows.next());
+                assertEquals("PENDING", rows.getString("attempt_state"));
+                assertFalse(rows.getBoolean("is_active"));
+                assertTrue(rows.next());
+                assertEquals("FAILED", rows.getString("attempt_state"));
+                assertFalse(rows.getBoolean("is_active"));
+            }
+        }
+    }
 
     @Test
     void coordinateUpgradePreservesExistingValuesAndSubsequentPreciseCoordinates() throws Exception {

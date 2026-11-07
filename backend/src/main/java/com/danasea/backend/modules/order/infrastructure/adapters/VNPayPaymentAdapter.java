@@ -5,10 +5,12 @@ import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -68,14 +70,25 @@ public class VNPayPaymentAdapter implements PaymentGatewayPort {
                 .build();
     }
 
+    @Override
+    public boolean supportsProvider(PaymentProvider provider) {
+        return provider == PaymentProvider.VNPAY;
+    }
+
     public VNPayPaymentAdapter(VNPayProperties vnpayProperties) {
         this(vnpayProperties, RestClient.builder(), new ObjectMapper());
     }
 
     @Override
     public PaymentIntentResult createPaymentIntent(UUID paymentId, UUID orderId, BigDecimal amount, PaymentProvider provider) {
+        return createPaymentIntent(paymentId, orderId, amount, provider, null, null);
+    }
+
+    @Override
+    public PaymentIntentResult createPaymentIntent(UUID paymentId, UUID orderId, BigDecimal amount,
+            PaymentProvider provider, Long specificOrderCode, OffsetDateTime deadline) {
         UUID effectivePaymentId = paymentId != null ? paymentId : UUID.randomUUID();
-        OffsetDateTime expiresAt = OffsetDateTime.now().plusMinutes(15);
+        OffsetDateTime expiresAt = deadline == null ? OffsetDateTime.now().plusMinutes(15) : deadline;
 
         BigDecimal vnpAmount = (amount != null ? amount : BigDecimal.ZERO)
                 .multiply(BigDecimal.valueOf(100))
@@ -83,7 +96,7 @@ public class VNPayPaymentAdapter implements PaymentGatewayPort {
 
         ZonedDateTime now = ZonedDateTime.now(VIETNAM_ZONE);
         String createDate = VNPAY_DATE_FORMAT.format(now);
-        String expireDate = VNPAY_DATE_FORMAT.format(now.plusMinutes(15));
+        String expireDate = VNPAY_DATE_FORMAT.format(expiresAt.atZoneSameInstant(VIETNAM_ZONE));
 
         Map<String, String> vnpParams = new HashMap<>();
         vnpParams.put("vnp_Version", "2.1.0");
@@ -266,8 +279,17 @@ public class VNPayPaymentAdapter implements PaymentGatewayPort {
                 amount,
                 "VND",
                 status,
-                "VNPay querydr responseCode: " + code + ", status: " + state
+                "VNPay querydr responseCode: " + code + ", status: " + state,
+                parsePaymentTime(root.path("vnp_PayDate").asText())
         );
+    }
+
+    public static OffsetDateTime parsePaymentTime(String value) {
+        try {
+            return LocalDateTime.parse(value, VNPAY_DATE_FORMAT).atZone(VIETNAM_ZONE).toOffsetDateTime();
+        } catch (DateTimeParseException ex) {
+            return null;
+        }
     }
 
     @Override

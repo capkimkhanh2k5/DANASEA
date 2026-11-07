@@ -304,6 +304,7 @@ class OrderControllerTest {
     void getMyOrders_CallsUseCase_Returns200Ok() {
         mockSecurityUser(customerId, "ROLE_CUSTOMER");
 
+        OffsetDateTime deadline = OffsetDateTime.parse("2026-11-07T08:10:00+07:00");
         MasterOrderDetailResult item = new MasterOrderDetailResult(
                 masterOrderId,
                 UUID.randomUUID(),
@@ -313,7 +314,7 @@ class OrderControllerTest {
                 new BigDecimal("500000"),
                 BigDecimal.ZERO,
                 null,
-                null,
+                deadline,
                 "key",
                 null,
                 List.of()
@@ -334,6 +335,7 @@ class OrderControllerTest {
         assertNotNull(response.getBody());
         assertEquals(1, response.getBody().totalElements());
         assertEquals(masterOrderId, response.getBody().content().get(0).id());
+        assertEquals(deadline, response.getBody().content().get(0).paymentDeadline());
     }
 
     @Test
