@@ -2,6 +2,7 @@ package com.danasea.backend.modules.order.infrastructure.adapters;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,8 +13,14 @@ import com.danasea.backend.modules.flashsale.application.FlashSaleStore;
 import com.danasea.backend.modules.flashsale.domain.FlashSaleException;
 import com.danasea.backend.modules.flashsale.domain.FlashSalePricing;
 import com.danasea.backend.modules.order.domain.ports.CommissionPolicyPort;
+import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
+import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
+import com.danasea.backend.modules.systemconfig.infrastructure.persistence.entities.CommissionRuleJpaEntity;
 import com.danasea.backend.modules.systemconfig.infrastructure.persistence.entities.SystemConfigJpaEntity;
+import com.danasea.backend.modules.systemconfig.infrastructure.persistence.repositories.JpaCommissionRuleRepository;
 import com.danasea.backend.modules.systemconfig.infrastructure.persistence.repositories.JpaSystemConfigRepository;
+import com.danasea.backend.modules.vendor.domain.models.VerificationStatus;
+import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
 
 @Component
 public class CommissionPolicyAdapter implements CommissionPolicyPort {
@@ -25,21 +32,36 @@ public class CommissionPolicyAdapter implements CommissionPolicyPort {
 
     private final FlashSaleStore policies;
     private final JpaSystemConfigRepository systemConfigRepository;
+    private final JpaCommissionRuleRepository commissionRuleRepository;
+    private final JpaVendorRepository vendorRepository;
+    private final JpaServiceRepository serviceRepository;
 
     @Autowired
     public CommissionPolicyAdapter(
             @Autowired(required = false) FlashSaleStore policies,
-            @Autowired(required = false) JpaSystemConfigRepository systemConfigRepository) {
+            @Autowired(required = false) JpaSystemConfigRepository systemConfigRepository,
+            @Autowired(required = false) JpaCommissionRuleRepository commissionRuleRepository,
+            @Autowired(required = false) JpaVendorRepository vendorRepository,
+            @Autowired(required = false) JpaServiceRepository serviceRepository) {
         this.policies = policies;
         this.systemConfigRepository = systemConfigRepository;
+        this.commissionRuleRepository = commissionRuleRepository;
+        this.vendorRepository = vendorRepository;
+        this.serviceRepository = serviceRepository;
+    }
+
+    public CommissionPolicyAdapter(
+            FlashSaleStore policies,
+            JpaSystemConfigRepository systemConfigRepository) {
+        this(policies, systemConfigRepository, null, null, null);
     }
 
     public CommissionPolicyAdapter(FlashSaleStore policies) {
-        this(policies, null);
+        this(policies, null, null, null, null);
     }
 
     public CommissionPolicyAdapter(JpaSystemConfigRepository systemConfigRepository) {
-        this(null, systemConfigRepository);
+        this(null, systemConfigRepository, null, null, null);
     }
 
     @Override
@@ -59,8 +81,56 @@ public class CommissionPolicyAdapter implements CommissionPolicyPort {
         throw new FlashSaleException("COMMISSION_POLICY_MISSING");
     }
 
+    @Override
+    public BigDecimal resolveCommissionRate(UUID vendorId, UUID serviceId, UUID categoryId) {
+        // 1. Kiểm tra Rule ONBOARDING (Priority 100)
+        if (commissionRuleRepository != null && vendorRepository != null && vendorId != null) {
+            Optional<CommissionRuleJpaEntity> onboardingRuleOpt = commissionRuleRepository
+                    .findFirstByTargetTypeAndIsActiveTrueOrderByPriorityDesc("ONBOARDING");
+            if (onboardingRuleOpt.isPresent()) {
+                CommissionRuleJpaEntity rule = onboardingRuleOpt.get();
+                var vendorOpt = vendorRepository.findById(vendorId);
+                if (vendorOpt.isPresent()) {
+                    var vendor = vendorOpt.get();
+                    if (VerificationStatus.APPROVED.equals(vendor.getVerificationStatus())) {
+                        OffsetDateTime anchor = vendor.getVerifiedAt() != null
+                                ? vendor.getVerifiedAt() : vendor.getCreatedAt();
+                        int days = rule.getDurationDays() != null ? rule.getDurationDays() : 90;
+                        if (anchor != null && OffsetDateTime.now().isBefore(anchor.plusDays(days))) {
+                            return rule.getCommissionRate().setScale(6, RoundingMode.HALF_UP);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Tra cứu Category ID nếu chưa có nhưng có Service ID
+        UUID effectiveCategoryId = categoryId;
+        if (effectiveCategoryId == null && serviceRepository != null && serviceId != null) {
+            effectiveCategoryId = serviceRepository.findById(serviceId)
+                    .map(ServiceJpaEntity::getCategoryId)
+                    .orElse(null);
+        }
+
+        // 3. Kiểm tra Rule CATEGORY (Priority 50)
+        if (commissionRuleRepository != null && effectiveCategoryId != null) {
+            Optional<CommissionRuleJpaEntity> catRuleOpt = commissionRuleRepository
+                    .findFirstByTargetTypeAndCategoryIdAndIsActiveTrueOrderByPriorityDesc("CATEGORY", effectiveCategoryId);
+            if (catRuleOpt.isPresent()) {
+                return catRuleOpt.get().getCommissionRate().setScale(6, RoundingMode.HALF_UP);
+            }
+        }
+
+        // 4. Fallback về cấu hình mặc định sàn (system_configs)
+        return getCommissionRate(vendorId);
+    }
+
     public FlashSalePricing.Policy resolveFlashSalePolicy(UUID vendorId) {
-        BigDecimal commissionRate = getCommissionRate(vendorId);
+        return resolveFlashSalePolicy(vendorId, null, null);
+    }
+
+    public FlashSalePricing.Policy resolveFlashSalePolicy(UUID vendorId, UUID serviceId, UUID categoryId) {
+        BigDecimal commissionRate = resolveCommissionRate(vendorId, serviceId, categoryId);
 
         BigDecimal maxSubsidyRatio = null;
         BigDecimal unitCost = BigDecimal.ZERO;

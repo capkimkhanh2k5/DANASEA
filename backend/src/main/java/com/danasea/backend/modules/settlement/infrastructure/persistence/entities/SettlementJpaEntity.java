@@ -49,6 +49,21 @@ public class SettlementJpaEntity extends BaseJpaEntity {
     @Column(name = "vendor_fault_compensation_deducted_amount", nullable = false, precision = 38, scale = 2)
     private BigDecimal vendorFaultCompensationDeductedAmount = BigDecimal.ZERO;
 
+    @Builder.Default
+    @Column(name = "safety_rebate_rate", nullable = false, precision = 5, scale = 4)
+    private BigDecimal safetyRebateRate = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "safety_rebate_amount", nullable = false, precision = 38, scale = 2)
+    private BigDecimal safetyRebateAmount = BigDecimal.ZERO;
+
+    @Builder.Default
+    @Column(name = "safety_rebate_qualified", nullable = false)
+    private Boolean safetyRebateQualified = false;
+
+    @Column(name = "safety_rebate_note")
+    private String safetyRebateNote;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status")
     private SettlementStatus status;

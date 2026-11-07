@@ -1,5 +1,5 @@
 {
-  "reviewedMigrations": "V1-V53",
+  "reviewedMigrations": "V1-V54",
   "classification": {
     "ai_assessment_cases": "replace",
     "ai_chat_requests": "replace",
@@ -23,6 +23,7 @@
     "categories": "replace",
     "category_safety_rules": "preserve",
     "checkin_tokens": "replace",
+    "commission_rules": "preserve",
     "conversations": "replace",
     "discount_codes": "replace",
     "discount_redemptions": "replace",
@@ -1497,6 +1498,108 @@
           ],
           [
             "used_by_vendor_staff_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.commission_rules",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "rule_code",
+            "character varying(80)",
+            true,
+            ""
+          ],
+          [
+            "rule_name",
+            "character varying(150)",
+            true,
+            ""
+          ],
+          [
+            "target_type",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "category_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "commission_rate",
+            "numeric(5,4)",
+            true,
+            ""
+          ],
+          [
+            "duration_days",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "priority",
+            "integer",
+            true,
+            ""
+          ],
+          [
+            "is_active",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "effective_from",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "effective_to",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "description",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "updated_by",
             "uuid",
             false,
             ""
@@ -4266,6 +4369,30 @@
             "numeric(38,2)",
             true,
             ""
+          ],
+          [
+            "safety_rebate_rate",
+            "numeric(5,4)",
+            true,
+            ""
+          ],
+          [
+            "safety_rebate_amount",
+            "numeric(38,2)",
+            true,
+            ""
+          ],
+          [
+            "safety_rebate_qualified",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "safety_rebate_note",
+            "character varying(255)",
+            false,
+            ""
           ]
         ]
       },
@@ -5865,6 +5992,32 @@
           "id"
         ],
         "definition": "FOREIGN KEY (used_by_vendor_staff_id) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "commission_rules_category_id_fkey",
+        "child": "public.commission_rules",
+        "parent": "public.categories",
+        "childcolumns": [
+          "category_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "commission_rules_vendor_id_fkey",
+        "child": "public.commission_rules",
+        "parent": "public.vendors",
+        "childcolumns": [
+          "vendor_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE CASCADE",
         "validated": true
       },
       {

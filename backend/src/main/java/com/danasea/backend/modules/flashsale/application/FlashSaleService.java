@@ -27,7 +27,10 @@ public class FlashSaleService implements FlashSaleBookingPort {
     public FlashSaleService(FlashSaleStore store,AuditLogInternalApi audit) { this(store,audit,null); }
     public void setClock(Clock clock) { this.clock=Objects.requireNonNull(clock); }
     private Policy resolvePolicy(UUID vendorId) {
-        if(commissionPolicy!=null) return commissionPolicy.resolveFlashSalePolicy(vendorId);
+        return resolvePolicy(vendorId, null);
+    }
+    private Policy resolvePolicy(UUID vendorId, UUID serviceId) {
+        if(commissionPolicy!=null) return commissionPolicy.resolveFlashSalePolicy(vendorId, serviceId, null);
         return store.latestPolicy(vendorId);
     }
     public record Terms(UUID serviceId, UUID optionId, BigDecimal unitSubsidy, OffsetDateTime startsAt,
@@ -46,7 +49,7 @@ public class FlashSaleService implements FlashSaleBookingPort {
     @Transactional(readOnly=true) public List<Policy> policies(UUID vendor) { return store.policies(vendor); }
     @Transactional(readOnly=true) public List<FlashSaleStore.Option> eligible(int page,int size) { page(page,size); return store.eligible(page,size); }
     @Transactional(readOnly=true) public Preview preview(UUID service,UUID option,BigDecimal subsidy) {
-        var o=eligibleOption(service,option); var policy=resolvePolicy(o.vendorId());
+        var o=eligibleOption(service,option); var policy=resolvePolicy(o.vendorId(), service);
         return new Preview(o,FlashSalePricing.calculate(o.price(),1,policy,subsidy),policy.unitCost(),policy.minimumMargin(),policy.provenance(),true,List.of());
     }
     public AdminDetail create(Terms t,UUID actor) {
@@ -67,7 +70,7 @@ public class FlashSaleService implements FlashSaleBookingPort {
         draft(s);
         if(!clock.instant().isBefore(s.endsAt())) throw new FlashSaleException("FLASH_SALE_EXPIRED");
         var option=eligibleOption(s.serviceId(),s.optionId());
-        var policy=resolvePolicy(option.vendorId());
+        var policy=resolvePolicy(option.vendorId(), s.serviceId());
         var snapshot=FlashSalePricing.calculate(option.price(),1,policy,s.unitSubsidy());
         if(s.budget().compareTo(snapshot.subsidyAmount())<0) throw new FlashSaleException("BUDGET_BELOW_ONE_UNIT");
         store.save(s.enabled(option.price(),policy.id())); log(actor,"FLASH_SALE_ACTIVATED",id); return detail(id);
@@ -81,7 +84,7 @@ public class FlashSaleService implements FlashSaleBookingPort {
     @Transactional(readOnly=true) public AdminDetail detail(UUID id) {
         var s=store.sale(id,false); Snapshot snapshot=null; String issue=null;
         try { var o=eligibleOption(s.serviceId(),s.optionId());
-            Policy policy=resolvePolicy(o.vendorId());
+            Policy policy=resolvePolicy(o.vendorId(), s.serviceId());
             snapshot=FlashSalePricing.calculate(s.originalUnitPrice()!=null?s.originalUnitPrice():o.price(),1,policy,s.unitSubsidy());
         } catch(FlashSaleException e) { issue=e.code(); }
         return new AdminDetail(s,snapshot,store.usage(id),issue);
