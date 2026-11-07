@@ -488,6 +488,42 @@ def load_fixtures():
     return base_rows, trans_rows, manifest_data
 
 
+def align_payment_attempt_defaults(rows):
+    # Match the V52 backfill so fresh installs and migrated fixtures compare identically.
+    orders = {o['id']: o for o in rows.get('master_orders', [])}
+    bookings = {b['id']: b for b in rows.get('bookings', [])}
+    attempts = {}
+    for payment in rows.get('payments', []):
+        attempts.setdefault(payment['master_order_id'], []).append(payment)
+
+    states = {'PENDING': 'PENDING', 'SUCCESS': 'COMPLETED', 'REFUNDED': 'COMPLETED', 'FAILED': 'FAILED'}
+    for order_id, payments in attempts.items():
+        order = orders[order_id]
+        deadline = order.get('payment_deadline')
+        active = None
+        canonical = None
+        if order['status'] == 'PENDING_PAYMENT':
+            pending = [p for p in payments if p['status'] == 'PENDING']
+            active = max(pending, key=lambda p: (datetime.fromisoformat(p['created_at']), p['id']), default=None)
+            if deadline is None:
+                expiries = [p['expires_at'] for p in pending if p.get('expires_at')]
+                deadline = min(expiries, key=datetime.fromisoformat, default=None)
+                if deadline is not None:
+                    order['payment_deadline'] = deadline
+        if (order['status'] in ('PAID', 'COMPLETED', 'PARTIALLY_COMPLETED')
+                and bookings[order['booking_id']]['status'] == 'CONFIRMED'):
+            successful = [p for p in payments if p['status'] == 'SUCCESS' and Decimal(p['amount']) == Decimal(order['total_amount'])]
+            canonical = min(successful, key=lambda p: (datetime.fromisoformat(p['paid_at']),
+                                                       datetime.fromisoformat(p['created_at']), p['id']), default=None)
+        for p in payments:
+            p.setdefault('attempt_number', 1)
+            p.setdefault('attempt_state', states.get(p['status'], 'TERMINATED'))
+            p.setdefault('danasea_deadline_at', deadline if p['status'] == 'PENDING' else None)
+            p.setdefault('cancel_status', 'NONE')
+            p.setdefault('is_active', p is active)
+            p.setdefault('is_canonical', p is canonical)
+
+
 def align_schema_defaults(rows, colmap):
     if ('services', 'waiver_required') in colmap:
         for s in rows.get('services', []):
@@ -508,6 +544,8 @@ def align_schema_defaults(rows, colmap):
     if ('service_slot_units', 'equipment_blocked') in colmap:
         for unit in rows.get('service_slot_units', []):
             unit.setdefault('equipment_blocked', False)
+    if ('payments', 'attempt_number') in colmap:
+        align_payment_attempt_defaults(rows)
 
 
 class Session:
@@ -781,8 +819,8 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     }
 
 
-# Replacement accepts only the exact reviewed V1-V50 table/column/FK/trigger inventory.
-REPLACEMENT_FLYWAY_VERSION = 50
+# Replacement accepts only the exact reviewed V1-V53 table/column/FK/trigger inventory.
+REPLACEMENT_FLYWAY_VERSION = 53
 RESET_INVENTORY_SQL = """
 SELECT json_build_object(
  'schemas',(SELECT json_agg(nspname ORDER BY nspname) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),
@@ -809,7 +847,7 @@ SELECT json_build_object(
    WHERE NOT t.tgisinternal AND n.nspname !~ '^pg_') x))
 """
 
-PROTECTED_TABLES = ('flyway_schema_history', 'system_configs', 'category_safety_rules', 'vendor_commission_policies')
+PROTECTED_TABLES = ('flyway_schema_history', 'system_configs', 'category_safety_rules', 'vendor_commission_policies', 'exchange_rates')
 # These source-defined relationships predate explicit FK constraints.
 PROTECTED_LEGACY_REFERENCES = (
     ('system_configs', 'updated_by', 'users'),

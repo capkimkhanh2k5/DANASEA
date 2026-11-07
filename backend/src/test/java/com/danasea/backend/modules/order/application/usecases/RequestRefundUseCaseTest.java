@@ -14,6 +14,7 @@ import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateExce
 import com.danasea.backend.modules.order.domain.exceptions.UnauthorizedOrderAccessException;
 import com.danasea.backend.modules.order.domain.models.MasterOrder;
 import com.danasea.backend.modules.order.domain.models.MasterOrderStatus;
+import com.danasea.backend.modules.order.domain.models.PaymentStatus;
 import com.danasea.backend.modules.order.domain.models.RefundReason;
 import com.danasea.backend.modules.order.domain.models.RefundStatus;
 import com.danasea.backend.modules.order.domain.models.SubOrder;
@@ -22,7 +23,9 @@ import com.danasea.backend.modules.order.domain.ports.MasterOrderRepositoryPort;
 import com.danasea.backend.modules.order.domain.ports.PaymentGatewayPort;
 import com.danasea.backend.modules.order.domain.ports.SubOrderRepositoryPort;
 import com.danasea.backend.modules.order.domain.services.RefundPolicyEngine;
+import com.danasea.backend.modules.order.infrastructure.persistence.entities.PaymentJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.RefundJpaEntity;
+import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaPaymentRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaRefundRepository;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -75,6 +78,17 @@ class RequestRefundUseCaseTest {
     @Test
     @DisplayName("Thành công: Hủy sớm >= 24h trước giờ khởi hành -> Hoàn 100% tiền")
     void shouldRefundFullAmountWhenCancelledMoreThan24hBeforeDeparture() {
+        var payments = mock(JpaPaymentRepository.class);
+        var canonical = new PaymentJpaEntity();
+        canonical.setId(UUID.randomUUID());
+        canonical.setIsCanonical(true);
+        canonical.setStatus(PaymentStatus.SUCCESS);
+        var newerDuplicate = new PaymentJpaEntity();
+        newerDuplicate.setId(UUID.randomUUID());
+        newerDuplicate.setStatus(PaymentStatus.SUCCESS);
+        when(payments.findByMasterOrderIdOrderByCreatedAtDesc(orderId)).thenReturn(List.of(newerDuplicate, canonical));
+        useCase = new RequestRefundUseCase(masterOrderRepository, subOrderRepository, paymentGatewayPort,
+                refundPolicyEngine, null, refunds, payments, null);
         MasterOrder order = MasterOrder.createFromBooking(
                 customerId, UUID.randomUUID(), new BigDecimal("100.00"), OffsetDateTime.now(), "key-1");
         order.setId(orderId);
@@ -104,6 +118,7 @@ class RequestRefundUseCaseTest {
         var persisted = org.mockito.ArgumentCaptor.forClass(RefundJpaEntity.class);
         verify(refunds).save(persisted.capture());
         assertThat(persisted.getValue().getSubOrderId()).isEqualTo(subOrderId);
+        assertThat(persisted.getValue().getPaymentId()).isEqualTo(canonical.getId());
         assertThat(persisted.getValue().getRequestedBy()).isEqualTo(customerId);
         assertThat(persisted.getValue().getIdempotencyKey()).isEqualTo("idem-ref-1");
         assertThat(persisted.getValue().getStatus()).isEqualTo(RefundStatus.PENDING);

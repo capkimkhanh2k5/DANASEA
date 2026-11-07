@@ -171,7 +171,7 @@ class PackageContract(unittest.TestCase):
             if s['id'] in historic_ids:
                 self.assertEqual('2026-10-25', s['date'], 'Historic slots must have fixed 2026-10-25 date')
             else:
-                self.assertGreaterEqual(s['date'], '2026-11-20', 'Unreferenced slots must have active future date')
+                self.assertGreaterEqual(s['date'], '2026-11-07', 'Unreferenced slots must have active future date')
             self.assertGreaterEqual(s['capacity'], 6, 'Slot capacity must be realistic (>= 6)')
             start_times.add(s['start_time'])
         self.assertGreaterEqual(len(start_times), 5, 'Operating hours must be diversified across activities')

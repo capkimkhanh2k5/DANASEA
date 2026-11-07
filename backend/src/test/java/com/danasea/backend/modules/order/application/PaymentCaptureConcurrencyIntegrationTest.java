@@ -98,7 +98,7 @@ class PaymentCaptureConcurrencyIntegrationTest extends BaseSecurityIntegrationTe
     }
 
     @Test
-    void refundOperationIsCommittedBeforeRequestAndNeverResentWhenQueryFails() {
+    void legacyRefundOperationIsCommittedBeforeQueryAndNeverResentWhenQueryFails() {
         var fixture = newPayment();
         var payment = payments.findById(fixture.paymentId()).orElseThrow();
         payment.setStatus(PaymentStatus.SUCCESS); payment.setProviderTransactionId("CAPTURE-REFUND-" + fixture.paymentId());
@@ -108,8 +108,9 @@ class PaymentCaptureConcurrencyIntegrationTest extends BaseSecurityIntegrationTe
         sub.setStatus(SubOrderStatus.CONFIRMED); sub = subs.saveAndFlush(sub);
         var refund = new RefundJpaEntity(); refund.setSubOrderId(sub.getId()); refund.setAmount(payment.getAmount());
         refund.setRefundPercentage(new BigDecimal("100")); refund.setReason(RefundReason.CUSTOMER_REQUEST); refund.setStatus(RefundStatus.PENDING);
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
         refund = refunds.saveAndFlush(refund); UUID refundId = refund.getId();
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> {
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> {
             GatewayRefundRequest request = inv.getArgument(0);
             try (var reader = Executors.newSingleThreadExecutor()) {
                 String committedRequest = reader.submit(() -> jdbc.queryForObject(
@@ -126,8 +127,8 @@ class PaymentCaptureConcurrencyIntegrationTest extends BaseSecurityIntegrationTe
         assertThat(persisted.getGatewayRequestId()).isEqualTo(operationId);
         assertThat(persisted.getStatus()).isEqualTo(RefundStatus.PENDING);
         assertThat(persisted.getLastError()).contains("GATEWAY_TIMEOUT_AWAITING_VERIFICATION");
-        verify(gateway, times(1)).requestRefund(any(GatewayRefundRequest.class));
-        verify(gateway).queryRefund(any(GatewayRefundRequest.class), any());
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
+        verify(gateway, times(2)).queryRefund(any(GatewayRefundRequest.class), any());
     }
 
     @Test

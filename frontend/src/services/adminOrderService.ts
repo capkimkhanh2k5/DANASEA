@@ -43,9 +43,18 @@ export const adminOrderService = {
   },
 
   // GET /api/admin/refunds - Danh sách các lệnh hoàn tiền hệ thống
-  async getRefunds(orderId?: string): Promise<SpringPage<RefundDetailResponse>> {
-    const params = orderId ? { orderId, size: 50 } : { size: 50 };
+  async getRefunds(orderId?: string, page = 0): Promise<SpringPage<RefundDetailResponse>> {
+    const params = orderId ? { orderId, page, size: 50 } : { status: "PENDING", page, size: 50 };
     const response = await apiClient.get<SpringPage<RefundDetailResponse>>('/admin/refunds', { params });
+    return response.data;
+  },
+
+  async completeManualRefund(refundId: string, evidence: {
+    providerRefundId: string;
+    providerAmount: number;
+    providerCurrency: string;
+  }): Promise<RefundDetailResponse> {
+    const response = await apiClient.post<RefundDetailResponse>(`/admin/refunds/${refundId}/manual-completion`, evidence);
     return response.data;
   },
 };

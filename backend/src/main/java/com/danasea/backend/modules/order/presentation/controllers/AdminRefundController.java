@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.order.presentation.controllers;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -9,19 +10,31 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.danasea.backend.modules.order.application.OrderPaymentService;
+import com.danasea.backend.modules.order.application.RefundProcessingService;
 import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.models.RefundReason;
 import com.danasea.backend.modules.order.domain.models.RefundStatus;
 import com.danasea.backend.modules.order.presentation.dtos.RefundDetailResponse;
+import com.danasea.backend.security.infrastructure.SecurityUtils;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -33,6 +46,12 @@ import lombok.extern.slf4j.Slf4j;
 public class AdminRefundController {
 
     private final OrderPaymentService orderPaymentService;
+    private final RefundProcessingService refundProcessingService;
+
+    public record ManualRefundCompletionRequest(
+            @NotBlank @Size(max = 150) String providerRefundId,
+            @NotNull @DecimalMin("0.01") @Digits(integer = 18, fraction = 2) BigDecimal providerAmount,
+            @NotBlank @Pattern(regexp = "[A-Z]{3}") String providerCurrency) {}
 
     @GetMapping
     public ResponseEntity<Page<RefundDetailResponse>> getRefunds(
@@ -72,5 +91,14 @@ public class AdminRefundController {
         log.info("Admin query refund detail with id: {}", refundId);
         RefundDetailResponse response = orderPaymentService.getAdminRefundDetail(refundId);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/manual-completion")
+    public ResponseEntity<RefundDetailResponse> completeManualRefund(@PathVariable("id") UUID refundId,
+            @Valid @RequestBody ManualRefundCompletionRequest request) {
+        UUID actorId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new AccessDeniedException("An authenticated administrator is required."));
+        return ResponseEntity.ok(RefundDetailResponse.fromEntity(refundProcessingService.completeManualRefund(
+                refundId, actorId, request.providerRefundId(), request.providerAmount(), request.providerCurrency())));
     }
 }

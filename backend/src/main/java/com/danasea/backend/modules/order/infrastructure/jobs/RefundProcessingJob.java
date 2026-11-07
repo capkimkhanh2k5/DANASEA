@@ -34,8 +34,8 @@ public class RefundProcessingJob {
     @Scheduled(fixedDelayString = "${app.scheduler.refund-processing-delay:30s}")
     public void processPendingRefunds() {
         List<RefundJpaEntity> pendingRefunds = refundRepository
-                .findByStatusAndRetryCountLessThanOrderByCreatedAtAsc(
-                        RefundStatus.PENDING, RefundProcessingService.MAX_RETRIES);
+                .findForAutomaticProcessing(RefundStatus.PENDING, RefundProcessingService.MAX_RETRIES,
+                        RefundProcessingService.MANUAL_REVIEW_REQUIRED);
 
         if (pendingRefunds.isEmpty()) {
             return;

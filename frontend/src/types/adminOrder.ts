@@ -75,7 +75,7 @@ export interface PaymentResponse {
 
 export interface RefundDetailResponse {
   id: string;
-  subOrderId: string;
+  subOrderId?: string | null;
   amount: number;
   percentage?: number | null;
   reason: RefundReason;
@@ -86,6 +86,9 @@ export interface RefundDetailResponse {
   createdAt: string;
   processedAt?: string | null;
   lastError?: string | null;
+  gatewayRequestedAt?: string | null;
+  providerAmount?: number | null;
+  providerCurrency?: string | null;
 }
 
 export interface AdminOrderQueryParams {

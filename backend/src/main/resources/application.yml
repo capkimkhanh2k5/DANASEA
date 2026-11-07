@@ -122,6 +122,14 @@ app:
       base-url: ${APP_PAYPAL_BASE_URL:https://api-m.sandbox.paypal.com}
       return-url: ${APP_PAYPAL_RETURN_URL:http://localhost:3000/payment/success}
       cancel-url: ${APP_PAYPAL_CANCEL_URL:http://localhost:3000/payment/cancel}
+      exchange-rate:
+        api-url: ${APP_PAYPAL_EXCHANGE_RATE_API_URL:https://api.frankfurter.dev/v2/rate/usd/vnd}
+        cron: ${APP_PAYPAL_EXCHANGE_RATE_CRON:0 0 20 * * *}
+        zone: ${APP_PAYPAL_EXCHANGE_RATE_ZONE:Asia/Ho_Chi_Minh}
+        max-age-days: ${APP_PAYPAL_EXCHANGE_RATE_MAX_AGE_DAYS:3}
+        volatility-threshold: ${APP_PAYPAL_EXCHANGE_RATE_VOLATILITY_THRESHOLD:0.03}
+        connect-timeout: ${APP_PAYPAL_EXCHANGE_RATE_CONNECT_TIMEOUT:5s}
+        read-timeout: ${APP_PAYPAL_EXCHANGE_RATE_READ_TIMEOUT:5s}
     vnpay:
       api-url: ${APP_VNPAY_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
       ip-address: ${APP_VNPAY_IP_ADDRESS:127.0.0.1}
@@ -194,3 +202,23 @@ ai:
     max-input-tokens: ${AI_CLIPROXY_MAX_INPUT_TOKENS:1048576}
     fallback-context-tokens: ${AI_CLIPROXY_FALLBACK_CONTEXT_TOKENS:131072}
     input-safety-tokens: ${AI_CLIPROXY_INPUT_SAFETY_TOKENS:8192}
+
+danasea:
+  payment:
+    payos:
+      enabled: ${PAYOS_ENABLED:false}
+      client-id: ${PAYOS_CLIENT_ID:}
+      api-key: ${PAYOS_API_KEY:}
+      checksum-key: ${PAYOS_CHECKSUM_KEY:}
+      base-url: ${PAYOS_BASE_URL:https://api-merchant.payos.vn}
+      return-url: ${PAYOS_RETURN_URL:http://localhost:3000/payment/success}
+      cancel-url: ${PAYOS_CANCEL_URL:http://localhost:3000/payment/cancel}
+    zalopay:
+      enabled: ${ZALOPAY_ENABLED:false}
+      app-id: ${ZALOPAY_APP_ID:}
+      key1: ${ZALOPAY_KEY1:}
+      key2: ${ZALOPAY_KEY2:}
+      endpoint: ${ZALOPAY_ENDPOINT:https://sb-openapi.zalopay.vn/v2}
+      return-url: ${ZALOPAY_RETURN_URL:http://localhost:3000/payment/success}
+      cancel-url: ${ZALOPAY_CANCEL_URL:http://localhost:3000/payment/cancel}
+      callback-url: ${ZALOPAY_CALLBACK_URL:}

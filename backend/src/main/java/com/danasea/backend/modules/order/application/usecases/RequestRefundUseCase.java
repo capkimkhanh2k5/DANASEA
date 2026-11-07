@@ -37,6 +37,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -201,7 +202,7 @@ public class RequestRefundUseCase {
                                     p ->
                                             p.getStatus() == PaymentStatus.SUCCESS
                                                     || p.getStatus() == PaymentStatus.REFUNDED)
-                            .findFirst()
+                            .min(Comparator.comparing(p -> !Boolean.TRUE.equals(p.getIsCanonical())))
                             .orElse(null);
         }
 

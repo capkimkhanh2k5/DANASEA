@@ -1,9 +1,14 @@
 package com.danasea.backend.modules.order.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -17,20 +22,25 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import com.danasea.backend.configs.TrackingAsyncTestExecutor;
 import com.danasea.backend.modules.booking.domain.models.BookingStatus;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
 import com.danasea.backend.modules.order.domain.exceptions.PaymentGatewayException;
+import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
 import com.danasea.backend.modules.order.domain.models.*;
 import com.danasea.backend.modules.order.domain.ports.*;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.*;
@@ -40,6 +50,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
+@AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Import(RefundProcessingConcurrencyIntegrationTest.AsyncTestConfiguration.class)
 @DisplayName("Refund Processing Concurrency and Recovery Integration Tests on Real PostgreSQL")
@@ -64,6 +75,7 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private TrackingAsyncTestExecutor testExecutor;
     @Autowired private ApplicationEventPublisher publisher;
+    @Autowired private MockMvc mockMvc;
 
     @MockitoBean(name = "payPalPaymentAdapter")
     private PaymentGatewayPort gateway;
@@ -74,12 +86,13 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
     }
 
     @Test
-    void twoWorkersCreateOneRefundOperation() throws Exception {
+    void twoWorkersReconcileOneLegacyRefundOperation() throws Exception {
         var fixture = createRefundFixture();
+        jdbc.update("UPDATE refunds SET gateway_requested_at = now() WHERE id = ?", fixture.refundId());
         var requestStarted = new CountDownLatch(1);
         var releaseGateway = new CountDownLatch(1);
 
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> {
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> {
             requestStarted.countDown();
             assertThat(releaseGateway.await(10, TimeUnit.SECONDS)).isTrue();
             return new RefundResult(true, "REFUND-CONCURRENT-01", new BigDecimal("19.31"), "Refund succeeded",
@@ -108,16 +121,17 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
         assertThat(persistedRefund.getProviderRefundId()).isEqualTo("REFUND-CONCURRENT-01");
         assertThat(persistedRefund.getProvider()).isEqualTo(PaymentProvider.PAYPAL);
 
-        verify(gateway, times(1)).requestRefund(any(GatewayRefundRequest.class));
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
     }
 
     @Test
     void workerRacingWithVerifiedNotificationAppliesEffectsOnce() throws Exception {
         var fixture = createRefundFixture();
+        jdbc.update("UPDATE refunds SET gateway_requested_at = now() WHERE id = ?", fixture.refundId());
         var workerGatewayStarted = new CountDownLatch(1);
         var releaseWorkerGateway = new CountDownLatch(1);
 
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> {
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> {
             workerGatewayStarted.countDown();
             assertThat(releaseWorkerGateway.await(10, TimeUnit.SECONDS)).isTrue();
             return new RefundResult(true, "REFUND-RACE-01", new BigDecimal("19.31"), "Refund succeeded",
@@ -180,10 +194,115 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
     }
 
     @Test
+    void administratorCompletesOnlyTheDuplicateCaptureAndAuditsTheEvidenceOnce() throws Exception {
+        var fixture = createRefundFixture();
+        var canonical = payments.findById(fixture.paymentId()).orElseThrow();
+        canonical.setIsCanonical(true);
+        payments.saveAndFlush(canonical);
+
+        var duplicate = new PaymentJpaEntity();
+        duplicate.setMasterOrderId(fixture.orderId());
+        duplicate.setProvider(PaymentProvider.PAYOS);
+        duplicate.setProviderTransactionId("PAYOS-" + fixture.orderId());
+        duplicate.setAmount(new BigDecimal("1000000"));
+        duplicate.setProviderAmount(new BigDecimal("1000000"));
+        duplicate.setProviderCurrency("VND");
+        duplicate.setStatus(PaymentStatus.SUCCESS);
+        duplicate = payments.saveAndFlush(duplicate);
+
+        var extraRefund = new RefundJpaEntity();
+        extraRefund.setPaymentId(duplicate.getId());
+        extraRefund.setAmount(new BigDecimal("1000000"));
+        extraRefund.setRefundPercentage(new BigDecimal("100"));
+        extraRefund.setReason(RefundReason.SYSTEM_FAULT);
+        extraRefund.setStatus(RefundStatus.PENDING);
+        UUID refundId = refunds.saveAndFlush(extraRefund).getId();
+        UUID operatorId = createFinanceOperator();
+        String reference = "PAYOS-REFUND-" + refundId;
+
+        assertThat(worker.processRefund(refundId)).isFalse();
+        var queued = refunds.findById(refundId).orElseThrow();
+        assertThat(queued.getStatus()).isEqualTo(RefundStatus.PENDING);
+        assertThat(queued.getLastError()).isEqualTo(RefundProcessingService.MANUAL_REVIEW_REQUIRED);
+        assertThat(queued.getRetryCount()).isZero();
+        assertThat(refunds.findForAutomaticProcessing(RefundStatus.PENDING, RefundProcessingService.MAX_RETRIES,
+                RefundProcessingService.MANUAL_REVIEW_REQUIRED)).extracting(RefundJpaEntity::getId).doesNotContain(refundId);
+        assertThat(refunds.findByAdvancedFilters(RefundStatus.PENDING, RefundReason.SYSTEM_FAULT, null,
+                PaymentProvider.PAYOS, null, fixture.customerId(), fixture.orderId(), null, null, Pageable.unpaged()))
+                .extracting(RefundJpaEntity::getId).containsExactly(refundId);
+
+        assertThatThrownBy(() -> worker.completeManualRefund(refundId, operatorId, reference, BigDecimal.ONE, "VND"))
+                .isInstanceOf(InvalidOrderStateException.class);
+        assertThat(refunds.findById(refundId).orElseThrow().getStatus()).isEqualTo(RefundStatus.PENDING);
+
+        String requestBody = """
+                {"providerRefundId":"%s","providerAmount":1000000,"providerCurrency":"VND"}
+                """.formatted(reference);
+        mockMvc.perform(post("/api/admin/refunds/{id}/manual-completion", refundId)
+                        .with(user(fixture.customerId().toString()).roles("CUSTOMER"))
+                        .contentType(MediaType.APPLICATION_JSON).content(requestBody))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/admin/refunds/{id}/manual-completion", refundId)
+                        .with(user(operatorId.toString()).roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON).content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PROCESSED"))
+                .andExpect(jsonPath("$.providerRefundId").value(reference));
+        var completed = refunds.findById(refundId).orElseThrow();
+        var replayed = worker.completeManualRefund(refundId, operatorId, reference, new BigDecimal("1000000.00"), "VND");
+        assertThat(completed.getStatus()).isEqualTo(RefundStatus.PROCESSED);
+        assertThat(completed.getProviderRefundId()).isEqualTo(reference);
+        assertThat(replayed.getProcessedAt()).isEqualTo(completed.getProcessedAt());
+        assertThat(payments.findById(duplicate.getId()).orElseThrow().getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(payments.findById(fixture.paymentId()).orElseThrow().getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(orders.findById(fixture.orderId()).orElseThrow().getPaymentStatus()).isEqualTo(PaymentOrderStatus.PAID);
+        assertThat(subs.findById(fixture.subOrderId()).orElseThrow().getStatus()).isEqualTo(SubOrderStatus.CONFIRMED);
+        assertThat(bookings.findById(fixture.bookingId()).orElseThrow().getStatus()).isEqualTo(BookingStatus.CONFIRMED);
+        assertThat(serviceSlots.findById(fixture.slotId()).orElseThrow().getBookedCount()).isEqualTo(5);
+        assertThat(jdbc.queryForList("SELECT metadata FROM audit_logs WHERE action = 'REFUND_MANUALLY_COMPLETED' AND entity_id = ? AND actor_user_id = ?",
+                String.class, refundId, operatorId)).singleElement().asString().contains(reference, "1000000", "VND");
+    }
+
+    @Test
+    void manuallyVerifiedCanonicalZaloPayRefundUpdatesOrderAccounting() {
+        var fixture = createRefundFixture();
+        var canonical = payments.findById(fixture.paymentId()).orElseThrow();
+        canonical.setIsCanonical(true);
+        canonical.setProvider(PaymentProvider.ZALOPAY);
+        canonical.setProviderCurrency("VND");
+        canonical.setProviderAmount(new BigDecimal("1000000"));
+        payments.saveAndFlush(canonical);
+
+        assertThat(worker.processRefund(fixture.refundId())).isFalse();
+        var completed = worker.completeManualRefund(fixture.refundId(), createFinanceOperator(), "ZALO-REFUND-" + fixture.refundId(),
+                new BigDecimal("1000000"), "VND");
+        assertThat(completed.getStatus()).isEqualTo(RefundStatus.PROCESSED);
+        assertThat(payments.findById(fixture.paymentId()).orElseThrow().getStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(orders.findById(fixture.orderId()).orElseThrow().getPaymentStatus()).isEqualTo(PaymentOrderStatus.REFUNDED);
+        assertThat(subs.findById(fixture.subOrderId()).orElseThrow().getStatus()).isEqualTo(SubOrderStatus.REFUNDED);
+        assertThat(bookings.findById(fixture.bookingId()).orElseThrow().getStatus()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(serviceSlots.findById(fixture.slotId()).orElseThrow().getBookedCount()).isEqualTo(3);
+    }
+
+    @Test
+    void administratorCannotConfirmAReturnWhileALegacyGatewayRefundMayStillSettle() {
+        var fixture = createRefundFixture();
+        jdbc.update("UPDATE refunds SET gateway_requested_at = now() WHERE id = ?", fixture.refundId());
+
+        assertThatThrownBy(() -> worker.completeManualRefund(fixture.refundId(), createFinanceOperator(),
+                "ADMIN-REFUND", new BigDecimal("19.31"), "USD"))
+                .isInstanceOf(InvalidOrderStateException.class)
+                .hasMessageContaining("awaiting verification");
+        assertThat(refunds.findById(fixture.refundId()).orElseThrow().getStatus()).isEqualTo(RefundStatus.PENDING);
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
+    }
+
+    @Test
     void freshProcessorReconcilesTimedOutRequestWithoutResendingMoney() throws Exception {
         var fixture = createRefundFixture();
+        jdbc.update("UPDATE refunds SET gateway_requested_at = now() WHERE id = ?", fixture.refundId());
 
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> {
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> {
             GatewayRefundRequest request = inv.getArgument(0);
             try (var reader = Executors.newSingleThreadExecutor()) {
                 String committedRequest = reader.submit(() -> jdbc.queryForObject(
@@ -218,16 +337,17 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
         assertThat(processedRefund.getGatewayRequestId()).isEqualTo(stableOperationId);
         assertThat(processedRefund.getProviderRefundId()).isEqualTo("REFUND-RECONCILED-" + fixture.refundId());
 
-        verify(gateway, times(1)).requestRefund(any(GatewayRefundRequest.class));
-        verify(gateway, times(1)).queryRefund(any(GatewayRefundRequest.class), any());
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
+        verify(gateway, times(2)).queryRefund(any(GatewayRefundRequest.class), any());
     }
 
     @Test
     void unverifiableResultRemainsPendingWithoutMoneyEffects() throws Exception {
         var fixture = createRefundFixture();
+        jdbc.update("UPDATE refunds SET gateway_requested_at = now() WHERE id = ?", fixture.refundId());
 
         // 1. Simulate initial request timeout to enter RECONCILE phase
-        when(gateway.requestRefund(any(GatewayRefundRequest.class)))
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any()))
                 .thenThrow(new PaymentGatewayException("GATEWAY_TIMEOUT_AWAITING_VERIFICATION"));
         assertThat(worker.processRefund(fixture.refundId())).isFalse();
 
@@ -310,6 +430,13 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
             UUID paymentId,
             UUID refundId
     ) {}
+
+    private UUID createFinanceOperator() {
+        UUID operatorId = UUID.randomUUID();
+        jdbc.update("INSERT INTO users(id, email, role, locale, created_at, updated_at, session_version) VALUES (?, ?, 'ADMIN', 'en', now(), now(), 0)",
+                operatorId, "finance-" + operatorId + "@example.com");
+        return operatorId;
+    }
 
     private Fixture createRefundFixture() {
         UUID customerId = UUID.randomUUID();

@@ -2,7 +2,8 @@ package com.danasea.backend.modules.order.application.usecases;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,9 +32,7 @@ import com.danasea.backend.modules.order.domain.models.RefundReason;
 import com.danasea.backend.modules.order.domain.models.RefundStatus;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.domain.ports.GatewayRefundRequest;
-import com.danasea.backend.modules.order.domain.ports.GatewayRefundStatus;
 import com.danasea.backend.modules.order.domain.ports.PaymentGatewayPort;
-import com.danasea.backend.modules.order.domain.ports.RefundResult;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.RefundJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
@@ -44,6 +43,7 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.presentation.dtos.RefundDetailResponse;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
+import io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager;
 
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=validate"})
 @ActiveProfiles("test")
@@ -51,7 +51,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 class RefundPersistenceIntegrationTest extends BaseE2ETest {
 
     @MockitoBean
-    private io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager<byte[]> proxyManager;
+    private LettuceBasedProxyManager<byte[]> proxyManager;
 
     @MockitoBean
     private PaymentGatewayPort paymentGatewayPort;
@@ -91,10 +91,6 @@ class RefundPersistenceIntegrationTest extends BaseE2ETest {
 
     @BeforeEach
     void setUp() {
-        when(paymentGatewayPort.requestRefund(any(GatewayRefundRequest.class)))
-                .thenReturn(new RefundResult(true, "PAYPAL-REF-REAL-01", new BigDecimal("19.31"), "Success",
-                        GatewayRefundStatus.COMPLETED, "USD"));
-
         customerId = customerUser.getId();
         ServiceSlotJpaEntity slot = slotA1TomorrowMorning;
         slot.setDate(LocalDate.now().plusDays(5));
@@ -161,8 +157,11 @@ class RefundPersistenceIntegrationTest extends BaseE2ETest {
         assertThat(result.subOrderId()).isEqualTo(subOrderId);
         assertThat(result.amount()).isEqualByComparingTo(BigDecimal.valueOf(500000));
         assertThat(result.status()).isEqualTo(RefundStatus.PENDING);
-        org.mockito.Mockito.verify(paymentGatewayPort, org.mockito.Mockito.never()).requestRefund(any(GatewayRefundRequest.class));
-        assertThat(refundProcessingService.processRefund(result.refundId())).isTrue();
+        assertThat(refundProcessingService.processRefund(result.refundId())).isFalse();
+        assertThat(refundRepository.findById(result.refundId()).orElseThrow().getStatus()).isEqualTo(RefundStatus.PENDING);
+        refundProcessingService.completeManualRefund(result.refundId(), adminUser.getId(), "PAYPAL-REF-REAL-01",
+                new BigDecimal("19.31"), "USD");
+        verify(paymentGatewayPort, never()).requestRefund(any(GatewayRefundRequest.class));
 
         assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(customerId).stream()
                 .filter(notification -> "REFUND_COMPLETED".equals(notification.getType())).count()).isEqualTo(1);

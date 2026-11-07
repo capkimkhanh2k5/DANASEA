@@ -8,8 +8,13 @@ import { customerDiscountService } from "../../../services/customerDiscountServi
 import type { DiscountCodeResponse } from "../../../types/adminDiscountCode";
 import { paymentService } from "../../../services/paymentService";
 import type { BookingHoldResponse } from "../../../types/booking";
-import type { DiscountPreviewResponse, PaymentProviderType } from "../../../types/order";
+import type { DiscountPreviewResponse, OrderPaymentStatusResponse, PaymentProviderType } from "../../../types/order";
 import { useState, useEffect, useRef } from "react";
+import {
+  getPendingOrder,
+  savePendingOrder,
+  savePurchasedItems,
+} from "../../../utils/checkoutPaymentSession";
 import {
   Timer,
   ShieldCheck,
@@ -19,20 +24,68 @@ import {
   AlertCircle,
   ArrowLeft,
   Loader2,
+  Wallet,
   Tag,
   X,
 } from "lucide-react";
 
 const VALID_UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const paymentMethods = [
+  {
+    provider: "VNPAY",
+    name: "Cổng VNPAY (QR Pay / Thẻ ATM & Quốc tế)",
+    description: "Hỗ trợ quét mã QR qua 30+ ứng dụng ngân hàng",
+    icon: QrCode,
+  },
+  {
+    provider: "PAYPAL",
+    name: "Cổng PayPal (Thẻ quốc tế Visa, MasterCard)",
+    description: "Dành cho du khách quốc tế hoặc thanh toán ngoại tệ",
+    icon: CreditCard,
+  },
+  {
+    provider: "PAYOS",
+    name: "payOS (VietQR)",
+    description: "Quét mã VietQR bằng ứng dụng ngân hàng",
+    icon: QrCode,
+  },
+  {
+    provider: "ZALOPAY",
+    name: "ZaloPay",
+    description: "Thanh toán qua ví điện tử ZaloPay",
+    icon: Wallet,
+  },
+] as const;
+
+const defaultPaymentProviders: PaymentProviderType[] = ["VNPAY", "PAYPAL"];
+
+interface CheckoutPaymentError {
+  response?: {
+    status?: number;
+    data?: {
+      code?: string;
+      errorCode?: string;
+      message?: string;
+      missingWaivers?: Array<{ subOrderId: string; waiverVersion?: number; contentLanguage?: string }>;
+    };
+  };
+}
+
 export function Checkout() {
   const navigate = useNavigate();
   const { items, getTotalPrice } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
 
+  const cartFingerprint = items.map(({ id, slotId, optionId, quantity }) =>
+    JSON.stringify([id, slotId, optionId, quantity])).sort();
+  const pendingOrderKey = `danasea_checkout_order:${JSON.stringify([user?.id, cartFingerprint])}`;
+  const pendingOrder = getPendingOrder(pendingOrderKey);
+
   // Booking Hold State
   const [bookingHold, setBookingHold] = useState<BookingHoldResponse | null>(null);
-  const [countdown, setCountdown] = useState<number>(900); // 15 minutes default
+  const [now, setNow] = useState(Date.now);
+  const [pendingStatus, setPendingStatus] = useState<OrderPaymentStatusResponse & { orderId: string }>();
   const [sessionCode] = useState(() => Math.floor(10000 + Math.random() * 90000));
 
   // Customer Contact Info State
@@ -41,11 +94,48 @@ export function Checkout() {
   const [email, setEmail] = useState<string>(user?.email || "khachhang@danasea.vn");
   const [notes, setNotes] = useState<string>("");
 
-  // Payment Method
-  const [paymentProvider, setPaymentProvider] = useState<PaymentProviderType>("VNPAY");
+  const pendingOrderId = pendingOrder?.id;
+  const paymentStatus = pendingStatus?.orderId === pendingOrderId ? pendingStatus : undefined;
 
-  // Slot Holding Status (15-minute slot timeout)
-  const isHoldExpired = countdown <= 0;
+  // Payment Method
+  const [selectedProvider, setSelectedProvider] = useState<PaymentProviderType>();
+  const [availableProviders, setAvailableProviders] = useState(defaultPaymentProviders);
+  const visiblePaymentMethods = paymentMethods.filter(({ provider }) =>
+    (isAuthenticated ? availableProviders : defaultPaymentProviders).includes(provider));
+  const preferredProvider = selectedProvider ?? paymentStatus?.activeProvider ?? pendingOrder?.provider;
+  const paymentProvider = visiblePaymentMethods.find(({ provider }) => provider === preferredProvider)?.provider
+    ?? visiblePaymentMethods[0]?.provider;
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const controller = new AbortController();
+    paymentService.getAvailableProviders(controller.signal).then((providers) => {
+      if (!controller.signal.aborted) setAvailableProviders(providers);
+    }).catch(() => {
+      if (!controller.signal.aborted) setAvailableProviders(defaultPaymentProviders);
+    });
+    return () => controller.abort();
+  }, [isAuthenticated]);
+
+  const deadline = pendingOrderId
+    ? paymentStatus?.danaseaDeadlineAt
+    : bookingHold?.holdExpiresAt || bookingHold?.expiresAt;
+  const deadlineMillis = deadline ? Date.parse(deadline) : NaN;
+  const countdown = Number.isFinite(deadlineMillis)
+    ? Math.max(0, Math.ceil((deadlineMillis - now) / 1000))
+    : undefined;
+  const isHoldExpired = countdown === 0 || paymentStatus?.isExpired === true;
+
+  useEffect(() => {
+    if (!isAuthenticated || !pendingOrderId) return;
+    const controller = new AbortController();
+    paymentService.getOrderPaymentStatus(pendingOrderId, controller.signal).then((status) => {
+      if (!controller.signal.aborted) setPendingStatus({ ...status, orderId: pendingOrderId });
+    }).catch(() => {
+      // The submit handler will check the authoritative status again.
+    });
+    return () => controller.abort();
+  }, [isAuthenticated, pendingOrderId]);
 
   // Promo Code State
   const [promoInput, setPromoInput] = useState<string>("");
@@ -79,8 +169,9 @@ export function Checkout() {
 
   // Request backend slot hold on mount
   const holdRequestedRef = useRef<boolean>(false);
+  const holdRequest = useRef<Promise<BookingHoldResponse> | null>(null);
   useEffect(() => {
-    if (items.length === 0 || holdRequestedRef.current) return;
+    if (!isAuthenticated || items.length === 0 || holdRequestedRef.current || getPendingOrder(pendingOrderKey)) return;
     holdRequestedRef.current = true;
 
     const holdItems = items.map((i) => ({
@@ -91,47 +182,29 @@ export function Checkout() {
       allowSplit: false,
     }));
 
-    const allUuids = holdItems.every((item) => VALID_UUID_REGEX.test(item.slotId));
-
-    if (!allUuids) {
-      console.warn('[Checkout] Phát hiện item mock cũ trong giỏ hàng, tự động làm mới giỏ hàng.');
+    if (!items.every((item) => VALID_UUID_REGEX.test(item.slotId) && VALID_UUID_REGEX.test(item.serviceId))) {
       useCartStore.getState().clearCart();
       navigate('/cart');
       return;
     }
 
-    if (isAuthenticated) {
-      bookingService
-        .holdBooking({ items: holdItems })
-        .then((res) => {
-          setBookingHold(res);
-          const expireTime = res.holdExpiresAt || res.expiresAt;
-          if (expireTime) {
-            const expireDate = new Date(expireTime).getTime();
-            const now = Date.now();
-            const diffSec = Math.max(0, Math.floor((expireDate - now) / 1000));
-            if (diffSec > 0) setCountdown(diffSec);
-          }
-        })
-        .catch((err) => {
-          console.warn('[Checkout] Không thể giữ chỗ qua API, dùng chế độ giữ chỗ cục bộ:', err);
-        });
-    }
-  }, [items, isAuthenticated, navigate]);
-
-  // 15-minute countdown timer
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
+    const request = bookingService.holdBooking({ items: holdItems });
+    holdRequest.current = request;
+    request
+      .then(setBookingHold)
+      .catch((err) => {
+        console.warn('[Checkout] Không thể giữ chỗ qua API:', err);
+      })
+      .finally(() => {
+        if (holdRequest.current === request) holdRequest.current = null;
       });
-    }, 1000);
+  }, [items, isAuthenticated, navigate, pendingOrderKey]);
+
+  useEffect(() => {
+    if (!deadline) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [deadline]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -216,9 +289,10 @@ export function Checkout() {
   // Submit Payment Handler
   const handlePayment = async () => {
     if (isHoldExpired) {
-      setPaymentError("Thời gian giữ chỗ 15 phút đã kết thúc. Vui lòng quay lại giỏ hàng để cập nhật lại suất trống.");
+      setPaymentError("Thời hạn đã kết thúc. Vui lòng quay lại giỏ hàng để chọn lại suất.");
       return;
     }
+    if (!paymentProvider || isProcessingPayment) return;
 
     setIsProcessingPayment(true);
     setPaymentError(null);
@@ -226,31 +300,62 @@ export function Checkout() {
     if (isAuthenticated) {
       try {
 
-        let activeHold = bookingHold;
-        if (!activeHold?.bookingId) {
-          const invalidItem = items.find((i) => !VALID_UUID_REGEX.test(i.slotId) || !VALID_UUID_REGEX.test(i.serviceId));
-          if (invalidItem) {
-            useCartStore.getState().clearCart();
-            setPaymentError('Giỏ hàng chứa dịch vụ từ phiên bản cũ (ID không hợp lệ). Hệ thống đã làm mới giỏ hàng, vui lòng chọn lại tour từ trang chủ.');
+        // Resume the same order after an uncertain payment submission or browser refresh.
+        let orderRes;
+        if (pendingOrder) {
+          try {
+            orderRes = await orderService.getOrderDetail(pendingOrder.id);
+          } catch (error) {
+            const { status } = (error as CheckoutPaymentError).response ?? {};
+            if (status === 403 || status === 404) savePendingOrder(pendingOrderKey, null);
+            throw error;
+          }
+          if (orderRes.status !== "PENDING_PAYMENT") {
+            savePendingOrder(pendingOrderKey, null);
+            setBookingHold(null);
             setIsProcessingPayment(false);
+            setPaymentError("Đơn hàng này đã được xử lý. Vui lòng kiểm tra trạng thái trong mục Đơn hàng.");
             return;
           }
-          const holdItems = items.map((i) => ({
-            slotId: i.slotId,
-            quantity: i.quantity,
-            optionId: i.optionId,
-            participantsCount: i.quantity,
-            allowSplit: false,
-          }));
-          activeHold = await bookingService.holdBooking({ items: holdItems });
-          setBookingHold(activeHold);
+        } else {
+          let activeHold = bookingHold ?? await holdRequest.current;
+          if (!activeHold?.bookingId) {
+            activeHold = await bookingService.holdBooking({ items: items.map((item) => ({
+              slotId: item.slotId,
+              quantity: item.quantity,
+              optionId: item.optionId,
+              participantsCount: item.quantity,
+              allowSplit: false,
+            })) });
+            setBookingHold(activeHold);
+          }
+          orderRes = await orderService.createOrder({
+            bookingId: activeHold.bookingId,
+            discountCode: appliedPromoCode || undefined,
+          });
         }
-
-        // 1. Create Master Order
-        const orderRes = await orderService.createOrder({
-          bookingId: activeHold.bookingId,
-          discountCode: appliedPromoCode || undefined,
-        });
+        const orderId = orderRes.id;
+        const currentStatus = pendingOrder
+          ? await paymentService.getOrderPaymentStatus(orderId)
+          : undefined;
+        if (currentStatus) {
+          setPendingStatus({ ...currentStatus, orderId });
+          if (currentStatus.isExpired || currentStatus.orderStatus !== "PENDING_PAYMENT"
+              || currentStatus.paymentStatus !== "UNPAID") {
+            setIsProcessingPayment(false);
+            setPaymentError(currentStatus.isExpired
+              ? "Đơn hàng đã hết hạn thanh toán. Vui lòng quay lại giỏ hàng để chọn lại suất."
+              : "Đơn hàng đã được xử lý. Vui lòng kiểm tra trạng thái trong mục Đơn hàng.");
+            return;
+          }
+        }
+        if (currentStatus?.activeProvider && currentStatus.activeProvider !== paymentProvider
+            && currentStatus.activeProvider !== paymentStatus?.activeProvider) {
+          setIsProcessingPayment(false);
+          setPaymentError("Phương thức đang giữ giao dịch đã thay đổi. Vui lòng kiểm tra lựa chọn trước khi đổi cổng.");
+          return;
+        }
+        savePendingOrder(pendingOrderKey, { id: orderId, provider: paymentProvider });
 
         // 2. Synchronize safety waiver acceptance for all sub-orders requiring it
         const orderSubOrders = orderRes.items || orderRes.subOrders || [];
@@ -273,31 +378,18 @@ export function Checkout() {
         }
 
         // 3. Create Payment Intent
+        const submitIntent = () => currentStatus
+          ? paymentService.continuePayment(orderId, { provider: paymentProvider }, currentStatus)
+          : paymentService.createPaymentIntent(orderId, { provider: paymentProvider });
+
         let payRes;
         try {
-          payRes = await paymentService.createPaymentIntent(orderRes.id, {
-            provider: paymentProvider,
-          });
-        } catch (paymentErr) {
-          const apiErr = paymentErr as {
-            response?: {
-              data?: {
-                errorCode?: string;
-                missingWaivers?: Array<{
-                  subOrderId: string;
-                  waiverVersion?: number;
-                  contentLanguage?: string;
-                }>;
-              };
-            };
-          };
-          if (
-            apiErr.response?.data?.errorCode === 'WAIVER_ACCEPTANCE_REQUIRED' &&
-            Array.isArray(apiErr.response?.data?.missingWaivers)
-          ) {
-            const missing = apiErr.response.data.missingWaivers;
+          payRes = await submitIntent();
+        } catch (error) {
+          const data = (error as CheckoutPaymentError).response?.data;
+          if ((data?.errorCode ?? data?.code) === "WAIVER_ACCEPTANCE_REQUIRED" && Array.isArray(data?.missingWaivers)) {
             await Promise.all(
-              missing.map((m: { subOrderId: string; waiverVersion?: number; contentLanguage?: string }) =>
+              data.missingWaivers.map((m) =>
                 orderService.acceptSubOrderWaiver(m.subOrderId, {
                   accepted: true,
                   version: m.waiverVersion || 1,
@@ -305,48 +397,16 @@ export function Checkout() {
                 })
               )
             );
-            payRes = await paymentService.createPaymentIntent(orderRes.id, {
-              provider: paymentProvider,
-            });
+            payRes = await submitIntent();
           } else {
-            throw paymentErr;
+            throw error;
           }
         }
 
         // 4. Backend returns paymentReference (which contains the gateway redirect URL)
-        const gatewayUrl = payRes.paymentReference || payRes.paymentUrl;
+        const gatewayUrl = payRes.paymentUrl || payRes.paymentReference;
         if (gatewayUrl && (gatewayUrl.startsWith("http://") || gatewayUrl.startsWith("https://"))) {
-          
-          // Save order snapshot for Step 3 (PaymentResult) when returning from VNPay gateway
-          const orderSnapshot = {
-            orderId: orderRes.id,
-            orderCode: `#ORD-${orderRes.id.slice(0, 8).toUpperCase()}`,
-            customerName: fullName.trim() || "Khách Hàng DANASEA",
-            customerPhone: phone.trim() || "0912 345 678",
-            customerEmail: email.trim() || "khachhang@danasea.vn",
-            specialRequest: notes.trim(),
-            paymentProvider: paymentProvider,
-            items: items.map((item, idx) => ({
-              id: item.id || `item-${idx}`,
-              serviceId: item.serviceId,
-              slotId: item.slotId,
-              serviceName: item.serviceName || 'Trải nghiệm biển Đà Nẵng',
-              thumbnailUrl: item.thumbnailUrl || 'https://images.unsplash.com/photo-1544551763-46a013bb70d5',
-              unitPrice: item.unitPrice,
-              quantity: item.quantity,
-              date: item.selectedDate || item.date || 'Hôm nay',
-              timeSlot: item.timeSlot || '08:00 - 10:00',
-              locationName: item.locationName || 'Bán đảo Sơn Trà, Đà Nẵng',
-              vendorName: item.vendorName || 'DanaSea Marine Club',
-              ticketCode: `TKT-${sessionCode || '89412'}-0${idx + 1}`
-            })),
-            rawTotal: rawTotal,
-            discountAmount: discountAmount,
-            appliedPromoCode: appliedPromoCode,
-            finalTotal: finalTotal,
-            paidAt: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' • ' + new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-          };
-          sessionStorage.setItem('danasea_last_order', JSON.stringify(orderSnapshot));
+          savePurchasedItems(payRes.paymentId, items.map(({ id, quantity }) => ({ id, quantity })));
           window.location.assign(gatewayUrl);
           return;
         } else {
@@ -355,8 +415,12 @@ export function Checkout() {
           return;
         }
       } catch (err) {
-        const error = err as { response?: { data?: { message?: string } } };
-        console.error('[Checkout] Lỗi khi tạo đơn hàng:', err);
+        const error = err as CheckoutPaymentError;
+        const code = error.response?.data?.code ?? error.response?.data?.errorCode;
+        if (code === "PAYMENT_WINDOW_EXPIRED") {
+          savePendingOrder(pendingOrderKey, null);
+          setBookingHold(null);
+        }
         setIsProcessingPayment(false);
         setPaymentError(error.response?.data?.message || "Không thể khởi tạo giao dịch thanh toán. Vui lòng kiểm tra lại kết nối và thử lại.");
         return;
@@ -407,14 +471,16 @@ export function Checkout() {
                   {isHoldExpired ? (
                     <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
                       <Timer className="w-4 h-4 text-rose-600" />
-                      <span>Hết thời gian giữ chỗ</span>
+                      <span>{pendingOrderId ? "Hết hạn thanh toán" : "Hết thời gian giữ chỗ"}</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 text-slate-900 text-sm">
                       <Timer className="w-4 h-4 text-slate-700" />
-                      <span className="font-medium text-slate-700">Thời gian giữ chỗ:</span>
+                      <span className="font-medium text-slate-700">
+                        {pendingOrderId ? "Thời gian thanh toán" : "Thời gian giữ chỗ"}
+                      </span>
                       <span className="font-bold font-mono text-base text-slate-900 tabular-nums">
-                        {formatTime(countdown)}
+                        {countdown === undefined ? "—" : formatTime(countdown)}
                       </span>
                     </div>
                   )}
@@ -492,60 +558,41 @@ export function Checkout() {
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    <label 
-                      onClick={() => setPaymentProvider("VNPAY")}
-                      className={`p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                        paymentProvider === "VNPAY" 
-                          ? "border-slate-900 bg-slate-50/80 shadow-xs" 
-                          : "border-slate-200 bg-white hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <input 
-                          checked={paymentProvider === "VNPAY"} 
-                          onChange={() => setPaymentProvider("VNPAY")}
-                          className="w-4 h-4 accent-slate-900 cursor-pointer" 
-                          name="payment_method" 
-                          type="radio" 
-                          value="VNPAY"
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-slate-900">Cổng VNPAY (QR Pay / Thẻ ATM &amp; Quốc tế)</span>
-                            <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
-                              Phổ biến
-                            </span>
+                    {visiblePaymentMethods.map(({ provider, name, description, icon: Icon }) => (
+                      <label
+                        key={provider}
+                        className={`p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                          paymentProvider === provider
+                            ? "border-slate-900 bg-slate-50/80 shadow-xs"
+                            : "border-slate-200 bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <input
+                            checked={paymentProvider === provider}
+                            onChange={() => setSelectedProvider(provider)}
+                            disabled={isProcessingPayment || !paymentProvider}
+                            className="w-4 h-4 accent-slate-900 cursor-pointer"
+                            name="payment_method"
+                            type="radio"
+                            value={provider}
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-slate-900">{name}</span>
+                              {provider === "VNPAY" && (
+                                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                                  Phổ biến
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-0.5">{description}</p>
                           </div>
-                          <p className="text-xs text-slate-500 mt-0.5">Hỗ trợ quét mã QR qua 30+ ứng dụng ngân hàng</p>
                         </div>
-                      </div>
-                      <QrCode className="w-5 h-5 text-slate-700 shrink-0" />
-                    </label>
-
-                    <label 
-                      onClick={() => setPaymentProvider("PAYPAL")}
-                      className={`p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                        paymentProvider === "PAYPAL" 
-                          ? "border-slate-900 bg-slate-50/80 shadow-xs" 
-                          : "border-slate-200 bg-white hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <input 
-                          checked={paymentProvider === "PAYPAL"} 
-                          onChange={() => setPaymentProvider("PAYPAL")}
-                          className="w-4 h-4 accent-slate-900 cursor-pointer" 
-                          name="payment_method" 
-                          type="radio" 
-                          value="PAYPAL"
-                        />
-                        <div>
-                          <span className="text-sm font-bold text-slate-900">Cổng PayPal (Thẻ quốc tế Visa, MasterCard)</span>
-                          <p className="text-xs text-slate-500 mt-0.5">Dành cho du khách quốc tế hoặc thanh toán ngoại tệ</p>
-                        </div>
-                      </div>
-                      <CreditCard className="w-5 h-5 text-slate-700 shrink-0" />
-                    </label>
+                        <Icon className="w-5 h-5 text-slate-700 shrink-0" aria-hidden="true" />
+                      </label>
+                    ))}
+                    {!paymentProvider && <p className="text-sm text-slate-600">Hiện chưa có phương thức thanh toán khả dụng.</p>}
                   </div>
                 </div>
 
@@ -693,7 +740,10 @@ export function Checkout() {
 
                   {isHoldExpired ? (
                     <button
-                      onClick={() => navigate('/cart')}
+                      onClick={() => {
+                        if (pendingOrderId) savePendingOrder(pendingOrderKey, null);
+                        navigate('/cart');
+                      }}
                       type="button"
                       className="w-full py-3.5 rounded-xl font-bold text-sm bg-rose-600 hover:bg-rose-700 text-white shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
@@ -703,7 +753,7 @@ export function Checkout() {
                   ) : (
                     <button 
                       onClick={handlePayment} 
-                      disabled={isProcessingPayment}
+                      disabled={isProcessingPayment || !paymentProvider}
                       className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-xs transition-colors flex items-center justify-center cursor-pointer ${
                         !isProcessingPayment
                           ? 'bg-[#0284c7] hover:bg-[#0369a1] text-white active:scale-95'
@@ -717,7 +767,8 @@ export function Checkout() {
                           <span>Đang kết nối cổng thanh toán...</span>
                         </span>
                       ) : (
-                        <span>Xác nhận &amp; Thanh toán</span>
+                        <span>{paymentStatus?.activeProvider && paymentStatus.activeProvider !== paymentProvider
+                          ? "Đổi cổng và thanh toán" : "Xác nhận & Thanh toán"}</span>
                       )}
                     </button>
                   )}

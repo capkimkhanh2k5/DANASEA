@@ -17,6 +17,7 @@ import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
 import { AdminButton, AdminDisclosure, AdminFilterTabs, AdminNotice, AdminPagination } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import { filterMasterOrders, ordersToCsv, relatedSubOrders, simulateRefund } from './ordersModel';
+import { ManualRefundPanel } from './ManualRefundPanel';
 import './AdminOrders.css';
 
 const statuses = [
@@ -74,7 +75,8 @@ export function OrderDetailContent({
   simulatedReasons,
   onRefund,
   payment,
-  refund
+  refund,
+  showLiveRefunds = false,
 }: {
   master: MasterOrder;
   subs: SubOrder[];
@@ -83,6 +85,7 @@ export function OrderDetailContent({
   onRefund: (sub: SubOrder) => void;
   payment?: Payment;
   refund?: Refund;
+  showLiveRefunds?: boolean;
 }) {
   const ext = master as DemoMasterOrderExtended;
   const customerUser = MOCK_ADMIN_USERS.find(u => u.id === master.customerId);
@@ -293,7 +296,7 @@ export function OrderDetailContent({
         ) : (
           <>
             <AdminBadge tone="neutral">Chưa có dữ liệu thanh toán</AdminBadge>
-            <p className="admin-detail-note">Trạng thái Master/Sub Order không xác nhận một giao dịch thanh toán hoặc hoàn tiền. Nguồn dữ liệu hiện tại chưa cung cấp bản ghi Payment hay Refund.</p>
+            <p className="admin-detail-note">Chưa có bản ghi thanh toán để đối chiếu tại đây.</p>
             <AdminDisclosure title="Dữ liệu đối soát" description="Các thông tin còn thiếu để xác minh giao dịch">
               <dl className="admin-detail-grid">
                 <div><dt>Mã Payment / giao dịch cổng</dt><dd>Chưa được cung cấp</dd></div>
@@ -317,6 +320,7 @@ export function OrderDetailContent({
             </div>
           </>
         )}
+        {showLiveRefunds && <ManualRefundPanel orderId={master.id} />}
       </section>
     </div>
   );
@@ -339,6 +343,7 @@ export function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [refundTarget, setRefundTarget] = useState<SubOrder | null>(null);
   const [refundOpen, setRefundOpen] = useState(false);
+  const [refundQueueOpen, setRefundQueueOpen] = useState(false);
   const [refundReason, setRefundReason] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
   const [exportError, setExportError] = useState(false);
@@ -529,6 +534,7 @@ export function AdminOrders() {
                 Xóa bộ lọc
               </AdminButton>
             )}
+            {!demo && <AdminButton onClick={() => setRefundQueueOpen(true)}>Yêu cầu hoàn tiền</AdminButton>}
             <AdminButton onClick={exportCsv} disabled={filteredOrders.length === 0}>
               <Download size={16} aria-hidden="true" />
               Xuất CSV ({filteredOrders.length})
@@ -690,9 +696,16 @@ export function AdminOrders() {
             onRefund={openRefund}
             payment={selectedPayment}
             refund={selectedRefund}
+            showLiveRefunds={drawerOpen && !demo}
           />
         )}
       </AdminDialog>
+
+      {!demo && (
+        <AdminDialog open={refundQueueOpen} onClose={() => setRefundQueueOpen(false)} title="Yêu cầu hoàn tiền đang chờ" variant="drawer">
+          {refundQueueOpen && <ManualRefundPanel />}
+        </AdminDialog>
+      )}
 
       {/* Modal xác nhận mô phỏng hoàn tiền */}
       <AdminDialog

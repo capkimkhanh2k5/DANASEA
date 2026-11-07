@@ -9,10 +9,12 @@ import org.springframework.boot.mail.autoconfigure.MailProperties;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
+import com.danasea.backend.configs.properties.CheckinProperties;
 import com.danasea.backend.configs.properties.CloudinaryProperties;
 import com.danasea.backend.configs.properties.CorsProperties;
+import com.danasea.backend.configs.properties.PayOSProperties;
 import com.danasea.backend.configs.properties.PaymentProperties;
-import com.danasea.backend.configs.properties.CheckinProperties;
+import com.danasea.backend.configs.properties.ZaloPayProperties;
 import com.danasea.backend.modules.ai.infrastructure.cliproxy.configs.CliProxyProperties;
 import com.danasea.backend.security.authentication.infrastructure.security.JwtProperties;
 
@@ -29,6 +31,8 @@ public class ProductionConfigurationValidator {
     private final JwtProperties jwt;
     private final CheckinProperties checkin;
     private final CliProxyProperties cliProxy;
+    private final PayOSProperties payOS;
+    private final ZaloPayProperties zaloPay;
 
     public ProductionConfigurationValidator(
             CloudinaryProperties cloudinary,
@@ -37,7 +41,9 @@ public class ProductionConfigurationValidator {
             PaymentProperties payment,
             JwtProperties jwt,
             CheckinProperties checkin,
-            CliProxyProperties cliProxy) {
+            CliProxyProperties cliProxy,
+            PayOSProperties payOS,
+            ZaloPayProperties zaloPay) {
         this.cloudinary = cloudinary;
         this.cors = cors;
         this.mail = mail;
@@ -45,6 +51,8 @@ public class ProductionConfigurationValidator {
         this.jwt = jwt;
         this.checkin = checkin;
         this.cliProxy = cliProxy;
+        this.payOS = payOS;
+        this.zaloPay = zaloPay;
     }
 
     @PostConstruct
@@ -71,6 +79,44 @@ public class ProductionConfigurationValidator {
         if (cors.allowedOrigins().stream().anyMatch(origin -> !isExactHttpsOrigin(origin))) {
             throw new IllegalStateException("Production CORS origins must be exact HTTPS origins without localhost.");
         }
+        validatePaymentGateways();
+    }
+
+    private void validatePaymentGateways() {
+        if (payOS.enabled()) {
+            requireText(payOS.clientId(), "danasea.payment.payos.client-id");
+            requireText(payOS.apiKey(), "danasea.payment.payos.api-key");
+            requireText(payOS.checksumKey(), "danasea.payment.payos.checksum-key");
+            requirePublicHttpsUrl(payOS.baseUrl(), "danasea.payment.payos.base-url");
+            requirePublicHttpsUrl(payOS.returnUrl(), "danasea.payment.payos.return-url");
+            requirePublicHttpsUrl(payOS.cancelUrl(), "danasea.payment.payos.cancel-url");
+        }
+        if (zaloPay.enabled()) {
+            if (zaloPay.appId() == null || zaloPay.appId() <= 0) {
+                throw new IllegalStateException("A positive production application ID is required: danasea.payment.zalopay.app-id");
+            }
+            requireText(zaloPay.key1(), "danasea.payment.zalopay.key1");
+            requireText(zaloPay.key2(), "danasea.payment.zalopay.key2");
+            requirePublicHttpsUrl(zaloPay.endpoint(), "danasea.payment.zalopay.endpoint");
+            requirePublicHttpsUrl(zaloPay.returnUrl(), "danasea.payment.zalopay.return-url");
+            requirePublicHttpsUrl(zaloPay.callbackUrl(), "danasea.payment.zalopay.callback-url");
+        }
+    }
+
+    private void requirePublicHttpsUrl(String value, String property) {
+        try {
+            URI uri = URI.create(value == null ? "" : value);
+            String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT).replaceFirst("\\.$", "");
+            if ("https".equalsIgnoreCase(uri.getScheme()) && host.contains(".") && !host.startsWith("[")
+                    && !host.matches("[0-9.]+") && !host.endsWith(".localhost") && !host.endsWith(".localdomain")
+                    && !host.endsWith(".local") && !host.endsWith(".internal") && !host.endsWith(".lan")
+                    && uri.getUserInfo() == null && uri.getRawFragment() == null && uri.getRawQuery() == null) {
+                return;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Report the property name without including the malformed configuration value.
+        }
+        throw new IllegalStateException("Production payment URL must use a public HTTPS hostname: " + property);
     }
 
     private void requireText(String value, String property) {

@@ -16,6 +16,7 @@ public record OrderResponse(
         BigDecimal discountAmount,
         List<SubOrderResponse> items,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        OffsetDateTime paymentDeadline
 ) {
 }

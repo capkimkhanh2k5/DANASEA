@@ -14,6 +14,12 @@ import com.danasea.backend.modules.booking.infrastructure.persistence.repositori
 import com.danasea.backend.modules.flashsale.domain.FlashSaleException;
 import com.danasea.backend.modules.order.application.dtos.CreatePaymentIntentCommand;
 import com.danasea.backend.modules.order.application.services.DisruptionDecisionService;
+import com.danasea.backend.modules.order.application.services.PaymentCoordinator;
+import com.danasea.backend.modules.order.domain.models.PaymentAttemptState;
+import com.danasea.backend.modules.order.infrastructure.adapters.PayOSPaymentAdapter;
+import com.danasea.backend.modules.order.infrastructure.adapters.PayPalPaymentAdapter;
+import com.danasea.backend.modules.order.infrastructure.adapters.VNPayPaymentAdapter;
+import com.danasea.backend.modules.order.infrastructure.adapters.PaymentGatewayRegistry;
 import com.danasea.backend.modules.order.application.services.WaiverAcceptanceGuard;
 import com.danasea.backend.modules.order.application.usecases.CreatePaymentIntentUseCase;
 import com.danasea.backend.modules.order.domain.events.PaymentSuccessEvent;
@@ -80,17 +86,23 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -135,6 +147,24 @@ public class OrderPaymentService {
         this.localizedContentSelector = localizedContentSelector;
     }
 
+    private PaymentCoordinator paymentCoordinator;
+    private PaymentGatewayRegistry paymentGatewayRegistry;
+
+    @Autowired
+    public void setPaymentCoordinator(@Autowired(required = false) PaymentCoordinator paymentCoordinator) {
+        this.paymentCoordinator = paymentCoordinator;
+    }
+
+    @Autowired
+    public void setPaymentGatewayRegistry(@Autowired(required = false) PaymentGatewayRegistry paymentGatewayRegistry) {
+        this.paymentGatewayRegistry = paymentGatewayRegistry;
+    }
+
+    @Autowired
+    public void setPaymentGatewayPort(@Autowired(required = false) PaymentGatewayPort paymentGatewayPort) {
+        this.paymentGatewayPort = paymentGatewayPort;
+    }
+
     private DepartureCheckoutGuard departureCheckout;
 
     @Autowired
@@ -155,7 +185,7 @@ public class OrderPaymentService {
     private final ObjectMapper objectMapper;
     private final CreatePaymentIntentUseCase createPaymentIntentUseCase;
     private final RefundProcessingService refundProcessingService;
-    private final PaymentGatewayPort paymentGatewayPort;
+    private PaymentGatewayPort paymentGatewayPort;
     private final TransactionTemplate gatewayTransaction;
     private final AuditLogInternalApi auditLogInternalApi;
 
@@ -430,6 +460,11 @@ public class OrderPaymentService {
             UUID orderId,
             PaymentProvider provider,
             String idempotencyKey) {
+        if (paymentCoordinator != null) {
+            var window = paymentCoordinator.startPayment(customerId, orderId, provider, idempotencyKey);
+            return new PaymentIntentResponse(window.paymentId(), window.orderId(), window.provider(),
+                    window.amount(), PaymentStatus.PENDING, window.paymentUrl(), window.danaseaDeadlineAt());
+        }
         var result = createPaymentIntentUseCase.execute(
                 new CreatePaymentIntentCommand(customerId, orderId, provider, idempotencyKey));
         return new PaymentIntentResponse(result.paymentId(), result.orderId(), result.provider(),
@@ -552,6 +587,7 @@ public class OrderPaymentService {
                 paymentRepository.save(payment);
                 return new CaptureOutcome(toPaymentResponse(payment), ex.getMessage());
             }
+            payment.setPaidAt(result.paidAt());
             applyPaymentSuccess(payment, order, result.captureId(), null, null);
             return new CaptureOutcome(toPaymentResponse(payment), null);
         });
@@ -590,12 +626,17 @@ public class OrderPaymentService {
     }
 
     private void validateCaptureResult(PaymentJpaEntity payment, PaymentCaptureResult result) {
+        BigDecimal expectedAmount = payment.getProviderAmount() != null ? payment.getProviderAmount() : payment.getAmount();
+        String expectedCurrency = payment.getProviderCurrency();
+        if (expectedCurrency == null && payment.getProvider() != PaymentProvider.PAYPAL) {
+            expectedCurrency = "VND";
+        }
         if (result == null || !result.success() || !"COMPLETED".equalsIgnoreCase(result.status())
                 || result.captureId() == null || result.captureId().isBlank()
-                || result.amount() == null || payment.getProviderAmount() == null
-                || payment.getProviderAmount().signum() <= 0
-                || payment.getProviderAmount().compareTo(result.amount()) != 0
-                || payment.getProviderCurrency() == null || !payment.getProviderCurrency().equals(result.currency())) {
+                || result.amount() == null || expectedAmount == null
+                || expectedAmount.signum() <= 0
+                || expectedAmount.compareTo(result.amount()) != 0
+                || expectedCurrency == null || result.currency() == null || !expectedCurrency.equalsIgnoreCase(result.currency())) {
             throw new PaymentGatewayException("Capture ID, amount, currency, or status does not match the payment intent.");
         }
     }
@@ -657,6 +698,7 @@ public class OrderPaymentService {
             return new PaymentWebhookResponse(eventId, payment.getId(), payment.getStatus(), true);
         }
         MasterOrderJpaEntity order = lockPaymentOrder(payment);
+        payment.setPaidAt(PayPalPaymentAdapter.parsePaymentTime(resource.path("create_time").asText()));
         applyPaymentSuccess(payment, order, captureId, eventId, payload);
         return new PaymentWebhookResponse(eventId, payment.getId(), payment.getStatus(), false);
     }
@@ -719,7 +761,10 @@ public class OrderPaymentService {
         }
 
         String secureHash = params.get("vnp_SecureHash");
-        if (paymentGatewayPort == null || !paymentGatewayPort.verifyWebhookSignature(params, secureHash)) {
+        PaymentGatewayPort vnpayAdapter = paymentGatewayPort != null
+                ? paymentGatewayPort
+                : (paymentGatewayRegistry != null ? paymentGatewayRegistry.getAdapter(PaymentProvider.VNPAY) : null);
+        if (vnpayAdapter == null || !vnpayAdapter.verifyWebhookSignature(params, secureHash)) {
             return Map.of("RspCode", "97", "Message", "Invalid Checksum");
         }
 
@@ -762,6 +807,7 @@ public class OrderPaymentService {
             if (transactionNo == null || transactionNo.isBlank()) {
                 return Map.of("RspCode", "99", "Message", "Payment requires reconciliation");
             }
+            payment.setPaidAt(VNPayPaymentAdapter.parsePaymentTime(params.getOrDefault("vnp_PayDate", "")));
             applyPaymentSuccess(payment, masterOrder, transactionNo, transactionNo, params.toString());
             return Map.of("RspCode", "00", "Message", "Confirm Success");
         } else {
@@ -769,6 +815,8 @@ public class OrderPaymentService {
             payment.setRawWebhookPayload(params.toString());
             if ("02".equals(params.get("vnp_TransactionStatus"))) {
                 payment.setStatus(PaymentStatus.FAILED);
+                payment.setIsActive(false);
+                payment.setAttemptState(PaymentAttemptState.FAILED);
                 payment.setLastError("GATEWAY_PAYMENT_FAILED: " + responseCode);
                 payment.setReconciliationNextAttemptAt(null);
                 paymentRepository.save(payment);
@@ -781,6 +829,149 @@ public class OrderPaymentService {
         }
     }
 
+    public boolean reconcilePaymentWithGateway(UUID orderId) {
+        return paymentRepository.findByMasterOrderIdAndIsActiveTrue(orderId)
+                .filter(payment -> payment.getStatus() == PaymentStatus.PENDING)
+                .map(payment -> reconcilePayment(payment.getId()))
+                .orElse(false);
+    }
+
+    @Transactional
+    public Map<String, Object> processPayOSWebhook(String rawPayload, String signature) {
+        if (rawPayload == null || rawPayload.isBlank()) {
+            return Map.of("code", "01", "desc", "Empty payload");
+        }
+        try {
+            JsonNode root = objectMapper.readTree(rawPayload);
+            String sig = (signature != null && !signature.isBlank()) ? signature : root.path("signature").asText();
+            PaymentGatewayPort payosAdapter = (paymentGatewayRegistry != null)
+                    ? paymentGatewayRegistry.getAdapter(PaymentProvider.PAYOS)
+                    : null;
+            JsonNode dataNode = root.path("data");
+            boolean validSig = false;
+            if (payosAdapter instanceof PayOSPaymentAdapter payosImpl && dataNode.isObject()) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> dataMap = objectMapper.convertValue(dataNode, Map.class);
+                validSig = payosImpl.verifyWebhookData(dataMap, sig);
+            } else if (payosAdapter != null) {
+                validSig = payosAdapter.verifyWebhookSignature(Map.of("rawPayload", rawPayload), sig);
+            }
+            if (!validSig) {
+                log.warn("Invalid payOS webhook signature.");
+                return Map.of("code", "02", "desc", "Invalid signature");
+            }
+
+            JsonNode data = root.path("data");
+            long orderCode = data.path("orderCode").asLong();
+            String reference = data.path("reference").asText();
+            if (orderCode == 123 && "TF230204212323".equals(reference) && "VQRIO123".equals(data.path("description").asText())) {
+                return Map.of("code", "00", "desc", "Webhook verified");
+            }
+            if (!"00".equals(data.path("code").asText()) || !"VND".equals(data.path("currency").asText())
+                    || reference.isBlank()) {
+                return Map.of("code", "04", "desc", "Invalid transaction data");
+            }
+
+            PaymentJpaEntity payment = paymentRepository.findByPayosOrderCodeForUpdate(orderCode)
+                    .or(() -> paymentRepository.findByProviderAndProviderOrderIdForUpdate(
+                            PaymentProvider.PAYOS, String.valueOf(orderCode)))
+                    .orElse(null);
+            if (payment == null) {
+                log.warn("payOS payment not found for orderCode: {}", orderCode);
+                return Map.of("code", "01", "desc", "Order not found");
+            }
+
+            MasterOrderJpaEntity masterOrder = masterOrderRepository.findByIdForUpdate(payment.getMasterOrderId()).orElse(null);
+            if (masterOrder == null) {
+                return Map.of("code", "01", "desc", "MasterOrder not found");
+            }
+
+            if (payment.getStatus() == PaymentStatus.SUCCESS || payment.getStatus() == PaymentStatus.REFUNDED) {
+                return Map.of("code", "00", "desc", "Success");
+            }
+
+            BigDecimal receivedAmount = new BigDecimal(data.path("amount").asText("0"));
+            if (payment.getAmount() == null || payment.getAmount().compareTo(receivedAmount) != 0) {
+                log.warn("payOS amount mismatch for payment {}: expected {}, got {}", payment.getId(), payment.getAmount(), receivedAmount);
+                return Map.of("code", "04", "desc", "Invalid amount");
+            }
+
+            payment.setPaidAt(PayOSPaymentAdapter.parsePaymentTime(data.path("transactionDateTime").asText()));
+            applyPaymentSuccess(payment, masterOrder, reference, reference, rawPayload);
+            return Map.of("code", "00", "desc", "Success");
+        } catch (Exception ex) {
+            log.error("Failed to process payOS webhook", ex);
+            rollbackWebhook();
+            return Map.of("code", "99", "desc", "Payment callback could not be processed");
+        }
+    }
+
+    @Transactional
+    public Map<String, Object> processZaloPayCallback(String rawPayload) {
+        if (rawPayload == null || rawPayload.isBlank()) {
+            return Map.of("return_code", 2, "return_message", "Empty payload");
+        }
+        try {
+            JsonNode root = objectMapper.readTree(rawPayload);
+            String dataStr = root.path("data").asText();
+            String mac = root.path("mac").asText();
+
+            PaymentGatewayPort zaloPayAdapter = (paymentGatewayRegistry != null)
+                    ? paymentGatewayRegistry.getAdapter(PaymentProvider.ZALOPAY)
+                    : null;
+            if (zaloPayAdapter == null || !zaloPayAdapter.verifyWebhookSignature(Map.of("data", dataStr), mac)) {
+                log.warn("Invalid ZaloPay callback MAC.");
+                return Map.of("return_code", -1, "return_message", "Invalid MAC");
+            }
+
+            JsonNode dataNode = objectMapper.readTree(dataStr);
+            String appTransId = dataNode.path("app_trans_id").asText();
+            PaymentJpaEntity payment = paymentRepository.findByProviderAndProviderOrderIdForUpdate(PaymentProvider.ZALOPAY, appTransId).orElse(null);
+            if (payment == null) {
+                log.warn("ZaloPay payment not found for appTransId: {}", appTransId);
+                return Map.of("return_code", 2, "return_message", "Order not found");
+            }
+
+            MasterOrderJpaEntity masterOrder = masterOrderRepository.findByIdForUpdate(payment.getMasterOrderId()).orElse(null);
+            if (masterOrder == null) {
+                return Map.of("return_code", 2, "return_message", "MasterOrder not found");
+            }
+
+            if (payment.getStatus() == PaymentStatus.SUCCESS || payment.getStatus() == PaymentStatus.REFUNDED) {
+                return Map.of("return_code", 1, "return_message", "success");
+            }
+
+            BigDecimal receivedAmount = new BigDecimal(dataNode.path("amount").asText("0"));
+            if (payment.getAmount() == null || payment.getAmount().compareTo(receivedAmount) != 0) {
+                log.warn("ZaloPay amount mismatch for payment {}: expected {}, got {}", payment.getId(), payment.getAmount(), receivedAmount);
+                return Map.of("return_code", 2, "return_message", "Invalid amount");
+            }
+
+            String zpTransId = dataNode.path("zp_trans_id").asText();
+            if (zpTransId.isBlank()) {
+                return Map.of("return_code", 2, "return_message", "Missing transaction ID");
+            }
+            long serverTime = dataNode.path("server_time").asLong();
+            if (serverTime > 0) {
+                payment.setPaidAt(Instant.ofEpochMilli(serverTime).atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toOffsetDateTime());
+            }
+            applyPaymentSuccess(payment, masterOrder, zpTransId, appTransId, rawPayload);
+            return Map.of("return_code", 1, "return_message", "success");
+        } catch (JsonProcessingException ex) {
+            return Map.of("return_code", 2, "return_message", "Malformed callback");
+        } catch (RuntimeException ex) {
+            log.error("Failed to process ZaloPay callback", ex);
+            rollbackWebhook();
+            return Map.of("return_code", 0, "return_message", "Payment callback could not be processed");
+        }
+    }
+
+    private void rollbackWebhook() {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+        }
+    }
+
     private void applyPaymentSuccess(
             PaymentJpaEntity payment,
             MasterOrderJpaEntity order,
@@ -790,6 +981,37 @@ public class OrderPaymentService {
 
         boolean locallyExpired = order.getStatus() == MasterOrderStatus.CANCELLED
                 && order.getPaymentStatus() == PaymentOrderStatus.UNPAID;
+        boolean alreadyPaidOrder = order.getPaymentStatus() == PaymentOrderStatus.PAID
+                || order.getPaymentStatus() == PaymentOrderStatus.REFUNDED
+                || order.getPaymentStatus() == PaymentOrderStatus.NO_REFUND;
+
+        if (alreadyPaidOrder) {
+            // Trường hợp khách thanh toán thành công attempt này sau khi đơn đã được chốt qua attempt khác (Overpayment / VNPay switch race)
+            payment.setLastError(null);
+            payment.setStatus(PaymentStatus.SUCCESS);
+            payment.setIsCanonical(false);
+            payment.setIsActive(false);
+            payment.setAttemptState(PaymentAttemptState.COMPLETED);
+            if (payment.getPaidAt() == null) {
+                payment.setPaidAt(OffsetDateTime.now());
+            }
+            if (providerTransactionId != null) payment.setProviderTransactionId(providerTransactionId);
+            if (webhookEventId != null) payment.setWebhookEventId(webhookEventId);
+            if (rawPayload != null) payment.setRawWebhookPayload(rawPayload);
+            paymentRepository.save(payment);
+
+            RefundJpaEntity refund = new RefundJpaEntity();
+            refund.setPaymentId(payment.getId());
+            refund.setProvider(payment.getProvider());
+            refund.setProviderTransactionId(providerTransactionId);
+            refund.setAmount(payment.getAmount());
+            refund.setRefundPercentage(BigDecimal.valueOf(100));
+            refund.setStatus(RefundStatus.PENDING);
+            refund.setReason(RefundReason.SYSTEM_FAULT);
+            refundRepository.save(refund);
+            return;
+        }
+
         if (!locallyExpired) {
             requirePendingPayment(payment, order);
         } else if (payment.getStatus() != PaymentStatus.PENDING || payment.getAmount() == null
@@ -799,12 +1021,17 @@ public class OrderPaymentService {
         if (providerTransactionId == null || providerTransactionId.isBlank()) {
             throw new InvalidWebhookException("Provider transaction ID is required.");
         }
-        BookingJpaEntity booking = departureCheckout == null || order.getBookingId() == null ? null
-                : departureCheckout.lockBooking(order.getBookingId());
-        var affected = booking == null ? java.util.Set.<UUID>of() : departureCheckout.affectedItems(booking);
-        if (locallyExpired && affected.isEmpty()) {
-            throw new InvalidOrderStateException("The order is not awaiting payment.");
-        }
+        BookingJpaEntity booking = (departureCheckout != null && order.getBookingId() != null) ? departureCheckout.lockBooking(order.getBookingId()) : (order.getBookingId() != null ? bookingRepository.findById(order.getBookingId()).orElse(null) : null);
+
+        var affected = (departureCheckout != null && booking != null) ? departureCheckout.affectedItems(booking) : Set.<UUID>of();
+        OffsetDateTime paidAt = payment.getPaidAt() != null ? payment.getPaidAt() : OffsetDateTime.now();
+        OffsetDateTime deadline = payment.getDanaseaDeadlineAt();
+        boolean pastPaymentWindow = deadline != null && paidAt.isAfter(deadline);
+        boolean holdUnavailable = booking != null && (booking.getStatus() == BookingStatus.CANCELLED
+                || (booking.getHoldExpiresAt() != null && !booking.getHoldExpiresAt().isAfter(OffsetDateTime.now())));
+        payment.setIsCanonical(true);
+        payment.setIsActive(false);
+        payment.setAttemptState(PaymentAttemptState.COMPLETED);
         payment.setLastError(null);
         payment.setStatus(PaymentStatus.SUCCESS);
         if (payment.getPaidAt() == null) {
@@ -823,10 +1050,8 @@ public class OrderPaymentService {
         paymentRepository.save(payment);
 
         List<SubOrderJpaEntity> subOrders = subOrderRepository.findByMasterOrderId(order.getId());
-        boolean voidCheckout = !affected.isEmpty() && (locallyExpired
-                || booking.getStatus() == BookingStatus.CANCELLED
-                || (booking.getHoldExpiresAt() != null && OffsetDateTime.now().isAfter(booking.getHoldExpiresAt()))
-                || booking.getItems().size() == affected.size());
+        boolean voidCheckout = locallyExpired || pastPaymentWindow || holdUnavailable
+                || (!affected.isEmpty() && booking.getItems().size() == affected.size());
 
         order.setStatus(voidCheckout ? MasterOrderStatus.CANCELLED : MasterOrderStatus.PAID);
         order.setPaymentStatus(PaymentOrderStatus.PAID);
@@ -977,7 +1202,7 @@ public class OrderPaymentService {
                 .findByMasterOrderIdOrderByCreatedAtDesc(subOrder.getMasterOrderId()).stream()
                 .filter(payment -> payment.getStatus() == PaymentStatus.SUCCESS
                         || payment.getStatus() == PaymentStatus.REFUNDED)
-                .findFirst()
+                .min(Comparator.comparing(payment -> !Boolean.TRUE.equals(payment.getIsCanonical())))
                 .orElseThrow(() -> new InvalidWebhookException("No successful original payment was found."));
         if (originalPayment.getProvider() != provider) {
             throw new InvalidWebhookException("Refund provider must match the original payment provider.");
@@ -1088,7 +1313,7 @@ public class OrderPaymentService {
         return new OrderResponse(order.getId(), order.getBookingId(), order.getCustomerId(), order.getStatus(),
                 order.getTotalAmount(), order.getDiscountAmount(),
                 subOrders.stream().map(this::toSubOrderResponse).toList(),
-                order.getCreatedAt(), order.getUpdatedAt());
+                order.getCreatedAt(), order.getUpdatedAt(), order.getPaymentDeadline());
     }
 
     private SubOrderResponse toSubOrderResponse(SubOrderJpaEntity subOrder) {
@@ -1338,14 +1563,13 @@ public class OrderPaymentService {
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public boolean reconcilePayment(UUID paymentId) {
-        if (paymentGatewayPort == null || gatewayTransaction == null) {
+        if (gatewayTransaction == null || (paymentGatewayPort == null && paymentGatewayRegistry == null)) {
             throw new IllegalStateException("Transactional payment gateway is not configured.");
         }
         PaymentJpaEntity snapshot = gatewayTransaction.execute(tx -> {
             PaymentJpaEntity payment = paymentRepository.findByIdForUpdate(paymentId).orElse(null);
             OffsetDateTime now = OffsetDateTime.now();
             if (payment == null || payment.getStatus() != PaymentStatus.PENDING
-                    || (payment.getProvider() != PaymentProvider.PAYPAL && payment.getProvider() != PaymentProvider.VNPAY)
                     || (payment.getReconciliationNextAttemptAt() != null && payment.getReconciliationNextAttemptAt().isAfter(now))) {
                 return null;
             }
@@ -1359,15 +1583,29 @@ public class OrderPaymentService {
             return false;
         }
 
+        PaymentGatewayPort adapter;
+        if (snapshot.getProvider() == PaymentProvider.PAYOS || snapshot.getProvider() == PaymentProvider.ZALOPAY) {
+            adapter = (paymentGatewayRegistry != null) ? paymentGatewayRegistry.getAdapter(snapshot.getProvider()) : paymentGatewayPort;
+        } else {
+            adapter = paymentGatewayPort != null ? paymentGatewayPort : (paymentGatewayRegistry != null ? paymentGatewayRegistry.getAdapter(snapshot.getProvider()) : null);
+        }
+        if (adapter == null) {
+            return recordReconciliationFailure(snapshot, "GATEWAY_ADAPTER_NOT_FOUND: " + snapshot.getProvider());
+        }
+
+        String queryRef = snapshot.getProvider() == PaymentProvider.PAYOS
+                ? (snapshot.getPayosOrderCode() != null ? String.valueOf(snapshot.getPayosOrderCode()) : snapshot.getProviderOrderId())
+                : snapshot.getProviderOrderId();
+
         PaymentCaptureResult result;
         try {
-            if (snapshot.getProviderOrderId() == null || snapshot.getProviderOrderId().isBlank()
+            if (queryRef == null || queryRef.isBlank()
                     || (snapshot.getProvider() == PaymentProvider.VNPAY && snapshot.getProviderTransactionDate() == null)) {
                 throw new PaymentGatewayException("Persisted gateway reference and transaction date are required.");
             }
             result = snapshot.getProvider() == PaymentProvider.PAYPAL && snapshot.getCaptureRequestedAt() != null
-                    ? paymentGatewayPort.queryCapture(PaymentProvider.PAYPAL, snapshot.getProviderOrderId())
-                    : paymentGatewayPort.queryPayment(snapshot.getProvider(), snapshot.getProviderOrderId(), snapshot.getProviderTransactionDate());
+                    ? adapter.queryCapture(PaymentProvider.PAYPAL, queryRef)
+                    : adapter.queryPayment(snapshot.getProvider(), queryRef, snapshot.getProviderTransactionDate());
         } catch (Exception ex) {
             return recordReconciliationFailure(snapshot, "GATEWAY_QUERY_AWAITING_VERIFICATION: " + ex.getMessage());
         }
@@ -1386,6 +1624,7 @@ public class OrderPaymentService {
                 payment.setLastReconciledAt(OffsetDateTime.now());
                 if (result != null && result.success() && "COMPLETED".equalsIgnoreCase(result.status())) {
                     validateCaptureResult(payment, result);
+                    payment.setPaidAt(result.paidAt());
                     applyPaymentSuccess(payment, order, result.captureId(), null, null);
                     recordReconciliationAudit(payment, "RECONCILE_PAYMENT_SUCCESS");
                     return true;
@@ -1394,9 +1633,13 @@ public class OrderPaymentService {
                         && ((payment.getProvider() == PaymentProvider.VNPAY && "FAILED".equalsIgnoreCase(result.status()))
                         || (payment.getProvider() == PaymentProvider.PAYPAL
                         && ("VOIDED".equalsIgnoreCase(result.status()) || "EXPIRED".equalsIgnoreCase(result.status())
-                        || "DECLINED".equalsIgnoreCase(result.status()))));
+                        || "DECLINED".equalsIgnoreCase(result.status())))
+                        || (payment.getProvider() == PaymentProvider.PAYOS && "CANCELLED".equalsIgnoreCase(result.status()))
+                        || (payment.getProvider() == PaymentProvider.ZALOPAY && ("FAILED".equalsIgnoreCase(result.status()) || "CANCELLED".equalsIgnoreCase(result.status()))));
                 if (failed) {
                     payment.setStatus(PaymentStatus.FAILED);
+                    payment.setIsActive(false);
+                    payment.setAttemptState(PaymentAttemptState.FAILED);
                     payment.setLastError("GATEWAY_PAYMENT_FAILED: " + result.status());
                     payment.setReconciliationNextAttemptAt(null);
                     paymentRepository.save(payment);
