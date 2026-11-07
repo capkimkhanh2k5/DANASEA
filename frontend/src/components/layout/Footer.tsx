@@ -158,25 +158,45 @@ export function Footer() {
               </li>
             </ul>
 
-            {/* Giấy chứng nhận pháp lý số hóa chính thức từ Cloudinary */}
-            <div className="mt-2 pt-3 border-t border-white/10 flex flex-col gap-2">
+            {/* Huy hiệu Đăng ký & Thông báo Bộ Công Thương */}
+            <div className="mt-2 pt-3 border-t border-white/10 flex flex-col gap-2.5">
               <span className="text-[11px] font-semibold text-white/80 tracking-wide">
-                Hồ sơ pháp lý số hóa
+                Chứng nhận Bộ Công Thương
               </span>
-              <a
-                href="https://res.cloudinary.com/xmxguqpi/image/authenticated/s--87pVT0lZ--/v1793625552/danasea_demo_data_package/vendor_documents/e2681ab1f16042a553303d0da9192b66c0ab21cf2492a35d72b5cfc512cd2bba.png"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Xem bản gốc Giấy phép đăng ký kinh doanh & thể thao biển số hóa Đà Nẵng"
-                className="group block relative w-full max-w-[240px] rounded-xl overflow-hidden border border-white/25 bg-white shadow-md hover:border-white/60 hover:shadow-lg transition-all"
-              >
-                <img
-                  src="/images/legal/legal_certificate.png"
-                  alt="Giấy chứng nhận đăng ký kinh doanh & thể thao biển số hóa Đà Nẵng"
-                  className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-                />
-              </a>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <a
+                  href="http://online.gov.vn"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Website thương mại điện tử đã thông báo với Bộ Công Thương"
+                  className="group block transition-transform duration-200 hover:scale-105"
+                >
+                  <img
+                    src="/images/legal/bo-cong-thuong-da-thong-bao.png"
+                    alt="Đã thông báo Bộ Công Thương"
+                    className="h-9 w-auto object-contain drop-shadow-xs"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </a>
+                <a
+                  href="http://online.gov.vn"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Sàn giao dịch thương mại điện tử đã đăng ký với Bộ Công Thương"
+                  className="group block transition-transform duration-200 hover:scale-105"
+                >
+                  <img
+                    src="/images/legal/bo-cong-thuong-da-dang-ky.png"
+                    alt="Đã đăng ký Bộ Công Thương"
+                    className="h-9 w-auto object-contain drop-shadow-xs"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </a>
+              </div>
             </div>
+
           </div>
 
           {/* Cột 3: Mạng xã hội, Hotline & Cứu hộ bờ biển (chiếm 3 cột) */}
