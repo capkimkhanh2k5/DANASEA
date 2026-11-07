@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { CustomerLayout } from "./layouts/CustomerLayout";
 import { Home } from "./pages/customer/Home";
-import { DevRoleSwitcher } from "./components/common/DevRoleSwitcher";
+
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import { ToastContainer } from "./components/common/ToastContainer";
 
@@ -59,7 +59,7 @@ function App() {
     <BrowserRouter>
       <ScrollToTop />
       <ToastContainer />
-      <DevRoleSwitcher />
+
       <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
         <Routes>
         {/* KHÁCH HÀNG */}
