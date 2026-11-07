@@ -4,10 +4,10 @@ import { PhoneCall, ShieldCheck, Mail, LifeBuoy, Award } from 'lucide-react';
 export function Footer() {
   return (
     <footer className="w-full bg-[#031d44] text-white border-t border-sky-950 relative z-10 selection:bg-sky-500 selection:text-white" data-ui="footer">
-      <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16">
+      <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-5">
         
         {/* Main Footer Grid: 3 Clean Columns (0 Duplicate Categories) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-12 pb-12 border-b border-white/10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-12 pb-8 border-b border-white/10">
           
           {/* Cột 1: Thương hiệu, Chứng nhận & Đối tác thanh toán (chiếm 6 cột) */}
           <div className="lg:col-span-6 flex flex-col gap-5">
@@ -272,7 +272,7 @@ export function Footer() {
         </div>
 
 {/* Chân trang bản quyền (Bottom Bar) */}
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/90 font-normal">
+        <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/80 font-normal">
           <p>© 2026 DANASEA Marine Experiences. Bảo lưu mọi quyền.</p>
           <div className="flex items-center gap-3 text-xs text-white/90 font-normal">
             <Link to="/terms" className="hover:text-white transition-colors">Điều khoản</Link>
