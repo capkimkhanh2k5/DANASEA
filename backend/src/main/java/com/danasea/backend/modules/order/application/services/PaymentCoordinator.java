@@ -27,6 +27,7 @@ import com.danasea.backend.modules.booking.domain.ports.InventoryLockPort;
 import com.danasea.backend.modules.booking.infrastructure.persistence.entities.BookingJpaEntity;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
 import com.danasea.backend.modules.order.application.OrderPaymentService;
+import com.danasea.backend.modules.order.domain.exceptions.ExchangeRateUnavailableException;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
 import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
 import com.danasea.backend.modules.order.domain.exceptions.PaymentAttemptConflictException;
@@ -161,7 +162,7 @@ public class PaymentCoordinator {
                     .ifPresent(payment -> {
                         payment.setLastError(ex.getMessage());
                         if (ex instanceof InvalidOrderStateException || ex instanceof IllegalArgumentException
-                                || ex instanceof com.danasea.backend.modules.order.domain.exceptions.ExchangeRateUnavailableException) {
+                                || ex instanceof ExchangeRateUnavailableException) {
                             payment.setStatus(PaymentStatus.FAILED);
                             payment.setAttemptState(PaymentAttemptState.FAILED);
                         } else {

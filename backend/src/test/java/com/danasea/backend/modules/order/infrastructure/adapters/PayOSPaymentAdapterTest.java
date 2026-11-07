@@ -6,11 +6,13 @@ import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.ports.PaymentCancelResult;
 import com.danasea.backend.modules.order.domain.ports.PaymentCaptureResult;
 import com.danasea.backend.modules.order.domain.ports.PaymentIntentResult;
+import com.danasea.backend.modules.order.domain.ports.RefundResult;
 import com.danasea.backend.modules.order.infrastructure.adapters.payos.PayOSSignatureHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -109,7 +111,7 @@ class PayOSPaymentAdapterTest {
                 """;
 
         mockServer.expect(requestTo("https://api-merchant.payos.vn/v2/payment-requests"))
-                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(method(HttpMethod.POST))
                 .andExpect(header("x-client-id", CLIENT_ID))
                 .andExpect(header("x-api-key", API_KEY))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
@@ -139,7 +141,7 @@ class PayOSPaymentAdapterTest {
                 """;
 
         mockServer.expect(requestTo("https://api-merchant.payos.vn/v2/payment-requests/link-uuid-1234/cancel"))
-                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(method(HttpMethod.POST))
                 .andExpect(header("x-client-id", CLIENT_ID))
                 .andExpect(header("x-api-key", API_KEY))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
@@ -163,7 +165,7 @@ class PayOSPaymentAdapterTest {
                 """;
 
         mockServer.expect(requestTo("https://api-merchant.payos.vn/v2/payment-requests/link-uuid-1234/cancel"))
-                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
         PaymentCancelResult cancelResult = adapter.cancelPayment(PaymentProvider.PAYOS, "link-uuid-1234", "Switched provider");
@@ -191,7 +193,7 @@ class PayOSPaymentAdapterTest {
                 """;
 
         mockServer.expect(requestTo("https://api-merchant.payos.vn/v2/payment-requests/123456"))
-                .andExpect(method(org.springframework.http.HttpMethod.GET))
+                .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
         PaymentCaptureResult captureResult = adapter.queryPayment(PaymentProvider.PAYOS, "123456", null);
@@ -231,7 +233,7 @@ class PayOSPaymentAdapterTest {
     @Test
     @DisplayName("requestRefund returns manual review required result")
     void testRequestRefundUnsupported() {
-        com.danasea.backend.modules.order.domain.ports.RefundResult refundResult =
+        RefundResult refundResult =
                 adapter.requestRefund("tx-123", BigDecimal.TEN);
         assertThat(refundResult.success()).isFalse();
         assertThat(refundResult.providerRefundId()).isEqualTo("MANUAL_REVIEW_REQUIRED");

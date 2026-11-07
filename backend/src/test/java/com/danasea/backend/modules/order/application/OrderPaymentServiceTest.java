@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -23,6 +24,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import com.danasea.backend.configs.properties.PaymentProperties;
 import com.danasea.backend.modules.booking.application.dtos.ConfirmBookingCommand;
@@ -40,6 +43,7 @@ import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.models.PaymentStatus;
 import com.danasea.backend.modules.order.domain.models.RefundStatus;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
+import com.danasea.backend.modules.order.domain.ports.CommissionPolicyPort;
 import com.danasea.backend.modules.order.domain.ports.PaymentCaptureResult;
 import com.danasea.backend.modules.order.domain.ports.PaymentGatewayPort;
 import com.danasea.backend.modules.order.domain.services.RefundPolicyEngine;
@@ -72,7 +76,7 @@ class OrderPaymentServiceTest {
     @Mock private VendorInternalApi vendorInternalApi;
     @Mock private ConfirmBookingUseCase confirmBookingUseCase;
     @Mock private CreatePaymentIntentUseCase createPaymentIntentUseCase;
-    @Mock private com.danasea.backend.modules.order.domain.ports.CommissionPolicyPort commissionPolicy;
+    @Mock private CommissionPolicyPort commissionPolicy;
 
     private PaymentWebhookSigner signer;
     private OrderPaymentService service;
@@ -95,7 +99,7 @@ class OrderPaymentServiceTest {
                 new ObjectMapper(),
                 createPaymentIntentUseCase);
         service.setConfiguredCommission(commissionPolicy);
-        org.mockito.Mockito.lenient().when(commissionPolicy.getCommissionRate(any())).thenReturn(new BigDecimal("0.10"));
+        lenient().when(commissionPolicy.getCommissionRate(any())).thenReturn(new BigDecimal("0.10"));
     }
 
     @Test
@@ -658,9 +662,9 @@ class OrderPaymentServiceTest {
     }
 
     private PaymentGatewayPort prepareStatusReconciliation(MasterOrderJpaEntity order, PaymentJpaEntity payment) {
-        var transactionManager = mock(org.springframework.transaction.PlatformTransactionManager.class);
+        var transactionManager = mock(PlatformTransactionManager.class);
         when(transactionManager.getTransaction(any()))
-                .thenAnswer(invocation -> new org.springframework.transaction.support.SimpleTransactionStatus());
+                .thenAnswer(invocation -> new SimpleTransactionStatus());
         service = new OrderPaymentService(bookingRepository, masterOrderRepository, subOrderRepository,
                 paymentRepository, refundRepository, serviceSlotRepository, vendorInternalApi,
                 new RefundPolicyEngine(), signer, confirmBookingUseCase, new ObjectMapper(),

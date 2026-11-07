@@ -10,6 +10,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -286,7 +287,7 @@ public class VNPayPaymentAdapter implements PaymentGatewayPort {
     public static OffsetDateTime parsePaymentTime(String value) {
         try {
             return LocalDateTime.parse(value, VNPAY_DATE_FORMAT).atZone(VIETNAM_ZONE).toOffsetDateTime();
-        } catch (java.time.format.DateTimeParseException ex) {
+        } catch (DateTimeParseException ex) {
             return null;
         }
     }

@@ -2,6 +2,8 @@ package com.danasea.backend.modules.order.application.usecases;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -41,6 +43,7 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.presentation.dtos.RefundDetailResponse;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
+import io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager;
 
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=validate"})
 @ActiveProfiles("test")
@@ -48,7 +51,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 class RefundPersistenceIntegrationTest extends BaseE2ETest {
 
     @MockitoBean
-    private io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager<byte[]> proxyManager;
+    private LettuceBasedProxyManager<byte[]> proxyManager;
 
     @MockitoBean
     private PaymentGatewayPort paymentGatewayPort;
@@ -158,7 +161,7 @@ class RefundPersistenceIntegrationTest extends BaseE2ETest {
         assertThat(refundRepository.findById(result.refundId()).orElseThrow().getStatus()).isEqualTo(RefundStatus.PENDING);
         refundProcessingService.completeManualRefund(result.refundId(), adminUser.getId(), "PAYPAL-REF-REAL-01",
                 new BigDecimal("19.31"), "USD");
-        org.mockito.Mockito.verify(paymentGatewayPort, org.mockito.Mockito.never()).requestRefund(any(GatewayRefundRequest.class));
+        verify(paymentGatewayPort, never()).requestRefund(any(GatewayRefundRequest.class));
 
         assertThat(notificationRepository.findByUserIdOrderByCreatedAtDesc(customerId).stream()
                 .filter(notification -> "REFUND_COMPLETED".equals(notification.getType())).count()).isEqualTo(1);

@@ -9,6 +9,7 @@ import com.danasea.backend.modules.booking.infrastructure.persistence.entities.B
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
 import com.danasea.backend.modules.order.application.OrderPaymentService;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
+import com.danasea.backend.modules.order.domain.exceptions.PaymentGatewayException;
 import com.danasea.backend.modules.order.domain.models.*;
 import com.danasea.backend.modules.order.domain.ports.PaymentCancelResult;
 import com.danasea.backend.modules.order.domain.ports.PaymentGatewayPort;
@@ -32,8 +33,10 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.math.BigDecimal;
+import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -283,8 +286,8 @@ class Payment5Plus5AcceptanceCasesTest {
 
         when(gatewayRegistry.getAdapter(PaymentProvider.PAYOS)).thenReturn(payosAdapter);
         when(payosAdapter.createPaymentIntent(any(), eq(orderId), any(), eq(PaymentProvider.PAYOS), any(), any(), any()))
-                .thenThrow(new com.danasea.backend.modules.order.domain.exceptions.PaymentGatewayException(
-                        "Read timed out from gateway", new java.net.SocketTimeoutException("Read timed out")));
+                .thenThrow(new PaymentGatewayException(
+                        "Read timed out from gateway", new SocketTimeoutException("Read timed out")));
 
         assertThatThrownBy(() -> coordinator.startPayment(customerId, orderId, PaymentProvider.PAYOS, "idemp-05"))
                 .isInstanceOf(RuntimeException.class);
@@ -573,7 +576,7 @@ class Payment5Plus5AcceptanceCasesTest {
         when(subOrderRepository.findByMasterOrderId(orderId)).thenReturn(Collections.emptyList());
 
         String paidAt = OffsetDateTime.now().minusSeconds(5)
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         String rawPayload = """
                 {"data":{"orderCode":12345,"amount":500000,"code":"00","currency":"VND",
                          "reference":"REF-12345","transactionDateTime":"%s"}}

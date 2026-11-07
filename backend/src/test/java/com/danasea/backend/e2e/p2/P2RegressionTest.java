@@ -16,6 +16,7 @@ import com.danasea.backend.modules.communication.domain.models.NotificationChann
 import com.danasea.backend.modules.communication.application.usecases.SendNotificationUseCase;
 import com.danasea.backend.modules.communication.application.dtos.NotificationCommand;
 import com.danasea.backend.modules.booking.domain.models.Booking;
+import com.danasea.backend.shared.i18n.LocalizedMessageRef;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -111,7 +112,7 @@ class P2RegressionTest extends BaseE2ETest {
             mockMvc.perform(post(completion).header("Authorization", "Bearer " + adminToken)
                     .contentType("application/json").content(evidence)).andExpect(status().isOk());
         }
-        org.mockito.Mockito.verify(gateway, org.mockito.Mockito.never()).requestRefund(any(GatewayRefundRequest.class));
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
         assertEquals(RefundStatus.PROCESSED,refunds.findById(refund.getId()).orElseThrow().getStatus());
         var receipt = objectMapper.readTree(mockMvc.perform(get("/api/orders/" + paidOrder.getId() + "/receipt")
                 .header("Authorization", "Bearer " + customerToken)).andExpect(status().isOk())
@@ -275,8 +276,8 @@ class P2RegressionTest extends BaseE2ETest {
         CyclicBarrier start = new CyclicBarrier(8);
         var command = new NotificationCommand(customerUser.getId(),
                 "TRIP_REMINDER", NotificationChannel.IN_APP,
-                com.danasea.backend.shared.i18n.LocalizedMessageRef.of("notification.trip.reminder.title"),
-                com.danasea.backend.shared.i18n.LocalizedMessageRef.of("notification.trip.reminder.body", "08:00", "2026-10-12"),
+                LocalizedMessageRef.of("notification.trip.reminder.title"),
+                LocalizedMessageRef.of("notification.trip.reminder.body", "08:00", "2026-10-12"),
                 "SERVICE_SLOT", slotA1TomorrowMorning.getId(), null);
         ExecutorService pool=Executors.newFixedThreadPool(8);
         try {

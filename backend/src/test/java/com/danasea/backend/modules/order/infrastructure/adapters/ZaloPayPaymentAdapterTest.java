@@ -6,19 +6,36 @@ import com.danasea.backend.modules.order.domain.models.PaymentProvider;
 import com.danasea.backend.modules.order.domain.ports.PaymentCancelResult;
 import com.danasea.backend.modules.order.domain.ports.PaymentCaptureResult;
 import com.danasea.backend.modules.order.domain.ports.PaymentIntentResult;
+import com.danasea.backend.modules.order.domain.ports.RefundResult;
 import com.danasea.backend.modules.order.infrastructure.adapters.zalopay.ZaloPaySignatureHelper;
+import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaPaymentRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -95,7 +112,7 @@ class ZaloPayPaymentAdapterTest {
                 """;
 
         mockServer.expect(requestTo("https://sb-openapi.zalopay.vn/v2/create"))
-                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
         PaymentIntentResult result = adapter.createPaymentIntent(paymentId, orderId, amount, PaymentProvider.ZALOPAY);
@@ -119,7 +136,7 @@ class ZaloPayPaymentAdapterTest {
                 """;
 
         mockServer.expect(requestTo("https://sb-openapi.zalopay.vn/v2/cancel"))
-                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
         PaymentCancelResult cancelResult = adapter.cancelPayment(PaymentProvider.ZALOPAY, "261105_123456", "Switched provider");
@@ -142,7 +159,7 @@ class ZaloPayPaymentAdapterTest {
                 """;
 
         mockServer.expect(requestTo("https://sb-openapi.zalopay.vn/v2/cancel"))
-                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
         PaymentCancelResult cancelResult = adapter.cancelPayment(PaymentProvider.ZALOPAY, "261105_123456", "Switched provider");
@@ -168,7 +185,7 @@ class ZaloPayPaymentAdapterTest {
                 """;
 
         mockServer.expect(requestTo("https://sb-openapi.zalopay.vn/v2/query"))
-                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
         PaymentCaptureResult captureResult = adapter.queryPayment(PaymentProvider.ZALOPAY, "261105_123456", null);
@@ -184,12 +201,12 @@ class ZaloPayPaymentAdapterTest {
         String appTransId = adapter.generateAppTransId();
         assertThat(appTransId).matches("^\\d{6}_\\d{6}$");
 
-        String expectedDatePrefix = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyMMdd"));
+        String expectedDatePrefix = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"))
+                .format(DateTimeFormatter.ofPattern("yyMMdd"));
         assertThat(appTransId).startsWith(expectedDatePrefix + "_");
 
         // Midnight rollover test with specific LocalDate
-        String rolloverId = adapter.generateAppTransId(java.time.LocalDate.of(2027, 1, 1));
+        String rolloverId = adapter.generateAppTransId(LocalDate.of(2027, 1, 1));
         assertThat(rolloverId).startsWith("270101_");
         assertThat(rolloverId).matches("^270101_\\d{6}$");
     }
@@ -200,9 +217,9 @@ class ZaloPayPaymentAdapterTest {
         int threadCount = 20;
         int perThread = 50;
         int total = threadCount * perThread;
-        java.util.Set<String> generatedIds = java.util.concurrent.ConcurrentHashMap.newKeySet();
-        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
-        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(threadCount);
+        Set<String> generatedIds = ConcurrentHashMap.newKeySet();
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(threadCount);
 
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
@@ -216,7 +233,7 @@ class ZaloPayPaymentAdapterTest {
             });
         }
 
-        latch.await(5, java.util.concurrent.TimeUnit.SECONDS);
+        latch.await(5, TimeUnit.SECONDS);
         executor.shutdown();
 
         assertThat(generatedIds).hasSize(total);
@@ -225,9 +242,9 @@ class ZaloPayPaymentAdapterTest {
     @Test
     @DisplayName("generateAppTransId uses DB sequence when JpaPaymentRepository is injected")
     void testGenerateAppTransIdUsesDbSequenceWhenAvailable() {
-        com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaPaymentRepository mockRepo =
-                org.mockito.Mockito.mock(com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaPaymentRepository.class);
-        org.mockito.Mockito.when(mockRepo.getNextPayOSOrderCode()).thenReturn(777888L);
+        JpaPaymentRepository mockRepo =
+                mock(JpaPaymentRepository.class);
+        when(mockRepo.getNextPayOSOrderCode()).thenReturn(777888L);
 
         adapter.setPaymentRepository(mockRepo);
 
@@ -240,14 +257,14 @@ class ZaloPayPaymentAdapterTest {
     @Test
     @DisplayName("generateAppTransId throws exception when DB sequence fails, never silently falls back to AtomicLong")
     void testGenerateAppTransIdThrowsWhenDbSequenceFails() {
-        com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaPaymentRepository mockRepo =
-                org.mockito.Mockito.mock(com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaPaymentRepository.class);
-        org.mockito.Mockito.when(mockRepo.getNextPayOSOrderCode()).thenThrow(new org.springframework.dao.QueryTimeoutException("DB sequence timeout"));
+        JpaPaymentRepository mockRepo =
+                mock(JpaPaymentRepository.class);
+        when(mockRepo.getNextPayOSOrderCode()).thenThrow(new QueryTimeoutException("DB sequence timeout"));
 
         adapter.setPaymentRepository(mockRepo);
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.generateAppTransId())
-                .isInstanceOf(org.springframework.dao.QueryTimeoutException.class);
+        assertThatThrownBy(() -> adapter.generateAppTransId())
+                .isInstanceOf(QueryTimeoutException.class);
 
         adapter.setPaymentRepository(null);
     }
@@ -261,7 +278,7 @@ class ZaloPayPaymentAdapterTest {
         assertThat(adapter.verifyCallback(data, validMac)).isTrue();
         assertThat(adapter.verifyCallback(data, "bad-mac")).isFalse();
 
-        java.util.Map<String, String> rawParams = java.util.Map.of("data", data, "mac", validMac);
+        Map<String, String> rawParams = Map.of("data", data, "mac", validMac);
         assertThat(adapter.verifyWebhookSignature(rawParams, validMac)).isTrue();
         assertThat(adapter.verifyWebhookSignature(rawParams, null)).isTrue();
     }
@@ -281,7 +298,7 @@ class ZaloPayPaymentAdapterTest {
     @Test
     @DisplayName("requestRefund returns manual review required result")
     void testRequestRefundUnsupported() {
-        com.danasea.backend.modules.order.domain.ports.RefundResult refundResult =
+        RefundResult refundResult =
                 adapter.requestRefund("tx-123", BigDecimal.TEN);
         assertThat(refundResult.success()).isFalse();
         assertThat(refundResult.providerRefundId()).isEqualTo("MANUAL_REVIEW_REQUIRED");
@@ -302,7 +319,7 @@ class ZaloPayPaymentAdapterTest {
                 """;
 
         mockServer.expect(requestTo("https://sb-openapi.zalopay.vn/v2/create"))
-                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess(mockResponse, MediaType.APPLICATION_JSON));
 
         PaymentIntentResult result = adapter.createPaymentIntent(UUID.randomUUID(), new BigDecimal("100000"), PaymentProvider.ZALOPAY);

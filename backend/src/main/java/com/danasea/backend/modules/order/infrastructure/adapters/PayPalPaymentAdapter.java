@@ -3,7 +3,9 @@ package com.danasea.backend.modules.order.infrastructure.adapters;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -11,8 +13,6 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
-import com.danasea.backend.modules.order.application.services.ExchangeRateService;
-import java.time.LocalDate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -21,6 +21,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import com.danasea.backend.configs.properties.PayPalProperties;
+import com.danasea.backend.modules.order.application.services.ExchangeRateService;
 import com.danasea.backend.modules.order.domain.exceptions.InvalidOrderStateException;
 import com.danasea.backend.modules.order.domain.exceptions.PaymentGatewayException;
 import com.danasea.backend.modules.order.domain.models.PaymentProvider;
@@ -347,7 +348,7 @@ public class PayPalPaymentAdapter implements PaymentGatewayPort {
     public static OffsetDateTime parsePaymentTime(String value) {
         try {
             return OffsetDateTime.parse(value);
-        } catch (java.time.format.DateTimeParseException ex) {
+        } catch (DateTimeParseException ex) {
             return null;
         }
     }

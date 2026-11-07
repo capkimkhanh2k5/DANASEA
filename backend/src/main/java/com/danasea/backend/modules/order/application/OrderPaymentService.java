@@ -86,6 +86,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
@@ -100,6 +102,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -964,8 +967,8 @@ public class OrderPaymentService {
     }
 
     private void rollbackWebhook() {
-        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
-            org.springframework.transaction.interceptor.TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
         }
     }
 
@@ -1020,7 +1023,7 @@ public class OrderPaymentService {
         }
         BookingJpaEntity booking = (departureCheckout != null && order.getBookingId() != null) ? departureCheckout.lockBooking(order.getBookingId()) : (order.getBookingId() != null ? bookingRepository.findById(order.getBookingId()).orElse(null) : null);
 
-        var affected = (departureCheckout != null && booking != null) ? departureCheckout.affectedItems(booking) : java.util.Set.<UUID>of();
+        var affected = (departureCheckout != null && booking != null) ? departureCheckout.affectedItems(booking) : Set.<UUID>of();
         OffsetDateTime paidAt = payment.getPaidAt() != null ? payment.getPaidAt() : OffsetDateTime.now();
         OffsetDateTime deadline = payment.getDanaseaDeadlineAt();
         boolean pastPaymentWindow = deadline != null && paidAt.isAfter(deadline);
