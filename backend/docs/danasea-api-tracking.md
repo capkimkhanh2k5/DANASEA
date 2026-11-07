@@ -708,7 +708,7 @@ Nếu DB dev đã áp dụng migration notification V25 cũ, cần kiểm tra ch
 
 # TODO 
 
-### P1 Chi trả vendor và cấu hình hoa hồng -> ĐÃ HOÀN THÀNH CẤU HÌNH HOA HỒNG ĐỘNG & SAFETY REBATE (V51); CÒN LUỒNG RÚT TIỀN.
+### P1 Chi trả vendor và cấu hình hoa hồng -> ĐÃ HOÀN THÀNH CẤU HÌNH HOA HỒNG ĐỘNG & SAFETY REBATE (V54); CÒN LUỒNG RÚT TIỀN.
 
 Settlement đã có generate/list/detail/finalize + cộng trực tiếp 2% Safety & SLA Cash Rebate (`safetyRebateAmount`, `safetyRebateQualified`). `CommissionPolicyAdapter` đã áp dụng chuỗi thác nước (Cascading Waterfall): Onboarding 5% (90 ngày đầu từ `approvedAt`) -> Category (MOTORIZED 7%, NON_MOTORIZED 10%, ALL_INCLUSIVE 12%) -> Platform Default (10%), lưu snapshot tại lúc tạo sub-order. Finalize chỉ chốt kỳ, chưa đánh dấu PAID; PayoutRequest mới có model/entity/repository. Chưa có luồng rút tiền và xác nhận chi trả.
 

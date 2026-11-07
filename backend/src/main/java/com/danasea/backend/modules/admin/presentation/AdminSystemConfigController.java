@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,17 +28,24 @@ import com.danasea.backend.modules.systemconfig.infrastructure.persistence.repos
 import com.danasea.backend.modules.systemconfig.infrastructure.persistence.repositories.JpaSystemConfigRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
 
-import lombok.RequiredArgsConstructor;
-
 @RestController
 @RequestMapping({"/api/admin/settings", "/api/admin/system-configs"})
 @PreAuthorize("hasRole('ADMIN')")
-@RequiredArgsConstructor
 public class AdminSystemConfigController {
 
     private final JpaSystemConfigRepository repository;
     private final JpaCommissionRuleRepository commissionRuleRepository;
     private final JpaCategoryRepository categoryRepository;
+
+    @Autowired
+    public AdminSystemConfigController(
+            JpaSystemConfigRepository repository,
+            @Autowired(required = false) JpaCommissionRuleRepository commissionRuleRepository,
+            @Autowired(required = false) JpaCategoryRepository categoryRepository) {
+        this.repository = repository;
+        this.commissionRuleRepository = commissionRuleRepository;
+        this.categoryRepository = categoryRepository;
+    }
 
     public AdminSystemConfigController(JpaSystemConfigRepository repository) {
         this(repository, null, null);

@@ -350,6 +350,7 @@ public class OrderPaymentService {
         for (BookingItemJpaEntity item : booking.getItems()) {
             var promotion=flashSale!=null?flashSale.snapshot(item.getId()).orElse(null):null;
             BigDecimal rate=promotion!=null?promotion.commissionRate():configuredCommission!=null?configuredCommission.resolveCommissionRate(item.getVendorId(), item.getServiceId(), null):null;
+            if(rate==null && configuredCommission!=null) rate=configuredCommission.getCommissionRate(item.getVendorId());
             if(rate==null) throw new FlashSaleException("COMMISSION_POLICY_MISSING");
             BigDecimal subtotal = item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()));
             BigDecimal commission = subtotal.multiply(rate).setScale(2, RoundingMode.HALF_UP);

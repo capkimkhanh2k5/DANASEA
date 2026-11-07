@@ -88,14 +88,14 @@ Khi Vendor đã qua 90 ngày đầu (hoặc khi tắt rule Onboarding), hệ th�
 
 ## 3. THIẾT KẾ KIẾN TRÚC KỸ THUẬT CHI TIẾT
 
-### 3.1. Thiết kế Cơ sở Dữ liệu (Database Migration - `V51`)
+### 3.1. Thiết kế Cơ sở Dữ liệu (Database Migration - `V54`)
 
-> **Lưu ý kỹ thuật quan trọng:** Thư mục `backend/src/main/resources/db/migration/` hiện đã có tới `V50__transactional_email_delivery.sql` (và `V44` đã tồn tại). Do đó, file migration mới bắt buộc đặt tên là **`V51__dynamic_commission_rules.sql`**.
+> **Lưu ý kỹ thuật quan trọng:** Thư mục `backend/src/main/resources/db/migration/` hiện đã có tới `V53__sync_payment_attempt_state_trigger.sql` (và `V44` đã tồn tại). Do đó, file migration mới bắt buộc đặt tên là **`V54__dynamic_commission_rules.sql`**.
 
-Tập tin migration: `backend/src/main/resources/db/migration/V51__dynamic_commission_rules.sql`
+Tập tin migration: `backend/src/main/resources/db/migration/V54__dynamic_commission_rules.sql`
 
 ```sql
--- V51__dynamic_commission_rules.sql
+-- V54__dynamic_commission_rules.sql
 -- Triển khai hệ thống quy tắc hoa hồng biến thiên (Onboarding 5%, Category 7%/10%/12%)
 -- và Quỹ thưởng An toàn Biển 2% cộng trực tiếp tiền mặt vào bảng quyết toán (settlements).
 
@@ -291,7 +291,7 @@ ON CONFLICT (rule_code) DO NOTHING;
 
 | Pha | Hạng mục công việc | Tập tin tác động chính | Thời gian dự kiến |
 | :--- | :--- | :--- | :--- |
-| **Pha 1** | Tạo migration **`V51__dynamic_commission_rules.sql`** (tạo bảng `commission_rules`, thêm cột thưởng 2% vào `settlements`, seed dữ liệu 3 nhóm danh mục & rule 90 ngày). | `V51__dynamic_commission_rules.sql` | 30 phút |
+| **Pha 1** | Tạo migration **`V54__dynamic_commission_rules.sql`** (tạo bảng `commission_rules`, thêm cột thưởng 2% vào `settlements`, seed dữ liệu 3 nhóm danh mục & rule 90 ngày). | `V54__dynamic_commission_rules.sql` | 30 phút |
 | **Pha 2** | Tạo `CommissionRuleJpaEntity`, `JpaCommissionRuleRepository`; nâng cấp `CommissionPolicyPort` và `CommissionPolicyAdapter`. | `CommissionRuleJpaEntity.java`, `CommissionPolicyPort.java`, `CommissionPolicyAdapter.java` | 1.5 giờ |
 | **Pha 3** | Tích hợp phân giải hoa hồng theo dịch vụ/danh mục vào cả 4 luồng: `CreateOrderUseCase`, `OrderPaymentService`, `DiscountPreviewUseCase`, `FlashSaleService`. | `CreateOrderUseCase.java`, `OrderPaymentService.java`, `DiscountPreviewUseCase.java` | 1.0 giờ |
 | **Pha 4** | Nâng cấp `SettlementJpaEntity`, `GenerateSettlementUseCase`, `SettlementMapper`, `SettlementResponse` để tính và cộng trực tiếp 2% tiền mặt thưởng An toàn Biển. | `SettlementJpaEntity.java`, `GenerateSettlementUseCase.java`, `SettlementResponse.java` | 1.5 giờ |
@@ -302,7 +302,7 @@ ON CONFLICT (rule_code) DO NOTHING;
 
 ## 5. CAM KẾT BẢO TOÀN TÀI CHÍNH & KIỂM TOÁN (AUDIT INVARIANTS)
 
-1. **Bảo toàn bất biến lịch sử (Historical Immutability)**: Mọi đơn hàng cũ đã tạo trước `V51` hoặc trước khi Admin đổi cấu hình đều giữ nguyên `commission_rate` đã snapshot trong `sub_orders`.
+1. **Bảo toàn bất biến lịch sử (Historical Immutability)**: Mọi đơn hàng cũ đã tạo trước `V54` hoặc trước khi Admin đổi cấu hình đều giữ nguyên `commission_rate` đã snapshot trong `sub_orders`.
 2. **Đồng nhất giữa Preview và Checkout**: Cả `DiscountPreviewUseCase`, `CreateOrderUseCase` và `OrderPaymentService` đều gọi chung một hàm phân giải `resolveCommissionRate`, đảm bảo không bao giờ lệch dù chỉ 1 VNĐ.
 3. **Không âm quỹ Voucher & Flash Sale**: Thuật toán phân bổ Hare-Niemeyer và trần trợ giá Flash Sale tự động tính toán dựa trên đúng tỷ lệ hoa hồng thực tế của dịch vụ đó.
 4. **Minh bạch quyết toán**: Khoản thưởng an toàn 2% được tách bạch rõ ràng trên bảng `settlements` (`safety_rebate_rate`, `safety_rebate_amount`, `safety_rebate_qualified`) trước khi cộng vào `net_payable_amount`.

@@ -541,6 +541,12 @@ def align_schema_defaults(rows, colmap):
     if ('settlements', 'vendor_fault_compensation_deducted_amount') in colmap:
         for s in rows.get('settlements', []):
             s.setdefault('vendor_fault_compensation_deducted_amount', 0)
+    if ('settlements', 'safety_rebate_rate') in colmap:
+        for s in rows.get('settlements', []):
+            s.setdefault('safety_rebate_rate', 0)
+            s.setdefault('safety_rebate_amount', 0)
+            s.setdefault('safety_rebate_qualified', False)
+            s.setdefault('safety_rebate_note', None)
     if ('service_slot_units', 'equipment_blocked') in colmap:
         for unit in rows.get('service_slot_units', []):
             unit.setdefault('equipment_blocked', False)
@@ -819,8 +825,8 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     }
 
 
-# Replacement accepts only the exact reviewed V1-V53 table/column/FK/trigger inventory.
-REPLACEMENT_FLYWAY_VERSION = 53
+# Replacement accepts only the exact reviewed V1-V54 table/column/FK/trigger inventory.
+REPLACEMENT_FLYWAY_VERSION = 54
 RESET_INVENTORY_SQL = """
 SELECT json_build_object(
  'schemas',(SELECT json_agg(nspname ORDER BY nspname) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),
@@ -847,10 +853,11 @@ SELECT json_build_object(
    WHERE NOT t.tgisinternal AND n.nspname !~ '^pg_') x))
 """
 
-PROTECTED_TABLES = ('flyway_schema_history', 'system_configs', 'category_safety_rules', 'vendor_commission_policies', 'exchange_rates')
+PROTECTED_TABLES = ('flyway_schema_history', 'system_configs', 'category_safety_rules', 'vendor_commission_policies', 'exchange_rates', 'commission_rules')
 # These source-defined relationships predate explicit FK constraints.
 PROTECTED_LEGACY_REFERENCES = (
     ('system_configs', 'updated_by', 'users'),
+    ('commission_rules', 'updated_by', 'users'),
     ('categories', 'parent_id', 'categories'),
     ('vendors', 'user_id', 'users'),
     ('vendors', 'verified_by', 'users'),

@@ -1,4 +1,4 @@
--- V51__dynamic_commission_rules.sql
+-- V54__dynamic_commission_rules.sql
 -- Triển khai hệ thống quy tắc hoa hồng biến thiên (Onboarding 5%, Category 7%/10%/12%)
 -- và Quỹ thưởng An toàn Biển 2% cộng trực tiếp tiền mặt vào bảng quyết toán (settlements).
 
