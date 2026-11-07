@@ -35,6 +35,7 @@ DESIGN.md
 .releases/
 .superpowers/
 .release-events/
+.impeccable/
 
 # Local GitHub production credential archive (never commit)
 /private/github-production-secrets*
