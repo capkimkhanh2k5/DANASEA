@@ -55,7 +55,7 @@ public class RefundProcessingService {
     public static final int MAX_RETRIES = 3;
     public static final String MANUAL_REVIEW_REQUIRED = "MANUAL_REFUND_REVIEW_REQUIRED";
     private static final String AWAITING = "GATEWAY_TIMEOUT_AWAITING_VERIFICATION";
-    private enum Preparation { CREATE, RECONCILE, BLOCKED }
+    private static final String CONTEXT_REVIEW = "REFUND_CONTEXT_REQUIRES_REVIEW";
 
     private ApplicationEventPublisher eventPublisher;
 
@@ -117,47 +117,35 @@ public class RefundProcessingService {
         if (transaction == null) {
             throw new IllegalStateException("Transactional refund processor is not configured.");
         }
-        Preparation preparation = transaction.execute(tx -> {
+        boolean reconcile = Boolean.TRUE.equals(transaction.execute(tx -> {
             RefundJpaEntity refund = refundRepository.findByIdForUpdate(refundId).orElse(null);
             if (refund == null || refund.getStatus() != RefundStatus.PENDING) {
-                return Preparation.RECONCILE;
+                return true;
             }
-            if (MANUAL_REVIEW_REQUIRED.equals(refund.getLastError())) {
-                return Preparation.BLOCKED;
+            if (MANUAL_REVIEW_REQUIRED.equals(refund.getLastError()) && refund.getProviderAmount() != null) {
+                return false;
             }
             try {
                 RefundContext context = lockContext(refund);
-                if (requiresManualCompletion(context.payment().getProvider())) {
-                    refund.setPaymentId(context.payment().getId());
-                    refund.setProvider(context.payment().getProvider());
-                    refund.setProviderTransactionId(context.payment().getProviderTransactionId());
-                    refund.setLastError(MANUAL_REVIEW_REQUIRED);
-                    refund.setNextAttemptAt(null);
-                    refundRepository.saveAndFlush(refund);
-                    return Preparation.BLOCKED;
-                }
                 initializeContext(refund, context.payment());
-                if (refund.getGatewayRequestedAt() != null || (refund.getLastError() != null
-                        && !refund.getLastError().startsWith("REFUND_CONTEXT_REQUIRES_REVIEW"))) {
+                if (mayHaveBeenSubmitted(refund)) {
                     if (refund.getGatewayRequestedAt() == null) {
                         refund.setGatewayRequestedAt(OffsetDateTime.now());
                         refundRepository.saveAndFlush(refund);
                     }
-                    return Preparation.RECONCILE;
+                    return true;
                 }
-                refund.setGatewayRequestedAt(OffsetDateTime.now());
-                refund.setLastError(AWAITING);
+                refund.setLastError(MANUAL_REVIEW_REQUIRED);
+                refund.setNextAttemptAt(null);
                 refundRepository.saveAndFlush(refund);
-                return Preparation.CREATE;
             } catch (IllegalArgumentException | IllegalStateException ex) {
                 configurationError(refund, ex.getMessage());
-                return Preparation.BLOCKED;
             }
-        });
-        if (preparation == null || preparation == Preparation.BLOCKED) {
+            return false;
+        }));
+        if (!reconcile) {
             return false;
         }
-        boolean fresh = preparation == Preparation.CREATE;
         return Boolean.TRUE.equals(transaction.execute(tx -> {
             RefundJpaEntity refund = refundRepository.findByIdForUpdate(refundId).orElse(null);
             if (refund == null) {
@@ -180,8 +168,7 @@ public class RefundProcessingService {
             GatewayRefundRequest request = toGatewayRequest(refund, context.payment());
             RefundResult result;
             try {
-                result = fresh ? paymentGatewayPort.requestRefund(request)
-                        : paymentGatewayPort.queryRefund(request, refund.getProviderRefundId());
+                result = paymentGatewayPort.queryRefund(request, refund.getProviderRefundId());
             } catch (Exception ex) {
                 awaitingVerification(refund, ex.getMessage());
                 return false;
@@ -201,7 +188,7 @@ public class RefundProcessingService {
             throw new InvalidWebhookException("PayPal refund operation was not found.");
         }
         RefundJpaEntity refund = refundRepository.findByIdForUpdate(candidate.getId()).orElseThrow();
-        if (refund.getProvider() != PaymentProvider.PAYPAL
+        if (refund.getProvider() != PaymentProvider.PAYPAL || !mayHaveBeenSubmitted(refund)
                 || (refund.getProviderRefundId() != null && !providerRefundId.equals(refund.getProviderRefundId()))
                 || (!operationId.isBlank() && !operationId.equals(refund.getGatewayRequestId()))) {
             throw new InvalidWebhookException("PayPal refund ID does not match the persisted operation.");
@@ -230,7 +217,7 @@ public class RefundProcessingService {
         RefundJpaEntity refund = refundRepository.findByIdForUpdate(refundId)
                 .orElseThrow(() -> new RefundNotFoundException(refundId));
         if (refund.getStatus() == RefundStatus.PROCESSED) {
-            if (requiresManualCompletion(refund.getProvider()) && reference.equals(refund.getProviderRefundId())
+            if (refund.getGatewayRequestedAt() == null && reference.equals(refund.getProviderRefundId())
                     && providerCurrency.equals(refund.getProviderCurrency()) && refund.getProviderAmount() != null
                     && providerAmount.compareTo(refund.getProviderAmount()) == 0) {
                 return refund;
@@ -240,12 +227,12 @@ public class RefundProcessingService {
         if (refund.getStatus() != RefundStatus.PENDING) {
             throw new InvalidOrderStateException("Only a pending refund can be completed manually.");
         }
+        if (mayHaveBeenSubmitted(refund)) {
+            throw new InvalidOrderStateException("The previous gateway refund is awaiting verification.");
+        }
         RefundContext context;
         try {
             context = lockContext(refund);
-            if (!requiresManualCompletion(context.payment().getProvider())) {
-                throw new InvalidOrderStateException("This refund provider requires gateway verification.");
-            }
             initializeContext(refund, context.payment());
         } catch (IllegalStateException ex) {
             throw new InvalidOrderStateException(ex.getMessage());
@@ -315,8 +302,11 @@ public class RefundProcessingService {
         return new RefundContext(subOrder, order, payment);
     }
 
-    private boolean requiresManualCompletion(PaymentProvider provider) {
-        return provider == PaymentProvider.PAYOS || provider == PaymentProvider.ZALOPAY;
+    private boolean mayHaveBeenSubmitted(RefundJpaEntity refund) {
+        String lastError = refund.getLastError();
+        return refund.getGatewayRequestedAt() != null || refund.getProviderRefundId() != null
+                || (lastError != null && !MANUAL_REVIEW_REQUIRED.equals(lastError)
+                        && !lastError.startsWith(CONTEXT_REVIEW));
     }
 
     private boolean matchesSubOrderPayment(RefundJpaEntity refund, PaymentJpaEntity payment) {
@@ -332,10 +322,10 @@ public class RefundProcessingService {
             throw new IllegalStateException("Original gateway transaction, amount, and currency are required.");
         }
         if (payment.getProvider() != PaymentProvider.PAYPAL && payment.getProvider() != PaymentProvider.VNPAY
-                && !requiresManualCompletion(payment.getProvider())) {
+                && payment.getProvider() != PaymentProvider.PAYOS && payment.getProvider() != PaymentProvider.ZALOPAY) {
             throw new IllegalStateException("Refund provider is not supported.");
         }
-        if (payment.getProvider() == PaymentProvider.VNPAY
+        if (payment.getProvider() == PaymentProvider.VNPAY && mayHaveBeenSubmitted(refund)
                 && (payment.getProviderOrderId() == null || payment.getProviderTransactionDate() == null)) {
             throw new IllegalStateException("Original VNPay reference and transaction date are required.");
         }
@@ -357,7 +347,7 @@ public class RefundProcessingService {
         if (refund.getGatewayRequestId() != null) {
             return;
         }
-        int providerScale = requiresManualCompletion(payment.getProvider()) && "VND".equals(payment.getProviderCurrency()) ? 0 : 2;
+        int providerScale = "VND".equals(payment.getProviderCurrency()) && !mayHaveBeenSubmitted(refund) ? 0 : 2;
         BigDecimal providerAmount = payment.getProviderAmount().multiply(refund.getAmount())
                 .divide(payment.getAmount(), providerScale, RoundingMode.HALF_UP);
         BigDecimal allocated = others.stream().filter(r -> r.getProviderAmount() != null)
@@ -452,11 +442,11 @@ public class RefundProcessingService {
     }
 
     private void configurationError(RefundJpaEntity refund, String detail) {
-        if (refund.getGatewayRequestedAt() != null || (refund.getLastError() != null && refund.getLastError().contains(AWAITING))) {
+        if (mayHaveBeenSubmitted(refund)) {
             awaitingVerification(refund, detail);
             return;
         }
-        refund.setLastError("REFUND_CONTEXT_REQUIRES_REVIEW: " + detail);
+        refund.setLastError(CONTEXT_REVIEW + ": " + detail);
         refund.setRetryCount((refund.getRetryCount() == null ? 0 : refund.getRetryCount()) + 1);
         refund.setNextAttemptAt(OffsetDateTime.now().plusMinutes(5));
         refundRepository.save(refund);

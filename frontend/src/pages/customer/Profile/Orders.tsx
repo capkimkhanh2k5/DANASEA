@@ -28,7 +28,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { orderService } from "../../../services/orderService";
-import { paymentService } from "../../../services/paymentService";
+import { ContinuePaymentDialog } from "./ContinuePaymentDialog";
 import { reviewService, type ReviewResponse } from "../../../services/reviewService";
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import { disputeService } from "../../../services/disputeService";
@@ -72,51 +72,22 @@ export function Orders() {
 
   const [serviceDetails, setServiceDetails] = useState<Record<string, ServiceDetailDto>>({});
 
-  // Order hold expiration check (15 minutes from creation)
-  const isOrderPaymentExpired = useCallback((order: OrderResponse, referenceTime = Date.now()) => {
-    if (order.status !== 'PENDING_PAYMENT') return false;
-    if (!order.createdAt) return false;
-    const createdMs = new Date(order.createdAt).getTime();
-    if (isNaN(createdMs)) return false;
-    return referenceTime - createdMs > 15 * 60 * 1000;
-  }, []);
+  const [paymentOrderId, setPaymentOrderId] = useState<string | null>(null);
 
-  // Pay now state
-  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
+  const [paymentClock, setPaymentClock] = useState(Date.now);
+  const isOrderPaymentExpired = (order: OrderResponse) =>
+    order.status === "PENDING_PAYMENT" && Date.parse(order.paymentDeadline ?? "") <= paymentClock;
 
-  const handlePayNow = async (order: OrderResponse) => {
-    if (isOrderPaymentExpired(order)) {
-      toast.error('Đơn hàng này đã quá thời hạn giữ chỗ thanh toán (15 phút). Vui lòng đặt lại đơn mới.');
-      return;
-    }
-
-    try {
-      setPayingOrderId(order.id);
-      const res = await paymentService.createPaymentIntent(order.id, {
-        provider: 'VNPAY',
-      });
-      const url = res.paymentUrl || res.paymentReference;
-      if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
-        window.location.assign(url);
-      } else {
-        toast.error('Không nhận được liên kết thanh toán. Vui lòng thử lại sau.');
-      }
-    } catch (err: unknown) {
-      console.error('[Orders] Lỗi khi mở cổng thanh toán:', err);
-      let msg = 'Không thể khởi tạo cổng thanh toán cho đơn hàng này. Vui lòng thử lại.';
-      if (err && typeof err === 'object' && 'response' in err) {
-        const resp = (err as { response?: { status?: number; data?: { message?: string } } }).response;
-        if (resp?.status === 409) {
-          msg = 'Đơn hàng đã hết hạn giữ chỗ (15 phút) hoặc không thể thanh toán. Vui lòng đặt lại đơn mới.';
-        } else if (resp?.data?.message) {
-          msg = resp.data.message;
-        }
-      }
-      toast.error(msg);
-    } finally {
-      setPayingOrderId(null);
-    }
-  };
+  useEffect(() => {
+    const nextDeadline = Math.min(...orders
+      .filter((order) => order.status === "PENDING_PAYMENT")
+      .map((order) => Date.parse(order.paymentDeadline ?? ""))
+      .filter((deadline) => deadline > paymentClock));
+    if (!Number.isFinite(nextDeadline)) return;
+    const timer = window.setTimeout(() => setPaymentClock(Date.now()),
+      Math.min(2_147_483_647, Math.max(0, nextDeadline - Date.now())));
+    return () => window.clearTimeout(timer);
+  }, [orders, paymentClock]);
 
   // Reschedule state
   const [rescheduleMap, setRescheduleMap] = useState<Record<string, RescheduleOptionsSummaryResponse>>({});
@@ -1156,18 +1127,11 @@ export function Orders() {
                                 </span>
                               )}
                               <button
-                                onClick={() => handlePayNow(masterOrder)}
-                                disabled={payingOrderId === masterOrder.id}
+                                onClick={() => setPaymentOrderId(masterOrder.id)}
+                                disabled={isOrderPaymentExpired(masterOrder)}
                                 className="px-4 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold shadow-xs cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1.5"
                               >
-                                {payingOrderId === masterOrder.id ? (
-                                  <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    <span>Đang mở cổng...</span>
-                                  </>
-                                ) : (
-                                  <span>Thanh toán ngay</span>
-                                )}
+                                <span>Thanh toán ngay</span>
                               </button>
                             </div>
                           )}
@@ -1307,19 +1271,12 @@ export function Orders() {
                                   <div className="flex items-center gap-2">
                                     {masterStatus === "PENDING_PAYMENT" && (
                                       <button
-                                        onClick={() => handlePayNow(masterOrder)}
-                                        disabled={payingOrderId === masterOrder.id}
+                                        onClick={() => setPaymentOrderId(masterOrder.id)}
+                                        disabled={isOrderPaymentExpired(masterOrder)}
                                         className="px-3.5 py-1.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
                                         type="button"
                                       >
-                                        {payingOrderId === masterOrder.id ? (
-                                          <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            <span>Đang mở cổng...</span>
-                                          </>
-                                        ) : (
-                                          <span>Thanh toán ngay</span>
-                                        )}
+                                        <span>Thanh toán ngay</span>
                                       </button>
                                     )}
                                     {/* Check-in QR button (P0 for CONFIRMED suborders) */}
@@ -2380,7 +2337,7 @@ export function Orders() {
                   <span>Thời gian nhận tiền dự kiến</span>
                 </div>
                 <p className="leading-relaxed">
-                  Lệnh hoàn tiền đã được gửi sang cổng thanh toán. Tiền sẽ được chuyển về tài khoản/thẻ ngân hàng của quý khách trong vòng <strong>3 - 5 ngày làm việc</strong> tùy theo quy trình đối soát của ngân hàng phát hành thẻ.
+                  DANASEA đã xác nhận hoàn tiền. Thời gian tiền về tài khoản phụ thuộc vào ngân hàng hoặc phương thức nhận tiền.
                 </p>
               </div>
 
@@ -2397,6 +2354,9 @@ export function Orders() {
           </div>,
           document.body
         )}
+      {paymentOrderId && (
+        <ContinuePaymentDialog orderId={paymentOrderId} onClose={() => setPaymentOrderId(null)} />
+      )}
     </main>
   );
 }

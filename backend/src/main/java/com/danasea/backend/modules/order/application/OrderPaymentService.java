@@ -1310,7 +1310,7 @@ public class OrderPaymentService {
         return new OrderResponse(order.getId(), order.getBookingId(), order.getCustomerId(), order.getStatus(),
                 order.getTotalAmount(), order.getDiscountAmount(),
                 subOrders.stream().map(this::toSubOrderResponse).toList(),
-                order.getCreatedAt(), order.getUpdatedAt());
+                order.getCreatedAt(), order.getUpdatedAt(), order.getPaymentDeadline());
     }
 
     private SubOrderResponse toSubOrderResponse(SubOrderJpaEntity subOrder) {

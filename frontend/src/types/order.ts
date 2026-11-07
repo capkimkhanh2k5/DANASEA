@@ -62,6 +62,7 @@ export interface OrderResponse {
   finalAmount?: number;
   createdAt: string;
   updatedAt?: string;
+  paymentDeadline?: string | null;
   items: SubOrderResponse[];
   subOrders?: SubOrderResponse[];
 }
@@ -127,7 +128,7 @@ export interface PaymentIntentResponse {
   provider: string;
   amount: number;
   status: string;
-  paymentReference: string;
+  paymentReference?: string;
   paymentUrl?: string;
   createdAt?: string;
   expiresAt?: string;
@@ -145,7 +146,11 @@ export interface PaymentResponse {
 }
 
 export interface OrderPaymentStatusResponse {
+  orderStatus: MasterOrderStatus;
   paymentStatus: 'UNPAID' | 'PAID' | 'REFUNDED' | 'NO_REFUND';
+  danaseaDeadlineAt?: string | null;
+  isExpired: boolean;
+  activeProvider?: PaymentProviderType | null;
 }
 
 export interface SubOrderCancellationPreview {

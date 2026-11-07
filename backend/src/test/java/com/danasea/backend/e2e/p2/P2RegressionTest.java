@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.math.BigDecimal;
@@ -99,9 +100,18 @@ class P2RegressionTest extends BaseE2ETest {
         refund.setAmount(paidPayment.getAmount()); refund.setRefundPercentage(new BigDecimal("100"));
         refund.setReason(RefundReason.CUSTOMER_CANCEL); refund.setStatus(RefundStatus.PENDING);
         refund.setIdempotencyKey("review-refund"); refund=refunds.saveAndFlush(refund);
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenReturn(new RefundResult(true,"review-refund-id",new BigDecimal("30.00"),"Completed",GatewayRefundStatus.COMPLETED,"USD"));
-        assertTrue(refundService.processRefund(refund.getId()));
-        assertTrue(refundService.processRefund(refund.getId()));
+        assertFalse(refundService.processRefund(refund.getId()));
+        String completion = "/api/admin/refunds/" + refund.getId() + "/manual-completion";
+        String evidence = """
+                {"providerRefundId":"review-refund-id","providerAmount":30.00,"providerCurrency":"USD"}
+                """;
+        mockMvc.perform(post(completion).header("Authorization", "Bearer " + customerToken)
+                .contentType("application/json").content(evidence)).andExpect(status().isForbidden());
+        for (int i = 0; i < 2; i++) {
+            mockMvc.perform(post(completion).header("Authorization", "Bearer " + adminToken)
+                    .contentType("application/json").content(evidence)).andExpect(status().isOk());
+        }
+        org.mockito.Mockito.verify(gateway, org.mockito.Mockito.never()).requestRefund(any(GatewayRefundRequest.class));
         assertEquals(RefundStatus.PROCESSED,refunds.findById(refund.getId()).orElseThrow().getStatus());
         var receipt = objectMapper.readTree(mockMvc.perform(get("/api/orders/" + paidOrder.getId() + "/receipt")
                 .header("Authorization", "Bearer " + customerToken)).andExpect(status().isOk())

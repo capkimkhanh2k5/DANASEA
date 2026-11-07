@@ -86,12 +86,13 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
     }
 
     @Test
-    void twoWorkersCreateOneRefundOperation() throws Exception {
+    void twoWorkersReconcileOneLegacyRefundOperation() throws Exception {
         var fixture = createRefundFixture();
+        jdbc.update("UPDATE refunds SET gateway_requested_at = now() WHERE id = ?", fixture.refundId());
         var requestStarted = new CountDownLatch(1);
         var releaseGateway = new CountDownLatch(1);
 
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> {
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> {
             requestStarted.countDown();
             assertThat(releaseGateway.await(10, TimeUnit.SECONDS)).isTrue();
             return new RefundResult(true, "REFUND-CONCURRENT-01", new BigDecimal("19.31"), "Refund succeeded",
@@ -120,16 +121,17 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
         assertThat(persistedRefund.getProviderRefundId()).isEqualTo("REFUND-CONCURRENT-01");
         assertThat(persistedRefund.getProvider()).isEqualTo(PaymentProvider.PAYPAL);
 
-        verify(gateway, times(1)).requestRefund(any(GatewayRefundRequest.class));
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
     }
 
     @Test
     void workerRacingWithVerifiedNotificationAppliesEffectsOnce() throws Exception {
         var fixture = createRefundFixture();
+        jdbc.update("UPDATE refunds SET gateway_requested_at = now() WHERE id = ?", fixture.refundId());
         var workerGatewayStarted = new CountDownLatch(1);
         var releaseWorkerGateway = new CountDownLatch(1);
 
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> {
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> {
             workerGatewayStarted.countDown();
             assertThat(releaseWorkerGateway.await(10, TimeUnit.SECONDS)).isTrue();
             return new RefundResult(true, "REFUND-RACE-01", new BigDecimal("19.31"), "Refund succeeded",
@@ -283,10 +285,24 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
     }
 
     @Test
+    void administratorCannotConfirmAReturnWhileALegacyGatewayRefundMayStillSettle() {
+        var fixture = createRefundFixture();
+        jdbc.update("UPDATE refunds SET gateway_requested_at = now() WHERE id = ?", fixture.refundId());
+
+        assertThatThrownBy(() -> worker.completeManualRefund(fixture.refundId(), createFinanceOperator(),
+                "ADMIN-REFUND", new BigDecimal("19.31"), "USD"))
+                .isInstanceOf(InvalidOrderStateException.class)
+                .hasMessageContaining("awaiting verification");
+        assertThat(refunds.findById(fixture.refundId()).orElseThrow().getStatus()).isEqualTo(RefundStatus.PENDING);
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
+    }
+
+    @Test
     void freshProcessorReconcilesTimedOutRequestWithoutResendingMoney() throws Exception {
         var fixture = createRefundFixture();
+        jdbc.update("UPDATE refunds SET gateway_requested_at = now() WHERE id = ?", fixture.refundId());
 
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(inv -> {
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(inv -> {
             GatewayRefundRequest request = inv.getArgument(0);
             try (var reader = Executors.newSingleThreadExecutor()) {
                 String committedRequest = reader.submit(() -> jdbc.queryForObject(
@@ -321,16 +337,17 @@ class RefundProcessingConcurrencyIntegrationTest extends BaseSecurityIntegration
         assertThat(processedRefund.getGatewayRequestId()).isEqualTo(stableOperationId);
         assertThat(processedRefund.getProviderRefundId()).isEqualTo("REFUND-RECONCILED-" + fixture.refundId());
 
-        verify(gateway, times(1)).requestRefund(any(GatewayRefundRequest.class));
-        verify(gateway, times(1)).queryRefund(any(GatewayRefundRequest.class), any());
+        verify(gateway, never()).requestRefund(any(GatewayRefundRequest.class));
+        verify(gateway, times(2)).queryRefund(any(GatewayRefundRequest.class), any());
     }
 
     @Test
     void unverifiableResultRemainsPendingWithoutMoneyEffects() throws Exception {
         var fixture = createRefundFixture();
+        jdbc.update("UPDATE refunds SET gateway_requested_at = now() WHERE id = ?", fixture.refundId());
 
         // 1. Simulate initial request timeout to enter RECONCILE phase
-        when(gateway.requestRefund(any(GatewayRefundRequest.class)))
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any()))
                 .thenThrow(new PaymentGatewayException("GATEWAY_TIMEOUT_AWAITING_VERIFICATION"));
         assertThat(worker.processRefund(fixture.refundId())).isFalse();
 

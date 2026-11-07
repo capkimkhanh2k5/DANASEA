@@ -42,7 +42,7 @@ public interface JpaRefundRepository extends JpaRepository<RefundJpaEntity, UUID
     @Query("""
             SELECT r FROM RefundJpaEntity r
             WHERE r.status = :status AND r.retryCount < :maxRetryCount
-              AND (r.lastError IS NULL OR r.lastError <> :manualReviewMarker)
+              AND (r.lastError IS NULL OR r.lastError <> :manualReviewMarker OR r.providerAmount IS NULL)
             ORDER BY r.createdAt ASC
             """)
     List<RefundJpaEntity> findForAutomaticProcessing(@Param("status") RefundStatus status,

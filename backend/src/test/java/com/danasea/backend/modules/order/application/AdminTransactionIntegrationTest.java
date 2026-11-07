@@ -473,8 +473,9 @@ class AdminTransactionIntegrationTest extends AbstractExternalInfrastructureInte
         var refund = refund(sub);
         refund.setAmount(BigDecimal.valueOf(amount));
         refund.setRefundPercentage(BigDecimal.valueOf(amount == 500000 ? 100 : 20));
+        refund.setGatewayRequestedAt(OffsetDateTime.now());
         refunds.saveAndFlush(refund);
-        when(gateway.requestRefund(any())).thenReturn(new RefundResult(true, "REFUND-" + refund.getId(),
+        when(gateway.queryRefund(any(), any())).thenReturn(new RefundResult(true, "REFUND-" + refund.getId(),
                 BigDecimal.valueOf(amount), "Completed", GatewayRefundStatus.COMPLETED, "VND"));
         assertThat(refundWorker.processRefund(refund.getId())).isTrue();
         var expectedStatus = amount == 500000 ? PaymentOrderStatus.REFUNDED : PaymentOrderStatus.PAID;
@@ -483,7 +484,8 @@ class AdminTransactionIntegrationTest extends AbstractExternalInfrastructureInte
         assertThat(service.getAdminOrders(null, expectedStatus, order.getCustomerId(), null, null, null, PageRequest.of(0, 20))
                 .getContent()).extracting(response -> response.id()).containsExactly(order.getId());
         assertThat(refundWorker.processRefund(refund.getId())).isTrue();
-        verify(gateway, times(1)).requestRefund(any());
+        verify(gateway, never()).requestRefund(any());
+        verify(gateway, times(1)).queryRefund(any(), any());
     }
 
     @Test

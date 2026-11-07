@@ -26,7 +26,9 @@ public record RefundDetailResponse(
         Integer verificationAttempts,
         OffsetDateTime nextAttemptAt,
         OffsetDateTime gatewayRequestedAt,
-        UUID paymentId
+        UUID paymentId,
+        BigDecimal providerAmount,
+        String providerCurrency
 ) {
     public RefundDetailResponse(
             UUID id,
@@ -43,7 +45,7 @@ public record RefundDetailResponse(
             OffsetDateTime processedAt,
             OffsetDateTime createdAt) {
         this(id, subOrderId, amount, percentage, reason, status, provider, providerRefundId, providerTransactionId,
-                retryCount, lastError, processedAt, createdAt, null, null, null, null);
+                retryCount, lastError, processedAt, createdAt, null, null, null, null, null, null);
     }
 
     public static RefundDetailResponse fromEntity(RefundJpaEntity entity) {
@@ -67,7 +69,9 @@ public record RefundDetailResponse(
                 entity.getVerificationAttempts(),
                 entity.getNextAttemptAt(),
                 entity.getGatewayRequestedAt(),
-                entity.getPaymentId()
+                entity.getPaymentId(),
+                entity.getProviderAmount(),
+                entity.getProviderCurrency()
         );
     }
 }

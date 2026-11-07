@@ -104,7 +104,8 @@ class RefundProcessingSafetyBranchesTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("invalidRefundResults")
     void independentlyRejectsEachUnboundRefundResult(String scenario, RefundResult result) {
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenReturn(result);
+        refund.setGatewayRequestedAt(java.time.OffsetDateTime.now());
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenReturn(result);
 
         assertThat(service.processRefund(refund.getId())).isFalse();
 
@@ -157,6 +158,7 @@ class RefundProcessingSafetyBranchesTest {
     @CsvSource({"0.05, 0.02, 0.01", "0.04, 0.01, 0.02"})
     void finalRefundUsesTheExactRemainingGatewayCents(
             String originalProviderAmount, String eachEarlierProviderAmount, String expectedFinalAmount) {
+        refund.setGatewayRequestedAt(java.time.OffsetDateTime.now());
         payment.setProviderAmount(new BigDecimal(originalProviderAmount));
         var firstSubOrder = subOrder(SubOrderStatus.REFUNDED);
         var secondSubOrder = subOrder(SubOrderStatus.REFUNDED);
@@ -168,7 +170,7 @@ class RefundProcessingSafetyBranchesTest {
         when(subOrders.findByMasterOrderId(order.getId())).thenReturn(allSubOrders);
         when(refunds.findBySubOrderIdIn(subOrderIds)).thenReturn(allRefunds);
         when(refunds.findBySubOrderIdInAndStatus(subOrderIds, RefundStatus.PROCESSED)).thenReturn(allRefunds);
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(invocation -> {
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(invocation -> {
             GatewayRefundRequest request = invocation.getArgument(0);
             assertThat(request.amount()).isEqualByComparingTo(expectedFinalAmount);
             assertThat(request.currency()).isEqualTo("USD");
@@ -187,10 +189,11 @@ class RefundProcessingSafetyBranchesTest {
 
     @Test
     void failedRefundReservationsDoNotConsumeOriginalMoneyOrGatewayCents() {
+        refund.setGatewayRequestedAt(java.time.OffsetDateTime.now());
         refund.setAmount(new BigDecimal("3"));
         var failed = refund(subOrder, "3", "0.05", RefundStatus.FAILED);
         when(refunds.findBySubOrderIdIn(List.of(subOrder.getId()))).thenReturn(List.of(failed, refund));
-        when(gateway.requestRefund(any(GatewayRefundRequest.class))).thenAnswer(invocation -> {
+        when(gateway.queryRefund(any(GatewayRefundRequest.class), any())).thenAnswer(invocation -> {
             GatewayRefundRequest request = invocation.getArgument(0);
             assertThat(request.amount()).isEqualByComparingTo("0.05");
             assertThat(request.fullRefund()).isTrue();
@@ -203,7 +206,7 @@ class RefundProcessingSafetyBranchesTest {
         assertThat(refund.getProviderAmount()).isEqualByComparingTo("0.05");
         assertThat(refund.getProviderRefundId()).isEqualTo("REFUND-PENDING");
         assertThat(refund.getLastError()).contains("Gateway refund remains pending");
-        verify(gateway).requestRefund(any(GatewayRefundRequest.class));
+        verify(gateway).queryRefund(any(GatewayRefundRequest.class), any());
         verifyNoInteractions(slots, events);
     }
 
@@ -276,6 +279,7 @@ class RefundProcessingSafetyBranchesTest {
 
     @Test
     void originalPaymentDisappearingBetweenPhasesLeavesTheRefundPendingForVerification() {
+        refund.setGatewayRequestedAt(java.time.OffsetDateTime.now());
         when(payments.findByIdForUpdate(payment.getId())).thenReturn(Optional.of(payment), Optional.empty());
         var processed = new AtomicBoolean(true);
 

@@ -8,7 +8,7 @@ import { customerDiscountService } from "../../../services/customerDiscountServi
 import type { DiscountCodeResponse } from "../../../types/adminDiscountCode";
 import { paymentService } from "../../../services/paymentService";
 import type { BookingHoldResponse } from "../../../types/booking";
-import type { DiscountPreviewResponse, PaymentProviderType } from "../../../types/order";
+import type { DiscountPreviewResponse, OrderPaymentStatusResponse, PaymentProviderType } from "../../../types/order";
 import { useState, useEffect, useRef } from "react";
 import {
   getPendingOrder,
@@ -84,7 +84,8 @@ export function Checkout() {
 
   // Booking Hold State
   const [bookingHold, setBookingHold] = useState<BookingHoldResponse | null>(null);
-  const [countdown, setCountdown] = useState<number>(900); // 15 minutes default
+  const [now, setNow] = useState(Date.now);
+  const [pendingStatus, setPendingStatus] = useState<OrderPaymentStatusResponse & { orderId: string }>();
   const [sessionCode] = useState(() => Math.floor(10000 + Math.random() * 90000));
 
   // Customer Contact Info State
@@ -93,12 +94,16 @@ export function Checkout() {
   const [email, setEmail] = useState<string>(user?.email || "khachhang@danasea.vn");
   const [notes, setNotes] = useState<string>("");
 
+  const pendingOrderId = pendingOrder?.id;
+  const paymentStatus = pendingStatus?.orderId === pendingOrderId ? pendingStatus : undefined;
+
   // Payment Method
-  const [selectedProvider, setSelectedProvider] = useState<PaymentProviderType>(() => pendingOrder?.provider ?? "VNPAY");
+  const [selectedProvider, setSelectedProvider] = useState<PaymentProviderType>();
   const [availableProviders, setAvailableProviders] = useState(defaultPaymentProviders);
   const visiblePaymentMethods = paymentMethods.filter(({ provider }) =>
     (isAuthenticated ? availableProviders : defaultPaymentProviders).includes(provider));
-  const paymentProvider = visiblePaymentMethods.find(({ provider }) => provider === selectedProvider)?.provider
+  const preferredProvider = selectedProvider ?? paymentStatus?.activeProvider ?? pendingOrder?.provider;
+  const paymentProvider = visiblePaymentMethods.find(({ provider }) => provider === preferredProvider)?.provider
     ?? visiblePaymentMethods[0]?.provider;
 
   useEffect(() => {
@@ -112,8 +117,25 @@ export function Checkout() {
     return () => controller.abort();
   }, [isAuthenticated]);
 
-  // Slot Holding Status (15-minute slot timeout)
-  const isHoldExpired = countdown <= 0 && !pendingOrder;
+  const deadline = pendingOrderId
+    ? paymentStatus?.danaseaDeadlineAt
+    : bookingHold?.holdExpiresAt || bookingHold?.expiresAt;
+  const deadlineMillis = deadline ? Date.parse(deadline) : NaN;
+  const countdown = Number.isFinite(deadlineMillis)
+    ? Math.max(0, Math.ceil((deadlineMillis - now) / 1000))
+    : undefined;
+  const isHoldExpired = countdown === 0 || paymentStatus?.isExpired === true;
+
+  useEffect(() => {
+    if (!isAuthenticated || !pendingOrderId) return;
+    const controller = new AbortController();
+    paymentService.getOrderPaymentStatus(pendingOrderId, controller.signal).then((status) => {
+      if (!controller.signal.aborted) setPendingStatus({ ...status, orderId: pendingOrderId });
+    }).catch(() => {
+      // The submit handler will check the authoritative status again.
+    });
+    return () => controller.abort();
+  }, [isAuthenticated, pendingOrderId]);
 
   // Promo Code State
   const [promoInput, setPromoInput] = useState<string>("");
@@ -169,16 +191,7 @@ export function Checkout() {
     const request = bookingService.holdBooking({ items: holdItems });
     holdRequest.current = request;
     request
-      .then((res) => {
-        setBookingHold(res);
-        const expireTime = res.holdExpiresAt || res.expiresAt;
-        if (expireTime) {
-          const expireDate = new Date(expireTime).getTime();
-          const now = Date.now();
-          const diffSec = Math.max(0, Math.floor((expireDate - now) / 1000));
-          setCountdown(diffSec);
-        }
-      })
+      .then(setBookingHold)
       .catch((err) => {
         console.warn('[Checkout] Không thể giữ chỗ qua API:', err);
       })
@@ -187,19 +200,11 @@ export function Checkout() {
       });
   }, [items, isAuthenticated, navigate, pendingOrderKey]);
 
-  // 15-minute countdown timer
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    if (!deadline) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [deadline]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -284,7 +289,7 @@ export function Checkout() {
   // Submit Payment Handler
   const handlePayment = async () => {
     if (isHoldExpired) {
-      setPaymentError("Thời gian giữ chỗ 15 phút đã kết thúc. Vui lòng quay lại giỏ hàng để cập nhật lại suất trống.");
+      setPaymentError("Thời hạn đã kết thúc. Vui lòng quay lại giỏ hàng để chọn lại suất.");
       return;
     }
     if (!paymentProvider || isProcessingPayment) return;
@@ -330,6 +335,26 @@ export function Checkout() {
           });
         }
         const orderId = orderRes.id;
+        const currentStatus = pendingOrder
+          ? await paymentService.getOrderPaymentStatus(orderId)
+          : undefined;
+        if (currentStatus) {
+          setPendingStatus({ ...currentStatus, orderId });
+          if (currentStatus.isExpired || currentStatus.orderStatus !== "PENDING_PAYMENT"
+              || currentStatus.paymentStatus !== "UNPAID") {
+            setIsProcessingPayment(false);
+            setPaymentError(currentStatus.isExpired
+              ? "Đơn hàng đã hết hạn thanh toán. Vui lòng quay lại giỏ hàng để chọn lại suất."
+              : "Đơn hàng đã được xử lý. Vui lòng kiểm tra trạng thái trong mục Đơn hàng.");
+            return;
+          }
+        }
+        if (currentStatus?.activeProvider && currentStatus.activeProvider !== paymentProvider
+            && currentStatus.activeProvider !== paymentStatus?.activeProvider) {
+          setIsProcessingPayment(false);
+          setPaymentError("Phương thức đang giữ giao dịch đã thay đổi. Vui lòng kiểm tra lựa chọn trước khi đổi cổng.");
+          return;
+        }
         savePendingOrder(pendingOrderKey, { id: orderId, provider: paymentProvider });
 
         // 2. Synchronize safety waiver acceptance for all sub-orders requiring it
@@ -353,7 +378,9 @@ export function Checkout() {
         }
 
         // 3. Create Payment Intent
-        const submitIntent = () => paymentService.createPaymentIntent(orderId, { provider: paymentProvider });
+        const submitIntent = () => currentStatus
+          ? paymentService.continuePayment(orderId, { provider: paymentProvider }, currentStatus)
+          : paymentService.createPaymentIntent(orderId, { provider: paymentProvider });
 
         let payRes;
         try {
@@ -444,14 +471,16 @@ export function Checkout() {
                   {isHoldExpired ? (
                     <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
                       <Timer className="w-4 h-4 text-rose-600" />
-                      <span>Hết thời gian giữ chỗ</span>
+                      <span>{pendingOrderId ? "Hết hạn thanh toán" : "Hết thời gian giữ chỗ"}</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 text-slate-900 text-sm">
                       <Timer className="w-4 h-4 text-slate-700" />
-                      <span className="font-medium text-slate-700">Thời gian giữ chỗ:</span>
+                      <span className="font-medium text-slate-700">
+                        {pendingOrderId ? "Thời gian thanh toán" : "Thời gian giữ chỗ"}
+                      </span>
                       <span className="font-bold font-mono text-base text-slate-900 tabular-nums">
-                        {formatTime(countdown)}
+                        {countdown === undefined ? "—" : formatTime(countdown)}
                       </span>
                     </div>
                   )}
@@ -711,7 +740,10 @@ export function Checkout() {
 
                   {isHoldExpired ? (
                     <button
-                      onClick={() => navigate('/cart')}
+                      onClick={() => {
+                        if (pendingOrderId) savePendingOrder(pendingOrderKey, null);
+                        navigate('/cart');
+                      }}
                       type="button"
                       className="w-full py-3.5 rounded-xl font-bold text-sm bg-rose-600 hover:bg-rose-700 text-white shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
@@ -735,7 +767,8 @@ export function Checkout() {
                           <span>Đang kết nối cổng thanh toán...</span>
                         </span>
                       ) : (
-                        <span>Xác nhận &amp; Thanh toán</span>
+                        <span>{paymentStatus?.activeProvider && paymentStatus.activeProvider !== paymentProvider
+                          ? "Đổi cổng và thanh toán" : "Xác nhận & Thanh toán"}</span>
                       )}
                     </button>
                   )}
