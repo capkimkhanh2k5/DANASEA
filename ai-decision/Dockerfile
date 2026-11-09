@@ -5,7 +5,7 @@ COPY scripts/install_dependencies.py ./install_dependencies.py
 RUN python install_dependencies.py config/requirements.lock.txt
 RUN python -m pip uninstall -y pip
 
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:8acb3a7694eda954b3ad4256aec3291bdd92715d7a8c030abd1a21546337b4e4 AS rootfs
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:24f549a7fcace88e69b9557941168c74645688ecc4acf7fb6d734a6b74e9019d AS rootfs
 
 
 RUN apk --root /runtime --initdb --keys-dir /etc/apk/keys \
