@@ -11,25 +11,25 @@ import java.util.UUID;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort;
-import com.danasea.backend.modules.ai.application.ports.TravelWeatherPort;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
+import com.danasea.backend.modules.service.application.api.AiCatalogReadApi.Slot;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CustomerMarineBriefingUseCase {
@@ -43,7 +43,7 @@ public class CustomerMarineBriefingUseCase {
             String meetingLocation,
             LocalDate departureDate,
             LocalTime departureTime,
-            String weatherSafetyStatus, // ACCEPTABLE, CAUTION, UNSAFE, UNKNOWN
+            String weatherSafetyStatus, // ACCEPTABLE, CAUTION, UNSAFE, UNKNOWN, NOT_REQUIRED
             String marineConditionsSummary,
             List<ChecklistItem> packingChecklist,
             List<String> arrivalAndSafetyGuidelines
@@ -62,7 +62,7 @@ public class CustomerMarineBriefingUseCase {
     private final JpaSubOrderRepository subOrderRepo;
     private final JpaServiceRepository serviceRepo;
     private final JpaServiceSlotRepository slotRepo;
-    private final TravelWeatherPort weatherPort;
+    private final MarineSlotWeather marineWeather;
     private final AiExtendedInsightStorePort insightStore;
     private final ObjectMapper mapper;
 
@@ -102,17 +102,12 @@ public class CustomerMarineBriefingUseCase {
         );
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void preGenerateForTripReminder(UUID masterOrderId, UUID subOrderId, UUID customerId, UUID slotId) {
-        try {
-            var subOrderOpt = subOrderRepo.findById(subOrderId);
-            if (subOrderOpt.isEmpty()) return;
-            var subOrder = subOrderOpt.get();
-            buildBriefingForSubOrder(masterOrderId, subOrder, customerId, SupportedLanguage.VI);
-            log.info("Pre-generated 24h marine briefing for customer {} subOrder {}", customerId, subOrderId);
-        } catch (Exception e) {
-            log.warn("Failed to pre-generate trip reminder marine briefing: {}", e.getMessage());
-        }
+        var subOrder = subOrderRepo.findById(subOrderId)
+                .filter(order -> masterOrderId.equals(order.getMasterOrderId()) && slotId.equals(order.getSlotId()))
+                .orElseThrow(() -> new IllegalArgumentException("Departure no longer matches the order"));
+        buildBriefingForSubOrder(masterOrderId, subOrder, customerId, SupportedLanguage.VI);
     }
 
     private SubOrderBriefing buildBriefingForSubOrder(UUID masterOrderId, SubOrderJpaEntity subOrder, UUID customerId, SupportedLanguage language) {
@@ -127,15 +122,31 @@ public class CustomerMarineBriefingUseCase {
                 : (isEn ? "Da Nang Marine Experience" : "Trải nghiệm biển Đà Nẵng");
         String meetingLocation = service != null && service.getAddress() != null && !service.getAddress().isBlank()
                 ? service.getAddress()
-                : (isEn ? "Man Thai / Son Tra Beach Area, Da Nang" : "Khu vực bãi biển Mân Thái / Sơn Trà, Đà Nẵng");
+                : (isEn ? "Confirm the meeting point with the operator" : "Xác nhận điểm hẹn với đơn vị tổ chức");
 
-        LocalDate date = slot != null ? slot.getDate() : LocalDate.now().plusDays(1);
-        LocalTime time = slot != null ? slot.getStartTime() : LocalTime.of(8, 0);
+        LocalDate date = slot != null ? slot.getDate() : null;
+        LocalTime time = slot != null ? slot.getStartTime() : null;
 
-        String weatherStatus = "ACCEPTABLE";
-        String conditionsSummary = isEn
-                ? "Favorable Da Nang marine forecast with calm waters (wave height under 0.6m) and good underwater visibility, ideal for water sports and coral snorkeling."
-                : "Dự báo thời tiết biển Đà Nẵng thuận lợi, mặt biển êm ả với độ cao sóng dưới 0.6m, tầm nhìn dưới nước tốt, rất thích hợp cho hoạt động thể thao biển và lặn ngắm san hô.";
+        var weatherStatus = marineWeather.assess(subOrder.getServiceId(),
+                slot == null ? null : new Slot(subOrder.getSlotId(), slot.getDate(), slot.getStartTime(), slot.getEndTime(), 0),
+                language);
+        String conditionsSummary = switch (weatherStatus) {
+            case ACCEPTABLE -> isEn
+                    ? "The latest forecast is within the service thresholds. Confirm conditions again before departure."
+                    : "Dự báo mới nhất nằm trong ngưỡng của dịch vụ. Hãy xác nhận lại điều kiện trước khi khởi hành.";
+            case CAUTION -> isEn
+                    ? "The marine forecast is provisional. Confirm current conditions with the operator before departure."
+                    : "Dự báo biển còn tạm thời. Hãy xác nhận điều kiện hiện tại với đơn vị tổ chức trước khi khởi hành.";
+            case UNSAFE -> isEn
+                    ? "The marine forecast exceeds the service safety thresholds. Contact the operator before travelling."
+                    : "Dự báo biển vượt ngưỡng an toàn của dịch vụ. Hãy liên hệ đơn vị tổ chức trước khi di chuyển.";
+            case NOT_REQUIRED -> isEn
+                    ? "This service does not require a slot-specific marine forecast."
+                    : "Dịch vụ này không yêu cầu dự báo biển riêng cho ca.";
+            case UNKNOWN -> isEn
+                    ? "A current marine forecast is unavailable. Confirm conditions with the operator before departure."
+                    : "Chưa có dự báo biển hiện hành. Hãy xác nhận điều kiện với đơn vị tổ chức trước khi khởi hành.";
+        };
 
         List<ChecklistItem> checklist = new ArrayList<>();
         if (isEn) {
@@ -155,8 +166,8 @@ public class CustomerMarineBriefingUseCase {
         String lowerTitle = serviceTitle.toLowerCase(Locale.ROOT);
         if (lowerTitle.contains("lặn") || lowerTitle.contains("cano") || lowerTitle.contains("snorkel") || lowerTitle.contains("speedboat")) {
             checklist.add(isEn
-                    ? new ChecklistItem("MEDICAL", "Motion sickness medication", "Take 30-45 minutes before departure if you are prone to seasickness", false)
-                    : new ChecklistItem("Y_TE", "Thuốc chống say sóng", "Uống trước giờ khởi hành 30-45 phút nếu bạn dễ bị say sóng", false));
+                    ? new ChecklistItem("MEDICAL", "Motion sickness medication", "If needed, follow the label or advice from your pharmacist", false)
+                    : new ChecklistItem("Y_TE", "Thuốc chống say sóng", "Nếu cần, hãy làm theo hướng dẫn trên nhãn hoặc tư vấn của dược sĩ", false));
         }
 
         List<String> guidelines = isEn
@@ -180,19 +191,20 @@ public class CustomerMarineBriefingUseCase {
                 meetingLocation,
                 date,
                 time,
-                weatherStatus,
+                weatherStatus.name(),
                 conditionsSummary,
                 checklist,
                 guidelines
         );
 
-        try {
-            String json = mapper.writeValueAsString(briefing);
-            insightStore.saveMarineBriefing(masterOrderId, subOrder.getId(), customerId,
-                    subOrder.getSlotId() != null ? subOrder.getSlotId() : UUID.randomUUID(),
-                    weatherStatus, json);
-        } catch (Exception e) {
-            log.warn("Failed to persist marine briefing: {}", e.getMessage());
+        if (slot != null) {
+            try {
+                String json = mapper.writeValueAsString(briefing);
+                insightStore.saveMarineBriefing(masterOrderId, subOrder.getId(), customerId,
+                        subOrder.getSlotId(), weatherStatus.name(), json);
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("Unable to serialize marine briefing", e);
+            }
         }
 
         return briefing;

@@ -4,21 +4,27 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort;
+import com.danasea.backend.modules.operation.infrastructure.persistence.entities.ReviewJpaEntity;
 import com.danasea.backend.modules.operation.infrastructure.persistence.repositories.JpaReviewRepository;
 import com.danasea.backend.modules.report.application.usecases.GetVendorPerformanceReportUseCase;
 import com.danasea.backend.modules.report.domain.models.TimeRange;
 import com.danasea.backend.modules.report.domain.models.VendorPerformanceItem;
 import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
+import com.danasea.backend.modules.service.infrastructure.persistence.entities.CategoryJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
+import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaCategoryRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
@@ -32,6 +38,7 @@ public class JpaVendorAiDataAdapter implements VendorAiDataPort {
 
     private final VendorInternalApi vendorInternalApi;
     private final JpaServiceRepository serviceRepo;
+    private final JpaCategoryRepository categoryRepo;
     private final JpaServiceSlotRepository slotRepo;
     private final JpaReviewRepository reviewRepo;
     private final GetVendorPerformanceReportUseCase vendorPerformanceReportUseCase;
@@ -52,46 +59,33 @@ public class JpaVendorAiDataAdapter implements VendorAiDataPort {
     @Transactional(readOnly = true)
     public List<VendorServiceItem> listServices(UUID vendorId) {
         return serviceRepo.findByVendorIdOrderByCreatedAtDesc(vendorId).stream()
-                .filter(s -> s.getStatus() == ServiceStatus.APPROVED || s.getStatus() == ServiceStatus.ACTIVE)
-                .map(s -> new VendorServiceItem(
-                        s.getId(), s.getVendorId(), s.getTitle(), s.getDescription(),
-                        s.getCategory() != null ? s.getCategory().getName() : "Du lịch biển",
-                        s.getRatingAvg() != null ? s.getRatingAvg() : BigDecimal.ZERO,
-                        s.getRatingCount() != null ? s.getRatingCount() : 0
-                )).toList();
+                .filter(service -> service.getStatus() == ServiceStatus.PUBLISHED)
+                .map(this::toServiceItem)
+                .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public Optional<VendorServiceItem> getService(UUID vendorId, UUID serviceId) {
-        return serviceRepo.findById(serviceId)
-                .filter(s -> s.getVendorId().equals(vendorId))
-                .map(s -> new VendorServiceItem(
-                        s.getId(), s.getVendorId(), s.getTitle(), s.getDescription(),
-                        s.getCategory() != null ? s.getCategory().getName() : "Du lịch biển",
-                        s.getRatingAvg() != null ? s.getRatingAvg() : BigDecimal.ZERO,
-                        s.getRatingCount() != null ? s.getRatingCount() : 0
-                ));
+        return findOwnedService(vendorId, serviceId).map(this::toServiceItem);
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<VendorSlotItem> listUpcomingSlots(UUID vendorId, UUID serviceId, int horizonDays) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(TimeRange.VIETNAM_ZONE);
         LocalDate toDate = today.plusDays(Math.max(1, Math.min(horizonDays, 30)));
         List<VendorSlotItem> result = new ArrayList<>();
-        List<UUID> targetServiceIds = serviceId != null
-                ? List.of(serviceId)
-                : serviceRepo.findByVendorId(vendorId).stream().map(ServiceJpaEntity::getId).toList();
+        List<ServiceJpaEntity> services = serviceId == null
+                ? serviceRepo.findByVendorId(vendorId)
+                : findOwnedService(vendorId, serviceId).stream().toList();
 
-        for (UUID sId : targetServiceIds) {
-            var service = serviceRepo.findById(sId).orElse(null);
-            String title = service != null ? service.getTitle() : "Dịch vụ biển";
-            var slots = slotRepo.findByServiceIdAndDateBetweenOrderByDateAscStartTimeAsc(sId, today, toDate);
+        for (ServiceJpaEntity service : services) {
+            var slots = slotRepo.findByServiceIdAndDateBetweenOrderByDateAscStartTimeAsc(service.getId(), today, toDate);
             for (var slot : slots) {
                 if (slot.getStatus() != SlotStatus.CANCELLED) {
                     result.add(new VendorSlotItem(
-                            slot.getId(), sId, title, slot.getDate(), slot.getStartTime(), slot.getEndTime(),
+                            slot.getId(), service.getId(), service.getName(), slot.getDate(), slot.getStartTime(), slot.getEndTime(),
                             slot.getCapacity(), slot.getBookedCount(), slot.getStatus().name()
                     ));
                 }
@@ -105,22 +99,42 @@ public class JpaVendorAiDataAdapter implements VendorAiDataPort {
     public List<VendorReviewItem> listReviews(UUID vendorId, UUID serviceId, int limit) {
         int bounded = Math.max(1, Math.min(limit, 100));
         var pageable = PageRequest.of(0, bounded);
-        var page = serviceId != null
-                ? reviewRepo.findByServiceIdAndIsVisibleTrue(serviceId, pageable)
-                : reviewRepo.findByVendorIdAndIsVisibleTrue(vendorId, pageable);
+        var page = serviceId == null
+                ? reviewRepo.findByVendorIdAndIsVisibleTrue(vendorId, pageable)
+                : reviewRepo.findByVendorIdAndServiceIdAndIsVisibleTrue(vendorId, serviceId, pageable);
+        List<ReviewJpaEntity> reviews = page.getContent();
+        var serviceIds = reviews.stream().map(ReviewJpaEntity::getServiceId).distinct().toList();
+        Map<UUID, ServiceJpaEntity> services = serviceRepo.findAllById(serviceIds).stream()
+                .collect(Collectors.toMap(ServiceJpaEntity::getId, Function.identity()));
 
-        return page.getContent().stream().map(r -> new VendorReviewItem(
-                r.getId(), r.getServiceId(),
-                r.getService() != null ? r.getService().getTitle() : "Trải nghiệm biển",
-                r.getRating(), r.getComment(), r.getCreatedAt()
+        return reviews.stream().map(review -> new VendorReviewItem(
+                review.getId(), review.getServiceId(),
+                Optional.ofNullable(services.get(review.getServiceId())).map(ServiceJpaEntity::getName).orElse("Trải nghiệm biển"),
+                review.getRating(), review.getComment(), review.getCreatedAt()
         )).toList();
+    }
+
+    private Optional<ServiceJpaEntity> findOwnedService(UUID vendorId, UUID serviceId) {
+        return serviceRepo.findById(serviceId).filter(service -> vendorId.equals(service.getVendorId()));
+    }
+
+    private VendorServiceItem toServiceItem(ServiceJpaEntity service) {
+        String categoryName = Optional.ofNullable(service.getCategoryId())
+                .flatMap(categoryRepo::findById)
+                .map(CategoryJpaEntity::getName)
+                .orElse("Du lịch biển");
+        return new VendorServiceItem(
+                service.getId(), service.getVendorId(), service.getName(), service.getDescription(),
+                categoryName, service.getAvgRating() != null ? service.getAvgRating() : BigDecimal.ZERO,
+                service.getRatingCount() != null ? service.getRatingCount() : 0
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
     public VendorPerformanceMetrics getPerformanceMetrics(UUID vendorId, LocalDate from, LocalDate to) {
-        LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(30);
-        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now(TimeRange.VIETNAM_ZONE).minusDays(30);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeRange.VIETNAM_ZONE);
         TimeRange range = TimeRange.of(effectiveFrom, effectiveTo);
 
         List<VendorPerformanceItem> items = vendorPerformanceReportUseCase.execute(range, vendorId);

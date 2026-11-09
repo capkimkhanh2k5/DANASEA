@@ -496,7 +496,7 @@ Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi 
 - [x] Quản lý hội thoại đa phiên (Multi-Session Thread Control: tạo mới, ghim, đổi tên, lưu trữ, xóa mềm) cho Customer, Vendor và Admin
 - [x] Cẩm nang an toàn & thời tiết biển trước chuyến đi (Customer Marine Briefing) tích hợp hook tự động 24h trong `TripReminderJob`
 - [x] Hệ thống huấn luyện chất lượng đối tác từ đánh giá (Vendor Review Coaching 4 trụ cột, Smart Reply Draft, Listing Optimizer, Slot Demand Advisor)
-- [x] Trung tâm hỗ trợ phán quyết tranh chấp của Quản trị viên (Admin Dispute Arbitration đối chiếu 3 sự thật hệ thống) & Bản tin điều hành sàn (Executive Digest)
+- [x] Tóm tắt bằng chứng tranh chấp cho Quản trị viên duyệt & Bản tin điều hành sàn (Executive Digest)
 - [x] Trợ lý hội thoại chuyên sâu cho Đối tác (Vendor Copilot) và Quản trị viên (Admin BI Copilot) tích hợp 11 công cụ kỹ thuật
 - [x] Có rate limit theo IP/user qua Redis và kiểm soát ngân sách thực thi `AiExecutionBudget`
 - [ ] Xác nhận giới hạn chi phí gọi LLM và kiểm chứng giới hạn dưới tải thực
@@ -562,7 +562,7 @@ Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi 
 - [x] GET /api/admin/support/requests
 - [x] GET /api/admin/support/requests/{id}
 - [x] POST /api/admin/support/requests/{id}/handle
-- [x] POST /api/admin/ai/disputes/{disputeId}/summarize (hòa giải tranh chấp thông minh đối chiếu 3 sự thật: QR check-in, thời tiết slot, chính sách hoàn hủy)
+- [x] POST /api/admin/ai/disputes/{disputeId}/summarize (tóm tắt bằng chứng và chuyển quản trị viên duyệt)
 - [x] GET /api/admin/ai/disputes/{disputeId}/summary (lấy bản tóm tắt hòa giải tranh chấp đã lưu)
 - [x] GET /api/admin/ai/executive-digest (bản tin điều hành sàn tổng quan 1 chạm: GMV, Payout, Commission, cảnh báo sức khỏe vendor)
 - [x] POST /api/admin/ai/executive-digest (tương đương GET, hỗ trợ truy vấn điều hành theo body/param)
@@ -578,7 +578,7 @@ Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi 
 - [x] Cách ly đa bên thuê (Multi-tenant IDOR Isolation) cho Vendor và Customer: suy ra `vendorId` và `customerId` từ JWT session token, tuyệt đối không nhận từ request body
 
 ### Test
-- [x] VendorAdminAiFeaturesTest (7 ca kiểm thử tích hợp chuyên sâu: Review Coaching 4 trụ cột, Smart Reply Draft, Listing Optimizer, Slot Advisor, Dispute Arbitration 3 sự thật hệ thống, Copilot Multi-Session Lifecycle, Customer Marine Briefing & IDOR Guard; toàn bộ pass 100% ngày 09/11/2026).
+- [x] VendorAdminAiFeaturesTest bao phủ tư vấn thời tiết, duyệt tranh chấp, phạm vi hội thoại, quyền truy cập cẩm nang và các công cụ hỗ trợ đối tác.
 - [x] AssistantChatUseCaseTest (15 ca: luồng chat/tool calling và xử lý lỗi, kiểm soát deadline ngân sách).
 - [x] AiToolContractHardeningTest (6 ca: kiểm thử contract cứng của toàn bộ 16 tools, bao gồm ai_marine_briefing).
 - [x] CustomerAiFeaturesTest (16 ca: kiểm thử khám phá dịch vụ, lập lịch trình, an toàn thời tiết và bảo vệ IDOR).

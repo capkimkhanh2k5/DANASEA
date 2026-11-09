@@ -122,13 +122,13 @@ public class VendorAiController {
             @RequestParam(defaultValue = "20") int limit
     ) {
         UUID userId = resolveUserId();
-        return roleCopilotUseCase.listConversations(userId, "VENDOR", archived, limit);
+        return roleCopilotUseCase.listConversations(userId, "VENDOR", resolveVendorId(), archived, limit);
     }
 
     @GetMapping("/copilot/conversations/{id}/history")
     public List<CopilotMessage> getConversationHistory(@PathVariable UUID id) {
         UUID userId = resolveUserId();
-        return roleCopilotUseCase.getConversationHistory(id, userId);
+        return roleCopilotUseCase.getConversationHistory(id, userId, "VENDOR", resolveVendorId());
     }
 
     @PatchMapping("/copilot/conversations/{id}")
@@ -140,13 +140,13 @@ public class VendorAiController {
         String title = dto != null ? dto.title() : null;
         Boolean pinned = dto != null ? dto.pinned() : null;
         Boolean archived = dto != null ? dto.archived() : null;
-        return roleCopilotUseCase.updateConversationMeta(id, userId, title, pinned, archived);
+        return roleCopilotUseCase.updateConversationMeta(id, userId, "VENDOR", resolveVendorId(), title, pinned, archived);
     }
 
     @DeleteMapping("/copilot/conversations/{id}")
     public ResponseEntity<Void> deleteConversation(@PathVariable UUID id) {
         UUID userId = resolveUserId();
-        roleCopilotUseCase.deleteConversation(id, userId);
+        roleCopilotUseCase.deleteConversation(id, userId, "VENDOR", resolveVendorId());
         return ResponseEntity.noContent().build();
     }
 

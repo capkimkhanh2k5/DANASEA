@@ -17,7 +17,7 @@
 | 11 | `Customer_Preference_And_Feedback_Flow` | Sequence Diagram | [`codeFlows/Sequence_Diagram/Customer_Preference_And_Feedback_SD.mmd`](codeFlows/Sequence_Diagram/Customer_Preference_And_Feedback_SD.mmd) | Quản lý sở thích cá nhân hóa (Consent bật/tắt, Exclusions, Version), Vòng lặp phản hồi gợi ý (SHOWN, CLICK, POSITIVE, NEGATIVE) & Tác động điểm xếp hạng |
 | 12 | `Customer_Support_And_Admin_Queue_Flow` | Sequence Diagram | [`codeFlows/Sequence_Diagram/Customer_Support_And_Admin_Queue_SD.mmd`](codeFlows/Sequence_Diagram/Customer_Support_And_Admin_Queue_SD.mmd) | Hỗ trợ khách hàng AI (Tra cứu đơn của chính mình, Quyet Topic/Urgency, AI Cancellation Preview tính phí hoàn), Tạo ticket có Idempotency & Hàng đợi Admin xử lý thủ công |
 | 13 | `Vendor_Review_Coaching_And_Copilot_Flow` | Workflow Diagram | [`docs/FE_AI_Features_Spec.md`](../../FE_AI_Features_Spec.md) | Huấn luyện Review 4 trụ cột, Smart Reply, Listing Optimizer, Slot Advisor & Trợ lý hội thoại Vendor Copilot đa phiên (Flyway V55) |
-| 14 | `Admin_Dispute_Arbitration_And_Marine_Briefing_Flow` | Workflow Diagram | [`docs/FE_AI_Features_Spec.md`](../../FE_AI_Features_Spec.md) | Hòa giải tranh chấp 3 sự thật hệ thống (QR Checkin, Weather, Policy), Executive Digest & Cẩm nang biển thông minh 24h trước giờ khởi hành |
+| 14 | `Admin_Dispute_Arbitration_And_Marine_Briefing_Flow` | Workflow Diagram | [`docs/FE_AI_Features_Spec.md`](../../FE_AI_Features_Spec.md) | Tóm tắt bằng chứng tranh chấp, Executive Digest & Cẩm nang biển thông minh 24h trước giờ khởi hành |
 
 ---
 
@@ -380,14 +380,11 @@ Sơ đồ nguồn: `codeFlows/Decision_Flowchart/CliProxy_ModelFallback_DF.mmd`.
 **Thành phần:** `Customer / Admin` → `CustomerAiController` / `AdminAiController` → `CustomerMarineBriefingUseCase` / `AdminDisputeSummaryUseCase` → `TripReminderJob` → `PostgreSQL V55`
 
 **Luồng xử lý:**
-1. **Hòa giải tranh chấp 3 sự thật khách quan (Dispute Arbitration):**
-   - Đối chiếu chéo 3 nguồn dữ liệu không thể làm giả:
-     - (1) Lịch sử quét mã QR vé tại bến tàu (`usedAt` có tồn tại hay không).
-     - (2) Dữ liệu quan trắc thời tiết thực tế tại slot giờ đó (sóng biển, gió, lệnh cấm xuất bến).
-     - (3) Chính sách hoàn hủy áp dụng cho dịch vụ.
-   - Tóm tắt lập luận 2 bên, đề xuất phán quyết công tâm (`RESOLVED_REFUND`, `RESOLVED_PARTIAL`, `RESOLVED_REJECTED`) kèm bản thảo công văn giải trình cho Admin.
+1. **Tóm tắt bằng chứng tranh chấp**
+   - Tổng hợp lượt quét mã QR, trạng thái ca và lời trình bày của hai bên.
+   - Trả về `MANUAL_REVIEW_REQUIRED` để quản trị viên xác minh bằng chứng và chính sách hoàn tiền.
 2. **Cẩm nang biển thông minh trước chuyến đi (Marine Briefing):**
-   - Tự động chuẩn bị thông tin dự báo sóng gió, nhiệt độ nước và checklist đồ cần mang phân loại theo mức độ bắt buộc / khuyên dùng.
+   - Đánh giá dự báo biển theo ngưỡng an toàn của dịch vụ và chuẩn bị checklist đồ cần mang. Nếu thiếu dự báo còn hiệu lực, cẩm nang hiển thị `UNKNOWN`.
    - Hook tự động trong `TripReminderJob`: Khi quét các chuyến khởi hành trong vòng 24 giờ, hệ thống tự động sinh trước Marine Briefing và gửi thông báo đẩy `MARINE_BRIEFING_READY` đến điện thoại khách hàng.
 
 ---

@@ -123,13 +123,13 @@ public class AdminAiController {
             @RequestParam(defaultValue = "20") int limit
     ) {
         UUID adminId = resolveUserId();
-        return roleCopilotUseCase.listConversations(adminId, "ADMIN", archived, limit);
+        return roleCopilotUseCase.listConversations(adminId, "ADMIN", null, archived, limit);
     }
 
     @GetMapping("/copilot/conversations/{id}/history")
     public List<CopilotMessage> getConversationHistory(@PathVariable UUID id) {
         UUID adminId = resolveUserId();
-        return roleCopilotUseCase.getConversationHistory(id, adminId);
+        return roleCopilotUseCase.getConversationHistory(id, adminId, "ADMIN", null);
     }
 
     @PatchMapping("/copilot/conversations/{id}")
@@ -141,13 +141,13 @@ public class AdminAiController {
         String title = dto != null ? dto.title() : null;
         Boolean pinned = dto != null ? dto.pinned() : null;
         Boolean archived = dto != null ? dto.archived() : null;
-        return roleCopilotUseCase.updateConversationMeta(id, adminId, title, pinned, archived);
+        return roleCopilotUseCase.updateConversationMeta(id, adminId, "ADMIN", null, title, pinned, archived);
     }
 
     @DeleteMapping("/copilot/conversations/{id}")
     public ResponseEntity<Void> deleteConversation(@PathVariable UUID id) {
         UUID adminId = resolveUserId();
-        roleCopilotUseCase.deleteConversation(id, adminId);
+        roleCopilotUseCase.deleteConversation(id, adminId, "ADMIN", null);
         return ResponseEntity.noContent().build();
     }
 

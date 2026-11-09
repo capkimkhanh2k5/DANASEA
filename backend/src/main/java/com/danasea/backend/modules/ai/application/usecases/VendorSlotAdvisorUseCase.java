@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorSlotItem;
+import com.danasea.backend.modules.report.domain.models.TimeRange;
+import com.danasea.backend.modules.service.application.api.AiCatalogReadApi.Slot;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -34,7 +36,7 @@ public class VendorSlotAdvisorUseCase {
             int capacity,
             int bookedCount,
             double occupancyRate,
-            String weatherRiskLevel, // SAFE, MODERATE, HIGH_RISK
+            String weatherRiskLevel, // SAFE, MODERATE, HIGH_RISK, UNKNOWN, NOT_REQUIRED
             String recommendationType, // EXPAND_CAPACITY, ADD_SLOT, WEATHER_WATCH, PROMOTE_OR_CONSOLIDATE, KEEP_OPTIMAL
             String actionTitle,
             String adviceReason
@@ -53,6 +55,7 @@ public class VendorSlotAdvisorUseCase {
     ) {}
 
     private final VendorAiDataPort vendorAiData;
+    private final MarineSlotWeather marineWeather;
     private final AiExtendedInsightStorePort insightStore;
     private final ObjectMapper mapper;
 
@@ -84,23 +87,38 @@ public class VendorSlotAdvisorUseCase {
             String type;
             String title;
             String advice;
-            String weatherLevel = "SAFE";
+            var weather = marineWeather.assess(slot.serviceId(),
+                    new Slot(slot.slotId(), slot.date(), slot.startTime(), slot.endTime(), 0), language);
+            String weatherLevel = switch (weather) {
+                case ACCEPTABLE -> "SAFE";
+                case CAUTION -> "MODERATE";
+                case UNSAFE -> "HIGH_RISK";
+                case UNKNOWN -> "UNKNOWN";
+                case NOT_REQUIRED -> "NOT_REQUIRED";
+            };
+            if (occupancy >= 85.0) highDemand++;
+            boolean lowOccupancy = occupancy < 20.0 && slot.date().isBefore(LocalDate.now(TimeRange.VIETNAM_ZONE).plusDays(3));
+            if (lowOccupancy) lowDemand++;
+            if (weather == MarineSlotWeather.Status.CAUTION || weather == MarineSlotWeather.Status.UNSAFE) weatherRisk++;
 
-            boolean isLateAfternoon = slot.startTime().isAfter(LocalTime.of(16, 0));
-
-            if (occupancy >= 85.0) {
-                highDemand++;
+            if (weather == MarineSlotWeather.Status.UNKNOWN || weather == MarineSlotWeather.Status.CAUTION
+                    || weather == MarineSlotWeather.Status.UNSAFE) {
+                type = "WEATHER_WATCH";
+                title = isEn ? "Confirm marine conditions before changing capacity" : "Xác nhận điều kiện biển trước khi đổi công suất";
+                advice = isEn
+                        ? "Check the current forecast and service safety limits before opening or expanding this slot."
+                        : "Kiểm tra dự báo hiện hành và ngưỡng an toàn của dịch vụ trước khi mở hoặc tăng công suất ca.";
+            } else if (occupancy >= 85.0) {
                 type = "EXPAND_CAPACITY";
                 title = isEn
                         ? "High demand — Expand capacity or open an extra slot"
                         : "Nhu cầu cao — Nên mở rộng chỗ hoặc mở thêm ca phụ";
                 advice = isEn
-                        ? String.format("Slot %s on %s has reached %.0f%% occupancy (%d/%d seats). Calm morning waters are ideal for opening an additional slot or expanding capacity.",
+                        ? String.format("Slot %s on %s has reached %.0f%% occupancy (%d/%d seats). Check inventory and operating limits before opening an additional slot.",
                                 slot.startTime(), slot.date(), occupancy, slot.bookedCount(), slot.capacity())
-                        : String.format("Ca %s ngày %s đã đạt %.0f%% công suất (%d/%d chỗ). Điều kiện biển sáng sớm thường êm dịu, mở thêm ca hoặc tăng công suất giúp tối đa doanh thu.",
+                        : String.format("Ca %s ngày %s đã đạt %.0f%% công suất (%d/%d chỗ). Kiểm tra tồn chỗ và giới hạn vận hành trước khi mở thêm ca.",
                                 slot.startTime(), slot.date(), occupancy, slot.bookedCount(), slot.capacity());
-            } else if (occupancy < 20.0 && slot.date().isBefore(LocalDate.now().plusDays(3))) {
-                lowDemand++;
+            } else if (lowOccupancy) {
                 type = "PROMOTE_OR_CONSOLIDATE";
                 title = isEn
                         ? "Low occupancy — Consider flash promotion or slot consolidation"
@@ -110,16 +128,6 @@ public class VendorSlotAdvisorUseCase {
                                 slot.startTime(), slot.date(), slot.bookedCount())
                         : String.format("Ca %s ngày %s mới chỉ có %d khách đặt. Cân nhắc bật khuyến mãi Flash Sale hoặc chủ động liên hệ gộp khách sang ca gần kề để tối ưu chi phí thuyền/cano.",
                                 slot.startTime(), slot.date(), slot.bookedCount());
-            } else if (isLateAfternoon && slot.date().isAfter(LocalDate.now().plusDays(2))) {
-                weatherRisk++;
-                weatherLevel = "MODERATE";
-                type = "WEATHER_WATCH";
-                title = isEn
-                        ? "Monitor afternoon sea wind & swell conditions"
-                        : "Theo dõi thời tiết biển buổi chiều";
-                advice = isEn
-                        ? "Afternoon coastal waters in Da Nang often experience stronger wind gusts and swells. Monitor marine forecasts and prepare an early-morning reschedule option."
-                        : "Vùng biển Đà Nẵng buổi chiều có xu hướng sóng dâng và gió giật mạnh hơn. Hãy theo dõi bản tin khí tượng và chuẩn bị phương án dời sang ca sáng nếu biển động.";
             } else {
                 type = "KEEP_OPTIMAL";
                 title = isEn ? "Optimal slot occupancy" : "Công suất ổn định";

@@ -65,13 +65,11 @@ public class PostgresAiExtendedInsightStoreAdapter implements AiExtendedInsightS
     @Override
     @Transactional(readOnly = true)
     public List<CopilotConversation> listCopilotConversations(
-            UUID actorUserId, String actorRole, Boolean archived, int limit) {
+            UUID actorUserId, String actorRole, UUID vendorId, Boolean archived, int limit) {
         int boundedLimit = Math.max(1, Math.min(limit, 100));
         var pageable = PageRequest.of(0, boundedLimit);
-        List<AiCopilotConversationJpaEntity> list = archived == null
-                ? conversationRepo.findByActor(actorUserId, actorRole, pageable)
-                : conversationRepo.findByActorAndArchived(actorUserId, actorRole, archived, pageable);
-        return list.stream().map(this::toRecord).toList();
+        return conversationRepo.findByActor(actorUserId, actorRole, vendorId, archived, pageable)
+                .stream().map(this::toRecord).toList();
     }
 
     @Override
@@ -186,17 +184,9 @@ public class PostgresAiExtendedInsightStoreAdapter implements AiExtendedInsightS
     public DisputeSummary saveDisputeSummary(
             UUID disputeId, UUID subOrderId, UUID requestedByAdminId, String recommendedResolution,
             Integer recommendedRefundPercent, String summaryJson, String analysisMethod) {
-        var existing = disputeSummaryRepo.findByDisputeId(disputeId);
-        AiDisputeSummaryJpaEntity entity = existing.orElseGet(AiDisputeSummaryJpaEntity::new);
-        entity.setDisputeId(disputeId);
-        entity.setSubOrderId(subOrderId);
-        entity.setRequestedByAdminId(requestedByAdminId);
-        entity.setRecommendedResolution(recommendedResolution);
-        entity.setRecommendedRefundPercent(recommendedRefundPercent);
-        entity.setSummaryJson(summaryJson);
-        entity.setAnalysisMethod(analysisMethod != null ? analysisMethod : "HYBRID_DUAL_BRAIN");
-        var saved = disputeSummaryRepo.save(entity);
-        return toRecord(saved);
+        disputeSummaryRepo.upsert(disputeId, subOrderId, requestedByAdminId, recommendedResolution,
+                recommendedRefundPercent, summaryJson, analysisMethod != null ? analysisMethod : "HYBRID_DUAL_BRAIN");
+        return toRecord(disputeSummaryRepo.findByDisputeId(disputeId).orElseThrow());
     }
 
     @Override
@@ -210,16 +200,9 @@ public class PostgresAiExtendedInsightStoreAdapter implements AiExtendedInsightS
     public MarineBriefing saveMarineBriefing(
             UUID masterOrderId, UUID subOrderId, UUID customerId, UUID slotId,
             String weatherStatus, String briefingJson) {
-        var existing = marineBriefingRepo.findBySubOrderIdAndCustomerId(subOrderId, customerId);
-        AiMarineBriefingJpaEntity entity = existing.orElseGet(AiMarineBriefingJpaEntity::new);
-        entity.setMasterOrderId(masterOrderId);
-        entity.setSubOrderId(subOrderId);
-        entity.setCustomerId(customerId);
-        entity.setSlotId(slotId);
-        entity.setWeatherStatus(weatherStatus != null ? weatherStatus : "UNKNOWN");
-        entity.setBriefingJson(briefingJson);
-        var saved = marineBriefingRepo.save(entity);
-        return toRecord(saved);
+        marineBriefingRepo.upsert(masterOrderId, subOrderId, customerId, slotId,
+                weatherStatus != null ? weatherStatus : "UNKNOWN", briefingJson);
+        return toRecord(marineBriefingRepo.findBySubOrderIdAndCustomerId(subOrderId, customerId).orElseThrow());
     }
 
     @Override

@@ -70,7 +70,7 @@ Trợ lý ảo (`POST /api/assistant/chat`) được trang bị **15 công cụ 
 23. **`admin_revenue_timeseries`**: Biểu đồ chuỗi thời gian GMV, tiền thu, tiền hoàn và hoa hồng theo ngày/tuần/tháng.
 24. **`admin_booking_cancellation_breakdown`**: Phân loại lý do hủy tour toàn sàn (thời tiết biển, lỗi đối tác, khách hủy, can thiệp admin).
 25. **`admin_vendor_diagnostics`**: Chẩn đoán sức khỏe vận hành đối tác (tỷ lệ hủy, tỷ lệ lấp đầy, điểm số và vi phạm).
-26. **`admin_dispute_summarize`**: Hòa giải tranh chấp thông minh đối chiếu 3 sự thật hệ thống (quét QR, thời tiết, SLA hoàn hủy).
+26. **`admin_dispute_summarize`**: Tóm tắt lượt quét QR, trạng thái ca và lời trình bày của hai bên.
 27. **`admin_risk_and_support_queue_overview`**: Giám sát hàng đợi rủi ro thanh toán và ticket hỗ trợ khách hàng.
 
 ### E. Ánh xạ Thẻ Giao Diện Cấu Trúc (AssistantArtifactMapper)
@@ -216,11 +216,11 @@ Backend tính toán các chỉ số hành vi thực tế trong CSDL:
    - Đối tác khởi tạo bài đăng mới qua `/api/vendor/ai/listings/optimize` $\rightarrow$ AI chấm điểm 45/100, chỉ ra thiếu quy định mặc áo phao và sinh bài viết chuẩn SEO.
    - Đối tác kiểm tra lịch slot qua `/api/vendor/ai/slots/advisor` $\rightarrow$ AI cảnh báo ca sáng thứ Bảy đã kín 95%, đề xuất mở thêm ca 05:30 đón bình minh.
 
-### Kịch bản 4: Hòa Giải Tranh Chấp 3 Sự Thật Khách Quan & Cẩm Nang Biển 24 Giờ
+### Kịch bản 4: Tóm Tắt Tranh Chấp & Cẩm Nang Biển 24 Giờ
 1. **Khách hàng khiếu nại không có cano đón:** Khách yêu cầu hoàn tiền 100% qua đơn tranh chấp `DISPUTE-101`.
 2. **Admin hòa giải bằng AI:** Quản trị viên bấm `POST /api/admin/ai/disputes/{id}/summarize`.
-   - AI đối chiếu 3 sự thật khách quan: (1) Mã QR vé chưa từng được quét tại bến (`usedAt == null`); (2) Trạm khí tượng xác nhận thời tiết biển êm ả, sóng 0.4m; (3) Chính sách hủy quy định vắng mặt phạt 100%.
-   - Tuy nhiên đối tác chưa chứng minh được có mặt tại điểm đón đúng giờ hẹn $\rightarrow$ AI đề xuất phương án công tâm: Hoàn tiền 50% (`RESOLVED_PARTIAL`) và tạo sẵn công văn giải trình cho Admin.
+   - Bản tóm tắt hiển thị lượt quét QR, trạng thái ca và lời trình bày của hai bên.
+   - Kết quả `MANUAL_REVIEW_REQUIRED` chuyển quản trị viên xác minh tình huống và chính sách hoàn tiền trước khi quyết định.
 3. **Tự động kích hoạt Cẩm nang biển trước 24 giờ:**
    - `TripReminderJob` quét các chuyến đi khởi hành trong ngày mai.
    - Tự động gọi `CustomerMarineBriefingUseCase.preGenerateForTripReminder` và gửi thông báo `MARINE_BRIEFING_READY` đến điện thoại khách hàng kèm checklist đồ cần mang và hướng dẫn an toàn biển.

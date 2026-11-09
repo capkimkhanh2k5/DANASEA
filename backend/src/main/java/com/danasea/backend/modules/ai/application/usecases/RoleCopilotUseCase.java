@@ -6,7 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.UUID;
 
 import org.springframework.security.access.AccessDeniedException;
@@ -105,34 +105,34 @@ public class RoleCopilotUseCase {
 
     // ==================== SESSION MANAGEMENT ====================
 
-    public List<CopilotConversation> listConversations(UUID actorUserId, String actorRole, Boolean archived, int limit) {
-        return insightStore.listCopilotConversations(actorUserId, actorRole, archived, limit);
+    public List<CopilotConversation> listConversations(UUID actorUserId, String actorRole, UUID vendorId, Boolean archived, int limit) {
+        return insightStore.listCopilotConversations(actorUserId, actorRole, vendorId, archived, limit);
     }
 
-    public Optional<CopilotConversation> getConversation(UUID id, UUID actorUserId) {
-        return insightStore.getCopilotConversation(id).map(c -> {
-            if (!c.actorUserId().equals(actorUserId)) {
-                throw new AccessDeniedException("Access to conversation denied");
-            }
-            return c;
-        });
+    public List<CopilotMessage> getConversationHistory(UUID id, UUID actorUserId, String actorRole, UUID vendorId) {
+        requireConversationScope(id, actorUserId, actorRole, vendorId);
+        return insightStore.listCopilotMessages(id);
     }
 
-    public List<CopilotMessage> getConversationHistory(UUID conversationId, UUID actorUserId) {
-        var conv = insightStore.getCopilotConversation(conversationId)
-                .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
-        if (!conv.actorUserId().equals(actorUserId)) {
-            throw new AccessDeniedException("Access to conversation denied");
-        }
-        return insightStore.listCopilotMessages(conversationId);
-    }
-
-    public CopilotConversation updateConversationMeta(UUID id, UUID actorUserId, String title, Boolean pinned, Boolean archived) {
+    public CopilotConversation updateConversationMeta(UUID id, UUID actorUserId, String actorRole, UUID vendorId,
+            String title, Boolean pinned, Boolean archived) {
+        requireConversationScope(id, actorUserId, actorRole, vendorId);
         return insightStore.updateCopilotConversationMeta(id, actorUserId, title, pinned, archived);
     }
 
-    public void deleteConversation(UUID id, UUID actorUserId) {
+    public void deleteConversation(UUID id, UUID actorUserId, String actorRole, UUID vendorId) {
+        requireConversationScope(id, actorUserId, actorRole, vendorId);
         insightStore.softDeleteCopilotConversation(id, actorUserId);
+    }
+
+    private CopilotConversation requireConversationScope(UUID id, UUID actorUserId, String actorRole, UUID vendorId) {
+        var conversation = insightStore.getCopilotConversation(id)
+                .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+        if (!conversation.actorUserId().equals(actorUserId) || !conversation.actorRole().equals(actorRole)
+                || !Objects.equals(conversation.vendorId(), vendorId)) {
+            throw new AccessDeniedException("Access to conversation denied");
+        }
+        return conversation;
     }
 
     // ==================== COPILOT CHAT PROCESSING ====================
@@ -164,13 +164,7 @@ public class RoleCopilotUseCase {
         boolean isEn = effectiveLanguage == SupportedLanguage.EN;
         CopilotConversation conversation;
         if (conversationId != null) {
-            conversation = insightStore.getCopilotConversation(conversationId)
-                    .orElseGet(() -> insightStore.createCopilotConversation(
-                            actorUserId, actorRole, vendorId, effectiveLanguage.code(),
-                            null, contextType, contextId));
-            if (!conversation.actorUserId().equals(actorUserId)) {
-                throw new AccessDeniedException("Conversation belongs to another user");
-            }
+            conversation = requireConversationScope(conversationId, actorUserId, actorRole, vendorId);
         } else {
             conversation = insightStore.createCopilotConversation(
                     actorUserId, actorRole, vendorId, effectiveLanguage.code(),

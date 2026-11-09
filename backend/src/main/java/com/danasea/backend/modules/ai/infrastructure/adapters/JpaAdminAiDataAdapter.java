@@ -3,42 +3,48 @@ package com.danasea.backend.modules.ai.infrastructure.adapters;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.danasea.backend.modules.account.infrastructure.persistence.entities.UserJpaEntity;
+import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository;
 import com.danasea.backend.modules.ai.application.ports.AdminAiDataPort;
 import com.danasea.backend.modules.ai.infrastructure.persistence.repositories.JpaAiAssessmentCaseRepository;
 import com.danasea.backend.modules.ai.infrastructure.persistence.repositories.JpaAiCustomerSupportRequestRepository;
+import com.danasea.backend.modules.checkin.infrastructure.persistence.entities.CheckinTokenJpaEntity;
 import com.danasea.backend.modules.checkin.infrastructure.persistence.repositories.JpaCheckinTokenRepository;
 import com.danasea.backend.modules.dispute.domain.models.DisputeStatus;
 import com.danasea.backend.modules.dispute.infrastructure.persistence.entities.DisputeJpaEntity;
 import com.danasea.backend.modules.dispute.infrastructure.persistence.repositories.JpaDisputeRepository;
-import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
+import com.danasea.backend.modules.order.domain.models.RefundReason;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
-import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.report.application.usecases.GetAdminDashboardUseCase;
 import com.danasea.backend.modules.report.application.usecases.GetBookingReportUseCase;
 import com.danasea.backend.modules.report.application.usecases.GetRevenueReportUseCase;
 import com.danasea.backend.modules.report.application.usecases.GetVendorPerformanceReportUseCase;
 import com.danasea.backend.modules.report.domain.enums.GroupByPeriod;
+import com.danasea.backend.modules.report.domain.enums.VendorAlertSeverity;
 import com.danasea.backend.modules.report.domain.models.BookingReportItem;
 import com.danasea.backend.modules.report.domain.models.DashboardMetrics;
 import com.danasea.backend.modules.report.domain.models.RevenueReportItem;
 import com.danasea.backend.modules.report.domain.models.TimeRange;
+import com.danasea.backend.modules.report.domain.models.VendorDiagnosisAlert;
 import com.danasea.backend.modules.report.domain.models.VendorPerformanceItem;
+import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
+import com.danasea.backend.modules.vendor.domain.models.Vendor;
 
 import lombok.RequiredArgsConstructor;
 
@@ -53,7 +59,7 @@ public class JpaAdminAiDataAdapter implements AdminAiDataPort {
 
     private final JpaDisputeRepository disputeRepo;
     private final JpaSubOrderRepository subOrderRepo;
-    private final JpaMasterOrderRepository masterOrderRepo;
+    private final JpaUserRepository userRepo;
     private final JpaServiceRepository serviceRepo;
     private final JpaServiceSlotRepository slotRepo;
     private final JpaCheckinTokenRepository checkinRepo;
@@ -64,49 +70,53 @@ public class JpaAdminAiDataAdapter implements AdminAiDataPort {
     @Override
     @Transactional(readOnly = true)
     public PlatformDashboardMetrics getPlatformDashboardMetrics() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(TimeRange.VIETNAM_ZONE);
         TimeRange range = TimeRange.of(today.minusDays(30), today);
         DashboardMetrics metrics = adminDashboardUseCase.execute(range, null);
 
-        List<String> alerts = metrics.diagnosisAlert() != null && metrics.diagnosisAlert().alertMessages() != null
-                ? metrics.diagnosisAlert().alertMessages() : List.of();
-
+        List<VendorPerformanceItem> vendors = vendorPerformanceReportUseCase.execute(range, null);
+        BigDecimal netPayout = revenueReportUseCase.execute(range, GroupByPeriod.DAY, null).stream()
+                .map(RevenueReportItem::getNetVendorPayout)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        long criticalVendors = vendors.stream()
+                .filter(item -> item.getSeverity() == VendorAlertSeverity.CRITICAL)
+                .count();
         return new PlatformDashboardMetrics(
-                metrics.gmv() != null ? metrics.gmv() : BigDecimal.ZERO,
-                metrics.netVendorPayout() != null ? metrics.netVendorPayout() : BigDecimal.ZERO,
-                metrics.platformCommission() != null ? metrics.platformCommission() : BigDecimal.ZERO,
-                metrics.totalBookings(),
-                metrics.activeServicesCount(),
-                metrics.activeVendorsCount(),
-                metrics.criticalVendorsCount(),
-                alerts
+                metrics.getTotalRevenue(),
+                netPayout,
+                metrics.getNetRevenue(),
+                metrics.getNewOrders(),
+                serviceRepo.countByStatus(ServiceStatus.PUBLISHED),
+                vendors.size(),
+                criticalVendors,
+                metrics.getAlerts().stream().map(VendorDiagnosisAlert::getMessage).toList()
         );
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<RevenueTimeSeriesItem> getRevenueTimeSeries(LocalDate from, LocalDate to, String groupBy) {
-        LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(30);
-        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now(TimeRange.VIETNAM_ZONE).minusDays(30);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeRange.VIETNAM_ZONE);
         TimeRange range = TimeRange.of(effectiveFrom, effectiveTo);
         GroupByPeriod period = GroupByPeriod.fromString(groupBy);
 
         List<RevenueReportItem> items = revenueReportUseCase.execute(range, period, null);
         return items.stream().map(item -> new RevenueTimeSeriesItem(
-                item.period(),
-                item.gmv() != null ? item.gmv() : BigDecimal.ZERO,
-                item.collectedCash() != null ? item.collectedCash() : BigDecimal.ZERO,
-                item.refunds() != null ? item.refunds() : BigDecimal.ZERO,
-                item.commission() != null ? item.commission() : BigDecimal.ZERO,
-                item.netVendorPayout() != null ? item.netVendorPayout() : BigDecimal.ZERO
+                item.getPeriodKey(),
+                item.getGmv(),
+                item.getCollectedCash(),
+                item.getRefunds(),
+                item.getPlatformCommission(),
+                item.getNetVendorPayout()
         )).toList();
     }
 
     @Override
     @Transactional(readOnly = true)
     public BookingCancellationBreakdown getBookingCancellationBreakdown(LocalDate from, LocalDate to, String groupBy) {
-        LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(30);
-        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now(TimeRange.VIETNAM_ZONE).minusDays(30);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeRange.VIETNAM_ZONE);
         TimeRange range = TimeRange.of(effectiveFrom, effectiveTo);
         GroupByPeriod period = GroupByPeriod.fromString(groupBy);
 
@@ -122,18 +132,16 @@ public class JpaAdminAiDataAdapter implements AdminAiDataPort {
         Map<String, Long> reasons = new HashMap<>();
 
         for (BookingReportItem item : items) {
-            totalBookings += item.totalBookings();
-            completedBookings += item.completedBookings();
-            totalCancelled += item.cancelledBookings();
-            weather += item.weatherCancellations();
-            vendorFault += item.vendorFaultCancellations();
-            customer += item.customerCancellations();
-            adminOverride += item.adminOverrideCancellations();
-            dispute += item.disputeCancellations();
-
-            if (item.cancellationsByReason() != null) {
-                item.cancellationsByReason().forEach((k, v) -> reasons.merge(k, v, Long::sum));
-            }
+            totalBookings += item.getTotalOrders();
+            completedBookings += item.getCompletedOrders();
+            totalCancelled += item.getCancelledOrders();
+            weather += item.getCancellationCount(RefundReason.WEATHER);
+            vendorFault += item.getCancellationCount(RefundReason.VENDOR_FAULT);
+            customer += item.getCancellationCount(RefundReason.CUSTOMER_CANCEL)
+                    + item.getCancellationCount(RefundReason.CUSTOMER_REQUEST);
+            adminOverride += item.getCancellationCount(RefundReason.ADMIN_OVERRIDE);
+            dispute += item.getCancellationCount(RefundReason.DISPUTE);
+            item.getCancellationReasonBreakdown().forEach((reason, count) -> reasons.merge(reason.name(), count, Long::sum));
         }
 
         return new BookingCancellationBreakdown(
@@ -145,33 +153,23 @@ public class JpaAdminAiDataAdapter implements AdminAiDataPort {
     @Override
     @Transactional(readOnly = true)
     public List<VendorDiagnosticItem> getVendorDiagnostics(LocalDate from, LocalDate to, UUID vendorId) {
-        LocalDate effectiveFrom = from != null ? from : LocalDate.now().minusDays(30);
-        LocalDate effectiveTo = to != null ? to : LocalDate.now();
+        LocalDate effectiveFrom = from != null ? from : LocalDate.now(TimeRange.VIETNAM_ZONE).minusDays(30);
+        LocalDate effectiveTo = to != null ? to : LocalDate.now(TimeRange.VIETNAM_ZONE);
         TimeRange range = TimeRange.of(effectiveFrom, effectiveTo);
 
         List<VendorPerformanceItem> items = vendorPerformanceReportUseCase.execute(range, vendorId);
-        List<VendorDiagnosticItem> result = new ArrayList<>();
-
-        for (VendorPerformanceItem item : items) {
-            String severity = item.severity() != null ? item.severity().name() : "HEALTHY";
-            List<String> issueTypes = item.issues() != null
-                    ? item.issues().stream().map(Enum::name).toList()
-                    : List.of();
-
-            result.add(new VendorDiagnosticItem(
-                    item.vendorId(),
-                    item.businessName() != null ? item.businessName() : "Đối tác",
-                    item.gmv() != null ? item.gmv() : BigDecimal.ZERO,
-                    item.totalBookings(),
-                    item.cancellationRate(),
-                    item.slotOccupancyRate(),
-                    item.ratingAvg(),
-                    item.ratingCount(),
-                    severity,
-                    issueTypes
-            ));
-        }
-        return result;
+        return items.stream().map(item -> new VendorDiagnosticItem(
+                item.getVendorId(),
+                item.getBusinessName(),
+                item.getRevenue(),
+                item.getTotalOrders(),
+                item.getCancellationRate(),
+                item.getSlotOccupancyRate(),
+                item.getRating(),
+                item.getRatingCount(),
+                item.getSeverity().name(),
+                item.getIssues().stream().map(Enum::name).toList()
+        )).toList();
     }
 
     @Override
@@ -183,26 +181,26 @@ public class JpaAdminAiDataAdapter implements AdminAiDataPort {
         }
         DisputeJpaEntity d = disputeOpt.get();
         SubOrderJpaEntity subOrder = subOrderRepo.findById(d.getSubOrderId()).orElse(null);
-        MasterOrderJpaEntity masterOrder = d.getOrderId() != null
-                ? masterOrderRepo.findById(d.getOrderId()).orElse(null)
-                : (subOrder != null ? masterOrderRepo.findById(subOrder.getMasterOrderId()).orElse(null) : null);
 
         ServiceJpaEntity service = subOrder != null && subOrder.getServiceId() != null
                 ? serviceRepo.findById(subOrder.getServiceId()).orElse(null) : null;
         ServiceSlotJpaEntity slot = subOrder != null && subOrder.getSlotId() != null
                 ? slotRepo.findById(subOrder.getSlotId()).orElse(null) : null;
 
-        var checkin = subOrder != null ? checkinRepo.findBySubOrderId(subOrder.getId()) : Optional.empty();
-        var vendor = subOrder != null && subOrder.getVendorId() != null
-                ? vendorInternalApi.findById(subOrder.getVendorId()) : Optional.empty();
-
-        boolean checkinUsed = checkin.isPresent() && checkin.get().getUsedAt() != null;
-        OffsetDateTime checkinUsedAt = checkinUsed ? checkin.get().getUsedAt() : null;
-
-        String customerName = "Khách hàng";
-        if (masterOrder != null && masterOrder.getCustomer() != null && masterOrder.getCustomer().getFullName() != null) {
-            customerName = masterOrder.getCustomer().getFullName();
-        }
+        OffsetDateTime checkinUsedAt = subOrder == null ? null : checkinRepo.findAllBySubOrderId(subOrder.getId()).stream()
+                .map(CheckinTokenJpaEntity::getUsedAt)
+                .filter(Objects::nonNull)
+                .min(OffsetDateTime::compareTo)
+                .orElse(null);
+        String vendorName = Optional.ofNullable(subOrder)
+                .map(SubOrderJpaEntity::getVendorId)
+                .flatMap(vendorInternalApi::findById)
+                .map(Vendor::getBusinessName)
+                .orElse("Đối tác cung cấp");
+        String customerName = Optional.ofNullable(d.getCustomerId())
+                .flatMap(userRepo::findById)
+                .map(UserJpaEntity::getFullName)
+                .orElse("Khách hàng");
 
         String slotTimeRange = slot != null
                 ? slot.getStartTime() + " - " + slot.getEndTime()
@@ -220,16 +218,16 @@ public class JpaAdminAiDataAdapter implements AdminAiDataPort {
                 d.getStatus() != null ? d.getStatus().name() : "OPEN",
                 d.getCreatedAt(),
                 service != null ? service.getId() : null,
-                service != null ? service.getTitle() : "Trải nghiệm biển",
+                service != null ? service.getName() : "Trải nghiệm biển",
                 subOrder != null ? subOrder.getVendorId() : null,
-                vendor.isPresent() ? vendor.get().getBusinessName() : "Đối tác cung cấp",
+                vendorName,
                 subOrder != null ? subOrder.getSubtotalAmount() : BigDecimal.ZERO,
                 subOrder != null ? subOrder.getQuantity() : 1,
                 slot != null ? slot.getId() : null,
-                slot != null ? slot.getDate() : LocalDate.now(),
+                slot != null ? slot.getDate() : null,
                 slotTimeRange,
-                slot != null && slot.getStatus() != null ? slot.getStatus().name() : "ACTIVE",
-                checkinUsed,
+                slot != null && slot.getStatus() != null ? slot.getStatus().name() : "UNKNOWN",
+                checkinUsedAt != null,
                 checkinUsedAt,
                 d.getVendorResponse() != null ? d.getVendorResponse() : "",
                 d.getVendorEvidenceUrls() != null ? d.getVendorEvidenceUrls() : List.of(),

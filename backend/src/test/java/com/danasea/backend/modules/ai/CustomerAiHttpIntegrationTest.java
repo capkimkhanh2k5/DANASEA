@@ -34,6 +34,7 @@ class CustomerAiHttpIntegrationTest extends BaseSecurityIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;
+    @Autowired AiExtendedInsightStorePort insights;
     @MockitoBean DecisionModelPort decisions;
     @MockitoBean TravelWeatherPort weather;
     @MockitoBean ReviewHighlightPort highlights;
@@ -66,6 +67,30 @@ class CustomerAiHttpIntegrationTest extends BaseSecurityIntegrationTest {
         return id;
     }
     private String request() { return "{\"categoryId\":\"" + categoryId + "\",\"query\":\"Kayak test\",\"partySize\":3,\"from\":\"" + LocalDate.now(TravelContext.ZONE).plusDays(1) + "\"}"; }
+
+    @Test void copilotConversationsStayWithinTheirRoleAndOwner() throws Exception {
+        UUID otherAdmin = account("ADMIN");
+        var own = insights.createCopilotConversation(admin, "ADMIN", null, "vi", "Own report", null, null);
+        insights.createCopilotConversation(otherAdmin, "ADMIN", null, "vi", "Other report", null, null);
+        mvc.perform(get("/api/admin/ai/copilot/conversations").with(user(admin.toString()).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(own.id().toString()));
+        mvc.perform(get("/api/admin/ai/copilot/conversations/" + own.id() + "/history")
+                .with(user(otherAdmin.toString()).roles("ADMIN")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test void marineBriefingUpdatesTheSamePersistentRecord() {
+        UUID orderId = UUID.randomUUID();
+        UUID subOrderId = UUID.randomUUID();
+        var first = insights.saveMarineBriefing(orderId, subOrderId, owner, slotId, "UNKNOWN", "{}");
+        var second = insights.saveMarineBriefing(orderId, subOrderId, owner, slotId, "UNSAFE", "{}");
+
+        assertThat(second.id()).isEqualTo(first.id());
+        assertThat(second.weatherStatus()).isEqualTo("UNSAFE");
+        assertThat(insights.listMarineBriefingsByMasterOrder(orderId)).hasSize(1);
+    }
 
     @Test void flywayMigratesThroughV21AndCatalogReadsPreserveViews() throws Exception {
         assertThat(jdbc.queryForObject("select count(*) from flyway_schema_history where version='21' and success=true", Integer.class)).isEqualTo(1);

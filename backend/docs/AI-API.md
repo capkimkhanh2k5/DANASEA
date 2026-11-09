@@ -41,7 +41,7 @@ DANASEA là sàn thương mại điện tử đa nhà cung cấp chuyên về tr
 | --- | --- |
 | 18. AI Content Moderation | Phát hiện văn bản dịch vụ và đánh giá có dấu hiệu vi phạm hoặc lộ thông tin liên hệ ngoài sàn; chuyển admin duyệt. |
 | 19. AI Fraud Detection | Phát hiện dấu hiệu bất thường trong giao dịch (Velocity Rules 3/5/3) và tài khoản để đưa vào hàng đợi xem xét. |
-| 20. AI Dispute Arbitration | Hòa giải tranh chấp thông minh đối chiếu 3 sự thật khách quan (lịch sử quét vé QR, thời tiết slot thực tế, chính sách hoàn hủy SLA), đề xuất tỷ lệ hoàn tiền công tâm. |
+| 20. AI Dispute Arbitration | Tóm tắt lời trình bày của hai bên, lượt quét vé QR và trạng thái ca để quản trị viên đối chiếu. |
 | 21. AI Executive Digest | Bản tin điều hành sàn 1 chạm tổng quan (GMV, Payout, Commission, tỷ lệ hủy, cảnh báo sức khỏe vận hành vendor). |
 | 22. Admin BI Copilot | Trợ lý phân tích số liệu điều hành đa phiên, tự động kích hoạt 6 công cụ dữ liệu phân tích BI toàn sàn. |
 
@@ -73,7 +73,7 @@ Hiện có **63 API** trong module AI, đối chiếu đồng nhất 100% với 
 | `POST /api/ai/services/compare` | So sánh các dịch vụ được chọn theo giá, đánh giá, chính sách và khả năng đáp ứng nhu cầu. |
 | `POST /api/ai/weather` | Đánh giá điều kiện thời tiết và quy tắc an toàn cho dịch vụ, lựa chọn và ca dự kiến. |
 | `GET /api/ai/review-summaries/{serviceId}` | Tổng hợp ưu điểm, hạn chế từ các đánh giá hợp lệ của dịch vụ. |
-| `GET /api/ai/orders/{orderId}/marine-briefing` | Cẩm nang an toàn, thời tiết biển và checklist đồ cần mang (bắt buộc/khuyên dùng) cho đơn hàng; có bảo vệ IDOR. |
+| `GET /api/ai/orders/{orderId}/marine-briefing` | Cẩm nang an toàn và checklist cho đơn hàng của khách. Trạng thái thời tiết là `UNKNOWN` khi thiếu dự báo còn hiệu lực. |
 | `GET /api/ai/preferences` | Xem hồ sơ sở thích và trạng thái bật/tắt cá nhân hóa của người dùng. |
 | `PUT /api/ai/preferences` | Cập nhật sở thích, hoạt động muốn loại trừ và trạng thái cá nhân hóa. |
 | `POST /api/ai/recommendations/{id}/feedback` | Ghi nhận phản hồi của người dùng về dịch vụ trong một lượt gợi ý. |
@@ -139,7 +139,7 @@ Hiện có **63 API** trong module AI, đối chiếu đồng nhất 100% với 
 | `GET /api/admin/support/requests` | Xem hàng đợi yêu cầu hỗ trợ theo trạng thái và giới hạn số bản ghi. |
 | `GET /api/admin/support/requests/{id}` | Xem chi tiết yêu cầu hỗ trợ để xử lý thủ công. |
 | `POST /api/admin/support/requests/{id}/handle` | Cập nhật tiến độ xử lý yêu cầu và phản hồi cho khách. |
-| `POST /api/admin/ai/disputes/{disputeId}/summarize` | Hòa giải tranh chấp thông minh đối chiếu 3 sự thật hệ thống (quét vé QR, thời tiết slot, chính sách hoàn hủy SLA), đề xuất tỷ lệ hoàn tiền công tâm. |
+| `POST /api/admin/ai/disputes/{disputeId}/summarize` | Tóm tắt bằng chứng và trả về `MANUAL_REVIEW_REQUIRED` với tỷ lệ hoàn tiền để trống cho đến khi quản trị viên xác minh. |
 | `GET /api/admin/ai/disputes/{disputeId}/summary` | Xem lại kết quả phân tích hòa giải tranh chấp đã lưu. |
 | `GET /api/admin/ai/executive-digest` | Bản tin điều hành sàn tổng quan 1 chạm: GMV, Payout, Commission, tỷ lệ hủy theo lý do, cảnh báo sức khỏe vận hành vendor. |
 | `POST /api/admin/ai/executive-digest` | Tương đương GET, hỗ trợ truy vấn điều hành sàn theo tham số mở rộng. |

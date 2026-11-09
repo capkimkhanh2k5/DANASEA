@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,6 +41,7 @@ import com.danasea.backend.modules.ai.application.usecases.AdminDisputeSummaryUs
 import com.danasea.backend.modules.ai.application.usecases.AssessTextUseCase;
 import com.danasea.backend.modules.ai.application.usecases.CustomerMarineBriefingUseCase;
 import com.danasea.backend.modules.ai.application.usecases.CustomerMarineBriefingUseCase.MarineBriefingOverview;
+import com.danasea.backend.modules.ai.application.usecases.MarineSlotWeather;
 import com.danasea.backend.modules.ai.application.usecases.RoleCopilotUseCase;
 import com.danasea.backend.modules.ai.application.usecases.RoleCopilotUseCase.CopilotChatResponse;
 import com.danasea.backend.modules.ai.application.usecases.VendorListingOptimizerUseCase;
@@ -57,6 +59,7 @@ import com.danasea.backend.modules.order.infrastructure.persistence.entities.Mas
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
+import com.danasea.backend.modules.service.application.api.AiCatalogReadApi;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
@@ -75,6 +78,7 @@ class VendorAdminAiFeaturesTest {
     private final LlmClientPort llmClient = mock(LlmClientPort.class);
     private final ModerationPort moderationPort = mock(ModerationPort.class);
     private final AssessTextUseCase assessTextUseCase = mock(AssessTextUseCase.class);
+    private final AiCatalogReadApi catalog = mock(AiCatalogReadApi.class);
     private final TravelWeatherPort weatherPort = mock(TravelWeatherPort.class);
 
     private final JpaMasterOrderRepository masterOrderRepo = mock(JpaMasterOrderRepository.class);
@@ -106,8 +110,9 @@ class VendorAdminAiFeaturesTest {
         listingOptimizerUseCase = new VendorListingOptimizerUseCase(
                 vendorAiData, insightStore, decisionModel, llmClient, assessTextUseCase, mapper);
 
+        var marineWeather = new MarineSlotWeather(catalog, weatherPort);
         slotAdvisorUseCase = new VendorSlotAdvisorUseCase(
-                vendorAiData, insightStore, mapper);
+                vendorAiData, marineWeather, insightStore, mapper);
 
         disputeSummaryUseCase = new AdminDisputeSummaryUseCase(
                 adminAiData, insightStore, mapper);
@@ -117,7 +122,7 @@ class VendorAdminAiFeaturesTest {
                 adminAiData, disputeSummaryUseCase, insightStore, llmClient, moderationPort, mapper);
 
         marineBriefingUseCase = new CustomerMarineBriefingUseCase(
-                masterOrderRepo, subOrderRepo, serviceRepo, slotRepo, weatherPort, insightStore, mapper);
+                masterOrderRepo, subOrderRepo, serviceRepo, slotRepo, marineWeather, insightStore, mapper);
 
         // Default Mocks
         when(moderationPort.isSafe(anyString())).thenReturn(true);
@@ -216,8 +221,8 @@ class VendorAdminAiFeaturesTest {
     // ==================== 3. VENDOR SLOT ADVISOR TESTS ====================
 
     @Test
-    @DisplayName("Vendor Slot Advisor đánh giá tỷ lệ lấp đầy và đề xuất mở rộng công suất")
-    void testVendorSlotAdvisor_RecommendsCapacityExpansionForCrowdedSlot() {
+    @DisplayName("Vendor Slot Advisor kiểm tra thời tiết trước khi đề xuất tăng công suất")
+    void testVendorSlotAdvisor_RequiresForecastBeforeRecommendingExpansion() {
         var profile = new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 25, "SILVER");
         when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(profile));
 
@@ -236,14 +241,29 @@ class VendorAdminAiFeaturesTest {
         assertThat(advisor.totalSlotsEvaluated()).isEqualTo(1);
         assertThat(advisor.highDemandSlotsCount()).isEqualTo(1);
         assertThat(advisor.recommendations()).hasSize(1);
-        assertThat(advisor.recommendations().get(0).recommendationType()).isEqualTo("EXPAND_CAPACITY");
+        assertThat(advisor.recommendations().get(0).weatherRiskLevel()).isEqualTo("UNKNOWN");
+        assertThat(advisor.recommendations().get(0).recommendationType()).isEqualTo("WEATHER_WATCH");
+
+        var published = new AiCatalogReadApi.PublishedService(srvId, vendorId, "SUP Bình Minh", null,
+                null, null, null, null, 16.1, 108.2, 120, true, BigDecimal.ZERO, 0, List.of());
+        when(catalog.metadata(eq(srvId), any())).thenReturn(published);
+        when(weatherPort.assess(eq(published), any())).thenReturn(
+                new TravelWeatherPort.Assessment("UNSAFE", false, false, null, null, null),
+                new TravelWeatherPort.Assessment("ACCEPTABLE", true, false, null, null, null));
+        var unsafe = slotAdvisorUseCase.execute(vendorUserId, srvId, 7);
+        assertThat(unsafe.weatherRiskSlotsCount()).isEqualTo(1);
+        assertThat(unsafe.recommendations().getFirst().weatherRiskLevel()).isEqualTo("HIGH_RISK");
+        assertThat(unsafe.recommendations().getFirst().recommendationType()).isEqualTo("WEATHER_WATCH");
+
+        var safe = slotAdvisorUseCase.execute(vendorUserId, srvId, 7);
+        assertThat(safe.recommendations().getFirst().recommendationType()).isEqualTo("EXPAND_CAPACITY");
     }
 
     // ==================== 4. ADMIN DISPUTE ARBITRATION TESTS ====================
 
     @Test
-    @DisplayName("Admin Dispute Arbitration đối chiếu 3 sự thật hệ thống đề xuất phán quyết hoàn tiền công tâm")
-    void testAdminDisputeArbitration_CorrelatesThreeTruths() {
+    @DisplayName("Admin Dispute Arbitration chuyển quản trị viên duyệt khi bằng chứng chưa đủ")
+    void testAdminDisputeArbitration_RequiresReviewForConflictingClaims() {
         UUID disputeId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
         UUID subOrderId = UUID.randomUUID();
@@ -269,16 +289,16 @@ class VendorAdminAiFeaturesTest {
         assertThat(result.customerClaimSummary()).isNotEmpty();
         assertThat(result.vendorDefenseSummary()).isNotEmpty();
         assertThat(result.objectiveSystemFacts()).hasSize(3);
-        assertThat(result.recommendedResolution()).isEqualTo("RESOLVED_PARTIAL");
-        assertThat(result.recommendedRefundPercent()).isEqualTo(50);
-        assertThat(result.draftAdminNote()).contains("50%");
+        assertThat(result.recommendedResolution()).isEqualTo("MANUAL_REVIEW_REQUIRED");
+        assertThat(result.recommendedRefundPercent()).isNull();
+        assertThat(result.draftAdminNote()).doesNotContain("50%");
 
-        verify(insightStore).saveDisputeSummary(eq(disputeId), eq(subOrderId), eq(adminUserId), eq("RESOLVED_PARTIAL"), eq(Integer.valueOf(50)), anyString(), anyString());
+        verify(insightStore).saveDisputeSummary(eq(disputeId), eq(subOrderId), eq(adminUserId), eq("MANUAL_REVIEW_REQUIRED"), isNull(), anyString(), anyString());
 
         // Verify English (EN) language support
         var resultEn = disputeSummaryUseCase.execute(adminUserId, disputeId, SupportedLanguage.EN);
         assertThat(resultEn.objectiveSystemFacts().get(0)).contains("CHECK-IN VERIFICATION");
-        assertThat(resultEn.draftAdminNote()).contains("50%");
+        assertThat(resultEn.draftAdminNote()).contains("review");
     }
 
     // ==================== 5. ROLE COPILOT MULTI-SESSION TESTS ====================
@@ -294,11 +314,11 @@ class VendorAdminAiFeaturesTest {
         when(insightStore.createCopilotConversation(any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(sampleConv);
         when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(sampleConv));
-        when(insightStore.listCopilotConversations(eq(vendorUserId), eq("VENDOR"), any(), anyInt()))
+        when(insightStore.listCopilotConversations(eq(vendorUserId), eq("VENDOR"), eq(vendorId), any(), anyInt()))
                 .thenReturn(List.of(sampleConv));
 
         // 1. List conversations
-        List<CopilotConversation> convs = roleCopilotUseCase.listConversations(vendorUserId, "VENDOR", false, 20);
+        List<CopilotConversation> convs = roleCopilotUseCase.listConversations(vendorUserId, "VENDOR", vendorId, false, 20);
         assertThat(convs).hasSize(1);
         assertThat(convs.get(0).title()).isEqualTo("Kế hoạch kinh doanh tuần này");
 
@@ -312,12 +332,24 @@ class VendorAdminAiFeaturesTest {
         assertThat(chatResp.conversationId()).isEqualTo(convId);
 
         // 3. Update meta
-        roleCopilotUseCase.updateConversationMeta(convId, vendorUserId, "Đổi tên chat", true, false);
+        roleCopilotUseCase.updateConversationMeta(convId, vendorUserId, "VENDOR", vendorId, "Đổi tên chat", true, false);
         verify(insightStore).updateCopilotConversationMeta(convId, vendorUserId, "Đổi tên chat", true, false);
 
         // 4. Soft delete
-        roleCopilotUseCase.deleteConversation(convId, vendorUserId);
+        roleCopilotUseCase.deleteConversation(convId, vendorUserId, "VENDOR", vendorId);
         verify(insightStore).softDeleteCopilotConversation(convId, vendorUserId);
+    }
+
+    @Test
+    void testRoleCopilot_DeniesPreviousAdminConversationAfterRoleChange() {
+        UUID convId = UUID.randomUUID();
+        var adminConversation = new CopilotConversation(convId, vendorUserId, "ADMIN", null,
+                "vi", "Admin reports", false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(adminConversation));
+
+        assertThatThrownBy(() -> roleCopilotUseCase.processMessage(
+                vendorUserId, "VENDOR", vendorId, convId, "show prior reports", null, null, SupportedLanguage.EN))
+                .isInstanceOf(AccessDeniedException.class);
     }
 
     // ==================== 6. CUSTOMER MARINE BRIEFING & IDOR GUARD TESTS ====================
@@ -360,6 +392,7 @@ class VendorAdminAiFeaturesTest {
 
         var activity = overview.activities().get(0);
         assertThat(activity.serviceTitle()).isEqualTo("Tour Lặn Ngắm San Hô Bán Đảo");
+        assertThat(activity.weatherSafetyStatus()).isEqualTo("UNKNOWN");
         assertThat(activity.packingChecklist()).isNotEmpty();
         assertThat(activity.arrivalAndSafetyGuidelines()).isNotEmpty();
 

@@ -34,6 +34,8 @@ public interface JpaReviewRepository extends JpaRepository<ReviewJpaEntity, UUID
 
     Page<ReviewJpaEntity> findByVendorIdAndIsVisibleTrue(UUID vendorId, Pageable pageable);
 
+    Page<ReviewJpaEntity> findByVendorIdAndServiceIdAndIsVisibleTrue(UUID vendorId, UUID serviceId, Pageable pageable);
+
     @Query("SELECT COUNT(r) FROM ReviewJpaEntity r WHERE r.serviceId = :serviceId AND r.isVisible = true")
     long countByServiceIdAndIsVisibleTrue(@Param("serviceId") UUID serviceId);
 

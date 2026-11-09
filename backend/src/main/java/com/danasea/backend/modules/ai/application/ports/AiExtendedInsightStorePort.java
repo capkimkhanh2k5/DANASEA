@@ -77,7 +77,7 @@ public interface AiExtendedInsightStorePort {
     Optional<CopilotConversation> getCopilotConversation(UUID id);
 
     List<CopilotConversation> listCopilotConversations(
-            UUID actorUserId, String actorRole, Boolean archived, int limit);
+            UUID actorUserId, String actorRole, UUID vendorId, Boolean archived, int limit);
 
     CopilotConversation updateCopilotConversationMeta(
             UUID id, UUID actorUserId, String title, Boolean pinned, Boolean archived);
