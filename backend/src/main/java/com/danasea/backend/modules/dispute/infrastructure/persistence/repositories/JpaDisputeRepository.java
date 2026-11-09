@@ -49,6 +49,8 @@ public interface JpaDisputeRepository extends JpaRepository<DisputeJpaEntity, UU
 
     Page<DisputeJpaEntity> findByStatus(DisputeStatus status, Pageable pageable);
 
+    long countByStatus(DisputeStatus status);
+
     Page<DisputeJpaEntity> findByReason(DisputeReason reason, Pageable pageable);
 
     @Query("SELECT d FROM DisputeEntity d WHERE " +

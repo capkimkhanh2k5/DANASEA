@@ -103,6 +103,7 @@ final class AssistantArtifactMapper {
             case "get_policy", "get_cancellation_policy" -> "POLICY";
             case "request_booking_confirmation" -> "BOOKING_CONFIRMATION";
             case "ai_customer_support" -> "CUSTOMER_SUPPORT";
+            case "ai_marine_briefing" -> "MARINE_BRIEFING_CARD";
             default -> "TOOL_RESULT";
         };
     }

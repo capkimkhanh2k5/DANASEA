@@ -35,7 +35,10 @@ public class AiExecutionBudgetFilter extends OncePerRequestFilter {
 
     @Override protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return !(path.startsWith("/api/ai/") || path.equals("/api/assistant/chat") || path.matches("/api/assistant/conversations/[^/]+/confirm") || path.equals("/api/admin/ai/risk-cases"));
+        return !(path.startsWith("/api/ai/") 
+                || path.startsWith("/api/assistant/") 
+                || path.startsWith("/api/vendor/ai/") 
+                || path.startsWith("/api/admin/ai/"));
     }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
         if (!concurrentRequests.tryAcquire()) {

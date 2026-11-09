@@ -10,4 +10,5 @@ import com.danasea.backend.modules.ai.infrastructure.persistence.entities.AiAsse
 
 public interface JpaAiAssessmentCaseRepository extends JpaRepository<AiAssessmentCaseJpaEntity, UUID> {
     List<AiAssessmentCaseJpaEntity> findByStatusOrderByCreatedAtDesc(String status, Pageable page);
+    long countByStatus(String status);
 }

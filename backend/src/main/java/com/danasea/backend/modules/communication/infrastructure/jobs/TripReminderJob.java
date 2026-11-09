@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import com.danasea.backend.modules.ai.application.usecases.CustomerMarineBriefingUseCase;
 import com.danasea.backend.modules.booking.domain.models.Booking;
 import com.danasea.backend.modules.communication.application.dtos.NotificationCommand;
 import com.danasea.backend.modules.communication.application.email.EmailRequest;
@@ -53,6 +54,10 @@ public class TripReminderJob {
     private final PushNotificationPort push;
     private final TransactionalEmailPort emailPort;
     private final JpaTransactionalEmailDeliveryRepository emailDeliveryRepository;
+
+    @Autowired(required = false)
+    @Setter
+    private CustomerMarineBriefingUseCase marineBriefingUseCase;
 
     @Setter
     private Clock clock = Clock.system(Booking.VIETNAM_ZONE);
@@ -145,6 +150,32 @@ public class TripReminderJob {
                             }
                         });
                     });
+
+                    // Enrich with AI Marine Briefing notification & pre-generation
+                    if (marineBriefingUseCase != null) {
+                        try {
+                            marineBriefingUseCase.preGenerateForTripReminder(order.getId(), subOrder.getId(), order.getCustomerId(), slot.getId());
+                            notifications.executeOnce(new NotificationCommand(order.getCustomerId(), "MARINE_BRIEFING_READY",
+                                    NotificationChannel.IN_APP, LocalizedMessageRef.of("notification.marine_briefing.ready.title"),
+                                    LocalizedMessageRef.of("notification.marine_briefing.ready.body", slot.getStartTime(), slot.getDate()),
+                                    "SERVICE_SLOT", slot.getId(), null),
+                                    "briefing:" + slot.getId() + ":customer:" + order.getCustomerId()).ifPresent(briefingNotification -> {
+                                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                                    @Override
+                                    public void afterCommit() {
+                                        try {
+                                            push.sendPush(briefingNotification.getUserId(), briefingNotification.getTitle(), briefingNotification.getBody(),
+                                                    Map.of("type", "MARINE_BRIEFING_READY", "slotId", slot.getId().toString(), "orderId", order.getId().toString()));
+                                        } catch (Exception failure) {
+                                            log.warn("Push delivery failed for marine briefing notification {}", briefingNotification.getId(), failure);
+                                        }
+                                    }
+                                });
+                            });
+                        } catch (Exception briefingEx) {
+                            log.warn("Pre-generation of marine briefing failed for order {}: {}", order.getId(), briefingEx.getMessage());
+                        }
+                    }
                 }
 
                 // Enqueue TRIP_REMINDER_24H via Transactional Outbox

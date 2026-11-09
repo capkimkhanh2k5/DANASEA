@@ -1,20 +1,25 @@
 {
-  "reviewedMigrations": "V1-V54",
+  "reviewedMigrations": "V1-V55",
   "classification": {
     "ai_assessment_cases": "replace",
     "ai_chat_requests": "replace",
     "ai_confirmation_outcomes": "replace",
     "ai_conversations": "replace",
+    "ai_copilot_conversations": "replace",
+    "ai_copilot_messages": "replace",
     "ai_customer_preferences": "replace",
     "ai_customer_support_requests": "replace",
+    "ai_dispute_summaries": "replace",
     "ai_itineraries": "replace",
     "ai_itinerary_items": "replace",
     "ai_itinerary_previews": "replace",
     "ai_itinerary_proposals": "replace",
     "ai_itinerary_revisions": "replace",
+    "ai_marine_briefings": "replace",
     "ai_messages": "replace",
     "ai_recommendation_feedback": "replace",
     "ai_recommendations": "replace",
+    "ai_vendor_insights": "replace",
     "assistant_audit_logs": "replace",
     "audit_logs": "replace",
     "booking_item_allocations": "replace",
@@ -349,6 +354,204 @@
             "timestamp with time zone",
             false,
             ""
+          ],
+          [
+            "title",
+            "character varying(200)",
+            false,
+            ""
+          ],
+          [
+            "pinned",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "archived",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "context_type",
+            "character varying(40)",
+            false,
+            ""
+          ],
+          [
+            "context_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "is_deleted",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "deleted_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_copilot_conversations",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "actor_user_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "actor_role",
+            "character varying(20)",
+            true,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "language",
+            "character varying(10)",
+            true,
+            ""
+          ],
+          [
+            "title",
+            "character varying(200)",
+            false,
+            ""
+          ],
+          [
+            "pinned",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "archived",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "context_type",
+            "character varying(40)",
+            false,
+            ""
+          ],
+          [
+            "context_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "is_deleted",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "deleted_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "version",
+            "bigint",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_copilot_messages",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "conversation_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "role",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "content",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "artifacts_json",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "tools_used",
+            "character varying(500)",
+            false,
+            ""
+          ],
+          [
+            "verified",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
           ]
         ]
       },
@@ -491,6 +694,72 @@
           [
             "version",
             "bigint",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_dispute_summaries",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "dispute_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "sub_order_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "requested_by_admin_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "recommended_resolution",
+            "character varying(50)",
+            false,
+            ""
+          ],
+          [
+            "recommended_refund_percent",
+            "integer",
+            false,
+            ""
+          ],
+          [
+            "summary_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "analysis_method",
+            "character varying(50)",
             true,
             ""
           ],
@@ -803,6 +1072,72 @@
         ]
       },
       {
+        "name": "public.ai_marine_briefings",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "master_order_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "sub_order_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "customer_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "slot_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "weather_status",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "briefing_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "notified_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
         "name": "public.ai_messages",
         "kind": "r",
         "columns": [
@@ -947,6 +1282,66 @@
           [
             "expires_at",
             "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
+        "name": "public.ai_vendor_insights",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "vendor_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "service_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "insight_type",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "source_fingerprint",
+            "character varying(128)",
+            false,
+            ""
+          ],
+          [
+            "payload_json",
+            "text",
+            true,
+            ""
+          ],
+          [
+            "analysis_method",
+            "character varying(50)",
             true,
             ""
           ],
@@ -5761,6 +6156,45 @@
         "validated": true
       },
       {
+        "name": "ai_copilot_conversations_vendor_id_fkey",
+        "child": "public.ai_copilot_conversations",
+        "parent": "public.vendors",
+        "childcolumns": [
+          "vendor_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "ai_copilot_messages_conversation_id_fkey",
+        "child": "public.ai_copilot_messages",
+        "parent": "public.ai_copilot_conversations",
+        "childcolumns": [
+          "conversation_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (conversation_id) REFERENCES ai_copilot_conversations(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "ai_dispute_summaries_dispute_id_fkey",
+        "child": "public.ai_dispute_summaries",
+        "parent": "public.disputes",
+        "childcolumns": [
+          "dispute_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (dispute_id) REFERENCES disputes(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
         "name": "ai_itineraries_owner_id_fkey",
         "child": "public.ai_itineraries",
         "parent": "public.users",
@@ -5862,6 +6296,32 @@
           "id"
         ],
         "definition": "FOREIGN KEY (recommendation_id) REFERENCES ai_recommendations(id)",
+        "validated": true
+      },
+      {
+        "name": "ai_vendor_insights_service_id_fkey",
+        "child": "public.ai_vendor_insights",
+        "parent": "public.services",
+        "childcolumns": [
+          "service_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE SET NULL",
+        "validated": true
+      },
+      {
+        "name": "ai_vendor_insights_vendor_id_fkey",
+        "child": "public.ai_vendor_insights",
+        "parent": "public.vendors",
+        "childcolumns": [
+          "vendor_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE CASCADE",
         "validated": true
       },
       {

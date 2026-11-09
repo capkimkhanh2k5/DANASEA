@@ -42,5 +42,7 @@ public interface JpaServiceRepository extends JpaRepository<ServiceJpaEntity, UU
 
     Optional<ServiceJpaEntity> findByIdAndStatus(UUID id, ServiceStatus status);
 
+    long countByStatus(ServiceStatus status);
+
     long countByVendorIdAndStatus(UUID vendorId, ServiceStatus status);
 }

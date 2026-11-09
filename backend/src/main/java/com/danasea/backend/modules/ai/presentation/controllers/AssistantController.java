@@ -83,6 +83,7 @@ public class AssistantController {
                     .fromTag(conversation.getLocale()).orElse(SupportedLanguage.VI);
             if (conversationLanguage != language) throw new AiConversationLocaleMismatchException();
             UUID conversationId = conversation.getId();
+            chatHistoryService.autoGenerateTitleIfEmpty(conversationId, request.message());
             if (chatIdempotency != null) chatIdempotency.bind(claim, conversationId);
             var response = chatUseCase.processMessage(conversationId, request.message(), conversationLanguage, userId);
             auditLogService.logChatAction(conversationId, userId, request.message(), response.getContent(), response.getKeyMasked());
@@ -153,6 +154,37 @@ public class AssistantController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+    public record UpdateConversationMetaRequest(String title, Boolean pinned, Boolean archived) {}
+
+    @GetMapping("/conversations")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<AiConversationJpaEntity>> listConversations(
+            @RequestParam(required = false) Boolean archived,
+            @RequestParam(defaultValue = "30") int limit) {
+        UUID userId = SecurityUtils.getCurrentUserId().orElseThrow(() -> new IllegalStateException("User not authenticated"));
+        return ResponseEntity.ok(chatHistoryService.listConversationsForUser(userId, archived, limit));
+    }
+
+    @PatchMapping("/conversations/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AiConversationJpaEntity> updateConversationMeta(
+            @PathVariable UUID id,
+            @RequestBody UpdateConversationMetaRequest request) {
+        UUID userId = SecurityUtils.getCurrentUserId().orElseThrow(() -> new IllegalStateException("User not authenticated"));
+        String title = request != null ? request.title() : null;
+        Boolean pinned = request != null ? request.pinned() : null;
+        Boolean archived = request != null ? request.archived() : null;
+        return ResponseEntity.ok(chatHistoryService.updateConversationMeta(id, userId, title, pinned, archived));
+    }
+
+    @DeleteMapping("/conversations/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> deleteConversation(@PathVariable UUID id) {
+        UUID userId = SecurityUtils.getCurrentUserId().orElseThrow(() -> new IllegalStateException("User not authenticated"));
+        chatHistoryService.softDeleteConversation(id, userId);
+        return ResponseEntity.noContent().build();
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> invalidChatBody(HttpMessageNotReadableException exception) {
         return ResponseEntity.badRequest().body(new ErrorResponse("INVALID_INPUT", messages.get("error.invalid_input")));

@@ -8,6 +8,7 @@ import java.util.stream.StreamSupport;
 
 import com.danasea.backend.modules.ai.application.dtos.TravelRequest;
 import com.danasea.backend.modules.ai.application.usecases.CompareServicesUseCase;
+import com.danasea.backend.modules.ai.application.usecases.CustomerMarineBriefingUseCase;
 import com.danasea.backend.modules.ai.application.usecases.CustomerSupportUseCase;
 import com.danasea.backend.modules.ai.application.usecases.DiscoverServicesUseCase;
 import com.danasea.backend.modules.ai.application.usecases.PlanItineraryUseCase;
@@ -26,13 +27,20 @@ public class CustomerFeatureTool implements ToolExecutor {
     private final ReviewSummaryUseCase reviews;
     private final WeatherAwareUseCase weather;
     private final CustomerSupportUseCase support;
+    private final CustomerMarineBriefingUseCase marineBriefing;
     private final ObjectMapper mapper;
 
     public CustomerFeatureTool(String name, DiscoverServicesUseCase discovery, CompareServicesUseCase comparisons,
                                PlanItineraryUseCase plans, ReviewSummaryUseCase reviews, WeatherAwareUseCase weather,
                                CustomerSupportUseCase support, ObjectMapper mapper) {
+        this(name, discovery, comparisons, plans, reviews, weather, support, null, mapper);
+    }
+
+    public CustomerFeatureTool(String name, DiscoverServicesUseCase discovery, CompareServicesUseCase comparisons,
+                               PlanItineraryUseCase plans, ReviewSummaryUseCase reviews, WeatherAwareUseCase weather,
+                               CustomerSupportUseCase support, CustomerMarineBriefingUseCase marineBriefing, ObjectMapper mapper) {
         this.name = name; this.discovery = discovery; this.comparisons = comparisons; this.plans = plans;
-        this.reviews = reviews; this.weather = weather; this.support = support; this.mapper = mapper;
+        this.reviews = reviews; this.weather = weather; this.support = support; this.marineBriefing = marineBriefing; this.mapper = mapper;
     }
 
     @Override public String getName() { return name; }
@@ -46,8 +54,12 @@ public class CustomerFeatureTool implements ToolExecutor {
             if (args == null || !args.isObject()) throw new IllegalArgumentException("Arguments must be a JSON object");
             SupportedLanguage language = context == null || context.language() == null ? SupportedLanguage.VI : context.language();
             UUID userId = context == null ? null : context.userId();
-            if (Set.of("ai_plan_itinerary", "ai_replan_itinerary", "ai_customer_support").contains(name) && userId == null) {
+            if (Set.of("ai_plan_itinerary", "ai_replan_itinerary", "ai_customer_support", "ai_marine_briefing").contains(name) && userId == null) {
                 return error("AUTHENTICATION_REQUIRED", "Authenticate before using private AI features");
+            }
+            if ("ai_marine_briefing".equals(name)) {
+                if (marineBriefing == null) return error("FEATURE_UNAVAILABLE", "Marine briefing feature is not configured");
+                if (!args.hasNonNull("orderId")) return error("ORDER_ID_REQUIRED", "orderId is required");
             }
             Object result = switch (name) {
                 case "ai_smart_search" -> discovery.execute(criteria(args), "SEARCH", language);
@@ -63,6 +75,7 @@ public class CustomerFeatureTool implements ToolExecutor {
                 case "ai_weather_slot" -> weather.execute(id(args, "serviceId"), id(args, "optionId"), id(args, "slotId"), criteria(args), language);
                 case "ai_customer_support" -> support.execute(userId, args.hasNonNull("orderId") ? id(args, "orderId") : null,
                         args.path("message").asText(), args.path("includeCancellationPreview").asBoolean(false));
+                case "ai_marine_briefing" -> marineBriefing.getMarineBriefing(userId, id(args, "orderId"), language);
                 default -> throw new IllegalArgumentException("Unknown customer feature tool");
             };
             return mapper.writeValueAsString(result);

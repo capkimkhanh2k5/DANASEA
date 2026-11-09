@@ -16,6 +16,8 @@
 | 10 | `AI_Travel_Assistant_MultiTool_Flow` | Sequence Diagram | [`codeFlows/Sequence_Diagram/AI_Travel_Assistant_MultiTool_SD.mmd`](codeFlows/Sequence_Diagram/AI_Travel_Assistant_MultiTool_SD.mmd) | Trợ lý du lịch đa công cụ (15 tools), Structured Artifacts (typed cards), Tạo thẻ Native Option Card trên Redis & Re-validation bền vững |
 | 11 | `Customer_Preference_And_Feedback_Flow` | Sequence Diagram | [`codeFlows/Sequence_Diagram/Customer_Preference_And_Feedback_SD.mmd`](codeFlows/Sequence_Diagram/Customer_Preference_And_Feedback_SD.mmd) | Quản lý sở thích cá nhân hóa (Consent bật/tắt, Exclusions, Version), Vòng lặp phản hồi gợi ý (SHOWN, CLICK, POSITIVE, NEGATIVE) & Tác động điểm xếp hạng |
 | 12 | `Customer_Support_And_Admin_Queue_Flow` | Sequence Diagram | [`codeFlows/Sequence_Diagram/Customer_Support_And_Admin_Queue_SD.mmd`](codeFlows/Sequence_Diagram/Customer_Support_And_Admin_Queue_SD.mmd) | Hỗ trợ khách hàng AI (Tra cứu đơn của chính mình, Quyet Topic/Urgency, AI Cancellation Preview tính phí hoàn), Tạo ticket có Idempotency & Hàng đợi Admin xử lý thủ công |
+| 13 | `Vendor_Review_Coaching_And_Copilot_Flow` | Workflow Diagram | [`docs/FE_AI_Features_Spec.md`](../../FE_AI_Features_Spec.md) | Huấn luyện Review 4 trụ cột, Smart Reply, Listing Optimizer, Slot Advisor & Trợ lý hội thoại Vendor Copilot đa phiên (Flyway V55) |
+| 14 | `Admin_Dispute_Arbitration_And_Marine_Briefing_Flow` | Workflow Diagram | [`docs/FE_AI_Features_Spec.md`](../../FE_AI_Features_Spec.md) | Tóm tắt bằng chứng tranh chấp, Executive Digest & Cẩm nang biển thông minh 24h trước giờ khởi hành |
 
 ---
 
@@ -354,7 +356,40 @@ Sơ đồ nguồn: `codeFlows/Decision_Flowchart/CliProxy_ModelFallback_DF.mmd`.
 
 ---
 
-## 🔗 Bản Đồ Liên Kết Giữa 12 Sơ Đồ Hệ Thống
+## 13. Vendor_Review_Coaching_And_Copilot_Flow — Huấn Luyện Đánh Giá & Vendor Copilot Đa Phiên
+
+**Thành phần:** `Vendor` → `VendorAiController` → `VendorReviewCoachingUseCase` / `RoleCopilotUseCase` → `VendorAiDataPort` → `AiExtendedInsightStorePort (PostgreSQL V55)` → `Dual-Brain AI`
+
+**Luồng xử lý:**
+1. **Phân tích Review Coaching 4 trụ cột:**
+   - Hệ thống quét lịch sử đánh giá của đối tác trong 30-180 ngày, bóc tách dữ liệu theo 4 khía cạnh trọng yếu: Hướng dẫn viên (`GUIDE`), An toàn & Thiết bị (`SAFETY`), Đúng giờ (`PUNCTUALITY`), Giá trị xứng đáng (`VALUE`).
+   - Trích xuất điểm mạnh và điểm yếu kèm bằng chứng thực tế từ bình luận của khách, xếp hạng huy hiệu (`BadgeTier`: STANDARD → SILVER → GOLD → ELITE) và lộ trình thăng hạng.
+   - Lưu trữ bản phân tích vào bảng `ai_vendor_insights` (Flyway V55).
+2. **Soạn nháp phản hồi đánh giá thông minh (Smart Reply Draft):**
+   - Hỗ trợ 3 tông giọng (`PROFESSIONAL`, `FRIENDLY`, `EMPATHETIC`), kiểm duyệt an toàn tự động, tích hợp voucher giữ chân khách hàng.
+3. **Cố vấn công suất slot & Tối ưu bài đăng (Slot Advisor & Listing Optimizer):**
+   - Chấm điểm nội dung dịch vụ (0-100), phát hiện thiếu sót về quy định an toàn biển và sinh bản dịch chuẩn SEO.
+   - Phân tích tỷ lệ lấp đầy các ca và đối chiếu thời tiết 7-14 ngày để tư vấn tăng/giảm ca hoặc mở ca đón bình minh/hoàng hôn.
+4. **Vendor Copilot Đa Phiên (Multi-Session):**
+   - Hỗ trợ quản lý từng luồng chat riêng biệt (tạo mới, ghim, đổi tên, lưu trữ, xóa mềm), tích hợp bộ công cụ quản lý doanh thu, đặt chỗ, đánh giá trong phiên làm việc.
+
+---
+
+## 14. Admin_Dispute_Arbitration_And_Marine_Briefing_Flow — Hòa Giải Tranh Chấp & Cẩm Nang Biển
+
+**Thành phần:** `Customer / Admin` → `CustomerAiController` / `AdminAiController` → `CustomerMarineBriefingUseCase` / `AdminDisputeSummaryUseCase` → `TripReminderJob` → `PostgreSQL V55`
+
+**Luồng xử lý:**
+1. **Tóm tắt bằng chứng tranh chấp**
+   - Tổng hợp lượt quét mã QR, trạng thái ca và lời trình bày của hai bên.
+   - Trả về `MANUAL_REVIEW_REQUIRED` để quản trị viên xác minh bằng chứng và chính sách hoàn tiền.
+2. **Cẩm nang biển thông minh trước chuyến đi (Marine Briefing):**
+   - Đánh giá dự báo biển theo ngưỡng an toàn của dịch vụ và chuẩn bị checklist đồ cần mang. Nếu thiếu dự báo còn hiệu lực, cẩm nang hiển thị `UNKNOWN`.
+   - Hook tự động trong `TripReminderJob`: Khi quét các chuyến khởi hành trong vòng 24 giờ, hệ thống tự động sinh trước Marine Briefing và gửi thông báo đẩy `MARINE_BRIEFING_READY` đến điện thoại khách hàng.
+
+---
+
+## 🔗 Bản Đồ Liên Kết Giữa Các Sơ Đồ Hệ Thống
 
 ```
                                 [Sơ đồ 6: AI_Hybrid_Architecture]

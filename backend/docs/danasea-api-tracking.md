@@ -1,8 +1,8 @@
 # DANASEA — Master API & Test Checklist (EPIC-01 → EPIC-08)
 
-**Cập nhật:** 06/11/2026 — chuẩn hóa checklist 256 HTTP method/path, bổ sung hệ thống Cấu hình Hoa hồng Động (Dynamic Commission) & Quỹ thưởng An toàn Biển (Safety Rebate), cập nhật bằng chứng kiểm thử.
+**Cập nhật:** 09/11/2026 — chuẩn hóa checklist 279 HTTP method/path từ 95 controller.
 
-**Phạm vi kiểm kê:** Đối chiếu 256 tổ hợp HTTP method/path từ 94 controller
+**Phạm vi kiểm kê:** Đối chiếu 279 tổ hợp HTTP method/path từ 95 controller
 
 **Quy ước:** Với mục API, `[x]` nghĩa là endpoint đã có trong controller; không đồng nghĩa đã kiểm chứng toàn bộ nghiệp vụ hoặc tích hợp cổng thanh toán thật. Với mục Test, chỉ đánh dấu `[x]` khi có bằng chứng kiểm thử; ghi rõ phạm vi mock, test bị bỏ qua và snapshot kiểm chứng. `[ ]` là việc còn thiếu/chưa xác nhận hoặc chính sách đang chờ thống nhất. Các hạng mục chi trả/hoa hồng và vận hành vendor được người dùng hoãn sang đợt sau, không thuộc phạm vi bổ sung API hiện tại.
 
@@ -493,31 +493,34 @@ Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi 
 
 ### Phạm vi hiện tại
 - [x] Tư vấn qua tool calling, tạo confirmation card và xác nhận để tạo booking hold; thanh toán theo luồng order/payment
-- [x] Có rate limit theo IP/user qua Redis
+- [x] Quản lý hội thoại đa phiên (Multi-Session Thread Control: tạo mới, ghim, đổi tên, lưu trữ, xóa mềm) cho Customer, Vendor và Admin
+- [x] Cẩm nang an toàn & thời tiết biển trước chuyến đi (Customer Marine Briefing) tích hợp hook tự động 24h trong `TripReminderJob`
+- [x] Hệ thống huấn luyện chất lượng đối tác từ đánh giá (Vendor Review Coaching 4 trụ cột, Smart Reply Draft, Listing Optimizer, Slot Demand Advisor)
+- [x] Tóm tắt bằng chứng tranh chấp cho Quản trị viên duyệt & Bản tin điều hành sàn (Executive Digest)
+- [x] Trợ lý hội thoại chuyên sâu cho Đối tác (Vendor Copilot) và Quản trị viên (Admin BI Copilot) tích hợp 11 công cụ kỹ thuật
+- [x] Có rate limit theo IP/user qua Redis và kiểm soát ngân sách thực thi `AiExecutionBudget`
 - [ ] Xác nhận giới hạn chi phí gọi LLM và kiểm chứng giới hạn dưới tải thực
 
-### API
-- [x] POST /api/assistant/chat
+### Trợ lý hội thoại Customer & Multi-Session Control — API
+- [x] POST /api/assistant/chat (tự động đặt tên tiêu đề khi bắt đầu cuộc trò chuyện mới)
 - [x] POST /api/assistant/conversations/{id}/confirm (tạo hold từ confirmation card)
+- [x] GET /api/assistant/conversations (liệt kê danh sách hội thoại của user, hỗ trợ lọc archived)
 - [x] GET /api/assistant/conversations/{id}
 - [x] GET /api/assistant/conversations/{id}/history
+- [x] PATCH /api/assistant/conversations/{id} (đổi tên, ghim, lưu trữ hội thoại)
+- [x] DELETE /api/assistant/conversations/{id} (xóa mềm hội thoại)
 
-### AI workflow, assessment, preferences and support — API
-- [x] GET /api/admin/ai/assessment-cases
-- [x] GET /api/admin/support/requests
-- [x] GET /api/admin/support/requests/{id}
+### Khám phá, lập lịch trình, cẩm nang biển & hỗ trợ khách hàng — API
 - [x] GET /api/ai/itineraries
 - [x] GET /api/ai/itineraries/page
 - [x] GET /api/ai/itineraries/{id}
 - [x] GET /api/ai/itineraries/{id}/proposals
 - [x] GET /api/ai/itineraries/{id}/revisions
+- [x] GET /api/ai/orders/{orderId}/marine-briefing (cẩm nang biển, checklist chuẩn bị đồ và an toàn trước chuyến đi)
 - [x] GET /api/ai/preferences
 - [x] GET /api/ai/review-summaries/{serviceId}
 - [x] GET /api/ai/support/requests
 - [x] GET /api/ai/support/requests/{id}
-- [x] POST /api/admin/ai/assessment-cases/{id}/resolve
-- [x] POST /api/admin/ai/risk-cases
-- [x] POST /api/admin/support/requests/{id}/handle
 - [x] POST /api/ai/classifications/service
 - [x] POST /api/ai/content-assessments
 - [x] POST /api/ai/itineraries
@@ -540,16 +543,48 @@ Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi 
 - [x] POST /api/ai/weather
 - [x] PUT /api/ai/preferences
 
+### Đối tác: Huấn luyện chất lượng, Tối ưu & Vendor Copilot — API
+- [x] POST /api/vendor/ai/review-coaching (phân tích 4 trụ cột Guide, Safety, Punctuality, Value; dẫn chứng và lộ trình nâng hạng BadgeTier)
+- [x] GET /api/vendor/ai/review-coaching/history (lịch sử các đợt phân tích review coaching)
+- [x] POST /api/vendor/ai/reviews/{reviewId}/reply-draft (soạn nháp phản hồi đánh giá khách hàng theo tông giọng và đính kèm voucher)
+- [x] POST /api/vendor/ai/listings/optimize (chấm điểm bài đăng 0-100, phát hiện thiếu sót an toàn/thiết bị, sinh bản dịch chuẩn SEO)
+- [x] POST /api/vendor/ai/slots/advisor (cố vấn công suất, tỷ lệ lấp đầy và cảnh báo thời tiết biển 7-14 ngày để tăng/giảm ca)
+- [x] POST /api/vendor/ai/copilot/chat (trò chuyện với trợ lý kinh doanh đối tác Vendor Copilot, tự động gọi 5 công cụ dữ liệu)
+- [x] GET /api/vendor/ai/copilot/conversations (danh sách các phiên hội thoại của vendor)
+- [x] GET /api/vendor/ai/copilot/conversations/{id}/history (lịch sử tin nhắn trong phiên hội thoại của vendor)
+- [x] PATCH /api/vendor/ai/copilot/conversations/{id} (đổi tên, ghim, lưu trữ phiên hội thoại vendor)
+- [x] DELETE /api/vendor/ai/copilot/conversations/{id} (xóa mềm phiên hội thoại vendor)
+
+### Quản trị viên: Đánh giá rủi ro, Hòa giải tranh chấp, BI Digest & Admin Copilot — API
+- [x] GET /api/admin/ai/assessment-cases
+- [x] POST /api/admin/ai/assessment-cases/{id}/resolve
+- [x] POST /api/admin/ai/risk-cases
+- [x] GET /api/admin/support/requests
+- [x] GET /api/admin/support/requests/{id}
+- [x] POST /api/admin/support/requests/{id}/handle
+- [x] POST /api/admin/ai/disputes/{disputeId}/summarize (tóm tắt bằng chứng và chuyển quản trị viên duyệt)
+- [x] GET /api/admin/ai/disputes/{disputeId}/summary (lấy bản tóm tắt hòa giải tranh chấp đã lưu)
+- [x] GET /api/admin/ai/executive-digest (bản tin điều hành sàn tổng quan 1 chạm: GMV, Payout, Commission, cảnh báo sức khỏe vendor)
+- [x] POST /api/admin/ai/executive-digest (tương đương GET, hỗ trợ truy vấn điều hành theo body/param)
+- [x] POST /api/admin/ai/copilot/chat (trò chuyện với trợ lý phân tích điều hành Admin BI Copilot, tự động gọi 6 công cụ dữ liệu)
+- [x] GET /api/admin/ai/copilot/conversations (danh sách các phiên hội thoại của admin)
+- [x] GET /api/admin/ai/copilot/conversations/{id}/history (lịch sử tin nhắn trong phiên hội thoại của admin)
+- [x] PATCH /api/admin/ai/copilot/conversations/{id} (đổi tên, ghim, lưu trữ phiên hội thoại admin)
+- [x] DELETE /api/admin/ai/copilot/conversations/{id} (xóa mềm phiên hội thoại admin)
+
 ### AI — Việc cần hoàn thiện
 - [x] Kiểm tra owner ở API đọc hội thoại và lịch sử; sai owner trả 403, UUID không tồn tại trả 404
 - [x] Ràng buộc owner, conversationId và confirmation card trước khi tạo hold; chặn ghép card của hội thoại khác
+- [x] Cách ly đa bên thuê (Multi-tenant IDOR Isolation) cho Vendor và Customer: suy ra `vendorId` và `customerId` từ JWT session token, tuyệt đối không nhận từ request body
 
 ### Test
-- [x] AssistantOwnershipHttpRegressionTest (10 ca MockMvc standalone với service/use case thật và repository mock: đọc/confirm đúng owner, chặn truy cập chéo và trả 404 khi không tồn tại)
-- [x] Ghi nhận lịch sử ngày 08/10/2026: 38 test ownership tập trung và 11 probe bổ sung pass; `mvn verify` lúc đó có 2 error ở fixture Dispute. Kết quả này thuộc snapshot cũ; xem lần hồi quy bản kết hợp ngày 10/10/2026 tại mục Regression.
-- [x] AssistantChatUseCaseTest (13 ca: luồng chat/tool calling và xử lý lỗi; báo cáo Surefire ngày 10/10/2026 không có failure/error/skip).
-- [x] RateLimitTest và RateLimitAndFallbackTest (14 ca ở tầng rate limiter với proxy/bucket mock; không thay thế nghiệm thu tải HTTP/Redis thật).
-- [x] LlmFallbackTest (13 ca fallback/circuit breaker với lời gọi LLM mô phỏng; không phải nghiệm thu chất lượng mô hình hoặc cổng LLM thật).
+- [x] VendorAdminAiFeaturesTest bao phủ tư vấn thời tiết, duyệt tranh chấp, phạm vi hội thoại, quyền truy cập cẩm nang và các công cụ hỗ trợ đối tác.
+- [x] AssistantChatUseCaseTest (15 ca: luồng chat/tool calling và xử lý lỗi, kiểm soát deadline ngân sách).
+- [x] AiToolContractHardeningTest (6 ca: kiểm thử contract cứng của toàn bộ 16 tools, bao gồm ai_marine_briefing).
+- [x] CustomerAiFeaturesTest (16 ca: kiểm thử khám phá dịch vụ, lập lịch trình, an toàn thời tiết và bảo vệ IDOR).
+- [x] AssistantOwnershipHttpRegressionTest (10 ca MockMvc standalone với service/use case thật và repository mock: đọc/confirm đúng owner, chặn truy cập chéo và trả 404 khi không tồn tại).
+- [x] RateLimitTest và RateLimitAndFallbackTest (14 ca ở tầng rate limiter với proxy/bucket mock).
+- [x] LlmFallbackTest (13 ca fallback/circuit breaker với lời gọi LLM mô phỏng).
 
 ---
 
