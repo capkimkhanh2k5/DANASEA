@@ -10,6 +10,7 @@
 <br/>
 
 [![CI Status](https://github.com/capkimkhanh2k5/PBL6_HTTT/actions/workflows/ci.yml/badge.svg)](https://github.com/capkimkhanh2k5/PBL6_HTTT/actions/workflows/ci.yml)
+[![CD](https://github.com/capkimkhanh2k5/DANASEA/actions/workflows/cd.yml/badge.svg)](https://github.com/capkimkhanh2k5/DANASEA/actions/workflows/cd.yml)
 ![Java 21](https://img.shields.io/badge/Java-21-ED8B00?style=flat&logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4-6DB33F?style=flat&logo=springboot&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react&logoColor=black)
