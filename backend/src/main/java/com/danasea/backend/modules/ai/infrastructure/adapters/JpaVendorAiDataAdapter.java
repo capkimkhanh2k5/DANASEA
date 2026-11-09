@@ -28,6 +28,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
+import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 
 import lombok.RequiredArgsConstructor;
@@ -146,19 +147,13 @@ public class JpaVendorAiDataAdapter implements VendorAiDataPort {
         }
 
         VendorPerformanceItem item = items.get(0);
-        List<String> alerts = item.getIssues() != null
-                ? item.getIssues().stream().map(Enum::name).toList() : List.of();
-
-        String badge = "STANDARD";
-        if (item.getRating() != null && item.getRating().doubleValue() >= 4.8) {
-            badge = "GOLD";
-        } else if (item.getRating() != null && item.getRating().doubleValue() >= 4.5) {
-            badge = "SILVER";
-        }
+        List<String> alerts = item.getIssues().stream().map(Enum::name).toList();
+        String badge = vendorInternalApi.findById(vendorId)
+                .map(Vendor::getBadgeTier).map(BadgeTier::name).orElse("NONE");
 
         return new VendorPerformanceMetrics(
-                item.getRevenue() != null ? item.getRevenue() : BigDecimal.ZERO,
-                item.getNetPayout() != null ? item.getNetPayout() : BigDecimal.ZERO,
+                item.getRevenue(),
+                item.getNetPayout(),
                 item.getTotalOrders(),
                 item.getCancelledOrders(),
                 item.getCancellationRate(),

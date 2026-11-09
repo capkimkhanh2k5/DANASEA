@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -16,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,9 +28,14 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.danasea.backend.modules.ai.application.ports.AdminAiDataPort;
+import com.danasea.backend.modules.ai.application.ports.AdminAiDataPort.BookingCancellationBreakdown;
 import com.danasea.backend.modules.ai.application.ports.AdminAiDataPort.DisputeFullEvidence;
+import com.danasea.backend.modules.ai.application.ports.AdminAiDataPort.PlatformDashboardMetrics;
+import com.danasea.backend.modules.ai.application.ports.AdminAiDataPort.RevenueTimeSeriesItem;
+import com.danasea.backend.modules.ai.application.ports.AdminAiDataPort.VendorDiagnosticItem;
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort;
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort.CopilotConversation;
+import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort.CopilotMessage;
 import com.danasea.backend.modules.ai.application.ports.DecisionModelPort;
 import com.danasea.backend.modules.ai.application.ports.LlmClientPort;
 import com.danasea.backend.modules.ai.application.ports.ModerationPort;
@@ -37,6 +44,10 @@ import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorProfile;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorReviewItem;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorSlotItem;
+import com.danasea.backend.modules.ai.application.tools.AdminFeatureTool;
+import com.danasea.backend.modules.ai.application.tools.CustomerFeatureTool;
+import com.danasea.backend.modules.ai.application.tools.ToolExecutionContext;
+import com.danasea.backend.modules.ai.application.tools.VendorFeatureTool;
 import com.danasea.backend.modules.ai.application.usecases.AdminDisputeSummaryUseCase;
 import com.danasea.backend.modules.ai.application.usecases.AssessTextUseCase;
 import com.danasea.backend.modules.ai.application.usecases.CustomerMarineBriefingUseCase;
@@ -108,7 +119,7 @@ class VendorAdminAiFeaturesTest {
                 vendorAiData, insightStore, decisionModel, llmClient, assessTextUseCase, mapper);
 
         listingOptimizerUseCase = new VendorListingOptimizerUseCase(
-                vendorAiData, insightStore, decisionModel, llmClient, assessTextUseCase, mapper);
+                vendorAiData, insightStore, decisionModel, assessTextUseCase, mapper);
 
         var marineWeather = new MarineSlotWeather(catalog, weatherPort);
         slotAdvisorUseCase = new VendorSlotAdvisorUseCase(
@@ -215,6 +226,9 @@ class VendorAdminAiFeaturesTest {
         assertThat(result.missingItems()).isNotEmpty();
         assertThat(result.drafts()).containsKey("VI");
         assertThat(result.drafts().get("VI").optimizedTitle()).containsIgnoringCase("sup");
+        assertThat(result.drafts().get("EN").optimizedDescription()).isEmpty();
+        assertThat(result.drafts().get("EN").sellingPoints()).isEmpty();
+        assertThat(result.drafts().get("VI").optimizedDescription()).doesNotContain("miễn phí");
         assertThat(result.listingQualityScore()).isLessThan(80); // Short raw input scores lower
     }
 
@@ -350,6 +364,129 @@ class VendorAdminAiFeaturesTest {
         assertThatThrownBy(() -> roleCopilotUseCase.processMessage(
                 vendorUserId, "VENDOR", vendorId, convId, "show prior reports", null, null, SupportedLanguage.EN))
                 .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void adminCopilotKeepsArrayAndObjectArtifactsWhenProviderIsUnavailable() {
+        UUID convId = UUID.randomUUID();
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "en", "Reports",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of(
+                new CopilotMessage(UUID.randomUUID(), convId, "USER", "prior question", null, null, true, OffsetDateTime.now()),
+                new CopilotMessage(UUID.randomUUID(), convId, "ASSISTANT", "prior answer", null, null, false, OffsetDateTime.now())));
+        when(llmClient.generateResponse(any(), any())).thenThrow(new IllegalStateException("Provider unavailable"));
+        when(adminAiData.getRevenueTimeSeries(any(), any(), any())).thenReturn(List.of(
+                new RevenueTimeSeriesItem("2026-11-09", BigDecimal.TEN, BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.ONE, BigDecimal.valueOf(9))));
+        when(adminAiData.getVendorDiagnostics(any(), any(), any())).thenReturn(List.of(
+                new VendorDiagnosticItem(vendorId, "Kayak", BigDecimal.TEN, 2, 0, 70, BigDecimal.valueOf(5), 5, "HEALTHY", List.of())));
+        when(adminAiData.getBookingCancellationBreakdown(any(), any(), any())).thenReturn(
+                new BookingCancellationBreakdown(3, 1, 2, 2, 0, 0, 0, 0, Map.of("WEATHER", 2L)));
+        when(adminAiData.getPlatformDashboardMetrics()).thenReturn(
+                new PlatformDashboardMetrics(BigDecimal.TEN, BigDecimal.valueOf(9), BigDecimal.ONE, 3, 2, 1, 0, List.of()));
+
+        Map<String, List<String>> questions = Map.of(
+                "ADMIN_REVENUE_CHART_CARD", List.of("revenue", "doanh thu", "gmv", "tiền"),
+                "ADMIN_CANCELLATION_BREAKDOWN_CARD", List.of("cancel", "hủy", "lý do", "thời tiết", "weather"),
+                "ADMIN_CRITICAL_VENDORS_TABLE", List.of("vendor", "đối tác", "chẩn đoán", "cảnh báo", "diagnostic"),
+                "ADMIN_KPI_SUMMARY_CARD", List.of("dashboard", "tổng quan", "sức khỏe", "overview"));
+        for (var cardType : questions.entrySet()) {
+            for (String question : cardType.getValue()) {
+                var reply = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                        question, null, null, SupportedLanguage.EN);
+                assertThat(reply.artifacts()).as(question).singleElement()
+                        .satisfies(card -> assertThat(card.get("type")).isEqualTo(cardType.getKey()));
+                assertThat(reply.toolsUsed()).hasSize(1);
+                assertThat(reply.generatedTextVerified()).isFalse();
+            }
+        }
+        var revenueReply = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "revenue", null, null, SupportedLanguage.EN);
+        assertThat(revenueReply.artifacts().getFirst().get("data")).isInstanceOf(List.class);
+        var unrecognized = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "hello", null, null, SupportedLanguage.EN);
+        assertThat(unrecognized.artifacts()).isEmpty();
+    }
+
+    @Test
+    void vendorCopilotRoutesVietnameseAndEnglishRequestsToVendorTools() {
+        UUID convId = UUID.randomUUID();
+        var conv = new CopilotConversation(convId, vendorUserId, "VENDOR", vendorId, "vi", null,
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.createCopilotConversation(eq(vendorUserId), eq("VENDOR"), eq(vendorId), any(), any(), any(), any()))
+                .thenReturn(conv);
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Vendor", BigDecimal.ZERO, 0, "NONE")));
+        when(vendorAiData.listReviews(eq(vendorId), isNull(), anyInt())).thenReturn(List.of());
+        when(vendorAiData.listUpcomingSlots(eq(vendorId), isNull(), anyInt())).thenReturn(List.of());
+        when(vendorAiData.getPerformanceMetrics(eq(vendorId), any(), any())).thenReturn(
+                new VendorAiDataPort.VendorPerformanceMetrics(BigDecimal.TEN, BigDecimal.ONE, 2, 0, 0, 0, 0, 80,
+                        BigDecimal.valueOf(5), 1, "VERIFIED", List.of()));
+        when(llmClient.generateResponse(any(), any())).thenReturn(null);
+
+        Map<String, List<String>> questions = Map.of(
+                "VENDOR_REVIEW_COACHING_CARD", List.of("review", "đánh giá", "điểm yếu", "điểm mạnh", "coaching"),
+                "VENDOR_SLOT_ADVISORY_CARD", List.of("slot", "ca", "công suất", "thời tiết", "weather", "capacity"),
+                "VENDOR_LISTING_DRAFT_CARD", List.of("bài đăng", "mô tả", "tối ưu", "tiêu đề", "listing", "optimize"),
+                "VENDOR_KPI_SUMMARY_CARD", List.of("doanh thu", "kpi", "tổng quan", "revenue", "summary"));
+        for (var cardType : questions.entrySet()) {
+            for (String question : cardType.getValue()) {
+                var reply = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, null,
+                        question, null, null, SupportedLanguage.VI);
+                assertThat(reply.artifacts()).as(question).singleElement()
+                        .satisfies(card -> assertThat(card.get("type")).isEqualTo(cardType.getKey()));
+                assertThat(reply.toolsUsed()).hasSize(1);
+            }
+        }
+    }
+
+    @Test
+    void copilotRejectsBlockedMessagesBeforeCreatingOrWritingAConversation() {
+        when(moderationPort.isSafe("blocked")).thenReturn(false);
+
+        assertThatThrownBy(() -> roleCopilotUseCase.processMessage(
+                vendorUserId, "VENDOR", vendorId, null, "blocked", null, null, SupportedLanguage.EN))
+                .hasMessageContaining("AI_MODERATION_BLOCKED");
+        verify(insightStore, never()).createCopilotConversation(any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void roleToolsValidateActorAndInputsBeforeReadingOperationalData() throws Exception {
+        var adminContext = new ToolExecutionContext(SupportedLanguage.EN, UUID.randomUUID(), adminUserId);
+        var disputeTool = new AdminFeatureTool("admin_dispute_summarize", adminAiData, disputeSummaryUseCase, mapper);
+        assertThat(disputeTool.getName()).isEqualTo("admin_dispute_summarize");
+        assertThat(mapper.readTree(disputeTool.execute("{}")).path("error").asText()).isEqualTo("AUTHENTICATION_REQUIRED");
+        assertThat(mapper.readTree(disputeTool.execute("", adminContext)).path("error").asText()).isEqualTo("INVALID_ARGUMENTS");
+        assertThat(mapper.readTree(disputeTool.execute("{", adminContext)).path("error").asText()).isEqualTo("TOOL_EXECUTION_FAILED");
+
+        var diagnostics = new AdminFeatureTool("admin_vendor_diagnostics", adminAiData, disputeSummaryUseCase, mapper);
+        String arguments = mapper.writeValueAsString(Map.of("from", "2026-11-01", "to", "2026-11-09", "vendorId", vendorId));
+        assertThat(mapper.readTree(diagnostics.execute(arguments, adminContext)).isArray()).isTrue();
+        verify(adminAiData).getVendorDiagnostics(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 9), vendorId);
+
+        var slotTool = new VendorFeatureTool("vendor_slot_advisor", vendorAiData, reviewCoachingUseCase,
+                slotAdvisorUseCase, listingOptimizerUseCase, mapper);
+        assertThat(slotTool.getName()).isEqualTo("vendor_slot_advisor");
+        assertThat(mapper.readTree(slotTool.execute(null)).path("error").asText()).isEqualTo("AUTHENTICATION_REQUIRED");
+        var vendorContext = new ToolExecutionContext(null, UUID.randomUUID(), vendorUserId);
+        assertThat(mapper.readTree(slotTool.execute("{}", vendorContext)).path("error").asText()).isEqualTo("VENDOR_PROFILE_NOT_FOUND");
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Vendor", BigDecimal.ZERO, 0, "NONE")));
+        when(vendorAiData.listUpcomingSlots(eq(vendorId), isNull(), anyInt())).thenReturn(List.of());
+        assertThat(mapper.readTree(slotTool.execute("{\"serviceId\":\"invalid\"}", vendorContext))
+                .path("error").asText()).isEqualTo("INVALID_ARGUMENTS");
+        assertThat(mapper.readTree(slotTool.execute(null, vendorContext)).path("totalSlotsEvaluated").asInt()).isZero();
+    }
+
+    @Test
+    void privateMarineBriefingToolReturnsStructuredErrors() throws Exception {
+        var feature = new CustomerFeatureTool("ai_marine_briefing", null, null, null, null, null, null, marineBriefingUseCase, mapper);
+        assertThat(mapper.readTree(feature.execute("{}")).path("error").asText()).isEqualTo("AUTHENTICATION_REQUIRED");
+        var context = new ToolExecutionContext(null, UUID.randomUUID(), customerUserId);
+        assertThat(mapper.readTree(feature.execute("{}", context)).path("error").asText()).isEqualTo("ORDER_ID_REQUIRED");
+        assertThat(mapper.readTree(feature.execute("{\"orderId\":123}", context)).path("error").asText()).isEqualTo("INVALID_ARGUMENTS");
+        var unavailable = new CustomerFeatureTool("ai_marine_briefing", null, null, null, null, null, null, mapper);
+        assertThat(mapper.readTree(unavailable.execute("{}", context)).path("error").asText()).isEqualTo("FEATURE_UNAVAILABLE");
     }
 
     // ==================== 6. CUSTOMER MARINE BRIEFING & IDOR GUARD TESTS ====================

@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.danasea.backend.modules.ai.application.ports.*;
 import com.danasea.backend.modules.ai.domain.models.DecisionResult;
+import com.danasea.backend.modules.ai.domain.services.ChatHistoryService;
 import com.danasea.backend.modules.ai.domain.models.TravelContext;
 import com.danasea.backend.security.authorization.BaseSecurityIntegrationTest;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,6 +36,7 @@ class CustomerAiHttpIntegrationTest extends BaseSecurityIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper mapper;
     @Autowired AiExtendedInsightStorePort insights;
+    @Autowired ChatHistoryService chatHistory;
     @MockitoBean DecisionModelPort decisions;
     @MockitoBean TravelWeatherPort weather;
     @MockitoBean ReviewHighlightPort highlights;
@@ -79,6 +81,44 @@ class CustomerAiHttpIntegrationTest extends BaseSecurityIntegrationTest {
         mvc.perform(get("/api/admin/ai/copilot/conversations/" + own.id() + "/history")
                 .with(user(otherAdmin.toString()).roles("ADMIN")))
                 .andExpect(status().isForbidden());
+        mvc.perform(patch("/api/admin/ai/copilot/conversations/" + own.id()).with(user(admin.toString()).roles("ADMIN"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"  Weekly  \",\"pinned\":true,\"archived\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Weekly"));
+        mvc.perform(get("/api/admin/ai/copilot/conversations").param("archived", "false")
+                .with(user(admin.toString()).roles("ADMIN")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/api/admin/ai/copilot/conversations/" + own.id() + "/history")
+                .with(user(admin.toString()).roles("ADMIN")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(delete("/api/admin/ai/copilot/conversations/" + own.id())
+                .with(user(admin.toString()).roles("ADMIN")))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/admin/ai/copilot/conversations").with(user(admin.toString()).roles("ADMIN")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test void customerConversationsCanBeRenamedArchivedAndDeletedByTheirOwner() throws Exception {
+        UUID own = chatHistory.getOrCreateConversation(null, owner).getId();
+        UUID foreign = chatHistory.getOrCreateConversation(null, other).getId();
+        String base = "/api/assistant/conversations";
+        mvc.perform(get(base).with(user(owner.toString()).roles("CUSTOMER")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(own.toString()));
+        mvc.perform(patch(base + "/" + foreign).with(user(owner.toString()).roles("CUSTOMER"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"forbidden\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(patch(base + "/" + own).with(user(owner.toString()).roles("CUSTOMER"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"  Weekend  \",\"pinned\":true,\"archived\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Weekend"))
+                .andExpect(jsonPath("$.pinned").value(true));
+        mvc.perform(get(base).param("archived", "false").with(user(owner.toString()).roles("CUSTOMER")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get(base).param("archived", "true").with(user(owner.toString()).roles("CUSTOMER")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+        mvc.perform(delete(base + "/" + own).with(user(owner.toString()).roles("CUSTOMER")))
+                .andExpect(status().isNoContent());
+        mvc.perform(get(base + "/" + own).with(user(owner.toString()).roles("CUSTOMER")))
+                .andExpect(status().isNotFound());
     }
 
     @Test void marineBriefingUpdatesTheSamePersistentRecord() {

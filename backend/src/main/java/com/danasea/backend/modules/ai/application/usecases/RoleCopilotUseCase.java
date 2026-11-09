@@ -248,7 +248,11 @@ public class RoleCopilotUseCase {
         }
 
         if (assistantResponse.isBlank()) {
-            if ("ADMIN".equalsIgnoreCase(actorRole)) {
+            if (artifacts.isEmpty()) {
+                assistantResponse = isEn
+                        ? "No operational data is available for this request."
+                        : "Chưa có dữ liệu vận hành cho yêu cầu này.";
+            } else if ("ADMIN".equalsIgnoreCase(actorRole)) {
                 assistantResponse = isEn
                         ? "I have aggregated and extracted the operational data from the platform. You can inspect the metrics and analytical charts below."
                         : "Tôi đã tổng hợp và trích xuất dữ liệu vận hành từ hệ thống. Bạn có thể xem chi tiết qua các thẻ số liệu và biểu đồ phân tích bên dưới.";
@@ -287,15 +291,15 @@ public class RoleCopilotUseCase {
         if (tool == null) return;
         try {
             String rawJson = tool.execute(args, context);
-            if (rawJson != null && !rawJson.contains("\"error\"")) {
-                toolsUsed.add(toolName);
-                JsonNode tree = mapper.readTree(rawJson);
-                Map<String, Object> map = new LinkedHashMap<>();
-                map.put("tool", toolName);
-                map.put("type", deriveArtifactType(toolName));
-                map.put("data", mapper.convertValue(tree, Map.class));
-                artifacts.add(map);
-            }
+            if (rawJson == null) return;
+            JsonNode result = mapper.readTree(rawJson);
+            if (result == null || result.isNull() || result.has("error")) return;
+            Map<String, Object> artifact = new LinkedHashMap<>();
+            artifact.put("tool", toolName);
+            artifact.put("type", deriveArtifactType(toolName));
+            artifact.put("data", mapper.convertValue(result, Object.class));
+            artifacts.add(artifact);
+            toolsUsed.add(toolName);
         } catch (Exception e) {
             log.warn("Copilot tool {} execution skipped: {}", toolName, e.getMessage());
         }

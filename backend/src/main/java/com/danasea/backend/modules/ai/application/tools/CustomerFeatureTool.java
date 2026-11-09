@@ -57,6 +57,10 @@ public class CustomerFeatureTool implements ToolExecutor {
             if (Set.of("ai_plan_itinerary", "ai_replan_itinerary", "ai_customer_support", "ai_marine_briefing").contains(name) && userId == null) {
                 return error("AUTHENTICATION_REQUIRED", "Authenticate before using private AI features");
             }
+            if ("ai_marine_briefing".equals(name)) {
+                if (marineBriefing == null) return error("FEATURE_UNAVAILABLE", "Marine briefing feature is not configured");
+                if (!args.hasNonNull("orderId")) return error("ORDER_ID_REQUIRED", "orderId is required");
+            }
             Object result = switch (name) {
                 case "ai_smart_search" -> discovery.execute(criteria(args), "SEARCH", language);
                 case "ai_recommend_services" -> discovery.execute(criteria(args), "RECOMMENDATION", language, userId);
@@ -71,11 +75,7 @@ public class CustomerFeatureTool implements ToolExecutor {
                 case "ai_weather_slot" -> weather.execute(id(args, "serviceId"), id(args, "optionId"), id(args, "slotId"), criteria(args), language);
                 case "ai_customer_support" -> support.execute(userId, args.hasNonNull("orderId") ? id(args, "orderId") : null,
                         args.path("message").asText(), args.path("includeCancellationPreview").asBoolean(false));
-                case "ai_marine_briefing" -> {
-                    if (marineBriefing == null) yield error("FEATURE_UNAVAILABLE", "Marine briefing feature is not configured");
-                    if (!args.hasNonNull("orderId")) yield error("ORDER_ID_REQUIRED", "orderId is required");
-                    yield marineBriefing.getMarineBriefing(userId, id(args, "orderId"), language);
-                }
+                case "ai_marine_briefing" -> marineBriefing.getMarineBriefing(userId, id(args, "orderId"), language);
                 default -> throw new IllegalArgumentException("Unknown customer feature tool");
             };
             return mapper.writeValueAsString(result);

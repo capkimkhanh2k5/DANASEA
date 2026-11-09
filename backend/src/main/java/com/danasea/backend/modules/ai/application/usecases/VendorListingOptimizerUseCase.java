@@ -12,13 +12,9 @@ import org.springframework.stereotype.Service;
 
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort;
 import com.danasea.backend.modules.ai.application.ports.DecisionModelPort;
-import com.danasea.backend.modules.ai.application.ports.LlmClientPort;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort;
-import com.danasea.backend.modules.ai.domain.models.AiMessage;
-import com.danasea.backend.modules.ai.domain.models.AiMessageRole;
 import com.danasea.backend.modules.ai.domain.models.DecisionResult;
 import com.danasea.backend.modules.ai.domain.models.DecisionTask;
-import com.danasea.backend.modules.ai.domain.models.LlmResponse;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -65,7 +61,6 @@ public class VendorListingOptimizerUseCase {
     private final VendorAiDataPort vendorAiData;
     private final AiExtendedInsightStorePort insightStore;
     private final DecisionModelPort decisions;
-    private final LlmClientPort llmClient;
     private final AssessTextUseCase textAssessment;
     private final ObjectMapper mapper;
 
@@ -124,8 +119,8 @@ public class VendorListingOptimizerUseCase {
         } else {
             missing.add(new MissingChecklistItem("MISSING_SAFETY_EQUIPMENT",
                     isEn ? "Missing safety equipment details" : "Chưa nêu rõ trang bị an toàn đi kèm",
-                    isEn ? "Explicitly state that standard life jackets and certified safety instructors are included."
-                         : "Khẳng định rõ dịch vụ đã bao gồm áo phao đạt chuẩn và hướng dẫn viên cứu hộ đi kèm.",
+                    isEn ? "List the safety equipment and staff support that are confirmed for this activity."
+                         : "Liệt kê thiết bị an toàn và nhân sự hỗ trợ đã được xác nhận cho hoạt động.",
                     true));
         }
 
@@ -159,51 +154,23 @@ public class VendorListingOptimizerUseCase {
         } else {
             missing.add(new MissingChecklistItem("CONTENT_TOO_SHORT",
                     isEn ? "Title or description is too brief" : "Tiêu đề hoặc mô tả còn quá ngắn",
-                    isEn ? "Expand the title with key selling points (e.g., 'Sunrise SUP Tour at Man Thai Beach with Free Drone Photos') to boost click-through rate."
-                         : "Mở rộng tiêu đề mô tả rõ điểm nhấn (ví dụ: 'Tour Chèo SUP Ngắm Bình Minh Biển Mân Thái - Có Ảnh Chụp') để tăng tỷ lệ click.",
+                    isEn ? "Expand the title with key selling points (e.g., 'Guided Sunrise SUP at Man Thai Beach') to boost click-through rate."
+                         : "Mở rộng tiêu đề mô tả rõ điểm nhấn (ví dụ: 'Tour Chèo SUP Ngắm Bình Minh Biển Mân Thái') để tăng tỷ lệ click.",
                     false));
         }
 
         // 3. Draft Generation (VI & EN)
         String titleVi = rawTitle.isEmpty() ? "Trải Nghiệm Thể Thao Biển Đà Nẵng" : rawTitle;
-        String descVi = rawDesc.isEmpty()
-                ? "Hành trình khám phá vẻ đẹp biển Đà Nẵng cùng đội ngũ huấn luyện viên giàu kinh nghiệm. Dịch vụ được trang bị đầy đủ áo phao, thiết bị an toàn và hỗ trợ chụp ảnh lưu niệm miễn phí."
-                : rawDesc;
-
+        String descVi = rawDesc;
         String titleEn = "Da Nang Marine Adventure Experience";
-        String descEn = "Explore the pristine waters of Da Nang with certified instructors. Fully equipped with professional life vests, safety gears, and complimentary photography.";
-
-        List<String> pointsVi = List.of(
-                "Được trang bị áo phao chuẩn an toàn hàng hải và thiết bị cứu hộ",
-                "Hướng dẫn viên chuyên nghiệp đồng hành và hỗ trợ người mới bắt đầu",
-                "Chụp ảnh check-in và lưu giữ khoảnh khắc bình minh/hoàng hôn tuyệt đẹp"
-        );
+        String descEn = "";
+        List<String> pointsVi = List.copyOf(highlights);
         List<String> packingVi = List.of("Đồ bơi thoải mái", "Kem chống nắng thân thiện rạn san hô", "Kính râm có dây đeo", "Túi chống nước điện thoại");
         String safetyVi = "Khách hàng vui lòng mặc áo phao trong suốt thời gian hoạt động và tuân thủ tuyệt đối chỉ dẫn của huấn luyện viên an toàn.";
 
-        List<String> pointsEn = List.of(
-                "Standard maritime life jackets and emergency rescue gears provided",
-                "Friendly certified local instructors with complete beginner orientation",
-                "Complimentary photo shooting capturing scenic coastal sunrise/sunset"
-        );
+        List<String> pointsEn = List.of();
         List<String> packingEn = List.of("Comfortable swimwear", "Reef-safe sunscreen", "Sunglasses with strap", "Waterproof phone pouch");
         String safetyEn = "Please wear life jackets at all times on the water and strictly adhere to safety briefing guidelines.";
-
-        // Try enhancing via LLM if available
-        try {
-            String prompt = String.format("Bạn là chuyên gia tối ưu bài đăng du lịch trải nghiệm biển Đà Nẵng. Viết lại tiêu đề hấp dẫn chuẩn SEO (VI + EN) và tóm tắt mô tả bán hàng cho tour '%s' (Mô tả gốc: %s).",
-                    titleVi, descVi);
-            AiMessage msg = new AiMessage();
-            msg.setRole(AiMessageRole.USER);
-            msg.setContent(prompt);
-            LlmResponse resp = llmClient.generateResponse(List.of(msg), SupportedLanguage.VI);
-            if (resp != null && resp.getContent() != null && !resp.getContent().contains("error")) {
-                // If response succeeds, keep enhanced copy
-                log.info("Listing optimizer copy generated via LLM");
-            }
-        } catch (Exception e) {
-            log.info("LLM listing optimizer fallback to deterministic template: {}", e.getMessage());
-        }
 
         Map<String, LocalizedListingDraft> drafts = Map.of(
                 "VI", new LocalizedListingDraft("VI", titleVi, descVi, pointsVi, packingVi, safetyVi),

@@ -29,7 +29,7 @@ DANASEA là sàn thương mại điện tử đa nhà cung cấp chuyên về tr
 | --- | --- |
 | 13. AI Review Coaching | Phân tích đánh giá theo 4 trụ cột (`GUIDE`, `SAFETY`, `PUNCTUALITY`, `VALUE`), trích xuất dẫn chứng và tư vấn lộ trình thăng hạng huy hiệu `BadgeTier`. |
 | 14. AI Smart Review Reply | Soạn nháp câu trả lời phản hồi khách hàng theo 3 tông giọng (`PROFESSIONAL`, `FRIENDLY`, `EMPATHETIC`) kèm ưu đãi voucher giữ chân khách. |
-| 15. AI Listing Optimizer | Chấm điểm bài đăng tour (0-100), phát hiện thiếu sót quy định an toàn/đồ bảo hộ và sinh bản dịch chuẩn SEO song ngữ. |
+| 15. AI Listing Optimizer | Chấm điểm bài đăng tour (0-100) và chỉ ra các thông tin an toàn còn thiếu. Bản nháp sử dụng các chi tiết đối tác đã cung cấp. |
 | 16. AI Slot Demand Advisor | Phân tích công suất lấp đầy slot và đối chiếu dự báo thời tiết 7-14 ngày để tư vấn tăng/giảm ca hoặc mở ca đón bình minh/hoàng hôn. |
 | 17. Vendor Copilot | Trợ lý kinh doanh hội thoại đa phiên, tự động kích hoạt 5 công cụ dữ liệu (doanh thu, đặt chỗ, đánh giá, slot, listing). |
 
@@ -121,7 +121,7 @@ Hiện có **63 API** trong module AI, đối chiếu đồng nhất 100% với 
 | `POST /api/vendor/ai/review-coaching` | Phân tích 4 trụ cột nghiệp vụ (`GUIDE`, `SAFETY`, `PUNCTUALITY`, `VALUE`), trích xuất dẫn chứng bằng chứng và tư vấn lộ trình BadgeTier. |
 | `GET /api/vendor/ai/review-coaching/history` | Xem lịch sử các đợt phân tích Review Coaching đã lưu trong hệ thống. |
 | `POST /api/vendor/ai/reviews/{reviewId}/reply-draft` | Soạn nháp câu trả lời phản hồi khách hàng thông minh theo 3 tông giọng (`PROFESSIONAL`, `FRIENDLY`, `EMPATHETIC`), có tích hợp voucher. |
-| `POST /api/vendor/ai/listings/optimize` | Chấm điểm chất lượng bài đăng tour (0-100), phát hiện thiếu sót quy định an toàn biển và sinh bản dịch chuẩn SEO song ngữ. |
+| `POST /api/vendor/ai/listings/optimize` | Chấm điểm bài đăng và trả về checklist an toàn. Các chi tiết tiếng Anh cần đối tác bổ sung khi nguồn chưa có. |
 | `POST /api/vendor/ai/slots/advisor` | Cố vấn công suất, tỷ lệ lấp đầy và đối chiếu dự báo thời tiết 7-14 ngày để tư vấn tăng/giảm ca hoặc mở ca vàng. |
 | `POST /api/vendor/ai/copilot/chat` | Trò chuyện với trợ lý đối tác Vendor Copilot, tự động gọi 5 công cụ dữ liệu nội bộ. |
 | `GET /api/vendor/ai/copilot/conversations` | Danh sách các phiên hội thoại của vendor, hỗ trợ lọc `archived`. |

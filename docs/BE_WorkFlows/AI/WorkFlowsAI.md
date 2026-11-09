@@ -209,11 +209,11 @@ Backend tính toán các chỉ số hành vi thực tế trong CSDL:
 ### Kịch bản 3: Đối Tác Huấn Luyện Đánh Giá 4 Trụ Cột ➔ Tối Ưu Lịch & Bài Đăng
 1. **Huấn luyện chất lượng:** Đối tác gọi `POST /api/vendor/ai/review-coaching`.
    - Backend quét các bình luận thực tế, trích xuất điểm mạnh/yếu theo 4 trụ cột (`GUIDE`, `SAFETY`, `PUNCTUALITY`, `VALUE`) kèm dẫn chứng bằng lời của khách.
-   - Đề xuất lộ trình thăng hạng từ `SILVER` lên `GOLD` và lưu trữ phân tích vào `ai_vendor_insights` (V55).
+   - Đề xuất lộ trình từ `VERIFIED` lên `TOP_RATED` và lưu trữ phân tích vào `ai_vendor_insights` (V55).
 2. **Soạn câu trả lời thông minh:** Khi nhận một đánh giá 3 sao phản ánh việc chờ cano lâu, đối tác bấm `POST /api/vendor/ai/reviews/{id}/reply-draft` (tone: `EMPATHETIC`, customPoints: `"thời gian chờ cano"`).
    - AI sinh câu trả lời thấu cảm, cam kết nâng cấp quy trình và đính kèm lời xin lỗi chân thành giữ chân khách hàng.
 3. **Tối ưu hóa bài đăng & Cố vấn slot:**
-   - Đối tác khởi tạo bài đăng mới qua `/api/vendor/ai/listings/optimize` $\rightarrow$ AI chấm điểm 45/100, chỉ ra thiếu quy định mặc áo phao và sinh bài viết chuẩn SEO.
+   - Đối tác khởi tạo bài đăng mới qua `/api/vendor/ai/listings/optimize` $\rightarrow$ AI chấm điểm 45/100, chỉ ra thiếu thông tin áo phao và tạo bản nháp từ dữ liệu đối tác đã cung cấp.
    - Đối tác kiểm tra lịch slot qua `/api/vendor/ai/slots/advisor` $\rightarrow$ AI cảnh báo ca sáng thứ Bảy đã kín 95%, đề xuất mở thêm ca 05:30 đón bình minh.
 
 ### Kịch bản 4: Tóm Tắt Tranh Chấp & Cẩm Nang Biển 24 Giờ
