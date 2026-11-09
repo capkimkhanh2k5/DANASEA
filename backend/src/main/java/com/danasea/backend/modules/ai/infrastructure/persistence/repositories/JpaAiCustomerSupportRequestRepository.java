@@ -14,4 +14,5 @@ public interface JpaAiCustomerSupportRequestRepository extends JpaRepository<AiC
     Optional<AiCustomerSupportRequestJpaEntity> findByOwnerIdAndIdempotencyKey(UUID ownerId, String key);
     List<AiCustomerSupportRequestJpaEntity> findByOwnerIdOrderByCreatedAtDesc(UUID ownerId, Pageable pageable);
     List<AiCustomerSupportRequestJpaEntity> findByStatusOrderByCreatedAtAsc(String status, Pageable pageable);
+    long countByStatus(String status);
 }

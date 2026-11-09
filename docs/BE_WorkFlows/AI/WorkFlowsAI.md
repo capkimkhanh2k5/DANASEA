@@ -56,8 +56,24 @@ Trợ lý ảo (`POST /api/assistant/chat`) được trang bị **15 công cụ 
 13. **`ai_review_summary`** *(READ)*: Đọc tóm tắt đánh giá trích xuất từ tối đa 50 bình luận thực tế; Quyet phân tích khía cạnh và CLI Proxy trích dẫn câu có ID nguồn kiểm chứng.
 14. **`ai_weather_slot`** *(READ)*: Kiểm tra an toàn thời tiết cho một ca dịch vụ cụ thể; nếu thiếu dữ liệu sẽ trả về `UNKNOWN` chứ không tự ý cho phép đặt chỗ.
 15. **`ai_customer_support`** *(READ)*: Tra cứu trạng thái đơn hàng của chính khách hàng đăng nhập và xem trước chính sách hủy (`CancellationPreviewResult`).
+16. **`ai_marine_briefing`** *(READ - PostgreSQL/Weather)*: Cẩm nang an toàn biển và checklist đồ cần mang cá nhân hóa theo từng hoạt động đặt chỗ của khách.
 
-### C. Ánh xạ Thẻ Giao Diện Cấu Trúc (AssistantArtifactMapper)
+### C. Bộ công cụ dành cho Đối tác (VendorFeatureTool — 5 Tools)
+17. **`vendor_dashboard_summary`**: Báo cáo tổng hợp số liệu kinh doanh, tỷ lệ lấp đầy slot và đánh giá chất lượng.
+18. **`vendor_revenue_and_bookings`**: Thống kê doanh thu thực tế, tiền quyết toán và lịch đặt tour theo chuỗi thời gian.
+19. **`vendor_review_coaching`**: Phân tích đánh giá theo 4 trụ cột (`GUIDE`, `SAFETY`, `PUNCTUALITY`, `VALUE`), trích dẫn dẫn chứng và tư vấn nâng hạng huy hiệu.
+20. **`vendor_slot_advisor`**: Dự báo công suất lấp đầy slot và cảnh báo thời tiết biển 7-14 ngày để tư vấn mở thêm/giảm ca.
+21. **`vendor_optimize_listing`**: Chấm điểm chất lượng bài đăng tour (0-100), phát hiện thiếu sót an toàn và tối ưu nội dung chuẩn SEO.
+
+### D. Bộ công cụ dành cho Quản trị viên (AdminFeatureTool — 6 Tools)
+22. **`admin_platform_dashboard`**: Bức tranh kinh doanh toàn sàn 1 chạm (GMV, Payout, Commission, số lượng booking và cảnh báo rủi ro).
+23. **`admin_revenue_timeseries`**: Biểu đồ chuỗi thời gian GMV, tiền thu, tiền hoàn và hoa hồng theo ngày/tuần/tháng.
+24. **`admin_booking_cancellation_breakdown`**: Phân loại lý do hủy tour toàn sàn (thời tiết biển, lỗi đối tác, khách hủy, can thiệp admin).
+25. **`admin_vendor_diagnostics`**: Chẩn đoán sức khỏe vận hành đối tác (tỷ lệ hủy, tỷ lệ lấp đầy, điểm số và vi phạm).
+26. **`admin_dispute_summarize`**: Hòa giải tranh chấp thông minh đối chiếu 3 sự thật hệ thống (quét QR, thời tiết, SLA hoàn hủy).
+27. **`admin_risk_and_support_queue_overview`**: Giám sát hàng đợi rủi ro thanh toán và ticket hỗ trợ khách hàng.
+
+### E. Ánh xạ Thẻ Giao Diện Cấu Trúc (AssistantArtifactMapper)
 Các kết quả gọi tool được chuyển hóa thành các thẻ tương tác (`AssistantArtifact`) đồng nhất:
 - `BOOKING_CONFIRMATION_CARD`: Thẻ xác nhận đặt vé nháp.
 - `ITINERARY_PREVIEW`: Thẻ phương án lịch trình kèm thông tin di chuyển.
@@ -188,3 +204,23 @@ Backend tính toán các chỉ số hành vi thực tế trong CSDL:
    - Đối chiếu lại giá và chỗ trống thực tế trong PostgreSQL.
    - Kích hoạt `CreateBookingHoldUseCase`, chạy script Redis Lua khóa nguyên tử và tạo bản ghi Booking trạng thái `HOLD` (15 phút) trong CSDL.
    - Lưu outcome vào `ai_confirmation_outcomes` (V25), giải phóng lock và chuyển khách hàng sang màn hình thanh toán đơn hàng an toàn.
+
+
+### Kịch bản 3: Đối Tác Huấn Luyện Đánh Giá 4 Trụ Cột ➔ Tối Ưu Lịch & Bài Đăng
+1. **Huấn luyện chất lượng:** Đối tác gọi `POST /api/vendor/ai/review-coaching`.
+   - Backend quét các bình luận thực tế, trích xuất điểm mạnh/yếu theo 4 trụ cột (`GUIDE`, `SAFETY`, `PUNCTUALITY`, `VALUE`) kèm dẫn chứng bằng lời của khách.
+   - Đề xuất lộ trình thăng hạng từ `SILVER` lên `GOLD` và lưu trữ phân tích vào `ai_vendor_insights` (V55).
+2. **Soạn câu trả lời thông minh:** Khi nhận một đánh giá 3 sao phản ánh việc chờ cano lâu, đối tác bấm `POST /api/vendor/ai/reviews/{id}/reply-draft` (tone: `EMPATHETIC`, customPoints: `"thời gian chờ cano"`).
+   - AI sinh câu trả lời thấu cảm, cam kết nâng cấp quy trình và đính kèm lời xin lỗi chân thành giữ chân khách hàng.
+3. **Tối ưu hóa bài đăng & Cố vấn slot:**
+   - Đối tác khởi tạo bài đăng mới qua `/api/vendor/ai/listings/optimize` $\rightarrow$ AI chấm điểm 45/100, chỉ ra thiếu quy định mặc áo phao và sinh bài viết chuẩn SEO.
+   - Đối tác kiểm tra lịch slot qua `/api/vendor/ai/slots/advisor` $\rightarrow$ AI cảnh báo ca sáng thứ Bảy đã kín 95%, đề xuất mở thêm ca 05:30 đón bình minh.
+
+### Kịch bản 4: Hòa Giải Tranh Chấp 3 Sự Thật Khách Quan & Cẩm Nang Biển 24 Giờ
+1. **Khách hàng khiếu nại không có cano đón:** Khách yêu cầu hoàn tiền 100% qua đơn tranh chấp `DISPUTE-101`.
+2. **Admin hòa giải bằng AI:** Quản trị viên bấm `POST /api/admin/ai/disputes/{id}/summarize`.
+   - AI đối chiếu 3 sự thật khách quan: (1) Mã QR vé chưa từng được quét tại bến (`usedAt == null`); (2) Trạm khí tượng xác nhận thời tiết biển êm ả, sóng 0.4m; (3) Chính sách hủy quy định vắng mặt phạt 100%.
+   - Tuy nhiên đối tác chưa chứng minh được có mặt tại điểm đón đúng giờ hẹn $\rightarrow$ AI đề xuất phương án công tâm: Hoàn tiền 50% (`RESOLVED_PARTIAL`) và tạo sẵn công văn giải trình cho Admin.
+3. **Tự động kích hoạt Cẩm nang biển trước 24 giờ:**
+   - `TripReminderJob` quét các chuyến đi khởi hành trong ngày mai.
+   - Tự động gọi `CustomerMarineBriefingUseCase.preGenerateForTripReminder` và gửi thông báo `MARINE_BRIEFING_READY` đến điện thoại khách hàng kèm checklist đồ cần mang và hướng dẫn an toàn biển.

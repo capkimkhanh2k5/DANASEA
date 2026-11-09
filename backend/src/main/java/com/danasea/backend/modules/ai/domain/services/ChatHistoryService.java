@@ -36,6 +36,7 @@ public class ChatHistoryService {
             UUID conversationId, UUID userId, SupportedLanguage language) {
         if (conversationId != null) {
             return conversationRepository.findById(conversationId)
+                    .filter(conversation -> !conversation.isDeleted())
                     .map(conversation -> requireOwnership(conversation, userId))
                     .orElseGet(() -> createNewConversation(userId, language));
         }
@@ -45,6 +46,7 @@ public class ChatHistoryService {
     @Transactional(readOnly = true)
     public Optional<AiConversationJpaEntity> getConversationForUser(UUID conversationId, UUID userId) {
         return conversationRepository.findById(conversationId)
+                .filter(conversation -> !conversation.isDeleted())
                 .map(conversation -> requireOwnership(conversation, userId));
     }
 
@@ -127,6 +129,58 @@ public class ChatHistoryService {
         int boundedLimit = Math.max(1, Math.min(limit, 100));
         return getConversationForUser(conversationId, userId)
                 .map(conversation -> getRecentMessages(conversation.getId(), boundedLimit));
+    }
+
+    @Transactional(readOnly = true)
+    public List<AiConversationJpaEntity> listConversationsForUser(UUID userId, Boolean archived, int limit) {
+        if (userId == null) return List.of();
+        int boundedLimit = Math.max(1, Math.min(limit, 100));
+        var pageable = PageRequest.of(0, boundedLimit);
+        if (archived != null) {
+            return conversationRepository.findByUserIdAndArchived(userId, archived, pageable);
+        }
+        return conversationRepository.findByUserId(userId, pageable);
+    }
+
+    @Transactional
+    public AiConversationJpaEntity updateConversationMeta(UUID conversationId, UUID userId, String title, Boolean pinned, Boolean archived) {
+        AiConversationJpaEntity conv = conversationRepository.findById(conversationId)
+                .filter(c -> !c.isDeleted())
+                .map(c -> requireOwnership(c, userId))
+                .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+        if (title != null && !title.isBlank()) {
+            conv.setTitle(title.trim().length() > 200 ? title.trim().substring(0, 200) : title.trim());
+        }
+        if (pinned != null) {
+            conv.setPinned(pinned);
+        }
+        if (archived != null) {
+            conv.setArchived(archived);
+        }
+        return conversationRepository.save(conv);
+    }
+
+    @Transactional
+    public void softDeleteConversation(UUID conversationId, UUID userId) {
+        conversationRepository.findById(conversationId).ifPresent(c -> {
+            requireOwnership(c, userId);
+            c.setDeleted(true);
+            c.setDeletedAt(OffsetDateTime.now());
+            conversationRepository.save(c);
+        });
+    }
+
+    @Transactional
+    public void autoGenerateTitleIfEmpty(UUID conversationId, String firstMessage) {
+        if (conversationId == null || firstMessage == null || firstMessage.isBlank()) return;
+        conversationRepository.findById(conversationId).ifPresent(conv -> {
+            if (conv.getTitle() == null || conv.getTitle().isBlank()) {
+                String clean = firstMessage.replaceAll("[\\r\\n]+", " ").trim();
+                String title = clean.length() > 60 ? clean.substring(0, 57) + "..." : clean;
+                conv.setTitle(title);
+                conversationRepository.save(conv);
+            }
+        });
     }
 
     private AiConversationJpaEntity requireOwnership(AiConversationJpaEntity conversation, UUID userId) {

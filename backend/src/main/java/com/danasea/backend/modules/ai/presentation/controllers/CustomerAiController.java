@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.danasea.backend.modules.ai.application.dtos.TravelRequest;
 import com.danasea.backend.modules.ai.application.usecases.CompareServicesUseCase;
+import com.danasea.backend.modules.ai.application.usecases.CustomerMarineBriefingUseCase;
 import com.danasea.backend.modules.ai.application.usecases.CustomerSupportUseCase;
 import com.danasea.backend.modules.ai.application.usecases.DiscoverServicesUseCase;
 import com.danasea.backend.modules.ai.application.usecases.PlanItineraryUseCase;
@@ -45,6 +46,7 @@ public class CustomerAiController {
     private final ReviewSummaryUseCase reviews;
     private final CustomerSupportUseCase support;
     private final WeatherAwareUseCase weather;
+    private final CustomerMarineBriefingUseCase marineBriefingUseCase;
 
     @PostMapping("/search")
     public DiscoverServicesUseCase.Result search(@RequestBody TravelRequest request) { return discovery.execute(request.context(), "SEARCH", language()); }
@@ -67,6 +69,11 @@ public class CustomerAiController {
 
     @GetMapping("/review-summaries/{serviceId}")
     public ReviewSummaryUseCase.Result reviews(@PathVariable UUID serviceId) { return reviews.execute(serviceId, language()); }
+
+    @GetMapping("/orders/{orderId}/marine-briefing")
+    public CustomerMarineBriefingUseCase.MarineBriefingOverview marineBriefing(@PathVariable UUID orderId) {
+        return marineBriefingUseCase.getMarineBriefing(userId(), orderId, language());
+    }
 
     @PostMapping("/support")
     public CustomerSupportUseCase.Result support(@RequestBody SupportRequest request) {

@@ -29,7 +29,7 @@ public class AiFeatureWebConfiguration implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new HandlerInterceptor() {
             @Override public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-                if ("GET".equals(request.getMethod()) && !request.getRequestURI().contains("review-summaries")) return true;
+                if ("GET".equals(request.getMethod()) && !request.getRequestURI().contains("review-summaries") && !request.getRequestURI().contains("marine-briefing")) return true;
                 var userId = SecurityUtils.getCurrentUserId();
                 if (userId.isEmpty()) return true;
                 if (limiter.getObject().isAllowed(userId.get().toString(), request.getRemoteAddr(), TrustTier.VERIFIED)) return true;
@@ -37,6 +37,6 @@ public class AiFeatureWebConfiguration implements WebMvcConfigurer {
                 mapper.getObject().writeValue(response.getWriter(), new ErrorResponse("AI_RATE_LIMIT_EXCEEDED", messages.getObject().get("error.ai_rate_limit_exceeded")));
                 return false;
             }
-        }).addPathPatterns("/api/ai/**", "/api/admin/ai/risk-cases");
+        }).addPathPatterns("/api/ai/**", "/api/vendor/ai/**", "/api/admin/ai/**");
     }
 }

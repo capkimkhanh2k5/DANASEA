@@ -23,6 +23,25 @@ public class AiConversationJpaEntity extends BaseJpaEntity {
     @Column(nullable = false, length = 2)
     private String locale = "vi";
 
+    @Column(length = 200)
+    private String title;
+
+    @Column(nullable = false)
+    private boolean pinned = false;
+
+    @Column(nullable = false)
+    private boolean archived = false;
+
+    @Column(length = 40)
+    private String contextType;
+
+    private UUID contextId;
+
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    private OffsetDateTime deletedAt;
+
     @Column(columnDefinition = "TEXT")
     private String structuredContext;
     private UUID processingToken;
