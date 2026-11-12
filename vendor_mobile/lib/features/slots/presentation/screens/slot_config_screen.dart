@@ -1,9 +1,9 @@
-import '../../../../core/data/vendor_mock_repositories.dart';
+import '../../../../core/data/vendor_repositories.dart';
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
-import '../../../../core/data/vendor_mock_database.dart';
+import '../../../../core/data/vendor_store.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/vendor_button.dart';
 import '../../../../core/widgets/toast_notification.dart';
@@ -26,7 +26,7 @@ class SlotConfigScreen extends StatefulWidget {
 }
 
 class _SlotConfigScreenState extends State<SlotConfigScreen> {
-  final _db = VendorMockDatabase.instance;
+  final _db = VendorStore.instance;
   final _slotRepo = VendorSlotRepository();
   bool _isSaving = false;
   String _inventoryType = 'PERSON_LIMIT';

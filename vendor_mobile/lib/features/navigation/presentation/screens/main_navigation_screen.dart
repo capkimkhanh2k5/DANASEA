@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/data/vendor_mock_database.dart';
+import '../../../../core/data/vendor_store.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
 import '../../../services/presentation/screens/service_list_screen.dart';
@@ -25,7 +25,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late int _currentIndex;
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
 
   List<Widget> _buildScreens() {
     return [

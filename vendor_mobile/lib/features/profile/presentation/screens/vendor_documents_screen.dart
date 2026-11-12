@@ -3,8 +3,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../core/widgets/toast_notification.dart';
 import '../../../../core/models/vendor_models.dart';
-import '../../../../core/data/vendor_mock_database.dart';
-import '../../../../core/data/vendor_mock_repositories.dart';
+import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
 
 class VendorDocumentsScreen extends StatefulWidget {
   const VendorDocumentsScreen({super.key});
@@ -15,7 +15,7 @@ class VendorDocumentsScreen extends StatefulWidget {
 
 class _VendorDocumentsScreenState extends State<VendorDocumentsScreen> {
   final VendorDocumentRepository _docRepo = VendorDocumentRepository();
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   @override
   void initState() {
     super.initState();

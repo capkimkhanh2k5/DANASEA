@@ -1,17 +1,16 @@
 // Repositories for DANASEA Vendor App
 // Connected directly to unified Spring Boot REST backend APIs (/api/vendor/...)
-// with seamless fallback to in-memory state for offline/demo reliability.
 
 import '../auth/auth_session.dart';
 import '../models/vendor_models.dart';
-import 'vendor_mock_database.dart';
+import 'vendor_store.dart';
 import 'vendor_repository_interfaces.dart';
 
 // =========================================================================
 // 1. AUTH REPOSITORY
 // =========================================================================
 class VendorAuthRepository implements IVendorAuthRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   @override
@@ -110,7 +109,7 @@ class VendorAuthRepository implements IVendorAuthRepository {
   }) async {
     try {
       await _session.request(
-        '/api/auth/change-password',
+        '/api/users/me/change-password',
         method: 'POST',
         data: {'currentPassword': currentPassword, 'newPassword': newPassword},
       );
@@ -133,7 +132,7 @@ class VendorAuthRepository implements IVendorAuthRepository {
 // 2. PROFILE REPOSITORY
 // =========================================================================
 class VendorProfileRepository implements IVendorProfileRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   @override
@@ -239,7 +238,7 @@ class VendorProfileRepository implements IVendorProfileRepository {
 // 3. DOCUMENT REPOSITORY
 // =========================================================================
 class VendorDocumentRepository implements IVendorDocumentRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   @override
@@ -325,7 +324,7 @@ class VendorDocumentRepository implements IVendorDocumentRepository {
 // 4. SERVICE REPOSITORY
 // =========================================================================
 class VendorServiceRepository implements IVendorServiceRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   static ServiceModel parseService(Map<String, dynamic> json) {
@@ -398,12 +397,10 @@ class VendorServiceRepository implements IVendorServiceRepository {
             .whereType<Map<String, dynamic>>()
             .map(parseService)
             .toList();
-        if (items.isNotEmpty) {
-          _db.services.clear();
-          _db.services.addAll(items);
-          _db.notifyStoreChanged();
-          return items;
-        }
+        _db.services.clear();
+        _db.services.addAll(items);
+        _db.notifyStoreChanged();
+        return items;
       }
     } catch (_) {}
     return List.unmodifiable(_db.services);
@@ -561,7 +558,7 @@ class VendorServiceRepository implements IVendorServiceRepository {
 // 5. SLOT REPOSITORY
 // =========================================================================
 class VendorSlotRepository implements IVendorSlotRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   static ServiceSlotModel parseSlot(Map<String, dynamic> json) {
@@ -606,12 +603,10 @@ class VendorSlotRepository implements IVendorSlotRepository {
             .whereType<Map<String, dynamic>>()
             .map(parseSlot)
             .toList();
-        if (parsed.isNotEmpty) {
-          _db.slots.removeWhere((s) => s.serviceId == serviceId);
-          _db.slots.addAll(parsed);
-          _db.notifyStoreChanged();
-          return parsed;
-        }
+        _db.slots.removeWhere((s) => s.serviceId == serviceId);
+        _db.slots.addAll(parsed);
+        _db.notifyStoreChanged();
+        return parsed;
       }
     } catch (_) {}
 
@@ -695,14 +690,26 @@ class VendorSlotRepository implements IVendorSlotRepository {
 
   @override
   Future<ServiceSlotModel> toggleBlockSlot(String slotId, bool blocked) async {
-    final index = _db.slots.indexWhere((s) => s.id == slotId);
+    final index = _db.slots.indexWhere((s) => s.id == slotId || s.slotId == slotId);
     if (index != -1) {
       final current = _db.slots[index];
-      final newStatus = blocked ? SlotStatus.blocked : SlotStatus.open;
-      final updated = current.copyWith(status: newStatus);
-      _db.slots[index] = updated;
-      _db.notifyStoreChanged();
-      return updated;
+      try {
+        final res = await _session.request(
+          '/api/vendor/services/${current.serviceId}/slots/$slotId',
+          method: 'PATCH',
+          data: {'status': blocked ? 'BLOCKED' : 'AVAILABLE'},
+        );
+        final updated = parseSlot(res);
+        _db.slots[index] = updated;
+        _db.notifyStoreChanged();
+        return updated;
+      } catch (e) {
+        final newStatus = blocked ? SlotStatus.blocked : SlotStatus.open;
+        final updated = current.copyWith(status: newStatus);
+        _db.slots[index] = updated;
+        _db.notifyStoreChanged();
+        return updated;
+      }
     }
     throw Exception('Khung giờ không tồn tại.');
   }
@@ -712,7 +719,7 @@ class VendorSlotRepository implements IVendorSlotRepository {
 // 6. ORDER REPOSITORY
 // =========================================================================
 class VendorOrderRepository implements IVendorOrderRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   static SubOrderModel parseSubOrder(Map<String, dynamic> json) {
@@ -788,15 +795,13 @@ class VendorOrderRepository implements IVendorOrderRepository {
         rawList = json;
       }
 
-      if (rawList.isNotEmpty) {
-        final parsed = rawList
-            .whereType<Map<String, dynamic>>()
-            .map(parseSubOrder)
-            .toList();
-        _db.subOrders.clear();
-        _db.subOrders.addAll(parsed);
-        _db.notifyStoreChanged();
-      }
+      final parsed = rawList
+          .whereType<Map<String, dynamic>>()
+          .map(parseSubOrder)
+          .toList();
+      _db.subOrders.clear();
+      _db.subOrders.addAll(parsed);
+      _db.notifyStoreChanged();
     } catch (_) {}
 
     if (filterStatus == null) {
@@ -986,7 +991,7 @@ class VendorOrderRepository implements IVendorOrderRepository {
 // 7. REVIEW REPOSITORY
 // =========================================================================
 class VendorReviewRepository implements IVendorReviewRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   static ReviewModel parseReview(Map<String, dynamic> json) {
@@ -1084,7 +1089,7 @@ class VendorReviewRepository implements IVendorReviewRepository {
 // 8. VOUCHER REPOSITORY
 // =========================================================================
 class VendorVoucherRepository implements IVendorVoucherRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   static DiscountCodeModel parseVoucher(Map<String, dynamic> json) {
@@ -1224,7 +1229,7 @@ class VendorVoucherRepository implements IVendorVoucherRepository {
 // 9. SETTLEMENT REPOSITORY
 // =========================================================================
 class VendorSettlementRepository implements IVendorSettlementRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   static SettlementModel parseSettlement(Map<String, dynamic> json) {
@@ -1282,15 +1287,13 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
         rawList = json;
       }
 
-      if (rawList.isNotEmpty) {
-        final parsed = rawList
-            .whereType<Map<String, dynamic>>()
-            .map(parseSettlement)
-            .toList();
-        _db.settlements.clear();
-        _db.settlements.addAll(parsed);
-        _db.notifyStoreChanged();
-      }
+      final parsed = rawList
+          .whereType<Map<String, dynamic>>()
+          .map(parseSettlement)
+          .toList();
+      _db.settlements.clear();
+      _db.settlements.addAll(parsed);
+      _db.notifyStoreChanged();
     } catch (_) {}
 
     if (status == null) {
@@ -1356,7 +1359,7 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
 // 10. DISPUTE REPOSITORY
 // =========================================================================
 class VendorDisputeRepository implements IVendorDisputeRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   static DisputeModel parseDispute(Map<String, dynamic> json) {
@@ -1469,7 +1472,7 @@ class VendorDisputeRepository implements IVendorDisputeRepository {
 // 11. REFUND REPOSITORY
 // =========================================================================
 class VendorRefundRepository implements IVendorRefundRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
 
   @override
   Future<List<RefundModel>> getRefunds() async {
@@ -1490,7 +1493,7 @@ class VendorRefundRepository implements IVendorRefundRepository {
 // 12. CHAT REPOSITORY
 // =========================================================================
 class VendorChatRepository implements IVendorChatRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   @override
@@ -1602,7 +1605,7 @@ class VendorChatRepository implements IVendorChatRepository {
 // 13. NOTIFICATION REPOSITORY
 // =========================================================================
 class VendorNotificationRepository implements IVendorNotificationRepository {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   final AuthSession _session = AuthSession.instance;
 
   @override
@@ -1640,5 +1643,27 @@ class VendorNotificationRepository implements IVendorNotificationRepository {
   @override
   Future<WeatherCacheModel> getWeatherInfo() async {
     return _db.weatherCache;
+  }
+}
+
+
+// =========================================================================
+// 14. DASHBOARD REPOSITORY
+// =========================================================================
+class VendorDashboardRepository implements IVendorDashboardRepository {
+  final AuthSession _session = AuthSession.instance;
+
+  @override
+  Future<VendorDashboardModel> getDashboardMetrics({DateTime? from, DateTime? to}) async {
+    try {
+      final params = <String>[];
+      if (from != null) params.add('from=${from.toIso8601String().split("T").first}');
+      if (to != null) params.add('to=${to.toIso8601String().split("T").first}');
+      final query = params.isNotEmpty ? '?${params.join("&")}' : '';
+      final json = await _session.request('/api/vendor/dashboard$query');
+      return VendorDashboardModel.fromJson(json);
+    } catch (_) {
+      return const VendorDashboardModel();
+    }
   }
 }

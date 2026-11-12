@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/data/vendor_mock_database.dart';
+import '../../../../core/data/vendor_store.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../auth/presentation/screens/login_register_screen.dart';
 import 'business_profile_screen.dart';
@@ -27,7 +27,7 @@ class PartnerAccountScreen extends StatefulWidget {
 }
 
 class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   String get _currentLocale => AppLanguage.instance.code;
 
   @override

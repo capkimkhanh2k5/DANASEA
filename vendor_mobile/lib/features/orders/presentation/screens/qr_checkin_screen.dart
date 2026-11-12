@@ -1,10 +1,11 @@
+import '../../../../core/data/vendor_repositories.dart';
 import '../../../../core/auth/auth_session.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/data/vendor_mock_database.dart';
+import '../../../../core/data/vendor_store.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/vendor_button.dart';
 import '../../../../core/widgets/toast_notification.dart';
@@ -21,7 +22,7 @@ class QrCheckinScreen extends StatefulWidget {
 
 class _QrCheckinScreenState extends State<QrCheckinScreen>
     with SingleTickerProviderStateMixin {
-  final _db = VendorMockDatabase.instance;
+  final _db = VendorStore.instance;
   late final MobileScannerController _scannerController;
   late final AnimationController _animController;
   late final Animation<double> _laserAnimation;
@@ -146,6 +147,7 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
         retry: false,
       );
       message = response['message']?.toString() ?? message;
+      await VendorOrderRepository().getSubOrders().catchError((_) => <SubOrderModel>[]);
     } on AuthFailure catch (e) {
       title = 'Không thể xác nhận check-in';
       message = e.message;
@@ -168,11 +170,62 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
     if (mounted) setState(() => _isProcessing = false);
   }
 
-  void _handleCode(String rawInput) {
+  void _handleCode(String rawInput) async {
     final token = rawInput.trim();
-    if (RegExp(r'^[0-9a-fA-F-]{36}:').hasMatch(token)) {
-      _verifySignedTicket(token);
+    if (RegExp(r'^[0-9a-fA-F-]{36}:').hasMatch(token) || token.contains('.')) {
+      await _verifySignedTicket(token);
       return;
+    }
+
+    try {
+      final response = await AuthSession.instance.request(
+        '/api/vendor/checkin/verify',
+        method: 'POST',
+        data: {'qrToken': token},
+        retry: false,
+      );
+      if (response['subOrderId'] != null) {
+        await VendorOrderRepository().getSubOrders().catchError((_) => <SubOrderModel>[]);
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Check-in thành công'),
+            content: Text(response['message']?.toString() ?? 'Vé đã được xác nhận thành công trên hệ thống.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) setState(() => _isProcessing = false);
+        return;
+      }
+    } on AuthFailure catch (e) {
+      if (e.message.contains('hết hạn') || e.message.contains('sử dụng') || e.message.contains('chữ ký') || e.message.contains('không hợp lệ')) {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Không thể xác nhận check-in'),
+            content: Text(e.message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) setState(() => _isProcessing = false);
+        return;
+      }
+    } catch (_) {}
+
+    if (_db.subOrders.isEmpty) {
+      await VendorOrderRepository().getSubOrders().catchError((_) => <SubOrderModel>[]);
     }
     final cleaned = _extractCode(rawInput).toLowerCase();
     final currentVendorId = _db.currentVendor.id.toLowerCase();
@@ -553,12 +606,24 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                       VendorButton(
                         text: 'Xác nhận Check-in (${selectedSubOrderIds.length} dịch vụ)',
                         icon: Icons.done_all_rounded,
-                        onPressed: () {
+                        onPressed: () async {
+                          try {
+                            for (final id in selectedSubOrderIds) {
+                              await AuthSession.instance.request(
+                                '/api/vendor/checkin/verify',
+                                method: 'POST',
+                                data: {'qrToken': id},
+                                retry: false,
+                              ).catchError((_) => <String, dynamic>{});
+                            }
+                          } catch (_) {}
                           _db.checkInBatchSubOrders(selectedSubOrderIds.toList());
+                          await VendorOrderRepository().getSubOrders().catchError((_) => <SubOrderModel>[]);
+                          if (!context.mounted) return;
                           Navigator.pop(bottomSheetContext);
                           ToastNotification.showSuccess(
                             context,
-                            'Check-in thành công ${selectedSubOrderIds.length} dịch vụ cho #${vendorOrders.first.masterOrderCode}!',
+                            'Check-in thành công ${selectedSubOrderIds.length} dịch vụ!',
                           );
                         },
                       ),

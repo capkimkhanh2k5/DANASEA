@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/data/vendor_mock_database.dart';
+import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../settlements/presentation/screens/settlement_revenue_screen.dart';
 import '../../../profile/presentation/screens/business_profile_screen.dart';
@@ -35,13 +36,54 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final _db = VendorMockDatabase.instance;
+  final _db = VendorStore.instance;
+  final _dashboardRepo = VendorDashboardRepository();
+  VendorDashboardModel _metrics = const VendorDashboardModel();
   bool _isBalanceVisible = true;
 
   @override
   void initState() {
     super.initState();
     _db.addListener(_onDbChanged);
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    try {
+      final metrics = await _dashboardRepo.getDashboardMetrics();
+      if (mounted) {
+        setState(() {
+          _metrics = metrics;
+          _isLoading = false;
+        });
+      }
+      await Future.wait([
+        VendorProfileRepository().getVendorProfile().catchError((_) => _db.currentVendor),
+        VendorOrderRepository().getSubOrders().catchError((_) => _db.subOrders),
+        VendorServiceRepository().getServices().catchError((_) => _db.services),
+        VendorSettlementRepository().getSettlements().catchError((_) => _db.settlements),
+      ]);
+      if (_db.services.isNotEmpty) {
+        await VendorSlotRepository().getSlotsForService(_db.services.first.serviceId, DateTime.now()).catchError((_) => <ServiceSlotModel>[]);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatVnd(double amount) {
+    final intVal = amount.toInt();
+    final str = intVal.toString();
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      buffer.write(str[i]);
+      count++;
+      if (count % 3 == 0 && i != 0) {
+        buffer.write('.');
+      }
+    }
+    return '${buffer.toString().split('').reversed.join()} đ';
   }
 
   @override
@@ -118,12 +160,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final confirmedCount = subOrders.where((o) => o.status == SubOrderStatus.confirmed).length;
     final pendingCount = subOrders.where((o) => o.status == SubOrderStatus.pending).length;
-    final cancelledCount = subOrders.where((o) => o.status == SubOrderStatus.cancelled).length;
-    final reviewCount = _db.reviews.isNotEmpty ? _db.reviews.length : 3;
+    final cancelledCount = subOrders.where((o) => o.status == SubOrderStatus.cancelled || o.status == SubOrderStatus.refunded).length;
+    final reviewCount = _db.reviews.length;
 
     // Next upcoming slot
     final nextSlot = slots.isNotEmpty ? slots.first : null;
-    final nextService = nextSlot != null
+    final nextService = nextSlot != null && _db.services.isNotEmpty
         ? _db.services.firstWhere((s) => s.serviceId == nextSlot.serviceId, orElse: () => _db.services.first)
         : null;
 
@@ -204,7 +246,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: () async {
-            await _db.syncWithApi();
+            await _loadDashboardData();
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -306,7 +348,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                       // Main Balance
                       Text(
-                        _isBalanceVisible ? '12.580.000 đ' : '••••••••',
+                        _isBalanceVisible ? _formatVnd(_metrics.totalRevenue) : '••••••••',
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -329,7 +371,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                _isBalanceVisible ? 'Đã quyết toán: 7.560.000 đ' : 'Đã quyết toán: ••••',
+                                _isBalanceVisible ? 'Đã quyết toán: ' + _formatVnd(_metrics.netPayout) : 'Đã quyết toán: ••••',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: Color(0xFFE2E8F0),
@@ -345,7 +387,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                _isBalanceVisible ? 'Chờ đối soát: 5.040.000 đ' : 'Chờ đối soát: ••••',
+                                _isBalanceVisible ? 'Chờ đối soát: ' + _formatVnd((_metrics.totalRevenue - _metrics.netPayout) > 0 ? (_metrics.totalRevenue - _metrics.netPayout) : 0.0) : 'Chờ đối soát: ••••',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: Color(0xFFFDE68A),
@@ -381,7 +423,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'Tài khoản nhận tiền: ${vendor.bankName ?? 'VPBank'} (••••${(vendor.bankAccountNumber ?? '6163').length > 4 ? (vendor.bankAccountNumber ?? '6163').substring((vendor.bankAccountNumber ?? '6163').length - 4) : vendor.bankAccountNumber ?? '6163'})',
+                                  'Tài khoản nhận tiền: ${vendor.bankName != null && vendor.bankName!.isNotEmpty ? vendor.bankName : 'Chưa liên kết'} (••••${(vendor.bankAccountNumber ?? '').length > 4 ? vendor.bankAccountNumber!.substring(vendor.bankAccountNumber!.length - 4) : (vendor.bankAccountNumber ?? 'Chưa có')})',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: Colors.white,
@@ -441,7 +483,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Container(width: 1, height: 26, color: const Color(0xFFE2E8F0)),
                           Expanded(
                             child: _buildToDoItem(
-                              count: '${pendingCount > 0 ? pendingCount : 1}',
+                              count: '${_metrics.newOrders > 0 ? _metrics.newOrders : pendingCount}',
                               label: 'Đơn mới',
                               countColor: const Color(0xFF0284C7),
                               onTap: _openOrders,
@@ -594,7 +636,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      '${nextSlot?.startTime.substring(0, 5) ?? '05:00'} - ${nextSlot?.endTime.substring(0, 5) ?? '07:00'}',
+                                      nextSlot != null ? '${nextSlot.startTime.length >= 5 ? nextSlot.startTime.substring(0, 5) : nextSlot.startTime} - ${nextSlot.endTime.length >= 5 ? nextSlot.endTime.substring(0, 5) : nextSlot.endTime}' : '--:--',
                                       style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
@@ -620,7 +662,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  nextService?.nameVi ?? 'Dù bay trên biển – Danabeach',
+                                  nextService?.nameVi ?? (nextSlot != null ? 'Ca chạy đã lên lịch' : 'Chưa có ca chạy hôm nay'),
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
@@ -643,7 +685,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                           ),
                           Text(
-                            '${nextSlot?.bookedCount ?? 8}/${nextSlot?.capacity ?? 10} khách',
+                            nextSlot != null ? '${nextSlot.bookedCount}/${nextSlot.capacity} khách' : '0/0 khách',
                             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.onSurface),
                           ),
                         ],
