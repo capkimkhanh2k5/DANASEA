@@ -193,6 +193,13 @@ export function Header() {
   const [selectedNotif, setSelectedNotif] = useState<NotificationResponse | null>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
+  // Sync real-time wishlist state when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      useWishlistStore.getState().fetchWishlistFromServer();
+    }
+  }, [isAuthenticated]);
+
   // Close account menu on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {

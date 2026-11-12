@@ -568,12 +568,14 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
   }
 
   const isSaved = isInWishlist(service.id);
+  const displayTitle = (language === 'en' && service.nameEn) ? service.nameEn : service.name;
+  const displayDesc = (language === 'en' && service.descriptionEn) ? service.descriptionEn : (service.description || '');
 
   return (
     <main className="w-full pt-20 bg-slate-50/60 flex-1">
       <SEOHead
-        title={service.name}
-        description={service.description ? service.description.slice(0, 160) : undefined}
+        title={displayTitle}
+        description={displayDesc ? displayDesc.slice(0, 160) : undefined}
         canonicalUrl={`/tour/${service.slug || service.id}`}
         ogImage={service.imageUrls?.[0]}
         ogType="product"
@@ -605,7 +607,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                   <span className="text-slate-300">/</span>
                 </>
               )}
-              <span className="text-slate-900 font-bold truncate max-w-[280px] sm:max-w-md">{service.name}</span>
+              <span className="text-slate-900 font-bold truncate max-w-[280px] sm:max-w-md">{displayTitle}</span>
             </nav>
           </div>
         </div>
@@ -616,7 +618,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
           <section className="animate-hero-2 flex flex-col lg:flex-row lg:items-end justify-between gap-4">
             <div className="flex flex-col gap-2 flex-1 min-w-0 pr-4">
               <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight leading-tight">
-                {service.name}
+                {displayTitle}
               </h1>
               <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-sm text-slate-700">
                 {service.reviewCount && service.reviewCount > 0 ? (
@@ -831,7 +833,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                 <div>
                   <h2 className="text-xl font-bold text-slate-900 mb-2">Mô tả trải nghiệm</h2>
                   <p className="text-slate-800 leading-relaxed text-base whitespace-pre-line max-w-[60ch]">
-                    {service.description}
+                    {displayDesc}
                   </p>
                 </div>
 
