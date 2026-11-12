@@ -16,6 +16,7 @@ import {
 import { useWishlistStore } from "../../../store/useWishlistStore";
 import { useCartStore } from "../../../store/useCartStore";
 import { useAuthStore } from "../../../store/useAuthStore";
+import { useLanguageStore } from "../../../store/useLanguageStore";
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import type { ServiceSummaryDto } from "../../../types/service";
 import { getTourUrl } from "../../../utils/seo";
@@ -24,6 +25,7 @@ interface WishlistItem {
   id: string;
   slug?: string;
   name: string;
+  nameEn?: string;
   categoryId?: string;
   category?: string;
   locationName: string;
@@ -74,6 +76,7 @@ function matchesCategory(itemCategory: string | undefined, categoryId: string): 
 
 export function Wishlist() {
   const navigate = useNavigate();
+  const { language } = useLanguageStore();
   const { wishlistIds, serverItems, removeFromWishlist, fetchWishlistFromServer } = useWishlistStore();
   const { addItem } = useCartStore();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -156,6 +159,7 @@ export function Wishlist() {
           id: s.id,
           slug: s.slug,
           name: s.name,
+          nameEn: s.nameEn,
           category: 'Thể thao biển Đà Nẵng',
           locationName: s.address || 'Đà Nẵng',
           price: p,
@@ -395,7 +399,7 @@ export function Wishlist() {
                         </div>
                         
                         <h3 className="text-base font-semibold text-slate-900 group-hover:text-slate-700 transition-colors line-clamp-2 leading-snug">
-                          {service.name}
+                          {(language === 'en' && service.nameEn) ? service.nameEn : service.name}
                         </h3>
                       </div>
 

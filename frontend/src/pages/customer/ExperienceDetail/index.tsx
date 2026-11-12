@@ -509,6 +509,7 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
         quantity: qty,
         unitPrice: unitPrice,
         serviceName: `${service.name}${selectedOption ? ` (${selectedOption.name})` : ''}`,
+        serviceNameEn: `${service.nameEn || service.name}${selectedOption ? ` (${selectedOption.name})` : ''}`,
         thumbnailUrl: (service.imageUrls && service.imageUrls.length > 0) ? service.imageUrls[0] : 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800',
         date: activeSlot.date,
         timeSlot: `${activeSlot.startTime} - ${activeSlot.endTime}`,

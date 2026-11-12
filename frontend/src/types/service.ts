@@ -1,8 +1,10 @@
 export interface ServiceSummaryDto {
   id: string;
   name: string;
+  nameEn?: string;
   slug?: string;
   shortDescription?: string;
+  descriptionEn?: string;
   price: number;
   promotionalPrice?: number | null;
   averageRating: number;

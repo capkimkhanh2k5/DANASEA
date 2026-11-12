@@ -36,6 +36,7 @@ import { notificationService } from "../../../services/notificationService";
 import type { DisputeReason, DisputeResponse } from "../../../types/dispute";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { authService } from "../../../services/authService";
+import { useLanguageStore } from "../../../store/useLanguageStore";
 import { toast } from "../../../store/useToastStore";
 import type {
   OrderResponse,
@@ -54,6 +55,7 @@ export function Orders() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, isAuthenticated, accessToken, setAuth } = useAuthStore();
+  const { language } = useLanguageStore();
 
   // State management
   const [filter, setFilter] = useState<OrderFilter>("all");
@@ -1164,7 +1166,9 @@ export function Orders() {
                       ) : (
                         displayedSubOrders.map((subOrder) => {
                           const serviceDetail = serviceDetails[subOrder.serviceId];
-                          const serviceName = serviceDetail?.name || subOrder.serviceName || `Dịch vụ #${subOrder.serviceId.slice(0, 8)}`;
+                          const serviceName = (language === 'en' && serviceDetail?.nameEn)
+                            ? serviceDetail.nameEn
+                            : (serviceDetail?.name || subOrder.serviceName || `Dịch vụ #${subOrder.serviceId.slice(0, 8)}`);
                           const serviceImage = serviceDetail?.imageUrls?.[0] || subOrder.serviceThumbnail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80";
                           const matchedSlot = serviceDetail?.slots?.find((s) => s.slotId === subOrder.slotId);
                           const displaySlotTime = subOrder.slotTime || (matchedSlot ? `${matchedSlot.startTime.slice(0, 5)} - ${matchedSlot.endTime.slice(0, 5)} • ${matchedSlot.date}` : undefined);
@@ -1651,7 +1655,9 @@ export function Orders() {
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                     {(selectedMasterOrder.items || selectedMasterOrder.subOrders || []).map((item, idx) => {
                       const itemDetail = serviceDetails[item.serviceId];
-                      const sName = itemDetail?.name || item.serviceName || `Dịch vụ #${item.serviceId.slice(0, 8)}`;
+                      const sName = (language === 'en' && itemDetail?.nameEn)
+                        ? itemDetail.nameEn
+                        : (itemDetail?.name || item.serviceName || `Dịch vụ #${item.serviceId.slice(0, 8)}`);
                       const st = (item.status || "").toUpperCase();
                       const matchedSlot = itemDetail?.slots?.find((s) => s.slotId === item.slotId);
                       const slotDisplay = item.slotTime || (matchedSlot ? `${matchedSlot.startTime.slice(0, 5)} - ${matchedSlot.endTime.slice(0, 5)} • ${matchedSlot.date}` : undefined);
@@ -1740,7 +1746,9 @@ export function Orders() {
                     </span>
                   </div>
                   <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-1 pt-0.5">
-                    {serviceDetails[selectedSubOrder.serviceId]?.name || selectedSubOrder.serviceName || "Trải nghiệm biển Đà Nẵng"}
+                    {(language === 'en' && serviceDetails[selectedSubOrder.serviceId]?.nameEn)
+                      ? serviceDetails[selectedSubOrder.serviceId]?.nameEn
+                      : (serviceDetails[selectedSubOrder.serviceId]?.name || selectedSubOrder.serviceName || "Trải nghiệm biển Đà Nẵng")}
                   </h3>
                   {(() => {
                     const modalMatchedSlot = serviceDetails[selectedSubOrder.serviceId]?.slots?.find((s) => s.slotId === selectedSubOrder.slotId);

@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { BookingStepper } from "../../../components/customer/BookingStepper";
 import { useCartStore } from "../../../store/useCartStore";
+import { useLanguageStore } from "../../../store/useLanguageStore";
 import {
   ShoppingCart,
   Trash2,
@@ -15,6 +16,7 @@ import {
 
 export function Cart() {
   const navigate = useNavigate();
+  const { language } = useLanguageStore();
   const { items, removeItem, updateQuantity, getTotalPrice } = useCartStore();
 
   const handleCheckout = () => {
@@ -64,7 +66,7 @@ export function Cart() {
                 </div>
               ) : (
                 items.map((item) => {
-                  const title = item.serviceName || 'Trải nghiệm biển Đà Nẵng';
+                  const title = (language === 'en' && item.serviceNameEn) ? item.serviceNameEn : (item.serviceName || 'Trải nghiệm biển Đà Nẵng');
                   const image = item.thumbnailUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800';
                   const location = item.locationName || 'Đà Nẵng';
                   const vendor = item.vendorName || 'DANASEA Official Partner';

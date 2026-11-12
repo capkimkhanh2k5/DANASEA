@@ -178,6 +178,7 @@ export function Search() {
               return {
                 id: item.id,
                 name: item.name,
+                nameEn: item.nameEn,
                 slug: item.slug,
                 description: item.shortDescription || 'Trải nghiệm thể thao biển chuẩn an toàn hàng hải tại vịnh Đà Nẵng, trang bị áo phao SOLAS và hướng dẫn viên 1:1.',
                 price: item.price,
@@ -785,7 +786,7 @@ export function Search() {
                       <div className="relative w-full sm:w-64 md:w-72 h-48 sm:h-auto shrink-0 overflow-hidden bg-slate-100">
                         <img
                           src={service.imageUrl}
-                          alt={service.name}
+                          alt={(language === 'en' && service.nameEn) ? service.nameEn : service.name}
                           loading="lazy"
                           onError={(e) => {
                             e.currentTarget.src = FALLBACK_CARD_IMAGE;
@@ -806,7 +807,7 @@ export function Search() {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            toggleWishlist(service.id, service.name);
+                            toggleWishlist(service.id, (language === 'en' && service.nameEn) ? service.nameEn : service.name);
                           }}
                           className="absolute top-2.5 right-2.5 w-8 h-8 rounded-xl bg-slate-900/60 hover:bg-slate-900/80 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform cursor-pointer z-10"
                         >
@@ -820,7 +821,7 @@ export function Search() {
                           
                           {/* Title */}
                           <h2 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-sky-700 transition-colors line-clamp-2 leading-snug">
-                            {service.name}
+                            {(language === 'en' && service.nameEn) ? service.nameEn : service.name}
                           </h2>
 
                           {/* Rating & Review Count (Traveloka Score Pill Style) */}
