@@ -358,6 +358,10 @@ class _PaymentResultScreenState extends State<PaymentResultScreen>
         return 'Ví MoMo';
       case PaymentProvider.sepay:
         return 'VietQR (SePay)';
+      case PaymentProvider.payos:
+        return 'PayOS (VietQR)';
+      case PaymentProvider.zalopay:
+        return 'Ví ZaloPay';
       case PaymentProvider.paypal:
         return 'PayPal Quốc tế';
     }
@@ -804,7 +808,8 @@ class _PaymentResultScreenState extends State<PaymentResultScreen>
                     context,
                     MaterialPageRoute(
                       builder: (_) => ETicketQrScreen(
-                        subOrder: _order.subOrders.first,
+                        masterOrder: _order,
+                        subOrder: _order.subOrders.isNotEmpty ? _order.subOrders.first : null,
                         allSubOrders: _order.subOrders,
                       ),
                     ),

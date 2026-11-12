@@ -4,7 +4,6 @@ import '../../../../core/auth/auth_session.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../auth/presentation/screens/forgot_password_screen.dart';
 import '../../../auth/presentation/screens/login_register_screen.dart';
 import '../../../chat/presentation/screens/ai_assistant_screen.dart';
 import '../../../chat/presentation/screens/conversations_screen.dart';
@@ -52,6 +51,232 @@ class _ProfileScreenState extends State<ProfileScreen> {
       MaterialPageRoute(builder: (_) => const EditProfileScreen()),
     );
     if (mounted) setState(() {});
+  }
+
+  void _showChangePasswordDialog() {
+    final currentPassController = TextEditingController();
+    final newPassController = TextEditingController();
+    final confirmPassController = TextEditingController();
+    bool submitting = false;
+    String? localError;
+    bool obscureCurrent = true;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppColors.outline.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.lock_reset_rounded,
+                          color: AppColors.secondary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 10),
+                        LocalizedText(
+                          'Đổi mật khẩu',
+                          style: AppTypography.headlineSm(
+                            color: AppColors.onSurface,
+                          ).copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    LocalizedText(
+                      'Nhập mật khẩu hiện tại và thiết lập mật khẩu mới an toàn cho tài khoản.',
+                      style: AppTypography.bodySm(color: AppColors.onSurfaceVariant),
+                    ),
+                    if (localError != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          localError!,
+                          style: AppTypography.bodySm(color: AppColors.error),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: currentPassController,
+                      obscureText: obscureCurrent,
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'Mật khẩu hiện tại'),
+                        prefixIcon: const Icon(Icons.lock_outline, size: 20),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureCurrent ? Icons.visibility_off : Icons.visibility,
+                            size: 20,
+                          ),
+                          onPressed: () => setModalState(() => obscureCurrent = !obscureCurrent),
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: newPassController,
+                      obscureText: obscureNew,
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'Mật khẩu mới'),
+                        prefixIcon: const Icon(Icons.lock_clock_outlined, size: 20),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureNew ? Icons.visibility_off : Icons.visibility,
+                            size: 20,
+                          ),
+                          onPressed: () => setModalState(() => obscureNew = !obscureNew),
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: confirmPassController,
+                      obscureText: obscureConfirm,
+                      decoration: InputDecoration(
+                        labelText: tr(context, 'Nhập lại mật khẩu mới'),
+                        prefixIcon: const Icon(Icons.check_circle_outline, size: 20),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            obscureConfirm ? Icons.visibility_off : Icons.visibility,
+                            size: 20,
+                          ),
+                          onPressed: () => setModalState(() => obscureConfirm = !obscureConfirm),
+                        ),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: submitting
+                            ? null
+                            : () async {
+                                final currentPass = currentPassController.text.trim();
+                                final newPass = newPassController.text.trim();
+                                final confirmPass = confirmPassController.text.trim();
+                                if (currentPass.isEmpty || newPass.isEmpty) {
+                                  setModalState(() {
+                                    localError = 'Vui lòng điền đầy đủ mật khẩu.';
+                                  });
+                                  return;
+                                }
+                                if (newPass.length < 8) {
+                                  setModalState(() {
+                                    localError = 'Mật khẩu mới phải có ít nhất 8 ký tự.';
+                                  });
+                                  return;
+                                }
+                                if (newPass != confirmPass) {
+                                  setModalState(() {
+                                    localError = 'Mật khẩu xác nhận không khớp.';
+                                  });
+                                  return;
+                                }
+                                setModalState(() {
+                                  submitting = true;
+                                  localError = null;
+                                });
+                                try {
+                                  await AuthSession.instance.changePassword(
+                                    currentPassword: currentPass,
+                                    newPassword: newPass,
+                                  );
+                                  if (!context.mounted) return;
+                                  Navigator.pop(ctx);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: LocalizedText('Đổi mật khẩu thành công!'),
+                                      backgroundColor: AppColors.secondary,
+                                    ),
+                                  );
+                                } on AuthFailure catch (e) {
+                                  setModalState(() {
+                                    submitting = false;
+                                    localError = e.message;
+                                  });
+                                } catch (_) {
+                                  setModalState(() {
+                                    submitting = false;
+                                    localError = 'Đổi mật khẩu thất bại. Vui lòng kiểm tra lại.';
+                                  });
+                                }
+                              },
+                        child: submitting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const LocalizedText(
+                                'Lưu mật khẩu mới',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showLogoutDialog() {
@@ -220,14 +445,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildMenuTile(
                     icon: Icons.lock_outline_rounded,
                     title: 'Đổi mật khẩu',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ForgotPasswordScreen(),
-                        ),
-                      );
-                    },
+                    onTap: _showChangePasswordDialog,
                   ),
                   const Divider(height: 1),
                   Padding(

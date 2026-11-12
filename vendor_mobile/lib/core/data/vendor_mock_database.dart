@@ -331,6 +331,58 @@ class VendorMockDatabase extends ChangeNotifier {
         createdAt: now.subtract(const Duration(days: 1)),
       ),
       SubOrderModel(
+        id: 'DNS-8924-2',
+        masterOrderId: 'DNS-8924',
+        vendorId: 'vnd-001',
+        serviceId: 'srv-002',
+        slotId: 'slot-002',
+        quantity: 2,
+        unitPrice: 500000,
+        subtotalAmount: 1000000,
+        commissionRate: 10.0,
+        commissionAmount: 100000,
+        vendorPayoutAmount: 900000,
+        status: SubOrderStatus.confirmed,
+        waiverAccepted: true,
+        waiverAcceptedAt: now.subtract(const Duration(hours: 10)),
+        qrSecret: 'sec-8924-2-ocean',
+        checkedInAt: null,
+        customerName: 'Nguyễn Văn An',
+        customerPhone: '0905 123 456',
+        serviceName: 'Lặn ngắm san hô Bán đảo Sơn Trà',
+        serviceImageUrl:
+            'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=300&auto=format&fit=crop&q=80',
+        slotDate: '${today.day.toString().padLeft(2, '0')}/${today.month.toString().padLeft(2, '0')}/${today.year}',
+        slotTime: '15:00 - 18:00',
+        createdAt: now.subtract(const Duration(days: 1)),
+      ),
+      SubOrderModel(
+        id: 'DNS-8924-3',
+        masterOrderId: 'DNS-8924',
+        vendorId: 'vnd-002', // Vendor khác (Sao Biển Club) để test Multi-tenant Isolation
+        serviceId: 'srv-003',
+        slotId: 'slot-003',
+        quantity: 2,
+        unitPrice: 450000,
+        subtotalAmount: 900000,
+        commissionRate: 10.0,
+        commissionAmount: 90000,
+        vendorPayoutAmount: 810000,
+        status: SubOrderStatus.confirmed,
+        waiverAccepted: true,
+        waiverAcceptedAt: now.subtract(const Duration(hours: 10)),
+        qrSecret: 'sec-8924-3-ocean',
+        checkedInAt: null,
+        customerName: 'Nguyễn Văn An',
+        customerPhone: '0905 123 456',
+        serviceName: 'Dù lượn ngắm toàn cảnh Sơn Trà',
+        serviceImageUrl:
+            'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=300&auto=format&fit=crop&q=80',
+        slotDate: '${today.day.toString().padLeft(2, '0')}/${today.month.toString().padLeft(2, '0')}/${today.year}',
+        slotTime: '10:00 - 11:30',
+        createdAt: now.subtract(const Duration(days: 1)),
+      ),
+      SubOrderModel(
         id: 'DNS-7712-1',
         masterOrderId: 'DNS-7712',
         vendorId: 'vnd-001',
@@ -843,6 +895,17 @@ class VendorMockDatabase extends ChangeNotifier {
       subOrders[index] = subOrders[index].copyWith(checkedInAt: DateTime.now());
       notifyStoreChanged();
     }
+  }
+
+  void checkInBatchSubOrders(List<String> subOrderIds) {
+    final now = DateTime.now();
+    for (final id in subOrderIds) {
+      final index = subOrders.indexWhere((o) => o.id == id || o.subOrderId == id);
+      if (index != -1) {
+        subOrders[index] = subOrders[index].copyWith(checkedInAt: now);
+      }
+    }
+    notifyStoreChanged();
   }
 
   void confirmSubOrder(String subOrderId) {

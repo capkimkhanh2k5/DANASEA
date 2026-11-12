@@ -585,6 +585,11 @@ class VendorSlotRepository implements IVendorSlotRepository {
       date: date,
       startTime: json['startTime']?.toString() ?? '06:00',
       endTime: json['endTime']?.toString() ?? '08:00',
+      inventoryType: json['inventoryType']?.toString() ?? 'PERSON_LIMIT',
+      units: (json['units'] as List? ?? []).map((u) => <String, int>{
+        'unitNumber': (u['unitNumber'] as num).toInt(),
+        'capacity': (u['capacity'] as num).toInt(),
+      }).toList(),
       capacity: (json['capacity'] as num?)?.toInt() ?? 10,
       bookedCount: (json['bookedCount'] as num?)?.toInt() ?? 0,
       heldCount: (json['heldCount'] as num?)?.toInt() ?? 0,
@@ -634,15 +639,17 @@ class VendorSlotRepository implements IVendorSlotRepository {
       final start = slot.startTime.length == 5 ? '${slot.startTime}:00' : slot.startTime;
       final end = slot.endTime.length == 5 ? '${slot.endTime}:00' : slot.endTime;
 
+      final editing = RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(slot.id);
       final res = await _session.request(
-        '/api/vendor/services/${slot.serviceId}/slots',
-        method: 'POST',
+        '/api/vendor/services/${slot.serviceId}/slots${editing ? '/${slot.id}' : ''}',
+        method: editing ? 'PATCH' : 'POST',
         data: {
           'date': dateStr,
           'startTime': start,
           'endTime': end,
           'capacity': slot.capacity,
-          'inventoryType': 'PERSON_LIMIT',
+          'inventoryType': slot.inventoryType,
+          if (slot.inventoryType == 'SHARED_CAPACITY_UNITS') 'units': slot.units,
         },
       );
       final saved = parseSlot(res);
@@ -655,14 +662,7 @@ class VendorSlotRepository implements IVendorSlotRepository {
       _db.notifyStoreChanged();
       return saved;
     } catch (_) {
-      final index = _db.slots.indexWhere((s) => s.id == slot.id || s.slotId == slot.slotId);
-      if (index != -1) {
-        _db.slots[index] = slot;
-      } else {
-        _db.slots.add(slot);
-      }
-      _db.notifyStoreChanged();
-      return slot;
+      rethrow;
     }
   }
 

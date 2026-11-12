@@ -29,6 +29,8 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
   final _db = VendorMockDatabase.instance;
   final _slotRepo = VendorSlotRepository();
   bool _isSaving = false;
+  String _inventoryType = 'PERSON_LIMIT';
+  final _unitsController = TextEditingController();
 
   late TextEditingController _dateController;
   late TextEditingController _startTimeController;
@@ -47,13 +49,15 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
     super.initState();
     if (_isEdit) {
       final s = widget.slot!;
-      _dateController = TextEditingController(text: s.slotDate);
+      _inventoryType = s.inventoryType;
+      _unitsController.text = s.units.map((u) => u['capacity']).join(', ');
+      _dateController = TextEditingController(text: s.date.toIso8601String().split('T').first);
       _startTimeController = TextEditingController(text: s.startTime.substring(0, 5));
       _endTimeController = TextEditingController(text: s.endTime.substring(0, 5));
       _capacity = s.capacity;
       _isBlocked = s.isBlocked;
     } else {
-      _dateController = TextEditingController(text: widget.initialDate ?? '2025-05-04');
+      _dateController = TextEditingController(text: widget.initialDate ?? DateTime.now().toIso8601String().split('T').first);
       _startTimeController = TextEditingController(text: '05:00');
       _endTimeController = TextEditingController(text: '07:00');
       _capacity = 10;
@@ -63,6 +67,7 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
 
   @override
   void dispose() {
+    _unitsController.dispose();
     _dateController.dispose();
     _startTimeController.dispose();
     _endTimeController.dispose();
@@ -137,6 +142,18 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
       return;
     }
 
+    final units = <Map<String, int>>[];
+    if (_inventoryType == 'SHARED_CAPACITY_UNITS') {
+      final values = _unitsController.text.split(',');
+      for (final value in values) {
+        final capacity = int.tryParse(value.trim());
+        if (capacity == null || capacity < 1) {
+          ToastNotification.showError(context, 'Nhập sức chứa từng đơn vị, ví dụ: 1, 2, 2.');
+          return;
+        }
+        units.add({'unitNumber': units.length + 1, 'capacity': capacity});
+      }
+    }
     setState(() => _isSaving = true);
 
     DateTime parsedDate = DateTime.tryParse(date) ?? DateTime.now();
@@ -148,7 +165,9 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
       slotDate: date,
       startTime: start.length == 5 ? '$start:00' : start,
       endTime: end.length == 5 ? '$end:00' : end,
-      capacity: _capacity,
+      inventoryType: _inventoryType,
+      units: units,
+      capacity: units.isEmpty ? _capacity : units.fold<int>(0, (sum, u) => sum + u['capacity']!),
       bookedCount: _bookedCount,
       heldCount: _heldCount,
       isBlocked: _isBlocked,
@@ -198,6 +217,26 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              DropdownButtonFormField<String>(
+                initialValue: _inventoryType,
+                decoration: const InputDecoration(labelText: 'Cách quản lý sức chứa'),
+                items: const [
+                  DropdownMenuItem(value: 'PERSON_LIMIT', child: Text('Theo tổng số khách')),
+                  DropdownMenuItem(value: 'SHARED_CAPACITY_UNITS', child: Text('Theo đơn vị / thiết bị (gói riêng)')),
+                ],
+                onChanged: _isEdit ? null : (value) => setState(() => _inventoryType = value!),
+              ),
+              if (_inventoryType == 'SHARED_CAPACITY_UNITS')
+                TextField(
+                  controller: _unitsController,
+                  decoration: const InputDecoration(
+                    labelText: 'Số chỗ từng đơn vị, cách nhau bằng dấu phẩy',
+                    helperText: 'Ví dụ 1, 2, 2: ba đơn vị có sức chứa 1, 2, 2 khách. Gói bay đôi cần đơn vị từ 2 chỗ.',
+                    helperMaxLines: 3,
+                  ),
+                ),
+              const SizedBox(height: 16),
+
               // Service Header Info
               Container(
                 padding: const EdgeInsets.all(14),
@@ -644,9 +683,10 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                 Center(
                   child: TextButton.icon(
                     onPressed: () {
-                      _db.deleteSlot(widget.slot!.slotId);
-                      ToastNotification.showSuccess(context, 'Đã xóa khung giờ');
-                      Navigator.of(context).maybePop();
+                      ToastNotification.showError(
+                        context,
+                        'Chưa thể xóa khung giờ: ứng dụng chưa có API xóa ca trên máy chủ. Khung giờ vẫn được giữ nguyên.',
+                      );
                     },
                     icon: const Icon(Icons.delete_outline, color: AppColors.error, size: 16),
                     label: const LocalizedText('Xóa khung giờ này', style: TextStyle(color: AppColors.error, fontSize: 12)),

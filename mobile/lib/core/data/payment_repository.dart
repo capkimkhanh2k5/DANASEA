@@ -55,6 +55,16 @@ class PaymentRepository {
 
   final AuthSession session;
 
+  static void validateOrderId(String orderId) {
+    if (!RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+        .hasMatch(orderId)) {
+      throw AuthFailure(
+        'Đơn hàng chưa được tạo hợp lệ trên máy chủ. Vui lòng quay lại và đặt chỗ lại.',
+        400,
+      );
+    }
+  }
+
   static String generateIdempotencyKey([String prefix = 'pay']) {
     final random = Random();
     final suffix = List.generate(
@@ -74,6 +84,10 @@ class PaymentRepository {
         return 'SEPAY';
       case PaymentProvider.paypal:
         return 'PAYPAL';
+      case PaymentProvider.payos:
+        return 'PAYOS';
+      case PaymentProvider.zalopay:
+        return 'ZALOPAY';
     }
   }
 
@@ -81,6 +95,10 @@ class PaymentRepository {
     switch (raw?.toUpperCase()) {
       case 'PAYPAL':
         return PaymentProvider.paypal;
+      case 'PAYOS':
+        return PaymentProvider.payos;
+      case 'ZALOPAY':
+        return PaymentProvider.zalopay;
       case 'MOMO':
         return PaymentProvider.momo;
       case 'SEPAY':
@@ -89,6 +107,25 @@ class PaymentRepository {
       default:
         return PaymentProvider.vnpay;
     }
+  }
+
+  Future<List<PaymentProvider>> getAvailableProviders() async {
+    try {
+      final raw = await session.requestJson('/api/payments/providers');
+      if (raw is List) {
+        final providers = raw
+            .map((e) => e?.toString())
+            .whereType<String>()
+            .map(providerFromBackend)
+            .toSet()
+            .toList();
+        if (providers.isNotEmpty) return providers;
+      }
+    } catch (_) {}
+    return const [
+      PaymentProvider.vnpay,
+      PaymentProvider.paypal,
+    ];
   }
 
   static PaymentStatus statusFromBackend(String? raw) {
@@ -110,6 +147,7 @@ class PaymentRepository {
     required PaymentProvider provider,
     required String idempotencyKey,
   }) async {
+    validateOrderId(orderId);
     final json = await session.request(
       '/api/payments/${Uri.encodeComponent(orderId)}/create-intent',
       method: 'POST',
@@ -121,6 +159,7 @@ class PaymentRepository {
   }
 
   Future<List<OrderPaymentRecord>> getOrderStatus(String orderId) async {
+    validateOrderId(orderId);
     final raw = await session.requestJson(
       '/api/payments/${Uri.encodeComponent(orderId)}/status',
     );

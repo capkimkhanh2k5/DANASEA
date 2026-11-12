@@ -761,6 +761,36 @@ class OrderRepository {
     );
     return SubOrderDisruptionResult.fromJson(json);
   }
+
+  Future<List<CustomerDiscountCode>> getMyDiscountCodes({
+    int page = 0,
+    int size = 20,
+  }) async {
+    try {
+      final json = await session.request(
+        '/api/customers/me/discount-codes?page=$page&size=$size',
+      );
+      final content = json['content'];
+      if (content is List) {
+        return content
+            .whereType<Map<String, dynamic>>()
+            .map(CustomerDiscountCode.fromJson)
+            .toList();
+      }
+    } catch (_) {}
+    return const [];
+  }
+
+  Future<MarineBriefingOverview?> getMarineBriefing(String orderId) async {
+    try {
+      final json = await session.request(
+        '/api/ai/orders/${Uri.encodeComponent(orderId)}/marine-briefing',
+      );
+      return MarineBriefingOverview.fromJson(json);
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 class SubOrderWaiverAcceptance {

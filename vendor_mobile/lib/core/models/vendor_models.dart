@@ -547,6 +547,8 @@ enum SlotStatus {
 }
 
 class ServiceSlotModel {
+  final String inventoryType;
+  final List<Map<String, int>> units;
   final String id;
   final String serviceId;
   final DateTime date;
@@ -558,6 +560,8 @@ class ServiceSlotModel {
   final SlotStatus status;
 
   ServiceSlotModel({
+    this.inventoryType = 'PERSON_LIMIT',
+    this.units = const [],
     String? id,
     String? slotId,
     required this.serviceId,
@@ -597,6 +601,8 @@ class ServiceSlotModel {
     int? heldCount,
   }) {
     return ServiceSlotModel(
+      inventoryType: inventoryType,
+      units: units,
       id: id,
       serviceId: serviceId,
       date: date,

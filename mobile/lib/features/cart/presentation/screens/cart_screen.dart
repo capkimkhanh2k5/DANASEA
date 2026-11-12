@@ -15,6 +15,8 @@ class CartItemData {
   ServiceSlotModel slot;
   int quantity;
   bool isSelected;
+  String? optionId;
+  bool allowSplit;
 
   CartItemData({
     required this.id,
@@ -22,6 +24,8 @@ class CartItemData {
     required this.slot,
     required this.quantity,
     this.isSelected = true,
+    this.optionId,
+    this.allowSplit = false,
   });
 
   int get subtotal => service.price * quantity;
@@ -90,6 +94,7 @@ class _CartScreenState extends State<CartScreen> {
                 bookedCount: 0,
               );
               item.quantity = newGuests;
+              item.optionId = newSlot.optionId ?? item.optionId;
             });
           },
         );

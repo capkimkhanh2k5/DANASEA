@@ -1,3 +1,4 @@
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,13 +10,15 @@ import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
 
 class ETicketQrScreen extends StatefulWidget {
-  final SubOrderModel subOrder;
+  final SubOrderModel? subOrder;
   final List<SubOrderModel>? allSubOrders;
+  final MasterOrderModel? masterOrder;
 
   const ETicketQrScreen({
     super.key,
-    required this.subOrder,
+    this.subOrder,
     this.allSubOrders,
+    this.masterOrder,
   });
 
   @override
@@ -24,23 +27,55 @@ class ETicketQrScreen extends StatefulWidget {
 
 class _ETicketQrScreenState extends State<ETicketQrScreen> {
   final OrderRepository _orderRepository = OrderRepository();
-  late SubOrderModel _currentSubOrder;
   final Map<String, CheckinQrCode> _qrCache = <String, CheckinQrCode>{};
   bool _loadingQr = false;
   String? _qrError;
   int _generation = 0;
 
-  CheckinQrCode? get _activeQr => _qrCache[_currentSubOrder.id];
+  String get _targetId {
+    if (widget.masterOrder != null && widget.masterOrder!.id.isNotEmpty) {
+      return widget.masterOrder!.id;
+    }
+    final masterId = widget.subOrder?.masterOrderId;
+    if (masterId != null && masterId.isNotEmpty) {
+      return masterId;
+    }
+    return widget.subOrder?.id ?? '';
+  }
+
+  List<SubOrderModel> get _activities {
+    if (widget.masterOrder != null && widget.masterOrder!.subOrders.isNotEmpty) {
+      return widget.masterOrder!.subOrders;
+    }
+    if (widget.allSubOrders != null && widget.allSubOrders!.isNotEmpty) {
+      return widget.allSubOrders!;
+    }
+    if (widget.subOrder != null) {
+      return [widget.subOrder!];
+    }
+    return const [];
+  }
+
+  SubOrderModel get _displaySubOrder {
+    if (_activities.isNotEmpty) return _activities.first;
+    if (widget.subOrder != null) return widget.subOrder!;
+    if (widget.masterOrder != null && widget.masterOrder!.subOrders.isNotEmpty) {
+      return widget.masterOrder!.subOrders.first;
+    }
+    throw StateError('ETicketQrScreen requires either subOrder or masterOrder');
+  }
+
+  CheckinQrCode? get _activeQr => _qrCache[_targetId];
 
   @override
   void initState() {
     super.initState();
-    _currentSubOrder = widget.subOrder;
     _loadQrForCurrentTicket();
   }
 
   Future<void> _loadQrForCurrentTicket({bool forceRefresh = false}) async {
-    final targetId = _currentSubOrder.id;
+    final targetId = _targetId;
+    if (targetId.isEmpty) return;
     if (!forceRefresh && _qrCache.containsKey(targetId)) {
       setState(() => _qrError = null);
       return;
@@ -108,13 +143,13 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tickets = widget.allSubOrders ?? [_currentSubOrder];
+    final displayOrder = _displaySubOrder;
     final profile = AuthSession.instance.profile;
     final fullName = (profile?['fullName']?.toString() ?? '').trim();
     final email = (profile?['email']?.toString() ?? '').trim();
     final attendeeName = fullName.isNotEmpty
         ? fullName
-        : (email.isNotEmpty ? email : '#${_currentSubOrder.masterOrderId}');
+        : (email.isNotEmpty ? email : '#$_targetId');
     final qrData = _activeQr;
     final expiresAt = qrData?.expiresAt.toLocal();
 
@@ -169,44 +204,6 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
         ),
         child: Column(
           children: [
-            // MULTI-TICKET SWITCHER (IF MORE THAN 1 SUB-ORDER)
-            if (tickets.length > 1)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: tickets.asMap().entries.map((entry) {
-                    final idx = entry.key;
-                    final item = entry.value;
-                    final isSel = item.id == _currentSubOrder.id;
-                    return InkWell(
-                      onTap: () {
-                        setState(() => _currentSubOrder = item);
-                        _loadQrForCurrentTicket();
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isSel
-                              ? AppColors.secondary
-                              : AppColors.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: LocalizedText(
-                          'Vé ${idx + 1}/${tickets.length}',
-                          style: AppTypography.labelSm(
-                            color: isSel ? Colors.white : AppColors.onSurface,
-                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-
             // BOARDING PASS / E-TICKET CARD
             Container(
               decoration: BoxDecoration(
@@ -228,8 +225,8 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                       fit: StackFit.expand,
                       children: [
                         Image.network(
-                          _currentSubOrder.serviceImageUrl.isNotEmpty
-                              ? _currentSubOrder.serviceImageUrl
+                          displayOrder.serviceImageUrl.isNotEmpty
+                              ? displayOrder.serviceImageUrl
                               : 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&auto=format&fit=crop&q=80',
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) => Container(
@@ -349,7 +346,9 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: LocalizedText(
-                                '${_currentSubOrder.vendorName} • ${_currentSubOrder.locationName}',
+                                _activities.length > 1
+                                    ? 'Vé toàn đơn • ${_activities.length} hoạt động biển'
+                                    : '${displayOrder.vendorName} • ${displayOrder.locationName}',
                                 style: AppTypography.labelSm(
                                   color: AppColors.secondary,
                                   fontWeight: FontWeight.w700,
@@ -362,7 +361,9 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                         ),
                         const SizedBox(height: 4),
                         LocalizedText(
-                          _currentSubOrder.serviceName,
+                          _activities.length > 1
+                              ? 'Gói trải nghiệm biển Đà Nẵng'
+                              : displayOrder.serviceName,
                           style: AppTypography.headlineSm(
                             color: AppColors.onSurface,
                           ),
@@ -376,7 +377,7 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                               child: _buildMetaBox(
                                 Icons.calendar_today,
                                 'Ngày trải nghiệm',
-                                '${_currentSubOrder.slotDate.day}/${_currentSubOrder.slotDate.month}/${_currentSubOrder.slotDate.year}',
+                                '${displayOrder.slotDate.day}/${displayOrder.slotDate.month}/${displayOrder.slotDate.year}',
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -384,12 +385,14 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                               child: _buildMetaBox(
                                 Icons.schedule,
                                 'Khung giờ biển',
-                                _currentSubOrder.slotTime.startsWith('Slot #')
-                                    ? 'Theo lịch đặt'
-                                    : _currentSubOrder.slotTime.replaceAllMapped(
-                                        RegExp(r'(\d{1,2}:\d{2}):00'),
-                                        (m) => m.group(1) ?? '',
-                                      ),
+                                _activities.length > 1
+                                    ? 'Theo chi tiết bên dưới'
+                                    : (displayOrder.slotTime.startsWith('Slot #')
+                                        ? 'Theo lịch đặt'
+                                        : displayOrder.slotTime.replaceAllMapped(
+                                            RegExp(r'(\d{1,2}:\d{2}):00'),
+                                            (m) => m.group(1) ?? '',
+                                          )),
                               ),
                             ),
                           ],
@@ -401,7 +404,7 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                               child: _buildMetaBox(
                                 Icons.tag,
                                 'Mã vé / Mã đơn',
-                                '#${_currentSubOrder.id}',
+                                '#$_targetId',
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -409,7 +412,7 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                               child: _buildMetaBox(
                                 Icons.group,
                                 'Số lượng khách',
-                                '${_currentSubOrder.quantity} người lớn',
+                                '${displayOrder.quantity} người lớn',
                               ),
                             ),
                           ],
@@ -524,8 +527,8 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                       children: [
                         if (_loadingQr && qrData == null)
                           const SizedBox(
-                            width: 200,
-                            height: 200,
+                            width: 260,
+                            height: 280,
                             child: Center(child: CircularProgressIndicator()),
                           )
                         else if (_qrError != null && qrData == null)
@@ -623,8 +626,8 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                         else ...[
                           // Outdoor High-Contrast QR Frame
                           Container(
-                            width: 200,
-                            height: 200,
+                            width: 260,
+                            height: 280,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -712,13 +715,14 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Icon(
-                                        Icons.qr_code_2,
-                                        size: 132,
-                                        color: Color(0xFF1A1C1A),
+                                      QrImageView(
+                                        data: qrData!.qrToken,
+                                        size: 220,
+                                        padding: const EdgeInsets.all(16),
+                                        backgroundColor: Colors.white,
                                       ),
                                       LocalizedText(
-                                        qrData!.subOrderId,
+                                        qrData.subOrderId,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
@@ -766,6 +770,186 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                 ],
               ),
             ),
+            if (_activities.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(AppShapes.spaceMd),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLowest,
+                  borderRadius: AppShapes.radiusLg,
+                  boxShadow: AppShapes.shadowLevel1,
+                  border: Border.all(color: AppColors.borderSubtle),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.playlist_add_check_circle_outlined,
+                                size: 18, color: AppColors.secondary),
+                            const SizedBox(width: 6),
+                            LocalizedText(
+                              'Các hoạt động trong vé (${_activities.length})',
+                              style: AppTypography.labelMd(
+                                color: AppColors.onSurface,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondaryContainer.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: LocalizedText(
+                            '1 mã QR chung',
+                            style: AppTypography.labelSm(
+                              color: AppColors.secondary,
+                              fontWeight: FontWeight.bold,
+                            ).copyWith(fontSize: 10),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ..._activities.map((sub) {
+                      final isCheckedIn = sub.checkedInAt != null ||
+                          sub.status == SubOrderStatus.completed;
+                      final isConfirmed = sub.status == SubOrderStatus.confirmed;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isCheckedIn
+                                ? AppColors.secondary.withValues(alpha: 0.3)
+                                : AppColors.outlineVariant.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: SizedBox(
+                                width: 44,
+                                height: 44,
+                                child: sub.serviceImageUrl.isNotEmpty
+                                    ? Image.network(
+                                        sub.serviceImageUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => Container(
+                                          color: AppColors.surfaceContainerHigh,
+                                          child: const Icon(Icons.surfing, size: 20, color: AppColors.secondary),
+                                        ),
+                                      )
+                                    : Container(
+                                        color: AppColors.surfaceContainerHigh,
+                                        child: const Icon(Icons.surfing, size: 20, color: AppColors.secondary),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  LocalizedText(
+                                    sub.serviceName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.labelMd(
+                                      color: AppColors.onSurface,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.schedule, size: 12, color: AppColors.secondary),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        sub.slotTime.replaceAllMapped(
+                                          RegExp(r'(\d{1,2}:\d{2}):00'),
+                                          (m) => m.group(1) ?? '',
+                                        ),
+                                        style: AppTypography.bodySm(
+                                          color: AppColors.onSurfaceVariant,
+                                        ).copyWith(fontSize: 11),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '• ${sub.quantity} khách',
+                                        style: AppTypography.bodySm(
+                                          color: AppColors.onSurfaceVariant,
+                                        ).copyWith(fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isCheckedIn
+                                    ? const Color(0xFFE0F2F1)
+                                    : isConfirmed
+                                        ? const Color(0xFFE8F5E9)
+                                        : AppColors.surfaceContainerHigh,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    isCheckedIn
+                                        ? Icons.check_circle
+                                        : isConfirmed
+                                            ? Icons.access_time_filled
+                                            : Icons.info,
+                                    size: 11,
+                                    color: isCheckedIn
+                                        ? AppColors.secondary
+                                        : isConfirmed
+                                            ? const Color(0xFF2E7D32)
+                                            : AppColors.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    isCheckedIn
+                                        ? 'ĐÃ VÀO BÃI'
+                                        : isConfirmed
+                                            ? 'CHỜ SOÁT VÉ'
+                                            : sub.status.name.toUpperCase(),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: isCheckedIn
+                                          ? AppColors.secondary
+                                          : isConfirmed
+                                              ? const Color(0xFF2E7D32)
+                                              : AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
 
             // SUPPORT NOTICE
