@@ -18,6 +18,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import com.danasea.backend.modules.order.application.OrderPaymentService;
 import com.danasea.backend.modules.order.application.dtos.GetVendorOrdersQuery;
 import com.danasea.backend.modules.order.application.dtos.SubOrderDetailResult;
 import com.danasea.backend.modules.order.application.usecases.GetVendorOrdersUseCase;
@@ -35,6 +36,9 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("VendorOrderController Unit Tests")
 class VendorOrderControllerTest {
+
+    @Mock
+    private OrderPaymentService orderPaymentService;
 
     @Mock
     private GetVendorOrdersUseCase getVendorOrdersUseCase;

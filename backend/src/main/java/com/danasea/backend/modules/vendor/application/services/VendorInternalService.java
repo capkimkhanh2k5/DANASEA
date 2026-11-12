@@ -1,5 +1,7 @@
 package com.danasea.backend.modules.vendor.application.services;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -91,8 +93,23 @@ public class VendorInternalService implements VendorInternalApi {
         if (vendorId == null) {
             return Set.of();
         }
-        return vendorDocumentRepository.findByVendorIdAndStatus(vendorId, DocStatus.APPROVED).stream()
-                .map(document -> document.getDocType())
+        List<com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorDocumentJpaEntity> docs =
+                vendorDocumentRepository.findByVendorId(vendorId);
+        if (docs == null || docs.isEmpty()) {
+            return Set.of();
+        }
+        Map<DocType, com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorDocumentJpaEntity> latestByDocType =
+                docs.stream()
+                    .filter(d -> d.getDocType() != null && d.getCreatedAt() != null)
+                    .collect(Collectors.toMap(
+                            com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorDocumentJpaEntity::getDocType,
+                            d -> d,
+                            (d1, d2) -> d1.getCreatedAt().isAfter(d2.getCreatedAt()) ? d1 : d2
+                    ));
+
+        return latestByDocType.entrySet().stream()
+                .filter(e -> e.getValue().getStatus() == DocStatus.APPROVED)
+                .map(Map.Entry::getKey)
                 .collect(Collectors.toUnmodifiableSet());
     }
 }

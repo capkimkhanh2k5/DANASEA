@@ -37,6 +37,12 @@ public interface JpaMasterOrderRepository extends JpaRepository<MasterOrderJpaEn
     @Query("SELECT o FROM MasterOrderJpaEntity o WHERE o.id = :id")
     Optional<MasterOrderJpaEntity> findByIdForUpdate(@Param("id") UUID id);
 
+    @Query("SELECT COUNT(o) > 0 FROM MasterOrderJpaEntity o WHERE o.customerId = :customerId " +
+           "AND o.status IN (com.danasea.backend.modules.order.domain.models.MasterOrderStatus.PENDING_PAYMENT, " +
+           "com.danasea.backend.modules.order.domain.models.MasterOrderStatus.PAID, " +
+           "com.danasea.backend.modules.order.domain.models.MasterOrderStatus.PARTIALLY_COMPLETED)")
+    boolean hasActiveMasterOrders(@Param("customerId") UUID customerId);
+
     default Page<MasterOrderJpaEntity> findByAdminFilters(
             MasterOrderStatus status,
             PaymentOrderStatus paymentStatus,

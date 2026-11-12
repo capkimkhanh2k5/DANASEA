@@ -26,9 +26,11 @@ import com.danasea.backend.modules.booking.domain.models.BookingStatus;
 import com.danasea.backend.modules.booking.domain.models.InventoryLockItem;
 import com.danasea.backend.modules.booking.domain.models.SlotValidationDetails;
 import com.danasea.backend.modules.booking.domain.ports.BookingRepositoryPort;
+import com.danasea.backend.modules.booking.domain.ports.CustomerAccountPort;
 import com.danasea.backend.modules.booking.domain.ports.InventoryLockPort;
 import com.danasea.backend.modules.booking.domain.ports.ServiceSlotPort;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
+import org.springframework.security.access.AccessDeniedException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -370,5 +372,66 @@ class CreateBookingHoldUseCaseTest {
 
         verify(inventoryLockPort).acquireHolds(any(), any(), any());
         verify(inventoryLockPort).releaseHolds(any(), any());
+    }
+
+    @Test
+    @DisplayName("Should invoke customer account validation with lock when port is configured")
+    void testCustomerAccountValidationWithLock_WhenPortPresent() {
+        CustomerAccountPort mockPort = org.mockito.Mockito.mock(CustomerAccountPort.class);
+        useCase.setCustomerAccountPort(mockPort);
+
+        UUID customerId = UUID.randomUUID();
+        UUID slotId = UUID.randomUUID();
+
+        SlotValidationDetails details = SlotValidationDetails.builder()
+                .slotId(slotId)
+                .serviceId(UUID.randomUUID())
+                .vendorId(UUID.randomUUID())
+                .bookingDate(LocalDate.now().plusDays(1))
+                .bookingTime(LocalTime.of(10, 0))
+                .capacity(10)
+                .bookedCount(0)
+                .status(SlotStatus.OPEN)
+                .price(new BigDecimal("100.00"))
+                .servicePublished(true)
+                .build();
+
+        when(serviceSlotPort.findSlotDetailsBatch(any())).thenReturn(List.of(details));
+        when(bookingRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        CreateBookingHoldCommand command = new CreateBookingHoldCommand(
+                customerId,
+                List.of(new BookingHoldItemDto(slotId, 1))
+        );
+
+        BookingHoldResult result = useCase.execute(command);
+        assertThat(result).isNotNull();
+        verify(mockPort).validateCustomerForBookingWithLock(customerId);
+    }
+
+    @Test
+    @DisplayName("Should reject booking creation when customer account validation fails (e.g. non-customer role)")
+    void testCustomerAccountValidationFailure_RejectsBooking() {
+        CustomerAccountPort mockPort = org.mockito.Mockito.mock(CustomerAccountPort.class);
+        useCase.setCustomerAccountPort(mockPort);
+
+        UUID customerId = UUID.randomUUID();
+        UUID slotId = UUID.randomUUID();
+
+        doThrow(new AccessDeniedException("Only customers are permitted to create bookings"))
+                .when(mockPort).validateCustomerForBookingWithLock(customerId);
+
+        CreateBookingHoldCommand command = new CreateBookingHoldCommand(
+                customerId,
+                List.of(new BookingHoldItemDto(slotId, 1))
+        );
+
+        assertThatThrownBy(() -> useCase.execute(command))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("Only customers are permitted to create bookings");
+
+        verify(serviceSlotPort, never()).findSlotDetailsBatch(any());
+        verify(inventoryLockPort, never()).acquireHolds(any(), any(), any());
+        verify(bookingRepository, never()).save(any());
     }
 }
