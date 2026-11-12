@@ -552,6 +552,9 @@ def align_schema_defaults(rows, colmap):
             unit.setdefault('equipment_blocked', False)
     if ('payments', 'attempt_number') in colmap:
         align_payment_attempt_defaults(rows)
+    if ('vendors', 'rejection_reason') in colmap:
+        for v in rows.get('vendors', []):
+            v.setdefault('rejection_reason', None)
 
 
 class Session:
@@ -825,8 +828,8 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     }
 
 
-# Replacement accepts only the exact reviewed V1-V55 table/column/FK/trigger inventory.
-REPLACEMENT_FLYWAY_VERSION = 55
+# Replacement accepts only the exact reviewed V1-V57 table/column/FK/trigger inventory.
+REPLACEMENT_FLYWAY_VERSION = 57
 RESET_INVENTORY_SQL = """
 SELECT json_build_object(
  'schemas',(SELECT json_agg(nspname ORDER BY nspname) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),
