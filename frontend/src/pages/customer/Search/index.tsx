@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useWishlistStore } from '../../../store/useWishlistStore';
 import { useLanguageStore } from '../../../store/useLanguageStore';
+import { TRANSLATIONS } from '../../../i18n/translations';
 
 import { serviceCatalogService, type ServiceQueryParams } from '../../../services/serviceCatalogService';
 import { categoryService } from '../../../services/categoryService';
@@ -60,6 +61,8 @@ export function Search() {
 
   const { toggleWishlist, isInWishlist } = useWishlistStore();
   const { language } = useLanguageStore();
+  const t = TRANSLATIONS[language].searchPage;
+  const isEn = language === 'en';
 
   const categoryParam = searchParams.get('category');
   const keywordParam = searchParams.get('q') || '';
@@ -180,12 +183,14 @@ export function Search() {
                 name: item.name,
                 nameEn: item.nameEn,
                 slug: item.slug,
-                description: item.shortDescription || 'Trải nghiệm thể thao biển chuẩn an toàn hàng hải tại vịnh Đà Nẵng, trang bị áo phao SOLAS và hướng dẫn viên 1:1.',
+                description: (language === 'en' && 'shortDescriptionEn' in item && typeof item.shortDescriptionEn === 'string')
+                  ? (item.shortDescriptionEn as string)
+                  : item.shortDescription || (language === 'en' ? 'Standard maritime safety experience in Da Nang Bay, equipped with SOLAS life vests and 1:1 local instructor.' : 'Trải nghiệm thể thao biển chuẩn an toàn hàng hải tại vịnh Đà Nẵng, trang bị áo phao SOLAS và hướng dẫn viên 1:1.'),
                 price: item.price,
                 promotionalPrice: item.promotionalPrice,
                 rating: item.averageRating || 4.9,
                 reviewCount: item.reviewCount || 128,
-                location: item.address ? item.address.split(',')[0] : `Bán đảo ${determinedArea}`,
+                location: item.address ? item.address.split(',')[0] : (language === 'en' ? `${determinedArea} Beach` : `Bán đảo ${determinedArea}`),
                 area: determinedArea,
                 imageUrl: getCardThumbnailUrl(item.primaryImageUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?auto=format&fit=crop&w=800&q=80'),
                 duration: ('duration' in item && typeof item.duration === 'number' && item.duration > 0 ? `${item.duration} phút` : undefined) || (item.name.toLowerCase().includes('phao chuối') ? '20 phút' : '60 phút'),
@@ -213,7 +218,7 @@ export function Search() {
 
     fetchServices();
     return () => { isMounted = false; };
-  }, [sortBy]);
+  }, [sortBy, language]);
 
   // Toggle helpers for Traveloka Multi-Checkboxes
   const toggleArea = (area: string) => {
@@ -371,12 +376,12 @@ export function Search() {
             <div className="flex-1 min-w-0 w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 focus-within:bg-white focus-within:ring-1 focus-within:ring-sky-500 border border-transparent focus-within:border-sky-500 transition-all">
               <MapPin className="w-4 h-4 text-sky-700 shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">Điểm đến / Trải nghiệm</p>
+                <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">{t.destLabel}</p>
                 <input
                   type="text"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="Mỹ Khê, Sơn Trà, chèo SUP, lặn biển..."
+                  placeholder={t.destPlaceholder}
                   className="w-full bg-transparent text-[13px] sm:text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none"
                 />
               </div>
@@ -389,18 +394,18 @@ export function Search() {
             <div className="w-full md:w-56 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-transparent transition-colors cursor-pointer shrink-0">
               <Calendar className="w-4 h-4 text-sky-700 shrink-0" />
               <div className="min-w-0 flex-1">
-                <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">Ngày trải nghiệm</p>
-                <p className="text-[13px] sm:text-sm font-semibold text-slate-900 truncate">Hôm nay - Ngày mai</p>
+                <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">{t.dateLabel}</p>
+                <p className="text-[13px] sm:text-sm font-semibold text-slate-900 truncate">{t.dateTodayTomorrow}</p>
               </div>
             </div>
 
-            {/* Field 3: Pax / Guests Count - Widen to 260px & add min-w-0 flex-1 so text never overflows */}
+            {/* Field 3: Pax / Guests Count */}
             <div className="w-full md:w-64 lg:w-72 flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100/80 border border-transparent transition-colors cursor-pointer shrink-0">
               <Users className="w-4 h-4 text-sky-700 shrink-0" />
               <div className="min-w-0 flex-1">
-                <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">Số lượng khách</p>
-                <p className="text-[13px] sm:text-sm font-semibold text-slate-900 truncate" title="2 Người lớn, 1 Cano/Ván">
-                  2 Người lớn, 1 Cano/Ván
+                <p className="text-[12px] text-slate-500 font-medium leading-none mb-1">{t.guestsLabel}</p>
+                <p className="text-[13px] sm:text-sm font-semibold text-slate-900 truncate" title={t.guestsDefault}>
+                  {t.guestsDefault}
                 </p>
               </div>
             </div>
@@ -411,7 +416,7 @@ export function Search() {
               className="w-full md:w-auto px-6 py-3 rounded-xl bg-sky-700 hover:bg-sky-600 active:bg-sky-800 text-white font-bold text-[13px] sm:text-sm flex items-center justify-center gap-2 transition-all shrink-0 hover:-translate-y-0.5 shadow-xs cursor-pointer"
             >
               <SearchIcon className="w-4 h-4" />
-              <span>Tìm kiếm</span>
+              <span>{t.searchBtn}</span>
             </button>
 
           </div>
@@ -453,7 +458,7 @@ export function Search() {
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-[13px] font-bold text-slate-700 cursor-pointer"
           >
             <SlidersHorizontal className="w-3.5 h-3.5 text-sky-700" />
-            <span>{mobileFilterOpen ? 'Đóng bộ lọc' : 'Bộ lọc tìm kiếm'}</span>
+            <span>{mobileFilterOpen ? t.closeFilter : t.filterTitle}</span>
           </button>
         </div>
 
@@ -470,7 +475,7 @@ export function Search() {
               <div className="flex items-center justify-between pb-1">
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="w-4 h-4 text-sky-700" />
-                  <h2 className="font-bold text-sm text-slate-900">Bộ lọc tìm kiếm</h2>
+                  <h2 className="font-bold text-sm text-slate-900">{t.filterTitle}</h2>
                 </div>
                 {hasActiveFilters && (
                   <button
@@ -479,7 +484,7 @@ export function Search() {
                     className="text-[13px] font-semibold text-sky-700 hover:text-sky-800 flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Đặt lại</span>
+                    <span>{t.resetBtn}</span>
                   </button>
                 )}
               </div>
@@ -492,7 +497,7 @@ export function Search() {
                 >
                   <span className="font-bold text-[13px] sm:text-sm text-slate-900 flex items-center gap-1.5">
                     <Sparkles className="w-4 h-4 text-amber-500" />
-                    <span>Bộ lọc phổ biến</span>
+                    <span>{t.popularFilters}</span>
                   </span>
                   {collapsePop ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
                 </div>
@@ -506,7 +511,7 @@ export function Search() {
                         onChange={(e) => setPopFreeCancel(e.target.checked)}
                         className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
                       />
-                      <span>Miễn phí hủy trước 24h</span>
+                      <span>{t.freeCancel}</span>
                     </label>
 
                     <label className="flex items-center gap-2.5 cursor-pointer hover:text-slate-900 transition-colors">
@@ -516,7 +521,7 @@ export function Search() {
                         onChange={(e) => setPopTopRated(e.target.checked)}
                         className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
                       />
-                      <span>Đánh giá xuất sắc (4.8+ ⭐)</span>
+                      <span>{t.topRated}</span>
                     </label>
 
                     <label className="flex items-center gap-2.5 cursor-pointer hover:text-slate-900 transition-colors">
@@ -526,7 +531,7 @@ export function Search() {
                         onChange={(e) => setPopUnder500k(e.target.checked)}
                         className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
                       />
-                      <span>Dưới 500.000 ₫ / khách</span>
+                      <span>{t.under500k}</span>
                     </label>
 
                     <label className="flex items-center gap-2.5 cursor-pointer hover:text-slate-900 transition-colors">
@@ -536,7 +541,7 @@ export function Search() {
                         onChange={(e) => setPopHasCoach(e.target.checked)}
                         className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
                       />
-                      <span>Kèm huấn luyện viên 1:1</span>
+                      <span>{t.hasCoach}</span>
                     </label>
 
                     <label className="flex items-center gap-2.5 cursor-pointer hover:text-slate-900 transition-colors">
@@ -546,7 +551,7 @@ export function Search() {
                         onChange={(e) => setPopHasPhotos(e.target.checked)}
                         className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
                       />
-                      <span>Chụp ảnh / Flycam miễn phí</span>
+                      <span>{t.hasPhotos}</span>
                     </label>
                   </div>
                 )}
@@ -560,7 +565,7 @@ export function Search() {
                 >
                   <span className="font-bold text-[13px] sm:text-sm text-slate-900 flex items-center gap-1.5">
                     <MapPin className="w-4 h-4 text-sky-700" />
-                    <span>Khu vực biển (Area)</span>
+                    <span>{t.areaTitle}</span>
                   </span>
                   {collapseArea ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
                 </div>
@@ -568,10 +573,10 @@ export function Search() {
                 {!collapseArea && (
                   <div className="space-y-2.5 pt-1 text-[13px] text-slate-700">
                     {[
-                      { id: 'Sơn Trà', label: 'Bán đảo Sơn Trà', note: 'Lặn ngắm san hô & Kayak' },
-                      { id: 'Mỹ Khê', label: 'Bãi biển Mỹ Khê', note: 'Chèo SUP & Dù bay cano' },
-                      { id: 'Bãi Rạng', label: 'Bãi Rạng - Nam Ô', note: 'Jetski & Rạn đá rêu' },
-                      { id: 'Non Nước', label: 'Vịnh Non Nước', note: 'Câu mực đêm & Lướt sóng' },
+                      { id: 'Sơn Trà', label: t.areas.sonTra, note: t.areas.sonTraNote },
+                      { id: 'Mỹ Khê', label: t.areas.myKhe, note: t.areas.myKheNote },
+                      { id: 'Bãi Rạng', label: t.areas.baiRang, note: t.areas.baiRangNote },
+                      { id: 'Non Nước', label: t.areas.nonNuoc, note: t.areas.nonNuocNote },
                     ].map((areaItem) => {
                       const isChecked = selectedAreas.includes(areaItem.id);
                       return (
@@ -607,16 +612,16 @@ export function Search() {
                   className="flex items-center justify-between cursor-pointer select-none"
                   onClick={() => setCollapsePrice(!collapsePrice)}
                 >
-                  <span className="font-bold text-[13px] sm:text-sm text-slate-900">Khoảng giá tối đa</span>
+                  <span className="font-bold text-[13px] sm:text-sm text-slate-900">{t.priceTitle}</span>
                   {collapsePrice ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
                 </div>
 
                 {!collapsePrice && (
                   <div className="space-y-2.5 pt-1">
                     <div className="flex items-center justify-between text-[13px]">
-                      <span className="text-slate-500 font-medium">Mức trần:</span>
+                      <span className="text-slate-500 font-medium">{t.priceCeiling}</span>
                       <span className="font-bold text-[#991b1b] tabular-nums">
-                        {priceMax >= 2500000 ? 'Tất cả mức giá' : `${(priceMax / 1000).toLocaleString('vi-VN')}k ₫ / khách`}
+                        {priceMax >= 2500000 ? t.allPrices : `${(priceMax / 1000).toLocaleString(isEn ? 'en-US' : 'vi-VN')}k ₫ ${t.perGuest}`}
                       </span>
                     </div>
                     <input
@@ -643,7 +648,7 @@ export function Search() {
                   className="flex items-center justify-between cursor-pointer select-none"
                   onClick={() => setCollapseCat(!collapseCat)}
                 >
-                  <span className="font-bold text-[13px] sm:text-sm text-slate-900">Thể loại hoạt động</span>
+                  <span className="font-bold text-[13px] sm:text-sm text-slate-900">{t.categoriesTitle}</span>
                   {collapseCat ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
                 </div>
 
@@ -652,6 +657,7 @@ export function Search() {
                     {categories.map((cat) => {
                       const slug = cat.slug || cat.id;
                       const isChecked = selectedCategorySlugs.includes(slug);
+                      const catName = (isEn && cat.nameEn) ? cat.nameEn : cat.name;
 
                       return (
                         <label 
@@ -665,7 +671,7 @@ export function Search() {
                               onChange={() => toggleCategorySlug(slug)}
                               className="w-4 h-4 rounded text-sky-600 accent-sky-600 cursor-pointer"
                             />
-                            <span className="font-medium text-slate-800">{cat.name}</span>
+                            <span className="font-medium text-slate-800">{catName}</span>
                           </div>
                           {isChecked && <CheckCircle2 className="w-4 h-4 text-sky-700" />}
                         </label>
@@ -681,7 +687,7 @@ export function Search() {
                   className="flex items-center justify-between cursor-pointer select-none"
                   onClick={() => setCollapseRating(!collapseRating)}
                 >
-                  <span className="font-bold text-[13px] sm:text-sm text-slate-900">Đánh giá của khách</span>
+                  <span className="font-bold text-[13px] sm:text-sm text-slate-900">{t.ratingTitle}</span>
                   {collapseRating ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronUp className="w-4 h-4 text-slate-400" />}
                 </div>
 
@@ -690,7 +696,7 @@ export function Search() {
                     {[
                       { label: '4.8+', val: 4.8 },
                       { label: '4.5+', val: 4.5 },
-                      { label: 'Tất cả', val: 0 },
+                      { label: t.allRatings, val: 0 },
                     ].map((r) => (
                       <button
                         key={r.label}
@@ -723,22 +729,27 @@ export function Search() {
               <div>
                 <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
                   {selectedAreas.length > 0
-                    ? `Trải nghiệm biển tại ${selectedAreas.join(', ')}`
-                    : 'Trải nghiệm thể thao biển Đà Nẵng'}
+                    ? `${t.pageTitleAreaPrefix} ${selectedAreas.map((a) => ({
+                        'Sơn Trà': t.areas.sonTra,
+                        'Mỹ Khê': t.areas.myKhe,
+                        'Bãi Rạng': t.areas.baiRang,
+                        'Non Nước': t.areas.nonNuoc,
+                      }[a] || a)).join(', ')}`
+                    : t.pageTitle}
                 </h1>
                 <p className="text-[13px] text-slate-600 mt-1">
-                  Tìm thấy <strong className="text-sky-700 tabular-nums font-bold">{filteredServices.length}</strong> trải nghiệm khả dụng
+                  {t.foundCount} <strong className="text-sky-700 tabular-nums font-bold">{filteredServices.length}</strong> {t.availableCount}
                 </p>
               </div>
 
               {/* Sort Pills (Traveloka Tabs - Wrap on narrow viewports without triggering horizontal scroll) */}
               <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                <span className="text-[13px] text-slate-600 font-medium shrink-0 mr-1 hidden sm:inline">Sắp xếp:</span>
+                <span className="text-[13px] text-slate-600 font-medium shrink-0 mr-1 hidden sm:inline">{t.sortBy}</span>
                 {([
-                  { id: 'popular', label: 'Phổ biến nhất' },
-                  { id: 'rating_desc', label: 'Đánh giá cao' },
-                  { id: 'price_asc', label: 'Giá thấp nhất' },
-                  { id: 'price_desc', label: 'Giá cao nhất' },
+                  { id: 'popular', label: t.sortPopular },
+                  { id: 'rating_desc', label: t.sortRating },
+                  { id: 'price_asc', label: t.sortPriceAsc },
+                  { id: 'price_desc', label: t.sortPriceDesc },
                 ] as const).map((s) => (
                   <button
                     key={s.id}
@@ -797,7 +808,7 @@ export function Search() {
                         {/* Status / Badge overlay */}
                         <div className="absolute top-2.5 left-2.5">
                           <span className="px-2.5 py-1 rounded-md bg-[#031d44]/90 backdrop-blur-xs text-white text-[13px] font-bold">
-                            Chuẩn an toàn SOLAS
+                            {t.solasBadge}
                           </span>
                         </div>
 
@@ -830,8 +841,8 @@ export function Search() {
                               <Star className="w-3.5 h-3.5 fill-sky-700 text-sky-700" />
                               <span>{service.rating.toFixed(1)} / 5</span>
                             </div>
-                            <span className="text-[13px] font-semibold text-slate-700">Tuyệt vời</span>
-                            <span className="text-[13px] text-slate-600 tabular-nums font-medium">({service.reviewCount} đánh giá)</span>
+                            <span className="text-[13px] font-semibold text-slate-700">{t.ratingExcellent}</span>
+                            <span className="text-[13px] text-slate-600 tabular-nums font-medium">({service.reviewCount} {t.reviewsCount})</span>
                           </div>
 
                           {/* Location & Duration & Distance */}
@@ -841,11 +852,13 @@ export function Search() {
                               <span>{service.location}</span>
                             </span>
                             <span>•</span>
-                            <span className="text-slate-500">{service.distanceFromCenter}</span>
+                            <span className="text-slate-500">
+                              {isEn ? service.distanceFromCenter?.replace('từ trung tâm', 'from center') : service.distanceFromCenter}
+                            </span>
                             <span>•</span>
                             <span className="flex items-center gap-1 text-slate-500">
                               <Clock className="w-3.5 h-3.5 text-slate-500" />
-                              <span>{service.duration || '120 phút'}</span>
+                              <span>{service.duration ? (isEn ? service.duration.replace('phút', 'mins') : service.duration) : t.durationDefault}</span>
                             </span>
                           </div>
 
@@ -858,16 +871,16 @@ export function Search() {
                           <div className="flex flex-wrap items-center gap-1.5 mt-3">
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-[13px] font-medium">
                               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                              Áo phao đạt chuẩn
+                              {t.lifeVest}
                             </span>
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-[13px] font-medium">
                               <Sparkles className="w-3.5 h-3.5 text-sky-700" />
-                              HDV 1:1 bản địa
+                              {t.coach1on1}
                             </span>
                             {service.hasPhotos && (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-[13px] font-medium">
                                 <Camera className="w-3.5 h-3.5 text-amber-600" />
-                                Chụp ảnh miễn phí
+                                {t.freePhotos}
                               </span>
                             )}
                           </div>
@@ -876,14 +889,14 @@ export function Search() {
                         {/* Cancellation Policy Banner */}
                         <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-1.5 text-[13px] text-emerald-700 font-medium">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Miễn phí hủy trước 24h • Hoàn tiền nếu biển động</span>
+                          <span>{t.policyBanner}</span>
                         </div>
                       </div>
 
                       {/* Right: Commercial Pricing & Action Box (Traveloka Style) */}
                       <div className="p-4 sm:p-5 sm:border-l sm:border-slate-100 flex flex-col justify-between items-start w-full sm:w-56 shrink-0 bg-slate-50/50 sm:bg-transparent">
                         
-                        {/* Price Display (Left-aligned within box to prevent floating button collision) */}
+                        {/* Price Display */}
                         <div className="text-left w-full">
                           {service.promotionalPrice && (
                             <p className="text-[13px] text-slate-500 line-through tabular-nums font-medium">
@@ -894,7 +907,7 @@ export function Search() {
                             {service.price.toLocaleString('vi-VN')} ₫
                           </p>
                           <p className="text-[13px] text-slate-600">
-                            / khách <span className="text-emerald-700 font-medium">(Đã gồm bảo hiểm)</span>
+                            {t.perGuest} <span className="text-emerald-700 font-medium">{t.insuranceIncluded}</span>
                           </p>
                         </div>
 
@@ -904,7 +917,7 @@ export function Search() {
                             type="button"
                             className="w-full py-2.5 px-4 rounded-xl bg-sky-700 hover:bg-sky-800 text-white font-bold text-[13px] sm:text-sm flex items-center justify-center gap-1.5 transition-all active:scale-[0.98] cursor-pointer"
                           >
-                            <span>Chọn trải nghiệm</span>
+                            <span>{t.selectBtn}</span>
                             <ArrowRight className="w-4 h-4" />
                           </button>
                         </div>
@@ -919,7 +932,7 @@ export function Search() {
                 {totalPages > 1 && (
                   <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white rounded-2xl border border-slate-200/90 p-4 shadow-xs">
                     <span className="text-xs text-slate-500 font-medium">
-                      Hiển thị <strong className="text-slate-800 font-mono">{(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredServices.length)}</strong> trong tổng số <strong className="text-slate-800 font-mono">{filteredServices.length}</strong> trải nghiệm
+                      {t.showing} <strong className="text-slate-800 font-mono">{(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, filteredServices.length)}</strong> {t.outOf} <strong className="text-slate-800 font-mono">{filteredServices.length}</strong> {t.experiencesUnit}
                     </span>
                     <div className="flex items-center gap-1.5">
                       <button
@@ -932,7 +945,7 @@ export function Search() {
                         className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-1"
                       >
                         <ChevronLeft className="w-3.5 h-3.5" />
-                        <span>Trước</span>
+                        <span>{t.prev}</span>
                       </button>
                       {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                         <button
@@ -960,7 +973,7 @@ export function Search() {
                         }}
                         className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center gap-1"
                       >
-                        <span>Sau</span>
+                        <span>{t.next}</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -974,17 +987,17 @@ export function Search() {
                   <SearchIcon className="w-6 h-6" />
                 </div>
                 <h3 className="font-bold text-base text-slate-900 mb-1">
-                  Không tìm thấy trải nghiệm phù hợp
+                  {t.emptyTitle}
                 </h3>
                 <p className="text-[13px] text-slate-500 max-w-sm mx-auto mb-4">
-                  Thử nới rộng khoảng giá hoặc bỏ bớt các tiêu chí lọc để xem thêm các hoạt động biển khác tại Đà Nẵng.
+                  {t.emptyDesc}
                 </p>
                 <button
                   type="button"
                   onClick={handleResetFilters}
                   className="px-4 py-2 rounded-xl bg-sky-700 text-white text-[13px] font-bold hover:bg-sky-800 transition-colors cursor-pointer"
                 >
-                  Xóa tất cả bộ lọc
+                  {t.clearFiltersBtn}
                 </button>
               </div>
             )}

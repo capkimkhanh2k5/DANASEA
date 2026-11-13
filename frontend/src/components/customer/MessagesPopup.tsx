@@ -15,6 +15,7 @@ import {
   CheckCheck 
 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useLanguageStore } from '../../store/useLanguageStore';
 import { communicationService, type ConversationItem, type MessageItem } from '../../services/communicationService';
 
 interface MessagesPopupProps {
@@ -24,6 +25,8 @@ interface MessagesPopupProps {
 
 export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose }) => {
   const { user, isAuthenticated } = useAuthStore();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [vendorNames, setVendorNames] = useState<Record<string, string>>({});
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
@@ -101,8 +104,8 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
 
   const activeConversation = conversations.find((c) => c.id === activeConvId);
   const activeVendorName = activeConversation
-    ? vendorNames[activeConversation.vendorId] || 'Nhà điều hành bến bãi'
-    : 'Đoạn chat';
+    ? vendorNames[activeConversation.vendorId] || (isEn ? 'Tour Operator' : 'Nhà điều hành bến bãi')
+    : (isEn ? 'Chat' : 'Đoạn chat');
 
   const handleSelectConversation = (id: string) => {
     setActiveConvId(id);
@@ -146,7 +149,7 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
     if (!isoString) return '';
     const date = new Date(isoString);
     if (isNaN(date.getTime())) return '';
-    return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' });
   };
 
   const filteredConversations = conversations.filter((c) => {
@@ -165,57 +168,40 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
     >
       {/* ==================== MESSENGER HEADER ==================== */}
       <div className="px-3.5 py-2.5 bg-white text-slate-900 flex items-center justify-between border-b border-slate-100 shadow-2xs shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           {activeConvId && (
             <button
               type="button"
               onClick={() => setActiveConvId(null)}
-              className="w-8 h-8 rounded-full text-[#0084ff] hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer mr-0.5 shrink-0"
-              title="Quay lại danh sách"
+              className="w-7 h-7 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer mr-0.5 shrink-0"
+              title={isEn ? "Back" : "Quay lại danh sách"}
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
           )}
 
-          {/* Avatar with Online Indicator */}
-          <div className="relative shrink-0">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-sky-600 to-blue-500 text-white flex items-center justify-center font-bold text-xs shadow-xs ring-2 ring-white">
-              {activeConversation ? (
-                activeVendorName.charAt(0).toUpperCase()
-              ) : (
-                <Store className="w-4 h-4 text-white" />
-              )}
-            </div>
-            {/* Green Online Dot */}
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
-          </div>
-
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <h3 className="font-semibold text-xs sm:text-[13px] text-slate-900 truncate leading-snug">
-              {activeVendorName}
+              {activeConvId ? activeVendorName : (isEn ? 'Chat' : 'Đoạn chat')}
             </h3>
-            <span className="text-[10.5px] text-emerald-600 font-medium flex items-center gap-1 leading-none mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              {activeConvId ? 'Đang hoạt động' : 'Hộp thư trực tuyến'}
-            </span>
           </div>
         </div>
 
-        {/* Header Action Buttons (Messenger Style) */}
+        {/* Header Action Buttons */}
         <div className="flex items-center gap-1 shrink-0 ml-2">
           {activeConvId && (
             <>
               <button
                 type="button"
-                className="w-7 h-7 rounded-full text-[#0084ff] hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
-                title="Gọi thoại"
+                className="w-7 h-7 rounded-lg text-sky-600 hover:bg-sky-50 flex items-center justify-center transition-colors cursor-pointer"
+                title={isEn ? "Voice call" : "Gọi thoại"}
               >
                 <Phone className="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
-                className="w-7 h-7 rounded-full text-[#0084ff] hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
-                title="Gọi video"
+                className="w-7 h-7 rounded-lg text-sky-600 hover:bg-sky-50 flex items-center justify-center transition-colors cursor-pointer"
+                title={isEn ? "Video call" : "Gọi video"}
               >
                 <Video className="w-3.5 h-3.5" />
               </button>
@@ -224,16 +210,18 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
           <button
             type="button"
             onClick={onClose}
-            title="Thu nhỏ"
-            className="w-7 h-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+            title={isEn ? "Minimize" : "Thu nhỏ"}
+            aria-label={isEn ? "Minimize" : "Thu nhỏ"}
+            className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
           >
             <Minus className="w-4 h-4" />
           </button>
           <button
             type="button"
             onClick={onClose}
-            title="Đóng chat"
-            className="w-7 h-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+            title={isEn ? "Close" : "Đóng chat"}
+            aria-label={isEn ? "Close" : "Đóng chat"}
+            className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -243,12 +231,16 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
       {/* ==================== BODY: NOT AUTHENTICATED ==================== */}
       {!isAuthenticated && (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-[#f0f2f5]">
-          <div className="w-12 h-12 rounded-full bg-white shadow-xs border border-slate-200 flex items-center justify-center text-[#0084ff] mb-3">
+          <div className="w-12 h-12 rounded-full bg-white shadow-xs border border-slate-200 flex items-center justify-center text-sky-600 mb-3">
             <Store className="w-6 h-6" />
           </div>
-          <h3 className="text-sm font-bold text-slate-800 mb-1">Đăng nhập tài khoản</h3>
+          <h3 className="text-sm font-bold text-slate-800 mb-1">
+            {isEn ? 'Sign in to continue' : 'Đăng nhập tài khoản'}
+          </h3>
           <p className="text-xs text-slate-500 leading-relaxed max-w-[260px]">
-            Vui lòng đăng nhập để trao đổi trực tiếp với nhà cung cấp tour biển và nhận thông tin hỗ trợ 24/7.
+            {isEn
+              ? 'Please sign in to message directly with tour operators and receive 24/7 support.'
+              : 'Vui lòng đăng nhập để trao đổi trực tiếp với nhà cung cấp tour biển và nhận thông tin hỗ trợ 24/7.'}
           </p>
         </div>
       )}
@@ -264,7 +256,7 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
                 type="text"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder="Tìm kiếm trên Messenger..."
+                placeholder={isEn ? 'Search conversations...' : 'Tìm kiếm trên Messenger...'}
                 className="w-full pl-8 pr-3 py-1.5 rounded-full bg-[#f0f2f5] text-xs text-slate-900 placeholder:text-slate-500 focus:outline-none focus:bg-white focus:ring-1 focus:ring-[#0084ff] transition-all"
               />
             </div>
@@ -289,15 +281,19 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
                 <div className="w-12 h-12 rounded-full bg-[#f0f2f5] flex items-center justify-center text-slate-400 mb-2">
                   <Store className="w-6 h-6" />
                 </div>
-                <h4 className="text-xs font-bold text-slate-800 mb-0.5">Chưa có tin nhắn nào</h4>
+                <h4 className="text-xs font-bold text-slate-800 mb-0.5">
+                  {isEn ? 'No messages yet' : 'Chưa có tin nhắn nào'}
+                </h4>
                 <p className="text-[11px] text-slate-500 max-w-[240px] leading-relaxed">
-                  Khi bạn đặt vé trải nghiệm hoặc gửi câu hỏi, cuộc trò chuyện với Vendor sẽ hiển thị tại đây.
+                  {isEn
+                    ? 'When you book a tour or ask a question, conversations with operators will appear here.'
+                    : 'Khi bạn đặt vé trải nghiệm hoặc gửi câu hỏi, cuộc trò chuyện với Vendor sẽ hiển thị tại đây.'}
                 </p>
               </div>
             ) : (
               filteredConversations.map((conv) => {
-                const vendorName = vendorNames[conv.vendorId] || 'Nhà điều hành bến bãi';
-                const lastText = conv.lastMessage?.content || 'Bắt đầu cuộc trò chuyện';
+                const vendorName = vendorNames[conv.vendorId] || (isEn ? 'Tour Operator' : 'Nhà điều hành bến bãi');
+                const lastText = conv.lastMessage?.content || (isEn ? 'Start a conversation' : 'Bắt đầu cuộc trò chuyện');
                 const timeStr = formatMessageTime(conv.lastMessage?.createdAt || conv.updatedAt);
                 const hasUnread = conv.unreadCount && conv.unreadCount > 0;
 
@@ -351,7 +347,9 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
                   <Store className="w-6 h-6 text-[#0084ff]" />
                 </div>
                 <span className="font-semibold text-slate-700 text-sm">{activeVendorName}</span>
-                <span className="text-[11px] text-slate-400 mt-1">Hãy vẫy tay hoặc gửi lời chào để bắt đầu!</span>
+                <span className="text-[11px] text-slate-400 mt-1">
+                  {isEn ? 'Say hello or ask questions to get started!' : 'Hãy vẫy tay hoặc gửi lời chào để bắt đầu!'}
+                </span>
               </div>
             ) : (
               messages.map((m, idx) => {
@@ -399,7 +397,10 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
 
           {/* Quick Reply Suggestion Chips */}
           <div className="px-2.5 py-1.5 bg-white border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-            {['Tôi sẽ có mặt đúng giờ', 'Vị trí đón ở đâu?', 'Cần mang theo đồ gì?'].map((chip, idx) => (
+            {(isEn
+              ? ['I will arrive on time', 'Where is the pickup point?', 'What should I bring along?']
+              : ['Tôi sẽ có mặt đúng giờ', 'Vị trí đón ở đâu?', 'Cần mang theo đồ gì?']
+            ).map((chip, idx) => (
               <button
                 key={idx}
                 type="button"
@@ -419,15 +420,15 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
             {/* Action Icons (Image & Emoji) */}
             <button
               type="button"
-              className="p-1.5 text-[#0084ff] hover:bg-blue-50 rounded-full transition-colors cursor-pointer shrink-0"
-              title="Đính kèm ảnh / vé"
+              className="p-1.5 text-sky-600 hover:bg-blue-50 rounded-full transition-colors cursor-pointer shrink-0"
+              title={isEn ? "Attach photo / voucher" : "Đính kèm ảnh / vé"}
             >
               <ImageIcon className="w-4 h-4" />
             </button>
             <button
               type="button"
-              className="p-1.5 text-[#0084ff] hover:bg-blue-50 rounded-full transition-colors cursor-pointer shrink-0"
-              title="Biểu cảm"
+              className="p-1.5 text-sky-600 hover:bg-blue-50 rounded-full transition-colors cursor-pointer shrink-0"
+              title={isEn ? "Emoji" : "Biểu cảm"}
             >
               <Smile className="w-4 h-4" />
             </button>
@@ -437,7 +438,7 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Nhắn tin..."
+              placeholder={isEn ? "Type a message..." : "Nhắn tin..."}
               disabled={sending}
               className="flex-1 bg-[#f0f2f5] rounded-full px-3.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-500 focus:outline-none focus:bg-white focus:ring-1.5 focus:ring-[#0084ff] border border-transparent transition-all"
             />
@@ -447,7 +448,7 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
               <button
                 type="submit"
                 disabled={sending}
-                title="Gửi tin nhắn"
+                title={isEn ? "Send message" : "Gửi tin nhắn"}
                 className="w-7 h-7 rounded-full bg-[#0084ff] hover:bg-[#0073e6] text-white flex items-center justify-center transition-all hover:scale-105 cursor-pointer shrink-0 shadow-xs"
               >
                 {sending ? (
@@ -461,8 +462,8 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
                 type="button"
                 onClick={handleSendLike}
                 disabled={sending}
-                title="Gửi nút thích"
-                className="p-1.5 text-[#0084ff] hover:bg-blue-50 rounded-full transition-all hover:scale-115 cursor-pointer shrink-0"
+                title={isEn ? "Send thumbs up" : "Gửi nút thích"}
+                className="p-1.5 text-sky-600 hover:bg-blue-50 rounded-full transition-all hover:scale-115 cursor-pointer shrink-0"
               >
                 <ThumbsUp className="w-4 h-4 fill-[#0084ff]" />
               </button>
