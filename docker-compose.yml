@@ -204,11 +204,12 @@ services:
     user: "${CLIPROXY_UID:-1000}:${CLIPROXY_GID:-1000}"
     restart: unless-stopped
     ports:
+      - "127.0.0.1:8317:8317"
       - "127.0.0.1:${CLIPROXYAPI_PORT:-8318}:8317"
       - "127.0.0.1:8085:8085"
       - "127.0.0.1:1455:1455"
       - "127.0.0.1:54545:54545"
-      - "127.0.0.1:${CLIPROXYAPI_AG_PORT:-51122}:51121"
+      - "127.0.0.1:${CLIPROXYAPI_AG_PORT:-51121}:51121"
     volumes:
       - ./private/cli-proxy/config.yaml:/CLIProxyAPI/config.yaml
       - ./cli-proxy/auths:/auths

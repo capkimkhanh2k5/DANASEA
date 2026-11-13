@@ -134,7 +134,7 @@ class PackageContract(unittest.TestCase):
         self.assertEqual('00700797976', banks[users['vender_7@danasea.test']['id']]['bank_account_number'])
         self.assertEqual('00700648686', banks[users['vender_8@danasea.test']['id']]['bank_account_number'])
         self.assertEqual('ADMIN', users['admin_demo@danasea.test']['role'])
-        self.assertEqual(2, sum(u['role'] == 'CUSTOMER' for u in users.values()))
+        self.assertEqual(15, sum(u['role'] == 'CUSTOMER' for u in users.values()))
         self.assertTrue(all(u['password_hash'] is None for u in users.values()))
 
 

@@ -59,7 +59,6 @@ export function ServiceForm() {
 
 function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
   const navigate = useNavigate();
-  const isEditMode = Boolean(serviceId);
 
   const [activeTab, setActiveTab] = useState<FormTab>('CONTENT_SAFETY');
   const [isLoading, setIsLoading] = useState<boolean>(Boolean(serviceId));
@@ -490,18 +489,6 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
         {/* Top Utility Header (Atlas Business Suite Standard) */}
         <div className="w-full bg-white/95 backdrop-blur-sm border-b border-slate-200/80 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4 shadow-xs sticky top-0 z-20">
           <div className="flex flex-col">
-            <nav className="flex items-center gap-1.5 text-xs text-slate-400 mb-0.5">
-              <span 
-                onClick={() => navigate('/vendor/services')} 
-                className="hover:text-slate-800 transition-colors cursor-pointer"
-              >
-                Dịch vụ &amp; Trải nghiệm
-              </span>
-              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="text-slate-700 font-medium">
-                {isEditMode ? 'Chỉnh sửa dịch vụ' : 'Soạn dịch vụ mới'}
-              </span>
-            </nav>
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl font-bold text-slate-900 tracking-tight font-display">
                 {nameVi || 'Chưa đặt tên dịch vụ'}
