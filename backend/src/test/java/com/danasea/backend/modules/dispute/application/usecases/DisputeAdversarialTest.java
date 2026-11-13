@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.dispute.application.usecases;
 
+import com.danasea.backend.modules.dispute.application.services.DisputeWindowService;
 import com.danasea.backend.modules.dispute.domain.exceptions.*;
 import com.danasea.backend.modules.dispute.domain.models.DisputeReason;
 import com.danasea.backend.modules.dispute.domain.models.DisputeStatus;
@@ -37,6 +38,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -86,7 +88,8 @@ class DisputeAdversarialTest {
     @BeforeEach
     void setUp() {
         createDisputeUseCase = new CreateDisputeUseCase(
-                disputeRepository, masterOrderRepository, subOrderRepository, slotRepository);
+                disputeRepository, masterOrderRepository, subOrderRepository,
+                new DisputeWindowService(slotRepository, Clock.systemDefaultZone()));
         resolveDisputeUseCase = new ResolveDisputeUseCase(
                 disputeRepository, subOrderRepository, refundRepository);
         exceptionHandler = new DisputeExceptionHandler();
@@ -369,9 +372,9 @@ class DisputeAdversarialTest {
         @ParameterizedTest(name = "SubOrder Status: {0} -> Must be REJECTED with 400 Bad Request")
         @EnumSource(
                 value = SubOrderStatus.class,
-                names = {"PENDING", "REJECTED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED", "CHECKED_IN", "IN_PROGRESS"}
+                names = {"PENDING", "REJECTED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED", "IN_PROGRESS"}
         )
-        @DisplayName("Exhaustive check: All 7 non-eligible statuses MUST be rejected with InvalidSubOrderStateException")
+        @DisplayName("Exhaustive check: All 6 non-eligible statuses MUST be rejected with InvalidSubOrderStateException")
         void testSubOrderStatus_AllInvalidStatuses_Throws400(SubOrderStatus invalidStatus) {
             MasterOrderJpaEntity masterOrder = new MasterOrderJpaEntity();
             masterOrder.setId(masterOrderIdA);
@@ -398,9 +401,9 @@ class DisputeAdversarialTest {
         @ParameterizedTest(name = "SubOrder Status: {0} -> Must be ACCEPTED")
         @EnumSource(
                 value = SubOrderStatus.class,
-                names = {"COMPLETED", "CONFIRMED"}
+                names = {"COMPLETED", "CONFIRMED", "CHECKED_IN", "NO_SHOW"}
         )
-        @DisplayName("Eligible statuses: Exactly COMPLETED and CONFIRMED are accepted")
+        @DisplayName("Eligible statuses: COMPLETED, CONFIRMED, and CHECKED_IN are accepted")
         void testSubOrderStatus_EligibleStatuses_Accepted(SubOrderStatus validStatus) {
             MasterOrderJpaEntity masterOrder = new MasterOrderJpaEntity();
             masterOrder.setId(masterOrderIdA);

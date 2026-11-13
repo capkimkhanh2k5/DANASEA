@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.dispute.application.usecases;
 
+import com.danasea.backend.modules.dispute.application.services.DisputeWindowService;
 import com.danasea.backend.modules.dispute.domain.exceptions.*;
 import com.danasea.backend.modules.dispute.domain.models.DisputeReason;
 import com.danasea.backend.modules.dispute.domain.models.DisputeStatus;
@@ -34,6 +35,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -79,7 +81,8 @@ class DisputeUseCaseTest {
     @BeforeEach
     void setUp() {
         createDisputeUseCase = new CreateDisputeUseCase(
-                disputeRepository, masterOrderRepository, subOrderRepository, slotRepository);
+                disputeRepository, masterOrderRepository, subOrderRepository,
+                new DisputeWindowService(slotRepository, Clock.systemDefaultZone()));
         resolveDisputeUseCase = new ResolveDisputeUseCase(
                 disputeRepository, subOrderRepository, refundRepository);
         getDisputesUseCase = new GetDisputesUseCase(disputeRepository);

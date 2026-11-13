@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.service.infrastructure.persistence.entities;
 
+import com.danasea.backend.modules.service.domain.models.OperationType;
 import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.shared.core.infrastructure.persistence.entities.BaseJpaEntity;
 import jakarta.persistence.*;
@@ -33,6 +34,10 @@ public class ServiceJpaEntity extends BaseJpaEntity {
     private Integer durationMinutes;
 
     private Integer capacityPerSlot;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "operation_type", nullable = false)
+    private OperationType operationType = OperationType.FIXED_DEPARTURE;
 
     private String locationName;
 

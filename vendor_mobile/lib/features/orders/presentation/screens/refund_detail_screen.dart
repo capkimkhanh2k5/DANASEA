@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/models/vendor_models.dart';
-import '../../../../core/data/vendor_mock_database.dart';
+import '../../../../core/data/vendor_store.dart';
 import 'sub_order_detail_screen.dart';
 
 class RefundDetailScreen extends StatelessWidget {
@@ -18,7 +18,7 @@ class RefundDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final db = VendorMockDatabase.instance;
+    final db = VendorStore.instance;
     final refund = this.refund ?? (db.refunds.isNotEmpty ? db.refunds.first : RefundModel(
       id: 'REF-001',
       subOrderId: 'DNS-5421-1',

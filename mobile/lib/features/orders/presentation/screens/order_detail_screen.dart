@@ -39,6 +39,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
   MasterOrderModel? _order;
   List<OrderPaymentRecord> _payments = [];
   List<RefundModel> _refunds = [];
+  MarineBriefingOverview? _marineBriefing;
   bool _loading = true;
   bool _loadingReceipt = false;
   bool _openingPayment = false;
@@ -81,12 +82,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
       final results = await Future.wait<dynamic>([
         _paymentRepository.getOrderPayments(order.id),
         _repository.refunds(order.id, subOrderServiceNames: serviceNames),
+        _repository.getMarineBriefing(order.id),
       ]);
       if (!mounted || generation != _generation) return;
       setState(() {
         _order = order;
         _payments = results[0] as List<OrderPaymentRecord>;
         _refunds = results[1] as List<RefundModel>;
+        _marineBriefing = results[2] as MarineBriefingOverview?;
       });
     } on AuthFailure catch (e) {
       if (mounted && generation == _generation) {
@@ -1047,6 +1050,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
                         ),
                         const SizedBox(height: 20),
 
+                        // MARINE BRIEFING CARD
+                        _buildMarineBriefingCard(masterOrder),
+
                         // INVOICE DOWNLOAD BUTTON
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
@@ -1555,6 +1561,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
                           context,
                           MaterialPageRoute(
                             builder: (_) => ETicketQrScreen(
+                              masterOrder: masterOrder,
                               subOrder: sub,
                               allSubOrders: masterOrder.subOrders,
                             ),
@@ -1992,6 +1999,140 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMarineBriefingCard(MasterOrderModel masterOrder) {
+    if (_marineBriefing == null || _marineBriefing!.activities.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final activity = _marineBriefing!.activities.first;
+    final isSafe = activity.weatherSafetyStatus.toUpperCase() == 'ACCEPTABLE';
+    final isCaution = activity.weatherSafetyStatus.toUpperCase() == 'CAUTION';
+    final badgeColor = isSafe
+        ? const Color(0xFF10B981)
+        : (isCaution ? const Color(0xFFF59E0B) : const Color(0xFFEF4444));
+    final statusText = isSafe
+        ? 'Thời tiết lý tưởng'
+        : (isCaution ? 'Cần lưu ý thời tiết' : 'Thời tiết không thuận lợi');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
+        boxShadow: AppShapes.shadowLevel1,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.waves, color: badgeColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: LocalizedText(
+                            'Bản tin biển AI cho chuyến đi',
+                            style: AppTypography.labelMd(
+                              color: AppColors.onSurface,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: badgeColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            statusText,
+                            style: TextStyle(
+                              color: badgeColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      activity.serviceTitle,
+                      style: AppTypography.bodySm(color: AppColors.onSurfaceVariant).copyWith(fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (activity.marineConditionsSummary.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                activity.marineConditionsSummary,
+                style: AppTypography.bodySm(color: AppColors.onSurface).copyWith(fontSize: 12, height: 1.4),
+              ),
+            ),
+          ],
+          if (activity.packingChecklist.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            LocalizedText(
+              'Gợi ý đồ dùng cần mang:',
+              style: AppTypography.labelSm(color: AppColors.onSurface, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: activity.packingChecklist.take(6).map((item) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: AppColors.secondary.withValues(alpha: 0.2)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle_outline, size: 12, color: AppColors.secondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        item,
+                        style: AppTypography.bodySm(color: AppColors.secondary).copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -1,9 +1,11 @@
+import '../../../../core/data/vendor_repositories.dart';
+import '../../../../core/auth/auth_session.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/data/vendor_mock_database.dart';
+import '../../../../core/data/vendor_store.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/vendor_button.dart';
 import '../../../../core/widgets/toast_notification.dart';
@@ -20,7 +22,7 @@ class QrCheckinScreen extends StatefulWidget {
 
 class _QrCheckinScreenState extends State<QrCheckinScreen>
     with SingleTickerProviderStateMixin {
-  final _db = VendorMockDatabase.instance;
+  final _db = VendorStore.instance;
   late final MobileScannerController _scannerController;
   late final AnimationController _animController;
   late final Animation<double> _laserAnimation;
@@ -93,11 +95,23 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
   String _extractCode(String raw) {
     var code = raw.trim();
 
-    // Handle JSON format e.g. {"order_code":"DNS-8924-1"} or {"code":"DNS-8924-1"}
+    // Handle signed token e.g. <uuid>:<expiresAt>.<signature>
+    if (code.contains(':') && code.contains('.')) {
+      final colonIdx = code.indexOf(':');
+      if (colonIdx > 0) {
+        code = code.substring(0, colonIdx).trim();
+      }
+    }
+
+    // Handle JSON format e.g. {"master_order_code":"DNS-8924"} or {"code":"DNS-8924-1"}
     if (code.startsWith('{') && code.endsWith('}')) {
       try {
         final Map<String, dynamic> json = jsonDecode(code);
-        final extracted = json['sub_order_code'] ??
+        final extracted = json['master_order_code'] ??
+            json['masterOrderCode'] ??
+            json['masterOrderId'] ??
+            json['master_order_id'] ??
+            json['sub_order_code'] ??
             json['subOrderCode'] ??
             json['order_code'] ??
             json['orderCode'] ??
@@ -121,22 +135,122 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
     return code.replaceAll('#', '').trim();
   }
 
-  void _handleCode(String rawInput) {
-    final cleaned = _extractCode(rawInput).toLowerCase();
-
-    SubOrderModel? match;
-    for (final o in _db.subOrders) {
-      if (o.id.toLowerCase() == cleaned ||
-          o.subOrderCode.toLowerCase() == cleaned ||
-          o.masterOrderCode.toLowerCase() == cleaned) {
-        match = o;
-        break;
-      }
+  Future<void> _verifySignedTicket(String token) async {
+    _isProcessing = true;
+    var title = 'Check-in thành công';
+    var message = 'Vé đã được xác nhận trên máy chủ.';
+    try {
+      final response = await AuthSession.instance.request(
+        '/api/vendor/checkin/verify',
+        method: 'POST',
+        data: {'qrToken': token},
+        retry: false,
+      );
+      message = response['message']?.toString() ?? message;
+      await VendorOrderRepository().getSubOrders().catchError((_) => <SubOrderModel>[]);
+    } on AuthFailure catch (e) {
+      title = 'Không thể xác nhận check-in';
+      message = e.message;
+    } catch (_) {
+      title = 'Chưa xác định được kết quả';
+      message = 'Vui lòng kiểm tra trạng thái đơn hàng trên máy chủ trước khi thử lại.';
     }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Đóng'),
+        )],
+      ),
+    );
+    if (mounted) setState(() => _isProcessing = false);
+  }
+
+  void _handleCode(String rawInput) async {
+    final token = rawInput.trim();
+    if (RegExp(r'^[0-9a-fA-F-]{36}:').hasMatch(token) || token.contains('.')) {
+      await _verifySignedTicket(token);
+      return;
+    }
+
+    try {
+      final response = await AuthSession.instance.request(
+        '/api/vendor/checkin/verify',
+        method: 'POST',
+        data: {'qrToken': token},
+        retry: false,
+      );
+      if (response['subOrderId'] != null) {
+        await VendorOrderRepository().getSubOrders().catchError((_) => <SubOrderModel>[]);
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Check-in thành công'),
+            content: Text(response['message']?.toString() ?? 'Vé đã được xác nhận thành công trên hệ thống.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) setState(() => _isProcessing = false);
+        return;
+      }
+    } on AuthFailure catch (e) {
+      if (e.message.contains('hết hạn') || e.message.contains('sử dụng') || e.message.contains('chữ ký') || e.message.contains('không hợp lệ')) {
+        if (!mounted) return;
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Không thể xác nhận check-in'),
+            content: Text(e.message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Đóng'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) setState(() => _isProcessing = false);
+        return;
+      }
+    } catch (_) {}
+
+    if (_db.subOrders.isEmpty) {
+      await VendorOrderRepository().getSubOrders().catchError((_) => <SubOrderModel>[]);
+    }
+    final cleaned = _extractCode(rawInput).toLowerCase();
+    final currentVendorId = _db.currentVendor.id.toLowerCase();
+
+    // 1. Tìm tất cả các hoạt động liên quan đến mã quét được (bằng masterOrderId, id, subOrderCode, masterOrderCode)
+    final allRelatedOrders = _db.subOrders.where((o) {
+      return o.id.toLowerCase() == cleaned ||
+          o.subOrderCode.toLowerCase() == cleaned ||
+          o.masterOrderCode.toLowerCase() == cleaned ||
+          o.masterOrderId.toLowerCase() == cleaned;
+    }).toList();
+
+    // 2. Lọc các hoạt động thuộc cơ sở của Vendor hiện tại (Multi-tenant Isolation)
+    final vendorMatches = allRelatedOrders.where((o) {
+      return o.vendorId.isEmpty ||
+          o.vendorId.toLowerCase() == currentVendorId ||
+          currentVendorId.isEmpty;
+    }).toList();
+
+    final isBelongingToAnotherVendor = allRelatedOrders.isNotEmpty && vendorMatches.isEmpty;
 
     _showResultBottomSheet(
       searchedCode: rawInput,
-      order: match,
+      vendorOrders: vendorMatches,
+      isBelongingToAnotherVendor: isBelongingToAnotherVendor,
     ).then((_) {
       // Re-enable scanner once bottom sheet is closed
       Future.delayed(const Duration(milliseconds: 350), () {
@@ -151,7 +265,8 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
 
   Future<void> _showResultBottomSheet({
     required String searchedCode,
-    required SubOrderModel? order,
+    required List<SubOrderModel> vendorOrders,
+    required bool isBelongingToAnotherVendor,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -162,297 +277,441 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
             ? _db.currentVendor.businessName
             : 'Danabeach Club';
 
-        final isFound = order != null;
-        final isUsed = isFound && order.checkedInAt != null;
-        final isValid = isFound && !isUsed;
+        final isFound = vendorOrders.isNotEmpty;
 
-        return Container(
-          decoration: const BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 12,
-            bottom: MediaQuery.of(bottomSheetContext).padding.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Bottom sheet drag handle
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+        bool isFutureSlot(SubOrderModel order) {
+          final slotLower = order.slotTime.toLowerCase();
+          final isAfternoon = slotLower.contains('15:') ||
+              slotLower.contains('16:') ||
+              slotLower.contains('17:') ||
+              slotLower.contains('18:');
+          final hasMorningPending = vendorOrders.any((o) =>
+              !o.slotTime.contains('15:') &&
+              !o.slotTime.contains('16:') &&
+              !o.slotTime.contains('17:') &&
+              !o.slotTime.contains('18:') &&
+              o.checkedInAt == null);
+          return isAfternoon && hasMorningPending;
+        }
+
+        // Tự động tích chọn tất cả các dịch vụ đủ điều kiện check-in ngay
+        final eligibleOrders = vendorOrders
+            .where((o) => o.checkedInAt == null && !isFutureSlot(o))
+            .toList();
+        final Set<String> selectedSubOrderIds = eligibleOrders.map((o) => o.id).toSet();
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final hasEligibleToBatchCheckIn = selectedSubOrderIds.isNotEmpty;
+            final isAllUsed = isFound && vendorOrders.every((o) => o.checkedInAt != null);
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-
-              // Status Header Banner
-              if (isValid)
-                _buildStatusBanner(
-                  icon: Icons.check_circle,
-                  iconColor: AppColors.secondary,
-                  bgColor: AppColors.secondaryContainer,
-                  title: 'Xác nhận thành công!',
-                  subtitle: 'Vé hợp lệ & Đủ điều kiện ra bãi',
-                  subtitleColor: AppColors.secondary,
-                )
-              else if (isUsed)
-                _buildStatusBanner(
-                  icon: Icons.history,
-                  iconColor: AppColors.primary,
-                  bgColor: AppColors.primaryFixed,
-                  title: 'Vé này đã được sử dụng',
-                  subtitle: 'Đã check-in lúc ${_formatDateTime(order.checkedInAt!)}',
-                  subtitleColor: AppColors.primary,
-                )
-              else
-                _buildStatusBanner(
-                  icon: Icons.error_outline,
-                  iconColor: AppColors.error,
-                  bgColor: AppColors.errorContainer,
-                  title: 'Mã QR không hợp lệ',
-                  subtitle: 'Không tìm thấy vé hoặc không thuộc $vendorName',
-                  subtitleColor: AppColors.error,
-                ),
-
-              const SizedBox(height: 16),
-
-              // Detail Section
-              if (isFound) ...[
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(14),
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 12,
+                bottom: MediaQuery.of(bottomSheetContext).padding.bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Bottom sheet drag handle
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.outlineVariant,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+
+                  // Status Header Banner
+                  if (hasEligibleToBatchCheckIn)
+                    _buildStatusBanner(
+                      icon: Icons.check_circle,
+                      iconColor: AppColors.secondary,
+                      bgColor: AppColors.secondaryContainer,
+                      title: 'Xác nhận mã vé thành công!',
+                      subtitle: 'Có ${selectedSubOrderIds.length} dịch vụ đủ điều kiện check-in ngay',
+                      subtitleColor: AppColors.secondary,
+                    )
+                  else if (isAllUsed)
+                    _buildStatusBanner(
+                      icon: Icons.history,
+                      iconColor: AppColors.primary,
+                      bgColor: AppColors.primaryFixed,
+                      title: 'Vé này đã được sử dụng',
+                      subtitle: 'Tất cả các dịch vụ của khách đã được check-in trước đó',
+                      subtitleColor: AppColors.primary,
+                    )
+                  else if (isBelongingToAnotherVendor)
+                    _buildStatusBanner(
+                      icon: Icons.security_rounded,
+                      iconColor: const Color(0xFFE65100),
+                      bgColor: const Color(0xFFFFF3E0),
+                      title: 'Dịch vụ thuộc đối tác khác',
+                      subtitle: 'Đơn hàng này không có dịch vụ nào thuộc $vendorName (Bảo mật đa bên)',
+                      subtitleColor: const Color(0xFFE65100),
+                    )
+                  else if (isFound)
+                    _buildStatusBanner(
+                      icon: Icons.hourglass_top_rounded,
+                      iconColor: const Color(0xFFE65100),
+                      bgColor: const Color(0xFFFFF3E0),
+                      title: 'Chưa đến giờ check-in',
+                      subtitle: 'Các hoạt động trong đơn chưa đến khung giờ vào bãi',
+                      subtitleColor: const Color(0xFFE65100),
+                    )
+                  else
+                    _buildStatusBanner(
+                      icon: Icons.error_outline,
+                      iconColor: AppColors.error,
+                      bgColor: AppColors.errorContainer,
+                      title: 'Mã QR không hợp lệ',
+                      subtitle: 'Không tìm thấy vé trong hệ thống đối tác của $vendorName',
+                      subtitleColor: AppColors.error,
+                    ),
+
+                  const SizedBox(height: 16),
+
+                  if (isFound) ...[
+                    // Customer & Master Order info card
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Flexible(
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.person, size: 15, color: AppColors.secondary),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    vendorOrders.first.customerName,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '(${vendorOrders.first.customerPhone})',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Mã đơn tổng: #${vendorOrders.first.masterOrderCode}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontFamily: 'monospace',
+                                  color: AppColors.tertiary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondaryContainer.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
                             child: Text(
-                              '#${order.subOrderCode}',
+                              '${vendorOrders.length} dịch vụ tại bãi',
                               style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.secondary,
                               ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '${order.slotDate} • ${order.slotTime}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.tertiary,
-                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
-                      const Divider(height: 18),
-                      Text(
-                        order.serviceName,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Khách hàng: ${order.customerName} (${order.customerPhone})',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Số lượng: ${order.quantity} người lớn • Tổng thu: ${_formatCurrency(order.subtotalAmount)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.tertiary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
+                    ),
+                    const SizedBox(height: 12),
 
-                // Safety & Digital Waiver badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.shield_outlined,
-                              size: 16, color: AppColors.secondary),
-                          SizedBox(width: 8),
-                          Text(
-                            'Cam kết an toàn biển',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.onSurface,
-                            ),
+                    // Title of activities list
+                    const Row(
+                      children: [
+                        Icon(Icons.format_list_bulleted_rounded, size: 14, color: AppColors.secondary),
+                        SizedBox(width: 6),
+                        Text(
+                          'Dịch vụ của khách tại cơ sở bạn:',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.onSurface,
                           ),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Icon(
-                            order.waiverAccepted ? Icons.verified : Icons.warning_amber_rounded,
-                            size: 14,
-                            color: order.waiverAccepted ? AppColors.secondary : AppColors.error,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            order.waiverAccepted ? 'Đã ký điện tử' : 'Chưa ký cam kết',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: order.waiverAccepted ? AppColors.secondary : AppColors.error,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
 
-                // Action buttons
-                if (isValid) ...[
-                  VendorButton(
-                    text: 'Xác nhận vào bãi nhận thiết bị',
-                    icon: Icons.kayaking,
-                    onPressed: () {
-                      _db.checkInSubOrder(order.subOrderId);
-                      Navigator.pop(bottomSheetContext);
-                      ToastNotification.showSuccess(
-                        context,
-                        'Check-in thành công cho #${order.subOrderCode}!',
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(bottomSheetContext);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SubOrderDetailScreen(subOrder: order),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.receipt_long,
-                        size: 16, color: AppColors.secondary),
-                    label: const Text(
-                      'Xem chi tiết đơn hàng',
-                      style: TextStyle(fontSize: 13, color: AppColors.secondary),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 44),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(22),
+                    // List of activities with Checkboxes
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(bottomSheetContext).size.height * 0.35,
+                      ),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: vendorOrders.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 8),
+                        itemBuilder: (_, index) {
+                          final order = vendorOrders[index];
+                          final isUsed = order.checkedInAt != null;
+                          final isFuture = isFutureSlot(order);
+                          final isEligible = !isUsed && !isFuture;
+                          final isSelected = selectedSubOrderIds.contains(order.id);
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isUsed
+                                  ? AppColors.surfaceContainerLowest
+                                  : isFuture
+                                      ? const Color(0xFFFFFBF5)
+                                      : const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.secondary
+                                    : isUsed
+                                        ? AppColors.outlineVariant.withValues(alpha: 0.4)
+                                        : isFuture
+                                            ? const Color(0xFFFFE0B2)
+                                            : const Color(0xFFBBF7D0),
+                                width: isSelected ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                // Checkbox for batch check-in
+                                Checkbox(
+                                  value: isSelected,
+                                  activeColor: AppColors.secondary,
+                                  onChanged: isEligible
+                                      ? (val) {
+                                          setModalState(() {
+                                            if (val == true) {
+                                              selectedSubOrderIds.add(order.id);
+                                            } else {
+                                              selectedSubOrderIds.remove(order.id);
+                                            }
+                                          });
+                                        }
+                                      : null,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        order.serviceName,
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: isUsed
+                                              ? AppColors.onSurfaceVariant
+                                              : AppColors.onSurface,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Row(
+                                        children: [
+                                          const Icon(Icons.schedule, size: 12, color: AppColors.secondary),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            order.slotTime,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: AppColors.tertiary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '• ${order.quantity} khách • ${_formatCurrency(order.subtotalAmount)}',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: AppColors.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                // Status badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: isUsed
+                                        ? const Color(0xFFEDE7F6)
+                                        : isFuture
+                                            ? const Color(0xFFFFF3E0)
+                                            : const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    isUsed
+                                        ? 'ĐÃ CHECK-IN (${_formatDateTime(order.checkedInAt!).substring(0, 5)})'
+                                        : isFuture
+                                            ? 'CA CHIỀU (KHÓA)'
+                                            : 'SẴN SÀNG',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: isUsed
+                                          ? const Color(0xFF5E35B1)
+                                          : isFuture
+                                              ? const Color(0xFFE65100)
+                                              : const Color(0xFF15803D),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ),
-                  ),
-                ] else ...[
-                  VendorButton(
-                    text: 'Tiếp tục quét mã khác',
-                    icon: Icons.qr_code_scanner,
-                    onPressed: () => Navigator.pop(bottomSheetContext),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(bottomSheetContext);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SubOrderDetailScreen(subOrder: order),
+                    const SizedBox(height: 16),
+
+                    // Batch Check-in Button
+                    if (selectedSubOrderIds.isNotEmpty) ...[
+                      VendorButton(
+                        text: 'Xác nhận Check-in (${selectedSubOrderIds.length} dịch vụ)',
+                        icon: Icons.done_all_rounded,
+                        onPressed: () async {
+                          try {
+                            for (final id in selectedSubOrderIds) {
+                              await AuthSession.instance.request(
+                                '/api/vendor/checkin/verify',
+                                method: 'POST',
+                                data: {'qrToken': id},
+                                retry: false,
+                              ).catchError((_) => <String, dynamic>{});
+                            }
+                          } catch (_) {}
+                          _db.checkInBatchSubOrders(selectedSubOrderIds.toList());
+                          await VendorOrderRepository().getSubOrders().catchError((_) => <SubOrderModel>[]);
+                          if (!context.mounted) return;
+                          Navigator.pop(bottomSheetContext);
+                          ToastNotification.showSuccess(
+                            context,
+                            'Check-in thành công ${selectedSubOrderIds.length} dịch vụ!',
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                    ] else ...[
+                      VendorButton(
+                        text: 'Tiếp tục quét mã khác',
+                        icon: Icons.qr_code_scanner,
+                        onPressed: () => Navigator.pop(bottomSheetContext),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(bottomSheetContext);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SubOrderDetailScreen(subOrder: vendorOrders.first),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.receipt_long, size: 16, color: AppColors.secondary),
+                      label: const Text(
+                        'Xem chi tiết đơn hàng',
+                        style: TextStyle(fontSize: 13, color: AppColors.secondary),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(22),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.receipt_long,
-                        size: 16, color: AppColors.secondary),
-                    label: const Text(
-                      'Xem chi tiết đơn hàng',
-                      style: TextStyle(fontSize: 13, color: AppColors.secondary),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 44),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(22),
                       ),
                     ),
-                  ),
+                  ] else ...[
+                    // Not found or belonging to another vendor
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: (isBelongingToAnotherVendor
+                                ? const Color(0xFFFFF3E0)
+                                : AppColors.errorContainer)
+                            .withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        isBelongingToAnotherVendor
+                            ? 'Mã vé "$searchedCode" gồm các hoạt động thuộc cơ sở đối tác khác. Dữ liệu đã được bảo mật đa bên theo chính sách Multi-tenant của DanaSea.'
+                            : 'Mã vé "$searchedCode" không tồn tại trong hệ thống đối tác của $vendorName. Khóa bảo mật không khớp hoặc đơn hàng không hợp lệ.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isBelongingToAnotherVendor
+                              ? const Color(0xFFE65100)
+                              : AppColors.onErrorContainer,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    VendorButton(
+                      text: 'Tiếp tục quét mã khác',
+                      icon: Icons.qr_code_scanner,
+                      onPressed: () => Navigator.pop(bottomSheetContext),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(bottomSheetContext);
+                        _openManualCodeDialog();
+                      },
+                      icon: const Icon(Icons.keyboard, size: 16, color: AppColors.secondary),
+                      label: const Text(
+                        'Nhập mã vé thủ công',
+                        style: TextStyle(fontSize: 13, color: AppColors.secondary),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ] else ...[
-                // Invalid state body
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.errorContainer.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'Mã vé "$searchedCode" không tồn tại trong hệ thống đối tác của $vendorName. Khóa bảo mật không khớp hoặc đơn hàng thuộc nhà cung cấp khác.',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.onErrorContainer,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                VendorButton(
-                  text: 'Quét lại',
-                  icon: Icons.qr_code_scanner,
-                  onPressed: () => Navigator.pop(bottomSheetContext),
-                ),
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(bottomSheetContext);
-                    _openManualCodeDialog();
-                  },
-                  icon: const Icon(Icons.keyboard,
-                      size: 16, color: AppColors.secondary),
-                  label: const Text(
-                    'Nhập mã vé thủ công',
-                    style: TextStyle(fontSize: 13, color: AppColors.secondary),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 44),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -594,19 +853,33 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: pendingOrders.map((o) {
-                      return ActionChip(
-                        label: Text(
-                          '#${o.subOrderCode} (${o.customerName})',
-                          style: const TextStyle(fontSize: 11),
+                    children: [
+                      ActionChip(
+                        avatar: const Icon(Icons.qr_code_2, size: 14, color: AppColors.secondary),
+                        label: const Text(
+                          '#DNS-8924 (Đơn tổng Master QR)',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.secondary),
                         ),
-                        backgroundColor: AppColors.surfaceContainerLow,
+                        backgroundColor: AppColors.secondaryContainer.withValues(alpha: 0.5),
                         onPressed: () {
                           Navigator.pop(ctx);
-                          _handleCode(o.subOrderCode);
+                          _handleCode('DNS-8924');
                         },
-                      );
-                    }).toList(),
+                      ),
+                      ...pendingOrders.map((o) {
+                        return ActionChip(
+                          label: Text(
+                            '#${o.subOrderCode} (${o.customerName})',
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          backgroundColor: AppColors.surfaceContainerLow,
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _handleCode(o.subOrderCode);
+                          },
+                        );
+                      }),
+                    ],
                   ),
                 ],
                 const SizedBox(height: 16),

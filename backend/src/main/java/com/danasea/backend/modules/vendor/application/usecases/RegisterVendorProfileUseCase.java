@@ -3,6 +3,7 @@ package com.danasea.backend.modules.vendor.application.usecases;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +39,10 @@ public class RegisterVendorProfileUseCase {
             throw new UserLockedException();
         }
 
+        if (user.getRole() != Role.VENDOR) {
+            throw new AccessDeniedException("Direct vendor profile registration is not permitted for non-vendors. Please submit a partner application.");
+        }
+
         if (jpaVendorRepository.existsByUserId(userId)) {
             throw new VendorAlreadyExistsException();
         }
@@ -56,9 +61,6 @@ public class RegisterVendorProfileUseCase {
         entity.setRatingCount(0);
 
         VendorJpaEntity savedEntity = jpaVendorRepository.save(entity);
-
-        user.setRole(Role.VENDOR);
-        accountInternalApi.saveUser(user);
 
         return vendorMapper.toDomain(savedEntity);
     }

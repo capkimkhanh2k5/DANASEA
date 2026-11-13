@@ -1,6 +1,7 @@
 package com.danasea.backend.modules.ai.infrastructure.cliproxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -15,6 +16,7 @@ import org.springframework.web.client.RestClient;
 
 import com.danasea.backend.configs.properties.HttpClientProperties;
 import com.danasea.backend.modules.ai.application.ports.AiExecutionBudget;
+import com.danasea.backend.modules.ai.domain.exceptions.AiModerationUnavailableException;
 import com.danasea.backend.modules.ai.infrastructure.cliproxy.configs.CliProxyProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -110,7 +112,7 @@ class ProxyDeadlineRoutingTest {
                 new HttpClientProperties(Duration.ofSeconds(2), Duration.ofSeconds(10)), new ObjectMapper());
         long start = System.nanoTime();
         try (var budget = AiExecutionBudget.open(Duration.ofMillis(500), 6)) {
-            assertThat(moderation.isSafe("Xin chào")).isFalse();
+            assertThatThrownBy(() -> moderation.isSafe("Xin chào")).isInstanceOf(AiModerationUnavailableException.class);
             assertThat(Duration.ofNanos(System.nanoTime() - start)).isLessThan(Duration.ofSeconds(1));
             assertThat(count.get()).isEqualTo(1);
         } finally { server.stop(0); }

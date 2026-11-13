@@ -36,6 +36,7 @@ function mapVendorResponseToRecord(v: AdminVendorResponse): VendorRecord {
     verifiedAt: v.verifiedAt || '',
     createdAt: v.createdAt,
     updatedAt: v.updatedAt,
+    rejectionReason: v.rejectionReason,
   };
 }
 
@@ -173,6 +174,10 @@ export function VendorApproval() {
   };
   const confirmDecision = async () => {
     if (!selected || !decisionOpen) return;
+    if (decision === 'reject' && !note.trim()) {
+      setNotice('Vui lòng nhập lý do từ chối bắt buộc để thông báo cho đối tác.');
+      return;
+    }
     if (demo) {
       const action = { vendorId: selected.id, kind: decision, tier, note, at: new Date().toISOString() };
       setReview(previous => applyVendorDecision(previous, action, demo));
@@ -343,8 +348,8 @@ export function VendorApproval() {
         {isSubmitting ? 'Đang xử lý...' : decision === 'reject' ? 'Xác nhận từ chối' : 'Xác nhận phê duyệt'}</AdminButton></>}>
       <div className="admin-vendors-confirm"><p><strong>{selected?.businessName}</strong></p>
         <p>{decision === 'reject' ? 'Trạng thái sẽ chuyển thành Từ chối; huy hiệu hiện tại được giữ nguyên.' : `Trạng thái sẽ chuyển thành Đã duyệt, huy hiệu ${tier}.`}</p>
-        <label className="admin-field"><span>{decision === 'reject' ? 'Lý do từ chối' : 'Ghi chú quyết định'} <small>(tùy chọn)</small></span>
-          <textarea value={note} onChange={event => setNote(event.target.value)} rows={4} placeholder="Ghi chú thẩm định…" /></label>
+        <label className="admin-field"><span>{decision === 'reject' ? 'Lý do từ chối (bắt buộc) *' : 'Ghi chú quyết định (tùy chọn)'}</span>
+          <textarea value={note} onChange={event => setNote(event.target.value)} rows={4} placeholder={decision === 'reject' ? 'Nhập chi tiết lý do từ chối để thông báo cho đối tác…' : 'Ghi chú thẩm định…'} required={decision === 'reject'} /></label>
         <p className="admin-detail-note">Xác minh đầy đủ giấy phép kinh doanh và chứng nhận an toàn trước khi duyệt.</p></div>
     </AdminDialog>
 

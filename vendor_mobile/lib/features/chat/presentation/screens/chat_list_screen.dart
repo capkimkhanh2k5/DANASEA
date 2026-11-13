@@ -2,7 +2,7 @@ import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
-import '../../../../core/data/vendor_mock_database.dart';
+import '../../../../core/data/vendor_store.dart';
 import '../../../../core/models/vendor_models.dart';
 import 'chat_conversation_screen.dart';
 import '../../../notifications/presentation/screens/notification_safety_screen.dart';
@@ -23,7 +23,7 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  final _db = VendorMockDatabase.instance;
+  final _db = VendorStore.instance;
   String _searchQuery = '';
   String _filter = 'all'; // all, unread, departing
 

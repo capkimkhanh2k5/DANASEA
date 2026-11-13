@@ -45,4 +45,7 @@ public class VendorJpaEntity extends BaseJpaEntity {
     @Enumerated(EnumType.STRING)
     private BadgeTier badgeTier;
 
+    @Column(name = "rejection_reason", length = 1000)
+    private String rejectionReason;
+
 }

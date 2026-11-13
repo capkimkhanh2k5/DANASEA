@@ -34,11 +34,26 @@ public class VendorDepartureCancellation {
     private final DisruptionDecisionService decisions;
     private final CancelBookingHoldUseCase cancelHold;
 
-    public record Cancellation(UUID slotId, String reason, OffsetDateTime cancelledAt) {}
-    private record AffectedOrder(UUID subOrderId, UUID slotId, UUID actor, String reason) {}
+    public record Cancellation(UUID slotId, String reason, OffsetDateTime cancelledAt) {
+    }
+
+    private record AffectedOrder(UUID subOrderId, UUID slotId, UUID actor, String reason, boolean isIncident) {
+    }
 
     @Transactional
     public Cancellation cancel(UUID actor, UUID serviceId, UUID slotId, String reason) {
+        return cancelInternal(actor, serviceId, slotId, reason, false, null);
+    }
+
+    @Transactional
+    public Cancellation cancelWithIncident(UUID actor, UUID serviceId, UUID slotId, String reason,
+            String incidentType) {
+        return cancelInternal(actor, serviceId, slotId, reason, true,
+                incidentType != null ? incidentType : "VENDOR_INCIDENT");
+    }
+
+    private Cancellation cancelInternal(UUID actor, UUID serviceId, UUID slotId, String reason, boolean isIncident,
+            String incidentType) {
         if (reason == null || reason.isBlank() || reason.trim().length() > 500) {
             throw new IllegalArgumentException("A cancellation reason of at most 500 characters is required.");
         }
@@ -49,31 +64,40 @@ public class VendorDepartureCancellation {
         var existing = findCancellation(slotId);
         if (!existing.isEmpty()) {
             if (!existing.getFirst().reason().equals(reason.trim())) {
-                throw new ApiConflictException("DEPARTURE_CANCELLATION_CONFLICT", "Departure was already cancelled with a different reason.");
+                throw new ApiConflictException("DEPARTURE_CANCELLATION_CONFLICT",
+                        "Departure was already cancelled with a different reason.");
             }
             return existing.getFirst();
         }
-        if (!slot.getDate().atTime(slot.getStartTime()).isAfter(LocalDateTime.now(Booking.VIETNAM_ZONE))) {
-            throw new ApiConflictException("DEPARTURE_CANCELLATION_CONFLICT", "Only upcoming departures can be cancelled.");
+        if (!slot.getDate().atTime(slot.getStartTime()).isAfter(LocalDateTime.now(Booking.VIETNAM_ZONE))
+                && !isIncident) {
+            throw new ApiConflictException("DEPARTURE_CANCELLATION_CONFLICT",
+                    "Only upcoming departures can be cancelled.");
         }
-        if (Boolean.TRUE.equals(jdbc.queryForObject("""
+        if (!isIncident && Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (SELECT 1 FROM sub_orders WHERE slot_id = ?
                     AND (checked_in_at IS NOT NULL OR status IN ('CHECKED_IN', 'IN_PROGRESS', 'COMPLETED')))
                 """, Boolean.class, slotId))) {
-            throw new ApiConflictException("DEPARTURE_CANCELLATION_CONFLICT", "A passenger has checked in. Escalate to operations.");
+            throw new ApiConflictException("DEPARTURE_CANCELLATION_CONFLICT",
+                    "A passenger has checked in. Escalate to operations.");
         }
         OffsetDateTime now = OffsetDateTime.now().truncatedTo(ChronoUnit.MICROS);
         slot.setStatus(SlotStatus.CANCELLED);
         slots.save(slot);
-        jdbc.update("""
-                INSERT INTO vendor_departure_cancellations (slot_id, vendor_id, requested_by, reason, cancelled_at)
-                VALUES (?, ?, ?, ?, ?)
-                """, slotId, vendorId, actor, reason.trim(), now);
+        jdbc.update(
+                """
+                        INSERT INTO vendor_departure_cancellations (slot_id, vendor_id, requested_by, reason, cancelled_at, is_incident, incident_type)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                slotId, vendorId, actor, reason.trim(), now, isIncident, incidentType);
         return new Cancellation(slotId, reason.trim(), now);
     }
 
-    public record RefundReview(UUID subOrderId, UUID refundId, String status) {}
-    public record CancellationStatus(Cancellation cancellation, List<RefundReview> existingRefundsToReview) {}
+    public record RefundReview(UUID subOrderId, UUID refundId, String status) {
+    }
+
+    public record CancellationStatus(Cancellation cancellation, List<RefundReview> existingRefundsToReview) {
+    }
 
     @Transactional(readOnly = true)
     public CancellationStatus status(UUID actor, UUID serviceId, UUID slotId) {
@@ -81,15 +105,16 @@ public class VendorDepartureCancellation {
         slots.findById(slotId).filter(slot -> serviceId.equals(slot.getServiceId()))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Departure not found."));
         var cancellation = findCancellation(slotId).stream().findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Departure has not been cancelled."));
+                .orElseThrow(
+                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Departure has not been cancelled."));
         var review = jdbc.query("""
                 SELECT s.id, r.id, r.status FROM sub_orders s JOIN refunds r ON r.sub_order_id = s.id
-                WHERE s.slot_id = ? AND s.vendor_id = ? AND r.created_at <= ?
+                WHERE COALESCE(s.actual_slot_id, s.slot_id) = ? AND s.vendor_id = ? AND r.created_at <= ?
                   AND (r.status IN ('PENDING', 'FAILED')
                     OR (r.status = 'PROCESSED' AND r.amount < s.final_amount))
                 ORDER BY s.id, r.created_at, r.id
                 """, (rs, index) -> new RefundReview(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
-                        rs.getString(3)), slotId, vendorId, cancellation.cancelledAt());
+                rs.getString(3)), slotId, vendorId, cancellation.cancelledAt());
         return new CancellationStatus(cancellation, review);
     }
 
@@ -97,14 +122,14 @@ public class VendorDepartureCancellation {
         return jdbc.query("""
                 SELECT reason, cancelled_at FROM vendor_departure_cancellations WHERE slot_id = ?
                 """, (rs, index) -> new Cancellation(slotId, rs.getString(1),
-                        rs.getObject(2, OffsetDateTime.class)), slotId);
+                rs.getObject(2, OffsetDateTime.class)), slotId);
     }
 
     private UUID requireOwnership(UUID actor, UUID serviceId) {
         UUID vendorId = vendors.findByUserId(actor)
                 .orElseThrow(() -> new AccessDeniedException("Vendor profile not found.")).getId();
-        var service = services.findById(serviceId).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Service not found."));
+        var service = services.findById(serviceId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Service not found."));
         if (!vendorId.equals(service.getVendorId())) {
             throw new AccessDeniedException("Vendor does not own this service.");
         }
@@ -113,23 +138,32 @@ public class VendorDepartureCancellation {
 
     @Scheduled(fixedDelayString = "${app.scheduler.vendor-departure-cancellation-delay:10s}")
     public void process() {
-        var affected = jdbc.query("""
-                SELECT s.id, c.slot_id, c.requested_by, c.reason
-                FROM vendor_departure_cancellations c JOIN sub_orders s ON s.slot_id = c.slot_id
-                JOIN master_orders m ON m.id = s.master_order_id
-                WHERE s.vendor_id = c.vendor_id AND s.status = 'CONFIRMED' AND s.checked_in_at IS NULL
-                  AND m.payment_status = 'PAID' AND m.status IN ('PAID', 'PARTIALLY_COMPLETED')
-                  AND NOT EXISTS (SELECT 1 FROM refunds r WHERE r.sub_order_id = s.id)
-                  AND NOT EXISTS (SELECT 1 FROM sub_order_disruptions d WHERE d.sub_order_id = s.id
-                      AND d.original_slot_id = c.slot_id AND d.status = 'AWAITING_DECISION')
-                  AND NOT EXISTS (SELECT 1 FROM sub_order_disruptions d WHERE d.sub_order_id = s.id
-                      AND d.source_key = 'vendor-departure:' || c.slot_id::text)
-                ORDER BY c.cancelled_at, s.id LIMIT 100
-                """, (rs, index) -> new AffectedOrder(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
-                        rs.getObject(3, UUID.class), rs.getString(4)));
+        var affected = jdbc.query(
+                """
+                        SELECT s.id, c.slot_id, c.requested_by, c.reason, COALESCE(c.is_incident, FALSE)
+                        FROM vendor_departure_cancellations c JOIN sub_orders s ON COALESCE(s.actual_slot_id, s.slot_id) = c.slot_id
+                        JOIN master_orders m ON m.id = s.master_order_id
+                        WHERE s.vendor_id = c.vendor_id
+                          AND ((s.status = 'CONFIRMED' AND s.checked_in_at IS NULL)
+                               OR (COALESCE(c.is_incident, FALSE) = TRUE AND s.status IN ('CONFIRMED', 'CHECKED_IN')))
+                          AND m.payment_status = 'PAID' AND m.status IN ('PAID', 'PARTIALLY_COMPLETED')
+                          AND NOT EXISTS (SELECT 1 FROM refunds r WHERE r.sub_order_id = s.id)
+                          AND NOT EXISTS (SELECT 1 FROM sub_order_disruptions d WHERE d.sub_order_id = s.id
+                              AND d.original_slot_id = c.slot_id AND d.status = 'AWAITING_DECISION')
+                          AND NOT EXISTS (SELECT 1 FROM sub_order_disruptions d WHERE d.sub_order_id = s.id
+                              AND d.source_key IN ('vendor-departure:' || c.slot_id::text, 'vendor-incident:' || c.slot_id::text))
+                        ORDER BY c.cancelled_at, s.id LIMIT 100
+                        """,
+                (rs, index) -> new AffectedOrder(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class),
+                        rs.getObject(3, UUID.class), rs.getString(4), rs.getBoolean(5)));
         for (var order : affected) {
             try {
-                decisions.recordVendorDeparture(order.subOrderId(), order.slotId(), order.reason(), order.actor());
+                if (order.isIncident()) {
+                    decisions.recordCheckedInIncident(order.subOrderId(), order.slotId(), order.reason(),
+                            order.actor());
+                } else {
+                    decisions.recordVendorDeparture(order.subOrderId(), order.slotId(), order.reason(), order.actor());
+                }
             } catch (RuntimeException ex) {
                 log.error("Could not resolve cancelled departure for sub-order {}", order.subOrderId(), ex);
             }

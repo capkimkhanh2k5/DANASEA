@@ -3,7 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
-import 'core/data/vendor_mock_database.dart';
+import 'core/data/vendor_store.dart';
 import 'features/auth/presentation/screens/login_register_screen.dart';
 import 'features/auth/presentation/screens/forgot_password_screen.dart';
 import 'features/dashboard/presentation/screens/dashboard_screen.dart';
@@ -31,8 +31,8 @@ import 'features/disputes/presentation/screens/dispute_management_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppLanguage.instance.initialize();
-  // Initialize mock database singleton
-  VendorMockDatabase.instance;
+  // Initialize vendor data store
+  VendorStore.instance;
   runApp(const DanaSeaVendorApp());
 }
 
@@ -86,9 +86,9 @@ class DanaSeaVendorApp extends StatelessWidget {
           if (settings.name == '/service-edit') {
             final serviceId = settings.arguments as String?;
             final service = serviceId != null
-                ? VendorMockDatabase.instance.services.firstWhere(
+                ? VendorStore.instance.services.firstWhere(
                     (s) => s.id == serviceId,
-                    orElse: () => VendorMockDatabase.instance.services.first,
+                    orElse: () => VendorStore.instance.services.first,
                   )
                 : null;
             return MaterialPageRoute(
@@ -97,9 +97,9 @@ class DanaSeaVendorApp extends StatelessWidget {
           }
           if (settings.name == '/order-detail') {
             final subOrderId = settings.arguments as String? ?? 'DNS-8924-1';
-            final subOrder = VendorMockDatabase.instance.subOrders.firstWhere(
+            final subOrder = VendorStore.instance.subOrders.firstWhere(
               (o) => o.id == subOrderId,
-              orElse: () => VendorMockDatabase.instance.subOrders.first,
+              orElse: () => VendorStore.instance.subOrders.first,
             );
             return MaterialPageRoute(
               builder: (context) => SubOrderDetailScreen(subOrder: subOrder),

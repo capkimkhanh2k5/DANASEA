@@ -5,8 +5,8 @@ import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/toast_notification.dart';
 import '../../../../core/models/vendor_models.dart';
-import '../../../../core/data/vendor_mock_database.dart';
-import '../../../../core/data/vendor_mock_repositories.dart';
+import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
 
 class ReviewFeedbackScreen extends StatefulWidget {
   const ReviewFeedbackScreen({super.key});
@@ -17,7 +17,7 @@ class ReviewFeedbackScreen extends StatefulWidget {
 
 class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
   final VendorReviewRepository _reviewRepo = VendorReviewRepository();
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
 
   String _currentFilter = 'all'; // all, pending, 5star, 4star, flagged
   final Map<String, TextEditingController> _replyControllers = {};

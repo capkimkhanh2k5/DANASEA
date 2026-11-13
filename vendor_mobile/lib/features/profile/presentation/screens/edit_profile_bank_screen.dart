@@ -4,8 +4,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/toast_notification.dart';
-import '../../../../core/data/vendor_mock_database.dart';
-import '../../../../core/data/vendor_mock_repositories.dart';
+import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
 
 class EditProfileBankScreen extends StatefulWidget {
   const EditProfileBankScreen({super.key});
@@ -16,7 +16,7 @@ class EditProfileBankScreen extends StatefulWidget {
 
 class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
   final VendorProfileRepository _profileRepo = VendorProfileRepository();
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
 
   late TextEditingController _bankAccountController;
   late TextEditingController _bankHolderController;

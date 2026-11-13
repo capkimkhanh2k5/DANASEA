@@ -145,6 +145,11 @@ public class ChatUseCase {
         UUID processing = language == null ? null : chatHistoryService.beginProcessing(conversationId);
         try {
             chatHistoryService.appendMessage(conversationId, AiMessageRole.USER, effectiveContent, null);
+            if (CopilotRequest.isRevenue(CopilotRequest.normalize(effectiveContent))) {
+                var answer = new LlmResponse();
+                answer.setContent(messages.get("ai.customer.finance_scope", language == null ? SupportedLanguage.EN : language));
+                return finish(conversationId, answer, List.of(), readContext(conversationId));
+            }
             return executeChatLoop(conversationId, language, userId, effectiveContent);
         } finally {
             chatHistoryService.finishProcessing(conversationId, processing);
@@ -206,10 +211,17 @@ public class ChatUseCase {
             } else {
                 boolean sourcedPolicy = cards.stream().anyMatch(artifactMapper::hasPolicyEvidence);
                 if (containsPolicyKeywords(response.getContent())) {
-                    if (!sourcedPolicy) response.setContent(language == null
-                            ? messages.get("ai.policy.lookup_required", SupportedLanguage.EN)
-                            : messages.get("ai.policy.lookup_required", language));
-                    else if (language != null) response.setContent(messages.get("ai.policy.verified_facts", language));
+                    var replyLanguage = language == null ? SupportedLanguage.EN : language;
+                    boolean foundServices = !containsPolicyKeywords(message) && cards.stream().anyMatch(card ->
+                            "SERVICE_LIST".equals(card.type()) && !card.sources().isEmpty()
+                                    && (hasResults(card.facts().get("candidates")) || hasResults(card.facts().get("results"))));
+                    if (foundServices) {
+                        response.setContent(messages.get("ai.search.results_available", replyLanguage));
+                    } else if (!sourcedPolicy) {
+                        response.setContent(messages.get("ai.policy.lookup_required", replyLanguage));
+                    } else if (language != null) {
+                        response.setContent(messages.get("ai.policy.verified_facts", language));
+                    }
                 }
                 return finish(conversationId, response, cards, state);
             }
@@ -220,6 +232,10 @@ public class ChatUseCase {
         timeout.setKeyMasked(lastResponse == null ? null : lastResponse.getKeyMasked());
         timeout.setResponseStatus("PARTIAL");
         return finish(conversationId, timeout, cards, state);
+    }
+
+    private boolean hasResults(Object value) {
+        return value instanceof List<?> results && !results.isEmpty();
     }
 
     private LlmResponse finish(UUID conversationId, LlmResponse response, List<AssistantArtifact> cards, ObjectNode state) {

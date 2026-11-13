@@ -1,8 +1,5 @@
 package com.danasea.backend.modules.admin.application.usecases;
 
-import com.danasea.backend.modules.account.application.api.AccountInternalApi;
-import com.danasea.backend.modules.account.domain.models.Role;
-import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.admin.presentation.dtos.AdminVendorResponse;
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
@@ -17,7 +14,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.EnumSet;
@@ -36,9 +32,6 @@ class ApproveVendorUseCaseTest {
     private VendorInternalApi vendorInternalApi;
 
     @Mock
-    private AccountInternalApi accountInternalApi;
-
-    @Mock
     private AuditLogInternalApi auditLogInternalApi;
 
     private ApproveVendorUseCase approveVendorUseCase;
@@ -49,7 +42,7 @@ class ApproveVendorUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        approveVendorUseCase = new ApproveVendorUseCase(vendorInternalApi, accountInternalApi, auditLogInternalApi);
+        approveVendorUseCase = new ApproveVendorUseCase(vendorInternalApi, auditLogInternalApi);
         vendorId = UUID.randomUUID();
         adminId = UUID.randomUUID();
         userId = UUID.randomUUID();
@@ -77,7 +70,6 @@ class ApproveVendorUseCaseTest {
                 .hasMessage("Vendor is not in PENDING status");
 
         verify(vendorInternalApi, never()).saveVendor(any());
-        verify(accountInternalApi, never()).saveUser(any());
     }
 
     @Test
@@ -92,12 +84,6 @@ class ApproveVendorUseCaseTest {
                 .thenReturn(EnumSet.allOf(DocType.class));
         when(vendorInternalApi.saveVendor(any(Vendor.class))).thenAnswer(i -> i.getArgument(0));
 
-        User user = new User();
-        user.setId(userId);
-        user.setRole(Role.CUSTOMER);
-        
-        when(accountInternalApi.findUserById(userId)).thenReturn(Optional.of(user));
-
         AdminVendorResponse response = approveVendorUseCase.execute(vendorId, adminId);
 
         // Verify Vendor updated
@@ -107,13 +93,6 @@ class ApproveVendorUseCaseTest {
         assertThat(vendor.getVerifiedBy()).isEqualTo(adminId);
         assertThat(vendor.getVerifiedAt()).isNotNull();
         verify(vendorInternalApi).saveVendor(vendor);
-
-        // Verify User updated
-        assertThat(user.getRole()).isEqualTo(Role.VENDOR);
-        verify(accountInternalApi).saveUser(user);
-
-        // Verify Tokens Revoked
-        verify(accountInternalApi).revokeAllRefreshTokensByUserId(userId);
 
         // Verify Audit Log
         verify(auditLogInternalApi).recordAuditLog(
@@ -140,6 +119,5 @@ class ApproveVendorUseCaseTest {
                 .hasMessageContaining("SAFETY_CERT");
 
         verify(vendorInternalApi, never()).saveVendor(any());
-        verify(accountInternalApi, never()).saveUser(any());
     }
 }

@@ -2,6 +2,7 @@ package com.danasea.backend.modules.booking.infrastructure.configs;
 
 import java.time.Duration;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +17,7 @@ import com.danasea.backend.modules.booking.application.usecases.GetVendorBooking
 import com.danasea.backend.modules.booking.domain.ports.BookingCancellationFinancialPort;
 import com.danasea.backend.modules.booking.domain.ports.BookingPaymentStatusPort;
 import com.danasea.backend.modules.booking.domain.ports.BookingRepositoryPort;
+import com.danasea.backend.modules.booking.domain.ports.CustomerAccountPort;
 import com.danasea.backend.modules.booking.domain.ports.InventoryLockPort;
 import com.danasea.backend.modules.booking.domain.ports.ServiceSlotPort;
 import com.danasea.backend.modules.booking.domain.ports.VendorLookupPort;
@@ -28,8 +30,13 @@ public class BookingBeans {
             BookingRepositoryPort bookingRepository,
             InventoryLockPort inventoryLockPort,
             ServiceSlotPort serviceSlotPort,
+            @Autowired(required = false) CustomerAccountPort customerAccountPort,
             @Value("${app.booking.hold-duration:5m}") Duration holdDuration) {
-        return new CreateBookingHoldUseCase(bookingRepository, inventoryLockPort, serviceSlotPort, holdDuration);
+        CreateBookingHoldUseCase useCase = new CreateBookingHoldUseCase(bookingRepository, inventoryLockPort, serviceSlotPort, holdDuration);
+        if (customerAccountPort != null) {
+            useCase.setCustomerAccountPort(customerAccountPort);
+        }
+        return useCase;
     }
 
     @Bean
