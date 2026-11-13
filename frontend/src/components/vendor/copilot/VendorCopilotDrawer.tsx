@@ -113,18 +113,10 @@ export function VendorCopilotDrawer() {
       <aside className="relative z-10 w-full max-w-[500px] h-full bg-white shadow-2xl flex flex-col border-l border-slate-200/90 text-slate-800">
         
         {/* Drawer Header */}
-        <div className="h-14 px-4 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-slate-50/70">
+        <div className="h-14 px-4 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
-              <Bot className="w-4 h-4 text-sky-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-900 leading-tight">Vendor Copilot</h3>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Trực tuyến" />
-              </div>
-              <p className="text-[10px] text-slate-500 font-medium">Trợ lý kinh doanh & điều phối bến bãi</p>
-            </div>
+            <Bot className="w-5 h-5 text-sky-600" strokeWidth={1.75} />
+            <h3 className="text-sm font-bold text-slate-900 leading-tight">DANASEA Copilot</h3>
           </div>
 
           <div className="flex items-center gap-1">
@@ -249,16 +241,7 @@ export function VendorCopilotDrawer() {
         {/* Messages Body */}
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
           {messages.length === 0 ? (
-            <div className="my-auto flex flex-col items-center text-center py-6">
-              <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-700 mb-3">
-                <Bot className="w-6 h-6 text-sky-600" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-900">Trợ lý kinh doanh biển DANASEA</h4>
-              <p className="text-xs text-slate-500 max-w-[340px] mt-1 mb-6">
-                Hỏi đáp nhanh số liệu GMV, kiểm tra các ca tour vắng khách, phân tích đánh giá của khách hàng và tối ưu bài đăng.
-              </p>
-
-              {/* Starter Prompt Cards */}
+            <div className="my-auto flex flex-col items-center py-4 w-full">
               <div className="w-full grid grid-cols-2 gap-2 text-left">
                 {STARTER_PROMPTS.map((sp, idx) => {
                   const Icon = sp.icon;
@@ -266,10 +249,12 @@ export function VendorCopilotDrawer() {
                     <button
                       key={idx}
                       onClick={() => sendMessage(sp.prompt)}
-                      className="p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/80 transition-all text-left flex flex-col gap-1.5 group cursor-pointer shadow-2xs hover:shadow-xs"
+                      className="p-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-slate-300 transition-all text-left flex flex-col gap-1 group cursor-pointer shadow-2xs hover:shadow-xs"
                     >
-                      <Icon className="w-4 h-4 text-sky-600 group-hover:scale-110 transition-transform" />
-                      <span className="text-xs font-bold text-slate-900">{sp.title}</span>
+                      <div className="flex items-center gap-1.5">
+                        <Icon className="w-3.5 h-3.5 text-sky-600 group-hover:text-sky-700 shrink-0" strokeWidth={1.75} />
+                        <span className="text-xs font-bold text-slate-900">{sp.title}</span>
+                      </div>
                       <span className="text-[10px] text-slate-500 line-clamp-2 leading-relaxed">
                         {sp.prompt}
                       </span>

@@ -495,13 +495,12 @@ export function VendorLayout() {
       {location.pathname !== "/vendor/copilot" && (
         <button
           onClick={() => useVendorCopilotStore.getState().toggleCopilot()}
-          className="fixed bottom-6 right-6 z-40 h-11 px-4 rounded-xl bg-slate-900 text-white hover:bg-slate-800 shadow-xl flex items-center gap-2.5 text-xs font-semibold border border-slate-700/60 transition-all hover:scale-102 cursor-pointer group print:hidden select-none"
+          className="fixed bottom-6 right-6 z-40 h-10 px-3.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-900/10 flex items-center gap-2 text-xs font-semibold border border-slate-800 transition-all hover:-translate-y-0.5 cursor-pointer print:hidden select-none"
           title="Mở Trợ lý kinh doanh DANASEA Copilot"
           aria-label="Toggle Vendor Copilot"
         >
-          <Bot className="w-4 h-4 text-sky-400 group-hover:rotate-6 transition-transform" />
-          <span>AI Copilot</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          <Bot className="w-4 h-4 text-sky-400 shrink-0" strokeWidth={1.75} />
+          <span>DANASEA Copilot</span>
         </button>
       )}
 

@@ -99,15 +99,13 @@ export function VendorCopilotPage() {
       <div className="w-72 bg-white border-r border-slate-200/80 flex flex-col shrink-0">
         <div className="p-4 border-b border-slate-200/80 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
-              <Bot className="w-4 h-4 text-sky-400" />
-            </div>
-            <span className="font-bold text-slate-900 text-sm">Copilot Chat</span>
+            <Bot className="w-4 h-4 text-sky-600" strokeWidth={1.75} />
+            <span className="font-bold text-slate-900 text-sm">Hội thoại</span>
           </div>
 
           <button
             onClick={startNewConversation}
-            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 text-xs font-semibold"
+            className="p-1.5 px-2.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
             title="Đoạn chat mới"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -176,11 +174,7 @@ export function VendorCopilotPage() {
         {/* Header */}
         <div className="h-14 px-6 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-2.5">
-            <span className="font-bold text-sm text-slate-900">Trợ lý kinh doanh DANASEA Copilot</span>
-            <span className="text-[11px] font-semibold text-emerald-700 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>Sẵn sàng</span>
-            </span>
+            <span className="font-bold text-sm text-slate-900">DANASEA Copilot</span>
           </div>
 
           {attachedContext && (
@@ -196,27 +190,20 @@ export function VendorCopilotPage() {
         {/* Message Thread */}
         <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5 max-w-4xl w-full mx-auto">
           {messages.length === 0 ? (
-            <div className="my-auto flex flex-col items-center text-center py-10">
-              <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center mb-4 shadow-sm">
-                <Bot className="w-7 h-7 text-sky-400" />
-              </div>
-              <h2 className="text-lg font-bold text-slate-900">Trợ lý đối tác DANASEA Copilot</h2>
-              <p className="text-xs text-slate-500 max-w-md mt-1 mb-8">
-                Hỏi đáp nhanh các thông số doanh thu, tình hình đơn đặt chỗ, rà soát ca tour vắng khách theo dự báo thời tiết biển và gợi ý tối ưu nội dung.
-              </p>
-
-              {/* Starter Prompt Grid */}
-              <div className="grid grid-cols-2 gap-3 w-full max-w-xl text-left">
+            <div className="my-auto flex flex-col items-center py-6 w-full max-w-2xl mx-auto">
+              <div className="w-full grid grid-cols-2 gap-2.5 text-left">
                 {STARTER_PROMPTS.map((sp, idx) => {
                   const Icon = sp.icon;
                   return (
                     <button
                       key={idx}
                       onClick={() => sendMessage(sp.prompt)}
-                      className="p-3.5 rounded-xl bg-slate-50 hover:bg-slate-100/90 border border-slate-200/80 transition-all text-left flex flex-col gap-1.5 group cursor-pointer shadow-2xs hover:shadow-xs"
+                      className="p-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-slate-300 transition-all text-left flex flex-col gap-1.5 group cursor-pointer shadow-2xs hover:shadow-xs"
                     >
-                      <Icon className="w-4 h-4 text-sky-600 group-hover:scale-110 transition-transform" />
-                      <span className="text-xs font-bold text-slate-900">{sp.title}</span>
+                      <div className="flex items-center gap-2">
+                        <Icon className="w-4 h-4 text-sky-600 group-hover:text-sky-700 shrink-0" strokeWidth={1.75} />
+                        <span className="text-xs font-bold text-slate-900">{sp.title}</span>
+                      </div>
                       <span className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
                         {sp.prompt}
                       </span>
