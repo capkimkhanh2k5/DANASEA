@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import {
-  Lock,
   Compass,
   Receipt,
   FileText,
@@ -35,7 +34,6 @@ import { disputeService } from "../../../services/disputeService";
 import { notificationService } from "../../../services/notificationService";
 import type { DisputeReason, DisputeResponse } from "../../../types/dispute";
 import { useAuthStore } from "../../../store/useAuthStore";
-import { authService } from "../../../services/authService";
 import { useLanguageStore } from "../../../store/useLanguageStore";
 import { toast } from "../../../store/useToastStore";
 import type {
@@ -54,7 +52,7 @@ type OrderFilter = "all" | "upcoming" | "pending" | "completed" | "cancelled";
 export function Orders() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, isAuthenticated, accessToken, setAuth } = useAuthStore();
+  const { user, isAuthenticated, accessToken } = useAuthStore();
   const { language } = useLanguageStore();
   const isEn = language === 'en';
 
@@ -284,37 +282,6 @@ export function Orders() {
       fetchOrders(page);
     }
   }, [page, isAuthenticated, accessToken, fetchOrders]);
-
-  // Quick Login helper for testing / unauthenticated state
-  const handleQuickLogin = async () => {
-    try {
-      setLoading(true);
-      const res = await authService.login({
-        email: "customer_1@danasea.test",
-        password: "password123",
-      });
-      setAuth(
-        {
-          id: res.userId,
-          email: res.email,
-          fullName: "Nguyễn Hoàng Long",
-          role: res.role,
-          avatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150",
-          isEmailVerified: true,
-          isLocked: false,
-          passwordHash: "",
-          phone: "0912345678",
-          locale: "vi",
-        },
-        res.accessToken
-      );
-    } catch (err) {
-      console.warn("[Orders] Đăng nhập nhanh thất bại qua API, dùng switchRole:", err);
-      useAuthStore.getState().switchRole('customer');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
@@ -787,41 +754,9 @@ export function Orders() {
 
 
 
-  // Unauthenticated Guard Screen
+  // Redirect unauthenticated user directly to login
   if (!isAuthenticated || !user) {
-    return (
-      <main className="w-full min-h-[calc(100vh-80px)] bg-slate-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center mx-auto text-sky-700">
-            <Lock className="w-8 h-8" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 tracking-tight">
-              {isEn ? "Please Sign In" : "Vui lòng đăng nhập tài khoản"}
-            </h1>
-            <p className="text-base text-slate-700 max-w-sm mx-auto leading-relaxed">
-              {isEn
-                ? "Please sign in with your customer account to view e-tickets, check-in QR codes, and submit service reviews."
-                : "Bạn cần đăng nhập tài khoản khách hàng để xem vé điện tử, mã QR check-in và gửi đánh giá dịch vụ biển."}
-            </p>
-          </div>
-          <div className="space-y-3 pt-2">
-            <button
-              onClick={() => navigate("/auth")}
-              className="w-full py-3 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-base font-bold cursor-pointer transition-colors"
-            >
-              {isEn ? "Go to Sign In" : "Đến trang Đăng nhập"}
-            </button>
-            <button
-              onClick={handleQuickLogin}
-              className="w-full py-2.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-semibold cursor-pointer transition-colors"
-            >
-              {isEn ? "Quick Sign In (customer_1@danasea.test)" : "Đăng nhập nhanh (customer_1@danasea.test)"}
-            </button>
-          </div>
-        </div>
-      </main>
-    );
+    return <Navigate to="/auth" replace />;
   }
 
   return (

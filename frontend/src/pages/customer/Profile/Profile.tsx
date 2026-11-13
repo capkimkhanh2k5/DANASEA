@@ -1,6 +1,6 @@
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useLanguageStore } from "../../../store/useLanguageStore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { authService } from "../../../services/authService";
 import {
@@ -74,36 +74,9 @@ export function Profile() {
   const [showNewPass, setShowNewPass] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
+  // Redirect unauthenticated user directly to login
   if (!user) {
-    return (
-      <main className="w-full pt-28 pb-20 bg-slate-50 flex-1 flex flex-col items-center justify-center min-h-[calc(100vh-80px)]">
-        <div className="max-w-md w-full mx-auto p-8 rounded-2xl bg-white border border-slate-200/80 shadow-xs text-center flex flex-col items-center">
-          <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 flex items-center justify-center mb-4">
-            <User className="w-6 h-6" />
-          </div>
-          <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 mb-2">{isEn ? "Please Sign In" : "Vui lòng đăng nhập"}</h1>
-          <p className="text-[13px] text-slate-600 mb-6 leading-relaxed">
-            {isEn 
-              ? "Sign in to your DANASEA account to manage personal details and security settings."
-              : "Đăng nhập vào tài khoản DANASEA để quản lý thông tin cá nhân và cài đặt bảo mật."}
-          </p>
-          <div className="space-y-2.5 w-full">
-            <button 
-              onClick={() => navigate('/auth')} 
-              className="w-full py-3 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-sm transition-colors cursor-pointer shadow-xs"
-            >
-              {isEn ? "Go to Sign In" : "Đến trang Đăng nhập"}
-            </button>
-            <button 
-              onClick={() => useAuthStore.getState().switchRole('customer')} 
-              className="w-full py-2.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-semibold cursor-pointer transition-colors"
-            >
-              {isEn ? "Quick Sign In (customer_1@danasea.test)" : "Đăng nhập nhanh (customer_1@danasea.test)"}
-            </button>
-          </div>
-        </div>
-      </main>
-    );
+    return <Navigate to="/auth" replace />;
   }
 
   const handleSaveName = async (e: React.FormEvent) => {
