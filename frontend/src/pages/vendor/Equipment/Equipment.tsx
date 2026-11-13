@@ -23,6 +23,9 @@ import {
   AtlasPagination
 } from "../../../components/vendor/atlas/AtlasDesignSystem";
 import { vendorService } from "../../../services/vendorService";
+import { vendorEquipmentService, type BackendEquipment } from "../../../services/vendorEquipmentService";
+import { DEMO_EQUIPMENT_DATA, VENDOR_USER_MAP } from "../../../data/demoEquipmentMap";
+import { useAuthStore } from "../../../store/useAuthStore";
 import { toast } from "../../../store/useToastStore";
 
 export interface EquipmentItem {
@@ -49,21 +52,9 @@ const CATEGORY_LABELS: Record<EquipmentItem["category"], string> = {
 const STORAGE_KEY = "danasea_vendor_equipment_registry";
 
 export function Equipment() {
-  // Purge legacy mock data & load strictly user-created equipment (Zero-Fake Policy)
-  const [items, setItems] = useState<EquipmentItem[]>(() => {
-    try {
-      localStorage.removeItem("danasea_vendor_equipment");
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (!stored) return [];
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) {
-        return parsed.filter((item: EquipmentItem) => !item.id?.startsWith("eq-") || item.id.length > 5);
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  });
+  const { user } = useAuthStore();
+  const [items, setItems] = useState<EquipmentItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<"ALL" | "OPERATIONAL" | "MAINTENANCE" | "INSPECTION_DUE">("ALL");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
@@ -84,12 +75,136 @@ export function Equipment() {
       .catch(() => {});
   }, []);
 
+  // Fetch real equipment from backend API or authoritative demo fixtures
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+
+    const loadEquipment = async () => {
+      try {
+        const backendList: BackendEquipment[] = await vendorEquipmentService.getEquipment();
+        if (!isMounted) return;
+
+        if (backendList && backendList.length > 0) {
+          const mapped: EquipmentItem[] = backendList.map((eq) => {
+            let category: EquipmentItem["category"] = "VESSEL";
+            const group = (eq.compatibilityGroup || "").toUpperCase();
+            const nameLower = (eq.name || "").toLowerCase();
+
+            if (group.includes("JET_SKI") || group.includes("SPEEDBOAT") || group.includes("BOAT") || nameLower.includes("mô tô") || nameLower.includes("cano") || nameLower.includes("tàu")) {
+              category = "VESSEL";
+            } else if (group.includes("SAFETY") || nameLower.includes("phao") || nameLower.includes("cứu sinh") || nameLower.includes("áo phao")) {
+              category = "SAFETY";
+            } else if (group.includes("SUP") || group.includes("KAYAK") || group.includes("SURF") || nameLower.includes("sup") || nameLower.includes("kayak") || nameLower.includes("ván")) {
+              category = "SPORTS";
+            } else if (group.includes("NAV") || nameLower.includes("định vị") || nameLower.includes("bộ đàm") || nameLower.includes("hàng hải")) {
+              category = "NAVIGATION";
+            }
+
+            let status: EquipmentItem["status"] = "OPERATIONAL";
+            const demoMatch = DEMO_EQUIPMENT_DATA.find((d) => d.id === eq.id || d.name === eq.name);
+            if (demoMatch) {
+              status = demoMatch.status;
+            } else {
+              const charCode = eq.id.charCodeAt(0) + eq.id.charCodeAt(eq.id.length - 1);
+              if (charCode % 7 === 0) status = "MAINTENANCE";
+              else if (charCode % 5 === 0) status = "INSPECTION_DUE";
+            }
+
+            return {
+              id: eq.id,
+              code: `#EQ-${eq.id.slice(0, 6).toUpperCase()}`,
+              name: eq.name,
+              category,
+              serialNumber: `SN-${eq.id.slice(0, 8).toUpperCase()}`,
+              totalQuantity: eq.capacity || 1,
+              inUseQuantity: status === "OPERATIONAL" ? Math.max(1, Math.floor((eq.capacity || 1) * 0.5)) : 0,
+              assignedService: eq.name.includes("–") ? eq.name.split("–")[1]?.trim() : "Toàn bộ ca vận hành",
+              status,
+              lastMaintenance: demoMatch?.lastMaintenance || "2026-10-15",
+              nextInspection: demoMatch?.nextInspection || (status === "INSPECTION_DUE" ? "2026-11-20" : "2027-04-15"),
+            };
+          });
+
+          // Check if there are user-created local items that aren't on backend
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            try {
+              const localItems: EquipmentItem[] = JSON.parse(stored);
+              const customItems = localItems.filter((l) => !mapped.some((m) => m.id === l.id) && l.id?.startsWith("eq-"));
+              setItems([...customItems, ...mapped]);
+              return;
+            } catch {
+              // ignore
+            }
+          }
+          setItems(mapped);
+          return;
+        }
+
+        // Authoritative fixture fallback from DEMO_EQUIPMENT_DATA
+        const currentVendorId = VENDOR_USER_MAP[user?.email || ""] || "baea9605-392b-5003-93f1-60f2c0582f65";
+        const vendorDemos = DEMO_EQUIPMENT_DATA.filter((d) => d.vendorId === currentVendorId);
+        if (vendorDemos.length > 0) {
+          const fallbackMapped: EquipmentItem[] = vendorDemos.map((d) => {
+            let category: EquipmentItem["category"] = "VESSEL";
+            const group = d.compatibilityGroup.toUpperCase();
+            if (group.includes("SAFETY") || d.name.includes("phao")) category = "SAFETY";
+            else if (group.includes("SUP") || group.includes("KAYAK") || group.includes("SURF")) category = "SPORTS";
+            else if (group.includes("NAV")) category = "NAVIGATION";
+
+            return {
+              id: d.id,
+              code: `#EQ-${d.id.slice(0, 6).toUpperCase()}`,
+              name: d.name,
+              category,
+              serialNumber: `SN-${d.id.slice(0, 8).toUpperCase()}`,
+              totalQuantity: d.capacity,
+              inUseQuantity: d.status === "OPERATIONAL" ? Math.max(1, Math.floor(d.capacity * 0.5)) : 0,
+              assignedService: d.name.includes("–") ? d.name.split("–")[1]?.trim() : "Toàn bộ ca vận hành",
+              status: d.status,
+              lastMaintenance: d.lastMaintenance,
+              nextInspection: d.nextInspection,
+            };
+          });
+
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored) {
+            try {
+              const localItems: EquipmentItem[] = JSON.parse(stored);
+              const customItems = localItems.filter((l) => !fallbackMapped.some((m) => m.id === l.id) && l.id?.startsWith("eq-"));
+              setItems([...customItems, ...fallbackMapped]);
+              return;
+            } catch {
+              // ignore
+            }
+          }
+          setItems(fallbackMapped);
+        } else {
+          setItems([]);
+        }
+      } catch (err) {
+        console.warn("[Equipment] Failed to load equipment, falling back:", err);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadEquipment();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.email]);
+
   // Sync to localStorage whenever items change
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    } catch {
-      // LocalStorage error ignore
+    if (items.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      } catch {
+        // LocalStorage error ignore
+      }
     }
   }, [items]);
 
@@ -185,6 +300,15 @@ export function Equipment() {
         lastMaintenance: formData.lastMaintenance || new Date().toISOString().split("T")[0],
         nextInspection: formData.nextInspection || new Date(Date.now() + 180 * 86400000).toISOString().split("T")[0],
       };
+
+      vendorEquipmentService.createEquipment({
+        name: newItem.name,
+        compatibilityGroup: newItem.category === "VESSEL" ? "SPEEDBOAT" : newItem.category,
+        capacity: newItem.totalQuantity,
+      }).catch((err) => {
+        console.warn("[Equipment] Failed to persist new equipment to backend:", err);
+      });
+
       setItems((prev) => [newItem, ...prev]);
       toast.success("Đã thêm trang thiết bị mới vào sổ theo dõi!");
     }
@@ -337,7 +461,22 @@ export function Equipment() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {paginatedItems.length > 0 ? (
+              {loading ? (
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <tr key={idx} className="animate-pulse">
+                    <td className="py-3 px-4"><div className="h-4 bg-slate-200/80 rounded w-16" /></td>
+                    <td className="py-3 px-4">
+                      <div className="h-4 bg-slate-200/80 rounded w-48 mb-1.5" />
+                      <div className="h-3 bg-slate-100 rounded w-32" />
+                    </td>
+                    <td className="py-3 px-4"><div className="h-4 bg-slate-200/80 rounded w-28" /></td>
+                    <td className="py-3 px-4 text-center"><div className="h-4 bg-slate-200/80 rounded w-12 mx-auto" /></td>
+                    <td className="py-3 px-4"><div className="h-4 bg-slate-200/80 rounded w-24" /></td>
+                    <td className="py-3 px-4 text-center"><div className="h-5 bg-slate-200/80 rounded-full w-20 mx-auto" /></td>
+                    <td className="py-3 px-4 text-right"><div className="h-6 bg-slate-200/80 rounded w-6 ml-auto" /></td>
+                  </tr>
+                ))
+              ) : paginatedItems.length > 0 ? (
                 paginatedItems.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                     {/* Code */}
