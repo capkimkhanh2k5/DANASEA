@@ -35,6 +35,7 @@ import {
 
 import { toast } from "../../../store/useToastStore";
 import { extractErrorMessage } from "../../../utils/errorHandler";
+import { getAuthoritativeCustomer } from "../../../data/demoCustomerMap";
 import type { VendorServiceDto, VendorServiceSlotDto } from "../../../types/vendorService";
 import type { VendorSubOrderDto, VendorBookingItemDto } from "../../../types/vendorOrder";
 
@@ -173,6 +174,8 @@ export function VendorOrders() {
           status = matchedSub.status;
         }
 
+        const authCustomer = getAuthoritativeCustomer(b.itemId) || getAuthoritativeCustomer(subId) || getAuthoritativeCustomer(b.bookingId);
+
         mergedList.push({
           id: subId,
           orderNumber: `DNS-${(b.itemId || b.bookingId || subId).replace(/-/g, '').slice(-5).toUpperCase()}`,
@@ -180,9 +183,9 @@ export function VendorOrders() {
           serviceId: b.serviceId,
           slotId: b.slotId || undefined,
           serviceTitle: srv?.name || "Dịch vụ thể thao biển",
-          customerName: matchedSub?.customerName || "Khách đặt chỗ",
-          customerPhone: matchedSub?.customerPhone || "Chưa cập nhật",
-          customerEmail: matchedSub?.customerEmail || "—",
+          customerName: matchedSub?.customerName || authCustomer?.name || "Khách đặt chỗ",
+          customerPhone: matchedSub?.customerPhone || authCustomer?.phone || "Chưa cập nhật",
+          customerEmail: matchedSub?.customerEmail || authCustomer?.email || "—",
           timeSlot: b.bookingTime ? b.bookingTime.slice(0, 5) : "08:00 - 10:00",
           dateStr: b.bookingDate || "Hôm nay",
           guestCount: b.quantity || 1,
@@ -207,15 +210,16 @@ export function VendorOrders() {
           const total = so.finalAmount ?? so.subtotalAmount;
           const commission = total * 0.1;
           const payout = total - commission;
+          const authCustomer = getAuthoritativeCustomer(so.id);
           mergedList.push({
             id: so.id,
             orderNumber: `DNS-${(so.id || '').replace(/-/g, '').slice(-5).toUpperCase()}`,
             serviceId: so.serviceId,
             slotId: so.slotId || undefined,
             serviceTitle: srv?.name || "Trải nghiệm thể thao biển",
-            customerName: so.customerName || "Khách đặt chỗ",
-            customerPhone: so.customerPhone || "Chưa cập nhật",
-            customerEmail: so.customerEmail || "—",
+            customerName: so.customerName || authCustomer?.name || "Khách đặt chỗ",
+            customerPhone: so.customerPhone || authCustomer?.phone || "Chưa cập nhật",
+            customerEmail: so.customerEmail || authCustomer?.email || "—",
             timeSlot: "08:00 - 10:00",
             dateStr: "Hôm nay",
             guestCount: so.quantity || 1,
@@ -789,7 +793,12 @@ export function VendorOrders() {
                     const isDrawerOpenForThis = drawerOrderId === order.id;
                     const cleanDate = order.dateStr !== "Hôm nay" ? order.dateStr : new Date().toISOString().slice(0, 10);
                     const cleanTime = order.timeSlot.split(" - ")[0] || "08:00";
-                    const cleanLocation = order.departurePoint.replace("Bãi biển ", "").replace("Bến thủy du lịch ", "").replace("Bến thủy ", "");
+                    const cleanLocation = order.departurePoint
+                      .replace("Khu vực biển Đà Nẵng (điểm hẹn cần Vendor xác nhận)", "Biển Đà Nẵng")
+                      .replace("Bãi biển Mỹ Khê, Đà Nẵng", "Bãi Mỹ Khê")
+                      .replace("Bãi biển ", "")
+                      .replace("Bến thủy du lịch ", "")
+                      .replace("Bến thủy ", "");
 
                     return (
                       <tr
@@ -801,9 +810,9 @@ export function VendorOrders() {
                             : "hover:bg-slate-50/80 text-slate-700"
                         }`}
                       >
-                        {/* 1. ORDER (Mã đơn - Only code, single line font-mono) */}
+                        {/* 1. ORDER (Mã đơn - Unique single line font-mono) */}
                         <td className="py-3.5 px-4 whitespace-nowrap font-mono text-sm font-bold text-slate-900" title={`ID gốc: ${order.id}`}>
-                          #{order.id.slice(0, 8).toUpperCase()}
+                          #{order.orderNumber || order.id.slice(-6).toUpperCase()}
                         </td>
 
                         {/* 2. DATE (Ngày & giờ - Dedicated separate column, font-mono) */}

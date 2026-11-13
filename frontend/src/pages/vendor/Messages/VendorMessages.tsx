@@ -14,6 +14,7 @@ import {
 import { useAuthStore } from '../../../store/useAuthStore';
 import { communicationService, type ConversationItem, type MessageItem } from '../../../services/communicationService';
 import { vendorOrderService } from '../../../services/vendorOrderService';
+import { getAuthoritativeCustomer } from '../../../data/demoCustomerMap';
 
 export function VendorMessages() {
   const { user } = useAuthStore();
@@ -154,6 +155,10 @@ export function VendorMessages() {
   const getCustomerLabel = (conv: ConversationItem) => {
     if (customerNames[conv.masterOrderId || '']) {
       return customerNames[conv.masterOrderId || ''];
+    }
+    const authCust = getAuthoritativeCustomer(conv.masterOrderId || '') || getAuthoritativeCustomer(conv.customerId);
+    if (authCust) {
+      return authCust.name;
     }
     return `Khách hàng #${conv.customerId.slice(0, 8)}`;
   };
