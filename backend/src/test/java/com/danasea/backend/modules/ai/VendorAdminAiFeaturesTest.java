@@ -10,12 +10,14 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -438,6 +440,100 @@ class VendorAdminAiFeaturesTest {
                 assertThat(reply.toolsUsed()).hasSize(1);
             }
         }
+    }
+
+    @Test
+    void vendorRevenueUsesDashboardFactsAndRequestedPeriodWithoutLlmSynthesis() {
+        var conversation = vendorConversation();
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Vendor", BigDecimal.ZERO, 0, "NONE")));
+        when(vendorAiData.getPerformanceMetrics(eq(vendorId), any(), any())).thenReturn(
+                new VendorAiDataPort.VendorPerformanceMetrics(BigDecimal.valueOf(1_300_000),
+                        BigDecimal.valueOf(877_500), 2, 0, 0, 0, 0, 80, BigDecimal.ZERO, 0, "NONE", List.of()));
+
+        var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                "Doanh thu tháng này là bao nhiêu?", null, null, SupportedLanguage.VI);
+
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        verify(vendorAiData).getPerformanceMetrics(vendorId, today.withDayOfMonth(1), today);
+        assertThat(response.message()).contains("1.300.000", "877.500", "thực thu dự kiến");
+        assertThat(response.toolsUsed()).containsExactly("vendor_dashboard_summary");
+        assertThat(response.artifacts()).singleElement().satisfies(card -> {
+            assertThat(card.get("period")).isEqualTo(Map.of("from", today.withDayOfMonth(1).toString(), "to", today.toString()));
+            assertThat(mapper.valueToTree(card.get("data")).path("gmv").decimalValue())
+                    .isEqualByComparingTo("1300000");
+        });
+
+        when(insightStore.listCopilotMessages(conversation.id())).thenReturn(List.of(new CopilotMessage(
+                UUID.randomUUID(), conversation.id(), "ASSISTANT", "Lời đáp cũ", null,
+                "vendor_dashboard_summary", false, OffsetDateTime.now())));
+        var followUp = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                "Còn tháng trước thì sao?", null, null, SupportedLanguage.VI);
+        verify(vendorAiData).getPerformanceMetrics(vendorId, today.minusMonths(1).withDayOfMonth(1),
+                today.withDayOfMonth(1).minusDays(1));
+        assertThat(followUp.message()).contains("1.300.000", "877.500");
+        verifyNoInteractions(llmClient);
+    }
+
+    @Test
+    void vendorServiceCountAndOutsideScopeUseTheAuthenticatedRole() {
+        var conversation = vendorConversation();
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Vendor", BigDecimal.ZERO, 0, "NONE")));
+        when(vendorAiData.countServicesByStatus(vendorId)).thenReturn(Map.of("PUBLISHED", 1L, "DRAFT", 2L));
+        for (String question : List.of("hiện tại có mấy dịch vụ?", "tổng dịch vụ hiện tại là bao nhiêu?")) {
+            var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                    question, null, null, SupportedLanguage.VI);
+            assertThat(response.toolsUsed()).containsExactly("vendor_service_count");
+            assertThat(response.message()).contains("3 dịch vụ", "1 đã đăng", "2 bản nháp");
+        }
+        var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                "Cho tôi biết GMV và doanh thu toàn sàn DANASEA trong 30 ngày qua.",
+                null, null, SupportedLanguage.VI);
+        assertThat(response.artifacts()).isEmpty();
+        assertThat(response.message()).contains("dành cho quản trị viên");
+        verify(vendorAiData, never()).getPerformanceMetrics(any(), any(), any());
+        verifyNoInteractions(llmClient);
+    }
+
+    @Test
+    void vendorServiceCountDistinguishesEmptyDataFromQueryFailure() {
+        var conversation = vendorConversation();
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Vendor", BigDecimal.ZERO, 0, "NONE")));
+        when(vendorAiData.countServicesByStatus(vendorId))
+                .thenReturn(Map.of()).thenThrow(new IllegalStateException("database unavailable"));
+        var empty = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                "Có bao nhiêu dịch vụ đã đăng?", null, null, SupportedLanguage.VI);
+        var failure = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                "Có bao nhiêu dịch vụ đã đăng?", null, null, SupportedLanguage.VI);
+        assertThat(empty.message()).contains("0 dịch vụ đã đăng");
+        assertThat(empty.toolsUsed()).containsExactly("vendor_service_count");
+        assertThat(failure.message()).contains("chưa tra cứu được");
+        assertThat(failure.artifacts()).isEmpty();
+        verifyNoInteractions(llmClient);
+    }
+
+    @Test
+    void adminCopilotRedirectsPersonalTourSearchWithoutCallingCustomerTools() {
+        UUID id = UUID.randomUUID();
+        when(insightStore.getCopilotConversation(id)).thenReturn(Optional.of(new CopilotConversation(
+                id, adminUserId, "ADMIN", null, "vi", null, false, false, null, null,
+                1L, OffsetDateTime.now(), OffsetDateTime.now())));
+        var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, id,
+                "Tôi muốn đặt tour lặn biển ở Đà Nẵng, bạn có thể tìm dịch vụ giúp tôi không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(response.message()).contains("Trợ lý khách hàng");
+        assertThat(response.artifacts()).isEmpty();
+        verifyNoInteractions(llmClient);
+    }
+
+    private CopilotConversation vendorConversation() {
+        UUID id = UUID.randomUUID();
+        var conversation = new CopilotConversation(id, vendorUserId, "VENDOR", vendorId, "vi", null,
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(id)).thenReturn(Optional.of(conversation));
+        return conversation;
     }
 
     @Test

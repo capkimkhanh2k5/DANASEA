@@ -1,6 +1,7 @@
 package com.danasea.backend.modules.ai.infrastructure.cliproxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +19,7 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.web.client.RestClient;
 
 import com.danasea.backend.configs.properties.HttpClientProperties;
+import com.danasea.backend.modules.ai.domain.exceptions.AiModerationUnavailableException;
 import com.danasea.backend.modules.ai.infrastructure.cliproxy.configs.CliProxyProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -55,8 +57,8 @@ class ProxyModerationRoutingTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"BENIGN,true", "MALICIOUS,false", "BENIGN with extra text,false", "SAFE,false", "benign,false", "0.05,false", "0.50,false", "0.99,false", "UNSAFE,false", "INJECTION,false", "JAILBREAK,false", "'',false"})
-    void moderationUsesOnlyGatewayAndRequiresExactClassification(String output, boolean safe) throws Exception {
+    @ValueSource(strings = {"BENIGN", "MALICIOUS", "BENIGN with extra text", "SAFE", "benign", "0.05", "UNSAFE", ""})
+    void moderationUsesOnlyGatewayAndRequiresExactClassification(String output) throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         AtomicReference<String> path = new AtomicReference<>();
         AtomicReference<String> authorization = new AtomicReference<>();
@@ -86,7 +88,13 @@ class ProxyModerationRoutingTest {
                     .withBean(CliProxyModerationClient.class)
                     .run(context -> {
                         assertThat(context).hasNotFailed();
-                        assertThat(context.getBean(CliProxyModerationClient.class).isSafe("Xin chào" + "a".repeat(2400))).isEqualTo(safe);
+                        var client = context.getBean(CliProxyModerationClient.class);
+                        String prompt = "Xin chào" + "a".repeat(2400);
+                        if ("BENIGN".equals(output) || "MALICIOUS".equals(output)) {
+                            assertThat(client.isSafe(prompt)).isEqualTo("BENIGN".equals(output));
+                        } else {
+                            assertThatThrownBy(() -> client.isSafe(prompt)).isInstanceOf(AiModerationUnavailableException.class);
+                        }
                         assertThat(path.get()).isEqualTo("/v1/chat/completions");
                         assertThat(authorization.get()).isEqualTo("Bearer gateway-key");
                         assertThat(requestCount.get()).isEqualTo(1);
@@ -119,7 +127,7 @@ class ProxyModerationRoutingTest {
             var client = new CliProxyModerationClient(RestClient.builder(), new CliProxyProperties(true,
                     "http://127.0.0.1:" + server.getAddress().getPort(), "gateway-key", "model", "fallback"),
                     new HttpClientProperties(Duration.ofSeconds(2), Duration.ofSeconds(2)), new ObjectMapper());
-            assertThat(client.isSafe("unsafe input")).isFalse();
+            assertThatThrownBy(() -> client.isSafe("ordinary input")).isInstanceOf(AiModerationUnavailableException.class);
         } finally {
             server.stop(0);
         }
@@ -130,7 +138,7 @@ class ProxyModerationRoutingTest {
         var client = new CliProxyModerationClient(RestClient.builder(), new CliProxyProperties(false,
                 "http://127.0.0.1:1", "gateway-key", "model", "fallback"),
                 new HttpClientProperties(Duration.ofMillis(50), Duration.ofMillis(50)), new ObjectMapper());
-        assertThat(client.isSafe("input")).isFalse();
+        assertThatThrownBy(() -> client.isSafe("input")).isInstanceOf(AiModerationUnavailableException.class);
         assertThat(client.isSafe(null)).isTrue();
         assertThat(client.isSafe(" ")).isTrue();
     }

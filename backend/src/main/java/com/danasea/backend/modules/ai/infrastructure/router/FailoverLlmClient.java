@@ -39,16 +39,26 @@ public class FailoverLlmClient implements LlmClientPort {
 
     @Override
     public LlmResponse generateResponse(List<AiMessage> messages, SupportedLanguage language) {
-        if (cliProxyProperties != null && cliProxyProperties.enabled()) {
-            LlmResponse response = cliProxyLlmClient.generateResponse(messages, language);
-            if (response == null || ((response.getContent() == null || response.getContent().isBlank())
-                    && (response.getToolCalls() == null || response.getToolCalls().isEmpty()))) {
-                throw new CliProxyException("CLI Proxy returned no content or tool calls");
-            }
-            return response;
-        } else {
+        return requireResponse(enabledClient().generateResponse(messages, language));
+    }
+
+    @Override
+    public LlmResponse generateText(List<AiMessage> messages, SupportedLanguage language, String systemPrompt) {
+        return requireResponse(enabledClient().generateText(messages, language, systemPrompt));
+    }
+
+    private CliProxyLlmClient enabledClient() {
+        if (cliProxyProperties == null || !cliProxyProperties.enabled()) {
             throw new CliProxyException("CLI Proxy is disabled; no AI provider is configured");
         }
+        return cliProxyLlmClient;
+    }
 
+    private LlmResponse requireResponse(LlmResponse response) {
+        if (response == null || ((response.getContent() == null || response.getContent().isBlank())
+                && (response.getToolCalls() == null || response.getToolCalls().isEmpty()))) {
+            throw new CliProxyException("CLI Proxy returned no content or tool calls");
+        }
+        return response;
     }
 }
