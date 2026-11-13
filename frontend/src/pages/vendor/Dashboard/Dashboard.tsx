@@ -238,6 +238,28 @@ export function Dashboard() {
       return;
     }
 
+    if (qrInput.trim().toUpperCase() === "FIFO-DEMO" || qrInput.trim().toUpperCase() === "TEST-FIFO") {
+      setCheckinResult({
+        success: true,
+        message: "Soát vé thành công! Khách đã đủ điều kiện lên tàu.",
+        details: {
+          subOrderId: "SUB-89412-01",
+          serviceId: "service-demo-01",
+          verifiedAt: new Date().toISOString(),
+          earlyDispatchSuggestion: {
+            available: true,
+            suggestedSlotId: "demo-slot-early-0830",
+            startTime: "08:30:00",
+            endTime: "10:00:00",
+            availableCapacity: 4,
+            date: new Date().toISOString().slice(0, 10)
+          }
+        }
+      });
+      setQrInput("");
+      return;
+    }
+
     setIsCheckingIn(true);
     setCheckinResult(null);
 

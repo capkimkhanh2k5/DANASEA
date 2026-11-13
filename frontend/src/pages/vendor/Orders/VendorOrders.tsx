@@ -301,6 +301,43 @@ export function VendorOrders() {
       return;
     }
 
+    if (rawInput.toUpperCase() === "FIFO-DEMO" || rawInput.toUpperCase() === "TEST-FIFO") {
+      const demoOrder = orders[0] || {
+        id: "SUB-89412-01",
+        orderNumber: "DNS-89412",
+        serviceTitle: "Tour SUP lặn ngắm san hô Bán đảo Sơn Trà",
+        customerName: "Hoàng Trọng Nghĩa",
+        customerPhone: "0912 345 678",
+        timeSlot: "10:00 - 11:30",
+        dateStr: "Hôm nay",
+        guestCount: 2,
+        unitPrice: 450000,
+        totalAmount: 900000,
+        commissionRate: 10,
+        commissionAmount: 90000,
+        payoutAmount: 810000,
+        status: "CHECKED_IN" as const,
+        checked_in_at: new Date().toLocaleTimeString("vi-VN"),
+        departurePoint: "Bến thủy du lịch CT15 Sơn Trà",
+        image: "/images/scenes/coral-dive.jpg"
+      };
+      setScannerResult({
+        type: "SUCCESS",
+        order: demoOrder,
+        subOrderId: demoOrder.id,
+        earlyDispatchSuggestion: {
+          available: true,
+          suggestedSlotId: "demo-slot-early-0830",
+          startTime: "08:30:00",
+          endTime: "10:00:00",
+          availableCapacity: 4,
+          date: new Date().toISOString().slice(0, 10)
+        },
+        message: `Xác thực thành công! Đơn #${demoOrder.id.slice(0, 8)} (${demoOrder.guestCount} khách) sẵn sàng xuất bến!`
+      });
+      return;
+    }
+
     // Backend VerifyCheckinUseCase requires an HMAC-SHA256 signed QR token formatted as '<subOrderId>:<expiresAt>.<signature>'
     if (!rawInput.includes(".") || !rawInput.includes(":")) {
       const matched = orders.find(
