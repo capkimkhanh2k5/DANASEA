@@ -23,6 +23,8 @@ export function localizeNotificationTitle(title?: string | null, language: strin
     'Có yêu cầu hỗ trợ khách hàng đang chờ': 'Customer support request waiting',
     'Yêu cầu hỗ trợ đã được cập nhật': 'Support request updated',
     'Phản hồi đánh giá từ nhà cung cấp': 'Review response from operator',
+    'Hồ sơ đăng ký đối tác đã được phê duyệt': 'Partner application approved',
+    'Hồ sơ đăng ký đối tác chưa được phê duyệt': 'Partner application rejected',
   };
 
   if (exactMap[trimmed]) {

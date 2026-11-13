@@ -28,6 +28,7 @@ import {
   AlertCircle,
   CheckCircle2,
   MessageSquare,
+  Store,
 } from "lucide-react";
 import type { NotificationResponse } from "../../types/notification";
 
@@ -119,7 +120,20 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
     };
   }
 
-  // 5. Thanh toán thành công / Đặt vé xác nhận -> CheckCircle2 màu đen nền trắng
+  // 5. Hồ sơ đối tác / Phê duyệt quyền -> Store màu đen nền trắng
+  if (
+    normTitle.includes('doi tac') ||
+    normTitle.includes('phe duyet') ||
+    t.includes('PARTNER') ||
+    r === 'PARTNER_APPLICATION'
+  ) {
+    return {
+      icon: <Store className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
+    };
+  }
+
+  // 6. Thanh toán thành công / Đặt vé xác nhận -> CheckCircle2 màu đen nền trắng
   if (
     normTitle.includes('thanh toan thanh cong') ||
     normTitle.includes('xac nhan dat ve') ||
