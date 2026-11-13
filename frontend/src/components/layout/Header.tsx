@@ -784,16 +784,25 @@ export function Header() {
                       selectedNotif.relatedEntityType === 'SUB_ORDER' ||
                       selectedNotif.type?.includes('ORDER') ||
                       selectedNotif.type?.includes('REFUND') ||
-                      selectedNotif.type?.includes('RESCHEDULE')) && (
+                      selectedNotif.type?.includes('RESCHEDULE') ||
+                      selectedNotif.type?.includes('REVIEW')) && (
                       <button
                         type="button"
                         onClick={() => {
                           setShowAccountMenu(false);
                           setAccountMenuView('menu');
-                          const targetUrl =
-                            selectedNotif.relatedEntityType === 'SUB_ORDER' && selectedNotif.relatedEntityId
-                              ? `/profile/orders?rescheduleSubOrderId=${selectedNotif.relatedEntityId}`
-                              : '/profile/orders';
+                          let targetUrl: string;
+                          if (selectedNotif.relatedEntityType === 'SUB_ORDER' && selectedNotif.relatedEntityId) {
+                            targetUrl = `/profile/orders?subOrderId=${selectedNotif.relatedEntityId}`;
+                            if (selectedNotif.type?.includes('RESCHEDULE')) {
+                              targetUrl += `&rescheduleSubOrderId=${selectedNotif.relatedEntityId}`;
+                            }
+                          } else if (selectedNotif.relatedEntityType === 'ORDER' && selectedNotif.relatedEntityId) {
+                            targetUrl = `/profile/orders?orderId=${selectedNotif.relatedEntityId}`;
+                          } else {
+                            targetUrl = '/profile/orders?tab=all';
+                          }
+                          targetUrl += `${targetUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
                           navigate(targetUrl);
                         }}
                         className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"

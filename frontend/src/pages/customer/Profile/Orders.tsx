@@ -349,6 +349,86 @@ export function Orders() {
     return filteredOrders.slice(start, start + PAGE_SIZE);
   }, [filteredOrders, page]);
 
+  // Handle targeted deep-linking from notifications or URL parameters (subOrderId, orderId, tab)
+  useEffect(() => {
+    if (orders.length === 0) return;
+
+    const targetSubOrderId = searchParams.get('subOrderId') || searchParams.get('rescheduleSubOrderId');
+    const targetOrderId = searchParams.get('orderId');
+    const targetTab = searchParams.get('tab') as OrderFilter | null;
+
+    if (targetTab && ['all', 'upcoming', 'pending', 'completed', 'cancelled'].includes(targetTab)) {
+      setFilter(targetTab);
+      setPage(0);
+      return;
+    }
+
+    if (!targetSubOrderId && !targetOrderId) return;
+
+    // Find the target order
+    const targetOrder = orders.find((o) => {
+      if (targetOrderId && o.id === targetOrderId) return true;
+      if (targetSubOrderId) {
+        const items = o.items || o.subOrders || [];
+        return items.some((s) => s.id === targetSubOrderId);
+      }
+      return false;
+    });
+
+    if (!targetOrder) return;
+
+    const subOrders = targetOrder.items || targetOrder.subOrders || [];
+    const masterStatus = (targetOrder.status || '').toUpperCase();
+
+    // Determine appropriate filter so targetOrder is visible
+    let nextFilter: OrderFilter = 'all';
+    if (subOrders.some((s) => (s.status || '').toUpperCase() === 'COMPLETED' || (s.status || '').toUpperCase() === 'CHECKED_IN')) {
+      nextFilter = 'completed';
+    } else if (subOrders.some((s) => (s.status || '').toUpperCase() === 'CONFIRMED' || (s.status || '').toUpperCase() === 'PENDING')) {
+      nextFilter = 'upcoming';
+    } else if (subOrders.some((s) => (s.status || '').toUpperCase() === 'CANCELLED' || (s.status || '').toUpperCase() === 'REFUNDED')) {
+      nextFilter = 'cancelled';
+    } else if (masterStatus === 'PENDING_PAYMENT') {
+      nextFilter = 'pending';
+    }
+
+    setFilter(nextFilter);
+
+    // Compute index in list for pagination
+    const matchingOrders = orders.filter((o) => {
+      const itms = o.items || o.subOrders || [];
+      const mst = (o.status || '').toUpperCase();
+      if (nextFilter === 'all') return true;
+      if (nextFilter === 'pending') return mst === 'PENDING_PAYMENT';
+      if (nextFilter === 'upcoming') return itms.some((i) => (i.status || '').toUpperCase() === 'CONFIRMED' || (i.status || '').toUpperCase() === 'PENDING');
+      if (nextFilter === 'completed') return itms.some((i) => (i.status || '').toUpperCase() === 'COMPLETED' || (i.status || '').toUpperCase() === 'CHECKED_IN');
+      if (nextFilter === 'cancelled') return itms.some((i) => (i.status || '').toUpperCase() === 'CANCELLED' || (i.status || '').toUpperCase() === 'REFUNDED' || (i.status || '').toUpperCase() === 'PARTIALLY_REFUNDED');
+      return true;
+    });
+
+    const targetIdx = matchingOrders.findIndex((o) => o.id === targetOrder.id);
+    if (targetIdx >= 0) {
+      const targetPage = Math.floor(targetIdx / PAGE_SIZE);
+      setPage(targetPage);
+    }
+
+    // Scroll and highlight
+    const timer = setTimeout(() => {
+      const el =
+        (targetSubOrderId && document.getElementById(`suborder-${targetSubOrderId}`)) ||
+        document.getElementById(`order-${targetOrder.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-2', 'ring-sky-500', 'ring-offset-2', 'transition-all');
+        setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-sky-500', 'ring-offset-2');
+        }, 3000);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchParams, orders]);
+
   // Confirm reschedule proposal handler
   const handleConfirmReschedule = async (
     subOrderId: string,
@@ -997,6 +1077,7 @@ export function Orders() {
                 return (
                   <article
                     key={masterOrder.id}
+                    id={`order-${masterOrder.id}`}
                     data-ui="order-card"
                     className="bg-white rounded-2xl p-6 border border-slate-200/90 flex flex-col gap-6"
                   >
@@ -1163,6 +1244,7 @@ export function Orders() {
                           return (
                             <div
                               key={subOrder.id}
+                              id={`suborder-${subOrder.id}`}
                               className="bg-white rounded-xl p-3.5 flex flex-col md:flex-row gap-3.5 border border-slate-200/70 hover:border-slate-300 transition-all shadow-2xs"
                             >
                               {/* Thumbnail */}
@@ -1330,7 +1412,7 @@ export function Orders() {
                                 </div>
 
                                 {/* Comprehensive Review Section for COMPLETED sub-orders */}
-                                {isCompleted && (
+                                {(isCompleted || Boolean(reviewsMap[subOrder.id])) && (
                                   <div className="mt-3.5 pt-3.5 border-t border-slate-200/70">
                                     {reviewsMap[subOrder.id] ? (
                                       <div data-ui="suborder-review-card" className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2.5">
