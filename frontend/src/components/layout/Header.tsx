@@ -239,57 +239,10 @@ export function Header() {
     setLoadingNotifs(true);
     try {
       const res = await notificationService.getMyNotifications(0, 10);
-      if (res && res.content && res.content.length > 0) {
+      if (res && res.content) {
         setNotifList(res.content);
       } else {
-        // Default system notifications fallback
-        setNotifList([
-          {
-            id: "notif-1",
-            userId: "user-me",
-            title: "Xác nhận đặt vé thành công",
-            body: "Tour lặn ngắm san hô Hòn Sụp của bạn đã được xác nhận. Mã vé điện tử: #DN-8842.",
-            type: "BOOKING_CONFIRMED",
-            status: "DELIVERED",
-            channel: "IN_APP",
-            locale: "vi",
-            isRead: false,
-            readAt: null,
-            relatedEntityType: "BOOKING",
-            relatedEntityId: "DN-8842",
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: "notif-2",
-            userId: "user-me",
-            title: "Cảnh báo luồng gió & an toàn biển",
-            body: "Tầm nhìn tại bãi biển Mỹ Khê hôm nay đạt 8m, sóng êm cấp 1, cờ xanh an toàn cho hoạt động chèo SUP.",
-            type: "WEATHER_SAFETY",
-            status: "DELIVERED",
-            channel: "IN_APP",
-            locale: "vi",
-            isRead: false,
-            readAt: null,
-            relatedEntityType: "WEATHER",
-            relatedEntityId: "MY_KHE",
-            createdAt: new Date(Date.now() - 3600000).toISOString(),
-          },
-          {
-            id: "notif-3",
-            userId: "user-me",
-            title: "Hợp đồng bảo hiểm điện tử Bảo Việt",
-            body: "Bảo hiểm trách nhiệm du lịch biển 100.000.000 ₫ đã được kích hoạt tự động theo hồ sơ du khách.",
-            type: "INSURANCE_ACTIVE",
-            status: "DELIVERED",
-            channel: "IN_APP",
-            locale: "vi",
-            isRead: true,
-            readAt: new Date().toISOString(),
-            relatedEntityType: "INSURANCE",
-            relatedEntityId: "BV-100M",
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-          },
-        ]);
+        setNotifList([]);
       }
     } catch (err) {
       console.warn('Lỗi nạp thông báo:', err);
