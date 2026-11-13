@@ -1,8 +1,10 @@
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useLanguageStore } from "../../../store/useLanguageStore";
 import { useNavigate, Navigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { authService } from "../../../services/authService";
+import { customerPartnerService } from "../../../services/customerPartnerService";
+import type { PartnerApplicationResponse } from "../../../types/partnerApplication";
 import {
   User,
   Receipt,
@@ -13,9 +15,15 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  Store,
+  Building2,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 
-type SettingsTab = "personal" | "security" | "orders" | "wishlist";
+type SettingsTab = "personal" | "security" | "orders" | "wishlist" | "partner";
 
 export function Profile() {
   const navigate = useNavigate();
@@ -73,6 +81,71 @@ export function Profile() {
   const [showCurrentPass, setShowCurrentPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // Partner Application states
+  const [partnerApp, setPartnerApp] = useState<PartnerApplicationResponse | null>(null);
+  const [loadingPartnerApp, setLoadingPartnerApp] = useState(false);
+  const [partnerSubmitting, setPartnerSubmitting] = useState(false);
+  const [partnerBusinessName, setPartnerBusinessName] = useState("");
+  const [partnerTaxCode, setPartnerTaxCode] = useState("");
+  const [partnerAddress, setPartnerAddress] = useState("");
+  const [partnerBankName, setPartnerBankName] = useState("Vietcombank");
+  const [partnerBankAccountNumber, setPartnerBankAccountNumber] = useState("");
+  const [partnerBankAccountHolder, setPartnerBankAccountHolder] = useState("");
+
+  const loadPartnerApplication = useCallback(async () => {
+    setLoadingPartnerApp(true);
+    try {
+      const app = await customerPartnerService.getMyApplication();
+      setPartnerApp(app);
+      if (app) {
+        setPartnerBusinessName(app.businessName || "");
+        setPartnerTaxCode(app.taxCode || "");
+        setPartnerAddress(app.address || "");
+        setPartnerBankName(app.bankName || "Vietcombank");
+        setPartnerBankAccountNumber(app.bankAccountNumber || "");
+        setPartnerBankAccountHolder(app.bankAccountHolder || "");
+      }
+    } finally {
+      setLoadingPartnerApp(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "partner") {
+      loadPartnerApplication();
+    }
+  }, [activeTab, loadPartnerApplication]);
+
+  const handleSubmitPartner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPartnerSubmitting(true);
+    try {
+      const payload = {
+        businessName: partnerBusinessName.trim(),
+        taxCode: partnerTaxCode.trim(),
+        address: partnerAddress.trim(),
+        bankName: partnerBankName.trim(),
+        bankAccountNumber: partnerBankAccountNumber.trim(),
+        bankAccountHolder: partnerBankAccountHolder.trim(),
+      };
+      const res = partnerApp?.status === "REJECTED"
+        ? await customerPartnerService.resubmitApplication(payload)
+        : await customerPartnerService.submitApplication(payload);
+
+      setPartnerApp(res);
+      setToastMessage(isEn ? "Partner application submitted successfully!" : "Đã gửi hồ sơ đăng ký đối tác thành công!");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Không thể gửi hồ sơ. Vui lòng kiểm tra lại thông tin.";
+      setToastMessage(msg);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } finally {
+      setPartnerSubmitting(false);
+    }
+  };
 
   // Redirect unauthenticated user directly to login
   if (!user) {
@@ -197,6 +270,31 @@ export function Profile() {
                   <span>{isEn ? "Login & Security" : "Đăng nhập & Bảo mật"}</span>
                 </div>
                 <ChevronRight className={`w-4 h-4 ${activeTab === "security" ? "text-white/80" : "text-slate-400"}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setActiveTab("partner"); setEditingField(null); }}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === "partner"
+                    ? "bg-[#0284c7] text-white shadow-xs"
+                    : "text-slate-700 hover:bg-slate-100"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Store className={`w-4 h-4 ${activeTab === "partner" ? "text-white" : "text-slate-500"}`} />
+                  <span>{isEn ? "Become a Partner" : "Đăng ký Đối tác"}</span>
+                </div>
+                {partnerApp && (
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    partnerApp.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' :
+                    partnerApp.status === 'PENDING' ? 'bg-amber-100 text-amber-700' :
+                    'bg-rose-100 text-rose-700'
+                  }`}>
+                    {partnerApp.status === 'APPROVED' ? 'Đã duyệt' : partnerApp.status === 'PENDING' ? 'Chờ duyệt' : 'Từ chối'}
+                  </span>
+                )}
+                <ChevronRight className={`w-4 h-4 ${activeTab === "partner" ? "text-white/80" : "text-slate-400"}`} />
               </button>
 
               <button
@@ -512,6 +610,242 @@ export function Profile() {
                     <span className="text-[11px] font-bold text-emerald-600">{isEn ? "This session" : "Phiên này"}</span>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* TAB 3: ĐĂNG KÝ ĐỐI TÁC (Partner Application & Onboarding) */}
+            {activeTab === "partner" && (
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 sm:p-8 space-y-6">
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                    {isEn ? "Become a Partner Operator" : "Hồ sơ Đăng ký Đối tác Vận hành"}
+                  </h1>
+                </div>
+
+                {loadingPartnerApp ? (
+                  <div className="space-y-4 animate-pulse">
+                    <div className="h-6 w-48 bg-slate-200 rounded" />
+                    <div className="h-20 bg-slate-100 rounded-xl" />
+                    <div className="h-10 w-full bg-slate-200 rounded-xl" />
+                  </div>
+                ) : partnerApp?.status === "APPROVED" ? (
+                  <div className="space-y-6">
+                    <div className="p-5 rounded-xl bg-emerald-50 border border-emerald-200/80 flex items-start gap-3.5">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-bold text-emerald-900">
+                          {isEn ? "Application Approved" : "Hồ sơ đối tác đã được phê duyệt"}
+                        </h3>
+                        <p className="text-xs text-emerald-800 leading-relaxed">
+                          {isEn
+                            ? "Your vendor account is active. You have full access to DanaSea Vendor Portal for managing sports services, bookings, and payouts."
+                            : "Tài khoản đối tác của bạn đã sẵn sàng. Bạn có quyền truy cập toàn diện vào Kênh Đối tác DanaSea để quản lý dịch vụ thể thao biển, tiếp nhận vé và quản lý giải ngân."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50 space-y-3 text-xs">
+                      <div className="flex justify-between py-1 border-b border-slate-200/60">
+                        <span className="text-slate-500">{isEn ? "Business Name" : "Tên đơn vị"}</span>
+                        <span className="font-semibold text-slate-900">{partnerApp.businessName}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-200/60">
+                        <span className="text-slate-500">{isEn ? "Tax Code" : "Mã số thuế"}</span>
+                        <span className="font-mono font-medium text-slate-900">{partnerApp.taxCode}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-200/60">
+                        <span className="text-slate-500">{isEn ? "Address" : "Địa chỉ bến bãi"}</span>
+                        <span className="font-medium text-slate-900 text-right">{partnerApp.address}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-slate-500">{isEn ? "Bank Account" : "Ngân hàng thụ hưởng"}</span>
+                        <span className="font-mono font-medium text-slate-900 text-right">
+                          {partnerApp.bankName} · {partnerApp.bankAccountNumber} ({partnerApp.bankAccountHolder})
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate("/vendor")}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
+                    >
+                      <Building2 className="w-4 h-4" />
+                      <span>{isEn ? "Go to Vendor Portal" : "Truy cập Kênh Đối tác"}</span>
+                    </button>
+                  </div>
+                ) : partnerApp?.status === "PENDING" ? (
+                  <div className="space-y-6">
+                    <div className="p-5 rounded-xl bg-amber-50 border border-amber-200/80 flex items-start gap-3.5">
+                      <Clock className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-bold text-amber-900">
+                          {isEn ? "Application Under Review" : "Hồ sơ đang được Cảng vụ DanaSea thẩm định"}
+                        </h3>
+                        <p className="text-xs text-amber-800 leading-relaxed">
+                          {isEn
+                            ? "Our operations team is reviewing your business licenses and maritime safety compliance. Verification usually completes within 24 business hours."
+                            : "Ban quản lý DanaSea đang đối soát giấy phép kinh doanh và điều kiện an toàn bến bãi đường thủy. Thời gian thẩm định thông thường trong vòng 24 giờ làm việc."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50 space-y-3 text-xs">
+                      <div className="flex justify-between py-1 border-b border-slate-200/60">
+                        <span className="text-slate-500">{isEn ? "Business Name" : "Tên đơn vị"}</span>
+                        <span className="font-semibold text-slate-900">{partnerApp.businessName}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-200/60">
+                        <span className="text-slate-500">{isEn ? "Tax Code" : "Mã số thuế"}</span>
+                        <span className="font-mono font-medium text-slate-900">{partnerApp.taxCode}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-200/60">
+                        <span className="text-slate-500">{isEn ? "Address" : "Địa chỉ bến bãi"}</span>
+                        <span className="font-medium text-slate-900 text-right">{partnerApp.address}</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-slate-500">{isEn ? "Bank Account" : "Tài khoản thanh toán"}</span>
+                        <span className="font-mono font-medium text-slate-900 text-right">
+                          {partnerApp.bankName} · {partnerApp.bankAccountNumber}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmitPartner} className="space-y-4 max-w-xl">
+                    {partnerApp?.status === "REJECTED" && (
+                      <div className="p-4 rounded-xl bg-rose-50 border border-rose-200/80 flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-rose-600 mt-0.5 shrink-0" />
+                        <div className="space-y-1 text-xs">
+                          <p className="font-bold text-rose-900">
+                            {isEn ? "Application Rejected" : "Hồ sơ chưa được phê duyệt"}
+                          </p>
+                          <p className="text-rose-800">
+                            {partnerApp.rejectionReason || (isEn ? "Please update your business details and resubmit." : "Vui lòng kiểm tra lại thông tin mã số thuế và tài khoản ngân hàng để gửi lại hồ sơ.")}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">
+                        {isEn ? "Legal Business / Brand Name" : "Tên Doanh nghiệp / Hộ kinh doanh"}
+                      </label>
+                      <input
+                        type="text"
+                        value={partnerBusinessName}
+                        onChange={(e) => setPartnerBusinessName(e.target.value)}
+                        placeholder={isEn ? "e.g. Da Nang Marine Watersports Co." : "VD: Công ty TNHH Du thuyền & Thể thao Biển Đà Nẵng"}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-[#0284c7]"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">
+                          {isEn ? "Tax Identification Code" : "Mã số thuế doanh nghiệp"}
+                        </label>
+                        <input
+                          type="text"
+                          value={partnerTaxCode}
+                          onChange={(e) => setPartnerTaxCode(e.target.value)}
+                          placeholder="0401234567"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-200 font-mono text-sm outline-none focus:border-[#0284c7]"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">
+                          {isEn ? "Settlement Bank" : "Ngân hàng thụ hưởng"}
+                        </label>
+                        <select
+                          value={partnerBankName}
+                          onChange={(e) => setPartnerBankName(e.target.value)}
+                          className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm outline-none focus:border-[#0284c7] bg-white cursor-pointer"
+                        >
+                          <option value="Vietcombank">Vietcombank</option>
+                          <option value="MB Bank">MB Bank</option>
+                          <option value="Techcombank">Techcombank</option>
+                          <option value="BIDV">BIDV</option>
+                          <option value="VietinBank">VietinBank</option>
+                          <option value="ACB">ACB</option>
+                          <option value="TPBank">TPBank</option>
+                          <option value="VPBank">VPBank</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700">
+                        {isEn ? "Operating Pier / Beach Address" : "Địa chỉ bến bãi / Điểm hoạt động đón khách"}
+                      </label>
+                      <input
+                        type="text"
+                        value={partnerAddress}
+                        onChange={(e) => setPartnerAddress(e.target.value)}
+                        placeholder={isEn ? "e.g. Zone 4, My Khe Beach, Son Tra, Da Nang" : "VD: Bến thủy nội địa CT15, Bán đảo Sơn Trà, Đà Nẵng"}
+                        className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-[#0284c7]"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">
+                          {isEn ? "Bank Account Number" : "Số tài khoản ngân hàng"}
+                        </label>
+                        <input
+                          type="text"
+                          value={partnerBankAccountNumber}
+                          onChange={(e) => setPartnerBankAccountNumber(e.target.value)}
+                          placeholder="0123456789"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-200 font-mono text-sm outline-none focus:border-[#0284c7]"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-semibold text-slate-700">
+                          {isEn ? "Bank Account Holder" : "Tên chủ tài khoản (in hoa)"}
+                        </label>
+                        <input
+                          type="text"
+                          value={partnerBankAccountHolder}
+                          onChange={(e) => setPartnerBankAccountHolder(e.target.value.toUpperCase())}
+                          placeholder="NGUYEN VAN A"
+                          className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-[#0284c7]"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-3">
+                      <button
+                        type="submit"
+                        disabled={partnerSubmitting}
+                        className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] disabled:bg-slate-300 text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
+                      >
+                        {partnerSubmitting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>{isEn ? "Submitting..." : "Đang gửi hồ sơ..."}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Building2 className="w-4 h-4" />
+                            <span>
+                              {partnerApp?.status === "REJECTED"
+                                ? (isEn ? "Resubmit Application" : "Gửi lại hồ sơ")
+                                : (isEn ? "Submit Application" : "Gửi hồ sơ đăng ký")}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             )}
 

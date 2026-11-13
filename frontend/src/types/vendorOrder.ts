@@ -141,3 +141,20 @@ export interface RescheduleProposalResponse {
   expiresAt?: string;
   createdAt: string;
 }
+
+// Request & Response điều phối khách chơi sớm (FIFO Early Dispatch)
+export interface EarlyDispatchRequest {
+  subOrderId: string;
+  targetSlotId: string;
+  dispatchReason?: string;
+}
+
+export interface EarlyDispatchResponse {
+  subOrderId: string;
+  originalSlotId: string;
+  actualSlotId: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  message: string;
+}
