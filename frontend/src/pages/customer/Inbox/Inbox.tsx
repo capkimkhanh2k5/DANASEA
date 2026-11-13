@@ -338,7 +338,13 @@ export function Inbox() {
                               ? "bg-[#eef2f6]"
                               : "hover:bg-slate-50"
                           }`}
-                          onClick={() => setActiveConvId(conv.id)}
+                          onClick={() => {
+                            setActiveConvId(conv.id);
+                            loadMessages(conv.id);
+                            setConversations((prev) =>
+                              prev.map((c) => (c.id === conv.id ? { ...c, unreadCount: 0 } : c))
+                            );
+                          }}
                         >
                           <div className="relative shrink-0">
                             <div className="w-12 h-12 rounded-full bg-sky-50 border border-sky-200 text-sky-800 flex items-center justify-center font-bold text-sm">

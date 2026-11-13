@@ -110,6 +110,9 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
   const handleSelectConversation = (id: string) => {
     setActiveConvId(id);
     loadMessages(id);
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
+    );
   };
 
   const executeSend = async (content: string) => {
@@ -172,7 +175,10 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
           {activeConvId && (
             <button
               type="button"
-              onClick={() => setActiveConvId(null)}
+              onClick={() => {
+                setActiveConvId(null);
+                loadConversations();
+              }}
               className="w-7 h-7 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer mr-0.5 shrink-0"
               title={isEn ? "Back" : "Quay lại danh sách"}
             >

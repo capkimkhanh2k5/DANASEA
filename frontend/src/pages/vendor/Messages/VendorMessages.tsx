@@ -243,7 +243,13 @@ export function VendorMessages() {
                 return (
                   <div
                     key={conv.id}
-                    onClick={() => setActiveConvId(conv.id)}
+                    onClick={() => {
+                      setActiveConvId(conv.id);
+                      loadMessages(conv.id);
+                      setConversations((prev) =>
+                        prev.map((c) => (c.id === conv.id ? { ...c, unreadCount: 0 } : c))
+                      );
+                    }}
                     className={`p-2.5 rounded-xl cursor-pointer transition-colors flex items-center gap-3 ${
                       isActive
                         ? 'bg-[#eef2f6]'
