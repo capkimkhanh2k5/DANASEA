@@ -65,10 +65,9 @@ export function Orders() {
   const loading = isAuthenticated && Boolean(accessToken) && loadingState;
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<number>(0);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [previousRequest, setPreviousRequest] = useState({ page, accessToken });
-  if (previousRequest.page !== page || previousRequest.accessToken !== accessToken) {
-    setPreviousRequest({ page, accessToken });
+  const [previousRequest, setPreviousRequest] = useState({ accessToken });
+  if (previousRequest.accessToken !== accessToken) {
+    setPreviousRequest({ accessToken });
     setLoading(true);
   }
 
@@ -149,14 +148,12 @@ export function Orders() {
   const serviceDetailsCache = useRef<Record<string, ServiceDetailDto>>({});
 
   // Fetch orders from API
-  const fetchOrders = useCallback((targetPage = 0) => {
+  const fetchOrders = useCallback(() => {
     if (!isAuthenticated || !accessToken) return;
 
-    return orderService.getMyOrders(targetPage, 20).then((res) => {
+    return orderService.getMyOrders(0, 100).then((res) => {
       setError(null);
       setOrders(res.content || []);
-      setPage(res.page || 0);
-      setTotalPages(res.totalPages || 1);
 
       // Extract unique service IDs to fetch service details and fetch refund history
       const serviceIds = new Set<string>();
@@ -283,9 +280,9 @@ export function Orders() {
 
   useEffect(() => {
     if (isAuthenticated && accessToken) {
-      fetchOrders(page);
+      fetchOrders();
     }
-  }, [page, isAuthenticated, accessToken, fetchOrders]);
+  }, [isAuthenticated, accessToken, fetchOrders]);
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
@@ -331,6 +328,14 @@ export function Orders() {
     });
   }, [orders, filter]);
 
+  // Client-side pagination over filtered orders
+  const PAGE_SIZE = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+  const paginatedOrders = useMemo(() => {
+    const start = page * PAGE_SIZE;
+    return filteredOrders.slice(start, start + PAGE_SIZE);
+  }, [filteredOrders, page]);
+
   // Confirm reschedule proposal handler
   const handleConfirmReschedule = async (
     subOrderId: string,
@@ -350,7 +355,7 @@ export function Orders() {
         delete next[subOrderId];
         return next;
       });
-      fetchOrders(page);
+      fetchOrders();
     } catch (err: unknown) {
       let msg = "Không thể xác nhận đổi ca.";
       if (err && typeof err === "object" && "response" in err) {
@@ -464,7 +469,7 @@ export function Orders() {
       setTimeout(() => {
         setCancellationOrder(null);
         setLoading(true);
-        fetchOrders(page);
+        fetchOrders();
       }, 1500);
     } catch (err: unknown) {
       console.error("[Orders] Lỗi khi xác nhận hủy đơn:", err);
@@ -793,7 +798,7 @@ export function Orders() {
             {/* Airbnb Signature Underline Tabs */}
             <div className="flex items-center gap-6 sm:gap-8 border-b border-slate-200 overflow-x-auto no-scrollbar pt-2">
               <button
-                onClick={() => setFilter("all")}
+                onClick={() => { setFilter("all"); setPage(0); }}
                 className={`pb-3.5 text-sm font-semibold transition-all relative whitespace-nowrap cursor-pointer ${
                   filter === "all"
                     ? "text-[#0284c7] font-bold"
@@ -808,7 +813,7 @@ export function Orders() {
               </button>
 
               <button
-                onClick={() => setFilter("upcoming")}
+                onClick={() => { setFilter("upcoming"); setPage(0); }}
                 className={`pb-3.5 text-sm font-semibold transition-all relative whitespace-nowrap cursor-pointer ${
                   filter === "upcoming"
                     ? "text-[#0284c7] font-bold"
@@ -823,7 +828,7 @@ export function Orders() {
               </button>
 
               <button
-                onClick={() => setFilter("pending")}
+                onClick={() => { setFilter("pending"); setPage(0); }}
                 className={`pb-3.5 text-sm font-semibold transition-all relative whitespace-nowrap cursor-pointer ${
                   filter === "pending"
                     ? "text-[#0284c7] font-bold"
@@ -838,7 +843,7 @@ export function Orders() {
               </button>
 
               <button
-                onClick={() => setFilter("completed")}
+                onClick={() => { setFilter("completed"); setPage(0); }}
                 className={`pb-3.5 text-sm font-semibold transition-all relative whitespace-nowrap cursor-pointer ${
                   filter === "completed"
                     ? "text-[#0284c7] font-bold"
@@ -853,7 +858,7 @@ export function Orders() {
               </button>
 
               <button
-                onClick={() => setFilter("cancelled")}
+                onClick={() => { setFilter("cancelled"); setPage(0); }}
                 className={`pb-3.5 text-sm font-semibold transition-all relative whitespace-nowrap cursor-pointer ${
                   filter === "cancelled"
                     ? "text-[#0284c7] font-bold"
@@ -901,7 +906,7 @@ export function Orders() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => { setLoading(true); fetchOrders(page); }}
+                    onClick={() => { setLoading(true); fetchOrders(); }}
                     className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold cursor-pointer"
                   >
                     Thử lại
@@ -934,7 +939,7 @@ export function Orders() {
           {/* Orders List */}
           {!loading && !error && filteredOrders.length > 0 && (
             <div className="w-full flex flex-col gap-6">
-              {filteredOrders.map((masterOrder) => {
+              {paginatedOrders.map((masterOrder) => {
                 const subOrders = masterOrder.items || masterOrder.subOrders || [];
                 const orderCode = `#ORD-${(masterOrder.id || "").slice(0, 8).toUpperCase()}`;
                 const allSubCancelled = subOrders.length > 0 && subOrders.every((s) => {
