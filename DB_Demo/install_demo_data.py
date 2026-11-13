@@ -116,7 +116,7 @@ def jlit(value):
 
 
 def source(table, rows):
-    require(table in ALL_TABLES or table in EXTENDED_TABLES, f'Unsupported table: {table}')
+    require(table in ALL_TABLES, f'Unsupported table: {table}')
     return 'jsonb_populate_recordset(NULL::public.' + table + ',' + jlit(rows) + ')'
 
 
@@ -142,8 +142,8 @@ def manifest():
 
 
 def validate_rows(rows):
-    expected = dict(categories=12, users=35, vendors=16, services=24,
-                    service_options=33, service_slots=24, vendor_documents=25, service_images=72)
+    expected = dict(categories=12, users=12, vendors=9, services=24,
+                    service_options=33, service_slots=24, vendor_documents=18, service_images=72)
     require(all(t in rows and len(rows[t]) == n for t, n in expected.items()), 'Unexpected package counts')
     require('service_safety_documents' in rows, 'Missing safety document dataset')
     ids = [r['id'] for rs in rows.values() for r in rs]
@@ -190,9 +190,10 @@ def validate_rows(rows):
             require(d.get('reviewed_by') is None and d.get('reviewed_at') is None,
                     'Pending vendor document must not have reviewed_by or reviewed_at')
 
-    require(len([u for u in rows['users'] if u['role'] == 'ADMIN']) == 4, 'Expected 4 ADMIN users')
-    require(len([u for u in rows['users'] if u['role'] == 'VENDOR']) == 16, 'Expected 16 VENDOR users')
-    require(len([u for u in rows['users'] if u['role'] == 'CUSTOMER']) == 15, 'Expected 15 CUSTOMER users')
+    required_accounts = {'admin_demo@danasea.test': 'ADMIN', 'customer_1@danasea.test': 'CUSTOMER',
+                         'customer_2@danasea.test': 'CUSTOMER',
+                         **{'vender_' + str(i) + '@danasea.test': 'VENDOR' for i in range(1, 10)}}
+    require({u['email']: u['role'] for u in rows['users']} == required_accounts, 'Account role/email mapping differs')
     categories = {c['id']: c for c in rows['categories']}
     needed = {s['id'] for s in rows['services'] if s.get('weather_sensitive') is True or
               categories[s['category_id']].get('requires_safety_cert') is True}
@@ -748,140 +749,6 @@ def preflight_audit(session, base_rows, trans_rows):
     }
 
 
-
-EXTENDED_TABLES = [
-    'reviews', 'discount_codes', 'discount_redemptions', 'flash_sales',
-    'disputes', 'dispute_attachments', 'conversations', 'messages',
-    'notifications', 'wishlists', 'recently_vieweds', 'checkin_tokens',
-    'vendor_equipment', 'equipment_maintenance', 'sub_order_disruptions',
-    'sub_order_reschedule_proposals', 'vendor_fault_compensations'
-]
-
-EXTENDED_FIXTURE_FILES = {
-    'reviews.json': ['reviews'],
-    'discounts.json': ['discount_codes', 'discount_redemptions', 'flash_sales'],
-    'disputes.json': ['disputes', 'dispute_attachments'],
-    'communications.json': ['conversations', 'messages', 'notifications', 'wishlists', 'recently_vieweds'],
-    'checkin.json': ['checkin_tokens'],
-    'maintenance.json': ['vendor_equipment', 'equipment_maintenance'],
-    'disruptions.json': ['sub_order_disruptions', 'sub_order_reschedule_proposals', 'vendor_fault_compensations']
-}
-
-def seed_extended_simulation_fixtures(session):
-    """Nạp toàn bộ dữ liệu nghiệp vụ mở rộng và đồng bộ 2 chiều (Rule 17)"""
-    for fname, tables in EXTENDED_FIXTURE_FILES.items():
-        fpath = TRANS_DIR / fname
-        if not fpath.is_file():
-            continue
-        data = json.loads(fpath.read_text(encoding='utf8'))
-        for table in tables:
-            rows = data.get(table, [])
-            if not rows:
-                continue
-            exp = source(table, rows)
-            names = list(rows[0].keys())
-            targets = ','.join('"' + k + '"' for k in names)
-            expressions = ','.join('coalesce(r."' + k + '",CURRENT_TIMESTAMP)' if k in ('created_at', 'updated_at')
-                                   else 'r."' + k + '"' for k in names)
-            
-            if table == 'reviews':
-                session.send(f"""
-                    INSERT INTO public.reviews ({targets})
-                    SELECT {expressions} FROM {exp} r
-                    ON CONFLICT (sub_order_id) DO UPDATE 
-                    SET rating = EXCLUDED.rating, comment = EXCLUDED.comment, 
-                        is_visible = EXCLUDED.is_visible, vendor_reply = EXCLUDED.vendor_reply, 
-                        updated_at = CURRENT_TIMESTAMP
-                """)
-            elif table == 'checkin_tokens':
-                session.send(f"""
-                    INSERT INTO public.checkin_tokens ({targets})
-                    SELECT {expressions} FROM {exp} r
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM public.checkin_tokens c 
-                        WHERE c.sub_order_id = r.sub_order_id OR c.qr_token_hash = r.qr_token_hash OR c.id = r.id
-                    )
-                """)
-            elif table == 'vendor_fault_compensations':
-                session.send(f"""
-                    INSERT INTO public.vendor_fault_compensations ({targets})
-                    SELECT {expressions} FROM {exp} r
-                    WHERE NOT EXISTS (
-                        SELECT 1 FROM public.vendor_fault_compensations c 
-                        WHERE c.disruption_id = r.disruption_id OR c.voucher_id = r.voucher_id
-                    )
-                """)
-            elif table == 'sub_order_disruptions':
-                session.send(f"""
-                    INSERT INTO public.sub_order_disruptions ({targets})
-                    SELECT {expressions} FROM {exp} r
-                    ON CONFLICT (sub_order_id, source_key) DO NOTHING
-                """)
-            else:
-                session.send(f"""
-                    INSERT INTO public.{table} ({targets})
-                    SELECT {expressions} FROM {exp} r
-                    ON CONFLICT (id) DO NOTHING
-                """)
-
-    # Two-Way Synchronization (Rule 17):
-    # Synchronize review metrics, vendor badge tiers, conversations, and discount counts
-    session.send("""
-        -- 1. Sync service ratings
-        UPDATE public.services s
-        SET avg_rating = COALESCE(sub.avg_r, 0.00),
-            rating_count = COALESCE(sub.cnt_r, 0)
-        FROM (
-            SELECT service_id,
-                   ROUND(AVG(rating)::numeric, 2) AS avg_r,
-                   COUNT(*)::int AS cnt_r
-            FROM public.reviews
-            WHERE is_visible = true
-            GROUP BY service_id
-        ) sub
-        WHERE s.id = sub.service_id;
-
-        -- 2. Sync vendor ratings and badge tiers
-        UPDATE public.vendors v
-        SET rating_avg = COALESCE(sub.avg_r, 0.00),
-            rating_count = COALESCE(sub.cnt_r, 0),
-            badge_tier = CASE
-                WHEN sub.cnt_r >= 5 AND sub.avg_r >= 4.8 THEN 'TOP_RATED'
-                WHEN v.verification_status = 'APPROVED' THEN 'VERIFIED'
-                ELSE 'NONE'
-            END
-        FROM (
-            SELECT vendor_id,
-                   ROUND(AVG(rating)::numeric, 2) AS avg_r,
-                   COUNT(*)::int AS cnt_r
-            FROM public.reviews
-            WHERE is_visible = true
-            GROUP BY vendor_id
-        ) sub
-        WHERE v.id = sub.vendor_id;
-
-        -- 3. Sync conversation last_message_sequence
-        UPDATE public.conversations c
-        SET last_message_sequence = sub.max_seq
-        FROM (
-            SELECT conversation_id, MAX(message_sequence) AS max_seq
-            FROM public.messages
-            GROUP BY conversation_id
-        ) sub
-        WHERE c.id = sub.conversation_id;
-
-        -- 4. Sync discount_codes used_count
-        UPDATE public.discount_codes d
-        SET used_count = COALESCE(sub.cnt_red, 0)
-        FROM (
-            SELECT discount_code_id, COUNT(*)::int AS cnt_red
-            FROM public.discount_redemptions
-            GROUP BY discount_code_id
-        ) sub
-        WHERE d.id = sub.discount_code_id;
-    """)
-
-
 def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     require(audit['flywayCompliant'], 'Cannot sync demo data: target database Flyway version is below 43')
     require(audit['conflictsCount'] == 0, 'Cannot sync demo data: unrelated field conflicts detected in database')
@@ -967,8 +834,6 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
             id_list = ','.join(lit(r['id']) + '::uuid' for r in rs)
             cnt = session.query(f"SELECT to_json(count(*)) FROM public.{table} WHERE id IN ({id_list})")
         require(cnt == len(rs), f"Post-sync fixture count incomplete for table: {table}")
-
-    seed_extended_simulation_fixtures(session)
 
     return {
         'status': 'SYNC_SUCCESS',
