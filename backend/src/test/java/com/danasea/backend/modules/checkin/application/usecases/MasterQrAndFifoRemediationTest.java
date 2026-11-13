@@ -216,13 +216,11 @@ class MasterQrAndFifoRemediationTest {
             CheckinTokenJpaEntity tokenEntity = setupMasterQrToken();
             String rawToken = qrTokenSigner.generateToken(masterOrderId, tokenEntity.getExpiresAt());
 
-            LocalDate today = LocalDate.now(VIETNAM_ZONE);
-            LocalTime nowTime = LocalTime.now(VIETNAM_ZONE);
-            LocalTime start = nowTime.plusMinutes(25);
-            LocalTime end = start.plusMinutes(60);
+            LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
+            LocalDateTime startDt = now.plusMinutes(25);
 
             UUID slotId = UUID.randomUUID();
-            ServiceSlotJpaEntity slot = createSlot(slotId, today, start, end, 20, 5, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slot = createSlot(slotId, startDt.toLocalDate(), startDt.toLocalTime(), startDt.plusMinutes(60).toLocalTime(), 20, 5, SlotStatus.OPEN);
 
             UUID subOrderId = UUID.randomUUID();
             SubOrderJpaEntity subOrder = createSubOrder(subOrderId, vendorId, slotId, SubOrderStatus.CONFIRMED, 2);
@@ -245,18 +243,19 @@ class MasterQrAndFifoRemediationTest {
             CheckinTokenJpaEntity tokenEntity = setupMasterQrToken();
             String rawToken = qrTokenSigner.generateToken(masterOrderId, tokenEntity.getExpiresAt());
 
-            LocalDate today = LocalDate.now(VIETNAM_ZONE);
-            LocalTime nowTime = LocalTime.now(VIETNAM_ZONE);
+            LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
 
             // SubOrder 1: Ca sáng (bắt đầu sau 20 phút) -> ĐANG trong cửa sổ check-in
+            LocalDateTime slot1Dt = now.plusMinutes(20);
             UUID slot1Id = UUID.randomUUID();
-            ServiceSlotJpaEntity slot1 = createSlot(slot1Id, today, nowTime.plusMinutes(20), nowTime.plusMinutes(80), 20, 5, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slot1 = createSlot(slot1Id, slot1Dt.toLocalDate(), slot1Dt.toLocalTime(), slot1Dt.plusMinutes(60).toLocalTime(), 20, 5, SlotStatus.OPEN);
             UUID subOrder1Id = UUID.randomUUID();
             SubOrderJpaEntity subOrder1 = createSubOrder(subOrder1Id, vendorId, slot1Id, SubOrderStatus.CONFIRMED, 2);
 
             // SubOrder 2: Ca chiều (bắt đầu sau 5 giờ) -> CHƯA đến giờ mở check-in
+            LocalDateTime slot2Dt = now.plusHours(5);
             UUID slot2Id = UUID.randomUUID();
-            ServiceSlotJpaEntity slot2 = createSlot(slot2Id, today, nowTime.plusHours(5), nowTime.plusHours(6), 20, 0, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slot2 = createSlot(slot2Id, slot2Dt.toLocalDate(), slot2Dt.toLocalTime(), slot2Dt.plusHours(1).toLocalTime(), 20, 0, SlotStatus.OPEN);
             UUID subOrder2Id = UUID.randomUUID();
             SubOrderJpaEntity subOrder2 = createSubOrder(subOrder2Id, vendorId, slot2Id, SubOrderStatus.CONFIRMED, 2);
 
@@ -282,16 +281,17 @@ class MasterQrAndFifoRemediationTest {
             CheckinTokenJpaEntity tokenEntity = setupMasterQrToken();
             String rawToken = qrTokenSigner.generateToken(masterOrderId, tokenEntity.getExpiresAt());
 
-            LocalDate today = LocalDate.now(VIETNAM_ZONE);
-            LocalTime nowTime = LocalTime.now(VIETNAM_ZONE);
+            LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
 
+            LocalDateTime slot1Dt = now.plusMinutes(20);
             UUID slot1Id = UUID.randomUUID();
-            ServiceSlotJpaEntity slot1 = createSlot(slot1Id, today, nowTime.plusMinutes(20), nowTime.plusMinutes(80), 20, 5, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slot1 = createSlot(slot1Id, slot1Dt.toLocalDate(), slot1Dt.toLocalTime(), slot1Dt.plusMinutes(60).toLocalTime(), 20, 5, SlotStatus.OPEN);
             UUID subOrder1Id = UUID.randomUUID();
             SubOrderJpaEntity subOrder1 = createSubOrder(subOrder1Id, vendorId, slot1Id, SubOrderStatus.CONFIRMED, 2);
 
+            LocalDateTime slot2Dt = now.plusMinutes(25);
             UUID slot2Id = UUID.randomUUID();
-            ServiceSlotJpaEntity slot2 = createSlot(slot2Id, today, nowTime.plusMinutes(25), nowTime.plusMinutes(85), 20, 2, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slot2 = createSlot(slot2Id, slot2Dt.toLocalDate(), slot2Dt.toLocalTime(), slot2Dt.plusMinutes(60).toLocalTime(), 20, 2, SlotStatus.OPEN);
             UUID subOrder2Id = UUID.randomUUID();
             SubOrderJpaEntity subOrder2 = createSubOrder(subOrder2Id, vendorId, slot2Id, SubOrderStatus.CONFIRMED, 3);
 
@@ -324,16 +324,17 @@ class MasterQrAndFifoRemediationTest {
             CheckinTokenJpaEntity tokenEntity = setupMasterQrToken();
             String rawToken = qrTokenSigner.generateToken(masterOrderId, tokenEntity.getExpiresAt());
 
-            LocalDate today = LocalDate.now(VIETNAM_ZONE);
-            LocalTime nowTime = LocalTime.now(VIETNAM_ZONE);
+            LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
 
+            LocalDateTime slot1Dt = now.plusMinutes(20);
             UUID slot1Id = UUID.randomUUID();
-            ServiceSlotJpaEntity slot1 = createSlot(slot1Id, today, nowTime.plusMinutes(20), nowTime.plusMinutes(80), 20, 5, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slot1 = createSlot(slot1Id, slot1Dt.toLocalDate(), slot1Dt.toLocalTime(), slot1Dt.plusMinutes(60).toLocalTime(), 20, 5, SlotStatus.OPEN);
             UUID subOrder1Id = UUID.randomUUID();
             SubOrderJpaEntity subOrder1 = createSubOrder(subOrder1Id, vendorId, slot1Id, SubOrderStatus.CONFIRMED, 2);
 
+            LocalDateTime slot2Dt = now.plusMinutes(25);
             UUID slot2Id = UUID.randomUUID();
-            ServiceSlotJpaEntity slot2 = createSlot(slot2Id, today, nowTime.plusMinutes(25), nowTime.plusMinutes(85), 20, 2, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slot2 = createSlot(slot2Id, slot2Dt.toLocalDate(), slot2Dt.toLocalTime(), slot2Dt.plusMinutes(60).toLocalTime(), 20, 2, SlotStatus.OPEN);
             UUID subOrder2Id = UUID.randomUUID();
             SubOrderJpaEntity subOrder2 = createSubOrder(subOrder2Id, vendorId, slot2Id, SubOrderStatus.CONFIRMED, 3);
 
@@ -369,16 +370,16 @@ class MasterQrAndFifoRemediationTest {
             CheckinTokenJpaEntity tokenEntity = setupMasterQrToken();
             String rawToken = qrTokenSigner.generateToken(masterOrderId, tokenEntity.getExpiresAt());
 
-            LocalDate today = LocalDate.now(VIETNAM_ZONE);
-            LocalTime nowTime = LocalTime.now(VIETNAM_ZONE);
+            LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
+            LocalDateTime slotDt = now.plusMinutes(20);
 
             UUID slotAId = UUID.randomUUID();
-            ServiceSlotJpaEntity slotA = createSlot(slotAId, today, nowTime.plusMinutes(20), nowTime.plusMinutes(80), 20, 5, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slotA = createSlot(slotAId, slotDt.toLocalDate(), slotDt.toLocalTime(), slotDt.plusMinutes(60).toLocalTime(), 20, 5, SlotStatus.OPEN);
             UUID subOrderAId = UUID.randomUUID();
             SubOrderJpaEntity subOrderA = createSubOrder(subOrderAId, vendorId, slotAId, SubOrderStatus.CONFIRMED, 2);
 
             UUID slotBId = UUID.randomUUID();
-            ServiceSlotJpaEntity slotB = createSlot(slotBId, today, nowTime.plusMinutes(20), nowTime.plusMinutes(80), 20, 5, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slotB = createSlot(slotBId, slotDt.toLocalDate(), slotDt.toLocalTime(), slotDt.plusMinutes(60).toLocalTime(), 20, 5, SlotStatus.OPEN);
             UUID subOrderBId = UUID.randomUUID();
             SubOrderJpaEntity subOrderB = createSubOrder(subOrderBId, otherVendorId, slotBId, SubOrderStatus.CONFIRMED, 2);
 
@@ -417,16 +418,16 @@ class MasterQrAndFifoRemediationTest {
             CheckinTokenJpaEntity tokenEntity = setupMasterQrToken();
             String rawToken = qrTokenSigner.generateToken(masterOrderId, tokenEntity.getExpiresAt());
 
-            LocalDate today = LocalDate.now(VIETNAM_ZONE);
-            LocalTime nowTime = LocalTime.now(VIETNAM_ZONE);
+            LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
+            LocalDateTime slotDt = now.plusMinutes(20);
 
             UUID slotAId = UUID.randomUUID();
-            ServiceSlotJpaEntity slotA = createSlot(slotAId, today, nowTime.plusMinutes(20), nowTime.plusMinutes(80), 20, 5, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slotA = createSlot(slotAId, slotDt.toLocalDate(), slotDt.toLocalTime(), slotDt.plusMinutes(60).toLocalTime(), 20, 5, SlotStatus.OPEN);
             UUID subOrderAId = UUID.randomUUID();
             SubOrderJpaEntity subOrderA = createSubOrder(subOrderAId, vendorId, slotAId, SubOrderStatus.CONFIRMED, 2);
 
             UUID slotBId = UUID.randomUUID();
-            ServiceSlotJpaEntity slotB = createSlot(slotBId, today, nowTime.plusMinutes(20), nowTime.plusMinutes(80), 20, 5, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slotB = createSlot(slotBId, slotDt.toLocalDate(), slotDt.toLocalTime(), slotDt.plusMinutes(60).toLocalTime(), 20, 5, SlotStatus.OPEN);
             UUID subOrderBId = UUID.randomUUID();
             SubOrderJpaEntity subOrderB = createSubOrder(subOrderBId, otherVendorId, slotBId, SubOrderStatus.CONFIRMED, 2);
 
@@ -495,14 +496,15 @@ class MasterQrAndFifoRemediationTest {
         @Test
         @DisplayName("2. FIFO PRIVATE: Private booking check-in -> NO early dispatch suggestion is generated")
         void testFifo_Private_CheckinEarly_NoFifoSuggestion() {
-            LocalDate today = LocalDate.now(VIETNAM_ZONE);
-            LocalTime nowTime = LocalTime.now(VIETNAM_ZONE);
+            LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
+            LocalDateTime currDt = now.plusMinutes(25);
+            LocalDateTime earlyDt = now.plusMinutes(10);
 
             UUID slotId = UUID.randomUUID();
-            ServiceSlotJpaEntity currentSlot = createSlot(slotId, today, nowTime.plusMinutes(25), nowTime.plusMinutes(85), 20, 10, SlotStatus.OPEN);
+            ServiceSlotJpaEntity currentSlot = createSlot(slotId, currDt.toLocalDate(), currDt.toLocalTime(), currDt.plusMinutes(60).toLocalTime(), 20, 10, SlotStatus.OPEN);
 
             UUID earlySlotId = UUID.randomUUID();
-            ServiceSlotJpaEntity earlySlot = createSlot(earlySlotId, today, nowTime.plusMinutes(10), nowTime.plusMinutes(70), 20, 0, SlotStatus.OPEN);
+            ServiceSlotJpaEntity earlySlot = createSlot(earlySlotId, earlyDt.toLocalDate(), earlyDt.toLocalTime(), earlyDt.plusMinutes(60).toLocalTime(), 20, 0, SlotStatus.OPEN);
 
             UUID bookingItemId = UUID.randomUUID();
             UUID subOrderId = UUID.randomUUID();
@@ -534,7 +536,7 @@ class MasterQrAndFifoRemediationTest {
             when(slotRepository.findByIdForUpdate(slotId)).thenReturn(Optional.of(currentSlot));
             when(bookingItemRepository.findById(bookingItemId)).thenReturn(Optional.of(bookingItem));
             when(serviceOptionRepository.findById(optionId)).thenReturn(Optional.of(option));
-            when(slotRepository.findByServiceIdAndDateAndStatus(serviceId, today, SlotStatus.OPEN)).thenReturn(List.of(earlySlot));
+            when(slotRepository.findByServiceIdAndDateAndStatus(serviceId, currDt.toLocalDate(), SlotStatus.OPEN)).thenReturn(List.of(earlySlot));
 
             VerifyCheckinResponse response = verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId);
 
@@ -819,12 +821,12 @@ class MasterQrAndFifoRemediationTest {
             CheckinTokenJpaEntity tokenEntity = setupMasterQrToken();
             String rawToken = qrTokenSigner.generateToken(masterOrderId, tokenEntity.getExpiresAt());
 
-            LocalDate today = LocalDate.now(VIETNAM_ZONE);
-            LocalTime nowTime = LocalTime.now(VIETNAM_ZONE);
+            LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
+            LocalDateTime pastDt = now.minusMinutes(5);
 
-            // Slot started 5 minutes ago (nowTime - 5) -> past cutoff (start - 15m)
+            // Slot started 5 minutes ago (now - 5m) -> past cutoff (start - 15m)
             UUID slotId = UUID.randomUUID();
-            ServiceSlotJpaEntity slot = createSlot(slotId, today, nowTime.minusMinutes(5), nowTime.plusMinutes(55), 20, 5, SlotStatus.OPEN);
+            ServiceSlotJpaEntity slot = createSlot(slotId, pastDt.toLocalDate(), pastDt.toLocalTime(), pastDt.plusMinutes(60).toLocalTime(), 20, 5, SlotStatus.OPEN);
 
             UUID subOrderId = UUID.randomUUID();
             SubOrderJpaEntity subOrder = createSubOrder(subOrderId, vendorId, slotId, SubOrderStatus.CONFIRMED, 2);
