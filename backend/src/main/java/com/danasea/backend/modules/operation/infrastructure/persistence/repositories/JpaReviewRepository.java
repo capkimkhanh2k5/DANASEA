@@ -1,6 +1,5 @@
 package com.danasea.backend.modules.operation.infrastructure.persistence.repositories;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,8 +25,6 @@ public interface JpaReviewRepository extends JpaRepository<ReviewJpaEntity, UUID
     Optional<UUID> findReviewIdBySubOrderId(UUID subOrderId);
 
     Optional<ReviewJpaEntity> findBySubOrderId(UUID subOrderId);
-
-    List<ReviewJpaEntity> findByCustomerId(UUID customerId);
 
     boolean existsBySubOrderId(UUID subOrderId);
 

@@ -1,14 +1,10 @@
 package com.danasea.backend.modules.operation.presentation.controllers;
 
-import java.util.List;
 import java.util.UUID;
 
 import com.danasea.backend.modules.operation.application.usecases.CreateReviewUseCase;
 import com.danasea.backend.modules.operation.application.usecases.FlagReviewUseCase;
 import com.danasea.backend.modules.operation.application.usecases.UpdateReviewUseCase;
-import com.danasea.backend.modules.operation.infrastructure.persistence.entities.ReviewJpaEntity;
-import com.danasea.backend.modules.operation.infrastructure.persistence.mappers.ReviewMapper;
-import com.danasea.backend.modules.operation.infrastructure.persistence.repositories.JpaReviewRepository;
 import com.danasea.backend.modules.operation.presentation.dtos.CreateReviewRequest;
 import com.danasea.backend.modules.operation.presentation.dtos.FlagReviewRequest;
 import com.danasea.backend.modules.operation.presentation.dtos.FlagReviewResponse;
@@ -33,20 +29,6 @@ public class CustomerReviewController {
     private final CreateReviewUseCase createReviewUseCase;
     private final UpdateReviewUseCase updateReviewUseCase;
     private final FlagReviewUseCase flagReviewUseCase;
-    private final JpaReviewRepository reviewRepository;
-    private final ReviewMapper reviewMapper;
-
-    @GetMapping("/customer/reviews")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<ReviewResponse>> getCustomerReviews() {
-        UUID customerId = SecurityUtils.getCurrentUserId()
-                .orElseThrow(() -> new AccessDeniedException("User is not authenticated"));
-        List<ReviewJpaEntity> entities = reviewRepository.findByCustomerId(customerId);
-        List<ReviewResponse> responses = entities.stream()
-                .map(reviewMapper::toResponse)
-                .toList();
-        return ResponseEntity.ok(responses);
-    }
 
     @PostMapping("/sub-orders/{id}/reviews")
     @PreAuthorize("isAuthenticated()")

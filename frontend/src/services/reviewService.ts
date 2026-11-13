@@ -52,15 +52,6 @@ export const reviewService = {
   },
 
   /**
-   * Get all reviews submitted by the current authenticated customer
-   * GET /api/customer/reviews
-   */
-  async getCustomerReviews(): Promise<ReviewResponse[]> {
-    const response = await apiClient.get<ReviewResponse[]>('/customer/reviews');
-    return response.data;
-  },
-
-  /**
    * Update an existing review for a sub-order within 7 days
    * PUT /api/sub-orders/{id}/reviews
    */
