@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Waves,
+  Compass,
   ShieldCheck,
   Check,
   AlertTriangle,
@@ -10,6 +10,7 @@ import {
   Clock,
   MapPin,
   CheckCircle2,
+  Waves,
 } from 'lucide-react';
 import { aiService } from '../../../services/aiService';
 import type { MarineBriefingOverview, SubOrderBriefing } from '../../../types/marineBriefing';
@@ -130,7 +131,7 @@ export const MarineBriefingModal: React.FC<MarineBriefingModalProps> = ({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 bg-white">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center border border-slate-200/80 shrink-0">
-              <Waves className="w-4 h-4 text-[#0284c7]" />
+              <Compass className="w-4.5 h-4.5 text-[#0284c7]" />
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-semibold text-slate-900 tracking-tight">

@@ -25,7 +25,6 @@ import {
   Info,
   Loader2,
   ArrowLeft,
-  Waves,
 } from "lucide-react";
 import { orderService } from "../../../services/orderService";
 import { ContinuePaymentDialog } from "./ContinuePaymentDialog";
@@ -1044,7 +1043,7 @@ export function Orders() {
                               className="px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284c7] border border-sky-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                               title={isEn ? "View 24h Marine Briefing & Checklist" : "Xem cẩm nang ra khơi 24h & checklist đồ cần mang"}
                             >
-                              <Waves className="w-4 h-4 text-[#0284c7]" />
+                              <Compass className="w-4 h-4 text-[#0284c7]" />
                               <span>{isEn ? "24h Briefing" : "Cẩm nang 24h"}</span>
                             </button>
                           )}
