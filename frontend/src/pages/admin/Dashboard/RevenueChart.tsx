@@ -98,7 +98,7 @@ export function RevenueChart({ points, loading, error, onRetry }: RevenueChartPr
       <div className="admin-chart-header">
         <div>
           <h2 className="admin-dashboard-block-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <TrendingUp size={17} strokeWidth={2.2} style={{ color: '#0B5D6F' }} />
+            <TrendingUp size={17} strokeWidth={2.2} style={{ color: '#0284C7' }} />
             Xu hướng doanh thu
           </h2>
           <p className="admin-dashboard-block-sub">Tiền thu ghi nhận theo ngày · VNĐ</p>
@@ -152,8 +152,8 @@ export function RevenueChart({ points, loading, error, onRetry }: RevenueChartPr
           >
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0B5D6F" stopOpacity="0.16" />
-                <stop offset="100%" stopColor="#0B5D6F" stopOpacity="0.0" />
+                <stop offset="0%" stopColor="#0284C7" stopOpacity="0.22" />
+                <stop offset="100%" stopColor="#0284C7" stopOpacity="0.0" />
               </linearGradient>
             </defs>
 
@@ -191,7 +191,7 @@ export function RevenueChart({ points, loading, error, onRetry }: RevenueChartPr
               className="admin-revenue-line"
               d={line}
               fill="none"
-              stroke="#0B5D6F"
+              stroke="#0284C7"
               strokeWidth="2.5"
               strokeLinejoin="round"
               strokeLinecap="round"
@@ -224,7 +224,7 @@ export function RevenueChart({ points, loading, error, onRetry }: RevenueChartPr
                   cy={pointY}
                   r={activeDate === point.date ? 5 : points.length <= 7 ? 3.5 : 2.5}
                   fill="white"
-                  stroke="#0B5D6F"
+                  stroke="#0284C7"
                   strokeWidth={activeDate === point.date ? 2.5 : 1.8}
                   pointerEvents="none"
                 />

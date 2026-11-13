@@ -48,14 +48,15 @@ function mapResultToRecord(
     price: s.price,
     basePrice: s.price,
     durationMinutes: s.durationMinutes || 60,
+    capacityPerSlot: s.capacityPerSlot != null ? Number(s.capacityPerSlot) : undefined,
     locationName: s.locationName || s.address || 'Đà Nẵng',
     address: s.address || '',
     status: (s.status === 'PUBLISHED' ? 'ACTIVE' : s.status === 'PENDING_REVIEW' ? 'PENDING_APPROVAL' : s.status) as unknown as ServiceRecord['status'],
     rejectionReason: s.rejectionReason || '',
     waiverContent: s.waiverContent || '',
     weatherSensitive: Boolean(s.weatherSensitive),
-    minWindKmh: s.minWindKmh || 0,
-    maxWaveM: s.maxWaveM || 0,
+    minWindKmh: s.minWindKmh != null && Number(s.minWindKmh) > 0 ? Number(s.minWindKmh) : undefined,
+    maxWaveM: s.maxWaveM != null && Number(s.maxWaveM) > 0 ? Number(s.maxWaveM) : undefined,
     avgRating: s.avgRating || 5.0,
     ratingCount: s.ratingCount || 0,
     viewCount: s.viewCount || 0,
@@ -395,13 +396,25 @@ export function ServiceApproval() {
                     <td>
                       <div className="admin-services-price-cell">
                         <strong>{price.toLocaleString('vi-VN')} ₫</strong>
-                        <small>Tối đa {service.capacityPerSlot} khách/ca</small>
+                        <small>
+                          {service.capacityPerSlot != null && service.capacityPerSlot > 0
+                            ? `Tối đa ${service.capacityPerSlot} khách/ca`
+                            : 'Theo cấu hình ca'}
+                        </small>
                       </div>
                     </td>
                     <td>
                       <div className="admin-services-safety-cell-table">
-                        <strong>Sóng ≤ {service.maxWaveM}m</strong>
-                        <span>Gió ≤ {service.minWindKmh} km/h</span>
+                        {service.maxWaveM != null && service.maxWaveM > 0 ? (
+                          <strong>Sóng ≤ {service.maxWaveM}m</strong>
+                        ) : (
+                          <strong style={{ opacity: 0.6 }}>Sóng: --</strong>
+                        )}
+                        {service.minWindKmh != null && service.minWindKmh > 0 ? (
+                          <span>Gió ≤ {service.minWindKmh} km/h</span>
+                        ) : (
+                          <span style={{ opacity: 0.6 }}>Gió: --</span>
+                        )}
                       </div>
                     </td>
                     <td>
@@ -601,7 +614,9 @@ export function ServiceApproval() {
             <div className="admin-services-recap-row">
               <span>Ngưỡng sóng / gió khai báo:</span>
               <strong>
-                Sóng ≤ {selected?.maxWaveM}m · Gió ≤ {selected?.minWindKmh} km/h
+                {selected?.maxWaveM != null && selected.maxWaveM > 0 ? `Sóng ≤ ${selected.maxWaveM}m` : 'Sóng: --'}
+                {' · '}
+                {selected?.minWindKmh != null && selected.minWindKmh > 0 ? `Gió ≤ ${selected.minWindKmh} km/h` : 'Gió: --'}
               </strong>
             </div>
           </div>

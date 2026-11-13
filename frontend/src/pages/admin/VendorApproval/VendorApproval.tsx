@@ -15,12 +15,11 @@ import './VendorApproval.css';
 const tiers: BadgeTier[] = ['BRONZE', 'SILVER', 'GOLD', 'PLATINUM'];
 
 function mapVendorResponseToRecord(v: AdminVendorResponse): VendorRecord {
-  const isTest = !v.taxCode || v.taxCode.startsWith('TEST-DS-') || v.taxCode.startsWith('TEST-');
   return {
     id: v.id,
     userId: v.userId,
     businessName: v.businessName,
-    taxCode: isTest ? '' : v.taxCode,
+    taxCode: v.taxCode || '',
     email: '',
     phone: '',
     address: v.address || 'Đà Nẵng',
@@ -266,7 +265,11 @@ export function VendorApproval() {
             ) : (
               <span className="admin-vendors-mono">{vendor.taxCode}</span>
             )}
-            <small>{vendor.bankName || 'Chưa cập nhật ngân hàng'}</small>
+            <small>
+              {vendor.bankName
+                ? `${vendor.bankName}${vendor.bankAccountNumber ? ` · ${vendor.bankAccountNumber}` : ''}`
+                : 'Chưa cập nhật ngân hàng'}
+            </small>
           </td>
           <td className="admin-vendors-area"><span>{vendor.address}</span><small>{vendor.ratingAvg} / 5 · {vendor.ratingCount} đánh giá</small></td>
           <td><VendorStatus status={vendor.verificationStatus} /></td><td><AdminBadge tone="neutral">{vendor.badgeTier}</AdminBadge></td>

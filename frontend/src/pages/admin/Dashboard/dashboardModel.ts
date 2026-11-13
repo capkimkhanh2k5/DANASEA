@@ -22,24 +22,26 @@ export interface DailyMetric {
   gmv: number;
   refunds: number;
 }
-export type OperationKind = 'vendors' | 'services' | 'refunds' | 'disputes' | 'settlements';
+export type OperationKind = 'vendors' | 'services' | 'refunds' | 'disputes' | 'settlements' | 'roleApplications';
 export type OperationCounts = Record<OperationKind, number | null>;
 
 export interface WorkloadGroup {
-  key: 'vendors' | 'services' | 'settlements' | 'disputes';
+  key: OperationKind;
   label: string;
   path: string;
   color: string;
 }
 
 export const workloadGroups: WorkloadGroup[] = [
-  { key: 'vendors', label: 'Đối tác', path: '/admin/vendor-approval', color: '#E07A5F' },
-  { key: 'services', label: 'Dịch vụ', path: '/admin/service-approval', color: '#0B5D6F' },
+  { key: 'roleApplications', label: 'Duyệt vai trò', path: '/admin/role-applications', color: '#0EA5E9' },
+  { key: 'vendors', label: 'Đối tác', path: '/admin/vendor-approval', color: '#F59E0B' },
+  { key: 'services', label: 'Dịch vụ', path: '/admin/service-approval', color: '#10B981' },
   { key: 'settlements', label: 'Quyết toán', path: '/admin/payouts', color: '#64748B' },
-  { key: 'disputes', label: 'Khiếu nại', path: '/admin/disputes', color: '#D9534F' },
+  { key: 'disputes', label: 'Khiếu nại', path: '/admin/disputes', color: '#EF4444' },
 ];
 
 export const operationGroups: { key: OperationKind; label: string; title: string; description: string; path: string; priority: number }[] = [
+  { key: 'roleApplications', label: 'Vai trò', title: 'đơn đăng ký vai trò đối tác', description: 'Xét duyệt đơn đăng ký chuyển đổi vai trò sang VENDOR.', path: '/admin/role-applications', priority: 2 },
   { key: 'disputes', label: 'Khiếu nại', title: 'khiếu nại đang chờ giải quyết', description: 'Đối chiếu phản hồi và bằng chứng từ khách hàng, đối tác.', path: '/admin/disputes', priority: 1 },
   { key: 'refunds', label: 'Đơn hàng', title: 'yêu cầu hoàn tiền cần theo dõi', description: 'Kiểm tra tiến trình hoàn tiền và thông tin đơn liên quan.', path: '/admin/orders', priority: 1 },
   { key: 'vendors', label: 'Đối tác', title: 'hồ sơ đối tác chờ thẩm định', description: 'Rà soát hồ sơ pháp lý và chứng từ của đối tác.', path: '/admin/vendor-approval', priority: 2 },
@@ -52,6 +54,15 @@ export interface HotServiceItem {
   serviceName: string;
   vendorName?: string;
   bookingCount: number;
+  sharePercent: number;
+}
+
+export interface TopServingVendorItem {
+  vendorId: string;
+  vendorName: string;
+  completedOrders: number;
+  totalOrders: number;
+  revenue: number;
   sharePercent: number;
 }
 
@@ -75,6 +86,7 @@ export interface DashboardData {
   revenue: RevenueMetric[] | null;
   operations: OperationCounts;
   hotServices?: HotServiceItem[] | null;
+  topServingVendors?: TopServingVendorItem[] | null;
   topVendors?: TopVendorItem[] | null;
   recentOrders: RecentOrder[] | null;
   errors: string[];

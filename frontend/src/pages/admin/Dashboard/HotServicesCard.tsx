@@ -1,37 +1,38 @@
-import { Flame } from 'lucide-react';
+import { Award } from 'lucide-react';
 import { AdminState } from '../../../components/admin/AdminUI';
-import { formatNumber, type HotServiceItem } from './dashboardModel';
+import { formatNumber, formatVND, type TopServingVendorItem } from './dashboardModel';
 
 interface HotServicesCardProps {
-  services?: HotServiceItem[] | null;
+  vendors?: TopServingVendorItem[] | null;
+  services?: unknown; // backward compatibility
   loading: boolean;
   rangeLabel: string;
 }
 
-export function HotServicesCard({ services, loading, rangeLabel }: HotServicesCardProps) {
-  const items = services ?? [];
+export function HotServicesCard({ vendors, loading, rangeLabel }: HotServicesCardProps) {
+  const items = vendors ?? [];
   const empty = !loading && items.length === 0;
 
   return (
-    <section className="admin-card admin-dashboard-ranking-block" aria-label="Dịch vụ được đặt nhiều">
+    <section className="admin-card admin-dashboard-ranking-block" aria-label="Đối tác có nhiều lượt phục vụ nhất">
       <div className="admin-dashboard-block-header">
         <div>
           <h2 className="admin-dashboard-block-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Flame size={17} strokeWidth={2.2} style={{ color: '#D97706' }} />
-            Dịch vụ được đặt nhiều
+            <Award size={17} strokeWidth={2.2} style={{ color: '#D97706' }} />
+            Đối tác có nhiều lượt phục vụ nhất
           </h2>
-          <p className="admin-dashboard-block-sub">{rangeLabel} · Top trải nghiệm có lượt đặt cao nhất</p>
+          <p className="admin-dashboard-block-sub">{rangeLabel} · Top đối tác theo số đơn hoàn tất</p>
         </div>
       </div>
 
       {loading ? (
-        <AdminState compact kind="loading" title="Đang tải danh sách dịch vụ…" />
+        <AdminState compact kind="loading" title="Đang tải dữ liệu đối tác…" />
       ) : empty ? (
         <AdminState
           compact
           kind="empty"
-          title="Chưa có lượt đặt dịch vụ trong kỳ"
-          description="Chưa có bản ghi đặt chỗ nào được tạo trong khoảng thời gian đã chọn."
+          title="Chưa có lượt phục vụ hoàn tất trong kỳ"
+          description="Chưa có bản ghi đơn hoàn thành nào từ các đối tác trong khoảng thời gian đã chọn."
         />
       ) : (
         <div className="admin-ranking-list">
@@ -40,7 +41,7 @@ export function HotServicesCard({ services, loading, rangeLabel }: HotServicesCa
             const isTop1 = rank === 1;
 
             return (
-              <div className="admin-ranking-row" key={item.serviceId}>
+              <div className="admin-ranking-row" key={item.vendorId}>
                 <div className="admin-ranking-row-top">
                   <div className="admin-ranking-identity">
                     <span
@@ -50,19 +51,17 @@ export function HotServicesCard({ services, loading, rangeLabel }: HotServicesCa
                       #{rank}
                     </span>
                     <div className="admin-ranking-names">
-                      <strong className="admin-ranking-title" title={item.serviceName}>
-                        {item.serviceName}
+                      <strong className="admin-ranking-title" title={item.vendorName}>
+                        {item.vendorName}
                       </strong>
-                      {item.vendorName && (
-                        <span className="admin-ranking-sub" title={item.vendorName}>
-                          {item.vendorName}
-                        </span>
-                      )}
+                      <span className="admin-ranking-sub" title={`Doanh thu ghi nhận: ${formatVND(item.revenue)}`}>
+                        Doanh thu: {formatVND(item.revenue)}
+                      </span>
                     </div>
                   </div>
                   <div className="admin-ranking-metric">
                     <strong className="admin-ranking-metric-num">
-                      {formatNumber(item.bookingCount)}
+                      {formatNumber(item.completedOrders)}
                     </strong>
                     <span className="admin-ranking-metric-unit">lượt</span>
                   </div>

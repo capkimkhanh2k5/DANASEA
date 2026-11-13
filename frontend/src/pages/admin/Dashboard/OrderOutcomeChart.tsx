@@ -86,7 +86,7 @@ export function OrderOutcomeChart({ points, loading, error, onRetry }: OrderOutc
       <div className="admin-chart-header">
         <div>
           <h2 className="admin-dashboard-block-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BarChart3 size={17} strokeWidth={2.2} style={{ color: '#0B5D6F' }} />
+            <BarChart3 size={17} strokeWidth={2.2} style={{ color: '#0284C7' }} />
             Kết quả đơn hàng
           </h2>
           <p className="admin-dashboard-block-sub">Phân bổ đơn hoàn thành và đơn hủy theo ngày</p>
@@ -94,11 +94,11 @@ export function OrderOutcomeChart({ points, loading, error, onRetry }: OrderOutc
         <div className="admin-chart-total-highlight">
           <div className="admin-chart-legend-row">
             <span className="admin-legend-item">
-              <span className="admin-legend-dot" style={{ backgroundColor: '#0B5D6F' }} />
+              <span className="admin-legend-dot" style={{ backgroundColor: '#0284C7' }} />
               Hoàn thành: <strong>{formatNumber(totalCompleted)}</strong>
             </span>
             <span className="admin-legend-item">
-              <span className="admin-legend-dot" style={{ backgroundColor: '#D9534F' }} />
+              <span className="admin-legend-dot" style={{ backgroundColor: '#EF4444' }} />
               Hủy: <strong>{formatNumber(totalCancelled)}</strong>
             </span>
           </div>
@@ -134,10 +134,10 @@ export function OrderOutcomeChart({ points, loading, error, onRetry }: OrderOutc
                 Ngày {shortDate(active.point.date)}/{active.point.date.slice(0, 4)}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
-                <span style={{ color: '#0B5D6F', fontWeight: 600 }}>
+                <span style={{ color: '#0284C7', fontWeight: 600 }}>
                   Hoàn thành: {active.point.completed} đơn
                 </span>
-                <span style={{ color: '#D9534F', fontWeight: 600 }}>
+                <span style={{ color: '#EF4444', fontWeight: 600 }}>
                   Hủy: {active.point.cancelled} đơn
                 </span>
                 <small style={{ color: '#64748B', borderTop: '1px solid #E2E8F0', paddingTop: '2px', marginTop: '2px' }}>
@@ -216,7 +216,7 @@ export function OrderOutcomeChart({ points, loading, error, onRetry }: OrderOutc
                       width={barWidth}
                       height={completedHeight}
                       rx={cancelledHeight > 0 ? 0 : 3}
-                      fill="#0B5D6F"
+                      fill="#0284C7"
                       opacity={isActive ? 1 : 0.88}
                       pointerEvents="none"
                     />
@@ -233,7 +233,7 @@ export function OrderOutcomeChart({ points, loading, error, onRetry }: OrderOutc
                       width={barWidth}
                       height={cancelledHeight}
                       rx="3"
-                      fill="#D9534F"
+                      fill="#EF4444"
                       opacity={isActive ? 1 : 0.88}
                       pointerEvents="none"
                     />

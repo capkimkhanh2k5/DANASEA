@@ -37,6 +37,7 @@ import { AdminDialog } from '../../../components/admin/AdminDialog';
 import {
   filterPayouts,
   calculatePayoutMetrics,
+  formatDisplayCode,
   approvePayout,
   rejectPayout,
   exportPayoutsCsv,
@@ -112,7 +113,7 @@ export function AdminPayouts() {
               processedBy: p.processedBy ? 'Ban Quản trị DANASEA' : '',
               processedAt: p.processedAt || p.updatedAt,
               vendorName: v?.businessName || `Đối tác ${p.vendorId.substring(0, 8)}`,
-              bankName: v?.bankName || 'Vietcombank (Hàng hải)',
+              bankName: v?.bankName || 'Chưa cập nhật ngân hàng',
               bankAccountNumber: v?.bankAccountNumber || '****',
               bankAccountHolder: v?.bankAccountHolder || v?.businessName || 'Chủ tài khoản đối tác',
               periodText: `Kỳ: ${periodStr}`,
@@ -133,13 +134,13 @@ export function AdminPayouts() {
               vendorId: s.vendorId,
               settlementId: s.id,
               amount: s.netPayableAmount,
-              status: (s.status === 'PAID' || s.status === 'FINALIZED' ? 'PAID' : 'REQUESTED') as unknown as PayoutExtended['status'],
+              status: (s.status === 'PAID' || s.status === 'FINALIZED' ? 'PAID' : (s.status as string) === 'APPROVED' ? 'APPROVED' : 'REQUESTED') as unknown as PayoutExtended['status'],
               processedBy: s.status === 'FINALIZED' ? 'Ban Quản trị DANASEA' : '',
               processedAt: s.updatedAt,
               vendorName: v?.businessName || `Đối tác ${s.vendorId.substring(0, 8)}`,
-              bankName: v?.bankName || 'Vietcombank',
-              bankAccountNumber: v?.bankAccountNumber || '****',
-              bankAccountHolder: v?.bankAccountHolder || v?.businessName || 'Chủ tài khoản đối tác',
+              bankName: v?.bankName || 'Chưa cập nhật ngân hàng',
+              bankAccountNumber: v?.bankAccountNumber || 'Chưa cập nhật số TK',
+              bankAccountHolder: v?.bankAccountHolder || v?.businessName || 'Chưa cập nhật chủ TK',
               periodText: `Kỳ đối soát ${s.periodStart.slice(0, 10)} - ${s.periodEnd.slice(0, 10)}`,
               totalOrdersCount: 0,
               createdAt: s.createdAt,
@@ -273,7 +274,7 @@ export function AdminPayouts() {
       await adminSettlementService.finalizeSettlement(selectedPayout.id);
       setPayouts(prev => prev.map(p => p.id === selectedPayout.id ? { ...p, status: 'PAID' as unknown as PayoutExtended['status'], processedBy: 'Ban Quản trị DANASEA', processedAt: new Date().toISOString() } : p));
       setIsApproveModalOpen(false);
-      setNotice(`Đã chốt sổ và giải ngân kỳ đối soát #${selectedPayout.id.slice(0, 8).toUpperCase()}.`);
+      setNotice(`Đã chốt sổ và chi trả kỳ đối soát #${formatDisplayCode(selectedPayout.id, 'PAY')}.`);
     } catch (err) {
       const msg = getAdminSettlementError(err, 'Lỗi khi xử lý lệnh chi trả.');
       setNotice(msg);
@@ -380,8 +381,8 @@ export function AdminPayouts() {
         </div>
         <div className="admin-payouts__summary-divider" />
         <div className="admin-payouts__summary-item">
-          <span className="admin-payouts__summary-badge" style={{ background: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }}>
-            <Clock size={14} />
+          <span className="admin-payouts__summary-badge" style={{ color: '#0284c7' }}>
+            <Check size={14} />
             Đã duyệt: {metrics.approvedCount}
           </span>
           <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)' }}>
@@ -392,7 +393,7 @@ export function AdminPayouts() {
         <div className="admin-payouts__summary-item">
           <span className="admin-payouts__summary-badge admin-payouts__summary-badge--paid">
             <CheckCircle2 size={14} />
-            Đã giải ngân: {metrics.paidCount}
+            Đã chi trả: {metrics.paidCount}
           </span>
           <span style={{ fontSize: 12, color: 'var(--admin-muted, #737373)' }}>
             ({metrics.totalPaidAmount.toLocaleString('vi-VN')} đ)
@@ -445,7 +446,7 @@ export function AdminPayouts() {
                 { value: 'all', label: 'Tất cả', count: metrics.totalCount },
                 { value: 'REQUESTED', label: 'Chờ duyệt', count: metrics.pendingCount },
                 { value: 'APPROVED', label: 'Đã duyệt', count: metrics.approvedCount },
-                { value: 'PAID', label: 'Đã giải ngân', count: metrics.paidCount },
+                { value: 'PAID', label: 'Đã chi trả', count: metrics.paidCount },
                 { value: 'REJECTED', label: 'Từ chối', count: metrics.rejectedCount },
               ]}
             />
@@ -546,19 +547,27 @@ export function AdminPayouts() {
                     aria-selected={isSelected}
                   >
                     <div className="admin-payouts__item-top">
-                      <span className="admin-payouts__item-id">#{p.id.substring(0, 12)}...</span>
+                      <span className="admin-payouts__item-id" title={p.id}>
+                        #{formatDisplayCode(p.id, 'PAY')}
+                      </span>
                       <AdminBadge
                         tone={
                           p.status === 'PAID'
                             ? 'teal'
                             : p.status === 'APPROVED'
-                            ? 'teal'
+                            ? 'neutral'
                             : p.status === 'REQUESTED'
                             ? 'amber'
                             : 'rose'
                         }
                       >
-                        {p.status === 'PAID' ? 'Đã giải ngân' : p.status === 'APPROVED' ? 'Đã duyệt' : p.status === 'REQUESTED' ? 'Chờ duyệt' : 'Từ chối'}
+                        {p.status === 'PAID'
+                          ? 'Đã chi trả'
+                          : p.status === 'APPROVED'
+                          ? 'Đã duyệt'
+                          : p.status === 'REQUESTED'
+                          ? 'Chờ duyệt'
+                          : 'Từ chối'}
                       </AdminBadge>
                     </div>
 
@@ -595,7 +604,9 @@ export function AdminPayouts() {
             <div key={selectedPayout.id} className="admin-master-detail-fade">
             <div className="admin-payouts__detail-header">
               <div>
-                <span className="admin-payouts__detail-id-tag">LỆNH CHI #{selectedPayout.id}</span>
+                <span className="admin-payouts__detail-id-tag" title={selectedPayout.id}>
+                  LỆNH CHI #{formatDisplayCode(selectedPayout.id, 'PAY')}
+                </span>
                 <h2 id="payout-detail-heading" className="admin-payouts__detail-vendor-name">
                   {selectedPayout.vendorName}
                 </h2>
@@ -610,13 +621,19 @@ export function AdminPayouts() {
                   selectedPayout.status === 'PAID'
                     ? 'teal'
                     : selectedPayout.status === 'APPROVED'
-                    ? 'teal'
+                    ? 'neutral'
                     : selectedPayout.status === 'REQUESTED'
                     ? 'amber'
                     : 'rose'
                 }
               >
-                {selectedPayout.status === 'PAID' ? 'ĐÃ GIẢI NGÂN' : selectedPayout.status === 'APPROVED' ? 'ĐÃ DUYỆT' : selectedPayout.status === 'REQUESTED' ? 'CHỜ DUYỆT' : 'TỪ CHỐI'}
+                {selectedPayout.status === 'PAID'
+                  ? 'ĐÃ CHI TRẢ'
+                  : selectedPayout.status === 'APPROVED'
+                  ? 'ĐÃ DUYỆT'
+                  : selectedPayout.status === 'REQUESTED'
+                  ? 'CHỜ DUYỆT'
+                  : 'TỪ CHỐI'}
               </AdminBadge>
             </div>
 
@@ -677,9 +694,23 @@ export function AdminPayouts() {
               <div className="admin-payouts__info-card">
                 <div className="admin-payouts__info-row">
                   <span className="admin-payouts__info-key">Mã bảng quyết toán:</span>
-                  <span className="admin-payouts__info-val" style={{ fontFamily: 'monospace' }}>
-                    {selectedPayout.settlementId}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span
+                      className="admin-payouts__info-val admin-payouts__info-val--mono"
+                      title={selectedPayout.settlementId}
+                    >
+                      {formatDisplayCode(selectedPayout.settlementId, 'STL')}
+                    </span>
+                    <button
+                      type="button"
+                      className="admin-payouts__copy-btn"
+                      onClick={() => handleCopyAccount(selectedPayout.settlementId)}
+                      title="Sao chép UUID bảng quyết toán"
+                      aria-label="Sao chép UUID bảng quyết toán"
+                    >
+                      <Copy size={13} />
+                    </button>
+                  </div>
                 </div>
                 <div className="admin-payouts__info-row">
                   <span className="admin-payouts__info-key">Thời gian tạo yêu cầu:</span>
@@ -875,7 +906,9 @@ export function AdminPayouts() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 13, color: 'var(--admin-body, #262626)' }}>
           <p>
             Bạn có chắc chắn muốn từ chối lệnh chi{' '}
-            <strong style={{ fontFamily: 'monospace' }}>#{selectedPayout?.id}</strong> không?
+            <strong style={{ fontFamily: 'monospace' }} title={selectedPayout?.id}>
+              #{formatDisplayCode(selectedPayout?.id || '', 'PAY')}
+            </strong> không?
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

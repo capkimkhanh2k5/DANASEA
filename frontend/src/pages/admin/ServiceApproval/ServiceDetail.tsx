@@ -175,8 +175,16 @@ export function ServiceDetail({
               <Waves size={16} aria-hidden="true" />
               <span>Ngưỡng sóng khai báo</span>
             </div>
-            <strong>≤ {service.maxWaveM} mét</strong>
-            <small>Ngưỡng khuyến cáo tạm dừng tour</small>
+            <strong>
+              {service.maxWaveM != null && service.maxWaveM > 0
+                ? `≤ ${service.maxWaveM} mét`
+                : 'Không giới hạn'}
+            </strong>
+            <small>
+              {service.maxWaveM != null && service.maxWaveM > 0
+                ? 'Ngưỡng khuyến cáo tạm dừng tour'
+                : 'Chưa thiết lập giới hạn sóng'}
+            </small>
           </div>
 
           <div className="admin-services-safety-cell">
@@ -184,8 +192,16 @@ export function ServiceDetail({
               <Wind size={16} aria-hidden="true" />
               <span>Ngưỡng gió vận hành</span>
             </div>
-            <strong>≤ {service.minWindKmh} km/h</strong>
-            <small>Theo dõi điều kiện thời tiết thực tế</small>
+            <strong>
+              {service.minWindKmh != null && service.minWindKmh > 0
+                ? `≤ ${service.minWindKmh} km/h`
+                : 'Không giới hạn'}
+            </strong>
+            <small>
+              {service.minWindKmh != null && service.minWindKmh > 0
+                ? 'Theo dõi điều kiện thời tiết thực tế'
+                : 'Chưa thiết lập giới hạn gió'}
+            </small>
           </div>
         </div>
 
@@ -305,7 +321,11 @@ export function ServiceDetail({
           </div>
           <div>
             <dt>Định mức phục vụ</dt>
-            <dd>Tối đa {service.capacityPerSlot} khách/ca</dd>
+            <dd>
+              {service.capacityPerSlot != null && service.capacityPerSlot > 0
+                ? `Tối đa ${service.capacityPerSlot} khách/ca`
+                : 'Theo cấu hình ca'}
+            </dd>
           </div>
           <div>
             <dt>Khu vực bến xuất phát</dt>
