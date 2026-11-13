@@ -45,6 +45,7 @@ const VendorMessages = lazy(() => import("./pages/vendor/Messages/VendorMessages
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard/AdminDashboard").then((m) => ({ default: m.AdminDashboard })));
 const Users = lazy(() => import("./pages/admin/Users/Users").then((m) => ({ default: m.Users })));
 const VendorApproval = lazy(() => import("./pages/admin/VendorApproval/VendorApproval").then((m) => ({ default: m.VendorApproval })));
+const RoleApplications = lazy(() => import("./pages/admin/RoleApplications/RoleApplications").then((m) => ({ default: m.RoleApplications })));
 const Categories = lazy(() => import("./pages/admin/Categories/Categories").then((m) => ({ default: m.Categories })));
 const ServiceApproval = lazy(() => import("./pages/admin/ServiceApproval/ServiceApproval").then((m) => ({ default: m.ServiceApproval })));
 const AdminOrders = lazy(() => import("./pages/admin/Orders/AdminOrders").then((m) => ({ default: m.AdminOrders })));
@@ -72,7 +73,7 @@ function App() {
           <Route path="tour/:id" element={<ExperienceDetail />} />
           <Route path="tours/:id" element={<ExperienceDetail />} />
           <Route path="experience/:id" element={<ExperienceDetail />} />
-          
+
           {/* Phase 3 */}
           <Route path="cart" element={<Cart />} />
           <Route path="checkout" element={<Checkout />} />
@@ -113,6 +114,7 @@ function App() {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<Users />} />
+          <Route path="role-applications" element={<RoleApplications />} />
           <Route path="vendor-approval" element={<VendorApproval />} />
           <Route path="categories" element={<Categories />} />
           <Route path="service-approval" element={<ServiceApproval />} />

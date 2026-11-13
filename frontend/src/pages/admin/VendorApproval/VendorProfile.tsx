@@ -29,6 +29,11 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
       <div className="admin-vendors-profile-heading"><img src={vendor.avatarUrl} alt="" width="56" height="56" /><div><span className="admin-vendors-mono">{vendor.id}</span>
         <div className="admin-vendors-profile-badges"><VendorStatus status={vendor.verificationStatus} /><AdminBadge tone="neutral">{vendor.badgeTier}</AdminBadge></div></div></div>
       <p>{vendor.address}</p>
+      {vendor.verificationStatus === 'REJECTED' && vendor.rejectionReason && (
+        <div style={{ margin: '12px 0', padding: '10px 14px', borderRadius: '8px', background: '#fff1f2', border: '1px solid #fecdd3', color: '#9f1239', fontSize: '12.5px' }}>
+          <strong>Lý do từ chối:</strong> {vendor.rejectionReason}
+        </div>
+      )}
       <dl className="admin-detail-grid"><div><dt>Email</dt><dd>{vendor.email || 'Chưa cập nhật'}</dd></div><div><dt>Điện thoại</dt><dd>{vendor.phone || 'Chưa cập nhật'}</dd></div>
         <div><dt>Mã số thuế</dt><dd>{formatTaxCode(vendor.taxCode) === 'Chưa cập nhật' ? <span style={{ fontStyle: 'italic', color: '#64748b' }}>Chưa cập nhật</span> : <span className="admin-vendors-mono">{vendor.taxCode}</span>}</dd></div><div><dt>Đánh giá</dt><dd>{vendor.ratingAvg} / 5 · {vendor.ratingCount} đánh giá</dd></div></dl>
     </section>

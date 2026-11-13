@@ -1,5 +1,5 @@
 {
-  "reviewedMigrations": "V1-V55",
+  "reviewedMigrations": "V1-V57",
   "classification": {
     "ai_assessment_cases": "replace",
     "ai_chat_requests": "replace",
@@ -78,6 +78,7 @@
     "vendor_equipment": "replace",
     "vendor_fault_compensation_recoveries": "replace",
     "vendor_fault_compensations": "replace",
+    "vendor_role_applications": "replace",
     "vendors": "replace",
     "weather_caches": "replace",
     "wishlists": "replace"
@@ -5872,6 +5873,96 @@
         ]
       },
       {
+        "name": "public.vendor_role_applications",
+        "kind": "r",
+        "columns": [
+          [
+            "id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "user_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "business_name",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "tax_code",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "address",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "bank_account_number",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "bank_name",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "bank_account_holder",
+            "character varying(255)",
+            true,
+            ""
+          ],
+          [
+            "status",
+            "character varying(50)",
+            true,
+            ""
+          ],
+          [
+            "rejection_reason",
+            "text",
+            false,
+            ""
+          ],
+          [
+            "reviewed_by",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "reviewed_at",
+            "timestamp with time zone",
+            false,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ],
+          [
+            "updated_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
         "name": "public.vendors",
         "kind": "r",
         "columns": [
@@ -5968,6 +6059,12 @@
           [
             "verification_status",
             "character varying(255)",
+            false,
+            ""
+          ],
+          [
+            "rejection_reason",
+            "character varying(1000)",
             false,
             ""
           ]
@@ -7284,6 +7381,32 @@
           "id"
         ],
         "definition": "FOREIGN KEY (voucher_id) REFERENCES discount_codes(id)",
+        "validated": true
+      },
+      {
+        "name": "vendor_role_applications_reviewed_by_fkey",
+        "child": "public.vendor_role_applications",
+        "parent": "public.users",
+        "childcolumns": [
+          "reviewed_by"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (reviewed_by) REFERENCES users(id)",
+        "validated": true
+      },
+      {
+        "name": "vendor_role_applications_user_id_fkey",
+        "child": "public.vendor_role_applications",
+        "parent": "public.users",
+        "childcolumns": [
+          "user_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
         "validated": true
       }
     ],

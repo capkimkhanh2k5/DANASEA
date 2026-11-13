@@ -22,8 +22,29 @@ public record VendorProfileResponse(
         BigDecimal ratingAvg,
         Integer ratingCount,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        String rejectionReason
 ) {
+    public VendorProfileResponse(
+            UUID id,
+            UUID userId,
+            String businessName,
+            String taxCode,
+            String address,
+            String bankAccountNumber,
+            String bankName,
+            String bankAccountHolder,
+            VerificationStatus verificationStatus,
+            BadgeTier badgeTier,
+            BigDecimal ratingAvg,
+            Integer ratingCount,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt
+    ) {
+        this(id, userId, businessName, taxCode, address, bankAccountNumber, bankName,
+                bankAccountHolder, verificationStatus, badgeTier, ratingAvg, ratingCount, createdAt, updatedAt, null);
+    }
+
     public static VendorProfileResponse fromDomain(Vendor vendor) {
         if (vendor == null) {
             return null;
@@ -42,7 +63,8 @@ public record VendorProfileResponse(
                 vendor.getRatingAvg(),
                 vendor.getRatingCount(),
                 vendor.getCreatedAt(),
-                vendor.getUpdatedAt()
+                vendor.getUpdatedAt(),
+                vendor.getRejectionReason()
         );
     }
 
@@ -100,5 +122,9 @@ public record VendorProfileResponse(
 
     public OffsetDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public String getRejectionReason() {
+        return rejectionReason;
     }
 }

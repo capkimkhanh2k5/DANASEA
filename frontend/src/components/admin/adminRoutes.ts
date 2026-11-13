@@ -1,8 +1,9 @@
-import { Building2, FolderKanban, LayoutDashboard, Scale, ScrollText, Settings2, ShieldCheck, ShoppingBag, TicketPercent, Users, Wallet } from 'lucide-react';
+import { Building2, FolderKanban, LayoutDashboard, Scale, ScrollText, Settings2, ShieldCheck, ShoppingBag, TicketPercent, UserCheck, Users, Wallet } from 'lucide-react';
 
 export const adminNavigation = [
   { id: 'overview', label: 'Điều hành', icon: LayoutDashboard, items: [{ to: '/admin', label: 'Tổng quan', pageTitle: 'Dashboard', icon: LayoutDashboard }] },
   { id: 'partners', label: 'Đối tác & trải nghiệm', icon: Building2, items: [
+    { to: '/admin/role-applications', label: 'Duyệt vai trò', pageTitle: 'Duyệt vai trò đối tác', icon: UserCheck },
     { to: '/admin/vendor-approval', label: 'Phê duyệt đối tác', pageTitle: 'Phê duyệt đối tác', icon: Building2 },
     { to: '/admin/service-approval', label: 'Kiểm duyệt dịch vụ', pageTitle: 'Kiểm duyệt dịch vụ', icon: ShieldCheck },
     { to: '/admin/categories', label: 'Danh mục trải nghiệm', pageTitle: 'Danh mục trải nghiệm', icon: FolderKanban },

@@ -44,4 +44,17 @@ public interface JpaSubOrderRepository extends JpaRepository<SubOrderJpaEntity, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM SubOrderJpaEntity s WHERE s.masterOrderId = :masterOrderId ORDER BY s.id ASC")
     List<SubOrderJpaEntity> findByMasterOrderIdForUpdate(@Param("masterOrderId") UUID masterOrderId);
+
+    @Query("SELECT COUNT(s) > 0 FROM SubOrderJpaEntity s WHERE s.masterOrderId IN " +
+           "(SELECT o.id FROM MasterOrderJpaEntity o WHERE o.customerId = :customerId) " +
+           "AND s.status IN (com.danasea.backend.modules.order.domain.models.SubOrderStatus.PENDING, " +
+           "com.danasea.backend.modules.order.domain.models.SubOrderStatus.CONFIRMED, " +
+           "com.danasea.backend.modules.order.domain.models.SubOrderStatus.CHECKED_IN, " +
+           "com.danasea.backend.modules.order.domain.models.SubOrderStatus.IN_PROGRESS)")
+    boolean hasActiveSubOrders(@Param("customerId") UUID customerId);
+
+    @Query("SELECT s FROM SubOrderJpaEntity s WHERE s.masterOrderId IN " +
+           "(SELECT o.id FROM MasterOrderJpaEntity o WHERE o.customerId = :customerId) " +
+           "AND s.status = com.danasea.backend.modules.order.domain.models.SubOrderStatus.COMPLETED")
+    List<SubOrderJpaEntity> findCompletedSubOrdersByCustomerId(@Param("customerId") UUID customerId);
 }

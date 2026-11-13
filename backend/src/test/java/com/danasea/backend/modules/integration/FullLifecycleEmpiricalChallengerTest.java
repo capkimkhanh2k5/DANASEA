@@ -4,6 +4,7 @@ import com.danasea.backend.modules.booking.domain.ports.VendorLookupPort;
 import com.danasea.backend.modules.checkin.domain.services.QrTokenSigner;
 import com.danasea.backend.modules.checkin.infrastructure.persistence.entities.CheckinTokenJpaEntity;
 import com.danasea.backend.modules.checkin.infrastructure.persistence.repositories.JpaCheckinTokenRepository;
+import com.danasea.backend.modules.dispute.application.services.DisputeWindowService;
 import com.danasea.backend.modules.dispute.application.usecases.CreateDisputeUseCase;
 import com.danasea.backend.modules.dispute.application.usecases.ResolveDisputeUseCase;
 import com.danasea.backend.modules.dispute.domain.models.DisputeReason;
@@ -55,6 +56,7 @@ import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -149,7 +151,8 @@ public class FullLifecycleEmpiricalChallengerTest {
         settlementMapper = new SettlementMapper();
 
         createDisputeUseCase = new CreateDisputeUseCase(
-                disputeRepository, masterOrderRepository, subOrderRepository, slotRepository);
+                disputeRepository, masterOrderRepository, subOrderRepository,
+                new DisputeWindowService(slotRepository, Clock.systemDefaultZone()));
 
         resolveDisputeUseCase = new ResolveDisputeUseCase(
                 disputeRepository, subOrderRepository, refundRepository);
