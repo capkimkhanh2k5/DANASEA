@@ -5,6 +5,7 @@ import type { NotificationResponse } from "../../../types/notification";
 import { communicationService, type ConversationItem, type MessageItem } from "../../../services/communicationService";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useLanguageStore } from "../../../store/useLanguageStore";
+import { localizeNotificationTitle, localizeNotificationBody } from "../../../utils/notificationLocalization";
 import {
   MessageSquare,
   Bell,
@@ -627,10 +628,10 @@ export function Inbox() {
                               </span>
                             </div>
                             <h3 className="font-bold text-sm text-slate-900">
-                              {notif.title}
+                              {localizeNotificationTitle(notif.title, language)}
                             </h3>
                             <p className="text-xs sm:text-sm text-slate-600 max-w-2xl leading-relaxed">
-                              {notif.body}
+                              {localizeNotificationBody(notif.body, language)}
                             </p>
                           </div>
                         </div>

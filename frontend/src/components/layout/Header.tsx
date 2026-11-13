@@ -5,6 +5,7 @@ import { useCartStore } from "../../store/useCartStore";
 import { useWishlistStore } from "../../store/useWishlistStore";
 import { useLanguageStore } from "../../store/useLanguageStore";
 import { notificationService } from "../../services/notificationService";
+import { localizeNotificationTitle, localizeNotificationBody } from "../../utils/notificationLocalization";
 import {
   Heart,
   ShoppingCart,
@@ -670,7 +671,7 @@ export function Header() {
                         className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
                       >
                         <CheckCheck className="w-3 h-3 text-slate-500" />
-                        <span>Đã đọc hết</span>
+                        <span>{language === 'en' ? 'Mark all as read' : 'Đã đọc hết'}</span>
                       </button>
                     ) : <div className="w-12" />}
                   </div>
@@ -678,7 +679,7 @@ export function Header() {
                   <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
                     {loadingNotifs ? (
                       <div className="p-8 text-center text-xs text-slate-500">
-                        Đang tải thông báo...
+                        {language === 'en' ? 'Loading notifications...' : 'Đang tải thông báo...'}
                       </div>
                     ) : notifList.length > 0 ? (
                       notifList.map((n) => (
@@ -700,25 +701,25 @@ export function Header() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-1">
                               <p className="text-xs font-bold text-slate-900 truncate">
-                                {n.title}
+                                {localizeNotificationTitle(n.title, language)}
                               </p>
                               {!n.isRead && (
                                 <span className="w-2 h-2 rounded-full bg-sky-600 shrink-0"></span>
                               )}
                             </div>
                             <p className="text-xs text-slate-600 line-clamp-2 mt-0.5 leading-relaxed">
-                              {n.body}
+                              {localizeNotificationBody(n.body, language)}
                             </p>
                             <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1">
                               <Clock className="w-3 h-3 text-slate-400" />
-                              <span>{new Date(n.createdAt).toLocaleDateString('vi-VN')}</span>
+                              <span>{new Date(n.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'vi-VN')}</span>
                             </div>
                           </div>
                         </div>
                       ))
                     ) : (
                       <div className="p-8 text-center text-xs text-slate-500">
-                        Không có thông báo hệ thống nào
+                        {language === 'en' ? 'No system notifications' : 'Không có thông báo hệ thống nào'}
                       </div>
                     )}
                   </div>
@@ -753,17 +754,17 @@ export function Header() {
                       })()}
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-bold text-slate-900 leading-snug">
-                          {selectedNotif.title}
+                          {localizeNotificationTitle(selectedNotif.title, language)}
                         </h4>
                         <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1">
                           <Clock className="w-3.5 h-3.5" />
-                          <span>{new Date(selectedNotif.createdAt).toLocaleString('vi-VN')}</span>
+                          <span>{new Date(selectedNotif.createdAt).toLocaleString(language === 'en' ? 'en-US' : 'vi-VN')}</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 leading-relaxed whitespace-pre-line select-text">
-                      {selectedNotif.body}
+                      {localizeNotificationBody(selectedNotif.body, language)}
                     </div>
 
                     {(selectedNotif.relatedEntityType === 'ORDER' ||
