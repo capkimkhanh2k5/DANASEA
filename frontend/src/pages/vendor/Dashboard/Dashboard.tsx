@@ -506,9 +506,9 @@ export function Dashboard() {
   }, [revenueTrendData]);
 
   return (
-    <div className="w-full max-w-[1440px] mx-auto px-6 py-3.5 space-y-3.5 text-slate-900">
+    <div className="w-full max-w-[1440px] mx-auto px-6 py-4 flex-1 flex flex-col justify-between gap-4 text-slate-900">
       {/* 1. Header: Pure Actionable Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-slate-200 shrink-0">
         <div>
           <h1 className="text-lg font-bold text-slate-900 tracking-tight">
             Tổng quan vận hành
@@ -520,7 +520,7 @@ export function Dashboard() {
           <div className="inline-flex rounded-xl bg-white border border-slate-200/80 p-0.5 shadow-2xs">
             <button
               onClick={() => setDateRange("TODAY")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                 dateRange === "TODAY" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -528,7 +528,7 @@ export function Dashboard() {
             </button>
             <button
               onClick={() => setDateRange("WEEK")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                 dateRange === "WEEK" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -536,7 +536,7 @@ export function Dashboard() {
             </button>
             <button
               onClick={() => setDateRange("MONTH")}
-              className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                 dateRange === "MONTH" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -551,7 +551,7 @@ export function Dashboard() {
               setQrInput("");
               setIsCheckinModalOpen(true);
             }}
-            className="px-3 py-1.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
           >
             <QrCode className="w-3.5 h-3.5" />
             <span>Soát vé QR</span>
@@ -560,7 +560,7 @@ export function Dashboard() {
           {/* Quick Action: Schedule */}
           <button
             onClick={() => navigate('/vendor/schedule')}
-            className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200/90 shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200/90 shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <CalendarDays className="w-3.5 h-3.5 text-slate-500" />
             <span>Điều phối ca</span>
@@ -569,7 +569,7 @@ export function Dashboard() {
           {/* Quick Action: New Service */}
           <button
             onClick={() => navigate('/vendor/services/new')}
-            className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200/90 shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold border border-slate-200/90 shadow-2xs transition-colors flex items-center gap-1 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 text-slate-500" />
             <span>Tạo dịch vụ</span>
@@ -577,33 +577,33 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* 2. Top Row: 3 Compact Detailed Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+      {/* 2. Top Row: 3 Balanced Detailed Metric Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
         {/* Card 1: Tài chính & Doanh thu */}
         <div 
           onClick={() => navigate('/vendor/revenue')}
-          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between"
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between"
         >
           <div>
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
                 Doanh thu thực nhận
               </span>
-              <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
-                <Wallet className="w-3.5 h-3.5" />
+              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                <Wallet className="w-4 h-4" />
               </div>
             </div>
 
-            <div className="mt-2.5">
-              <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 tracking-tight">
+            <div className="mt-3">
+              <div className="text-2xl lg:text-3xl font-bold font-mono tabular-nums text-slate-900 tracking-tight">
                 {financialSummary.net.toLocaleString("vi-VN")}{" "}
-                <span className="text-xs font-sans font-normal text-slate-500">đ</span>
+                <span className="text-sm font-sans font-normal text-slate-500">đ</span>
               </div>
             </div>
           </div>
 
           {/* Vertical Details Breakdown */}
-          <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-1.5 text-xs">
+          <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
             <div className="flex items-center justify-between text-slate-600">
               <span>Doanh thu gộp (Gross)</span>
               <span className="font-mono font-bold text-slate-900 tabular-nums">
@@ -634,28 +634,28 @@ export function Dashboard() {
         {/* Card 2: Lượt khách & Đặt chỗ */}
         <div 
           onClick={() => navigate('/vendor/orders')}
-          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between"
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between"
         >
           <div>
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
                 {customerMetrics.title}
               </span>
-              <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
-                <Users className="w-3.5 h-3.5" />
+              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                <Users className="w-4 h-4" />
               </div>
             </div>
 
-            <div className="mt-2.5">
-              <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 tracking-tight">
+            <div className="mt-3">
+              <div className="text-2xl lg:text-3xl font-bold font-mono tabular-nums text-slate-900 tracking-tight">
                 {customerMetrics.totalBooked}{" "}
-                <span className="text-xs font-sans font-normal text-slate-500">/ {customerMetrics.totalCapacity} chỗ</span>
+                <span className="text-sm font-sans font-normal text-slate-500">/ {customerMetrics.totalCapacity} chỗ</span>
               </div>
             </div>
           </div>
 
           {/* Vertical Details Breakdown */}
-          <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-1.5 text-xs">
+          <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
             <div className="flex items-center justify-between text-slate-600">
               <span>Đã check-in lên tàu</span>
               <span className="font-mono font-bold text-emerald-700 tabular-nums">
@@ -686,28 +686,28 @@ export function Dashboard() {
         {/* Card 3: Ca khởi hành & Vận hành */}
         <div 
           onClick={() => navigate('/vendor/schedule')}
-          className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between"
+          className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all cursor-pointer flex flex-col justify-between"
         >
           <div>
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
                 Ca khởi hành hôm nay
               </span>
-              <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center">
-                <CalendarDays className="w-3.5 h-3.5" />
+              <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                <CalendarDays className="w-4 h-4" />
               </div>
             </div>
 
-            <div className="mt-2.5">
-              <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 tracking-tight">
+            <div className="mt-3">
+              <div className="text-2xl lg:text-3xl font-bold font-mono tabular-nums text-slate-900 tracking-tight">
                 {slotSummary.total < 10 ? `0${slotSummary.total}` : slotSummary.total}{" "}
-                <span className="text-xs font-sans font-normal text-slate-500">ca đã lên lịch</span>
+                <span className="text-sm font-sans font-normal text-slate-500">ca đã lên lịch</span>
               </div>
             </div>
           </div>
 
           {/* Vertical Details Breakdown */}
-          <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-1.5 text-xs">
+          <div className="mt-4 pt-3 border-t border-slate-100 space-y-2 text-xs">
             <div className="flex items-center justify-between text-slate-600">
               <span>Ca đang chạy tại bến</span>
               <span className="font-mono font-bold text-sky-700 tabular-nums">
@@ -736,11 +736,11 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* 3. Bottom Row: 2 Large Analytical Visualizations (60% / 40%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+      {/* 3. Bottom Row: 2 Large Analytical Visualizations (Expands to fill remaining height) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch flex-1 min-h-[280px]">
         {/* Large Revenue Trend SVG Chart (7 cols) */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
             <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
               {dateRange === "TODAY"
                 ? "Doanh thu các ca hôm nay"
@@ -748,23 +748,23 @@ export function Dashboard() {
                 ? "Doanh thu 7 ngày qua"
                 : "Doanh thu tháng này"}
             </h2>
-            <span className="text-xs font-mono font-semibold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded-lg tabular-nums">
+            <span className="text-xs font-mono font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg tabular-nums">
               {financialSummary.net.toLocaleString("vi-VN")} đ
             </span>
           </div>
 
           {/* Clean SVG Area Chart */}
-          <div className="mt-2 w-full h-[180px] flex flex-col justify-end">
-            <div className="relative w-full h-[145px]">
-              <svg className="w-full h-full overflow-visible" viewBox="0 0 700 145" preserveAspectRatio="none">
+          <div className="mt-3 w-full flex-1 min-h-[190px] flex flex-col justify-end">
+            <div className="relative w-full flex-1 min-h-[160px]">
+              <svg className="w-full h-full overflow-visible" viewBox="0 0 700 170" preserveAspectRatio="none">
                 {/* Horizontal Gridlines */}
                 {[0, 0.33, 0.66, 1].map((pct, idx) => (
                   <line
                     key={idx}
                     x1="0"
-                    y1={145 - pct * 120}
+                    y1={170 - pct * 140}
                     x2="700"
-                    y2={145 - pct * 120}
+                    y2={170 - pct * 140}
                     stroke="#f1f5f9"
                     strokeWidth="1"
                     strokeDasharray="4 4"
@@ -775,7 +775,7 @@ export function Dashboard() {
                 {(() => {
                   const pts = revenueTrendData.map((d, i) => {
                     const x = (i / Math.max(1, revenueTrendData.length - 1)) * 680 + 10;
-                    const y = 140 - (d.amount / maxRevenue) * 115;
+                    const y = 155 - (d.amount / maxRevenue) * 135;
                     return { x, y, amount: d.amount, label: d.label };
                   });
 
@@ -783,7 +783,7 @@ export function Dashboard() {
                     return i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`;
                   }, "");
 
-                  const areaCmd = `${lineCmd} L ${pts[pts.length - 1].x} 145 L ${pts[0].x} 145 Z`;
+                  const areaCmd = `${lineCmd} L ${pts[pts.length - 1].x} 170 L ${pts[0].x} 170 Z`;
 
                   return (
                     <g>
@@ -820,7 +820,7 @@ export function Dashboard() {
             </div>
 
             {/* X-axis Labels */}
-            <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between text-xs font-mono text-slate-500 pt-2.5 border-t border-slate-100 shrink-0">
               {revenueTrendData.map((d, idx) => (
                 <span key={idx} className="tabular-nums">
                   {d.label}
@@ -831,8 +831,8 @@ export function Dashboard() {
         </div>
 
         {/* Large Visual Donut Chart (5 cols) */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-5 flex flex-col justify-between">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
             <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
               {dateRange === "TODAY"
                 ? "Hiệu suất lấp đầy hôm nay"
@@ -849,33 +849,33 @@ export function Dashboard() {
           </div>
 
           {serviceOccupancies.length === 0 ? (
-            <div className="py-14 text-center text-xs text-slate-500">
+            <div className="py-16 text-center text-xs text-slate-500">
               Chưa có dịch vụ nào đang mở ca.
             </div>
           ) : (
-            <div className="my-auto py-2 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="my-auto py-2 flex flex-col sm:flex-row items-center justify-between gap-5 flex-1">
               {/* Native SVG Donut Gauge */}
-              <div className="relative w-36 h-36 shrink-0 flex items-center justify-center">
+              <div className="relative w-42 h-42 shrink-0 flex items-center justify-center">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 160 160">
                   {/* Background Track Ring */}
                   <circle
                     cx="80"
                     cy="80"
-                    r="56"
+                    r="58"
                     fill="none"
                     stroke="#f1f5f9"
-                    strokeWidth="14"
+                    strokeWidth="15"
                   />
                   {/* Active Value Arc */}
                   <circle
                     cx="80"
                     cy="80"
-                    r="56"
+                    r="58"
                     fill="none"
                     stroke={customerMetrics.occupancyRate >= 100 ? "#f59e0b" : "#0284c7"}
-                    strokeWidth="14"
-                    strokeDasharray={351.85}
-                    strokeDashoffset={351.85 - (351.85 * Math.min(100, Math.max(0, customerMetrics.occupancyRate))) / 100}
+                    strokeWidth="15"
+                    strokeDasharray={364.42}
+                    strokeDashoffset={364.42 - (364.42 * Math.min(100, Math.max(0, customerMetrics.occupancyRate))) / 100}
                     strokeLinecap="round"
                     className="transition-all duration-700 ease-out"
                   />
@@ -883,7 +883,7 @@ export function Dashboard() {
 
                 {/* Centered KPI Metrics */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
-                  <span className="text-2xl font-bold font-mono text-slate-900 tabular-nums tracking-tight">
+                  <span className="text-3xl font-bold font-mono text-slate-900 tabular-nums tracking-tight">
                     {customerMetrics.occupancyRate}%
                   </span>
                   <span className="text-[10px] font-semibold text-slate-600 tracking-wider uppercase mt-0.5">
@@ -893,7 +893,7 @@ export function Dashboard() {
               </div>
 
               {/* Service Breakdown Legend */}
-              <div className="flex-1 w-full space-y-2">
+              <div className="flex-1 w-full space-y-2.5">
                 {serviceOccupancies.slice(0, 3).map((srv, idx) => {
                   const colors = ["bg-[#0284c7]", "bg-[#06b6d4]", "bg-[#10b981]"];
                   const color = colors[idx % colors.length];
@@ -902,7 +902,7 @@ export function Dashboard() {
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <span className={`w-2 h-2 rounded-full ${color} shrink-0`} />
-                          <span className="font-semibold text-slate-800 truncate max-w-[130px]">
+                          <span className="font-semibold text-slate-800 truncate max-w-[140px]">
                             {cleanServiceName(srv.name)}
                           </span>
                         </div>
