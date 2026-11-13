@@ -6,20 +6,19 @@ import '../../../components/admin/admin.css';
 import '../../../components/admin/adminInteractions.css';
 import './Dashboard.css';
 import { getDateRange, mergeDailyReports, shortDate, summarizeMetrics } from './dashboardModel';
-import { HotServicesCard } from './HotServicesCard';
 import { KpiOverview } from './KpiOverview';
 import { OrderOutcomeChart } from './OrderOutcomeChart';
 import { RevenueChart } from './RevenueChart';
-import { TopVendorsCard } from './TopVendorsCard';
 import { useAdminDashboard } from './useAdminDashboard';
 import { WorkloadDonut } from './WorkloadDonut';
+import { ExecutiveDigestBanner } from './ExecutiveDigestBanner';
 
 export function AdminDashboard() {
   const [searchParams] = useSearchParams();
   const demo = Boolean(import.meta.env.DEV && searchParams.get('demo') === '1');
   const outletCtx = useOutletContext<{ days: 7 | 30; setDays: (d: 7 | 30) => void }>() ?? {
     days: 7 as const,
-    setDays: () => {},
+    setDays: () => { },
   };
   const days = outletCtx.days ?? 7;
 
@@ -39,7 +38,7 @@ export function AdminDashboard() {
     dashboard.reload();
   };
 
-  const rangeLabel = `${shortDate(range.from)} – ${shortDate(range.to)}/${range.to.slice(0, 4)}`;
+  const _rangeLabel = `${shortDate(range.from)} – ${shortDate(range.to)}/${range.to.slice(0, 4)}`;
   const bookingUnavailable = loading || !data?.bookings;
   const revenueUnavailable = loading || !data?.revenue;
 
@@ -79,6 +78,9 @@ export function AdminDashboard() {
             </div>
           )}
 
+          {/* 4 Box Tóm lược kinh doanh độc lập (Dynamic theo 7/30 ngày) */}
+          <ExecutiveDigestBanner days={days} metrics={metrics} loading={loading} />
+
           {/* =========================================================================
               HÀNG 1: Block 1 (KPI Overview ~38%) + Block 2 (Revenue Trend ~62%)
               ========================================================================= */}
@@ -101,7 +103,7 @@ export function AdminDashboard() {
           </div>
 
           {/* =========================================================================
-              HÀNG 2: Block 3 (Order Outcome ~60%) + Block 4 (Hot Services ~40%)
+              HÀNG 2: Kết quả đơn hàng (~58%) + Công việc chờ xử lý (~42%)
               ========================================================================= */}
           <div className="admin-dashboard-row-2">
             {/* Block 3: Kết quả đơn hàng (Stacked Bar Chart: Hoàn thành & Hủy) */}
@@ -112,38 +114,13 @@ export function AdminDashboard() {
               onRetry={refresh}
             />
 
-            {/* Block 4: Dịch vụ đặt nhiều nhất (Top <= 5 trải nghiệm nổi bật) */}
-            <HotServicesCard
-              services={data?.hotServices}
-              loading={loading}
-              rangeLabel={rangeLabel}
-            />
-          </div>
-
-          {/* =========================================================================
-              HÀNG 3: Block 5 (Workload Donut ~40%) + Block 6 (Top 5 Vendors ~60%)
-              ========================================================================= */}
-          <div className="admin-dashboard-row-3">
-            {/* Block 5: Công việc chờ xử lý (Donut 4 nhóm, tương tác click & hover, không lọc 7/30d) */}
+            {/* Block 4: Công việc chờ xử lý (Donut 4 nhóm, tương tác click & hover) */}
             <WorkloadDonut
               counts={counts}
               loading={loading}
               demo={demo}
             />
-
-            {/* Block 6: Top 5 đối tác theo doanh thu (Xếp hạng doanh thu trong kỳ) */}
-            <TopVendorsCard
-              vendors={data?.topVendors}
-              loading={loading}
-              rangeLabel={rangeLabel}
-            />
           </div>
-
-          <p className="admin-description" style={{ margin: '4px 0 0', fontSize: '12px' }}>
-            {demo
-              ? 'Dữ liệu mẫu độc lập. KPI, biểu đồ và xếp hạng sử dụng cùng bộ dữ liệu chuẩn hóa theo ngày. Donut phản ánh tồn đọng hiện tại.'
-              : `Nguồn: API quản trị DANASEA${dashboard.loadedAt ? ` · Cập nhật lúc ${new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' }).format(dashboard.loadedAt)}` : ''}.`}
-          </p>
         </>
       )}
     </main>

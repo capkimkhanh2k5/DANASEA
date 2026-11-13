@@ -1,4 +1,4 @@
-import { numeric, type BookingMetric, type DashboardData, type DateRange, type RecentOrder, type RevenueMetric } from './dashboardModel.ts';
+import { numeric, type BookingMetric, type DashboardData, type DateRange, type RecentOrder, type RevenueMetric, type TopServingVendorItem, type TopVendorItem } from './dashboardModel.ts';
 
 export type DashboardGet = (path: string, config: {
   params: Record<string, string | number>;
@@ -60,6 +60,47 @@ function parseOrders(value: unknown): RecentOrder[] {
     return { id: row.id, status: row.status, paymentStatus: row.paymentStatus, totalAmount: numeric(row.totalAmount), createdAt: row.createdAt };
   });
 }
+function parseTopServingVendors(value: unknown): TopServingVendorItem[] {
+  const items = list(record(value).items);
+  const parsed: TopServingVendorItem[] = items.map(item => {
+    const row = record(item);
+    return {
+      vendorId: String(row.vendorId ?? ''),
+      vendorName: String(row.businessName || 'Đối tác'),
+      completedOrders: orderCount(row.completedOrders),
+      totalOrders: orderCount(row.totalOrders),
+      revenue: numeric(row.revenue),
+      sharePercent: 0,
+    };
+  }).filter(v => v.completedOrders > 0);
+
+  parsed.sort((a, b) => b.completedOrders - a.completedOrders || b.revenue - a.revenue);
+  const max = Math.max(1, ...parsed.map(v => v.completedOrders));
+  return parsed.slice(0, 5).map(v => ({
+    ...v,
+    sharePercent: Math.round((v.completedOrders / max) * 100),
+  }));
+}
+
+function parseTopVendors(value: unknown): TopVendorItem[] {
+  const items = list(record(value).items);
+  const parsed: TopVendorItem[] = items.map(item => {
+    const row = record(item);
+    return {
+      vendorId: String(row.vendorId ?? ''),
+      vendorName: String(row.businessName || 'Đối tác'),
+      revenue: numeric(row.revenue),
+      completedOrders: orderCount(row.completedOrders),
+      sharePercent: 0,
+    };
+  });
+  parsed.sort((a, b) => b.revenue - a.revenue);
+  const totalRevenue = parsed.reduce((sum, v) => sum + v.revenue, 0);
+  return parsed.slice(0, 5).map(v => ({
+    ...v,
+    sharePercent: totalRevenue > 0 ? Math.round((v.revenue / totalRevenue) * 1000) / 10 : 0,
+  }));
+}
 
 export async function loadAdminDashboard(get: DashboardGet, range: DateRange, signal: AbortSignal): Promise<DashboardData> {
   const errors: string[] = [];
@@ -73,7 +114,11 @@ export async function loadAdminDashboard(get: DashboardGet, range: DateRange, si
     }
   }
   const page = { page: 0, size: 1 };
-  const [bookings, revenue, vendors, services, refunds, disputesOpen, disputesReview, settlementDraft, settlementPending, recentOrders] = await Promise.all([
+  const [
+    bookings, revenue, vendors, services, refunds,
+    disputesOpen, disputesReview, settlementDraft, settlementPending,
+    recentOrders, topVendors, roleApplications
+  ] = await Promise.all([
     read('/admin/reports/bookings', { ...range, groupBy: 'day' }, data => parseBookings(data, range), 'báo cáo đặt chỗ'),
     read('/admin/reports/revenue', { ...range, groupBy: 'day' }, data => parseRevenue(data, range), 'báo cáo tiền thu'),
     read('/admin/vendors', { ...page, status: 'PENDING' }, count, 'hồ sơ đối tác'),
@@ -84,15 +129,22 @@ export async function loadAdminDashboard(get: DashboardGet, range: DateRange, si
     read('/admin/settlements', { ...page, status: 'DRAFT' }, count, 'kỳ quyết toán nháp'),
     read('/admin/settlements', { ...page, status: 'PENDING' }, count, 'kỳ quyết toán chờ xử lý'),
     read('/admin/orders', { page: 0, size: 5, sort: 'createdAt,desc' }, parseOrders, 'đơn hàng gần đây'),
+    read('/admin/reports/vendors', { from: range.from, to: range.to }, data => ({
+      topVendors: parseTopVendors(data),
+      topServingVendors: parseTopServingVendors(data),
+    }), 'báo cáo đối tác'),
+    read('/admin/partner-applications', { ...page, status: 'PENDING' }, count, 'đơn xét duyệt vai trò'),
   ]);
   return {
     bookings, revenue, recentOrders, errors,
     hotServices: null,
-    topVendors: null,
+    topVendors: topVendors?.topVendors ?? null,
+    topServingVendors: topVendors?.topServingVendors ?? null,
     operations: {
       vendors, services, refunds,
       disputes: disputesOpen === null || disputesReview === null ? null : disputesOpen + disputesReview,
       settlements: settlementDraft === null || settlementPending === null ? null : settlementDraft + settlementPending,
+      roleApplications: roleApplications !== null ? roleApplications : 1,
     },
   };
 }

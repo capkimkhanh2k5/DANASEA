@@ -6,11 +6,47 @@
   background: #ffffff;
   border: 1px solid var(--admin-border, #e0e8eb);
   border-radius: 12px;
-  padding: 20px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.admin-role-applications-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-role-applications .admin-filter-tabs {
+  padding: 0 20px;
+  margin: 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admin-role-applications .admin-workspace-toolbar {
+  padding: 8px 20px 10px;
+  margin-top: 0;
+  gap: 12px;
 }
 
 .admin-role-applications .admin-table-scroll {
   overflow-x: auto;
+  padding: 0 20px;
+  margin-top: 0;
+}
+
+.admin-role-applications .admin-pagination-wrapper {
+  padding: 12px 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.admin-role-applications .admin-vendors-list-footer {
+  padding: 12px 20px;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 0;
 }
 
 .admin-drawer-overlay {
