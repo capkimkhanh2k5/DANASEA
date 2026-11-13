@@ -1,4 +1,5 @@
 import { useAuthStore } from "../../../store/useAuthStore";
+import { useLanguageStore } from "../../../store/useLanguageStore";
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { authService } from "../../../services/authService";
@@ -18,6 +19,8 @@ type SettingsTab = "personal" | "security" | "orders" | "wishlist";
 
 export function Profile() {
   const navigate = useNavigate();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
   const { user, logout } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>("personal");
@@ -78,15 +81,17 @@ export function Profile() {
           <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 flex items-center justify-center mb-4">
             <User className="w-6 h-6" />
           </div>
-          <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 mb-2">Vui lòng đăng nhập</h1>
+          <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 mb-2">{isEn ? "Please Sign In" : "Vui lòng đăng nhập"}</h1>
           <p className="text-[13px] text-slate-600 mb-6 leading-relaxed">
-            Đăng nhập vào tài khoản DANASEA để quản lý thông tin cá nhân và cài đặt bảo mật.
+            {isEn 
+              ? "Sign in to your DANASEA account to manage personal details and security settings."
+              : "Đăng nhập vào tài khoản DANASEA để quản lý thông tin cá nhân và cài đặt bảo mật."}
           </p>
           <button 
             onClick={() => navigate('/auth')} 
             className="w-full py-3 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-sm transition-colors cursor-pointer shadow-xs"
           >
-            Đến trang Đăng nhập
+            {isEn ? "Go to Sign In" : "Đến trang Đăng nhập"}
           </button>
         </div>
       </main>
@@ -105,11 +110,11 @@ export function Profile() {
         );
       }
       setEditingField(null);
-      setToastMessage("Đã cập nhật tên pháp lý thành công!");
+      setToastMessage(isEn ? "Legal name updated successfully!" : "Đã cập nhật tên pháp lý thành công!");
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     } catch {
-      setToastMessage("Cập nhật tên pháp lý thất bại, vui lòng thử lại!");
+      setToastMessage(isEn ? "Failed to update legal name. Please try again!" : "Cập nhật tên pháp lý thất bại, vui lòng thử lại!");
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
     }
@@ -120,7 +125,7 @@ export function Profile() {
     e.preventDefault();
     setPhone(tempPhone);
     setEditingField(null);
-    setToastMessage("Đã cập nhật số điện thoại liên hệ!");
+    setToastMessage(isEn ? "Contact phone number updated!" : "Đã cập nhật số điện thoại liên hệ!");
     setShowToast(true);
     setTimeout(() => setShowToast(false), 3000);
   };
@@ -128,7 +133,7 @@ export function Profile() {
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      alert("Mật khẩu xác nhận không khớp!");
+      alert(isEn ? "New passwords do not match!" : "Mật khẩu xác nhận không khớp!");
       return;
     }
     setPasswordSuccess(true);
@@ -175,7 +180,7 @@ export function Profile() {
             {/* Sidebar Title */}
             <div>
               <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider px-2">
-                Cài đặt và quyền riêng tư
+                {isEn ? "Settings & Privacy" : "Cài đặt và quyền riêng tư"}
               </h3>
             </div>
 
@@ -192,7 +197,7 @@ export function Profile() {
               >
                 <div className="flex items-center gap-3">
                   <User className={`w-4 h-4 ${activeTab === "personal" ? "text-white" : "text-slate-500"}`} />
-                  <span>Thông tin cá nhân</span>
+                  <span>{isEn ? "Personal Info" : "Thông tin cá nhân"}</span>
                 </div>
                 <ChevronRight className={`w-4 h-4 ${activeTab === "personal" ? "text-white/80" : "text-slate-400"}`} />
               </button>
@@ -208,7 +213,7 @@ export function Profile() {
               >
                 <div className="flex items-center gap-3">
                   <ShieldCheck className={`w-4 h-4 ${activeTab === "security" ? "text-white" : "text-slate-500"}`} />
-                  <span>Đăng nhập &amp; Bảo mật</span>
+                  <span>{isEn ? "Login & Security" : "Đăng nhập & Bảo mật"}</span>
                 </div>
                 <ChevronRight className={`w-4 h-4 ${activeTab === "security" ? "text-white/80" : "text-slate-400"}`} />
               </button>
@@ -220,7 +225,7 @@ export function Profile() {
               >
                 <div className="flex items-center gap-3">
                   <Receipt className="w-4 h-4 text-slate-500" />
-                  <span>Chuyến đi &amp; Vé QR</span>
+                  <span>{isEn ? "Bookings & QR Passes" : "Chuyến đi & Vé QR"}</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
@@ -232,7 +237,7 @@ export function Profile() {
               >
                 <div className="flex items-center gap-3">
                   <Heart className="w-4 h-4 text-slate-500" />
-                  <span>Tour đã lưu</span>
+                  <span>{isEn ? "Saved Wishlist" : "Tour đã lưu"}</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </button>
@@ -244,7 +249,7 @@ export function Profile() {
                   className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
                 >
                   <LogOut className="w-4 h-4 text-rose-500" />
-                  <span>Đăng xuất tài khoản</span>
+                  <span>{isEn ? "Sign Out" : "Đăng xuất tài khoản"}</span>
                 </button>
               </div>
             </nav>
@@ -260,7 +265,7 @@ export function Profile() {
               <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 sm:p-8 space-y-6">
                 <div>
                   <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                    Thông tin cá nhân
+                    {isEn ? "Personal Information" : "Thông tin cá nhân"}
                   </h1>
                 </div>
 
@@ -272,7 +277,7 @@ export function Profile() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-0.5 flex-1">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Tên pháp lý
+                          {isEn ? "Legal Name" : "Tên pháp lý"}
                         </span>
                         {editingField === "name" ? (
                           <form onSubmit={handleSaveName} className="pt-2 space-y-3">
@@ -288,14 +293,14 @@ export function Profile() {
                                 type="submit"
                                 className="px-4 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold cursor-pointer shadow-xs"
                               >
-                                Lưu thay đổi
+                                {isEn ? "Save" : "Lưu thay đổi"}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setEditingField(null)}
                                 className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
                               >
-                                Hủy
+                                {isEn ? "Cancel" : "Hủy"}
                               </button>
                             </div>
                           </form>
@@ -312,7 +317,7 @@ export function Profile() {
                           onClick={() => { setTempFullName(fullName); setEditingField("name"); }}
                           className="text-xs font-bold text-[#0284c7] hover:underline cursor-pointer shrink-0"
                         >
-                          Chỉnh sửa
+                          {isEn ? "Edit" : "Chỉnh sửa"}
                         </button>
                       )}
                     </div>
@@ -323,14 +328,14 @@ export function Profile() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-0.5">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Địa chỉ Email
+                          {isEn ? "Email Address" : "Địa chỉ Email"}
                         </span>
                         <p className="text-sm sm:text-base font-semibold text-slate-900">
                           {email}
                         </p>
                       </div>
                       <span className="text-xs font-semibold text-slate-400 shrink-0">
-                        Cố định
+                        {isEn ? "Primary" : "Cố định"}
                       </span>
                     </div>
                   </div>
@@ -340,7 +345,7 @@ export function Profile() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-0.5 flex-1">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Số điện thoại liên lạc
+                          {isEn ? "Contact Phone Number" : "Số điện thoại liên lạc"}
                         </span>
                         {editingField === "phone" ? (
                           <form onSubmit={handleSavePhone} className="pt-2 space-y-3">
@@ -356,14 +361,14 @@ export function Profile() {
                                 type="submit"
                                 className="px-4 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold cursor-pointer shadow-xs"
                               >
-                                Lưu thay đổi
+                                {isEn ? "Save" : "Lưu thay đổi"}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setEditingField(null)}
                                 className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer"
                               >
-                                Hủy
+                                {isEn ? "Cancel" : "Hủy"}
                               </button>
                             </div>
                           </form>
@@ -380,7 +385,7 @@ export function Profile() {
                           onClick={() => { setTempPhone(phone); setEditingField("phone"); }}
                           className="text-xs font-bold text-[#0284c7] hover:underline cursor-pointer shrink-0"
                         >
-                          Chỉnh sửa
+                          {isEn ? "Edit" : "Chỉnh sửa"}
                         </button>
                       )}
                     </div>
@@ -391,19 +396,19 @@ export function Profile() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-0.5">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Xác minh danh tính &amp; Bảo hiểm du lịch biển
+                          {isEn ? "Identity & Marine Travel Insurance" : "Xác minh danh tính & Bảo hiểm du lịch biển"}
                         </span>
                         <div className="flex items-center gap-2 pt-0.5">
                           <span className="text-sm sm:text-base font-semibold text-slate-900">
-                            Đã xác minh đầy đủ
+                            {isEn ? "Fully Verified" : "Đã xác minh đầy đủ"}
                           </span>
                           <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[11px] font-bold border border-emerald-200">
-                            Hạn mức 100 triệu
+                            {isEn ? "100M VND Coverage" : "Hạn mức 100 triệu"}
                           </span>
                         </div>
                       </div>
                       <span className="text-xs font-bold text-emerald-600 shrink-0">
-                        Đạt chuẩn
+                        {isEn ? "Compliant" : "Đạt chuẩn"}
                       </span>
                     </div>
                   </div>
@@ -413,14 +418,14 @@ export function Profile() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-0.5">
                         <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Hạng thành viên
+                          {isEn ? "Membership Tier" : "Hạng thành viên"}
                         </span>
                         <p className="text-sm sm:text-base font-semibold text-slate-900">
-                          Hạng Bạc
+                          {isEn ? "Silver Tier" : "Hạng Bạc"}
                         </p>
                       </div>
                       <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 shrink-0">
-                        Đang hoạt động
+                        {isEn ? "Active" : "Đang hoạt động"}
                       </span>
                     </div>
                   </div>
@@ -434,29 +439,31 @@ export function Profile() {
               <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 sm:p-8 space-y-6">
                 <div>
                   <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-                    Đăng nhập &amp; Bảo mật
+                    {isEn ? "Login & Security" : "Đăng nhập & Bảo mật"}
                   </h1>
                   <p className="text-xs sm:text-sm text-slate-600 mt-1">
-                    Cập nhật mật khẩu định kỳ và kiểm tra các phiên đăng nhập để bảo vệ an toàn cho tài khoản.
+                    {isEn
+                      ? "Update your password periodically and monitor active login sessions to secure your account."
+                      : "Cập nhật mật khẩu định kỳ và kiểm tra các phiên đăng nhập để bảo vệ an toàn cho tài khoản."}
                   </p>
                 </div>
 
                 {passwordSuccess && (
                   <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs sm:text-sm font-semibold flex items-center gap-2">
                     <Check className="w-4 h-4 text-emerald-600" />
-                    <span>Mật khẩu tài khoản đã được cập nhật thành công!</span>
+                    <span>{isEn ? "Account password updated successfully!" : "Mật khẩu tài khoản đã được cập nhật thành công!"}</span>
                   </div>
                 )}
 
                 <form onSubmit={handlePasswordSubmit} className="space-y-4 max-w-lg">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Mật khẩu hiện tại</label>
+                    <label className="text-xs font-semibold text-slate-700">{isEn ? "Current Password" : "Mật khẩu hiện tại"}</label>
                     <div className="relative flex items-center">
                       <input
                         type={showCurrentPass ? "text" : "password"}
                         value={currentPassword}
                         onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="Nhập mật khẩu hiện tại"
+                        placeholder={isEn ? "Enter current password" : "Nhập mật khẩu hiện tại"}
                         className="w-full h-10 px-3.5 pr-10 rounded-xl border border-slate-200 text-sm outline-none focus:border-[#0284c7]"
                         required
                       />
@@ -471,13 +478,13 @@ export function Profile() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Mật khẩu mới</label>
+                    <label className="text-xs font-semibold text-slate-700">{isEn ? "New Password" : "Mật khẩu mới"}</label>
                     <div className="relative flex items-center">
                       <input
                         type={showNewPass ? "text" : "password"}
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Tối thiểu 8 ký tự"
+                        placeholder={isEn ? "At least 8 characters" : "Tối thiểu 8 ký tự"}
                         className="w-full h-10 px-3.5 pr-10 rounded-xl border border-slate-200 text-sm outline-none focus:border-[#0284c7]"
                         required
                       />
@@ -492,12 +499,12 @@ export function Profile() {
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-slate-700">Xác nhận mật khẩu mới</label>
+                    <label className="text-xs font-semibold text-slate-700">{isEn ? "Confirm New Password" : "Xác nhận mật khẩu mới"}</label>
                     <input
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Nhập lại mật khẩu mới"
+                      placeholder={isEn ? "Re-enter new password" : "Nhập lại mật khẩu mới"}
                       className="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-sm outline-none focus:border-[#0284c7]"
                       required
                     />
@@ -508,20 +515,20 @@ export function Profile() {
                       type="submit"
                       className="px-5 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs sm:text-sm font-semibold transition-colors cursor-pointer shadow-xs"
                     >
-                      Cập nhật mật khẩu
+                      {isEn ? "Update Password" : "Cập nhật mật khẩu"}
                     </button>
                   </div>
                 </form>
 
                 {/* Device History Card */}
                 <div className="pt-6 border-t border-slate-100 space-y-3">
-                  <h3 className="text-sm font-bold text-slate-900">Thiết bị đang đăng nhập</h3>
+                  <h3 className="text-sm font-bold text-slate-900">{isEn ? "Active Login Sessions" : "Thiết bị đang đăng nhập"}</h3>
                   <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between text-xs">
                     <div>
-                      <p className="font-semibold text-slate-900">Trình duyệt Web hiện tại (Windows · Chrome)</p>
-                      <p className="text-slate-500 mt-0.5">Đà Nẵng, Việt Nam · Hoạt động ngay bây giờ</p>
+                      <p className="font-semibold text-slate-900">{isEn ? "Current Web Browser (Windows · Chrome)" : "Trình duyệt Web hiện tại (Windows · Chrome)"}</p>
+                      <p className="text-slate-500 mt-0.5">{isEn ? "Da Nang, Vietnam · Active now" : "Đà Nẵng, Việt Nam · Hoạt động ngay bây giờ"}</p>
                     </div>
-                    <span className="text-[11px] font-bold text-emerald-600">Phiên này</span>
+                    <span className="text-[11px] font-bold text-emerald-600">{isEn ? "This session" : "Phiên này"}</span>
                   </div>
                 </div>
               </div>

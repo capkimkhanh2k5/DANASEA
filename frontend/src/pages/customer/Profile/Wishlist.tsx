@@ -36,15 +36,15 @@ interface WishlistItem {
 }
 
 const CATEGORY_FILTERS = [
-  { id: 'all', name: 'Tất cả' },
-  { id: 'cheo-sup-kayak', name: 'Chèo SUP & Kayak' },
-  { id: 'lan-ngam-san-ho', name: 'Lặn ngắm san hô' },
-  { id: 'cano-du-bay', name: 'Cano & Dù bay' },
-  { id: 'mo-to-nuoc-jetski', name: 'Mô tô nước Jetski' },
-  { id: 'du-thuyen-ngam-hoang-hon', name: 'Du thuyền & Tour đảo' },
-  { id: 'cau-ca-muc', name: 'Câu cá & Câu mực' },
-  { id: 'hoc-luot-song', name: 'Lướt sóng' },
-  { id: 'truot-phao-chuoi', name: 'Trượt phao chuối' },
+  { id: 'all', name: 'Tất cả', nameEn: 'All' },
+  { id: 'cheo-sup-kayak', name: 'Chèo SUP & Kayak', nameEn: 'SUP & Kayak' },
+  { id: 'lan-ngam-san-ho', name: 'Lặn ngắm san hô', nameEn: 'Snorkeling & Diving' },
+  { id: 'cano-du-bay', name: 'Cano & Dù bay', nameEn: 'Speedboat & Parasailing' },
+  { id: 'mo-to-nuoc-jetski', name: 'Mô tô nước Jetski', nameEn: 'Jetski Riding' },
+  { id: 'du-thuyen-ngam-hoang-hon', name: 'Du thuyền & Tour đảo', nameEn: 'Yacht & Island Tour' },
+  { id: 'cau-ca-muc', name: 'Câu cá & Câu mực', nameEn: 'Fishing & Squid' },
+  { id: 'hoc-luot-song', name: 'Lướt sóng', nameEn: 'Surfing' },
+  { id: 'truot-phao-chuoi', name: 'Trượt phao chuối', nameEn: 'Banana Boat' },
 ];
 
 function matchesCategory(itemCategory: string | undefined, categoryId: string): boolean {
@@ -77,6 +77,7 @@ function matchesCategory(itemCategory: string | undefined, categoryId: string): 
 export function Wishlist() {
   const navigate = useNavigate();
   const { language } = useLanguageStore();
+  const isEn = language === 'en';
   const { wishlistIds, serverItems, removeFromWishlist, fetchWishlistFromServer } = useWishlistStore();
   const { addItem } = useCartStore();
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -211,9 +212,9 @@ export function Wishlist() {
       });
       count++;
     });
-    setToastMessage(`Đã thêm ${count} trải nghiệm vào giỏ hàng thành công!`);
+    setToastMessage(isEn ? `Added ${count} experiences to cart!` : `Đã thêm ${count} trải nghiệm vào giỏ hàng thành công!`);
     setTimeout(() => setToastMessage(null), 3000);
-  }, [wishlist, addItem]);
+  }, [wishlist, addItem, isEn]);
 
   const handleRemove = (e: React.MouseEvent, item: WishlistItem) => {
     e.stopPropagation();
@@ -245,16 +246,16 @@ export function Wishlist() {
                 className="hover:text-slate-900 transition-colors cursor-pointer bg-transparent border-0 p-0 flex items-center gap-1 text-slate-600 font-semibold"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>Tài khoản của bạn</span>
+                <span>{isEn ? 'Your Account' : 'Tài khoản của bạn'}</span>
               </button>
               <span className="text-slate-300">/</span>
-              <span className="text-slate-900 font-semibold">Danh sách tour đã lưu</span>
+              <span className="text-slate-900 font-semibold">{isEn ? 'Saved Wishlist' : 'Danh sách tour đã lưu'}</span>
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
               <div>
                 <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight">
-                  Danh sách yêu thích
+                  {isEn ? 'Your Wishlist' : 'Danh sách yêu thích'}
                 </h1>
               </div>
 
@@ -265,7 +266,7 @@ export function Wishlist() {
                   className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-2 cursor-pointer transition-colors shadow-xs self-start sm:self-auto"
                 >
                   <ShoppingCart className="w-4 h-4 text-white" />
-                  <span>Thêm tất cả vào giỏ hàng</span>
+                  <span>{isEn ? 'Add all to cart' : 'Thêm tất cả vào giỏ hàng'}</span>
                   <span className="px-1.5 py-0.5 rounded-md bg-white/20 text-white font-mono text-[11px] font-bold tabular-nums">
                     {wishlist.length}
                   </span>
@@ -308,7 +309,7 @@ export function Wishlist() {
                           : "bg-slate-50 text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/80"
                       }`}
                     >
-                      {cat.name}
+                      {isEn ? cat.nameEn : cat.name}
                     </button>
                   );
                 })}
@@ -369,13 +370,13 @@ export function Wishlist() {
                       
                       {/* Floating Guest Favorite / Category Badge */}
                       <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-xs px-2.5 py-1 rounded-md text-[11px] font-bold text-slate-900 border border-slate-200/70 shadow-xs">
-                        {service.category || 'Trải nghiệm biển'}
+                        {isEn ? 'Marine Experience' : (service.category || 'Trải nghiệm biển')}
                       </div>
 
                       {/* Heart Button - Airbnb Circular Icon */}
                       <button 
-                        aria-label="Bỏ lưu khỏi danh sách" 
-                        title="Bỏ lưu khỏi danh sách yêu thích"
+                        aria-label={isEn ? "Remove from wishlist" : "Bỏ lưu khỏi danh sách"} 
+                        title={isEn ? "Remove from wishlist" : "Bỏ lưu khỏi danh sách yêu thích"}
                         className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 backdrop-blur-xs hover:bg-white border border-slate-200/80 shadow-xs flex items-center justify-center hover:scale-105 active:scale-95 transition-all cursor-pointer" 
                         onClick={(e) => handleRemove(e, service)} 
                         type="button"
@@ -399,7 +400,7 @@ export function Wishlist() {
                         </div>
                         
                         <h3 className="text-base font-semibold text-slate-900 group-hover:text-slate-700 transition-colors line-clamp-2 leading-snug">
-                          {(language === 'en' && service.nameEn) ? service.nameEn : service.name}
+                          {(isEn && service.nameEn) ? service.nameEn : service.name}
                         </h3>
                       </div>
 
@@ -416,7 +417,7 @@ export function Wishlist() {
                               {servicePrice.toLocaleString('vi-VN')}₫
                             </span>
                             <span className="text-xs text-slate-500 font-normal">
-                              / người
+                              {isEn ? '/ person' : '/ người'}
                             </span>
                           </div>
                         </div>
@@ -427,7 +428,7 @@ export function Wishlist() {
                           type="button"
                         >
                           <Calendar className="w-3.5 h-3.5" />
-                          Đặt lịch
+                          {isEn ? 'Book' : 'Đặt lịch'}
                         </button>
                       </div>
                     </div>
@@ -441,16 +442,18 @@ export function Wishlist() {
                 <Compass className="w-6 h-6" />
               </div>
               <h2 className="text-lg font-bold text-slate-900 mb-1">
-                Chưa có trải nghiệm nào được lưu
+                {isEn ? 'No saved experiences yet' : 'Chưa có trải nghiệm nào được lưu'}
               </h2>
               <p className="text-slate-600 text-sm max-w-md mb-6 leading-relaxed">
-                Khám phá các tour cano, lặn biển và chèo SUP tại Đà Nẵng để lưu lại trải nghiệm yêu thích cho chuyến đi của bạn.
+                {isEn 
+                  ? 'Explore speedboats, scuba diving, and SUP tours in Da Nang to save your favorite adventures.'
+                  : 'Khám phá các tour cano, lặn biển và chèo SUP tại Đà Nẵng để lưu lại trải nghiệm yêu thích cho chuyến đi của bạn.'}
               </p>
               <button 
                 onClick={() => navigate('/')}
                 className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-medium text-sm shadow-xs transition-all flex items-center gap-2 cursor-pointer"
               >
-                <span>Khám phá ngay</span>
+                <span>{isEn ? 'Explore Now' : 'Khám phá ngay'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

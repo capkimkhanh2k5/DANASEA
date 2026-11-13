@@ -56,6 +56,7 @@ export function Orders() {
   const [searchParams] = useSearchParams();
   const { user, isAuthenticated, accessToken, setAuth } = useAuthStore();
   const { language } = useLanguageStore();
+  const isEn = language === 'en';
 
   // State management
   const [filter, setFilter] = useState<OrderFilter>("all");
@@ -658,19 +659,19 @@ export function Orders() {
   };
 
   const formatPolicyDescription = (rawPolicy?: string | null, percentage?: number) => {
-    if (!rawPolicy) return "Chính sách tiêu chuẩn 24 giờ";
+    if (!rawPolicy) return isEn ? "Standard 24-hour cancellation policy" : "Chính sách tiêu chuẩn 24 giờ";
     const lower = rawPolicy.toLowerCase();
     if (lower.includes("within 24 hours") || lower.includes("no refund") || percentage === 0) {
-      return "Không hoàn tiền do hủy trong vòng 24h trước giờ khởi hành";
+      return isEn ? "No refund for cancellation within 24 hours before departure" : "Không hoàn tiền do hủy trong vòng 24h trước giờ khởi hành";
     }
     if (lower.includes("more than 24 hours") || lower.includes("100% refund") || percentage === 100) {
-      return "Hoàn tiền 100% khi hủy trước giờ khởi hành trên 24 giờ";
+      return isEn ? "100% refund for cancellation more than 24 hours before departure" : "Hoàn tiền 100% khi hủy trước giờ khởi hành trên 24 giờ";
     }
     if (lower.includes("weather") || lower.includes("disruption")) {
-      return "Hoàn tiền 100% do thời tiết biển bất khả kháng";
+      return isEn ? "100% refund due to severe ocean weather conditions" : "Hoàn tiền 100% do thời tiết biển bất khả kháng";
     }
     if (lower.includes("vendor") || lower.includes("operator")) {
-      return "Hoàn tiền 100% do đối tác hủy ca hoạt động";
+      return isEn ? "100% refund due to partner departure cancellation" : "Hoàn tiền 100% do đối tác hủy ca hoạt động";
     }
     return rawPolicy;
   };
@@ -679,7 +680,7 @@ export function Orders() {
     if (!dateStr) return "N/A";
     try {
       const d = new Date(dateStr);
-      return d.toLocaleDateString("vi-VN", {
+      return d.toLocaleDateString(isEn ? "en-US" : "vi-VN", {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
@@ -695,23 +696,23 @@ export function Orders() {
     const s = (status || "").toUpperCase();
     switch (s) {
       case "PAID":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ THANH TOÁN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">{isEn ? "PAID" : "ĐÃ THANH TOÁN"}</span>;
       case "PENDING_PAYMENT":
       case "UNPAID":
-        return <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-xs font-semibold tracking-tight">CHỜ THANH TOÁN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-xs font-semibold tracking-tight">{isEn ? "PENDING PAYMENT" : "CHỜ THANH TOÁN"}</span>;
       case "CONFIRMED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ XÁC NHẬN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">{isEn ? "CONFIRMED" : "ĐÃ XÁC NHẬN"}</span>;
       case "CHECKED_IN":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ CHECK-IN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">{isEn ? "CHECKED IN" : "ĐÃ CHECK-IN"}</span>;
       case "PARTIALLY_COMPLETED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold tracking-tight">HOÀN TẤT MỘT PHẦN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold tracking-tight">{isEn ? "PARTIALLY COMPLETED" : "HOÀN TẤT MỘT PHẦN"}</span>;
       case "COMPLETED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">HOÀN TẤT</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">{isEn ? "COMPLETED" : "HOÀN TẤT"}</span>;
       case "CANCELLED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold tracking-tight">ĐÃ HỦY</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold tracking-tight">{isEn ? "CANCELLED" : "ĐÃ HỦY"}</span>;
       case "REFUNDED":
       case "PARTIALLY_REFUNDED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">ĐÃ HOÀN TIỀN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">{isEn ? "REFUNDED" : "ĐÃ HOÀN TIỀN"}</span>;
       default:
         return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">{s}</span>;
     }
@@ -725,7 +726,7 @@ export function Orders() {
     if (m === "PENDING_PAYMENT" || m === "UNPAID") {
       return (
         <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-xs font-semibold tracking-tight">
-          CHỜ THANH TOÁN
+          {isEn ? "PENDING PAYMENT" : "CHỜ THANH TOÁN"}
         </span>
       );
     }
@@ -735,44 +736,44 @@ export function Orders() {
       case "PENDING":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold tracking-tight">
-            CHỜ TIẾP NHẬN
+            {isEn ? "PENDING ACCEPTANCE" : "CHỜ TIẾP NHẬN"}
           </span>
         );
       case "CONFIRMED":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
-            ĐÃ XÁC NHẬN
+            {isEn ? "CONFIRMED" : "ĐÃ XÁC NHẬN"}
           </span>
         );
       case "CHECKED_IN":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
-            ĐÃ CHECK-IN
+            {isEn ? "CHECKED IN" : "ĐÃ CHECK-IN"}
           </span>
         );
       case "IN_PROGRESS":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold tracking-tight">
-            ĐANG DIỄN RA
+            {isEn ? "IN PROGRESS" : "ĐANG DIỄN RA"}
           </span>
         );
       case "COMPLETED":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
-            HOÀN TẤT
+            {isEn ? "COMPLETED" : "HOÀN TẤT"}
           </span>
         );
       case "CANCELLED":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold tracking-tight">
-            ĐÃ HỦY
+            {isEn ? "CANCELLED" : "ĐÃ HỦY"}
           </span>
         );
       case "REFUNDED":
       case "PARTIALLY_REFUNDED":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">
-            ĐÃ HOÀN TIỀN
+            {isEn ? "REFUNDED" : "ĐÃ HOÀN TIỀN"}
           </span>
         );
       default:
@@ -832,15 +833,17 @@ export function Orders() {
                 className="hover:text-slate-900 transition-colors cursor-pointer bg-transparent border-0 p-0 flex items-center gap-1 text-slate-600 font-semibold"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>Tài khoản của bạn</span>
+                <span>{isEn ? "Your Account" : "Tài khoản của bạn"}</span>
               </button>
               <span className="text-slate-300">/</span>
-              <span className="text-slate-900 font-semibold">Lịch sử đặt tour &amp; Vé QR</span>
+              <span className="text-slate-900 font-semibold">
+                {isEn ? "Booking History & QR Tickets" : "Lịch sử đặt tour & Vé QR"}
+              </span>
             </div>
 
             <div className="mb-4">
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Quản lý vé &amp; Đơn trải nghiệm
+                {isEn ? "Manage Tickets & Bookings" : "Quản lý vé & Đơn trải nghiệm"}
               </h1>
             </div>
 
@@ -855,7 +858,7 @@ export function Orders() {
                 }`}
                 type="button"
               >
-                <span>Tất cả đơn hàng</span>
+                <span>{isEn ? "All Bookings" : "Tất cả đơn hàng"}</span>
                 {filter === "all" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0284c7] rounded-full" />
                 )}
@@ -870,7 +873,7 @@ export function Orders() {
                 }`}
                 type="button"
               >
-                <span>Sắp diễn ra</span>
+                <span>{isEn ? "Upcoming" : "Sắp diễn ra"}</span>
                 {filter === "upcoming" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0284c7] rounded-full" />
                 )}
@@ -885,7 +888,7 @@ export function Orders() {
                 }`}
                 type="button"
               >
-                <span>Chờ thanh toán</span>
+                <span>{isEn ? "Pending Payment" : "Chờ thanh toán"}</span>
                 {filter === "pending" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0284c7] rounded-full" />
                 )}
@@ -900,7 +903,7 @@ export function Orders() {
                 }`}
                 type="button"
               >
-                <span>Đã hoàn thành</span>
+                <span>{isEn ? "Completed" : "Đã hoàn thành"}</span>
                 {filter === "completed" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0284c7] rounded-full" />
                 )}
@@ -915,7 +918,7 @@ export function Orders() {
                 }`}
                 type="button"
               >
-                <span>Đã hủy &amp; Hoàn tiền</span>
+                <span>{isEn ? "Cancelled & Refunded" : "Đã hủy & Hoàn tiền"}</span>
                 {filter === "cancelled" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0284c7] rounded-full" />
                 )}
@@ -971,13 +974,15 @@ export function Orders() {
               <div className="w-14 h-14 rounded-2xl bg-cyan-50 border border-cyan-200 flex items-center justify-center mx-auto text-cyan-700">
                 <Compass className="w-7 h-7" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900">Chưa có đơn đặt tour nào</h3>
+              <h3 className="text-lg font-bold text-slate-900">
+                {isEn ? "No bookings found" : "Chưa có đơn đặt tour nào"}
+              </h3>
               <div>
                 <button
                   onClick={() => navigate("/")}
                   className="px-6 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
                 >
-                  Khám phá ngay
+                  {isEn ? "Explore Experiences Now" : "Khám phá ngay"}
                 </button>
               </div>
             </div>
@@ -1042,7 +1047,9 @@ export function Orders() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Đơn hàng:</span>
+                            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
+                              {isEn ? "Order:" : "Đơn hàng:"}
+                            </span>
                             <span className="text-base font-bold text-slate-900 font-mono">{orderCode}</span>
                             {!hasRefund && getMasterStatusBadge(masterOrder.status || "PENDING")}
                             {hasRefund && (
@@ -1050,22 +1057,24 @@ export function Orders() {
                                 className="px-2.5 py-0.5 rounded-md text-xs font-semibold border tracking-tight bg-slate-100 text-slate-800 border-slate-200"
                               >
                                 {isPartialRefund
-                                  ? `Hoàn tiền 1 phần (${cancelledCount}/${subOrders.length} dịch vụ)`
+                                  ? (isEn ? `Partial refund (${cancelledCount}/${subOrders.length} services)` : `Hoàn tiền 1 phần (${cancelledCount}/${subOrders.length} dịch vụ)`)
                                   : latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
-                                  ? "Đã hoàn tiền"
-                                  : "Đang xử lý hoàn"}
+                                  ? (isEn ? "Refunded" : "Đã hoàn tiền")
+                                  : (isEn ? "Refund processing" : "Đang xử lý hoàn")}
                               </span>
                             )}
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            Ngày tạo: {formatDateTime(masterOrder.createdAt)}
+                            {isEn ? "Created:" : "Ngày tạo:"} {formatDateTime(masterOrder.createdAt)}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
                         <div className="text-right">
-                          <span className="text-xs text-slate-500 uppercase tracking-wider block font-medium">Tổng tiền</span>
+                          <span className="text-xs text-slate-500 uppercase tracking-wider block font-medium">
+                            {isEn ? "Total Amount" : "Tổng tiền"}
+                          </span>
                           <span className="text-xl text-[#991b1b] font-extrabold tabular-nums">
                             {formatVnd(masterOrder.finalAmount ?? masterOrder.totalAmount)}
                           </span>
@@ -1078,10 +1087,10 @@ export function Orders() {
                               type="button"
                               onClick={() => handleOpenMasterQrModal(masterOrder)}
                               className="px-3.5 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer active:scale-95"
-                              title="Xem mã QR dùng chung cho toàn bộ hoạt động trong đơn"
+                              title={isEn ? "View unified QR pass for all activities" : "Xem mã QR dùng chung cho toàn bộ hoạt động trong đơn"}
                             >
                               <QrCode className="w-4 h-4" />
-                              <span>Vé QR toàn đơn</span>
+                              <span>{isEn ? "All-in-One Pass" : "Vé QR toàn đơn"}</span>
                             </button>
                           )}
                           {canDownloadPdf && (
@@ -1089,14 +1098,14 @@ export function Orders() {
                               onClick={() => handleDownloadReceiptPdf(masterOrder.id)}
                               disabled={downloadingPdfId === masterOrder.id}
                               className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                              title="Tải hóa đơn & Vé điện tử PDF"
+                              title={isEn ? "Download PDF e-ticket & receipt" : "Tải hóa đơn & Vé điện tử PDF"}
                             >
                               {downloadingPdfId === masterOrder.id ? (
                                 <Loader2 className="w-4 h-4 animate-spin text-slate-700" />
                               ) : (
                                 <FileText className="w-4 h-4 text-slate-700" />
                               )}
-                              <span>{downloadingPdfId === masterOrder.id ? "Đang xuất..." : "Tải vé PDF"}</span>
+                              <span>{downloadingPdfId === masterOrder.id ? (isEn ? "Exporting..." : "Đang xuất...") : (isEn ? "Download PDF" : "Tải vé PDF")}</span>
                             </button>
                           )}
 
@@ -1105,7 +1114,7 @@ export function Orders() {
                               onClick={() => handleOpenCancellationModal(masterOrder)}
                               className="px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
                             >
-                              Yêu cầu hủy đơn
+                              {isEn ? "Cancel Booking" : "Yêu cầu hủy đơn"}
                             </button>
                           )}
 
@@ -1114,9 +1123,9 @@ export function Orders() {
                               type="button"
                               onClick={() => setViewingRefundOrder({ order: masterOrder, refunds })}
                               className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold border border-slate-200 shadow-xs transition-colors cursor-pointer"
-                              title="Xem chi tiết biên nhận hoàn tiền"
+                              title={isEn ? "View refund transaction receipt" : "Xem chi tiết biên nhận hoàn tiền"}
                             >
-                              Chi tiết hoàn tiền
+                              {isEn ? "Refund Details" : "Chi tiết hoàn tiền"}
                             </button>
                           )}
 
@@ -1125,7 +1134,7 @@ export function Orders() {
                               {isOrderPaymentExpired(masterOrder) && (
                                 <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-[11px] font-semibold border border-amber-200 flex items-center gap-1 shadow-2xs">
                                   <Clock className="w-3.5 h-3.5 text-amber-600" />
-                                  <span>Quá hạn giữ chỗ</span>
+                                  <span>{isEn ? "Payment Expired" : "Quá hạn giữ chỗ"}</span>
                                 </span>
                               )}
                               <button
@@ -1133,7 +1142,7 @@ export function Orders() {
                                 disabled={isOrderPaymentExpired(masterOrder)}
                                 className="px-4 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold shadow-xs cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1.5"
                               >
-                                <span>Thanh toán ngay</span>
+                                <span>{isEn ? "Pay Now" : "Thanh toán ngay"}</span>
                               </button>
                             </div>
                           )}
@@ -1147,8 +1156,8 @@ export function Orders() {
                         <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                           <Layers className="w-4 h-4 text-cyan-700" />
                           {filter === "all"
-                            ? `Các dịch vụ (${subOrders.length})`
-                            : `Dịch vụ thuộc mục này (${displayedSubOrders.length}/${subOrders.length})`}
+                            ? (isEn ? `Services (${subOrders.length})` : `Các dịch vụ (${subOrders.length})`)
+                            : (isEn ? `Services in this tab (${displayedSubOrders.length}/${subOrders.length})` : `Dịch vụ thuộc mục này (${displayedSubOrders.length}/${subOrders.length})`)}
                         </span>
                         {filter !== "all" && displayedSubOrders.length < subOrders.length && (
                           <span className="text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md">
@@ -1230,12 +1239,12 @@ export function Orders() {
                                       {displaySlotTime ? (
                                         <div className="flex items-center gap-1.5 mt-1 text-xs text-sky-700 font-semibold">
                                           <Clock className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                                          <span>Khởi hành: {displaySlotTime}</span>
+                                          <span>{isEn ? "Departure:" : "Khởi hành:"} {displaySlotTime}</span>
                                         </div>
                                       ) : subOrder.slotId ? (
                                         <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500">
                                           <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                          <span>Ca khởi hành: #{subOrder.slotId.slice(0, 8)}</span>
+                                          <span>{isEn ? "Departure slot:" : "Ca khởi hành:"} #{subOrder.slotId.slice(0, 8)}</span>
                                         </div>
                                       ) : null}
                                     </div>
@@ -1245,7 +1254,7 @@ export function Orders() {
                                         {formatVnd(subOrder.finalAmount ?? subOrder.subtotalAmount)}
                                       </span>
                                       <span className="text-xs text-slate-500">
-                                        Số lượng: <strong>{subOrder.quantity} khách</strong>
+                                        {isEn ? "Quantity:" : "Số lượng:"} <strong>{subOrder.quantity} {isEn ? "guest(s)" : "khách"}</strong>
                                       </span>
                                     </div>
                                   </div>
@@ -1258,15 +1267,15 @@ export function Orders() {
                                     {submittedDisputes[subOrder.id] && (
                                       submittedDisputes[subOrder.id].status === "RESOLVED_REJECTED" ? (
                                         <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold">
-                                          Khiếu nại bị từ chối
+                                          {isEn ? "Dispute Rejected" : "Khiếu nại bị từ chối"}
                                         </span>
                                       ) : submittedDisputes[subOrder.id].status === "RESOLVED_REFUND" || submittedDisputes[subOrder.id].status === "RESOLVED_PARTIAL" ? (
                                         <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
-                                          Đã giải quyết hoàn tiền
+                                          {isEn ? "Refunded via Dispute" : "Đã giải quyết hoàn tiền"}
                                         </span>
                                       ) : (
                                         <span className="px-2.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold">
-                                          Đang khiếu nại
+                                          {isEn ? "Dispute in progress" : "Đang khiếu nại"}
                                         </span>
                                       )
                                     )}
@@ -1280,7 +1289,7 @@ export function Orders() {
                                         className="px-3.5 py-1.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
                                         type="button"
                                       >
-                                        <span>Thanh toán ngay</span>
+                                        <span>{isEn ? "Pay Now" : "Thanh toán ngay"}</span>
                                       </button>
                                     )}
                                     {/* Check-in QR button (P0 for CONFIRMED suborders) */}
@@ -1291,7 +1300,7 @@ export function Orders() {
                                         type="button"
                                       >
                                         <QrCode className="w-4 h-4" />
-                                        <span>Mã QR Check-in</span>
+                                        <span>{isEn ? "Check-in QR Pass" : "Mã QR Check-in"}</span>
                                       </button>
                                     )}
 
@@ -1299,7 +1308,7 @@ export function Orders() {
                                     {subOrder.status === "REFUNDED" && (
                                       <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-500 text-xs font-semibold flex items-center gap-1">
                                         <Ban className="w-3.5 h-3.5 text-slate-400" />
-                                        <span>Vé đã hủy</span>
+                                        <span>{isEn ? "Booking Cancelled" : "Vé đã hủy"}</span>
                                       </span>
                                     )}
 
@@ -1307,7 +1316,7 @@ export function Orders() {
                                     {isCheckedIn && (
                                       <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-800 border border-slate-200 text-xs font-semibold flex items-center gap-1">
                                         <CheckCheck className="w-4 h-4 text-slate-700" />
-                                        <span>Đã quét vé lên tàu</span>
+                                        <span>{isEn ? "Boarded / Checked-in" : "Đã quét vé lên tàu"}</span>
                                       </span>
                                     )}
 
@@ -1342,7 +1351,7 @@ export function Orders() {
                                         className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
                                         type="button"
                                       >
-                                        Hỗ trợ / Khiếu nại
+                                        {isEn ? "Support / Dispute" : "Hỗ trợ / Khiếu nại"}
                                       </button>
                                     )}
                                   </div>
@@ -1369,10 +1378,10 @@ export function Orders() {
                                             </div>
                                             <span className="text-xs font-bold text-slate-900">
                                               {reviewsMap[subOrder.id]?.rating === 5
-                                                ? "5/5 • Tuyệt vời"
+                                                ? (isEn ? "5/5 • Excellent" : "5/5 • Tuyệt vời")
                                                 : reviewsMap[subOrder.id]?.rating === 4
-                                                ? "4/5 • Rất tốt"
-                                                : `${reviewsMap[subOrder.id]?.rating}/5 • Đã đánh giá`}
+                                                ? (isEn ? "4/5 • Very Good" : "4/5 • Rất tốt")
+                                                : `${reviewsMap[subOrder.id]?.rating}/5 • ${isEn ? "Reviewed" : "Đã đánh giá"}`}
                                             </span>
                                             <span className="text-[11px] text-slate-500 font-medium">
                                               • {formatDateTime(reviewsMap[subOrder.id]?.createdAt)}
@@ -1385,7 +1394,7 @@ export function Orders() {
                                             className="text-xs font-semibold text-sky-700 hover:text-sky-800 flex items-center gap-1 hover:underline cursor-pointer"
                                           >
                                             <Edit3 className="w-3.5 h-3.5" />
-                                            <span>Sửa đánh giá</span>
+                                            <span>{isEn ? "Edit Review" : "Sửa đánh giá"}</span>
                                           </button>
                                         </div>
 
@@ -1399,7 +1408,7 @@ export function Orders() {
                                               <img
                                                 key={i}
                                                 src={img}
-                                                alt="Ảnh thực tế chuyến đi"
+                                                alt={isEn ? "Trip photo" : "Ảnh thực tế chuyến đi"}
                                                 className="w-16 h-16 rounded-lg object-cover border border-slate-200 shadow-xs"
                                               />
                                             ))}
@@ -1409,7 +1418,9 @@ export function Orders() {
                                         {reviewsMap[subOrder.id]?.vendorReply && (
                                           <div className="mt-2 p-3 rounded-lg bg-sky-50/80 border border-sky-100 text-xs space-y-1">
                                             <div className="flex items-center justify-between">
-                                              <strong className="font-bold text-sky-950">Phản hồi từ đơn vị tổ chức:</strong>
+                                              <strong className="font-bold text-sky-950">
+                                                {isEn ? "Partner Response:" : "Phản hồi từ đơn vị tổ chức:"}
+                                              </strong>
                                               {reviewsMap[subOrder.id]?.vendorRepliedAt && (
                                                 <span className="text-[11px] text-sky-700">
                                                   {formatDateTime(reviewsMap[subOrder.id]?.vendorRepliedAt)}
@@ -1430,10 +1441,12 @@ export function Orders() {
                                           </div>
                                           <div className="space-y-0.5">
                                             <h4 className="text-sm font-bold text-slate-900">
-                                              Đánh giá dịch vụ &amp; Tiêu chuẩn an toàn
+                                              {isEn ? "Review Service & Safety Standards" : "Đánh giá dịch vụ & Tiêu chuẩn an toàn"}
                                             </h4>
                                             <p className="text-xs text-slate-700 leading-relaxed">
-                                              Trải nghiệm đã hoàn tất. Hãy chia sẻ cảm nhận về hướng dẫn viên, áo phao cứu sinh và độ hài lòng thực tế.
+                                              {isEn
+                                                ? "Your experience is completed. Share your feedback on instructors, safety equipment, and overall satisfaction."
+                                                : "Trải nghiệm đã hoàn tất. Hãy chia sẻ cảm nhận về hướng dẫn viên, áo phao cứu sinh và độ hài lòng thực tế."}
                                             </p>
                                           </div>
                                         </div>
@@ -1444,7 +1457,7 @@ export function Orders() {
                                           className="px-4 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0 transition-transform active:scale-95"
                                         >
                                           <Star className="w-3.5 h-3.5 fill-white text-white" />
-                                          <span>Viết đánh giá ngay</span>
+                                          <span>{isEn ? "Write Review" : "Viết đánh giá ngay"}</span>
                                         </button>
                                       </div>
                                     )}
@@ -2177,33 +2190,51 @@ export function Orders() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Phân loại sự cố</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  {isEn ? "Incident Category" : "Phân loại sự cố"}
+                </label>
                 <select
                   value={disputeReasonType}
                   onChange={(e) => setDisputeReasonType(e.target.value as DisputeReason)}
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 bg-white"
                 >
-                  <option value="SERVICE_NOT_AS_DESCRIBED">Dịch vụ không đúng mô tả / cam kết</option>
-                  <option value="VENDOR_NO_SHOW">Nhà cung cấp không đến / vắng mặt tại điểm hẹn</option>
-                  <option value="SAFETY_CONCERN">Vấn đề an toàn / thiếu trang thiết bị cứu sinh</option>
-                  <option value="PAYMENT_ISSUE">Sự cố thanh toán / phụ thu sai quy định</option>
-                  <option value="OTHER">Lý do khác</option>
+                  <option value="SERVICE_NOT_AS_DESCRIBED">
+                    {isEn ? "Service not as described" : "Dịch vụ không đúng mô tả / cam kết"}
+                  </option>
+                  <option value="VENDOR_NO_SHOW">
+                    {isEn ? "Operator no-show at meeting point" : "Nhà cung cấp không đến / vắng mặt tại điểm hẹn"}
+                  </option>
+                  <option value="SAFETY_CONCERN">
+                    {isEn ? "Safety concern / missing life-saving equipment" : "Vấn đề an toàn / thiếu trang thiết bị cứu sinh"}
+                  </option>
+                  <option value="PAYMENT_ISSUE">
+                    {isEn ? "Payment issue / incorrect surcharge" : "Sự cố thanh toán / phụ thu sai quy định"}
+                  </option>
+                  <option value="OTHER">{isEn ? "Other reason" : "Lý do khác"}</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Mô tả chi tiết</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  {isEn ? "Detailed Description" : "Mô tả chi tiết"}
+                </label>
                 <textarea
                   rows={4}
                   value={disputeReason}
                   onChange={(e) => setDisputeReason(e.target.value)}
-                  placeholder="Mô tả sự cố bạn gặp phải (ví dụ: nhà cung cấp trễ ca không báo trước, trang thiết bị không đảm bảo an toàn...)"
+                  placeholder={
+                    isEn
+                      ? "Describe the issue (e.g. operator late without notice, unsafe equipment, incorrect charges...)"
+                      : "Mô tả sự cố bạn gặp phải (ví dụ: nhà cung cấp trễ ca không báo trước, trang thiết bị không đảm bảo an toàn...)"
+                  }
                   className="w-full p-3 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 resize-none"
                 />
               </div>
 
               <p className="text-[11px] text-slate-500">
-                Đội ngũ điều phối và hỗ trợ khách hàng DANASEA sẽ tiếp nhận và phản hồi trong vòng 24 giờ.
+                {isEn
+                  ? "DANASEA operations and customer support team will process and respond within 24 hours."
+                  : "Đội ngũ điều phối và hỗ trợ khách hàng DANASEA sẽ tiếp nhận và phản hồi trong vòng 24 giờ."}
               </p>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
@@ -2213,7 +2244,7 @@ export function Orders() {
                   onClick={() => setDisputingSubOrder(null)}
                   className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-semibold cursor-pointer disabled:opacity-50"
                 >
-                  Hủy
+                  {isEn ? "Cancel" : "Hủy"}
                 </button>
                 <button
                   type="button"
@@ -2222,7 +2253,7 @@ export function Orders() {
                   className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {isSubmittingDispute && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{isSubmittingDispute ? "Đang gửi..." : "Gửi khiếu nại"}</span>
+                  <span>{isSubmittingDispute ? (isEn ? "Submitting..." : "Đang gửi...") : (isEn ? "Submit Dispute" : "Gửi khiếu nại")}</span>
                 </button>
               </div>
             </div>
@@ -2243,7 +2274,9 @@ export function Orders() {
                     <Receipt className="w-5 h-5 text-amber-700" />
                   </div>
                   <div>
-                    <h3 className="text-base font-extrabold text-slate-900">Chi tiết hoàn tiền</h3>
+                    <h3 className="text-base font-extrabold text-slate-900">
+                      {isEn ? "Refund Details" : "Chi tiết hoàn tiền"}
+                    </h3>
                     <p className="text-xs text-slate-500 font-mono">
                       #ORD-{(viewingRefundOrder.order.id || "").slice(0, 8).toUpperCase()}
                     </p>
@@ -2253,7 +2286,7 @@ export function Orders() {
                   type="button"
                   onClick={() => setViewingRefundOrder(null)}
                   className="p-1.5 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                  aria-label="Đóng"
+                  aria-label={isEn ? "Close" : "Đóng"}
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -2270,7 +2303,9 @@ export function Orders() {
                       className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2.5 text-xs"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Trạng thái hoàn:</span>
+                        <span className="text-slate-500 font-medium">
+                          {isEn ? "Refund Status:" : "Trạng thái hoàn:"}
+                        </span>
                         <span
                           className={`px-2.5 py-0.5 rounded-md font-bold text-[11px] ${
                             isProcessed
@@ -2281,37 +2316,37 @@ export function Orders() {
                           }`}
                         >
                           {isProcessed
-                            ? "Đã hoàn tất"
+                            ? (isEn ? "Completed" : "Đã hoàn tất")
                             : isFailed
-                            ? "Thất bại"
-                            : "Đang chờ đối soát (Pending)"}
+                            ? (isEn ? "Failed" : "Thất bại")
+                            : (isEn ? "Pending Settlement" : "Đang chờ đối soát (Pending)")}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Số tiền hoàn:</span>
+                        <span className="text-slate-500 font-medium">{isEn ? "Refund Amount:" : "Số tiền hoàn:"}</span>
                         <span className="font-extrabold text-slate-900 text-sm tabular-nums">
                           {formatVnd(ref.amount)}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Tỷ lệ hoàn:</span>
+                        <span className="text-slate-500 font-medium">{isEn ? "Refund Rate:" : "Tỷ lệ hoàn:"}</span>
                         <span className="font-bold text-blue-600 tabular-nums">
                           {ref.percentage ?? ref.refundPercentage ?? 100}%
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Cổng nhận hoàn:</span>
+                        <span className="text-slate-500 font-medium">{isEn ? "Refund Gateway:" : "Cổng nhận hoàn:"}</span>
                         <span className="font-semibold text-slate-800">
-                          {ref.provider || "VNPAY"} (về thẻ/tài khoản gốc)
+                          {ref.provider || "VNPAY"} {isEn ? "(to original card/account)" : "(về thẻ/tài khoản gốc)"}
                         </span>
                       </div>
 
                       {ref.providerRefundId && (
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-500 font-medium">Mã giao dịch hoàn:</span>
+                          <span className="text-slate-500 font-medium">{isEn ? "Refund Transaction ID:" : "Mã giao dịch hoàn:"}</span>
                           <span className="font-mono font-bold text-slate-700">
                             #{ref.providerRefundId}
                           </span>
@@ -2319,7 +2354,7 @@ export function Orders() {
                       )}
 
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Ngày yêu cầu:</span>
+                        <span className="text-slate-500 font-medium">{isEn ? "Requested Date:" : "Ngày yêu cầu:"}</span>
                         <span className="text-slate-700">
                           {formatDateTime(ref.createdAt)}
                         </span>
@@ -2327,7 +2362,7 @@ export function Orders() {
 
                       {ref.processedAt && (
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-500 font-medium">Ngày hoàn tất:</span>
+                          <span className="text-slate-500 font-medium">{isEn ? "Completed Date:" : "Ngày hoàn tất:"}</span>
                           <span className="text-emerald-700 font-semibold">
                             {formatDateTime(ref.processedAt)}
                           </span>
@@ -2342,10 +2377,12 @@ export function Orders() {
               <div className="p-3 bg-blue-50/80 border border-blue-200/80 rounded-xl text-[11px] text-blue-900 space-y-1">
                 <div className="flex items-center gap-1.5 font-bold text-blue-950">
                   <Clock className="w-3.5 h-3.5 text-blue-700" />
-                  <span>Thời gian nhận tiền dự kiến</span>
+                  <span>{isEn ? "Estimated Settlement Time" : "Thời gian nhận tiền dự kiến"}</span>
                 </div>
                 <p className="leading-relaxed">
-                  DANASEA đã xác nhận hoàn tiền. Thời gian tiền về tài khoản phụ thuộc vào ngân hàng hoặc phương thức nhận tiền.
+                  {isEn
+                    ? "DANASEA has processed the refund. Actual arrival time depends on the banking network or payment provider."
+                    : "DANASEA đã xác nhận hoàn tiền. Thời gian tiền về tài khoản phụ thuộc vào ngân hàng hoặc phương thức nhận tiền."}
                 </p>
               </div>
 
@@ -2355,7 +2392,7 @@ export function Orders() {
                   onClick={() => setViewingRefundOrder(null)}
                   className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer"
                 >
-                  Đóng
+                  {isEn ? "Close" : "Đóng"}
                 </button>
               </div>
             </div>

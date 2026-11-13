@@ -4,6 +4,7 @@ import { notificationService } from "../../../services/notificationService";
 import type { NotificationResponse } from "../../../types/notification";
 import { communicationService, type ConversationItem, type MessageItem } from "../../../services/communicationService";
 import { useAuthStore } from "../../../store/useAuthStore";
+import { useLanguageStore } from "../../../store/useLanguageStore";
 import {
   MessageSquare,
   Bell,
@@ -25,6 +26,8 @@ import {
 
 export function Inbox() {
   const navigate = useNavigate();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
   const [searchParams, setSearchParams] = useSearchParams();
   const tabQuery = searchParams.get("tab");
   const activeTab = tabQuery === "notifications" ? "notifications" : "messages";
@@ -214,20 +217,22 @@ export function Inbox() {
               className="hover:text-slate-900 transition-colors cursor-pointer bg-transparent border-0 p-0 flex items-center gap-1 text-slate-600 font-semibold"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span>Tài khoản của bạn</span>
+              <span>{isEn ? "Your Account" : "Tài khoản của bạn"}</span>
             </button>
             <span className="text-slate-300">/</span>
-            <span className="text-slate-900 font-semibold">Hộp thư &amp; Hỗ trợ trực tuyến</span>
+            <span className="text-slate-900 font-semibold">{isEn ? "Inbox & Online Support" : "Hộp thư & Hỗ trợ trực tuyến"}</span>
           </div>
 
           {/* Top Header & Dual Tab Switcher */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200/80 pb-6">
             <div>
               <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight">
-                Hộp thư &amp; Thông báo
+                {isEn ? "Inbox & Notifications" : "Hộp thư & Thông báo"}
               </h1>
               <p className="text-sm text-slate-600 mt-1 max-w-2xl">
-                Quản lý trao đổi trực tiếp với nhà điều hành biển và nhận thông báo từ hệ thống
+                {isEn 
+                  ? "Direct messaging with marine operators and official system notifications"
+                  : "Quản lý trao đổi trực tiếp với nhà điều hành biển và nhận thông báo từ hệ thống"}
               </p>
             </div>
 
@@ -243,7 +248,7 @@ export function Inbox() {
                 type="button"
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>Tin nhắn câu lạc bộ</span>
+                <span>{isEn ? "Operator Messages" : "Tin nhắn câu lạc bộ"}</span>
                 {conversations.length > 0 && (
                   <span className="ml-1 px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[11px] font-bold">
                     {conversations.length}
@@ -261,7 +266,7 @@ export function Inbox() {
                 type="button"
               >
                 <Bell className="w-4 h-4" />
-                <span>Thông báo hệ thống</span>
+                <span>{isEn ? "System Notifications" : "Thông báo hệ thống"}</span>
               </button>
             </div>
           </div>
@@ -277,16 +282,16 @@ export function Inbox() {
                     <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       className="w-full h-9 pl-9 pr-4 rounded-full bg-[#f0f2f5] border-0 text-xs sm:text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 transition-colors"
-                      placeholder="Tìm kiếm đối tác hoặc mã đơn..."
+                      placeholder={isEn ? "Search operators or order codes..." : "Tìm kiếm đối tác hoặc mã đơn..."}
                       type="text"
                       value={searchFilter}
                       onChange={(e) => setSearchFilter(e.target.value)}
                     />
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold px-1">
-                    <span>ĐỐI TÁC VẬN HÀNH BIỂN</span>
+                    <span>{isEn ? "MARINE OPERATORS" : "ĐỐI TÁC VẬN HÀNH BIỂN"}</span>
                     <span className="font-mono tabular-nums text-slate-400">
-                      {filteredConversations.length} đoạn chat
+                      {filteredConversations.length} {isEn ? (filteredConversations.length > 1 ? "chats" : "chat") : "đoạn chat"}
                     </span>
                   </div>
                 </div>
@@ -310,16 +315,18 @@ export function Inbox() {
                       <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
                         <Store className="w-6 h-6" />
                       </div>
-                      <p className="text-xs font-semibold text-slate-700">Chưa có hội thoại nào</p>
+                      <p className="text-xs font-semibold text-slate-700">{isEn ? "No conversations yet" : "Chưa có hội thoại nào"}</p>
                       <p className="text-[11px] text-slate-400 mt-1 max-w-[200px]">
-                        Khi bạn đặt dịch vụ tour biển, kênh trao đổi với nhà điều hành sẽ hiển thị tại đây.
+                        {isEn 
+                          ? "When you book marine tours, communication channels with operators will appear here."
+                          : "Khi bạn đặt dịch vụ tour biển, kênh trao đổi với nhà điều hành sẽ hiển thị tại đây."}
                       </p>
                     </div>
                   ) : (
                     filteredConversations.map((conv) => {
                       const isActive = conv.id === activeConvId;
-                      const vendorName = vendorNames[conv.vendorId] || "Nhà điều hành tour";
-                      const lastSnippet = conv.lastMessage?.content || "Chưa có tin nhắn";
+                      const vendorName = vendorNames[conv.vendorId] || (isEn ? "Tour Operator" : "Nhà điều hành tour");
+                      const lastSnippet = conv.lastMessage?.content || (isEn ? "No messages yet" : "Chưa có tin nhắn");
                       const timeStr = formatMessageTime(conv.lastMessage?.createdAt || conv.updatedAt);
 
                       return (
@@ -350,7 +357,7 @@ export function Inbox() {
                             </div>
                             {conv.masterOrderId && (
                               <p className="text-[11px] font-mono text-sky-700 truncate">
-                                Đơn #{conv.masterOrderId.slice(0, 8)}
+                                {isEn ? `Order #${conv.masterOrderId.slice(0, 8)}` : `Đơn #${conv.masterOrderId.slice(0, 8)}`}
                               </p>
                             )}
                             <p className={`text-xs truncate mt-0.5 ${conv.unreadCount && conv.unreadCount > 0 ? "font-bold text-slate-900" : "text-slate-500"}`}>
@@ -373,8 +380,8 @@ export function Inbox() {
                 <div className="mt-auto p-3.5 bg-slate-50 border-t border-slate-100 flex items-center gap-3">
                   <Phone className="w-4 h-4 text-slate-700 shrink-0" />
                   <div className="flex-1 min-w-0 text-xs">
-                    <p className="font-bold text-slate-900 truncate">Trực ban cứu hộ biển</p>
-                    <p className="text-slate-500 truncate">Ban Quản lý Bán Đảo: 1900 8468</p>
+                    <p className="font-bold text-slate-900 truncate">{isEn ? "Coast Guard Hotline" : "Trực ban cứu hộ biển"}</p>
+                    <p className="text-slate-500 truncate">{isEn ? "Peninsula Authority: 1900 8468" : "Ban Quản lý Bán Đảo: 1900 8468"}</p>
                   </div>
                 </div>
               </div>
@@ -384,8 +391,8 @@ export function Inbox() {
                 {!activeConversation ? (
                   <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400">
                     <MessageSquare className="w-12 h-12 stroke-[1.5] text-slate-300 mb-2" />
-                    <p className="text-sm font-semibold text-slate-700">Chọn một hội thoại để trao đổi</p>
-                    <p className="text-xs text-slate-400 mt-1">Danh sách đối tác biển nằm ở cột bên trái</p>
+                    <p className="text-sm font-semibold text-slate-700">{isEn ? "Select a conversation to start chatting" : "Chọn một hội thoại để trao đổi"}</p>
+                    <p className="text-xs text-slate-400 mt-1">{isEn ? "Operator list is on the left column" : "Danh sách đối tác biển nằm ở cột bên trái"}</p>
                   </div>
                 ) : (
                   <>
@@ -404,15 +411,15 @@ export function Inbox() {
                               {activeVendorName}
                             </h2>
                             <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
-                              Đối tác xác minh
+                              {isEn ? "Verified Operator" : "Đối tác xác minh"}
                             </span>
                           </div>
                           <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
-                            <span>Đang hoạt động</span>
+                            <span>{isEn ? "Active now" : "Đang hoạt động"}</span>
                             {activeConversation.masterOrderId && (
                               <span className="text-slate-400 font-mono ml-1">
-                                • Đơn #{activeConversation.masterOrderId.slice(0, 8)}
+                                • {isEn ? `Order #${activeConversation.masterOrderId.slice(0, 8)}` : `Đơn #${activeConversation.masterOrderId.slice(0, 8)}`}
                               </span>
                             )}
                           </p>
@@ -423,7 +430,7 @@ export function Inbox() {
                         <a
                           href="tel:19008468"
                           className="w-9 h-9 rounded-full hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors"
-                          title="Gọi ban quản lý / đối tác"
+                          title={isEn ? "Call Authority / Operator" : "Gọi ban quản lý / đối tác"}
                         >
                           <Phone className="w-4 h-4 text-[#0084ff]" />
                         </a>
@@ -437,8 +444,8 @@ export function Inbox() {
                           <div className="w-16 h-16 rounded-full bg-sky-50 text-[#0084ff] flex items-center justify-center mb-3">
                             <MessageSquare className="w-8 h-8" />
                           </div>
-                          <p className="font-semibold text-slate-700 text-sm">Chưa có tin nhắn nào</p>
-                          <p className="text-slate-400 text-xs mt-1">Hãy bắt đầu cuộc trò chuyện với {activeVendorName}!</p>
+                          <p className="font-semibold text-slate-700 text-sm">{isEn ? "No messages yet" : "Chưa có tin nhắn nào"}</p>
+                          <p className="text-slate-400 text-xs mt-1">{isEn ? `Start a conversation with ${activeVendorName}!` : `Hãy bắt đầu cuộc trò chuyện với ${activeVendorName}!`}</p>
                         </div>
                       ) : (
                         messages.map((m) => {
@@ -492,7 +499,7 @@ export function Inbox() {
                         <button
                           type="button"
                           className="w-9 h-9 rounded-full flex items-center justify-center text-[#0084ff] hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
-                          title="Gửi hình ảnh"
+                          title={isEn ? "Send Image" : "Gửi hình ảnh"}
                         >
                           <ImageIcon className="w-5 h-5" />
                         </button>
@@ -500,7 +507,7 @@ export function Inbox() {
                         <div className="flex-1 relative flex items-center">
                           <input
                             className="w-full h-10 pl-4 pr-10 rounded-full bg-[#f0f2f5] text-xs sm:text-sm text-slate-900 placeholder:text-slate-500 outline-none focus:bg-[#e4e6eb] transition-colors border-0"
-                            placeholder="Nhắn tin cho nhà điều hành biển..."
+                            placeholder={isEn ? "Message marine operator..." : "Nhắn tin cho nhà điều hành biển..."}
                             type="text"
                             value={inputMessage}
                             onChange={(e) => setInputMessage(e.target.value)}
@@ -509,7 +516,7 @@ export function Inbox() {
                           <button
                             type="button"
                             className="absolute right-3 text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
-                            title="Biểu tượng cảm xúc"
+                            title={isEn ? "Emoji" : "Biểu tượng cảm xúc"}
                           >
                             <Smile className="w-5 h-5" />
                           </button>
@@ -520,7 +527,7 @@ export function Inbox() {
                             className="w-10 h-10 rounded-full bg-[#0084ff] hover:bg-[#0073e6] text-white flex items-center justify-center transition-colors cursor-pointer shrink-0 disabled:opacity-40 shadow-xs"
                             type="submit"
                             disabled={sending}
-                            title="Gửi"
+                            title={isEn ? "Send" : "Gửi"}
                           >
                             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                           </button>
@@ -530,7 +537,7 @@ export function Inbox() {
                             onClick={handleSendLike}
                             disabled={sending}
                             className="w-10 h-10 rounded-full text-[#0084ff] hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                            title="Thích"
+                            title={isEn ? "Like" : "Thích"}
                           >
                             <ThumbsUp className="w-5 h-5 fill-[#0084ff]" />
                           </button>
@@ -539,9 +546,9 @@ export function Inbox() {
                       <div className="flex items-center justify-between mt-2 text-[11px] text-slate-400 px-2">
                         <span className="flex items-center gap-1">
                           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                          Lưu trữ và đồng bộ bảo mật thời gian thực
+                          {isEn ? "Real-time encrypted synchronization" : "Lưu trữ và đồng bộ bảo mật thời gian thực"}
                         </span>
-                        <span className="hidden sm:inline font-mono">Nhấn Enter để gửi</span>
+                        <span className="hidden sm:inline font-mono">{isEn ? "Press Enter to send" : "Nhấn Enter để gửi"}</span>
                       </div>
                     </div>
                   </>
@@ -555,25 +562,25 @@ export function Inbox() {
             <div className="w-full flex flex-col gap-4">
               <div className="flex items-center justify-between pb-2">
                 <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                  Thông báo từ hệ thống &amp; Đối tác tổ chức
+                  {isEn ? "System & Partner Notifications" : "Thông báo từ hệ thống & Đối tác tổ chức"}
                 </h2>
                 <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold">
-                  {notifications.length} thông báo
+                  {notifications.length} {isEn ? (notifications.length > 1 ? "notifications" : "notification") : "thông báo"}
                 </span>
               </div>
 
               {loadingNotifs && (
                 <div className="p-12 text-center bg-white rounded-2xl border border-slate-200">
                   <Loader2 className="w-8 h-8 text-slate-500 animate-spin mx-auto" />
-                  <p className="text-xs text-slate-500 mt-2 font-medium">Đang tải thông báo từ hệ thống...</p>
+                  <p className="text-xs text-slate-500 mt-2 font-medium">{isEn ? "Loading system notifications..." : "Đang tải thông báo từ hệ thống..."}</p>
                 </div>
               )}
 
               {!loadingNotifs && notifications.length === 0 && (
                 <div className="p-12 text-center bg-white rounded-2xl border border-slate-200/80">
                   <BellOff className="w-10 h-10 text-slate-400 mx-auto" />
-                  <p className="text-sm text-slate-700 mt-2 font-semibold">Hiện bạn chưa có thông báo mới.</p>
-                  <p className="text-xs text-slate-500 mt-1">Các cập nhật lịch trình và thời tiết sẽ hiển thị tại đây.</p>
+                  <p className="text-sm text-slate-700 mt-2 font-semibold">{isEn ? "You currently have no new notifications." : "Hiện bạn chưa có thông báo mới."}</p>
+                  <p className="text-xs text-slate-500 mt-1">{isEn ? "Trip schedule updates and weather alerts will appear here." : "Các cập nhật lịch trình và thời tiết sẽ hiển thị tại đây."}</p>
                 </div>
               )}
 
@@ -613,10 +620,10 @@ export function Inbox() {
                                     : "bg-slate-100 text-slate-700"
                                 }`}
                               >
-                                {isProposal ? "ĐỀ XUẤT ĐỔI CA" : "THÔNG BÁO"}
+                                {isProposal ? (isEn ? "RESCHEDULE PROPOSAL" : "ĐỀ XUẤT ĐỔI CA") : (isEn ? "NOTIFICATION" : "THÔNG BÁO")}
                               </span>
                               <span className="text-xs text-slate-500 font-mono">
-                                {new Date(notif.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} • {new Date(notif.createdAt).toLocaleDateString("vi-VN")}
+                                {new Date(notif.createdAt).toLocaleTimeString(isEn ? "en-US" : "vi-VN", { hour: "2-digit", minute: "2-digit" })} • {new Date(notif.createdAt).toLocaleDateString(isEn ? "en-US" : "vi-VN")}
                               </span>
                             </div>
                             <h3 className="font-bold text-sm text-slate-900">
@@ -633,7 +640,7 @@ export function Inbox() {
                             to="/profile/orders"
                             className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors flex items-center gap-1.5"
                           >
-                            <span>Xem đơn &amp; Phản hồi</span>
+                            <span>{isEn ? "View Order & Reply" : "Xem đơn & Phản hồi"}</span>
                             <ArrowRight className="w-3.5 h-3.5" />
                           </Link>
                         </div>
