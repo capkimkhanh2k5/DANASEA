@@ -602,7 +602,7 @@ Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi 
 ## EPIC-07 · Operations / Settlement / Review
 
 ### Review & Rating — API
-- [x] POST /api/sub-orders/{id}/reviews (chỉ chủ đơn và SubOrder ở trạng thái COMPLETED; một review mỗi sub-order; không giới hạn thời gian gửi đánh giá sau khi hoàn thành)
+- [x] POST /api/sub-orders/{id}/reviews (chủ đơn COMPLETED; một review mỗi sub-order)
 - [x] PUT /api/sub-orders/{id}/reviews (sửa qua sub-order, trong 7 ngày)
 - [x] PUT /api/reviews/{id} (chỉ tác giả, trong 7 ngày)
 - [x] GET /api/services/{id}/reviews (công khai, phân trang, chỉ review visible; không trả metadata nội bộ)
@@ -641,7 +641,7 @@ Chính sách hiện tại: khách sửa review trong 7 ngày; chưa cung cấp A
 `after` (ISO-8601) được giữ để tương thích: nếu khớp timestamp một tin đã lưu, backend tiếp tục từ sequence của tin đầu tiên tại timestamp đó. Khi nhiều tin cùng timestamp, có thể trả lặp tin ở ranh giới; client cũ cần loại trùng theo id. Nếu không khớp timestamp nào, nó là bộ lọc thời gian. Client nên chuyển sang `afterSequence` để tiến qua mọi batch mà không phụ thuộc đồng hồ/timestamp trùng nhau. Không tăng cursor chỉ từ response gửi tin: khi polling, chỉ tăng sau khi đã xử lý toàn bộ batch nhận được để không bỏ qua tin của phía bên kia.
 
 ### Khiếu nại — Tranh chấp
-- [x] POST /api/orders/{id}/disputes (chỉ khách hàng chủ đơn; trong vòng 7 ngày kể từ ngày trải nghiệm; đơn CHECKED_IN hoặc NO_SHOW được khiếu nại ngay không cần đợi giờ khởi hành; khóa bi quan chống xung đột đồng thời với Auto-Completion)
+- [x] POST /api/orders/{id}/disputes
 - [x] GET /api/disputes (chỉ tranh chấp của customer hiện tại)
 - [x] GET /api/disputes/{id} (chi tiết, gồm giải trình và bằng chứng vendor)
 - [x] GET /api/vendor/disputes (phân trang, lọc status; chỉ sub-order của vendor hiện tại)
@@ -659,69 +659,33 @@ Chính sách hiện tại: khách sửa review trong 7 ngày; chưa cung cấp A
 
 **Kiểm chứng 09/10/2026 — worktree `implement_customer_vendor_chat`:** `./mvnw clean verify` BUILD SUCCESS; 2.224 test, 0 failure/error, 135 skipped (2.089 test thực thi đạt). Trong đó 11 test ChatDisputeConcurrencyIntegrationTest và 1 test ChatMigrationIntegrationTest chạy trên PostgreSQL 16 thật đều pass; Flyway V26 và Hibernate schema validation pass. Đối chiếu checklist với mapping runtime profile test: đủ 163/163 endpoint từ 55 controller, không có mục API thừa.
 
-### QR Check-in & Early Dispatch
-- [x] POST /api/bookings/{id}/qr-code — Tạo mã Master QR cho đơn hàng (hỗ trợ hiển thị và quét tuần tự ngay cả khi MasterOrder PARTIALLY_COMPLETED, miễn là còn SubOrder CONFIRMED).
-- [x] POST /api/vendor/checkin/verify — Vendor quét mã QR để xác thực check-in cho khách:
-  - Hỗ trợ Master QR dùng chung hoặc QR từng SubOrder (`hasRole('VENDOR') or hasRole('ADMIN')`).
-  - Body: `VerifyCheckinRequest` (`qrCodeData`, `vendorNote`, `targetSubOrderId`).
-  - Response: `VerifyCheckinResponse` (`subOrderId`, `orderCode`, `serviceTitle`, `optionName`, `customerName`, `quantity`, `pricingUnit`, `checkedInAt`, `actualSlotId`, `isLate`, `lateReason`).
-  - Phân định chính sách trễ: Dịch vụ ghép đoàn (`SHARED`) du di tối đa 15 phút sau giờ bắt đầu ca; Dịch vụ thuê riêng (`PRIVATE`) cho phép check-in trong toàn bộ thời gian diễn ra ca (thời gian trải nghiệm rút ngắn tương ứng).
-  - Trả về HTTP 409 `AMBIGUOUS_MASTER_QR_CHECKIN` kèm payload `eligibleSubOrders` (danh sách `EligibleSubOrderCandidate`: `subOrderId`, `serviceTitle`, `optionName`, `quantity`, `pricingUnit`, `slotStartTime`, `slotEndTime`) khi Master QR chứa nhiều SubOrder cùng Vendor đủ điều kiện check-in mà Vendor chưa chọn `targetSubOrderId`.
-  - Ghi nhận `isLate`, `late_checkin_reason`, `actual_slot_id` và cập nhật SubOrder sang `CHECKED_IN`.
-- [x] POST /api/vendor/checkin/early-dispatch — Vendor điều phối khách chơi ca sớm (FIFO Early Dispatch):
-  - Quyền: `hasRole('VENDOR') or hasRole('ADMIN')`.
-  - Body: `EarlyDispatchRequest` (`subOrderId`, `targetSlotId`, `reason`).
-  - Response: `EarlyDispatchResponse` (`subOrderId`, `originalSlotId`, `actualSlotId`, `dispatchedAt`, `message`).
-  - Quy tắc: Chỉ áp dụng cho dịch vụ ghép đoàn `SHARED`, không áp dụng cho thuê nguyên chuyến `PRIVATE`. Khách đến sớm trong cùng ngày được điều phối vào ca khởi hành sớm hơn khi ca đích còn chỗ trống khả dụng. Lưu `actual_slot_id` trên SubOrder.
-- [x] CheckinUseCaseTest, EarlyDispatchSlotUseCaseTest, MasterQrAndFifoRemediationTest, FifoAndHoldConcurrencyIntegrationTest (xác thực toàn bộ luồng Master QR, FIFO sớm, late checkin, chặn conflict và concurrency).
+### QR Check-in
+- [x] POST /api/bookings/{id}/qr-code
+- [x] POST /api/vendor/checkin/verify
+- [x] POST /api/vendor/checkin/early-dispatch (điều phối khách chơi ca sớm theo thỏa thuận FIFO)
+- [x] CheckinUseCaseTest và CheckinAdversarialEmpiricalTest (44 ca: QR hết hạn/không hợp lệ, đã sử dụng, quyền và trạng thái; báo cáo ngày 10/10/2026 không có failure/error/skip).
 
-### Tự động hoàn thành & Xử lý vắng mặt (Auto-Completion & NO_SHOW)
-- [x] Background Scheduler Job (`SubOrderAutoCompletionJob` / `AutoCompleteSubOrdersUseCase`, chạy định kỳ mỗi 60s theo `app.scheduler.sub-order-completion-delay`):
-  - Tự động chuyển SubOrder từ `CHECKED_IN` sang `COMPLETED` sau khi ca trải nghiệm kết thúc quá 30 phút mà không có sự cố hoặc khiếu nại.
-  - Tự động chuyển SubOrder từ `CONFIRMED` sang `NO_SHOW` khi khách hàng không check-in và thời hạn check-in của ca đã kết thúc (đóng đơn, không hoàn tiền theo chính sách).
-  - Tự động rollup trạng thái `MasterOrder` sang `COMPLETED` (khi toàn bộ SubOrder hoàn tất) hoặc `PARTIALLY_COMPLETED` (khi có SubOrder hoàn tất và SubOrder bị hủy/NO_SHOW).
-  - Tự động kích hoạt thông báo nhắc khách hàng đánh giá trải nghiệm (`REVIEW_REMINDER`) ngay sau khi SubOrder chuyển sang `COMPLETED`.
-- [x] AutoCompleteSubOrdersUseCaseTest (kiểm thử chuyển trạng thái tự động, rollup MasterOrder và xử lý an toàn đồng thời).
-
-### Settlement & Safety Rebate
-- [x] GET /api/admin/settlements — Admin xem danh sách kỳ đối soát toàn sàn (phân trang, lọc theo vendorId, status, khoảng ngày).
-- [x] POST /api/admin/settlements/generate — Admin sinh kỳ đối soát cho Vendor theo kỳ:
-  - Cơ chế Settlement D+7: Tự động giữ lại tiền của các SubOrder có ngày trải nghiệm chưa qua đủ 7 ngày (`DISPUTE_WINDOW_OPEN`) hoặc đang có khiếu nại mở (`ACTIVE_DISPUTE`). Các đơn bị giữ tự động rollover sang kỳ đối soát tiếp theo khi đủ điều kiện.
-  - Quỹ thưởng An toàn Biển (Safety Rebate 2.0% tiền mặt): Tự động cộng 2% trên tổng doanh thu hợp lệ (`totalGross`) khi Vendor đạt tiêu chuẩn an toàn (không có khiếu nại mở, không có sự cố hủy chuyến do lỗi Vendor, điểm đánh giá >= 4.8*). Không tính thưởng trên các đơn bị giữ D+7; không cộng trùng/trừ lặp; bảo toàn chính xác `netPayableAmount`.
-- [x] GET /api/admin/settlements/{id} — Admin xem chi tiết kỳ đối soát kèm danh sách line items, lý do giữ đơn và thưởng an toàn.
-- [x] PATCH /api/admin/settlements/{id}/finalize — Admin chốt kỳ đối soát (`FINALIZED`), cấn trừ nợ bồi thường vi phạm hủy chuyến (nếu có); chỉ kỳ đã FINALIZED mới được tạo Payout Request.
-- [x] GET /api/vendor/settlements — Vendor xem danh sách các kỳ đối soát của mình.
-- [x] GET /api/vendor/settlements/{id} — Vendor xem chi tiết đối soát của mình, chi tiết line items, số tiền giữ và thưởng an toàn biển.
-- [x] SettlementCalculationTest, SettlementUseCaseTest, SettlementAdversarialTest và AdversarialSettlementStressTest (tính tiền, hoa hồng bậc thang, khấu trừ hoàn tiền, D+7 dispute window rollover, Safety Rebate 2% và chống tạo/chốt trùng kỳ).
+### Settlement
+- [x] GET /api/admin/settlements
+- [x] POST /api/admin/settlements/generate
+- [x] GET /api/admin/settlements/{id}
+- [x] PATCH /api/admin/settlements/{id}/finalize (chốt kỳ FINALIZED; chưa phải xác nhận chi trả PAID)
+- [x] GET /api/vendor/settlements
+- [x] GET /api/vendor/settlements/{id}
+- [x] SettlementCalculationTest, SettlementUseCaseTest, SettlementAdversarialTest và AdversarialSettlementStressTest (71 ca: tính tiền/hoa hồng, refund, cam kết kỳ và chống tạo/chốt trùng; báo cáo ngày 10/10/2026 không có failure/error/skip). Không nghiệm thu payout hoặc cấu hình hoa hồng chưa triển khai.
 
 ### Vendor Payout Requests — API
-- [x] POST /api/vendor/payout-requests — Vendor gửi yêu cầu rút tiền cho kỳ đối soát đã chốt:
-  - Quyền: `hasRole('VENDOR') or hasRole('ADMIN')`.
-  - Body: `CreatePayoutRequestRequest` (`settlementId`, `amount`, `vendorNote`).
-  - Response: `PayoutRequestResponse` (`id`, `settlementId`, `vendorId`, `amount`, `status: REQUESTED`, `requestedAt`, ...).
-  - Ràng buộc: Kỳ đối soát phải thuộc về Vendor và ở trạng thái `FINALIZED`. Số tiền yêu cầu phải lớn hơn 0 và không vượt quá số dư khả dụng còn lại (`remainingBalance = netPayableAmount - alreadyCommitted`). Khóa bi quan `findByIdForUpdate` chống race condition rút kép.
-- [x] GET /api/vendor/payout-requests — Vendor xem danh sách lịch sử yêu cầu rút tiền (phân trang, lọc theo `status`, `settlementId`).
-- [x] GET /api/vendor/payout-requests/eligible-settlements — Vendor lấy danh sách các kỳ đối soát đã chốt (`FINALIZED`) còn số dư khả dụng để rút tiền (`remainingAvailableAmount > 0`).
-- [x] GET /api/vendor/payout-requests/{id} — Vendor xem chi tiết yêu cầu rút tiền của mình (kèm thông tin kỳ đối soát và lý do từ chối nếu có).
+- [x] POST /api/vendor/payout-requests (vendor tạo yêu cầu rút tiền từ kỳ đối soát FINALIZED)
+- [x] GET /api/vendor/payout-requests (vendor xem danh sách yêu cầu rút tiền)
+- [x] GET /api/vendor/payout-requests/{id} (vendor xem chi tiết yêu cầu rút tiền)
+- [x] GET /api/vendor/payout-requests/eligible-settlements (vendor lấy danh sách kỳ đối soát còn số dư khả dụng)
 
 ### Admin Payout Requests — API
-- [x] GET /api/admin/payout-requests — Admin xem danh sách toàn bộ yêu cầu rút tiền toàn sàn (phân trang, lọc theo `vendorId`, `settlementId`, `status`, khoảng ngày `from`/`to`).
-- [x] GET /api/admin/payout-requests/{id} — Admin xem chi tiết yêu cầu rút tiền (kèm thông tin tài khoản ngân hàng thụ hưởng của Vendor và dữ liệu tài chính kỳ đối soát).
-- [x] PATCH /api/admin/payout-requests/{id}/approve — Admin phê duyệt yêu cầu rút tiền (`REQUESTED` -> `APPROVED`):
-  - Quyền: `hasRole('ADMIN')`.
-  - Body: `ApprovePayoutRequest` (`adminNote` tùy chọn).
-  - Response: `PayoutRequestResponse` (`status: APPROVED`, `processedAt`).
-- [x] PATCH /api/admin/payout-requests/{id}/reject — Admin từ chối yêu cầu rút tiền (`REQUESTED` -> `REJECTED`):
-  - Quyền: `hasRole('ADMIN')`.
-  - Body: `RejectPayoutRequest` (`rejectionReason` bắt buộc, tối đa 500 ký tự).
-  - Response: `PayoutRequestResponse` (`status: REJECTED`, `rejectionReason`).
-  - Hạn mức rút tiền của Settlement được hoàn trả lại ngay lập tức cho Vendor để tạo yêu cầu mới.
-- [x] PATCH /api/admin/payout-requests/{id}/mark-paid — Admin ghi nhận đã giải ngân chi trả thành công (`APPROVED` -> `PAID`):
-  - Quyền: `hasRole('ADMIN')`.
-  - Body: `MarkPaidPayoutRequest` (`bankReference` tùy chọn, `adminNote` tùy chọn).
-  - Response: `PayoutRequestResponse` (`status: PAID`, `bankReference`, `processedAt`).
-  - Chống thao tác lặp hoặc sai trạng thái (`InvalidPayoutRequestStateException`).
-- [x] PayoutRequestUseCaseTest và PayoutRequestControllerTest (kiểm tra đầy đủ quyền hạn, tenant isolation, giới hạn số dư khả dụng, idempotency, từ chối kèm lý do và giải ngân thành công).
+- [x] GET /api/admin/payout-requests (admin xem toàn bộ danh sách yêu cầu rút tiền)
+- [x] GET /api/admin/payout-requests/{id} (admin xem chi tiết yêu cầu rút tiền và tài khoản ngân hàng)
+- [x] PATCH /api/admin/payout-requests/{id}/approve (admin phê duyệt yêu cầu rút tiền)
+- [x] PATCH /api/admin/payout-requests/{id}/reject (admin từ chối yêu cầu rút tiền kèm lý do)
+- [x] PATCH /api/admin/payout-requests/{id}/mark-paid (admin ghi nhận giải ngân kế toán nội bộ kèm mã tham chiếu)
 
 ### Flash Sale & Platform Promotions — API
 - [x] GET /api/flash-sales/active
@@ -804,14 +768,20 @@ Nếu DB dev đã áp dụng migration notification V25 cũ, cần kiểm tra ch
 
 # TODO
 
-### P1 Chi trả vendor và cấu hình hoa hồng -> ĐÃ HOÀN THÀNH TOÀN DIỆN (CẤU HÌNH HOA HỒNG ĐỘNG, SAFETY REBATE V54, SETTLEMENT D+7 VÀ LUỒNG RÚT TIỀN PAYOUT REQUEST V58).
+### P1 Chi trả vendor và cấu hình hoa hồng -> ĐÃ HOÀN THÀNH CẤU HÌNH HOA HỒNG ĐỘNG & SAFETY REBATE (V54); CÒN LUỒNG RÚT TIỀN.
 
-Settlement và Payout đã hoàn thiện 100%:
-- [x] Cấu hình commission bậc ưu đãi Onboarding / Category / Mặc định (`GET/PUT /api/admin/system-configs/commission-rules`).
-- [x] Đánh giá Quỹ thưởng An toàn Biển (+2% Safety & SLA Cash Rebate) tự động theo tiêu chí vận hành thực tế.
-- [x] Cơ chế Settlement D+7: giữ đơn trong dispute window / active dispute và tự động rollover sang kỳ tiếp theo.
-- [x] Vendor tạo yêu cầu rút tiền: `POST /api/vendor/payout-requests`, xem danh sách `GET /api/vendor/payout-requests`, xem kỳ khả dụng `GET /api/vendor/payout-requests/eligible-settlements`, chi tiết `GET /api/vendor/payout-requests/{id}`.
-- [x] Admin quản lý & xét duyệt chi trả: `GET /api/admin/payout-requests`, chi tiết `GET /api/admin/payout-requests/{id}`, duyệt `PATCH /api/admin/payout-requests/{id}/approve`, từ chối kèm lý do `PATCH /api/admin/payout-requests/{id}/reject`, xác nhận giải ngân PAID `PATCH /api/admin/payout-requests/{id}/mark-paid`.
-- [x] Chống double payout, chống rút quá số dư khả dụng (`netPayableAmount`), khóa bi quan chống race condition, lưu audit log và bảo vệ thông tin ngân hàng.
+Settlement đã có generate/list/detail/finalize + cộng trực tiếp 2% Safety & SLA Cash Rebate (`safetyRebateAmount`, `safetyRebateQualified`). `CommissionPolicyAdapter` đã áp dụng chuỗi thác nước (Cascading Waterfall): Onboarding 5% (90 ngày đầu từ `approvedAt`) -> Category (MOTORIZED 7%, NON_MOTORIZED 10%, ALL_INCLUSIVE 12%) -> Platform Default (10%), lưu snapshot tại lúc tạo sub-order. Finalize chỉ chốt kỳ, chưa đánh dấu PAID; PayoutRequest mới có model/entity/repository. Chưa có luồng rút tiền và xác nhận chi trả.
+
+- `POST /api/vendor/payout-requests`, `GET /api/vendor/payout-requests`.
+- `GET /api/admin/payout-requests`; approve/reject và xác nhận paid, hoặc luồng admin trực tiếp chi trả settlement nếu muốn thu gọn MVP.
+- `PATCH /api/admin/settlements/{id}/mark-paid` kèm tham chiếu giao dịch/chứng từ, nếu chọn cách chi trả thủ công mô phỏng.
+- [x] API cấu hình commission theo bậc ưu đãi Onboarding / Category / Mặc định (`GET/PUT /api/admin/system-configs/commission-rules`); lưu tỷ lệ tại lúc tạo sub-order để thay đổi sau không sửa giao dịch cũ.
+
+Đảm bảo một settlement không chi trả hai lần, không rút quá số được nhận, lưu audit log. Thông tin ngân hàng riêng tư chỉ dùng cho vendor/admin có quyền.
+
+***SUGGEST TODO***
+Thay mức 10% cố định bằng chính sách mặc định + thỏa thuận riêng của vendor, có thời gian hiệu lực và audit.
+Giữ snapshot commission theo từng sub-order. Phần lưu tỷ lệ đã có; cần bổ sung nguồn/phiên bản chính sách và dùng nhất quán kết quả xác định tỷ lệ trong luồng tạo đơn.
+Hoàn thiện chi trả settlement: chốt số tiền, kiểm soát khoản đang chi trả, chống trả trùng và xác nhận PAID kèm chứng từ. Khoản điều chỉnh phát sinh sau khi chốt cần có lịch sử riêng, không sửa số đã chi trả. Có thể dùng luồng rút tiền vendor hoặc admin trực tiếp chi trả.
 
 ### P0 Test nghiệm thu sandbox thật với cổng thanh toán, callback và refund. Hiện tại gateway mock không chứng minh luồng thực đã hoạt động.
