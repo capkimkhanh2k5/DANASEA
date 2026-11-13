@@ -28,7 +28,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       text: user['fullName']?.toString() ?? '',
     );
     _phoneController = TextEditingController(
-      text: user['phone']?.toString() ?? '0905 123 456',
+      text: user['phone']?.toString() ?? '',
     );
     _emailController = TextEditingController(
       text: user['email']?.toString() ?? '',

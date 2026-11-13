@@ -19,23 +19,50 @@ class RefundDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final db = VendorStore.instance;
-    final refund = this.refund ?? (db.refunds.isNotEmpty ? db.refunds.first : RefundModel(
-      id: 'REF-001',
-      subOrderId: 'DNS-5421-1',
-      amount: 560000,
-      refundPercentage: 100.0,
-      reason: RefundReason.weather,
-      status: RefundStatus.processed,
-      processedAt: DateTime.now(),
-      customerName: 'Hoàng Anh',
-      serviceName: 'Lặn ngắm san hô Bán đảo Sơn Trà',
-      originalSubtotal: 560000,
-    ));
+    final currentRefund = this.refund ?? (db.refunds.isNotEmpty ? db.refunds.first : null);
+    if (currentRefund == null) {
+      return Scaffold(
+        backgroundColor: AppColors.surface,
+        appBar: AppBar(
+          backgroundColor: AppColors.surface,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.secondary),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          title: const LocalizedText('Chi tiết hoàn tiền', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
+        ),
+        body: const Center(
+          child: LocalizedText('Chưa có dữ liệu hoàn tiền từ máy chủ.', style: TextStyle(color: AppColors.tertiary)),
+        ),
+      );
+    }
+    final refund = currentRefund;
 
-    final subOrder = this.subOrder ?? db.subOrders.firstWhere(
-      (o) => o.id == refund.subOrderId,
-      orElse: () => db.subOrders.first,
-    );
+    final subOrder = this.subOrder ?? (db.subOrders.any((o) => o.id == refund.subOrderId)
+        ? db.subOrders.firstWhere((o) => o.id == refund.subOrderId)
+        : SubOrderModel(
+            id: refund.subOrderId,
+            masterOrderId: refund.subOrderId,
+            vendorId: db.vendor.id,
+            serviceId: '',
+            slotId: '',
+            quantity: 1,
+            unitPrice: refund.originalSubtotal,
+            subtotalAmount: refund.originalSubtotal,
+            commissionRate: 10.0,
+            commissionAmount: refund.originalSubtotal * 0.1,
+            vendorPayoutAmount: refund.originalSubtotal * 0.9,
+            status: SubOrderStatus.refunded,
+            qrSecret: '',
+            customerName: refund.customerName ?? 'Khách hàng',
+            customerPhone: '',
+            serviceName: refund.serviceName ?? '',
+            serviceImageUrl: '',
+            slotDate: '',
+            slotTime: '',
+            createdAt: refund.processedAt ?? DateTime.now(),
+          ));
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
@@ -164,7 +191,7 @@ class RefundDetailScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         LocalizedText(subOrder.serviceName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
                         const SizedBox(height: 2),
-                        LocalizedText('Nhà cung cấp: Danang Ocean Club', style: const TextStyle(fontSize: 11, color: AppColors.tertiary)),
+                        LocalizedText('Nhà cung cấp: nhà cung cấp', style: const TextStyle(fontSize: 11, color: AppColors.tertiary)),
                         const SizedBox(height: 12),
                         Row(
                           children: [

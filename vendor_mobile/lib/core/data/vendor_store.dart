@@ -35,7 +35,7 @@ class VendorStore extends ChangeNotifier {
   final List<NotificationModel> notifications = [];
   late WeatherCacheModel weatherCache;
 
-  void resetToInitialMock() {
+  void resetStore() {
     categories.clear();
     vendorDocuments.clear();
     services.clear();
@@ -72,45 +72,14 @@ class VendorStore extends ChangeNotifier {
 
     currentVendor = VendorModel.empty();
 
-    categories.addAll([
-      const CategoryModel(
-        id: 'cat-001',
-        name: 'Thể thao nước (Chèo SUP / Kayak)',
-        nameEn: 'Stand-up Paddleboard & Kayak',
-        slug: 'cheo-sup',
-        iconUrl: 'surfing',
-      ),
-      const CategoryModel(
-        id: 'cat-002',
-        name: 'Lặn ngắm san hô (Snorkeling & Diving)',
-        nameEn: 'Scuba Diving & Snorkeling',
-        slug: 'lan-bien',
-        iconUrl: 'scuba_diving',
-      ),
-      const CategoryModel(
-        id: 'cat-003',
-        name: 'Lướt ván diều & Lướt sóng (Surfing)',
-        nameEn: 'Surfing & Kitesurfing',
-        slug: 'luot-song',
-        iconUrl: 'kayaking',
-      ),
-      const CategoryModel(
-        id: 'cat-004',
-        name: 'Du thuyền khám phá Bán đảo Sơn Trà',
-        nameEn: 'Yacht & Catamaran Tour',
-        slug: 'du-thuyen',
-        iconUrl: 'sailing',
-      ),
-    ]);
-
     weatherCache = WeatherCacheModel(
-      id: 'wth-001',
-      locationKey: 'my-khe-da-nang',
-      windSpeedKmh: 12.0,
-      waveHeightM: 0.6,
+      id: '',
+      locationKey: 'da-nang',
+      windSpeedKmh: 0.0,
+      waveHeightM: 0.0,
       precipitationMm: 0.0,
       fetchedAt: now,
-      expiresAt: now.add(const Duration(hours: 1)),
+      expiresAt: now,
     );
   }
 
@@ -252,6 +221,7 @@ class VendorStore extends ChangeNotifier {
       if (AuthSession.instance.isAuthenticated) {
         await Future.wait([
           VendorProfileRepository().getVendorProfile().catchError((_) => currentVendor),
+          VendorServiceRepository().getCategories().catchError((_) => categories),
           VendorServiceRepository().getServices().catchError((_) => services),
           VendorOrderRepository().getSubOrders().catchError((_) => subOrders),
           VendorReviewRepository().getReviews().catchError((_) => reviews),
@@ -260,6 +230,7 @@ class VendorStore extends ChangeNotifier {
           VendorDisputeRepository().getDisputes().catchError((_) => disputes),
           VendorChatRepository().getConversations().catchError((_) => conversations),
           VendorNotificationRepository().getNotifications().catchError((_) => notifications),
+          VendorNotificationRepository().getWeatherInfo().catchError((_) => weatherCache),
         ]);
         lastSyncedAt = DateTime.now();
         notifyStoreChanged();

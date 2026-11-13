@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/status_badge.dart';
+import '../../../../core/widgets/toast_notification.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
 import '../../../profile/presentation/screens/edit_profile_bank_screen.dart';
 import 'payout_detail_screen.dart';
 
@@ -18,11 +21,110 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
   String _filterStatus = 'all'; // all, pending, paid
   String _selectedMonth = 'all'; // all, 2024-10, 2024-09
   bool _isBalanceVisible = true;
+  bool _isExportingCsv = false;
+
+  Future<void> _exportCsvReport() async {
+    if (_isExportingCsv) return;
+    setState(() => _isExportingCsv = true);
+    try {
+      final now = DateTime.now();
+      final from = now.subtract(const Duration(days: 30));
+      final csvText = await VendorReportRepository().exportReportCsv(
+        type: 'revenue',
+        from: from,
+        to: now,
+        groupBy: 'day',
+      );
+      if (!mounted) return;
+      setState(() => _isExportingCsv = false);
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.75),
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 16,
+            bottom: MediaQuery.of(ctx).padding.bottom + 20,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.file_download_done, color: AppColors.secondary, size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        'Báo cáo Doanh thu CSV',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                      ),
+                    ],
+                  ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: csvText));
+                      Navigator.pop(ctx);
+                      ToastNotification.showSuccess(context, 'Đã sao chép dữ liệu CSV vào bộ nhớ tạm');
+                    },
+                    icon: const Icon(Icons.copy, size: 16),
+                    label: const Text('Sao chép CSV'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Flexible(
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      csvText.isNotEmpty ? csvText : 'Không có dữ liệu trong khoảng thời gian này.',
+                      style: const TextStyle(fontSize: 11.5, fontFamily: 'monospace', color: AppColors.onSurface),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isExportingCsv = false);
+      ToastNotification.showError(context, 'Lỗi xuất báo cáo CSV: $e');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _db.addListener(_onDbChanged);
+    VendorSettlementRepository().getSettlements();
   }
 
   @override
@@ -209,14 +311,11 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
     }
 
     // Filter by month
-    if (_selectedMonth == '2024-10') {
-      filtered = filtered
-          .where((s) => s.periodStart.month == 10 && s.periodStart.year == 2024)
-          .toList();
-    } else if (_selectedMonth == '2024-09') {
-      filtered = filtered
-          .where((s) => s.periodStart.month == 9 && s.periodStart.year == 2024)
-          .toList();
+    if (_selectedMonth != 'all') {
+      filtered = filtered.where((s) {
+        final key = '${s.periodStart.year}-${s.periodStart.month.toString().padLeft(2, '0')}';
+        return key == _selectedMonth;
+      }).toList();
     }
 
     final double filteredGross = filtered.fold(0.0, (acc, s) => acc + s.grossAmount);
@@ -245,6 +344,20 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
           },
         ),
         actions: [
+          TextButton.icon(
+            onPressed: _isExportingCsv ? null : _exportCsvReport,
+            icon: _isExportingCsv
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.secondary),
+                  )
+                : const Icon(Icons.download_outlined, size: 18, color: AppColors.secondary),
+            label: const Text(
+              'Xuất CSV',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.secondary),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.help_outline_rounded, color: AppColors.onSurfaceVariant),
             tooltip: 'Chính sách thanh toán',
@@ -583,10 +696,17 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
                 child: Row(
                   children: [
                     _buildMonthChip('all', 'Tất cả các kỳ'),
-                    const SizedBox(width: 8),
-                    _buildMonthChip('2024-10', 'Tháng 10/2024'),
-                    const SizedBox(width: 8),
-                    _buildMonthChip('2024-09', 'Tháng 09/2024'),
+                    ...settlements
+                        .map((s) => '${s.periodStart.year}-${s.periodStart.month.toString().padLeft(2, '0')}')
+                        .toSet()
+                        .map((m) {
+                      final parts = m.split('-');
+                      final label = 'Tháng ${parts.length > 1 ? parts[1] : ""}/${parts.first}';
+                      return Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: _buildMonthChip(m, label),
+                      );
+                    }),
                   ],
                 ),
               ),

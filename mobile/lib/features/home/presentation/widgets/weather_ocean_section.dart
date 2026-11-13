@@ -316,19 +316,21 @@ class _WeatherOceanSectionState extends State<WeatherOceanSection> {
   Widget build(BuildContext context) {
     final windVal = _snapshot?.windSpeed != null
         ? '${_snapshot!.windSpeed!.toStringAsFixed(0)} km/h'
-        : '12 km/h';
+        : '-- km/h';
     final waveVal = _snapshot?.waveHeight != null
         ? '${_snapshot!.waveHeight!.toStringAsFixed(1)}m'
-        : '0.4m';
+        : '-- m';
     final rainVal = _snapshot?.precipitation != null
         ? '${_snapshot!.precipitation!.toStringAsFixed(0)} mm'
-        : '0 mm';
+        : '-- mm';
 
     final safetyTipText =
         _safety?.summaryMessage ??
         (_safety?.advisoryDetails.isNotEmpty == true
             ? _safety!.advisoryDetails.first
-            : 'Biển êm, sóng nhẹ 0.4m, điều kiện lý tưởng cho các hoạt động thể thao mặt nước.');
+            : (_snapshot == null
+                ? 'Đang tải dữ liệu quan trắc thời tiết biển từ máy chủ...'
+                : 'Theo dõi chỉ số sóng và gió thực tế trước khi tham gia hoạt động mặt nước.'));
 
     return Container(
       padding: const EdgeInsets.all(AppShapes.spaceMd),

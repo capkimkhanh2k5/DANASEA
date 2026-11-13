@@ -2,6 +2,7 @@ import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/auth/auth_session.dart';
+import '../../../../core/data/assistant_repository.dart';
 import '../../../../core/data/catalog_repository.dart';
 import '../../../../core/data/review_repository.dart';
 import '../../../../core/models/danasea_models.dart';
@@ -62,6 +63,9 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
   bool _loadingMoreReviews = false;
   bool _reviewActionBusy = false;
   String? _reviewsError;
+  Map<String, dynamic>? _aiReviewSummary;
+  bool _loadingAiSummary = false;
+  String? _aiSummaryError;
 
   final BookingRepository _bookingRepository = BookingRepository();
   final OrderRepository _orderRepository = OrderRepository();
@@ -193,6 +197,38 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
       _loadSlotsForDate(_selectedDate);
     }
     _loadReviews();
+    _loadAiReviewSummary();
+  }
+
+  Future<void> _loadAiReviewSummary() async {
+    if (widget.service.id.trim().isEmpty) return;
+    setState(() {
+      _loadingAiSummary = true;
+      _aiSummaryError = null;
+    });
+    try {
+      final summary = await AssistantRepository.instance.getReviewSummary(
+        widget.service.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _aiReviewSummary = summary.isNotEmpty ? summary : null;
+      });
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        setState(() => _aiSummaryError = e.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _aiSummaryError = 'Không thể tải tóm tắt đánh giá AI.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingAiSummary = false);
+      }
+    }
   }
 
   @override
@@ -795,7 +831,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
             Expanded(
               child: _buildMetricCell(
                 icon: Icons.health_and_safety_outlined,
-                value: 'Áo phao',
+                value: service.weatherSensitive ? 'An toàn biển' : 'Tiêu chuẩn',
               ),
             ),
             _buildMetricDivider(),
@@ -1381,48 +1417,57 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
                           height: 1,
                         ),
 
-                        // 6. INCLUSIONS & HIGHLIGHTS CHECKLIST (ĐƯA LÊN TRÊN LỊCH KHỞI HÀNH)
-                        const SizedBox(height: 22),
-                        LocalizedText(
-                          'Dịch vụ bao gồm & Tiện ích',
-                          style: AppTypography.headlineSm(
-                            color: AppColors.onSurface,
-                          ).copyWith(fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 14),
-                        _buildInclusionCheckItem(
-                          title: 'Miễn phí ảnh máy cơ & flycam góc rộng',
-                          subtitle:
-                              'Chụp ảnh & quay video độ phân giải cao bắt trọn khoảnh khắc đẹp nhất.',
-                        ),
-                        _buildInclusionCheckItem(
-                          title: 'Trang bị an toàn tiêu chuẩn quốc tế',
-                          subtitle:
-                              'Áo phao đạt chuẩn, dây leash an toàn và thiết bị thể thao biển cao cấp.',
-                        ),
-                        _buildInclusionCheckItem(
-                          title: 'Huấn luyện viên kèm 1:5 & hỗ trợ cứu hộ',
-                          subtitle:
-                              'Hướng dẫn kỹ thuật từ cơ bản và cứu hộ đồng hành suốt chặng.',
-                        ),
-                        _buildInclusionCheckItem(
-                          title: 'Tiện ích trạm bãi biển',
-                          subtitle:
-                              'Nước khoáng giải khát, khu tắm tráng nước ngọt và tủ giữ đồ an toàn.',
-                        ),
-
-                        const SizedBox(height: 22),
-                        Divider(
-                          color: AppColors.borderSubtle.withValues(alpha: 0.5),
-                          height: 1,
-                        ),
+                        // 6. INCLUSIONS & HIGHLIGHTS CHECKLIST (DỮ LIỆU TỪ SERVER)
+                        if (service.options.isNotEmpty ||
+                            service.safetyRules.trim().isNotEmpty ||
+                            service.participantConditions.trim().isNotEmpty ||
+                            service.cancellationPolicy.trim().isNotEmpty ||
+                            service.refundPolicy.trim().isNotEmpty) ...[
+                          const SizedBox(height: 22),
+                          LocalizedText(
+                            'Dịch vụ bao gồm & Quy định',
+                            style: AppTypography.headlineSm(
+                              color: AppColors.onSurface,
+                            ).copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 14),
+                          ...service.options.map(
+                            (opt) => _buildInclusionCheckItem(
+                              title: opt.name,
+                              subtitle: 'Gói dịch vụ chính thức từ đối tác ${service.vendorName}',
+                            ),
+                          ),
+                          if (service.safetyRules.trim().isNotEmpty)
+                            _buildInclusionCheckItem(
+                              title: 'Quy chuẩn an toàn biển',
+                              subtitle: service.safetyRules.trim(),
+                            ),
+                          if (service.participantConditions.trim().isNotEmpty)
+                            _buildInclusionCheckItem(
+                              title: 'Điều kiện tham gia',
+                              subtitle: service.participantConditions.trim(),
+                            ),
+                          if (service.cancellationPolicy.trim().isNotEmpty ||
+                              service.refundPolicy.trim().isNotEmpty)
+                            _buildInclusionCheckItem(
+                              title: 'Chính sách hoàn hủy',
+                              subtitle: service.cancellationPolicy.trim().isNotEmpty
+                                  ? service.cancellationPolicy.trim()
+                                  : service.refundPolicy.trim(),
+                            ),
+                          const SizedBox(height: 22),
+                          Divider(
+                            color: AppColors.borderSubtle.withValues(alpha: 0.5),
+                            height: 1,
+                          ),
+                        ],
 
                         // 7. LỊCH KHỞI HÀNH & SUẤT BIỂN
                         _buildInlineScheduleSection(),
 
 
                         const SizedBox(height: 24),
-                      // 7. REVIEWS PREVIEW
+                      // 7. REVIEWS PREVIEW & AI REVIEW SUMMARY
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -1454,6 +1499,8 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
                           ),
                         ],
                       ),
+                      const SizedBox(height: 12),
+                      _buildAiReviewSummarySection(),
                       const SizedBox(height: 12),
 
                       if (_loadingReviews)
@@ -1950,6 +1997,373 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiReviewSummarySection() {
+    if (_loadingAiSummary) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppColors.secondary.withValues(alpha: 0.25),
+          ),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: LocalizedText(
+                'AI đang tổng hợp nhận xét từ đánh giá thực tế...',
+                style: AppTypography.bodySm(color: AppColors.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_aiSummaryError != null && _aiReviewSummary == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.borderSubtle),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.auto_awesome,
+              size: 18,
+              color: AppColors.secondary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: LocalizedText(
+                _aiSummaryError!,
+                style: AppTypography.bodySm(color: AppColors.onSurfaceVariant),
+              ),
+            ),
+            TextButton(
+              onPressed: _loadAiReviewSummary,
+              child: const LocalizedText('Tải lại'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final summary = _aiReviewSummary;
+    if (summary == null || summary.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final status = summary['status']?.toString() ?? 'AVAILABLE';
+    final totalPublic =
+        (summary['totalPublicReviews'] as num?)?.toInt() ?? _reviewTotalElements;
+    final positiveCount = (summary['positiveRatingCount'] as num?)?.toInt() ?? 0;
+    final negativeCount = (summary['negativeRatingCount'] as num?)?.toInt() ?? 0;
+    final avgRating =
+        (summary['publicAverageRating'] as num?)?.toDouble() ??
+        (summary['sampledAverageRating'] as num?)?.toDouble() ??
+        widget.service.avgRating;
+
+    final highlightsRaw = summary['highlights'];
+    final posRaw = summary['positiveExamples'];
+    final negRaw = summary['negativeExamples'];
+    final aspectsRaw = summary['aspectEvidence'];
+
+    final positiveQuotes = <String>[];
+    if (posRaw is List) {
+      for (final item in posRaw.whereType<Map>()) {
+        final comment = item['comment']?.toString().trim() ?? '';
+        if (comment.isNotEmpty) positiveQuotes.add(comment);
+      }
+    }
+    if (positiveQuotes.isEmpty && highlightsRaw is List) {
+      for (final item in highlightsRaw.whereType<Map>()) {
+        final comment = item['comment']?.toString().trim() ?? '';
+        if (comment.isNotEmpty) positiveQuotes.add(comment);
+      }
+    }
+
+    final negativeQuotes = <String>[];
+    if (negRaw is List) {
+      for (final item in negRaw.whereType<Map>()) {
+        final comment = item['comment']?.toString().trim() ?? '';
+        if (comment.isNotEmpty) negativeQuotes.add(comment);
+      }
+    }
+
+    final aspectCounts = <String, int>{};
+    if (aspectsRaw is List) {
+      for (final item in aspectsRaw.whereType<Map>()) {
+        final aspect = item['aspect']?.toString() ?? '';
+        if (aspect.isNotEmpty) {
+          aspectCounts[aspect] = (aspectCounts[aspect] ?? 0) + 1;
+        }
+      }
+    }
+
+    String aspectLabel(String key) {
+      switch (key.toUpperCase()) {
+        case 'GUIDE':
+          return 'Hướng dẫn viên';
+        case 'SAFETY':
+          return 'An toàn & Thiết bị';
+        case 'PUNCTUALITY':
+          return 'Đúng giờ';
+        case 'VALUE':
+          return 'Đáng giá tiền';
+        default:
+          return key;
+      }
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.secondary.withValues(alpha: 0.08),
+            Colors.white,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.secondary.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome,
+                  size: 16,
+                  color: AppColors.secondary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: LocalizedText(
+                  'AI Tóm tắt đánh giá dịch vụ',
+                  style: AppTypography.labelMd(
+                    color: AppColors.onSurface,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  status == 'NO_REVIEWS'
+                      ? 'Chưa có dữ liệu'
+                      : '${avgRating.toStringAsFixed(1)}★ • $totalPublic nhận xét',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.secondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.thumb_up_alt_outlined,
+                        size: 14,
+                        color: Color(0xFF059669),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Tích cực: $positiveCount',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF059669),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: Color(0xFFD97706),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Cần lưu ý: $negativeCount',
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFD97706),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (aspectCounts.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: aspectCounts.entries.map((entry) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.borderSubtle),
+                  ),
+                  child: Text(
+                    '${aspectLabel(entry.key)} (${entry.value})',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onSurface,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+          if (positiveQuotes.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            LocalizedText(
+              'Điểm cộng khách hàng nhắc nhiều:',
+              style: AppTypography.labelSm(
+                color: const Color(0xFF059669),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ...positiveQuotes.take(2).map(
+              (quote) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(
+                        Icons.check_circle,
+                        size: 13,
+                        color: Color(0xFF059669),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '"$quote"',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.bodySm(
+                          color: AppColors.onSurface,
+                        ).copyWith(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (negativeQuotes.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            LocalizedText(
+              'Lưu ý thực tế từ khách trước:',
+              style: AppTypography.labelSm(
+                color: const Color(0xFFD97706),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ...negativeQuotes.take(2).map(
+              (quote) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(
+                        Icons.warning_amber_rounded,
+                        size: 13,
+                        color: Color(0xFFD97706),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '"$quote"',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypography.bodySm(
+                          color: AppColors.onSurface,
+                        ).copyWith(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'translations.dart';
 
-/// Device preference, independent of mock account data and navigation state.
+/// Device preference, independent of account data and navigation state.
 class AppLanguage extends ChangeNotifier {
   AppLanguage._();
   static final instance = AppLanguage._();

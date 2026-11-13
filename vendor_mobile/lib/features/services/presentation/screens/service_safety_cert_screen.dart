@@ -1,13 +1,14 @@
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_colors.dart';
 
 import '../../../../core/theme/app_shapes.dart';
 
 import '../../../../core/data/vendor_store.dart';
-
+import '../../../../core/data/vendor_repositories.dart';
 import '../../../../core/models/vendor_models.dart';
 
 import '../../../../core/widgets/vendor_button.dart';
@@ -39,6 +40,7 @@ class ServiceSafetyCertScreen extends StatefulWidget {
 class _ServiceSafetyCertScreenState extends State<ServiceSafetyCertScreen> {
 
   final _db = VendorStore.instance;
+  final _serviceRepo = VendorServiceRepository();
 
 
 
@@ -65,7 +67,11 @@ class _ServiceSafetyCertScreenState extends State<ServiceSafetyCertScreen> {
     _maxWaveController = TextEditingController(text: widget.service.maxWaveM.toStringAsFixed(1));
 
     _waiverController = TextEditingController(text: widget.service.waiverContent);
-
+    if (widget.service.serviceId.isNotEmpty) {
+      _serviceRepo.getServiceSafetyDocuments(widget.service.serviceId).then((_) {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
 
@@ -108,16 +114,28 @@ class _ServiceSafetyCertScreenState extends State<ServiceSafetyCertScreen> {
 
 
 
-  void _save(ServiceStatus targetStatus, String successMsg) {
-
+  Future<void> _save(ServiceStatus targetStatus, String successMsg) async {
     final updated = _updateModel(targetStatus);
-
-    _db.saveService(updated);
-
-    ToastNotification.showSuccess(context, successMsg);
-
-    Navigator.of(context).popUntil((route) => route.isFirst);
-
+    try {
+      ServiceModel saved = updated;
+      if (RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(updated.id)) {
+        saved = await _serviceRepo.updateService(updated);
+      } else {
+        saved = await _serviceRepo.createService(updated);
+      }
+      if (targetStatus == ServiceStatus.pendingReview ||
+          targetStatus == ServiceStatus.paused ||
+          targetStatus == ServiceStatus.published) {
+        saved = await _serviceRepo.updateServiceStatus(saved.id, targetStatus);
+      }
+      _db.saveService(saved);
+      if (!mounted) return;
+      ToastNotification.showSuccess(context, successMsg);
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (!mounted) return;
+      ToastNotification.showError(context, 'Không thể cập nhật trạng thái dịch vụ: $e');
+    }
   }
 
 
@@ -761,26 +779,63 @@ class _ServiceSafetyCertScreenState extends State<ServiceSafetyCertScreen> {
                         const SizedBox(width: 8),
 
                         OutlinedButton.icon(
-
-                          onPressed: () {
-
-                            _db.addServiceSafetyDoc(
-
-                              widget.service.serviceId,
-
-                              'Chứng chỉ Cứu hộ đường nước cấp mới',
-
-                              'https://example.com/safety_cert_new.pdf',
-
+                          onPressed: () async {
+                            final source = await showModalBottomSheet<ImageSource>(
+                              context: context,
+                              backgroundColor: AppColors.surfaceContainerLowest,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                              ),
+                              builder: (ctx) => SafeArea(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 8),
+                                        child: LocalizedText(
+                                          'Tải lên chứng chỉ an toàn dịch vụ (Cloud)',
+                                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                                        ),
+                                      ),
+                                      ListTile(
+                                        leading: const Icon(Icons.photo_library_outlined, color: AppColors.secondary),
+                                        title: const LocalizedText('Chọn tệp ảnh chứng chỉ từ Thư viện'),
+                                        onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+                                      ),
+                                      ListTile(
+                                        leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+                                        title: const LocalizedText('Chụp ảnh chứng chỉ trực tiếp'),
+                                        onTap: () => Navigator.pop(ctx, ImageSource.camera),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             );
-
-                            ToastNotification.showSuccess(context, 'Đã tải lên chứng chỉ mới (Đang chờ duyệt)');
-
+                            if (source == null || !mounted) return;
+                            try {
+                              final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+                              if (picked == null || !mounted) return;
+                              await _serviceRepo.uploadServiceSafetyDocument(
+                                serviceId: widget.service.serviceId,
+                                fileName: picked.name,
+                                filePath: picked.path,
+                              );
+                              if (!mounted) return;
+                              setState(() {});
+                              ToastNotification.showSuccess(context, 'Đã tải chứng chỉ lên Cloudinary (Đang chờ duyệt)');
+                            } catch (e) {
+                              if (!mounted) return;
+                              ToastNotification.showError(context, 'Lỗi tải chứng chỉ lên Cloud: $e');
+                            }
                           },
 
-                          icon: const Icon(Icons.upload_file, size: 14),
+                          icon: const Icon(Icons.cloud_upload_outlined, size: 14),
 
-                          label: const LocalizedText('Tải lên', style: TextStyle(fontSize: 11)),
+                          label: const LocalizedText('Tải lên Cloud', style: TextStyle(fontSize: 11)),
 
                           style: OutlinedButton.styleFrom(
 
@@ -1122,7 +1177,12 @@ class _ServiceSafetyCertScreenState extends State<ServiceSafetyCertScreen> {
 
                                 decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: BorderRadius.circular(8)),
 
-                                child: const LocalizedText('BÃI BIỂN MỸ KHÊ', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.onSecondaryFixed)),
+                                child: LocalizedText(
+                                  widget.service.locationName.isNotEmpty
+                                      ? widget.service.locationName.toUpperCase()
+                                      : 'ĐIỂM ĐÓN KHÁCH',
+                                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.onSecondaryFixed),
+                                ),
 
                               ),
 

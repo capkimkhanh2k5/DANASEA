@@ -12,6 +12,7 @@ import '../../../reviews/presentation/screens/review_feedback_screen.dart';
 import '../../../disputes/presentation/screens/dispute_management_screen.dart';
 import '../../../orders/presentation/screens/qr_checkin_screen.dart';
 import '../../../notifications/presentation/screens/notification_safety_screen.dart';
+import '../../../ai/presentation/screens/vendor_copilot_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onNavigateTab;
@@ -54,7 +55,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (mounted) {
         setState(() {
           _metrics = metrics;
-          _isLoading = false;
         });
       }
       await Future.wait([
@@ -66,9 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (_db.services.isNotEmpty) {
         await VendorSlotRepository().getSlotsForService(_db.services.first.serviceId, DateTime.now()).catchError((_) => <ServiceSlotModel>[]);
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    } catch (_) {}
   }
 
   String _formatVnd(double amount) {
@@ -208,6 +206,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            tooltip: 'AI Copilot Trợ lý',
+            icon: const Icon(Icons.auto_awesome, color: AppColors.secondary, size: 22),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const VendorCopilotScreen()),
+              );
+            },
+          ),
           Stack(
             alignment: Alignment.center,
             children: [
@@ -728,6 +736,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.secondary,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.auto_awesome, size: 20),
+        label: const Text(
+          'AI Copilot',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const VendorCopilotScreen()),
+          );
+        },
       ),
     );
   }

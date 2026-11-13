@@ -689,7 +689,7 @@ class _VoucherManagementScreenState extends State<VoucherManagementScreen> with 
             LocalizedText('Tạo mã giảm giá mới', style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface)),
             const SizedBox(height: 4),
             LocalizedText(
-              'Mã áp dụng tự động cho toàn bộ dịch vụ của Danang Ocean Club',
+              'Mã áp dụng tự động cho toàn bộ dịch vụ của nhà cung cấp',
               style: AppTypography.bodySm.copyWith(color: AppColors.tertiary),
             ),
             const SizedBox(height: 18),
