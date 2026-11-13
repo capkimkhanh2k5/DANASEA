@@ -662,6 +662,7 @@ Chính sách hiện tại: khách sửa review trong 7 ngày; chưa cung cấp A
 ### QR Check-in
 - [x] POST /api/bookings/{id}/qr-code
 - [x] POST /api/vendor/checkin/verify
+- [x] POST /api/vendor/checkin/early-dispatch (điều phối khách chơi ca sớm theo thỏa thuận FIFO)
 - [x] CheckinUseCaseTest và CheckinAdversarialEmpiricalTest (44 ca: QR hết hạn/không hợp lệ, đã sử dụng, quyền và trạng thái; báo cáo ngày 10/10/2026 không có failure/error/skip).
 
 ### Settlement
@@ -672,6 +673,19 @@ Chính sách hiện tại: khách sửa review trong 7 ngày; chưa cung cấp A
 - [x] GET /api/vendor/settlements
 - [x] GET /api/vendor/settlements/{id}
 - [x] SettlementCalculationTest, SettlementUseCaseTest, SettlementAdversarialTest và AdversarialSettlementStressTest (71 ca: tính tiền/hoa hồng, refund, cam kết kỳ và chống tạo/chốt trùng; báo cáo ngày 10/10/2026 không có failure/error/skip). Không nghiệm thu payout hoặc cấu hình hoa hồng chưa triển khai.
+
+### Vendor Payout Requests — API
+- [x] POST /api/vendor/payout-requests (vendor tạo yêu cầu rút tiền từ kỳ đối soát FINALIZED)
+- [x] GET /api/vendor/payout-requests (vendor xem danh sách yêu cầu rút tiền)
+- [x] GET /api/vendor/payout-requests/{id} (vendor xem chi tiết yêu cầu rút tiền)
+- [x] GET /api/vendor/payout-requests/eligible-settlements (vendor lấy danh sách kỳ đối soát còn số dư khả dụng)
+
+### Admin Payout Requests — API
+- [x] GET /api/admin/payout-requests (admin xem toàn bộ danh sách yêu cầu rút tiền)
+- [x] GET /api/admin/payout-requests/{id} (admin xem chi tiết yêu cầu rút tiền và tài khoản ngân hàng)
+- [x] PATCH /api/admin/payout-requests/{id}/approve (admin phê duyệt yêu cầu rút tiền)
+- [x] PATCH /api/admin/payout-requests/{id}/reject (admin từ chối yêu cầu rút tiền kèm lý do)
+- [x] PATCH /api/admin/payout-requests/{id}/mark-paid (admin ghi nhận giải ngân kế toán nội bộ kèm mã tham chiếu)
 
 ### Flash Sale & Platform Promotions — API
 - [x] GET /api/flash-sales/active

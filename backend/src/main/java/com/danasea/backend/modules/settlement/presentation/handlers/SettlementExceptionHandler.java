@@ -70,6 +70,30 @@ public class SettlementExceptionHandler extends LocalizedExceptionHandlerSupport
                 .body(error("FORBIDDEN_SETTLEMENT_ACCESS"));
     }
 
+    @ExceptionHandler(com.danasea.backend.modules.settlement.domain.exceptions.PayoutRequestNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handlePayoutRequestNotFound(com.danasea.backend.modules.settlement.domain.exceptions.PayoutRequestNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(error("PAYOUT_REQUEST_NOT_FOUND"));
+    }
+
+    @ExceptionHandler(com.danasea.backend.modules.settlement.domain.exceptions.PayoutAmountExceedsBalanceException.class)
+    public ResponseEntity<ErrorResponse> handlePayoutAmountExceedsBalance(com.danasea.backend.modules.settlement.domain.exceptions.PayoutAmountExceedsBalanceException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(error("PAYOUT_AMOUNT_EXCEEDS_BALANCE"));
+    }
+
+    @ExceptionHandler(com.danasea.backend.modules.settlement.domain.exceptions.InvalidPayoutRequestStateException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPayoutRequestState(com.danasea.backend.modules.settlement.domain.exceptions.InvalidPayoutRequestStateException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(error("INVALID_PAYOUT_REQUEST_STATE"));
+    }
+
+    @ExceptionHandler(com.danasea.backend.modules.settlement.domain.exceptions.SettlementNotFinalizedException.class)
+    public ResponseEntity<ErrorResponse> handleSettlementNotFinalized(com.danasea.backend.modules.settlement.domain.exceptions.SettlementNotFinalizedException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(error("SETTLEMENT_NOT_FINALIZED"));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationErrors(MethodArgumentNotValidException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

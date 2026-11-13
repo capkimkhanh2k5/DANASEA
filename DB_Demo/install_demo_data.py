@@ -555,6 +555,24 @@ def align_schema_defaults(rows, colmap):
     if ('vendors', 'rejection_reason') in colmap:
         for v in rows.get('vendors', []):
             v.setdefault('rejection_reason', None)
+    if ('sub_orders', 'actual_slot_id') in colmap:
+        for so in rows.get('sub_orders', []):
+            so.setdefault('actual_slot_id', None)
+            so.setdefault('is_late', False)
+            so.setdefault('late_checkin_reason', None)
+    if ('services', 'operation_type') in colmap:
+        for s in rows.get('services', []):
+            s.setdefault('operation_type', 'FIXED_DEPARTURE')
+    if ('vendor_departure_cancellations', 'is_incident') in colmap:
+        for vdc in rows.get('vendor_departure_cancellations', []):
+            vdc.setdefault('is_incident', False)
+            vdc.setdefault('incident_type', None)
+    if ('payout_requests', 'rejection_reason') in colmap:
+        for pr in rows.get('payout_requests', []):
+            pr.setdefault('rejection_reason', None)
+            pr.setdefault('bank_reference', None)
+            pr.setdefault('admin_note', None)
+            pr.setdefault('vendor_note', None)
 
 
 class Session:
@@ -828,8 +846,8 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     }
 
 
-# Replacement accepts only the exact reviewed V1-V57 table/column/FK/trigger inventory.
-REPLACEMENT_FLYWAY_VERSION = 57
+# Replacement accepts only the exact reviewed V1-V58 table/column/FK/trigger inventory.
+REPLACEMENT_FLYWAY_VERSION = 58
 RESET_INVENTORY_SQL = """
 SELECT json_build_object(
  'schemas',(SELECT json_agg(nspname ORDER BY nspname) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),

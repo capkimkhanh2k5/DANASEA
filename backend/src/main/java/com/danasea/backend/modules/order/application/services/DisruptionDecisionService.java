@@ -419,6 +419,54 @@ public class DisruptionDecisionService {
         record(subId, RefundReason.VENDOR_FAULT, reason, "vendor-departure:" + expectedSlotId, actor);
     }
 
+    @Transactional
+    public void recordCheckedInIncident(UUID subId, UUID expectedSlotId, String reason, UUID actor) {
+        var locked = support.lock(subId);
+        if (!Objects.equals(locked.sub().getSlotId(), expectedSlotId)
+                || (locked.sub().getStatus() != SubOrderStatus.CONFIRMED && locked.sub().getStatus() != SubOrderStatus.CHECKED_IN)
+                || locked.master().getPaymentStatus() != PaymentOrderStatus.PAID) {
+            return;
+        }
+
+        String sourceKey = "vendor-incident:" + expectedSlotId;
+        var existing = disruptions.findBySubOrderIdAndSourceKey(subId, sourceKey);
+        if (existing.isPresent()) {
+            return;
+        }
+
+        RefundReason refundReason = RefundReason.VENDOR_FAULT;
+        if (reason != null && (reason.toUpperCase().contains("WEATHER") || reason.toUpperCase().contains("STORM"))) {
+            refundReason = RefundReason.WEATHER;
+        }
+
+        var slot = slots.findById(locked.sub().getSlotId()).orElseThrow();
+        var departure = slot.getDate().atTime(slot.getStartTime()).atOffset(ZoneOffset.ofHours(7));
+        var disruption = new SubOrderDisruptionJpaEntity();
+        disruption.setSubOrderId(subId);
+        disruption.setOriginalSlotId(slot.getId());
+        disruption.setOriginalDepartureAt(departure);
+        disruption.setDecisionDeadline(departure.minusHours(12));
+        disruption.setReason(refundReason);
+        disruption.setDetails(reason != null ? reason : "Departure cancelled due to incident after check-in");
+        disruption.setSourceKey(sourceKey);
+        disruption.setVerifiedBy(actor);
+        disruption.setStatus(AWAITING);
+        disruption = disruptions.saveAndFlush(disruption);
+
+        if (refundReason == RefundReason.VENDOR_FAULT) {
+            compensation.issue(disruption, locked);
+        }
+
+        audit.recordTransactionalAuditLog(
+                actor,
+                "VERIFY_CHECKED_IN_INCIDENT",
+                "SUB_ORDER",
+                subId,
+                "{\"disruptionId\":\"" + disruption.getId() + "\",\"reason\":\"" + refundReason + "\"}");
+
+        requestRefund(disruption, locked, actor);
+    }
+
     public void notifyUnfulfilledPayment(UUID customerId, UUID subOrderId, UUID paymentId, boolean refundPending) {
         String action = refundPending ? "refund" : "no_payment";
         notifications.executeOnce(

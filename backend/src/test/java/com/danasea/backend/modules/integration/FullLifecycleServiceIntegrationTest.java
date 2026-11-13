@@ -307,8 +307,9 @@ public class FullLifecycleServiceIntegrationTest {
             checkedInOrder.setStatus(SubOrderStatus.COMPLETED);
             subOrderStore.put(subOrderId, checkedInOrder);
 
-            // Bước 6: Admin tạo kỳ đối soát hoa hồng
-            SettlementResponse settlementResponse = generateSettlementUseCase.execute(vendorAId, periodStart, periodEnd);
+            // Bước 6: Admin tạo kỳ đối soát hoa hồng sau khi kết thúc cửa sổ khiếu nại D+7
+            LocalDate settlementEvalDate = slot1.getDate().plusDays(8);
+            SettlementResponse settlementResponse = generateSettlementUseCase.execute(vendorAId, periodStart, periodEnd, settlementEvalDate);
 
             assertThat(settlementResponse).isNotNull();
             assertThat(settlementResponse.vendorId()).isEqualTo(vendorAId);
@@ -338,7 +339,7 @@ public class FullLifecycleServiceIntegrationTest {
             assertThat(finalizedResponse.status()).isEqualTo(SettlementStatus.FINALIZED);
 
             // Bước 8: Kiểm thử Idempotency 409 Conflict khi tái tạo kỳ đã FINALIZED
-            assertThatThrownBy(() -> generateSettlementUseCase.execute(vendorAId, periodStart, periodEnd))
+            assertThatThrownBy(() -> generateSettlementUseCase.execute(vendorAId, periodStart, periodEnd, settlementEvalDate))
                     .isInstanceOf(SettlementAlreadyFinalizedException.class);
 
             assertThatThrownBy(() -> finalizeSettlementUseCase.execute(settlementId))
@@ -505,7 +506,9 @@ public class FullLifecycleServiceIntegrationTest {
             slot.setDate(LocalDate.now().plusDays(25)); // Đơn được đưa vào kỳ tiếp theo
             slotStore.put(slotId, slot);
 
-            SettlementResponse settlement2 = generateSettlementUseCase.execute(vendorAId, nextPeriodStart, nextPeriodEnd);
+            // Sinh đối soát sau khi kết thúc cửa sổ khiếu nại D+7 của ca trải nghiệm
+            LocalDate nextEvalDate = slot.getDate().plusDays(8);
+            SettlementResponse settlement2 = generateSettlementUseCase.execute(vendorAId, nextPeriodStart, nextPeriodEnd, nextEvalDate);
 
             // GrossAmount = 1.500.000, Commission (10%) = 150.000, NetPayout = 1.350.000
             assertThat(settlement2.grossAmount()).isEqualByComparingTo(new BigDecimal("1500000.00"));
@@ -631,7 +634,8 @@ public class FullLifecycleServiceIntegrationTest {
         @Test
         @DisplayName("4.1 Đối soát 1 kỳ kết hợp 4 loại đơn: Hoàn tất chuẩn, Đang khiếu nại, Hoàn 1 phần, Hoàn 100% thời tiết -> Cân bằng kế toán tuyệt đối")
         void testCombinedMultiOrderPeriod_StrictAccountingBalance() {
-            LocalDate periodDate = LocalDate.now();
+            // Ngày diễn ra tour 8 ngày trước (nằm trong kỳ [-10, +20]) để đã kết thúc cửa sổ khiếu nại D+7
+            LocalDate periodDate = LocalDate.now().minusDays(8);
 
             // Đơn 1: Hoàn tất chuẩn (2.000.000 -> Gross 2.000.000, Hoa hồng 200.000, Payout 1.800.000)
             UUID sub1Id = UUID.randomUUID();
