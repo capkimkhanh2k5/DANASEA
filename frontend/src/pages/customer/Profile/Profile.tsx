@@ -87,12 +87,20 @@ export function Profile() {
               ? "Sign in to your DANASEA account to manage personal details and security settings."
               : "Đăng nhập vào tài khoản DANASEA để quản lý thông tin cá nhân và cài đặt bảo mật."}
           </p>
-          <button 
-            onClick={() => navigate('/auth')} 
-            className="w-full py-3 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-sm transition-colors cursor-pointer shadow-xs"
-          >
-            {isEn ? "Go to Sign In" : "Đến trang Đăng nhập"}
-          </button>
+          <div className="space-y-2.5 w-full">
+            <button 
+              onClick={() => navigate('/auth')} 
+              className="w-full py-3 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-sm transition-colors cursor-pointer shadow-xs"
+            >
+              {isEn ? "Go to Sign In" : "Đến trang Đăng nhập"}
+            </button>
+            <button 
+              onClick={() => useAuthStore.getState().switchRole('customer')} 
+              className="w-full py-2.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-semibold cursor-pointer transition-colors"
+            >
+              {isEn ? "Quick Sign In (customer_1@danasea.test)" : "Đăng nhập nhanh (customer_1@danasea.test)"}
+            </button>
+          </div>
         </div>
       </main>
     );

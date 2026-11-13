@@ -290,27 +290,27 @@ export function Orders() {
     try {
       setLoading(true);
       const res = await authService.login({
-        email: "customer@danasea.vn",
+        email: "customer_1@danasea.test",
         password: "password123",
       });
       setAuth(
         {
           id: res.userId,
           email: res.email,
-          fullName: "Nguyễn Văn Khách",
+          fullName: "Nguyễn Hoàng Long",
           role: res.role,
-          avatarUrl: "",
+          avatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150",
           isEmailVerified: true,
           isLocked: false,
           passwordHash: "",
-          phone: "0905000003",
+          phone: "0912345678",
           locale: "vi",
         },
         res.accessToken
       );
     } catch (err) {
-      console.error("[Orders] Đăng nhập nhanh thất bại:", err);
-      navigate("/auth");
+      console.warn("[Orders] Đăng nhập nhanh thất bại qua API, dùng switchRole:", err);
+      useAuthStore.getState().switchRole('customer');
     } finally {
       setLoading(false);
     }
@@ -796,9 +796,13 @@ export function Orders() {
             <Lock className="w-8 h-8" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 tracking-tight">Vui lòng đăng nhập tài khoản</h1>
+            <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 tracking-tight">
+              {isEn ? "Please Sign In" : "Vui lòng đăng nhập tài khoản"}
+            </h1>
             <p className="text-base text-slate-700 max-w-sm mx-auto leading-relaxed">
-              Bạn cần đăng nhập tài khoản khách hàng để xem vé điện tử, mã QR check-in và gửi đánh giá dịch vụ biển.
+              {isEn
+                ? "Please sign in with your customer account to view e-tickets, check-in QR codes, and submit service reviews."
+                : "Bạn cần đăng nhập tài khoản khách hàng để xem vé điện tử, mã QR check-in và gửi đánh giá dịch vụ biển."}
             </p>
           </div>
           <div className="space-y-3 pt-2">
@@ -806,13 +810,13 @@ export function Orders() {
               onClick={() => navigate("/auth")}
               className="w-full py-3 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-base font-bold cursor-pointer transition-colors"
             >
-              Đến trang Đăng nhập
+              {isEn ? "Go to Sign In" : "Đến trang Đăng nhập"}
             </button>
             <button
               onClick={handleQuickLogin}
               className="w-full py-2.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-semibold cursor-pointer transition-colors"
             >
-              Đăng nhập nhanh (customer@danasea.vn)
+              {isEn ? "Quick Sign In (customer_1@danasea.test)" : "Đăng nhập nhanh (customer_1@danasea.test)"}
             </button>
           </div>
         </div>
