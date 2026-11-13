@@ -11,18 +11,27 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface JpaSubOrderRepository extends JpaRepository<SubOrderJpaEntity, UUID> {
+public interface JpaSubOrderRepository
+        extends JpaRepository<SubOrderJpaEntity, UUID>, JpaSpecificationExecutor<SubOrderJpaEntity> {
     @Query("SELECT s.masterOrderId FROM SubOrderJpaEntity s WHERE s.id = :id")
     Optional<UUID> findMasterOrderIdById(@Param("id") UUID id);
 
     List<SubOrderJpaEntity> findBySlotId(UUID slotId);
     List<SubOrderJpaEntity> findBySlotIdAndStatus(UUID slotId, SubOrderStatus status);
+
+    @Query("SELECT s FROM SubOrderJpaEntity s WHERE (s.actualSlotId IS NOT NULL AND s.actualSlotId = :slotId) OR (s.actualSlotId IS NULL AND s.slotId = :slotId)")
+    List<SubOrderJpaEntity> findByEffectiveSlotId(@Param("slotId") UUID slotId);
+
+    @Query("SELECT s FROM SubOrderJpaEntity s WHERE ((s.actualSlotId IS NOT NULL AND s.actualSlotId = :slotId) OR (s.actualSlotId IS NULL AND s.slotId = :slotId)) AND s.status = :status")
+    List<SubOrderJpaEntity> findByEffectiveSlotIdAndStatus(@Param("slotId") UUID slotId, @Param("status") SubOrderStatus status);
+
     List<SubOrderJpaEntity> findByMasterOrderId(UUID masterOrderId);
     List<SubOrderJpaEntity> findByMasterOrderIdIn(Collection<UUID> masterOrderIds);
     List<SubOrderJpaEntity> findByVendorId(UUID vendorId);
@@ -30,6 +39,12 @@ public interface JpaSubOrderRepository extends JpaRepository<SubOrderJpaEntity, 
     List<SubOrderJpaEntity> findByVendorIdAndStatusIn(UUID vendorId, Collection<SubOrderStatus> statuses);
     List<SubOrderJpaEntity> findByVendorIdAndCreatedAtBetween(UUID vendorId, OffsetDateTime startDateTime, OffsetDateTime endDateTime);
     Optional<SubOrderJpaEntity> findByBookingItemId(UUID bookingItemId);
+
+    @Query("SELECT s.id FROM SubOrderJpaEntity s WHERE s.status = :status AND s.checkedInAt IS NOT NULL")
+    List<UUID> findCandidateIdsByStatusAndCheckedInAtNotNull(@Param("status") SubOrderStatus status);
+
+    @Query("SELECT s.id FROM SubOrderJpaEntity s WHERE s.status = :status AND s.checkedInAt IS NULL")
+    List<UUID> findCandidateIdsByStatusAndCheckedInAtNull(@Param("status") SubOrderStatus status);
 
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

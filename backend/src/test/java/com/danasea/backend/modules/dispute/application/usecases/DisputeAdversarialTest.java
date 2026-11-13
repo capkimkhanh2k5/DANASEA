@@ -369,9 +369,9 @@ class DisputeAdversarialTest {
         @ParameterizedTest(name = "SubOrder Status: {0} -> Must be REJECTED with 400 Bad Request")
         @EnumSource(
                 value = SubOrderStatus.class,
-                names = {"PENDING", "REJECTED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED", "CHECKED_IN", "IN_PROGRESS"}
+                names = {"PENDING", "REJECTED", "CANCELLED", "REFUNDED", "PARTIALLY_REFUNDED", "IN_PROGRESS"}
         )
-        @DisplayName("Exhaustive check: All 7 non-eligible statuses MUST be rejected with InvalidSubOrderStateException")
+        @DisplayName("Exhaustive check: All 6 non-eligible statuses MUST be rejected with InvalidSubOrderStateException")
         void testSubOrderStatus_AllInvalidStatuses_Throws400(SubOrderStatus invalidStatus) {
             MasterOrderJpaEntity masterOrder = new MasterOrderJpaEntity();
             masterOrder.setId(masterOrderIdA);
@@ -398,9 +398,9 @@ class DisputeAdversarialTest {
         @ParameterizedTest(name = "SubOrder Status: {0} -> Must be ACCEPTED")
         @EnumSource(
                 value = SubOrderStatus.class,
-                names = {"COMPLETED", "CONFIRMED"}
+                names = {"COMPLETED", "CONFIRMED", "CHECKED_IN", "NO_SHOW"}
         )
-        @DisplayName("Eligible statuses: Exactly COMPLETED and CONFIRMED are accepted")
+        @DisplayName("Eligible statuses: COMPLETED, CONFIRMED, and CHECKED_IN are accepted")
         void testSubOrderStatus_EligibleStatuses_Accepted(SubOrderStatus validStatus) {
             MasterOrderJpaEntity masterOrder = new MasterOrderJpaEntity();
             masterOrder.setId(masterOrderIdA);

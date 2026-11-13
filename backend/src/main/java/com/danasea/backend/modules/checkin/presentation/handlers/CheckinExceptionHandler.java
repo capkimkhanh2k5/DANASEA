@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.checkin.presentation.handlers;
 
+import com.danasea.backend.modules.checkin.domain.exceptions.AmbiguousCheckinTargetException;
 import com.danasea.backend.modules.checkin.domain.exceptions.CheckinAlreadyUsedException;
 import com.danasea.backend.modules.checkin.domain.exceptions.CheckinTokenNotFoundException;
 import com.danasea.backend.modules.checkin.domain.exceptions.InvalidCheckinStateException;
@@ -35,6 +36,13 @@ public class CheckinExceptionHandler extends LocalizedExceptionHandlerSupport {
             UUID usedByVendorStaffId
     ) {}
 
+    public record AmbiguousCheckinResponse(
+            String code,
+            String message,
+            UUID masterOrderId,
+            java.util.List<com.danasea.backend.modules.checkin.presentation.dtos.EligibleSubOrderCandidate> eligibleSubOrders
+    ) {}
+
     @ExceptionHandler(InvalidQrSignatureException.class)
     public ResponseEntity<ErrorResponse> handleInvalidQrSignature(InvalidQrSignatureException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -57,6 +65,19 @@ public class CheckinExceptionHandler extends LocalizedExceptionHandlerSupport {
     public ResponseEntity<ErrorResponse> handleInvalidCheckinState(InvalidCheckinStateException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(error("SLOT_ALREADY_CONCLUDED"));
+    }
+
+    @ExceptionHandler(AmbiguousCheckinTargetException.class)
+    public ResponseEntity<AmbiguousCheckinResponse> handleAmbiguousCheckinTarget(AmbiguousCheckinTargetException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new AmbiguousCheckinResponse(
+                        "AMBIGUOUS_MASTER_QR_CHECKIN",
+                        ex.getMessage() != null && !ex.getMessage().isBlank()
+                                ? ex.getMessage()
+                                : message("error.ambiguous_master_qr_checkin"),
+                        ex.getMasterOrderId(),
+                        ex.getCandidates()
+                ));
     }
 
     @ExceptionHandler(UnauthorizedCheckinAccessException.class)

@@ -32,14 +32,14 @@ public class SettlementCalculationEngine {
     public static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
     public record CalculationItem(
-        UUID subOrderId,
-        UUID vendorId,
-        BigDecimal subtotalAmount,
-        BigDecimal commissionRate,
-        SubOrderStatus status,
-        BigDecimal refundAmount,
-        boolean hasActiveDispute
-    ) {}
+            UUID subOrderId,
+            UUID vendorId,
+            BigDecimal subtotalAmount,
+            BigDecimal commissionRate,
+            SubOrderStatus status,
+            BigDecimal refundAmount,
+            boolean hasActiveDispute) {
+    }
 
     /**
      * Tính toán chi tiết từng dòng đơn hàng con (Line Item)
@@ -50,7 +50,8 @@ public class SettlementCalculationEngine {
         }
 
         BigDecimal rate = context.getCommissionRate();
-        if(rate==null) throw new InvalidCommissionRateException("Commission policy or snapshot is required");
+        if (rate == null)
+            throw new InvalidCommissionRateException("Commission policy or snapshot is required");
         if (rate.compareTo(BigDecimal.ZERO) < 0 || rate.compareTo(BigDecimal.ONE) > 0) {
             throw new InvalidCommissionRateException("Commission rate must be between 0 and 1");
         }
@@ -68,9 +69,10 @@ public class SettlementCalculationEngine {
         BigDecimal customerPaid = context.getEffectiveFinalAmount();
         SubOrderStatus status = context.getStatus();
 
-        // 1. Kiểm tra khiếu nại đang mở (Active Dispute) -> Tạm giữ
+        // 1. Kiểm tra khiếu nại đang mở (Active Dispute) -> Tạm giữ tiền
         boolean hasActiveDispute = context.isHasActiveDispute()
-                || (context.getDisputeStatus() != null && (context.getDisputeStatus() == DisputeStatus.OPEN || context.getDisputeStatus() == DisputeStatus.UNDER_REVIEW));
+                || (context.getDisputeStatus() != null && (context.getDisputeStatus() == DisputeStatus.OPEN
+                        || context.getDisputeStatus() == DisputeStatus.UNDER_REVIEW));
 
         if (hasActiveDispute) {
             return SettlementLineItem.builder()
@@ -85,9 +87,52 @@ public class SettlementCalculationEngine {
                     .build();
         }
 
+        // 2. Kiểm tra yêu cầu hoàn tiền đang chờ xử lý (Pending Refund) -> Tạm giữ tiền
+        if (context.isHasPendingRefund()) {
+            return SettlementLineItem.builder()
+                    .id(UUID.randomUUID())
+                    .subOrderId(context.getSubOrderId())
+                    .grossAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .refundAmount(refund.setScale(SCALE, ROUNDING))
+                    .commissionRate(rate)
+                    .commissionAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .netAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .excludedReason(LineItemExclusionReason.PENDING_REFUND)
+                    .build();
+        }
+
+        // 3. Kiểm tra sự cố gián đoạn vận hành đang chờ quyết định (Active Disruption) -> Tạm giữ tiền
+        if (context.isHasActiveDisruption()) {
+            return SettlementLineItem.builder()
+                    .id(UUID.randomUUID())
+                    .subOrderId(context.getSubOrderId())
+                    .grossAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .refundAmount(refund.setScale(SCALE, ROUNDING))
+                    .commissionRate(rate)
+                    .commissionAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .netAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .excludedReason(LineItemExclusionReason.ACTIVE_DISRUPTION)
+                    .build();
+        }
+
+        // 4. Kiểm tra cửa sổ khiếu nại 7 ngày (D+7) theo CreateDisputeUseCase -> Tạm giữ tiền
+        if (context.isDisputeWindowOpen()) {
+            return SettlementLineItem.builder()
+                    .id(UUID.randomUUID())
+                    .subOrderId(context.getSubOrderId())
+                    .grossAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .refundAmount(refund.setScale(SCALE, ROUNDING))
+                    .commissionRate(rate)
+                    .commissionAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .netAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .excludedReason(LineItemExclusionReason.DISPUTE_WINDOW_OPEN)
+                    .build();
+        }
+
         // 2. Kiểm tra hoàn tiền 100% (Full Refund)
         boolean isFullRefund = status == SubOrderStatus.REFUNDED
-                || (context.getRefundPercentage() != null && context.getRefundPercentage().compareTo(new BigDecimal("100")) >= 0)
+                || (context.getRefundPercentage() != null
+                        && context.getRefundPercentage().compareTo(new BigDecimal("100")) >= 0)
                 || (customerPaid.signum() > 0 && refund.compareTo(customerPaid) >= 0);
 
         if (isFullRefund) {
@@ -103,8 +148,10 @@ public class SettlementCalculationEngine {
                     .build();
         }
 
-        // 3. Kiểm tra trạng thái đơn hợp lệ để đối soát
-        if (status != null && status != SubOrderStatus.COMPLETED && status != SubOrderStatus.CHECKED_IN && status != SubOrderStatus.PARTIALLY_REFUNDED) {
+        // 3. Kiểm tra trạng thái đơn hợp lệ để đối soát (Hỗ trợ COMPLETED, CHECKED_IN,
+        // PARTIALLY_REFUNDED, NO_SHOW)
+        if (status != null && status != SubOrderStatus.COMPLETED && status != SubOrderStatus.CHECKED_IN
+                && status != SubOrderStatus.PARTIALLY_REFUNDED && status != SubOrderStatus.NO_SHOW) {
             return SettlementLineItem.builder()
                     .id(UUID.randomUUID())
                     .subOrderId(context.getSubOrderId())
@@ -126,7 +173,8 @@ public class SettlementCalculationEngine {
         if (status == SubOrderStatus.PARTIALLY_REFUNDED || refund.compareTo(BigDecimal.ZERO) > 0) {
             // Reverse platform funding in the same proportion as refunded customer cash.
             BigDecimal reversedBasis = customerPaid.signum() > 0
-                    ? basis.multiply(refund).divide(customerPaid, SCALE, ROUNDING) : basis;
+                    ? basis.multiply(refund).divide(customerPaid, SCALE, ROUNDING)
+                    : basis;
             BigDecimal netAfterRefund = basis.subtract(reversedBasis).max(BigDecimal.ZERO);
             if (netAfterRefund.compareTo(BigDecimal.ZERO) <= 0) {
                 return SettlementLineItem.builder()
@@ -182,8 +230,7 @@ public class SettlementCalculationEngine {
             LocalDate periodStart,
             LocalDate periodEnd,
             List<SubOrderCalculationContext> orders,
-            BigDecimal defaultCommissionRate
-    ) {
+            BigDecimal defaultCommissionRate) {
         log.info("Calculating settlement for vendor {} from {} to {} with {} orders",
                 vendorId, periodStart, periodEnd, orders != null ? orders.size() : 0);
 
@@ -209,7 +256,8 @@ public class SettlementCalculationEngine {
 
         for (SubOrderCalculationContext order : orders) {
             if (order.getCommissionRate() == null) {
-                if(rate==null) throw new InvalidCommissionRateException("Commission policy or snapshot is required");
+                if (rate == null)
+                    throw new InvalidCommissionRateException("Commission policy or snapshot is required");
                 order.setCommissionRate(rate);
             }
             SettlementLineItem item = calculateLineItem(order);
@@ -244,9 +292,9 @@ public class SettlementCalculationEngine {
             LocalDate periodStart,
             LocalDate periodEnd,
             List<SubOrderCalculationContext> orders,
-            BigDecimal defaultCommissionRate
-    ) {
-        SettlementCalculationResult result = calculateSettlement(vendorId, periodStart, periodEnd, orders, defaultCommissionRate);
+            BigDecimal defaultCommissionRate) {
+        SettlementCalculationResult result = calculateSettlement(vendorId, periodStart, periodEnd, orders,
+                defaultCommissionRate);
         OffsetDateTime now = OffsetDateTime.now();
 
         Settlement settlement = Settlement.builder()
@@ -294,8 +342,7 @@ public class SettlementCalculationEngine {
             UUID vendorId,
             LocalDate periodStart,
             LocalDate periodEnd,
-            List<CalculationItem> items
-    ) {
+            List<CalculationItem> items) {
         List<SubOrderCalculationContext> contexts = items != null ? items.stream()
                 .map(item -> SubOrderCalculationContext.builder()
                         .subOrderId(item.subOrderId())

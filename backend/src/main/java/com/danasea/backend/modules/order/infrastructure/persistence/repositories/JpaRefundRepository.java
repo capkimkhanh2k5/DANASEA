@@ -39,6 +39,9 @@ public interface JpaRefundRepository extends JpaRepository<RefundJpaEntity, UUID
     List<RefundJpaEntity> findBySubOrderIdInAndStatus(
             Collection<UUID> subOrderIds, RefundStatus status);
 
+    boolean existsBySubOrderId(UUID subOrderId);
+    boolean existsBySubOrderIdAndStatusIn(UUID subOrderId, Collection<RefundStatus> statuses);
+
     @Query("""
             SELECT r FROM RefundJpaEntity r
             WHERE r.status = :status AND r.retryCount < :maxRetryCount

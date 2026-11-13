@@ -168,8 +168,24 @@ class ReviewUseCaseTest {
         }
 
         @Test
-        @DisplayName("Should reject review if sub-order is not completed")
-        void shouldRejectIfNotCompleted() {
+        @DisplayName("Should reject review if sub-order is CHECKED_IN")
+        void shouldRejectIfCheckedIn() {
+            SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
+            subOrder.setId(subOrderId);
+            subOrder.setStatus(SubOrderStatus.CHECKED_IN);
+
+            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+
+            CreateReviewRequest request = new CreateReviewRequest((short) 5, "Comment", null);
+
+            assertThatThrownBy(() -> createReviewUseCase.execute(subOrderId, request, customerId))
+                    .isInstanceOf(InvalidReviewSubOrderStateException.class)
+                    .hasMessageContaining("Only completed sub-orders can be reviewed. Current status: CHECKED_IN");
+        }
+
+        @Test
+        @DisplayName("Should reject review if sub-order is CONFIRMED")
+        void shouldRejectIfConfirmed() {
             SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
             subOrder.setId(subOrderId);
             subOrder.setStatus(SubOrderStatus.CONFIRMED);
@@ -180,7 +196,209 @@ class ReviewUseCaseTest {
 
             assertThatThrownBy(() -> createReviewUseCase.execute(subOrderId, request, customerId))
                     .isInstanceOf(InvalidReviewSubOrderStateException.class)
-                    .hasMessageContaining("Only completed sub-orders can be reviewed");
+                    .hasMessageContaining("Only completed sub-orders can be reviewed. Current status: CONFIRMED");
+        }
+
+        @Test
+        @DisplayName("Should reject review if sub-order is NO_SHOW")
+        void shouldRejectIfNoShow() {
+            SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
+            subOrder.setId(subOrderId);
+            subOrder.setStatus(SubOrderStatus.NO_SHOW);
+
+            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+
+            CreateReviewRequest request = new CreateReviewRequest((short) 5, "Comment", null);
+
+            assertThatThrownBy(() -> createReviewUseCase.execute(subOrderId, request, customerId))
+                    .isInstanceOf(InvalidReviewSubOrderStateException.class)
+                    .hasMessageContaining("Only completed sub-orders can be reviewed. Current status: NO_SHOW");
+        }
+
+        @Test
+        @DisplayName("Should reject review if sub-order is CANCELLED, REFUNDED, PARTIALLY_REFUNDED, PENDING, REJECTED, or IN_PROGRESS")
+        void shouldRejectIfOtherNonCompletedStatuses() {
+            List<SubOrderStatus> invalidStatuses = List.of(
+                    SubOrderStatus.PENDING,
+                    SubOrderStatus.REJECTED,
+                    SubOrderStatus.IN_PROGRESS,
+                    SubOrderStatus.CANCELLED,
+                    SubOrderStatus.REFUNDED,
+                    SubOrderStatus.PARTIALLY_REFUNDED
+            );
+
+            for (SubOrderStatus status : invalidStatuses) {
+                SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
+                subOrder.setId(subOrderId);
+                subOrder.setStatus(status);
+
+                when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+
+                CreateReviewRequest request = new CreateReviewRequest((short) 5, "Comment", null);
+
+                assertThatThrownBy(() -> createReviewUseCase.execute(subOrderId, request, customerId))
+                        .isInstanceOf(InvalidReviewSubOrderStateException.class)
+                        .hasMessageContaining("Only completed sub-orders can be reviewed");
+            }
+        }
+
+        @Test
+        @DisplayName("FIFO Early Dispatch: SubOrder in CHECKED_IN cannot review even if dispatched early, until COMPLETED")
+        void shouldRejectCheckedInEvenIfDispatchedEarlyViaFifo() {
+            UUID actualEarlySlotId = UUID.randomUUID();
+            SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
+            subOrder.setId(subOrderId);
+            subOrder.setMasterOrderId(masterOrderId);
+            subOrder.setVendorId(vendorId);
+            subOrder.setServiceId(serviceId);
+            subOrder.setSlotId(UUID.randomUUID()); // Original slot 08:00
+            subOrder.setActualSlotId(actualEarlySlotId); // Dispatched early to 07:30 slot
+            subOrder.setCheckedInAt(OffsetDateTime.now().minusMinutes(40));
+            subOrder.setStatus(SubOrderStatus.CHECKED_IN);
+
+            when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(subOrder));
+
+            CreateReviewRequest request = new CreateReviewRequest((short) 5, "Chuyến đi tuyệt vời!", List.of());
+
+            // 1. Phải bị từ chối khi đang CHECKED_IN
+            assertThatThrownBy(() -> createReviewUseCase.execute(subOrderId, request, customerId))
+                    .isInstanceOf(InvalidReviewSubOrderStateException.class)
+                    .hasMessageContaining("Only completed sub-orders can be reviewed. Current status: CHECKED_IN");
+
+            // 2. Khi hệ thống Auto-Completion hoàn thành đơn hàng -> SubOrder chuyển sang COMPLETED -> Được phép đánh giá
+            subOrder.setStatus(SubOrderStatus.COMPLETED);
+
+            MasterOrderJpaEntity masterOrder = new MasterOrderJpaEntity();
+            masterOrder.setId(masterOrderId);
+            masterOrder.setCustomerId(customerId);
+            when(masterOrderRepository.findById(masterOrderId)).thenReturn(Optional.of(masterOrder));
+            when(reviewRepository.existsBySubOrderId(subOrderId)).thenReturn(false);
+
+            ReviewJpaEntity savedReview = ReviewJpaEntity.builder()
+                    .subOrderId(subOrderId)
+                    .customerId(customerId)
+                    .vendorId(vendorId)
+                    .serviceId(serviceId)
+                    .rating((short) 5)
+                    .comment("Chuyến đi tuyệt vời!")
+                    .isVisible(true)
+                    .isFlagged(false)
+                    .build();
+            savedReview.setId(reviewId);
+            savedReview.setCreatedAt(OffsetDateTime.now());
+
+            when(reviewRepository.saveAndFlush(any(ReviewJpaEntity.class))).thenReturn(savedReview);
+            when(serviceRepository.findByIdForUpdate(serviceId)).thenReturn(Optional.of(new ServiceJpaEntity()));
+            when(vendorRepository.findByIdForUpdate(vendorId)).thenReturn(Optional.of(new VendorJpaEntity()));
+            when(reviewRepository.countByServiceIdAndIsVisibleTrue(serviceId)).thenReturn(1L);
+            when(reviewRepository.getAvgRatingByServiceId(serviceId)).thenReturn(5.0);
+            when(reviewRepository.countByVendorIdAndIsVisibleTrue(vendorId)).thenReturn(1L);
+            when(reviewRepository.getAvgRatingByVendorId(vendorId)).thenReturn(5.0);
+
+            ReviewResponse response = createReviewUseCase.execute(subOrderId, request, customerId);
+            assertThat(response).isNotNull();
+            assertThat(response.rating()).isEqualTo((short) 5);
+        }
+
+        @Test
+        @DisplayName("Multi-SubOrder: Review eligibility is strictly evaluated per SubOrder status, not MasterOrder")
+        void shouldEnforceReviewEligibilityPerSubOrderInMultiSubOrderBooking() {
+            MasterOrderJpaEntity masterOrder = new MasterOrderJpaEntity();
+            masterOrder.setId(masterOrderId);
+            masterOrder.setCustomerId(customerId);
+            when(masterOrderRepository.findById(masterOrderId)).thenReturn(Optional.of(masterOrder));
+
+            // SubOrder 1: COMPLETED -> Allowed
+            UUID subOrderCompletedId = UUID.randomUUID();
+            SubOrderJpaEntity subOrderCompleted = new SubOrderJpaEntity();
+            subOrderCompleted.setId(subOrderCompletedId);
+            subOrderCompleted.setMasterOrderId(masterOrderId);
+            subOrderCompleted.setVendorId(vendorId);
+            subOrderCompleted.setServiceId(serviceId);
+            subOrderCompleted.setStatus(SubOrderStatus.COMPLETED);
+
+            // SubOrder 2: CHECKED_IN -> Rejected
+            UUID subOrderCheckedInId = UUID.randomUUID();
+            SubOrderJpaEntity subOrderCheckedIn = new SubOrderJpaEntity();
+            subOrderCheckedIn.setId(subOrderCheckedInId);
+            subOrderCheckedIn.setMasterOrderId(masterOrderId);
+            subOrderCheckedIn.setStatus(SubOrderStatus.CHECKED_IN);
+
+            // SubOrder 3: CONFIRMED -> Rejected
+            UUID subOrderConfirmedId = UUID.randomUUID();
+            SubOrderJpaEntity subOrderConfirmed = new SubOrderJpaEntity();
+            subOrderConfirmed.setId(subOrderConfirmedId);
+            subOrderConfirmed.setMasterOrderId(masterOrderId);
+            subOrderConfirmed.setStatus(SubOrderStatus.CONFIRMED);
+
+            // SubOrder 4: NO_SHOW -> Rejected
+            UUID subOrderNoShowId = UUID.randomUUID();
+            SubOrderJpaEntity subOrderNoShow = new SubOrderJpaEntity();
+            subOrderNoShow.setId(subOrderNoShowId);
+            subOrderNoShow.setMasterOrderId(masterOrderId);
+            subOrderNoShow.setStatus(SubOrderStatus.NO_SHOW);
+
+            when(subOrderRepository.findById(subOrderCompletedId)).thenReturn(Optional.of(subOrderCompleted));
+            when(subOrderRepository.findById(subOrderCheckedInId)).thenReturn(Optional.of(subOrderCheckedIn));
+            when(subOrderRepository.findById(subOrderConfirmedId)).thenReturn(Optional.of(subOrderConfirmed));
+            when(subOrderRepository.findById(subOrderNoShowId)).thenReturn(Optional.of(subOrderNoShow));
+
+            CreateReviewRequest request = new CreateReviewRequest((short) 5, "Đánh giá!", List.of());
+
+            // SubOrder 2 (CHECKED_IN) fails
+            assertThatThrownBy(() -> createReviewUseCase.execute(subOrderCheckedInId, request, customerId))
+                    .isInstanceOf(InvalidReviewSubOrderStateException.class)
+                    .hasMessageContaining("CHECKED_IN");
+
+            // SubOrder 3 (CONFIRMED) fails
+            assertThatThrownBy(() -> createReviewUseCase.execute(subOrderConfirmedId, request, customerId))
+                    .isInstanceOf(InvalidReviewSubOrderStateException.class)
+                    .hasMessageContaining("CONFIRMED");
+
+            // SubOrder 4 (NO_SHOW) fails
+            assertThatThrownBy(() -> createReviewUseCase.execute(subOrderNoShowId, request, customerId))
+                    .isInstanceOf(InvalidReviewSubOrderStateException.class)
+                    .hasMessageContaining("NO_SHOW");
+
+            // SubOrder 1 (COMPLETED) succeeds
+            ReviewJpaEntity savedReview = ReviewJpaEntity.builder()
+                    .subOrderId(subOrderCompletedId)
+                    .customerId(customerId)
+                    .vendorId(vendorId)
+                    .serviceId(serviceId)
+                    .rating((short) 5)
+                    .comment("Đánh giá!")
+                    .isVisible(true)
+                    .isFlagged(false)
+                    .build();
+            savedReview.setId(reviewId);
+            savedReview.setCreatedAt(OffsetDateTime.now());
+
+            when(reviewRepository.existsBySubOrderId(subOrderCompletedId)).thenReturn(false);
+            when(reviewRepository.saveAndFlush(any(ReviewJpaEntity.class))).thenReturn(savedReview);
+            when(serviceRepository.findByIdForUpdate(serviceId)).thenReturn(Optional.of(new ServiceJpaEntity()));
+            when(vendorRepository.findByIdForUpdate(vendorId)).thenReturn(Optional.of(new VendorJpaEntity()));
+            when(reviewRepository.countByServiceIdAndIsVisibleTrue(serviceId)).thenReturn(1L);
+            when(reviewRepository.getAvgRatingByServiceId(serviceId)).thenReturn(5.0);
+            when(reviewRepository.countByVendorIdAndIsVisibleTrue(vendorId)).thenReturn(1L);
+            when(reviewRepository.getAvgRatingByVendorId(vendorId)).thenReturn(5.0);
+
+            ReviewResponse response = createReviewUseCase.execute(subOrderCompletedId, request, customerId);
+            assertThat(response).isNotNull();
+            assertThat(response.rating()).isEqualTo((short) 5);
+        }
+
+        @Test
+        @DisplayName("Should reject review if sub-order does not exist")
+        void shouldRejectIfSubOrderNotFound() {
+            UUID unknownId = UUID.randomUUID();
+            when(subOrderRepository.findById(unknownId)).thenReturn(Optional.empty());
+
+            CreateReviewRequest request = new CreateReviewRequest((short) 5, "Comment", null);
+
+            assertThatThrownBy(() -> createReviewUseCase.execute(unknownId, request, customerId))
+                    .isInstanceOf(OrderNotFoundException.class)
+                    .hasMessageContaining("Sub-order not found");
         }
 
         @Test
