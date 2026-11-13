@@ -20,10 +20,13 @@ import {
   Pin,
   CheckCheck,
   LifeBuoy,
-  Star
+  Star,
+  Bot
 } from "lucide-react";
 import { AtlasAvatar } from "../components/vendor/atlas/AtlasDesignSystem";
 import { toast } from "../store/useToastStore";
+import { useVendorCopilotStore } from "../store/useVendorCopilotStore";
+import { VendorCopilotDrawer } from "../components/vendor/copilot/VendorCopilotDrawer";
 
 interface NavItem {
   to: string;
@@ -42,6 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupTitle: "VẬN HÀNH & ĐIỀU PHỐI",
     items: [
       { to: "/vendor", label: "Tổng quan", icon: LayoutDashboard, exact: true },
+      { to: "/vendor/copilot", label: "Trợ lý Copilot", icon: Bot },
       { to: "/vendor/analytics", label: "Phân tích kinh doanh", icon: TrendingUp },
       { to: "/vendor/orders", label: "Đơn đặt chỗ & Vé", icon: Ticket },
       { to: "/vendor/messages", label: "Tin nhắn khách hàng", icon: MessageSquare },
@@ -69,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
 
 const VENDOR_PAGE_ORDER: Record<string, number> = {
   "/vendor": 0,
+  "/vendor/copilot": 0.5,
   "/vendor/analytics": 1,
   "/vendor/orders": 2,
   "/vendor/messages": 2.5,
@@ -485,6 +490,24 @@ export function VendorLayout() {
           </div>
         </main>
       </div>
+
+      {/* Floating Copilot Trigger Button (Visible across all vendor screens except dedicated /vendor/copilot) */}
+      {location.pathname !== "/vendor/copilot" && (
+        <button
+          onClick={() => useVendorCopilotStore.getState().toggleCopilot()}
+          className="fixed bottom-6 right-6 z-40 h-11 px-4 rounded-xl bg-slate-900 text-white hover:bg-slate-800 shadow-xl flex items-center gap-2.5 text-xs font-semibold border border-slate-700/60 transition-all hover:scale-102 cursor-pointer group print:hidden select-none"
+          title="Mở Trợ lý kinh doanh DANASEA Copilot"
+          aria-label="Toggle Vendor Copilot"
+        >
+          <Bot className="w-4 h-4 text-sky-400 group-hover:rotate-6 transition-transform" />
+          <span>AI Copilot</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+        </button>
+      )}
+
+      {/* Vendor Copilot Slide-over Drawer */}
+      <VendorCopilotDrawer />
+
 
       {/* Notification Detail Modal (Portaled directly to document.body) */}
       {selectedNoti && createPortal(

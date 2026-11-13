@@ -40,6 +40,7 @@ const VendorDisputes = lazy(() => import("./pages/vendor/Disputes/Disputes").the
 const VendorDisputeDetail = lazy(() => import("./pages/vendor/Disputes/DisputeDetail").then((m) => ({ default: m.DisputeDetail })));
 const VendorProfile = lazy(() => import("./pages/vendor/Profile/Profile").then((m) => ({ default: m.Profile })));
 const VendorMessages = lazy(() => import("./pages/vendor/Messages/VendorMessages").then((m) => ({ default: m.VendorMessages })));
+const VendorCopilotPage = lazy(() => import("./pages/vendor/Copilot/VendorCopilotPage").then((m) => ({ default: m.VendorCopilotPage })));
 
 // Admin Phase 5
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard/AdminDashboard").then((m) => ({ default: m.AdminDashboard })));
@@ -91,6 +92,7 @@ function App() {
         {/* NHÀ CUNG CẤP */}
         <Route path="/vendor" element={<VendorLayout />}>
           <Route index element={<VendorDashboard />} />
+          <Route path="copilot" element={<VendorCopilotPage />} />
           <Route path="analytics" element={<AnalyticsDashboard />} />
           <Route path="profile" element={<VendorProfile />} />
           <Route path="services" element={<Services />} />

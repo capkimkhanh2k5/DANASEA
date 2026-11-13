@@ -6,7 +6,10 @@ import type {
   OptimizeListingRequest,
   OptimizeListingResult,
   CopilotChatRequest,
-  CopilotChatResponse
+  CopilotChatResponse,
+  CopilotConversation,
+  CopilotMessage,
+  UpdateConversationMetaRequest
 } from '../types/vendorAi';
 
 export const vendorAiService = {
@@ -26,6 +29,43 @@ export const vendorAiService = {
   async chatCopilot(req: CopilotChatRequest): Promise<CopilotChatResponse> {
     const res = await apiClient.post<CopilotChatResponse>('/vendor/ai/copilot/chat', req);
     return res.data;
+  },
+
+  /**
+   * GET /api/vendor/ai/copilot/conversations
+   * Lấy danh sách đoạn chat của Vendor
+   */
+  async getConversations(archived = false, limit = 20): Promise<CopilotConversation[]> {
+    const res = await apiClient.get<CopilotConversation[]>('/vendor/ai/copilot/conversations', {
+      params: { archived, limit },
+    });
+    return res.data;
+  },
+
+  /**
+   * GET /api/vendor/ai/copilot/conversations/{id}/history
+   * Lấy lịch sử tin nhắn của một phiên chat
+   */
+  async getConversationHistory(id: string): Promise<CopilotMessage[]> {
+    const res = await apiClient.get<CopilotMessage[]>(`/vendor/ai/copilot/conversations/${id}/history`);
+    return res.data;
+  },
+
+  /**
+   * PATCH /api/vendor/ai/copilot/conversations/{id}
+   * Đổi tên, ghim hoặc lưu trữ đoạn chat
+   */
+  async updateConversation(id: string, meta: UpdateConversationMetaRequest): Promise<CopilotConversation> {
+    const res = await apiClient.patch<CopilotConversation>(`/vendor/ai/copilot/conversations/${id}`, meta);
+    return res.data;
+  },
+
+  /**
+   * DELETE /api/vendor/ai/copilot/conversations/{id}
+   * Xóa đoạn chat
+   */
+  async deleteConversation(id: string): Promise<void> {
+    await apiClient.delete(`/vendor/ai/copilot/conversations/${id}`);
   },
 
   /**

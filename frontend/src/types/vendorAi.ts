@@ -123,11 +123,54 @@ export interface CopilotChatRequest {
   contextId?: string;
 }
 
-export interface CopilotChatResponse {
-  conversationId: string;
-  reply: string;
-  role: string;
-  insights?: unknown[];
-  actions?: unknown[];
+export interface CopilotArtifact {
+  tool?: string;
+  type?: string;
+  data?: Record<string, unknown>;
+  [key: string]: unknown;
 }
+
+export interface CopilotChatResponse {
+  status: string;
+  conversationId: string;
+  message: string;
+  role: string;
+  artifacts?: CopilotArtifact[];
+  toolsUsed?: string[];
+  generatedTextVerified?: boolean;
+}
+
+export interface CopilotConversation {
+  id: string;
+  actorUserId: string;
+  actorRole: string;
+  vendorId: string;
+  language: string;
+  title: string;
+  pinned: boolean;
+  archived: boolean;
+  contextType?: string | null;
+  contextId?: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CopilotMessage {
+  id: string;
+  conversationId: string;
+  role: 'USER' | 'ASSISTANT' | string;
+  content: string;
+  artifactsJson?: string | null;
+  toolsUsed?: string | null;
+  verified: boolean;
+  createdAt: string;
+}
+
+export interface UpdateConversationMetaRequest {
+  title?: string;
+  pinned?: boolean;
+  archived?: boolean;
+}
+
 
