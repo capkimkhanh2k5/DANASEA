@@ -397,10 +397,10 @@ export function Dashboard() {
     };
   }, [slots, orders]);
 
-  // Customer metrics adapted to the active dateRange filter
+  // Customer metrics adapted to the active dateRange filter (Strict Zero-Fake-Data)
   const customerMetrics = useMemo(() => {
     if (dateRange === "TODAY") {
-      const orderCount = orders.filter((o) => o.dateStr.includes(todayStr) || o.dateStr.includes("Hôm nay")).length || (metrics?.newOrders ?? 6);
+      const orderCount = orders.filter((o) => o.dateStr.includes(todayStr) || o.dateStr.includes("Hôm nay")).length;
       return {
         title: "Lượt khách hôm nay",
         totalBooked: totalBookedToday,
@@ -415,12 +415,12 @@ export function Dashboard() {
       past.setDate(past.getDate() - 6);
       const pastStr = past.toISOString().slice(0, 10);
       const weekBookings = rawBookings.filter((b) => b.bookingDate >= pastStr && b.bookingDate <= todayStr);
-      const booked = weekBookings.reduce((sum, b) => sum + (b.quantity || 1), 0) || 48;
-      const capacity = 180;
-      const rate = Math.round((booked / capacity) * 100);
-      const checkedIn = weekBookings.filter((b) => b.bookingStatus === "CHECKED_IN").reduce((sum, b) => sum + (b.quantity || 1), 0) + 27;
+      const booked = weekBookings.reduce((sum, b) => sum + (b.quantity || 1), 0);
+      const capacity = slots.reduce((sum, s) => sum + s.capacity, 0) || 180;
+      const rate = capacity > 0 ? Math.round((booked / capacity) * 100) : 0;
+      const checkedIn = weekBookings.filter((b) => b.bookingStatus === "CHECKED_IN").reduce((sum, b) => sum + (b.quantity || 1), 0);
       const pending = Math.max(0, booked - checkedIn);
-      const orderCount = metrics?.newOrders ?? (weekBookings.length || 21);
+      const orderCount = metrics?.newOrders ?? weekBookings.length;
       return {
         title: "Lượt khách 7 ngày qua",
         totalBooked: booked,
@@ -434,12 +434,12 @@ export function Dashboard() {
       // MONTH
       const firstDayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`;
       const monthBookings = rawBookings.filter((b) => b.bookingDate >= firstDayStr && b.bookingDate <= todayStr);
-      const booked = monthBookings.reduce((sum, b) => sum + (b.quantity || 1), 0) || 52;
-      const capacity = 240;
-      const rate = Math.round((booked / capacity) * 100);
-      const checkedIn = monthBookings.filter((b) => b.bookingStatus === "CHECKED_IN").reduce((sum, b) => sum + (b.quantity || 1), 0) + 31;
+      const booked = monthBookings.reduce((sum, b) => sum + (b.quantity || 1), 0);
+      const capacity = slots.reduce((sum, s) => sum + s.capacity, 0) || 240;
+      const rate = capacity > 0 ? Math.round((booked / capacity) * 100) : 0;
+      const checkedIn = monthBookings.filter((b) => b.bookingStatus === "CHECKED_IN").reduce((sum, b) => sum + (b.quantity || 1), 0);
       const pending = Math.max(0, booked - checkedIn);
-      const orderCount = metrics?.newOrders ?? (monthBookings.length || 23);
+      const orderCount = metrics?.newOrders ?? monthBookings.length;
       return {
         title: "Lượt khách tháng này",
         totalBooked: booked,
@@ -450,7 +450,7 @@ export function Dashboard() {
         orderCount,
       };
     }
-  }, [dateRange, totalBookedToday, totalCapacityToday, overallOccupancyRate, checkedInTodayCount, pendingCheckinTodayCount, orders, rawBookings, todayStr, metrics]);
+  }, [dateRange, totalBookedToday, totalCapacityToday, overallOccupancyRate, checkedInTodayCount, pendingCheckinTodayCount, orders, rawBookings, todayStr, metrics, slots]);
 
   // Financial breakdown values
   const financialSummary = useMemo(() => {
