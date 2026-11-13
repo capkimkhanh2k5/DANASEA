@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, type ChangeEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Sparkles, Loader2 } from 'lucide-react';
-import { apiClient } from '../../../services/apiClient';
+import { Loader2, Wand2 } from 'lucide-react';
 import { vendorService } from '../../../services/vendorService';
 import { categoryService } from '../../../services/categoryService';
+import { vendorAiService } from '../../../services/vendorAiService';
 import type {
   VendorServiceDto,
   CreateServiceRequest,
@@ -116,49 +116,56 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
 
   // Preview Modal
   const [previewOpen, setPreviewOpen] = useState<boolean>(false);
-  const [isTranslatingAi, setIsTranslatingAi] = useState<boolean>(false);
+  const [isOptimizingAi, setIsOptimizingAi] = useState<boolean>(false);
 
-  const handleAiTranslate = async () => {
+  const handleAiOptimizeListing = async () => {
     if (!nameVi.trim()) {
-      toast.error('Vui lòng nhập Tên dịch vụ (Tiếng Việt) trước khi dịch');
+      toast.error('Vui lòng nhập tên dịch vụ hoặc từ khóa sơ bộ trước khi tối ưu');
       return;
     }
-    setIsTranslatingAi(true);
+    setIsOptimizingAi(true);
     try {
-      // 1. Call Backend AI Listing Optimizer
-      const response = await apiClient.post('/vendor/ai/listings/optimize', {
+      const res = await vendorAiService.optimizeListing({
+        serviceId: currentServiceId || undefined,
         rawTitle: nameVi.trim(),
         rawDescription: descriptionVi.trim() || nameVi.trim(),
         highlights: [],
         includedItems: [],
-        targetLanguages: ['en'],
+        targetLanguages: ['vi', 'en'],
       });
 
-      const data = response.data;
-      const draft =
-        data?.localizedDrafts?.find((d: { language?: string }) => d.language?.toLowerCase() === 'en') ||
-        data?.drafts?.find((d: { language?: string }) => d.language?.toLowerCase() === 'en');
+      const draftVi = res.drafts?.vi || res.drafts?.['vi'];
+      const draftEn = res.drafts?.en || res.drafts?.['en'];
 
-      if (draft && draft.optimizedTitle) {
-        setNameEn(draft.optimizedTitle);
-        if (draft.optimizedDescription) {
-          setDescriptionEn(draft.optimizedDescription);
-        }
-        toast.success('✨ AI đã tự động dịch và tối ưu hóa bài đăng sang Tiếng Anh!');
-        return;
+      if (draftVi?.optimizedTitle) {
+        setNameVi(draftVi.optimizedTitle);
       }
-      throw new Error('Fallback translation');
-    } catch {
-      // 2. High-precision maritime domain dictionary fallback
+      if (draftVi?.optimizedDescription) {
+        setDescriptionVi(draftVi.optimizedDescription);
+      }
+      if (draftEn?.optimizedTitle) {
+        setNameEn(draftEn.optimizedTitle);
+      }
+      if (draftEn?.optimizedDescription) {
+        setDescriptionEn(draftEn.optimizedDescription);
+      }
+      if (draftVi?.safetyAdvisory && (!waiverContent || waiverContent.length < 20)) {
+        setWaiverContent(draftVi.safetyAdvisory);
+      }
+
+      toast.success('Đã tối ưu hóa tiêu đề, mô tả chuẩn SEO và song ngữ cho tour!');
+    } catch (err) {
+      console.error('[ListingOptimizer] AI fallback:', err);
+      // Fallback từ điển du lịch biển chính xác cao
       const marineTitle = translateMarineTitle(nameVi.trim());
       const marineDesc = descriptionVi.trim()
         ? translateMarineTitle(descriptionVi.trim())
-        : `Experience premium ${marineTitle} in Da Nang with international maritime safety equipment and certified local instructors.`;
+        : `Experience premium ${marineTitle} in Da Nang with international SOLAS maritime safety standards and certified local instructors.`;
       setNameEn(marineTitle);
       setDescriptionEn(marineDesc);
-      toast.success('✨ Đã sinh bản dịch Tiếng Anh du lịch biển!');
+      toast.success('Đã hoàn thiện bản dịch tiếng Anh chuẩn du lịch biển!');
     } finally {
-      setIsTranslatingAi(false);
+      setIsOptimizingAi(false);
     }
   };
 
@@ -682,9 +689,30 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                   <div className="lg:col-span-8 space-y-6">
                     {/* Basic Info */}
                     <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
-                      <h2 className="text-sm font-bold text-black border-b border-slate-100 pb-2">
-                        Thông tin cơ bản
-                      </h2>
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <h2 className="text-sm font-bold text-black">
+                          Thông tin cơ bản
+                        </h2>
+                        <button
+                          type="button"
+                          onClick={handleAiOptimizeListing}
+                          disabled={isOptimizingAi || !nameVi.trim()}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors disabled:opacity-40 cursor-pointer shadow-xs"
+                          title="AI viết và tối ưu hóa tiêu đề, mô tả chuẩn SEO du lịch biển & song ngữ"
+                        >
+                          {isOptimizingAi ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-300" />
+                              <span>Đang tối ưu...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 className="w-3.5 h-3.5 text-sky-400" />
+                              <span>Tối ưu nội dung tour</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="md:col-span-2">
@@ -701,30 +729,9 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                         </div>
 
                         <div className="md:col-span-2">
-                          <div className="flex items-center justify-between mb-1">
-                            <label className="text-xs font-semibold text-slate-700">
-                              Tên dịch vụ (Tiếng Anh - Tùy chọn)
-                            </label>
-                            <button
-                              type="button"
-                              onClick={handleAiTranslate}
-                              disabled={isTranslatingAi || !nameVi.trim()}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-700 text-[11px] font-semibold transition-colors disabled:opacity-50 cursor-pointer border border-sky-200/80 shadow-2xs"
-                              title="Tự động dịch Tên và Mô tả sang Tiếng Anh chuẩn du lịch biển"
-                            >
-                              {isTranslatingAi ? (
-                                <>
-                                  <Loader2 className="w-3 h-3 animate-spin text-sky-600" />
-                                  <span>AI đang dịch...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Sparkles className="w-3 h-3 text-sky-600" />
-                                  <span>✨ AI Dịch tự động sang Tiếng Anh</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Tên dịch vụ (Tiếng Anh - Tự động điền)
+                          </label>
                           <input 
                             type="text"
                             value={nameEn}

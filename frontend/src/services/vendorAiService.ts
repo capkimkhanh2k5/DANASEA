@@ -1,7 +1,33 @@
 import { apiClient } from './apiClient';
-import type { CoachingResult, ReplyDraftResult, SlotAdvisorResult } from '../types/vendorAi';
+import type { 
+  CoachingResult, 
+  ReplyDraftResult, 
+  SlotAdvisorResult,
+  OptimizeListingRequest,
+  OptimizeListingResult,
+  CopilotChatRequest,
+  CopilotChatResponse
+} from '../types/vendorAi';
 
 export const vendorAiService = {
+  /**
+   * POST /api/vendor/ai/listings/optimize
+   * AI tối ưu hóa tiêu đề, mô tả chuẩn SEO, trang bị an toàn và đa ngữ cho Tour
+   */
+  async optimizeListing(req: OptimizeListingRequest): Promise<OptimizeListingResult> {
+    const res = await apiClient.post<OptimizeListingResult>('/vendor/ai/listings/optimize', req);
+    return res.data;
+  },
+
+  /**
+   * POST /api/vendor/ai/copilot/chat
+   * Chat hỏi đáp KPIs, doanh thu, phân tích đơn hàng và hỗ trợ đính kèm ngữ cảnh
+   */
+  async chatCopilot(req: CopilotChatRequest): Promise<CopilotChatResponse> {
+    const res = await apiClient.post<CopilotChatResponse>('/vendor/ai/copilot/chat', req);
+    return res.data;
+  },
+
   /**
    * POST /api/vendor/ai/review-coaching
    * Phân tích đánh giá dịch vụ 4 trụ cột (GUIDE, SAFETY, PUNCTUALITY, VALUE)

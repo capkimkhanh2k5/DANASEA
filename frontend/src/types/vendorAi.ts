@@ -78,3 +78,56 @@ export interface SlotAdvisorResult {
   analysisMethod: string;
   generatedAt: string;
 }
+
+export interface OptimizeListingRequest {
+  serviceId?: string;
+  rawTitle?: string;
+  rawDescription?: string;
+  highlights?: string[];
+  includedItems?: string[];
+  targetLanguages?: string[];
+}
+
+export interface LocalizedListingDraft {
+  language: string;
+  optimizedTitle: string;
+  optimizedDescription: string;
+  sellingPoints: string[];
+  travelerPackingList: string[];
+  safetyAdvisory: string;
+}
+
+export interface MissingChecklistItem {
+  itemCode: string;
+  description: string;
+  suggestion: string;
+  critical: boolean;
+}
+
+export interface OptimizeListingResult {
+  vendorId: string;
+  serviceId?: string;
+  detectedCategory: string;
+  listingQualityScore: number;
+  missingItems: MissingChecklistItem[];
+  drafts: Record<string, LocalizedListingDraft>;
+  policyCompliant: boolean;
+  analysisMethod: string;
+  generatedAt: string;
+}
+
+export interface CopilotChatRequest {
+  conversationId?: string;
+  message: string;
+  contextType?: string;
+  contextId?: string;
+}
+
+export interface CopilotChatResponse {
+  conversationId: string;
+  reply: string;
+  role: string;
+  insights?: unknown[];
+  actions?: unknown[];
+}
+
