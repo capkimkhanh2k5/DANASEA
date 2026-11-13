@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Eye, FileCheck, Search } from 'lucide-react';
+import { Copy, Download, Eye, FileCheck, Search } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   MOCK_ADMIN_MASTER_ORDERS,
@@ -12,17 +12,20 @@ import {
   type DemoMasterOrderExtended
 } from '../../../data/adminMockData';
 import { adminOrderService, getAdminOrderError } from '../../../services/adminOrderService';
+import { adminUserService } from '../../../services/adminUserService';
+import type { AdminUserSummaryDto } from '../../../types/adminUser';
 import type { MasterOrder, SubOrder, Payment, Refund } from '../../../types';
 import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
 import { AdminButton, AdminDisclosure, AdminFilterTabs, AdminNotice, AdminPagination } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
-import { filterMasterOrders, ordersToCsv, relatedSubOrders, simulateRefund } from './ordersModel';
+import { filterMasterOrders, ordersToCsv, relatedSubOrders, simulateRefund, formatDisplayCode, type AdminDisplayOrder } from './ordersModel';
 import { ManualRefundPanel } from './ManualRefundPanel';
 import './AdminOrders.css';
 
 const statuses = [
   { value: 'all', label: 'Tất cả đơn' },
   { value: 'PENDING', label: 'Chờ xác nhận' },
+  { value: 'PAID', label: 'Đã thanh toán' },
   { value: 'CONFIRMED', label: 'Đã xác nhận' },
   { value: 'COMPLETED', label: 'Hoàn thành' },
   { value: 'CANCELLED', label: 'Đã hủy' },
@@ -40,6 +43,7 @@ function OrderStatus({ status }: { status: MasterOrder['status'] }) {
   const tone = status === 'CANCELLED' || status === 'REFUNDED' ? 'rose' : status === 'PENDING' ? 'amber' : 'teal';
   const labelMap: Record<string, string> = {
     PENDING: 'Chờ xác nhận',
+    PAID: 'Đã thanh toán',
     CONFIRMED: 'Đã xác nhận',
     COMPLETED: 'Hoàn thành',
     CANCELLED: 'Đã hủy',
@@ -49,20 +53,21 @@ function OrderStatus({ status }: { status: MasterOrder['status'] }) {
 }
 
 function OrderPaymentBadge({ order, payment }: { order: MasterOrder; payment?: Payment }) {
-  const ext = order as DemoMasterOrderExtended;
-  const pStatus = ext.paymentStatus || payment?.status;
+  const ext = order as AdminDisplayOrder;
+  const pStatus = (ext.paymentStatus || payment?.status) as string | undefined;
   const provider = ext.paymentProvider || payment?.provider;
+  const oStatus = order.status as string;
 
-  if (pStatus === 'PAID' || pStatus === 'COMPLETED' || order.status === 'COMPLETED') {
-    return <AdminBadge tone="teal">Đã thanh toán · {provider || 'Cổng TT'}</AdminBadge>;
+  if (pStatus === 'PAID' || pStatus === 'COMPLETED' || pStatus === 'SUCCESS' || oStatus === 'COMPLETED' || oStatus === 'PAID') {
+    return <AdminBadge tone="teal">{provider ? `Đã thanh toán · ${provider}` : 'Đã thanh toán'}</AdminBadge>;
   }
-  if (pStatus === 'REFUNDED' || order.status === 'REFUNDED') {
+  if (pStatus === 'REFUNDED' || oStatus === 'REFUNDED') {
     return <AdminBadge tone="rose">Đã hoàn tiền</AdminBadge>;
   }
-  if (pStatus === 'FAILED' || order.status === 'CANCELLED') {
+  if (pStatus === 'FAILED' || oStatus === 'CANCELLED') {
     return <AdminBadge tone="rose">Thanh toán thất bại</AdminBadge>;
   }
-  if (pStatus === 'PENDING' || pStatus === 'UNPAID' || order.status === 'PENDING') {
+  if (pStatus === 'PENDING' || pStatus === 'UNPAID' || oStatus === 'PENDING') {
     return <AdminBadge tone="amber">Chờ thanh toán</AdminBadge>;
   }
   return <AdminBadge tone="neutral">Chưa có dữ liệu thanh toán</AdminBadge>;
@@ -102,7 +107,18 @@ export function OrderDetailContent({
         <dl className="admin-detail-grid">
           <div>
             <dt>Mã đơn hàng (Master)</dt>
-            <dd><strong>#{master.id}</strong></dd>
+            <dd style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <strong title={master.id}>#{formatDisplayCode(master.id, 'ORD')}</strong>
+              <button
+                type="button"
+                className="admin-copy-mini-btn"
+                onClick={() => navigator.clipboard.writeText(master.id)}
+                title="Sao chép UUID đơn hàng"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--admin-muted, #737373)' }}
+              >
+                <Copy size={12} />
+              </button>
+            </dd>
           </div>
           <div>
             <dt>Khách hàng đặt</dt>
@@ -113,7 +129,18 @@ export function OrderDetailContent({
           </div>
           <div>
             <dt>Mã tài khoản khách</dt>
-            <dd><code>{master.customerId}</code></dd>
+            <dd style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <code title={master.customerId}>{formatDisplayCode(master.customerId, 'CUST')}</code>
+              <button
+                type="button"
+                className="admin-copy-mini-btn"
+                onClick={() => navigator.clipboard.writeText(master.customerId)}
+                title="Sao chép UUID khách hàng"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--admin-muted, #737373)' }}
+              >
+                <Copy size={12} />
+              </button>
+            </dd>
           </div>
           <div>
             <dt>Ngày tạo · giờ Việt Nam</dt>
@@ -255,8 +282,8 @@ export function OrderDetailContent({
               <div>
                 <dt>Trạng thái giao dịch</dt>
                 <dd>
-                  <AdminBadge tone={payment.status === 'COMPLETED' ? 'teal' : payment.status === 'REFUNDED' ? 'rose' : payment.status === 'FAILED' ? 'rose' : 'amber'}>
-                    {payment.status === 'COMPLETED' ? 'Giao dịch thành công' : payment.status === 'REFUNDED' ? 'Đã hoàn tiền' : payment.status === 'FAILED' ? 'Thất bại' : 'Đang xử lý'}
+                  <AdminBadge tone={payment.status === 'COMPLETED' || (payment.status as string) === 'SUCCESS' ? 'teal' : payment.status === 'REFUNDED' ? 'rose' : payment.status === 'FAILED' ? 'rose' : 'amber'}>
+                    {payment.status === 'COMPLETED' || (payment.status as string) === 'SUCCESS' ? 'Giao dịch thành công' : payment.status === 'REFUNDED' ? 'Đã hoàn tiền' : payment.status === 'FAILED' ? 'Thất bại' : 'Đang xử lý'}
                   </AdminBadge>
                 </dd>
               </div>
@@ -348,30 +375,50 @@ export function AdminOrders() {
   const [notice, setNotice] = useState<string | null>(null);
   const [exportError, setExportError] = useState(false);
 
-  // Tra cứu User và Payment nhanh bằng Map (chỉ dùng trong chế độ demo, chế độ thật dùng dữ liệu API)
-  const customerMap = useMemo(() => (demo ? new Map(MOCK_ADMIN_USERS.map(u => [u.id, u])) : new Map()), [demo]);
+  // Tra cứu User và Payment nhanh bằng Map (chế độ demo hoặc API thật)
+  const [liveUsers, setLiveUsers] = useState<AdminUserSummaryDto[]>([]);
+  const customerMap = useMemo(() => {
+    if (demo) return new Map(MOCK_ADMIN_USERS.map(u => [u.id, u]));
+    return new Map(liveUsers.map(u => [u.id, u]));
+  }, [demo, liveUsers]);
   const paymentMap = useMemo(() => (demo ? new Map(MOCK_ADMIN_PAYMENTS.map(p => [p.masterOrderId, p])) : new Map()), [demo]);
   const refundMap = useMemo(() => (demo ? new Map(MOCK_ADMIN_REFUNDS.map(r => [r.subOrderId, r])) : new Map()), [demo]);
+
+  const [liveSubOrders, setLiveSubOrders] = useState<SubOrder[]>([]);
+  const [livePayments, setLivePayments] = useState<Payment[]>([]);
 
   useEffect(() => {
     if (demo) return;
 
     let isMounted = true;
-    adminOrderService
-      .getOrders({ page: 0, size: 50 })
-      .then(res => {
+    Promise.all([
+      adminOrderService.getOrders({ page: 0, size: 200 }),
+      adminUserService.getUsers({ size: 100 }).catch(() => ({ content: [] as AdminUserSummaryDto[], totalElements: 0, totalPages: 0, size: 100, number: 0 })),
+    ])
+      .then(([res, userRes]) => {
         if (!isMounted) return;
-        const mappedOrders: MasterOrder[] = (res.content || []).map(o => ({
-          id: o.id,
-          customerId: o.customerId,
-          totalAmount: o.totalAmount,
-          discountAmount: o.discountAmount,
-          discountCodeId: '',
-          finalAmount: o.totalAmount - o.discountAmount,
-          status: o.status as unknown as MasterOrder['status'],
-          createdAt: o.createdAt,
-          updatedAt: o.updatedAt,
-        }));
+        const users = userRes?.content || [];
+        setLiveUsers(users);
+        const uMap = new Map<string, AdminUserSummaryDto>(users.map(u => [u.id, u]));
+
+        const mappedOrders: DemoMasterOrderExtended[] = (res.content || []).map(o => {
+          const u = uMap.get(o.customerId);
+          return {
+            id: o.id,
+            customerId: o.customerId,
+            customerName: u?.fullName || u?.email || '',
+            totalAmount: o.totalAmount,
+            discountAmount: o.discountAmount || 0,
+            discountCodeId: '',
+            finalAmount: (o.totalAmount || 0) - (o.discountAmount || 0),
+            status: o.status as unknown as MasterOrder['status'],
+            totalItems: o.totalItems || 0,
+            paymentStatus: o.paymentStatus as DemoMasterOrderExtended['paymentStatus'],
+            paymentProvider: undefined,
+            createdAt: o.createdAt,
+            updatedAt: o.updatedAt,
+          };
+        });
         setMasterOrders(mappedOrders);
         setLoading(false);
       })
@@ -386,6 +433,63 @@ export function AdminOrders() {
       isMounted = false;
     };
   }, [demo]);
+
+  useEffect(() => {
+    if (demo || !selectedOrderId) {
+      setLiveSubOrders([]);
+      setLivePayments([]);
+      return;
+    }
+
+    let isMounted = true;
+    Promise.all([
+      adminOrderService.getOrder(selectedOrderId).catch(() => null),
+      adminOrderService.getPayments(selectedOrderId).catch(() => null),
+    ]).then(([orderRes, paymentsRes]) => {
+      if (!isMounted) return;
+      if (orderRes?.items) {
+        const mappedSubs: SubOrder[] = orderRes.items.map(item => ({
+          id: item.id,
+          masterOrderId: selectedOrderId,
+          vendorId: item.vendorId,
+          serviceId: item.serviceId,
+          slotId: item.slotId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotalAmount: item.subtotalAmount,
+          status: item.status as unknown as SubOrder['status'],
+          commissionRate: 10,
+          commissionAmount: Math.round(item.subtotalAmount * 0.1),
+          vendorPayoutAmount: item.subtotalAmount - Math.round(item.subtotalAmount * 0.1),
+          waiverAccepted: Boolean(item.waiverRequired),
+          waiverAcceptedAt: item.waiverRequired ? (orderRes.createdAt || '') : '',
+          checkedInAt: '',
+          qrSecret: 'qr-' + item.id,
+          createdAt: orderRes.createdAt,
+          updatedAt: orderRes.updatedAt,
+        }));
+        setLiveSubOrders(mappedSubs);
+      }
+      if (paymentsRes?.content) {
+        const mappedP: Payment[] = paymentsRes.content.map(p => ({
+          id: p.id,
+          masterOrderId: p.masterOrderId,
+          provider: p.provider as unknown as Payment['provider'],
+          providerTransactionId: p.providerTransactionId || p.id,
+          amount: p.amount,
+          status: p.status as unknown as Payment['status'],
+          rawWebhookPayload: '',
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+        }));
+        setLivePayments(mappedP);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [demo, selectedOrderId]);
 
   const filteredOrders = useMemo(
     () => filterMasterOrders(masterOrders, searchQuery, statusFilter),
@@ -402,8 +506,20 @@ export function AdminOrders() {
     return filteredOrders.slice(start, start + PAGE_SIZE);
   }, [filteredOrders, activePage]);
   const selectedMaster = masterOrders.find(order => order.id === selectedOrderId);
-  const selectedSubs = selectedMaster ? relatedSubOrders(visibleSubs, selectedMaster.id) : [];
-  const selectedPayment = selectedMaster ? paymentMap.get(selectedMaster.id) : undefined;
+  const selectedSubs = useMemo(() => {
+    if (demo) {
+      return selectedMaster ? relatedSubOrders(visibleSubs, selectedMaster.id) : [];
+    }
+    return liveSubOrders;
+  }, [demo, selectedMaster, visibleSubs, liveSubOrders]);
+
+  const selectedPayment = useMemo(() => {
+    if (demo) {
+      return selectedMaster ? paymentMap.get(selectedMaster.id) : undefined;
+    }
+    return livePayments.find(p => p.masterOrderId === selectedOrderId) || livePayments[0];
+  }, [demo, selectedMaster, selectedOrderId, paymentMap, livePayments]);
+
   const selectedRefund = selectedSubs.find(s => refundMap.has(s.id)) ? refundMap.get(selectedSubs.find(s => refundMap.has(s.id))!.id) : undefined;
 
   const openRefund = (sub: SubOrder) => {
@@ -444,7 +560,7 @@ export function AdminOrders() {
         link.remove();
         URL.revokeObjectURL(url);
       }
-      setNotice(`Đã tạo CSV gồm ${filteredOrders.length} đơn đang hiển thị từ dữ liệu mẫu.`);
+      setNotice(`Đã xuất CSV gồm ${filteredOrders.length} đơn hàng theo bộ lọc hiện tại.`);
     } catch {
       setExportError(true);
     }
@@ -466,6 +582,13 @@ export function AdminOrders() {
         </div>
         <div className="admin-orders__summary-divider" />
         <div className="admin-orders__summary-item">
+          <span>Đã thanh toán:</span>
+          <strong style={{ color: '#0284c7' }}>
+            {masterOrders.filter(order => (order.status as string) === 'PAID').length}
+          </strong>
+        </div>
+        <div className="admin-orders__summary-divider" />
+        <div className="admin-orders__summary-item">
           <span>Đã hoàn thành:</span>
           <strong style={{ color: '#0d9488' }}>
             {masterOrders.filter(order => order.status === 'COMPLETED').length}
@@ -474,7 +597,9 @@ export function AdminOrders() {
         <div className="admin-orders__summary-divider" />
         <div className="admin-orders__summary-item">
           <span>Tổng dịch vụ con:</span>
-          <strong style={{ color: 'var(--admin-ink, #171717)' }}>{visibleSubs.length}</strong>
+          <strong style={{ color: 'var(--admin-ink, #171717)' }}>
+            {demo ? visibleSubs.length : masterOrders.reduce((sum, o) => sum + ((o as AdminDisplayOrder).totalItems || 0), 0)}
+          </strong>
         </div>
       </div>
 
@@ -501,7 +626,7 @@ export function AdminOrders() {
             ...status,
             count: status.value === 'all'
               ? masterOrders.length
-              : masterOrders.filter(order => order.status === status.value).length,
+              : masterOrders.filter(order => (order.status as string) === status.value).length,
           }))}
         />
 
@@ -590,16 +715,33 @@ export function AdminOrders() {
                   return (
                     <tr key={order.id} data-selected={drawerOpen && order.id === selectedOrderId}>
                       <td>
-                        <strong className="admin-orders-id">#{order.id}</strong>
+                        <strong className="admin-orders-id" title={order.id}>
+                          #{formatDisplayCode(order.id, 'ORD')}
+                        </strong>
                         <small>{dateTime(order.createdAt)}</small>
                       </td>
                       <td>
                         <strong style={{ display: 'block', color: 'var(--admin-ink, #171717)', fontSize: '13.5px' }}>
-                          {customerName}
+                          {customerName || `Khách #${formatDisplayCode(order.customerId, 'CUST')}`}
                         </strong>
-                        <small>{customerSub}</small>
+                        <small style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {customerSub}
+                          <button
+                            type="button"
+                            className="admin-copy-mini-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(order.customerId);
+                              setNotice('Đã sao chép UUID khách hàng: ' + order.customerId);
+                            }}
+                            title="Sao chép UUID khách hàng"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 1, color: 'var(--admin-muted, #737373)' }}
+                          >
+                            <Copy size={11} />
+                          </button>
+                        </small>
                       </td>
-                      <td style={{ fontWeight: 600 }}>{relatedSubOrders(visibleSubs, order.id).length}</td>
+                      <td style={{ fontWeight: 600 }}>{demo ? relatedSubOrders(visibleSubs, order.id).length : ((order as AdminDisplayOrder).totalItems || 0)}</td>
                       <td className="admin-orders-money">
                         <strong>{money(order.totalAmount)}</strong>
                         {order.discountAmount > 0 && (
@@ -673,8 +815,8 @@ export function AdminOrders() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         variant="drawer"
-        title={selectedMaster ? `Chi tiết đơn #${selectedMaster.id}` : 'Chi tiết đơn hàng'}
-        description="Master / Sub Orders · Dữ liệu đối soát hệ thống"
+        title={selectedMaster ? `Chi tiết đơn #${formatDisplayCode(selectedMaster.id, 'ORD')}` : 'Chi tiết đơn hàng'}
+        description={selectedMaster ? `Mã định danh hệ thống: ${selectedMaster.id}` : 'Master / Sub Orders · Dữ liệu đối soát hệ thống'}
         footer={
           <div className="admin-drawer-actions">
             <AdminButton onClick={() => navigate(`/admin/disputes${demo ? '?demo=1' : ''}`)}>

@@ -41,7 +41,7 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
     <section className="admin-detail-section" aria-labelledby="vendor-documents-heading">
       <div className="admin-vendors-section-heading">
         <h3 id="vendor-documents-heading">Hồ sơ pháp lý & Chứng chỉ</h3>
-        <span>{vendor.documents && vendor.documents.length > 0 ? `${vendor.documents.length} chứng từ CSDL` : '2 bản xem trước mẫu'}</span>
+        <span>{vendor.documents && vendor.documents.length > 0 ? `${vendor.documents.length} chứng từ CSDL` : 'Chưa có hồ sơ'}</span>
       </div>
       {vendor.documents && vendor.documents.length > 0 ? (
         <div className="admin-documents">
@@ -106,45 +106,21 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
           })}
         </div>
       ) : (
-        <>
-          <p className="admin-detail-note">Hai tên tệp cố định để xem thử giao diện, không phải chứng từ đã được đối tác tải lên hoặc xác thực.</p>
-          <div className="admin-documents">{[
-            {
-              name: 'giay_phep_kinh_doanh_2024.pdf',
-              detail: '2.8 MB · Mã mẫu: #GP-DANANG-2024',
-              subMeta: 'Cấp bởi: Sở Kế hoạch & Đầu tư Đà Nẵng · Hạn: 12/2026',
-              status: vendor.verificationStatus === 'REJECTED' ? 'Cần bổ sung' : 'Đã xác minh (mẫu)',
-              statusTone: vendor.verificationStatus === 'REJECTED' ? 'rose' : 'teal',
-              reason: vendor.verificationStatus === 'REJECTED' ? 'Khu vực bến thủy chưa được công bố hoạt động hợp chuẩn.' : undefined,
-            },
-            {
-              name: 'chung_chi_cuu_ho_padi_rescue.pdf',
-              detail: '4.1 MB · PADI Rescue Standard (mẫu)',
-              subMeta: 'Tiêu chuẩn: PADI Rescue Diver & First Aid · Hạn: 08/2025',
-              status: vendor.verificationStatus === 'PENDING' ? 'Chờ kiểm tra' : vendor.verificationStatus === 'REJECTED' ? 'Cần bổ sung' : 'Đã xác minh (mẫu)',
-              statusTone: vendor.verificationStatus === 'PENDING' ? 'amber' : vendor.verificationStatus === 'REJECTED' ? 'rose' : 'teal',
-              reason: vendor.verificationStatus === 'PENDING' ? (vendor.safetyCertificateStatus || 'Chờ đối soát danh sách cứu hộ viên trực ban theo QCVN.') : undefined,
-            },
-          ].map(document => <button type="button" key={document.name} onClick={() => onPreview(document.name)} className="admin-vendors-document" aria-haspopup="dialog">
-            <FileText size={22} aria-hidden="true" className="admin-vendors-doc-icon" />
-            <span className="admin-vendors-doc-info">
-              <div className="admin-vendors-doc-top">
-                <strong>{document.name}</strong>
-                <AdminBadge tone={document.statusTone as 'teal' | 'amber' | 'rose'}>{document.status}</AdminBadge>
-              </div>
-              <small>{document.detail}</small>
-              <span className="admin-vendors-doc-meta">{document.subMeta}</span>
-              {document.reason && <span className="admin-vendors-doc-reason">Lý do chưa đạt: {document.reason}</span>}
-            </span>
-            <span className="admin-vendors-preview-link">Xem mẫu</span>
-          </button>)}</div>
-        </>
+        <div style={{ padding: '24px 16px', textAlign: 'center', background: '#f8fafc', borderRadius: 8, border: '1px dashed #cbd5e1' }}>
+          <FileText size={28} style={{ color: '#94a3b8', margin: '0 auto 8px', display: 'block' }} aria-hidden="true" />
+          <p style={{ margin: '0 0 4px', fontSize: 13, fontWeight: 600, color: '#475569' }}>
+            Đối tác chưa tải lên hồ sơ pháp lý
+          </p>
+          <span style={{ fontSize: 12, color: '#64748b' }}>
+            Chưa có Giấy phép kinh doanh (GPKD) hoặc Chứng nhận an toàn đường thủy được ghi nhận trên hệ thống.
+          </span>
+        </div>
       )}
     </section>
 
     <AdminDisclosure title="Pháp lý & tài khoản thụ hưởng" description="Mã số thuế, ngân hàng và thông tin người thụ hưởng">
-      <dl className="admin-detail-grid"><div><dt>Mã số thuế</dt><dd>{formatTaxCode(vendor.taxCode) === 'Chưa cập nhật' ? <span style={{ fontStyle: 'italic', color: '#64748b' }}>Chưa cập nhật</span> : <span className="admin-vendors-mono">{vendor.taxCode}</span>}</dd></div><div><dt>Ngân hàng</dt><dd>{vendor.bankName}</dd></div>
-        <div><dt>Số tài khoản</dt><dd className="admin-vendors-mono">{vendor.bankAccountNumber}</dd></div><div><dt>Chủ tài khoản</dt><dd>{vendor.bankAccountHolder}</dd></div></dl>
+      <dl className="admin-detail-grid"><div><dt>Mã số thuế</dt><dd>{formatTaxCode(vendor.taxCode) === 'Chưa cập nhật' ? <span style={{ fontStyle: 'italic', color: '#64748b' }}>Chưa cập nhật</span> : <span className="admin-vendors-mono">{vendor.taxCode}</span>}</dd></div><div><dt>Ngân hàng</dt><dd>{vendor.bankName || 'Chưa cập nhật'}</dd></div>
+        <div><dt>Số tài khoản</dt><dd className="admin-vendors-mono">{vendor.bankAccountNumber || 'Chưa cập nhật'}</dd></div><div><dt>Chủ tài khoản</dt><dd>{vendor.bankAccountHolder || 'Chưa cập nhật'}</dd></div></dl>
     </AdminDisclosure>
 
     <AdminDisclosure title="Thông tin bổ sung & dữ liệu gốc" description="Định danh, ngày đăng ký và thông tin vận hành mẫu">

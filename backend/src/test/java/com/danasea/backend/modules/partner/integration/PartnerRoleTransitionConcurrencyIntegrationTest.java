@@ -272,6 +272,47 @@ public class PartnerRoleTransitionConcurrencyIntegrationTest extends BaseSecurit
     }
 
     @Test
+    @DisplayName("GET /api/admin/partner-applications without search or with empty search returns 200 OK against PostgreSQL")
+    @WithMockUser(roles = "ADMIN")
+    void adminCanQueryApplicationsWithoutSearchParam() throws Exception {
+        User customer = createCustomer("app_nosearch_" + UUID.randomUUID() + "@danasea.test");
+        VendorRoleApplicationJpaEntity app = createApplication(customer.getId());
+        app.setBusinessName("No Search Test Co");
+        applicationRepository.save(app);
+
+        // 1. Without search parameter (?page=0&size=8)
+        mockMvc.perform(get("/api/admin/partner-applications")
+                        .param("page", "0")
+                        .param("size", "8"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+
+        // 2. With empty search parameter (?page=0&size=8&search=)
+        mockMvc.perform(get("/api/admin/partner-applications")
+                        .param("page", "0")
+                        .param("size", "8")
+                        .param("search", ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+
+        // 3. With status filter and no search (?status=PENDING&page=0&size=8)
+        mockMvc.perform(get("/api/admin/partner-applications")
+                        .param("status", "PENDING")
+                        .param("page", "0")
+                        .param("size", "8"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+
+        // 4. With search parameter and NO status (?search=No Search Test&page=0&size=8)
+        mockMvc.perform(get("/api/admin/partner-applications")
+                        .param("search", "No Search Test")
+                        .param("page", "0")
+                        .param("size", "8"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
     @DisplayName("Stale JWT token with old session_version is rejected with 401 after Admin approval")
     void staleJwt_AfterRoleTransition_RejectedWith401() throws Exception {
         User customer = createCustomer("jwt_cust_" + UUID.randomUUID() + "@danasea.test");

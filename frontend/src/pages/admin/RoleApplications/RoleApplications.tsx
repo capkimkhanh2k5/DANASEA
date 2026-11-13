@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Eye, Search, UserCheck, RefreshCw, XCircle } from 'lucide-react';
+import { Eye, Search, RefreshCw, XCircle } from 'lucide-react';
 import { adminPartnerApplicationService, getAdminPartnerApplicationError } from '../../../services/adminPartnerApplicationService';
 import type { PartnerApplicationResponse, PartnerApplicationStatus, SpringPage } from '../../../types/partnerApplication';
 import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
@@ -180,15 +180,11 @@ export function RoleApplications() {
       <AdminNotice message={notice} onDismiss={() => setNotice(null)} />
 
       <section className="admin-workspace-card" aria-labelledby="role-app-heading">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        <div className="admin-role-applications-header">
           <div>
-            <h1 id="role-app-heading" className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <UserCheck className="w-5 h-5 text-sky-600" aria-hidden="true" />
-              <span>Duyệt vai trò đối tác (Quy trình 1)</span>
+            <h1 id="role-app-heading" className="text-xl font-bold text-slate-900 tracking-tight">
+              Danh sách đăng kí hợp tác
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Thẩm định đơn đăng ký chuyển đổi từ Khách hàng (CUSTOMER) sang Nhà cung cấp (VENDOR).
-            </p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-500 tabular-nums">
@@ -202,27 +198,25 @@ export function RoleApplications() {
         </div>
 
         {/* Filter Tabs */}
-        <div className="mt-4">
-          <AdminFilterTabs
-            label="Lọc theo trạng thái xét duyệt"
-            value={status}
-            onChange={(value) => {
-              if (value === 'all' || value === 'PENDING' || value === 'APPROVED' || value === 'REJECTED') {
-                setStatus(value);
-                setCurrentPage(1);
-              }
-            }}
-            items={[
-              { value: 'all', label: 'Tất cả', count: demo ? demoApplications.length : undefined },
-              { value: 'PENDING', label: 'Chờ duyệt', count: countDemoStatus('PENDING') },
-              { value: 'APPROVED', label: 'Đã duyệt', count: countDemoStatus('APPROVED') },
-              { value: 'REJECTED', label: 'Từ chối', count: countDemoStatus('REJECTED') },
-            ]}
-          />
-        </div>
+        <AdminFilterTabs
+          label="Lọc theo trạng thái xét duyệt"
+          value={status}
+          onChange={(value) => {
+            if (value === 'all' || value === 'PENDING' || value === 'APPROVED' || value === 'REJECTED') {
+              setStatus(value);
+              setCurrentPage(1);
+            }
+          }}
+          items={[
+            { value: 'all', label: 'Tất cả', count: demo ? demoApplications.length : undefined },
+            { value: 'PENDING', label: 'Chờ duyệt', count: countDemoStatus('PENDING') },
+            { value: 'APPROVED', label: 'Đã duyệt', count: countDemoStatus('APPROVED') },
+            { value: 'REJECTED', label: 'Từ chối', count: countDemoStatus('REJECTED') },
+          ]}
+        />
 
         {/* Search & Actions Toolbar */}
-        <div className="admin-workspace-toolbar mt-4">
+        <div className="admin-workspace-toolbar">
           <label className="admin-search-field">
             <Search size={18} aria-hidden="true" />
             <input
@@ -269,7 +263,7 @@ export function RoleApplications() {
                 />
               </div>
             ) : (
-              <div className="admin-table-scroll mt-4" role="region" aria-label="Bảng danh sách đơn đối tác" tabIndex={0}>
+              <div className="admin-table-scroll" role="region" aria-label="Bảng danh sách đơn đối tác" tabIndex={0}>
                 <table className="admin-workspace-table">
                   <caption className="sr-only">Danh sách đơn xin chuyển đổi vai trò sang VENDOR</caption>
                   <thead>
@@ -320,8 +314,8 @@ export function RoleApplications() {
               </div>
             )}
 
-            {totalPages > 1 && (
-              <div className="mt-4 pt-4 border-t border-slate-100">
+            {totalRecords > 0 && (
+              <div className="admin-pagination-wrapper">
                 <AdminPagination
                   currentPage={activePage}
                   totalPages={totalPages}
@@ -329,13 +323,14 @@ export function RoleApplications() {
                   pageSize={PAGE_SIZE}
                   recordLabel="đơn"
                   onPageChange={setCurrentPage}
+                  hideOnSinglePage={false}
                 />
               </div>
             )}
           </>
         )}
 
-        <div className="admin-vendors-list-footer mt-4 text-xs text-slate-500 text-center">
+        <div className="admin-vendors-list-footer text-xs text-slate-500 text-center">
           Hiển thị {paginated.length} đơn {demo ? 'mẫu (Demo Mode)' : 'từ hệ thống DANASEA'} · Chi tiết thẩm định mở trong ngăn riêng, giữ nguyên danh sách và bộ lọc.
         </div>
       </section>
