@@ -93,6 +93,8 @@ export function VendorLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, accessToken } = useAuthStore();
+  const isCopilotOpen = useVendorCopilotStore((s) => s.isOpen);
+  const toggleCopilot = useVendorCopilotStore((s) => s.toggleCopilot);
 
   useEffect(() => {
     if (!accessToken || !isAuthenticated) {
@@ -491,17 +493,30 @@ export function VendorLayout() {
         </main>
       </div>
 
-      {/* Floating Copilot Trigger Button (Visible across all vendor screens except dedicated /vendor/copilot) */}
+      {/* Floating Copilot Trigger Button (Styled identically to Customer deck) */}
       {location.pathname !== "/vendor/copilot" && (
-        <button
-          onClick={() => useVendorCopilotStore.getState().toggleCopilot()}
-          className="fixed bottom-6 right-6 z-40 h-10 px-3.5 rounded-xl bg-slate-900 text-white hover:bg-slate-800 shadow-lg shadow-slate-900/10 flex items-center gap-2 text-xs font-semibold border border-slate-800 transition-all hover:-translate-y-0.5 cursor-pointer print:hidden select-none"
-          title="Mở Trợ lý kinh doanh DANASEA Copilot"
-          aria-label="Toggle Vendor Copilot"
+        <aside
+          aria-label="Menu Trợ lý Copilot"
+          className="fixed bottom-6 right-6 z-40 flex flex-col items-center select-none print:hidden"
         >
-          <Bot className="w-4 h-4 text-sky-400 shrink-0" strokeWidth={1.75} />
-          <span>DANASEA Copilot</span>
-        </button>
+          <div className="relative group/btn flex items-center">
+            <span className="absolute right-full mr-2.5 px-2.5 py-1 rounded-lg bg-slate-900/90 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none shadow-md">
+              DANASEA Copilot
+            </span>
+            <button
+              type="button"
+              onClick={toggleCopilot}
+              aria-label="Trợ lý kinh doanh DANASEA Copilot"
+              className={`relative w-11 h-11 rounded-2xl flex items-center justify-center border shadow-md transition-all cursor-pointer ${
+                isCopilotOpen
+                  ? "bg-slate-900 text-white border-slate-900 shadow-slate-900/20"
+                  : "bg-white text-slate-900 border-slate-200/90 hover:border-slate-400 hover:shadow-lg"
+              }`}
+            >
+              <Bot className="w-5 h-5 text-current transition-transform group-hover/btn:scale-110" />
+            </button>
+          </div>
+        </aside>
       )}
 
       {/* Vendor Copilot Slide-over Drawer */}
