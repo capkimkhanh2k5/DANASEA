@@ -261,23 +261,67 @@ export function Dashboard() {
     }
   };
 
-  // Occupancy calculations per service
+  // Occupancy calculations per service based on active dateRange
   const serviceOccupancies: ServiceOccupancy[] = useMemo(() => {
     if (services.length === 0) return [];
-    return services.map((s) => {
-      const relatedSlots = slots.filter((sl) => sl.title === s.name);
-      const totalBooked = relatedSlots.reduce((sum, sl) => sum + sl.booked, 0);
-      const totalCapacity = relatedSlots.reduce((sum, sl) => sum + sl.capacity, 0) || s.capacityPerSlot || 10;
-      const percentage = Math.min(100, Math.round((totalBooked / totalCapacity) * 100));
-      return {
-        id: s.id,
-        name: s.name,
-        booked: totalBooked,
-        capacity: totalCapacity,
-        percentage,
-      };
-    }).sort((a, b) => b.percentage - a.percentage);
-  }, [services, slots]);
+
+    if (dateRange === "TODAY") {
+      return services.map((s) => {
+        const relatedSlots = slots.filter((sl) => sl.title === s.name);
+        const totalBooked = relatedSlots.reduce((sum, sl) => sum + sl.booked, 0);
+        const totalCapacity = relatedSlots.reduce((sum, sl) => sum + sl.capacity, 0) || s.capacityPerSlot || 10;
+        const percentage = Math.min(100, Math.round((totalBooked / totalCapacity) * 100));
+        return {
+          id: s.id,
+          name: s.name,
+          booked: totalBooked,
+          capacity: totalCapacity,
+          percentage,
+        };
+      }).sort((a, b) => b.percentage - a.percentage);
+    } else if (dateRange === "WEEK") {
+      const past = new Date();
+      past.setDate(past.getDate() - 6);
+      const pastStr = past.toISOString().slice(0, 10);
+      const weekBookings = rawBookings.filter((b) => b.bookingDate >= pastStr && b.bookingDate <= todayStr);
+
+      return services.map((s) => {
+        const sBookings = weekBookings.filter((b) => b.serviceId === s.id);
+        const booked = sBookings.reduce((sum, b) => sum + (b.quantity || 1), 0);
+        const relatedTodaySlots = slots.filter((sl) => sl.title === s.name);
+        const dailyCap = relatedTodaySlots.reduce((sum, sl) => sum + sl.capacity, 0) || s.capacityPerSlot || 16;
+        const totalCapacity = dailyCap * 2;
+        const percentage = Math.min(100, Math.round((booked / totalCapacity) * 100));
+        return {
+          id: s.id,
+          name: s.name,
+          booked,
+          capacity: totalCapacity,
+          percentage,
+        };
+      }).sort((a, b) => b.percentage - a.percentage);
+    } else {
+      // MONTH
+      const firstDayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`;
+      const monthBookings = rawBookings.filter((b) => b.bookingDate >= firstDayStr && b.bookingDate <= todayStr);
+
+      return services.map((s) => {
+        const sBookings = monthBookings.filter((b) => b.serviceId === s.id);
+        const booked = sBookings.reduce((sum, b) => sum + (b.quantity || 1), 0);
+        const relatedTodaySlots = slots.filter((sl) => sl.title === s.name);
+        const dailyCap = relatedTodaySlots.reduce((sum, sl) => sum + sl.capacity, 0) || s.capacityPerSlot || 16;
+        const totalCapacity = dailyCap * 3;
+        const percentage = Math.min(100, Math.round((booked / totalCapacity) * 100));
+        return {
+          id: s.id,
+          name: s.name,
+          booked,
+          capacity: totalCapacity,
+          percentage,
+        };
+      }).sort((a, b) => b.percentage - a.percentage);
+    }
+  }, [services, slots, dateRange, rawBookings, todayStr]);
 
   // Overall Today Capacity & Checked-in metrics
   const { totalBookedToday, totalCapacityToday, overallOccupancyRate, checkedInTodayCount, pendingCheckinTodayCount } = useMemo(() => {
@@ -790,7 +834,11 @@ export function Dashboard() {
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-6 flex flex-col justify-between">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-              Hiệu suất lấp đầy hôm nay
+              {dateRange === "TODAY"
+                ? "Hiệu suất lấp đầy hôm nay"
+                : dateRange === "WEEK"
+                ? "Hiệu suất lấp đầy 7 ngày qua"
+                : "Hiệu suất lấp đầy tháng này"}
             </h2>
             <button
               onClick={() => navigate('/vendor/services')}
@@ -824,10 +872,10 @@ export function Dashboard() {
                     cy="80"
                     r="58"
                     fill="none"
-                    stroke={overallOccupancyRate >= 100 ? "#f59e0b" : "#0284c7"}
+                    stroke={customerMetrics.occupancyRate >= 100 ? "#f59e0b" : "#0284c7"}
                     strokeWidth="16"
                     strokeDasharray={364.42}
-                    strokeDashoffset={364.42 - (364.42 * Math.min(100, Math.max(0, overallOccupancyRate))) / 100}
+                    strokeDashoffset={364.42 - (364.42 * Math.min(100, Math.max(0, customerMetrics.occupancyRate))) / 100}
                     strokeLinecap="round"
                     className="transition-all duration-700 ease-out"
                   />
@@ -836,10 +884,10 @@ export function Dashboard() {
                 {/* Centered KPI Metrics */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
                   <span className="text-3xl font-bold font-mono text-slate-900 tabular-nums tracking-tight">
-                    {overallOccupancyRate}%
+                    {customerMetrics.occupancyRate}%
                   </span>
                   <span className="text-[10px] font-semibold text-slate-600 tracking-wider uppercase mt-0.5">
-                    {totalBookedToday}/{totalCapacityToday} VÉ
+                    {customerMetrics.totalBooked}/{customerMetrics.totalCapacity} VÉ
                   </span>
                 </div>
               </div>

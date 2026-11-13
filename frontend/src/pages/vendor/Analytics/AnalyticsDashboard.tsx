@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { vendorReportService, type VendorDashboardResponse } from "../../../services/vendorReportService";
 import { vendorService } from "../../../services/vendorService";
 import type { VendorServiceDto } from "../../../types/vendorService";
 import { vendorSettlementService, type SettlementResponse } from "../../../services/vendorSettlementService";
+import { vendorOrderService } from "../../../services/vendorOrderService";
+import type { VendorBookingItemDto } from "../../../types/vendorOrder";
 import { Download, BarChart3 } from "lucide-react";
 import { 
   AtlasPageHeader, 
@@ -16,18 +18,46 @@ export function AnalyticsDashboard() {
   const [metrics, setMetrics] = useState<VendorDashboardResponse | null>(null);
   const [services, setServices] = useState<VendorServiceDto[]>([]);
   const [settlements, setSettlements] = useState<SettlementResponse[]>([]);
+  const [bookings, setBookings] = useState<VendorBookingItemDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const getRangeDates = useCallback((range: "7d" | "30d" | "90d" | "12m") => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const todayStr = `${year}-${month}-${day}`;
+
+    const daysMap: Record<string, number> = {
+      "7d": 6,
+      "30d": 29,
+      "90d": 89,
+      "12m": 364,
+    };
+
+    const past = new Date(now);
+    past.setDate(past.getDate() - (daysMap[range] ?? 29));
+    const pYear = past.getFullYear();
+    const pMonth = String(past.getMonth() + 1).padStart(2, "0");
+    const pDay = String(past.getDate()).padStart(2, "0");
+
+    return { from: `${pYear}-${pMonth}-${pDay}`, to: todayStr, todayStr };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
     setIsLoading(true);
 
+    const { from, to } = getRangeDates(timeRange);
+
     Promise.allSettled([
-      vendorReportService.getVendorDashboard(),
+      vendorReportService.getVendorDashboard(from, to),
       vendorService.getMyServices(),
-      vendorSettlementService.getSettlements()
-    ]).then(([dashRes, servRes, settleRes]) => {
+      vendorSettlementService.getSettlements(),
+      vendorOrderService.getVendorBookings({ page: 0, size: 100 }),
+    ]).then(([dashRes, servRes, settleRes, bookRes]) => {
       if (!isMounted) return;
+
       if (dashRes.status === "fulfilled" && dashRes.value) {
         setMetrics(dashRes.value);
       } else {
@@ -50,40 +80,138 @@ export function AnalyticsDashboard() {
         setSettlements(settleRes.value.content);
       }
 
+      if (bookRes.status === "fulfilled" && bookRes.value?.content) {
+        setBookings(bookRes.value.content);
+      }
+
       setIsLoading(false);
     });
 
     return () => {
       isMounted = false;
     };
-  }, [timeRange]);
+  }, [timeRange, getRangeDates]);
+
+  // Filter bookings belonging to the active time range
+  const filteredBookings = useMemo(() => {
+    const { from, to } = getRangeDates(timeRange);
+    return bookings.filter((b) => b.bookingDate >= from && b.bookingDate <= to);
+  }, [bookings, timeRange, getRangeDates]);
 
   // Calculated Analytics derived from real data
-  const totalRevenueCalc = metrics?.totalRevenue ?? 0;
-  const completedOrdersCalc = metrics?.completedOrders ?? 0;
+  const totalRevenueCalc = useMemo(() => {
+    if (metrics?.totalRevenue && metrics.totalRevenue > 0) return metrics.totalRevenue;
+    return filteredBookings.reduce((sum, b) => sum + (b.subtotal || b.price * b.quantity || 0), 0);
+  }, [metrics, filteredBookings]);
+
+  const completedOrdersCalc = useMemo(() => {
+    if (metrics?.completedOrders && metrics.completedOrders > 0) return metrics.completedOrders;
+    return filteredBookings.length;
+  }, [metrics, filteredBookings]);
+
   const completionRateCalc = metrics?.completionRate ?? 100;
 
-  // Weekly trend data grounded in current total
-  const weeklyTrend = useMemo(() => {
-    const base = totalRevenueCalc > 0 ? totalRevenueCalc / 8 : 0;
-    return [
-      { week: "Wk 1", revenue: Math.round(base * 0.75), bookings: totalRevenueCalc > 0 ? 3 : 0 },
-      { week: "Wk 2", revenue: Math.round(base * 0.9), bookings: totalRevenueCalc > 0 ? 4 : 0 },
-      { week: "Wk 3", revenue: Math.round(base * 0.82), bookings: totalRevenueCalc > 0 ? 3 : 0 },
-      { week: "Wk 4", revenue: Math.round(base * 1.05), bookings: totalRevenueCalc > 0 ? 5 : 0 },
-      { week: "Wk 5", revenue: Math.round(base * 1.15), bookings: totalRevenueCalc > 0 ? 6 : 0 },
-      { week: "Wk 6", revenue: Math.round(base * 1.02), bookings: totalRevenueCalc > 0 ? 4 : 0 },
-      { week: "Wk 7", revenue: Math.round(base * 1.25), bookings: totalRevenueCalc > 0 ? 7 : 0 },
-      { week: "Wk 8", revenue: Math.round(base * 1.35), bookings: totalRevenueCalc > 0 ? 8 : 0 },
-    ];
-  }, [totalRevenueCalc]);
+  // Real trend data grounded in actual bookings for the selected time range
+  const trendBars = useMemo(() => {
+    const now = new Date();
 
-  const maxWeeklyRev = Math.max(...weeklyTrend.map((w) => w.revenue), 1);
+    if (timeRange === "7d") {
+      // 7 ngày gần nhất
+      const days = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const label = d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+        const iso = d.toISOString().slice(0, 10);
+        const bOnDay = filteredBookings.filter((b) => b.bookingDate === iso);
+        const rev = bOnDay.reduce((sum, b) => sum + (b.subtotal || b.price * b.quantity || 0), 0);
+        days.push({
+          label,
+          revenue: Math.round(rev),
+          bookings: bOnDay.reduce((sum, b) => sum + (b.quantity || 1), 0),
+        });
+      }
+      return days;
+    } else if (timeRange === "30d") {
+      // 4 tuần trong 30 ngày
+      const weeks = [];
+      for (let w = 3; w >= 0; w--) {
+        const startD = new Date(now);
+        startD.setDate(startD.getDate() - (w * 7 + 6));
+        const endD = new Date(now);
+        endD.setDate(endD.getDate() - (w * 7));
+        const startIso = startD.toISOString().slice(0, 10);
+        const endIso = endD.toISOString().slice(0, 10);
+        const bInWeek = filteredBookings.filter((b) => b.bookingDate >= startIso && b.bookingDate <= endIso);
+        const rev = bInWeek.reduce((sum, b) => sum + (b.subtotal || b.price * b.quantity || 0), 0);
+        weeks.push({
+          label: `Tuần ${4 - w}`,
+          revenue: Math.round(rev),
+          bookings: bInWeek.reduce((sum, b) => sum + (b.quantity || 1), 0),
+        });
+      }
+      return weeks;
+    } else if (timeRange === "90d") {
+      // 3 tháng gần nhất
+      const months = [];
+      for (let m = 2; m >= 0; m--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+        const mNum = d.getMonth() + 1;
+        const mPrefix = `${d.getFullYear()}-${String(mNum).padStart(2, "0")}`;
+        const bInMonth = filteredBookings.filter((b) => b.bookingDate.startsWith(mPrefix));
+        const rev = bInMonth.reduce((sum, b) => sum + (b.subtotal || b.price * b.quantity || 0), 0);
+        months.push({
+          label: `Thg ${mNum}`,
+          revenue: Math.round(rev),
+          bookings: bInMonth.reduce((sum, b) => sum + (b.quantity || 1), 0),
+        });
+      }
+      return months;
+    } else {
+      // 12 tháng gần nhất (rút gọn hiển thị 6 mốc 2 tháng hoặc 12 tháng)
+      const months = [];
+      for (let m = 11; m >= 0; m -= 2) {
+        const d = new Date(now.getFullYear(), now.getMonth() - m, 1);
+        const mNum = d.getMonth() + 1;
+        const mPrefix = `${d.getFullYear()}-${String(mNum).padStart(2, "0")}`;
+        const bInMonth = filteredBookings.filter((b) => b.bookingDate.startsWith(mPrefix));
+        const rev = bInMonth.reduce((sum, b) => sum + (b.subtotal || b.price * b.quantity || 0), 0);
+        months.push({
+          label: `T${mNum}`,
+          revenue: Math.round(rev),
+          bookings: bInMonth.reduce((sum, b) => sum + (b.quantity || 1), 0),
+        });
+      }
+      return months;
+    }
+  }, [timeRange, filteredBookings]);
 
-  // Compute real price sum for breakdown percentages
-  const totalPriceSum = useMemo(() => {
-    return services.reduce((acc, s) => acc + (s.price || 0), 0);
-  }, [services]);
+  const maxWeeklyRev = useMemo(() => {
+    return Math.max(...trendBars.map((w) => w.revenue), 1000000);
+  }, [trendBars]);
+
+  // Breakdown revenue per service from real bookings
+  const serviceRevenueBreakdown = useMemo(() => {
+    if (services.length === 0) return [];
+    const totalRev = filteredBookings.reduce((sum, b) => sum + (b.subtotal || b.price * b.quantity || 0), 0) || totalRevenueCalc || 1;
+
+    return services.map((s) => {
+      const sBookings = filteredBookings.filter((b) => b.serviceId === s.id);
+      const rev = sBookings.reduce((sum, b) => sum + (b.subtotal || b.price * b.quantity || 0), 0);
+      const guestCount = sBookings.reduce((sum, b) => sum + (b.quantity || 1), 0);
+      const pct = Math.min(100, Math.round((rev / totalRev) * 100));
+      return {
+        id: s.id,
+        name: s.name,
+        revenue: rev,
+        guestCount,
+        percentage: pct,
+        capacityPerSlot: s.capacityPerSlot,
+        status: s.status,
+        location: s.locationName || s.address || "Đà Nẵng",
+      };
+    }).sort((a, b) => b.revenue - a.revenue);
+  }, [services, filteredBookings, totalRevenueCalc]);
 
   return (
     <div className="flex-1 w-full max-w-[1400px] mx-auto px-6 py-5 space-y-5">
@@ -130,7 +258,7 @@ export function AnalyticsDashboard() {
 
         <AtlasMetricCard
           label="Lượt đặt vé hoàn thành"
-          value={isLoading ? "---" : completedOrdersCalc}
+          value={isLoading ? "---" : `${completedOrdersCalc} đơn`}
         />
 
         <AtlasMetricCard
@@ -153,7 +281,9 @@ export function AnalyticsDashboard() {
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 mb-4 gap-2">
               <div>
-                <h3 className="text-sm font-semibold text-slate-900">Xu hướng doanh thu</h3>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Xu hướng doanh thu ({timeRange === "7d" ? "7 ngày qua" : timeRange === "30d" ? "30 ngày qua" : timeRange === "90d" ? "Quý này" : "12 tháng"})
+                </h3>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 {services.length > 0 && (
@@ -178,7 +308,7 @@ export function AnalyticsDashboard() {
               </div>
             ) : (
               <div className="h-60 flex items-end gap-3 pt-6 pb-2 px-2">
-                {weeklyTrend.map((item, idx) => {
+                {trendBars.map((item, idx) => {
                   const heightPct = Math.max(8, Math.round((item.revenue / maxWeeklyRev) * 100));
                   return (
                     <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full justify-end group">
@@ -188,10 +318,10 @@ export function AnalyticsDashboard() {
                       <div
                         style={{ height: `${heightPct}%` }}
                         className="w-full bg-[#0284C7] rounded-t-sm transition-all cursor-pointer hover:bg-sky-600 shadow-2xs"
-                        title={`${item.week}: ${item.revenue.toLocaleString("vi-VN")} đ`}
+                        title={`${item.label}: ${item.revenue.toLocaleString("vi-VN")} đ (${item.bookings} vé)`}
                       />
                       <span className="text-xs font-mono font-medium text-slate-500">
-                        {item.week}
+                        {item.label}
                       </span>
                     </div>
                   );
@@ -212,26 +342,26 @@ export function AnalyticsDashboard() {
               <h3 className="text-sm font-semibold text-slate-900">Cơ cấu doanh thu theo dịch vụ</h3>
             </div>
 
-            {/* Category Breakdown (Grounded in real vendor services) */}
+            {/* Category Breakdown (Grounded in real vendor bookings & services) */}
             <div className="space-y-4">
-              {services.length > 0 ? (
-                services.map((s, index) => {
+              {serviceRevenueBreakdown.length > 0 ? (
+                serviceRevenueBreakdown.map((s, index) => {
                   const colors = ["#0284C7", "#0ea5e9", "#38bdf8", "#7dd3fc"];
                   const color = colors[index % colors.length];
-                  const pct = totalPriceSum > 0 ? Math.round(((s.price || 0) / totalPriceSum) * 100) : 0;
                   return (
                     <div key={s.id}>
                       <div className="flex justify-between text-xs font-medium text-slate-700 mb-1.5">
                         <span className="truncate max-w-[180px]" title={s.name}>{s.name}</span>
                         <span className="font-mono font-semibold text-slate-900">
-                          {s.price ? `${s.price.toLocaleString("vi-VN")} đ` : "---"} <span className="text-slate-400 font-normal">({pct}%)</span>
+                          {s.revenue > 0 ? `${s.revenue.toLocaleString("vi-VN")} đ` : "0 đ"}{" "}
+                          <span className="text-slate-400 font-normal">({s.percentage}%)</span>
                         </span>
                       </div>
                       <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                         <div
                           className="h-2 rounded-full transition-all"
                           style={{
-                            width: `${pct}%`,
+                            width: `${s.percentage}%`,
                             backgroundColor: color,
                           }}
                         />
@@ -270,18 +400,18 @@ export function AnalyticsDashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {services.length > 0 ? (
-                services.map((s) => (
+              {serviceRevenueBreakdown.length > 0 ? (
+                serviceRevenueBreakdown.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3.5 px-4 font-medium text-slate-900 max-w-xs truncate">
                       {s.name}
                     </td>
-                    <td className="py-3.5 px-4 text-slate-500">{s.locationName || s.address || "Đà Nẵng"}</td>
+                    <td className="py-3.5 px-4 text-slate-500">{s.location}</td>
                     <td className="py-3.5 px-4 text-center font-mono tabular-nums">
-                      {s.ratingCount > 0 ? `${s.ratingCount} lượt` : "---"}
+                      {s.guestCount > 0 ? `${s.guestCount} khách` : "0 khách"}
                     </td>
                     <td className="py-3.5 px-4 text-right font-mono font-semibold text-slate-900 tabular-nums">
-                      {s.price ? `${s.price.toLocaleString("vi-VN")} đ` : "---"}
+                      {s.revenue > 0 ? `${s.revenue.toLocaleString("vi-VN")} đ` : "0 đ"}
                     </td>
                     <td className="py-3.5 px-4 text-center">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono font-semibold bg-slate-100 text-slate-700">
