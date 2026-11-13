@@ -143,12 +143,17 @@ class VendorModel {
   final VendorBadgeTier badgeTier;
   final DateTime createdAt;
 
+  final String? phone;
+  final String? description;
+
   const VendorModel({
     required this.id,
     required this.userId,
     required this.businessName,
     this.taxCode,
     this.address,
+    this.phone,
+    this.description,
     this.bankAccountNumber,
     this.bankName,
     this.bankAccountHolder,
@@ -162,8 +167,21 @@ class VendorModel {
   });
 
   String? get businessAddress => address;
-  String? get phone => '0905 888 999';
-  String? get description => 'Câu lạc bộ thể thao biển chuyên nghiệp tại bờ biển Mỹ Khê và Bán đảo Sơn Trà. Chuyên cung cấp dịch vụ chèo SUP, lướt sóng, lặn ngắm san hô với đội ngũ cứu hộ và HLV chứng chỉ quốc tế.';
+
+  static VendorModel empty() => VendorModel(
+    id: '',
+    userId: '',
+    businessName: '',
+    taxCode: '',
+    address: '',
+    phone: '',
+    description: '',
+    bankAccountNumber: '',
+    bankName: '',
+    bankAccountHolder: '',
+    verificationStatus: VendorVerificationStatus.pending,
+    createdAt: DateTime.now(),
+  );
 
   VendorModel copyWith({
     String? businessName,
@@ -186,6 +204,8 @@ class VendorModel {
       businessName: businessName ?? this.businessName,
       taxCode: taxCode ?? this.taxCode,
       address: businessAddress ?? address ?? this.address,
+      phone: phone ?? this.phone,
+      description: description ?? this.description,
       bankAccountNumber: bankAccountNumber ?? this.bankAccountNumber,
       bankName: bankName ?? this.bankName,
       bankAccountHolder: bankAccountHolder ?? this.bankAccountHolder,
@@ -547,6 +567,8 @@ enum SlotStatus {
 }
 
 class ServiceSlotModel {
+  final String inventoryType;
+  final List<Map<String, int>> units;
   final String id;
   final String serviceId;
   final DateTime date;
@@ -558,6 +580,8 @@ class ServiceSlotModel {
   final SlotStatus status;
 
   ServiceSlotModel({
+    this.inventoryType = 'PERSON_LIMIT',
+    this.units = const [],
     String? id,
     String? slotId,
     required this.serviceId,
@@ -597,6 +621,8 @@ class ServiceSlotModel {
     int? heldCount,
   }) {
     return ServiceSlotModel(
+      inventoryType: inventoryType,
+      units: units,
       id: id,
       serviceId: serviceId,
       date: date,
@@ -1289,6 +1315,35 @@ class NotificationModel {
   String get notificationId => id;
   String get content => body;
   bool get isRead => status == 'READ';
+}
+
+class VendorDashboardModel {
+  final double totalRevenue;
+  final double netPayout;
+  final int newOrders;
+  final int completedOrders;
+  final double completionRate;
+  final double cancellationRate;
+
+  const VendorDashboardModel({
+    this.totalRevenue = 0.0,
+    this.netPayout = 0.0,
+    this.newOrders = 0,
+    this.completedOrders = 0,
+    this.completionRate = 0.0,
+    this.cancellationRate = 0.0,
+  });
+
+  factory VendorDashboardModel.fromJson(Map<String, dynamic> json) {
+    return VendorDashboardModel(
+      totalRevenue: (json['totalRevenue'] as num?)?.toDouble() ?? 0.0,
+      netPayout: (json['netPayout'] as num?)?.toDouble() ?? 0.0,
+      newOrders: (json['newOrders'] as num?)?.toInt() ?? 0,
+      completedOrders: (json['completedOrders'] as num?)?.toInt() ?? 0,
+      completionRate: (json['completionRate'] as num?)?.toDouble() ?? 0.0,
+      cancellationRate: (json['cancellationRate'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
 }
 
 class WeatherCacheModel {

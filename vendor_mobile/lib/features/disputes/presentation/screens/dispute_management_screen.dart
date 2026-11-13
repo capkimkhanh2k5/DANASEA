@@ -6,8 +6,8 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../core/widgets/toast_notification.dart';
 import '../../../../core/models/vendor_models.dart';
-import '../../../../core/data/vendor_mock_database.dart';
-import '../../../../core/data/vendor_mock_repositories.dart';
+import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
 import '../../../orders/presentation/screens/sub_order_detail_screen.dart';
 
 class DisputeManagementScreen extends StatefulWidget {
@@ -19,7 +19,7 @@ class DisputeManagementScreen extends StatefulWidget {
 
 class _DisputeManagementScreenState extends State<DisputeManagementScreen> {
   final VendorDisputeRepository _disputeRepo = VendorDisputeRepository();
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
 
   String _selectedStatus = 'ALL'; // ALL, OPEN, IN_REVIEW, RESOLVED, REJECTED
 

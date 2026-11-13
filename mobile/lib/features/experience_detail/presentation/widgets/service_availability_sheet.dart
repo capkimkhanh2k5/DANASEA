@@ -272,6 +272,8 @@ class _ServiceAvailabilitySheetState extends State<ServiceAvailabilitySheet> {
       service: widget.service,
       slot: slot,
       quantity: _quantity,
+      optionId: slot.optionId ?? _optionId ?? widget.service.options.firstOrNull?.id,
+      allowSplit: _allowSplit,
     );
 
     _showAddToCartToast();

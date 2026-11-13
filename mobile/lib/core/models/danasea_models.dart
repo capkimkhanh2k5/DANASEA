@@ -246,6 +246,7 @@ enum SlotStatus { open, closed, blocked }
 
 class ServiceSlotModel {
   final String id;
+  final String? optionId;
   final String serviceId;
   final DateTime date;
   final String startTime; // "05:00"
@@ -256,6 +257,7 @@ class ServiceSlotModel {
 
   const ServiceSlotModel({
     required this.id,
+    this.optionId,
     required this.serviceId,
     required this.date,
     required this.startTime,
@@ -290,7 +292,7 @@ enum SubOrderStatus {
   refunded,
 }
 
-enum PaymentProvider { vnpay, momo, sepay, paypal }
+enum PaymentProvider { vnpay, momo, sepay, paypal, payos, zalopay }
 
 enum PaymentStatus { pending, success, failed, refunded }
 
@@ -692,4 +694,134 @@ class FlashSaleModel {
     );
   }
 }
+
+class CustomerDiscountCode {
+  final String id;
+  final String code;
+  final String? discountType;
+  final num discountValue;
+  final num minOrderAmount;
+  final num maxDiscountAmount;
+  final DateTime? validFrom;
+  final DateTime? validTo;
+  final bool isActive;
+
+  const CustomerDiscountCode({
+    required this.id,
+    required this.code,
+    this.discountType,
+    required this.discountValue,
+    required this.minOrderAmount,
+    required this.maxDiscountAmount,
+    this.validFrom,
+    this.validTo,
+    required this.isActive,
+  });
+
+  factory CustomerDiscountCode.fromJson(Map<String, dynamic> json) {
+    return CustomerDiscountCode(
+      id: json['id']?.toString() ?? '',
+      code: json['code']?.toString() ?? '',
+      discountType: json['discountType']?.toString(),
+      discountValue: (json['discountValue'] as num?) ?? 0,
+      minOrderAmount: (json['minOrderAmount'] as num?) ?? 0,
+      maxDiscountAmount: (json['maxDiscountAmount'] as num?) ?? 0,
+      validFrom: DateTime.tryParse(json['validFrom']?.toString() ?? ''),
+      validTo: DateTime.tryParse(json['validTo']?.toString() ?? ''),
+      isActive: json['isActive'] != false,
+    );
+  }
+}
+
+class MarineBriefingItem {
+  final String subOrderId;
+  final String serviceTitle;
+  final String meetingLocation;
+  final String? departureDate;
+  final String? departureTime;
+  final String weatherSafetyStatus;
+  final String marineConditionsSummary;
+  final List<String> packingChecklist;
+  final List<String> safetyGuidelines;
+
+  const MarineBriefingItem({
+    required this.subOrderId,
+    required this.serviceTitle,
+    required this.meetingLocation,
+    this.departureDate,
+    this.departureTime,
+    required this.weatherSafetyStatus,
+    required this.marineConditionsSummary,
+    required this.packingChecklist,
+    required this.safetyGuidelines,
+  });
+
+  factory MarineBriefingItem.fromJson(Map<String, dynamic> json) {
+    final packingRaw = json['packingChecklist'];
+    final packing = <String>[];
+    if (packingRaw is List) {
+      for (final p in packingRaw) {
+        if (p is Map && p['item'] != null) {
+          packing.add(p['item'].toString());
+        } else if (p != null) {
+          packing.add(p.toString());
+        }
+      }
+    }
+    final guideRaw = json['arrivalAndSafetyGuidelines'];
+    final guides = <String>[];
+    if (guideRaw is List) {
+      for (final g in guideRaw) {
+        if (g != null) guides.add(g.toString());
+      }
+    }
+    return MarineBriefingItem(
+      subOrderId: json['subOrderId']?.toString() ?? '',
+      serviceTitle: json['serviceTitle']?.toString() ?? '',
+      meetingLocation: json['meetingLocation']?.toString() ?? '',
+      departureDate: json['departureDate']?.toString(),
+      departureTime: json['departureTime']?.toString(),
+      weatherSafetyStatus: json['weatherSafetyStatus']?.toString() ?? 'ACCEPTABLE',
+      marineConditionsSummary: json['marineConditionsSummary']?.toString() ?? '',
+      packingChecklist: packing,
+      safetyGuidelines: guides,
+    );
+  }
+}
+
+class MarineBriefingOverview {
+  final String masterOrderId;
+  final String orderCode;
+  final int totalActivities;
+  final List<MarineBriefingItem> activities;
+  final DateTime generatedAt;
+
+  const MarineBriefingOverview({
+    required this.masterOrderId,
+    required this.orderCode,
+    required this.totalActivities,
+    required this.activities,
+    required this.generatedAt,
+  });
+
+  factory MarineBriefingOverview.fromJson(Map<String, dynamic> json) {
+    final actRaw = json['activities'];
+    final acts = <MarineBriefingItem>[];
+    if (actRaw is List) {
+      for (final a in actRaw) {
+        if (a is Map<String, dynamic>) {
+          acts.add(MarineBriefingItem.fromJson(a));
+        }
+      }
+    }
+    return MarineBriefingOverview(
+      masterOrderId: json['masterOrderId']?.toString() ?? '',
+      orderCode: json['orderCode']?.toString() ?? '',
+      totalActivities: (json['totalActivities'] as num?)?.toInt() ?? acts.length,
+      activities: acts,
+      generatedAt: DateTime.tryParse(json['generatedAt']?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
+}
+
 

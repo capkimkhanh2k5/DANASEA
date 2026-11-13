@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../core/models/vendor_models.dart';
-import '../../../../core/data/vendor_mock_database.dart';
+import '../../../../core/data/vendor_store.dart';
 import '../../../profile/presentation/screens/edit_profile_bank_screen.dart';
 import 'payout_detail_screen.dart';
 
@@ -14,7 +14,7 @@ class SettlementRevenueScreen extends StatefulWidget {
 }
 
 class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
   String _filterStatus = 'all'; // all, pending, paid
   String _selectedMonth = 'all'; // all, 2024-10, 2024-09
   bool _isBalanceVisible = true;

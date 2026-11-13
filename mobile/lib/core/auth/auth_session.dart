@@ -478,6 +478,21 @@ class AuthSession {
     );
   }
 
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await request(
+      '/api/users/me/change-password',
+      method: 'POST',
+      data: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+      retry: false,
+    );
+  }
+
   Future<void> refresh() =>
       _refreshing ??= _doRefresh().whenComplete(() => _refreshing = null);
   Future<void> _doRefresh() async {

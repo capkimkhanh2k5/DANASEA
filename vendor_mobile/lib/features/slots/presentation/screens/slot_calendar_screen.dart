@@ -1,8 +1,8 @@
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/data/vendor_mock_database.dart';
-import '../../../../core/data/vendor_mock_repositories.dart';
+import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/toast_notification.dart';
 import '../../../../core/widgets/partner_account_app_bar_button.dart';
@@ -25,7 +25,7 @@ class SlotCalendarScreen extends StatefulWidget {
 }
 
 class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
-  final _db = VendorMockDatabase.instance;
+  final _db = VendorStore.instance;
   final _slotRepo = VendorSlotRepository();
   late String _selectedServiceId;
   DateTime _selectedDate = DateTime.now();

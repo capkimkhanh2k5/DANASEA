@@ -113,6 +113,18 @@ class BookingRepository {
     );
   }
 
+  Future<BookingHold> holdItems(List<Map<String, dynamic>> items) async {
+    if (items.isEmpty) {
+      throw AuthFailure('Vui lòng chọn dịch vụ để giữ chỗ.');
+    }
+    return BookingHold.fromJson(await session.request(
+      '/api/bookings/hold',
+      method: 'POST',
+      data: {'items': items},
+      retry: false,
+    ));
+  }
+
   Future<BookingHold> confirm(String holdId) async => BookingHold.fromJson(
     await session.request(
       '/api/bookings/${Uri.encodeComponent(holdId)}/confirm',

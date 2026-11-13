@@ -5,8 +5,8 @@ import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/toast_notification.dart';
 import '../../../../core/models/vendor_models.dart';
-import '../../../../core/data/vendor_mock_database.dart';
-import '../../../../core/data/vendor_mock_repositories.dart';
+import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
 
 class VoucherManagementScreen extends StatefulWidget {
   const VoucherManagementScreen({super.key});
@@ -17,7 +17,7 @@ class VoucherManagementScreen extends StatefulWidget {
 
 class _VoucherManagementScreenState extends State<VoucherManagementScreen> with SingleTickerProviderStateMixin {
   final VendorVoucherRepository _voucherRepo = VendorVoucherRepository();
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
 
   late TabController _tabController;
 

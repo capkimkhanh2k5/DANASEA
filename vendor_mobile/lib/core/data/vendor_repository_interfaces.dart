@@ -1,5 +1,5 @@
-// Abstract Repository Interfaces for DANASEA Vendor App
-// Enables future swapping of mock data with unified REST/GraphQL backend APIs.
+// Repository Interfaces for DANASEA Vendor App
+// Unified Spring Boot REST backend APIs (/api/vendor/...)
 
 import '../models/vendor_models.dart';
 
@@ -160,4 +160,8 @@ abstract class IVendorChatRepository {
 abstract class IVendorNotificationRepository {
   Future<List<NotificationModel>> getNotifications();
   Future<WeatherCacheModel> getWeatherInfo();
+}
+
+abstract class IVendorDashboardRepository {
+  Future<VendorDashboardModel> getDashboardMetrics({DateTime? from, DateTime? to});
 }

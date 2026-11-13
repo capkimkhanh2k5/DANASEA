@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:vendor_mobile/core/data/vendor_mock_repositories.dart';
+import 'package:vendor_mobile/core/data/vendor_repositories.dart';
 import 'package:vendor_mobile/core/models/vendor_models.dart';
 
 void main() {
