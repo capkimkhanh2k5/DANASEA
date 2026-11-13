@@ -29,15 +29,17 @@ public interface JpaVendorRoleApplicationRepository extends JpaRepository<Vendor
     @Query("SELECT a FROM VendorRoleApplicationJpaEntity a WHERE a.userId = :userId")
     Optional<VendorRoleApplicationJpaEntity> findByUserIdWithLock(@Param("userId") UUID userId);
 
+    Page<VendorRoleApplicationJpaEntity> findByStatus(PartnerApplicationStatus status, Pageable pageable);
+
     @Query("""
             SELECT a FROM VendorRoleApplicationJpaEntity a
             WHERE (:status IS NULL OR a.status = :status)
               AND (:pattern IS NULL
-                OR LOWER(a.businessName) LIKE LOWER(:pattern) ESCAPE '!'
-                OR LOWER(a.taxCode) LIKE LOWER(:pattern) ESCAPE '!'
-                OR LOWER(a.bankAccountHolder) LIKE LOWER(:pattern) ESCAPE '!'
+                OR LOWER(a.businessName) LIKE :pattern ESCAPE '!'
+                OR LOWER(a.taxCode) LIKE :pattern ESCAPE '!'
+                OR LOWER(a.bankAccountHolder) LIKE :pattern ESCAPE '!'
                 OR a.bankAccountNumber LIKE :pattern ESCAPE '!'
-                OR LOWER(a.address) LIKE LOWER(:pattern) ESCAPE '!')
+                OR LOWER(a.address) LIKE :pattern ESCAPE '!')
             """)
     Page<VendorRoleApplicationJpaEntity> searchApplications(@Param("status") PartnerApplicationStatus status,
             @Param("pattern") String pattern, Pageable pageable);

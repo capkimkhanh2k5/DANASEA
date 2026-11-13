@@ -168,6 +168,52 @@ class AdminPartnerApplicationControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/admin/partner-applications returns 200 OK when search is not provided")
+    @WithMockUser(username = "99999999-9999-9999-9999-999999999999", roles = "ADMIN")
+    void shouldReturn200WhenSearchNotProvided() throws Exception {
+        when(getApplicationsUseCase.execute(eq(null), eq(null), any()))
+                .thenReturn(new PageImpl<>(List.of(sampleResponse)));
+
+        mockMvc.perform(get("/api/admin/partner-applications")
+                        .param("page", "0")
+                        .param("size", "8"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(applicationId.toString()))
+                .andExpect(jsonPath("$.content[0].businessName").value("Danang Beach Tour Co."));
+    }
+
+    @Test
+    @DisplayName("GET /api/admin/partner-applications returns 200 OK when search is empty")
+    @WithMockUser(username = "99999999-9999-9999-9999-999999999999", roles = "ADMIN")
+    void shouldReturn200WhenSearchIsEmpty() throws Exception {
+        when(getApplicationsUseCase.execute(eq(null), eq(""), any()))
+                .thenReturn(new PageImpl<>(List.of(sampleResponse)));
+
+        mockMvc.perform(get("/api/admin/partner-applications")
+                        .param("page", "0")
+                        .param("size", "8")
+                        .param("search", ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(applicationId.toString()))
+                .andExpect(jsonPath("$.content[0].businessName").value("Danang Beach Tour Co."));
+    }
+
+    @Test
+    @DisplayName("GET /api/admin/partner-applications preserves status filter and pagination")
+    @WithMockUser(username = "99999999-9999-9999-9999-999999999999", roles = "ADMIN")
+    void shouldFilterByStatusAndPaginationWithoutSearch() throws Exception {
+        when(getApplicationsUseCase.execute(eq(PartnerApplicationStatus.PENDING), eq(null), any()))
+                .thenReturn(new PageImpl<>(List.of(sampleResponse)));
+
+        mockMvc.perform(get("/api/admin/partner-applications")
+                        .param("status", "PENDING")
+                        .param("page", "1")
+                        .param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(applicationId.toString()));
+    }
+
+    @Test
     @DisplayName("GET /api/admin/partner-applications returns 403 Forbidden for CUSTOMER")
     @WithMockUser(username = "11111111-1111-1111-1111-111111111111", roles = "CUSTOMER")
     void shouldReturn403ForCustomerOnList() throws Exception {
