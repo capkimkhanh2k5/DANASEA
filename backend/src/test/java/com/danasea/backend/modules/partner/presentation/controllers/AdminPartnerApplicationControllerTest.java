@@ -6,6 +6,7 @@ import com.danasea.backend.modules.partner.application.usecases.GetAdminPartnerA
 import com.danasea.backend.modules.partner.application.usecases.GetAdminPartnerApplicationsUseCase;
 import com.danasea.backend.modules.partner.application.usecases.RejectPartnerApplicationUseCase;
 import com.danasea.backend.modules.partner.domain.exceptions.ApplicationNotFoundException;
+import com.danasea.backend.modules.partner.domain.exceptions.CustomerHasActiveObligationsException;
 import com.danasea.backend.modules.partner.domain.models.PartnerApplicationStatus;
 import com.danasea.backend.modules.partner.presentation.dtos.AdminRejectApplicationRequest;
 import com.danasea.backend.modules.partner.presentation.dtos.PartnerApplicationResponse;
@@ -156,11 +157,11 @@ class AdminPartnerApplicationControllerTest {
     @DisplayName("GET /api/admin/partner-applications returns 200 OK for ADMIN")
     @WithMockUser(username = "99999999-9999-9999-9999-999999999999", roles = "ADMIN")
     void shouldReturn200OnListApplications() throws Exception {
-        when(getApplicationsUseCase.execute(eq(PartnerApplicationStatus.PENDING), any()))
+        when(getApplicationsUseCase.execute(eq(PartnerApplicationStatus.PENDING), eq("Danang"), any()))
                 .thenReturn(new PageImpl<>(List.of(sampleResponse)));
 
         mockMvc.perform(get("/api/admin/partner-applications")
-                        .param("status", "PENDING"))
+                        .param("status", "PENDING").param("search", "Danang"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].id").value(applicationId.toString()))
                 .andExpect(jsonPath("$.content[0].businessName").value("Danang Beach Tour Co."));
@@ -273,7 +274,7 @@ class AdminPartnerApplicationControllerTest {
     @WithMockUser(username = "99999999-9999-9999-9999-999999999999", roles = "ADMIN")
     void shouldReturn409OnApproveWhenCustomerHasActiveObligations() throws Exception {
         when(approveApplicationUseCase.execute(eq(applicationId), eq(adminId)))
-                .thenThrow(new com.danasea.backend.modules.partner.domain.exceptions.CustomerHasActiveObligationsException(
+                .thenThrow(new CustomerHasActiveObligationsException(
                         "Customer has orders currently being processed or pending payment"));
 
         mockMvc.perform(patch("/api/admin/partner-applications/" + applicationId + "/approve"))

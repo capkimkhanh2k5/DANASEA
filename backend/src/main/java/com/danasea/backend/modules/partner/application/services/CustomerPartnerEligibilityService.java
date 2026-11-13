@@ -1,8 +1,8 @@
 package com.danasea.backend.modules.partner.application.services;
 
-import com.danasea.backend.modules.booking.infrastructure.persistence.entities.BookingItemJpaEntity;
-import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingItemRepository;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
+import com.danasea.backend.modules.dispute.application.services.DisputeWindowService;
+import com.danasea.backend.modules.dispute.application.services.DisputeWindowService.DisputeWindow;
 import com.danasea.backend.modules.dispute.infrastructure.persistence.repositories.JpaDisputeRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
@@ -10,16 +10,12 @@ import com.danasea.backend.modules.order.infrastructure.persistence.repositories
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRescheduleProposalRepository;
 import com.danasea.backend.modules.partner.domain.exceptions.CustomerHasActiveObligationsException;
-import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
-import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -28,13 +24,12 @@ import java.util.UUID;
 public class CustomerPartnerEligibilityService {
 
     private final JpaBookingRepository bookingRepository;
-    private final JpaBookingItemRepository bookingItemRepository;
     private final JpaMasterOrderRepository masterOrderRepository;
     private final JpaSubOrderRepository subOrderRepository;
     private final JpaRefundRepository refundRepository;
     private final JpaSubOrderRescheduleProposalRepository rescheduleProposalRepository;
     private final JpaDisputeRepository disputeRepository;
-    private final JpaServiceSlotRepository serviceSlotRepository;
+    private final DisputeWindowService disputeWindowService;
 
     @Transactional(readOnly = true)
     public void validateCustomerEligibility(UUID customerId) {
@@ -86,42 +81,14 @@ public class CustomerPartnerEligibilityService {
 
         // 7. Check completed sub-orders still within the 7-day dispute window (matching CreateDisputeUseCase rule)
         List<SubOrderJpaEntity> completedSubOrders = subOrderRepository.findCompletedSubOrdersByCustomerId(customerId);
-        LocalDate today = LocalDate.now();
         for (SubOrderJpaEntity subOrder : completedSubOrders) {
-            LocalDate experienceDate = resolveExperienceDate(subOrder, today);
-            if (!today.isAfter(experienceDate.plusDays(7))) {
+            DisputeWindow window = disputeWindowService.resolve(subOrder);
+            if (!window.isExpired()) {
                 log.warn("Customer {} has completed sub-order {} still within 7-day dispute window (experienceDate: {})",
-                        customerId, subOrder.getId(), experienceDate);
+                        customerId, subOrder.getId(), window.experienceDate());
                 throw new CustomerHasActiveObligationsException(
                         "Customer has completed orders still within the 7-day dispute period");
             }
         }
-    }
-
-    private LocalDate resolveExperienceDate(SubOrderJpaEntity subOrder, LocalDate today) {
-        // Priority 1: ServiceSlot date (primary source of truth for tour schedule)
-        if (subOrder.getSlotId() != null) {
-            Optional<ServiceSlotJpaEntity> slotOpt = serviceSlotRepository.findById(subOrder.getSlotId());
-            if (slotOpt.isPresent() && slotOpt.get().getDate() != null) {
-                return slotOpt.get().getDate();
-            }
-        }
-        // Priority 2: Physical check-in date (actual attendance)
-        if (subOrder.getCheckedInAt() != null) {
-            return subOrder.getCheckedInAt().toLocalDate();
-        }
-        // Priority 3: Scheduled booking item date (not null booking_date in booking_items)
-        if (subOrder.getBookingItemId() != null) {
-            Optional<BookingItemJpaEntity> itemOpt = bookingItemRepository.findById(subOrder.getBookingItemId());
-            if (itemOpt.isPresent() && itemOpt.get().getBookingDate() != null) {
-                return itemOpt.get().getBookingDate();
-            }
-        }
-        // Priority 4: Completion timestamp (when sub-order became COMPLETED)
-        if (subOrder.getUpdatedAt() != null) {
-            return subOrder.getUpdatedAt().toLocalDate();
-        }
-        // Fail-safe fallback: creation date or today
-        return subOrder.getCreatedAt() != null ? subOrder.getCreatedAt().toLocalDate() : today;
     }
 }

@@ -1,5 +1,7 @@
 package com.danasea.backend.modules.dispute.application.usecases;
 
+import com.danasea.backend.modules.dispute.application.services.DisputeWindowService;
+import com.danasea.backend.modules.dispute.application.services.DisputeWindowService.DisputeWindow;
 import com.danasea.backend.modules.dispute.domain.exceptions.DisputePeriodExpiredException;
 import com.danasea.backend.modules.dispute.domain.exceptions.DuplicateDisputeException;
 import com.danasea.backend.modules.dispute.domain.exceptions.InvalidSubOrderStateException;
@@ -15,16 +17,12 @@ import com.danasea.backend.modules.order.infrastructure.persistence.entities.Mas
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
-import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
-import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -36,7 +34,7 @@ public class CreateDisputeUseCase {
     private final JpaDisputeRepository disputeRepository;
     private final JpaMasterOrderRepository masterOrderRepository;
     private final JpaSubOrderRepository subOrderRepository;
-    private final JpaServiceSlotRepository slotRepository;
+    private final DisputeWindowService disputeWindowService;
 
     @Transactional
     public DisputeResponse execute(UUID orderId, CreateDisputeRequest request) {
@@ -73,34 +71,15 @@ public class CreateDisputeUseCase {
         }
 
         // 6. Kiểm tra giới hạn thời gian 7 ngày kể từ ngày trải nghiệm
-        LocalDate experienceDate = null;
-        LocalDateTime experienceStart = null;
-        if (subOrder.getSlotId() != null) {
-            var slotOpt = slotRepository.findById(subOrder.getSlotId());
-            if (slotOpt.isPresent()) {
-                ServiceSlotJpaEntity slot = slotOpt.get();
-                experienceDate = slot.getDate();
-                if (slot.getDate() != null && slot.getStartTime() != null) {
-                    experienceStart = LocalDateTime.of(slot.getDate(), slot.getStartTime());
-                }
-            }
+        DisputeWindow window = disputeWindowService.resolve(subOrder);
+        if (!window.hasStarted()) {
+            throw new InvalidSubOrderStateException(window.scheduledStart() != null
+                    ? "A dispute cannot be opened before the scheduled experience has started."
+                    : "A dispute cannot be opened before the scheduled experience date.");
         }
-        if (experienceDate == null) {
-            experienceDate = subOrder.getCreatedAt() != null ? subOrder.getCreatedAt().toLocalDate() : LocalDate.now();
-        }
-
-        if (experienceStart != null && experienceStart.isAfter(LocalDateTime.now())) {
-            throw new InvalidSubOrderStateException(
-                    "A dispute cannot be opened before the scheduled experience has started.");
-        }
-        if (experienceStart == null && experienceDate.isAfter(LocalDate.now())) {
-            throw new InvalidSubOrderStateException(
-                    "A dispute cannot be opened before the scheduled experience date.");
-        }
-
-        if (LocalDate.now().isAfter(experienceDate.plusDays(7))) {
+        if (window.isExpired()) {
             throw new DisputePeriodExpiredException(
-                    "Dispute must be filed within 7 days of the experience date (" + experienceDate + ")"
+                    "Dispute must be filed within 7 days of the experience date (" + window.experienceDate() + ")"
             );
         }
 

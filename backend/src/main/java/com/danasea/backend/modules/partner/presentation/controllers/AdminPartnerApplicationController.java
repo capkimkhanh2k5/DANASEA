@@ -44,11 +44,12 @@ public class AdminPartnerApplicationController {
     @GetMapping
     public ResponseEntity<Page<PartnerApplicationResponse>> getApplications(
             @RequestParam(required = false) PartnerApplicationStatus status,
-            @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+            @RequestParam(required = false) String search,
+            @PageableDefault(sort = {"createdAt", "id"}, direction = Sort.Direction.DESC) Pageable pageable) {
         if (pageable.getPageNumber() < 0 || pageable.getPageSize() < 1 || pageable.getPageSize() > 100) {
             throw new IllegalArgumentException("page must be non-negative and size must be between 1 and 100");
         }
-        return ResponseEntity.ok(getApplicationsUseCase.execute(status, pageable));
+        return ResponseEntity.ok(getApplicationsUseCase.execute(status, search, pageable));
     }
 
     @GetMapping("/{id}")

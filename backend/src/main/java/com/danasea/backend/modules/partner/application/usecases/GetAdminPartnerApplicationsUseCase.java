@@ -18,14 +18,16 @@ public class GetAdminPartnerApplicationsUseCase {
     private final PartnerApplicationMapper mapper;
 
     @Transactional(readOnly = true)
-    public Page<PartnerApplicationResponse> execute(PartnerApplicationStatus status, Pageable pageable) {
-        if (status == null) {
-            return applicationRepository.findAll(pageable)
-                    .map(mapper::toDomain)
-                    .map(mapper::toResponse);
-        }
-        return applicationRepository.findByStatus(status, pageable)
+    public Page<PartnerApplicationResponse> execute(PartnerApplicationStatus status, String search, Pageable pageable) {
+        return applicationRepository.searchApplications(status, toContainsPattern(search), pageable)
                 .map(mapper::toDomain)
                 .map(mapper::toResponse);
+    }
+
+    private static String toContainsPattern(String search) {
+        if (search == null || search.isBlank()) {
+            return null;
+        }
+        return "%" + search.strip().replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
     }
 }

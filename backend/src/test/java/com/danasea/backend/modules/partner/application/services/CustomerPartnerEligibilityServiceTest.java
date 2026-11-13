@@ -1,8 +1,7 @@
 package com.danasea.backend.modules.partner.application.services;
 
-import com.danasea.backend.modules.booking.infrastructure.persistence.entities.BookingItemJpaEntity;
-import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingItemRepository;
 import com.danasea.backend.modules.booking.infrastructure.persistence.repositories.JpaBookingRepository;
+import com.danasea.backend.modules.dispute.application.services.DisputeWindowService;
 import com.danasea.backend.modules.dispute.infrastructure.persistence.repositories.JpaDisputeRepository;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
@@ -20,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -35,9 +35,6 @@ class CustomerPartnerEligibilityServiceTest {
 
     @Mock
     private JpaBookingRepository bookingRepository;
-
-    @Mock
-    private JpaBookingItemRepository bookingItemRepository;
 
     @Mock
     private JpaMasterOrderRepository masterOrderRepository;
@@ -64,13 +61,12 @@ class CustomerPartnerEligibilityServiceTest {
     void setUp() {
         service = new CustomerPartnerEligibilityService(
                 bookingRepository,
-                bookingItemRepository,
                 masterOrderRepository,
                 subOrderRepository,
                 refundRepository,
                 rescheduleProposalRepository,
                 disputeRepository,
-                serviceSlotRepository
+                new DisputeWindowService(serviceSlotRepository, Clock.systemDefaultZone())
         );
         customerId = UUID.randomUUID();
     }
@@ -221,8 +217,8 @@ class CustomerPartnerEligibilityServiceTest {
     }
 
     @Test
-    @DisplayName("Throws exception when completed sub-order has no slot but createdAt is within 7 days")
-    void validateCustomerEligibility_WhenNoSlotAndCreatedAtWithin7Days_ThrowsException() {
+    @DisplayName("Throws exception when completed sub-order has no slot and was created exactly 7 days ago")
+    void validateCustomerEligibility_WhenNoSlotAndCreatedAtExactly7Days_ThrowsException() {
         when(bookingRepository.hasActiveBookings(customerId)).thenReturn(false);
         when(masterOrderRepository.hasActiveMasterOrders(customerId)).thenReturn(false);
         when(subOrderRepository.hasActiveSubOrders(customerId)).thenReturn(false);
@@ -234,83 +230,9 @@ class CustomerPartnerEligibilityServiceTest {
         subOrder.setId(UUID.randomUUID());
         subOrder.setStatus(SubOrderStatus.COMPLETED);
         subOrder.setSlotId(null);
-        subOrder.setCreatedAt(OffsetDateTime.now().minusDays(2)); // created 2 days ago
+        subOrder.setCreatedAt(OffsetDateTime.now().minusDays(7));
 
         when(subOrderRepository.findCompletedSubOrdersByCustomerId(customerId)).thenReturn(List.of(subOrder));
-
-        assertThatThrownBy(() -> service.validateCustomerEligibility(customerId))
-                .isInstanceOf(CustomerHasActiveObligationsException.class)
-                .hasMessageContaining("7-day dispute period");
-    }
-
-    @Test
-    @DisplayName("Throws exception when no slot, but checkedInAt is within 7 days")
-    void validateCustomerEligibility_WhenNoSlot_CheckedInAtWithin7Days_ThrowsException() {
-        when(bookingRepository.hasActiveBookings(customerId)).thenReturn(false);
-        when(masterOrderRepository.hasActiveMasterOrders(customerId)).thenReturn(false);
-        when(subOrderRepository.hasActiveSubOrders(customerId)).thenReturn(false);
-        when(refundRepository.hasUnresolvedRefunds(customerId)).thenReturn(false);
-        when(rescheduleProposalRepository.hasPendingRescheduleProposals(customerId)).thenReturn(false);
-        when(disputeRepository.hasActiveDisputes(customerId)).thenReturn(false);
-
-        SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
-        subOrder.setId(UUID.randomUUID());
-        subOrder.setStatus(SubOrderStatus.COMPLETED);
-        subOrder.setSlotId(null);
-        subOrder.setCheckedInAt(OffsetDateTime.now().minusDays(3)); // checked in 3 days ago
-
-        when(subOrderRepository.findCompletedSubOrdersByCustomerId(customerId)).thenReturn(List.of(subOrder));
-
-        assertThatThrownBy(() -> service.validateCustomerEligibility(customerId))
-                .isInstanceOf(CustomerHasActiveObligationsException.class)
-                .hasMessageContaining("7-day dispute period");
-    }
-
-    @Test
-    @DisplayName("Succeeds when no slot, but checkedInAt is older than 7 days")
-    void validateCustomerEligibility_WhenNoSlot_CheckedInAtOlderThan7Days_Succeeds() {
-        when(bookingRepository.hasActiveBookings(customerId)).thenReturn(false);
-        when(masterOrderRepository.hasActiveMasterOrders(customerId)).thenReturn(false);
-        when(subOrderRepository.hasActiveSubOrders(customerId)).thenReturn(false);
-        when(refundRepository.hasUnresolvedRefunds(customerId)).thenReturn(false);
-        when(rescheduleProposalRepository.hasPendingRescheduleProposals(customerId)).thenReturn(false);
-        when(disputeRepository.hasActiveDisputes(customerId)).thenReturn(false);
-
-        SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
-        subOrder.setId(UUID.randomUUID());
-        subOrder.setStatus(SubOrderStatus.COMPLETED);
-        subOrder.setSlotId(null);
-        subOrder.setCheckedInAt(OffsetDateTime.now().minusDays(10)); // checked in 10 days ago
-
-        when(subOrderRepository.findCompletedSubOrdersByCustomerId(customerId)).thenReturn(List.of(subOrder));
-
-        assertThatCode(() -> service.validateCustomerEligibility(customerId))
-                .doesNotThrowAnyException();
-    }
-
-    @Test
-    @DisplayName("Throws exception when no slot and no checkin, but bookingItem bookingDate is within 7 days")
-    void validateCustomerEligibility_WhenNoSlot_BookingDateWithin7Days_ThrowsException() {
-        when(bookingRepository.hasActiveBookings(customerId)).thenReturn(false);
-        when(masterOrderRepository.hasActiveMasterOrders(customerId)).thenReturn(false);
-        when(subOrderRepository.hasActiveSubOrders(customerId)).thenReturn(false);
-        when(refundRepository.hasUnresolvedRefunds(customerId)).thenReturn(false);
-        when(rescheduleProposalRepository.hasPendingRescheduleProposals(customerId)).thenReturn(false);
-        when(disputeRepository.hasActiveDisputes(customerId)).thenReturn(false);
-
-        UUID itemId = UUID.randomUUID();
-        SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
-        subOrder.setId(UUID.randomUUID());
-        subOrder.setStatus(SubOrderStatus.COMPLETED);
-        subOrder.setSlotId(null);
-        subOrder.setBookingItemId(itemId);
-
-        BookingItemJpaEntity item = new BookingItemJpaEntity();
-        item.setId(itemId);
-        item.setBookingDate(LocalDate.now().minusDays(4));
-
-        when(subOrderRepository.findCompletedSubOrdersByCustomerId(customerId)).thenReturn(List.of(subOrder));
-        when(bookingItemRepository.findById(itemId)).thenReturn(Optional.of(item));
 
         assertThatThrownBy(() -> service.validateCustomerEligibility(customerId))
                 .isInstanceOf(CustomerHasActiveObligationsException.class)
@@ -343,6 +265,21 @@ class CustomerPartnerEligibilityServiceTest {
 
         assertThatCode(() -> service.validateCustomerEligibility(customerId))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void recentlyUpdatedOrderWithoutSlotDoesNotExtendExpiredDisputeWindow() {
+        SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
+        UUID missingSlotId = UUID.randomUUID();
+        subOrder.setSlotId(missingSlotId);
+        subOrder.setStatus(SubOrderStatus.COMPLETED);
+        subOrder.setCreatedAt(OffsetDateTime.now().minusDays(8));
+        subOrder.setUpdatedAt(OffsetDateTime.now().minusDays(1));
+
+        when(subOrderRepository.findCompletedSubOrdersByCustomerId(customerId)).thenReturn(List.of(subOrder));
+        when(serviceSlotRepository.findById(missingSlotId)).thenReturn(Optional.empty());
+
+        assertThatCode(() -> service.validateCustomerEligibility(customerId)).doesNotThrowAnyException();
     }
 
     @Test
