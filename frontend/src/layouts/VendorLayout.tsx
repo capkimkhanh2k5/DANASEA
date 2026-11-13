@@ -89,12 +89,40 @@ const VENDOR_PAGE_ORDER: Record<string, number> = {
   "/vendor/profile": 11,
 };
 
+const VENDOR_BRAND_MAP: Record<string, string> = {
+  "vender_1@danasea.test": "Danabeach Club",
+  "vender_2@danasea.test": "Công ty TNHH Kajin Vina",
+  "vender_3@danasea.test": "Da Nang Outdoor Adventures",
+  "vender_4@danasea.test": "Loca Travel Đà Nẵng",
+  "vender_5@danasea.test": "Công ty Cổ phần D BLUE",
+  "vender_6@danasea.test": "Khuê Nguyễn – Dịch Vụ Câu Mực",
+  "vender_7@danasea.test": "DaNaFi – Tour Câu Cá",
+  "vender_8@danasea.test": "Go N Chill SUP Club",
+  "vender_9@danasea.test": "Surf Shack Da Nang",
+  "vender_10@danasea.test": "Mỹ Khê Jet Sports",
+  "vender_1": "Danabeach Club",
+  "vender_2": "Công ty TNHH Kajin Vina",
+  "vender_3": "Da Nang Outdoor Adventures",
+  "vender_4": "Loca Travel Đà Nẵng",
+  "vender_5": "Công ty Cổ phần D BLUE",
+  "vender_6": "Khuê Nguyễn – Dịch Vụ Câu Mực",
+  "vender_7": "DaNaFi – Tour Câu Cá",
+  "vender_8": "Go N Chill SUP Club",
+  "vender_9": "Surf Shack Da Nang",
+};
+
 export function VendorLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, accessToken } = useAuthStore();
   const isCopilotOpen = useVendorCopilotStore((s) => s.isOpen);
   const toggleCopilot = useVendorCopilotStore((s) => s.toggleCopilot);
+
+  const vendorDisplayName = 
+    (user?.email && VENDOR_BRAND_MAP[user.email]) ||
+    (user?.fullName && VENDOR_BRAND_MAP[user.fullName]) ||
+    user?.fullName ||
+    "Công ty TNHH Kajin Vina";
 
   useEffect(() => {
     if (!accessToken || !isAuthenticated) {
@@ -435,18 +463,18 @@ export function VendorLayout() {
           {/* Account Profile Card */}
           <div
             onClick={() => navigate("/vendor/profile")}
-            title={!isExpanded ? user?.fullName || "Hồ sơ đối tác" : undefined}
+            title={!isExpanded ? vendorDisplayName : undefined}
             className={`group flex items-center h-12 rounded-xl transition-all duration-150 cursor-pointer ${
               isExpanded 
                 ? "px-2.5 w-full bg-slate-50 hover:bg-slate-100/90 border border-slate-200/60" 
                 : "w-10 justify-center mx-auto"
             }`}
           >
-            <AtlasAvatar name={user?.fullName || "Danabeach"} size="sm" />
+            <AtlasAvatar name={vendorDisplayName} size="sm" />
             {isExpanded && (
               <div className="flex flex-col min-w-0 ml-2.5 text-left flex-1">
                 <span className="text-xs font-bold text-slate-900 truncate leading-tight">
-                  {user?.fullName || "Danabeach Club"}
+                  {vendorDisplayName}
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
                   Đối tác vận hành

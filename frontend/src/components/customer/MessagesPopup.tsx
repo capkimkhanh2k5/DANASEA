@@ -309,12 +309,11 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
                     onClick={() => handleSelectConversation(conv.id)}
                     className="p-2.5 mx-1.5 my-0.5 rounded-xl hover:bg-[#f0f2f5] flex items-center gap-3 transition-colors cursor-pointer group"
                   >
-                    {/* Circle Avatar with Active Dot */}
+                    {/* Circle Avatar */}
                     <div className="relative shrink-0">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
                         {vendorName.charAt(0).toUpperCase()}
                       </div>
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
                     </div>
 
                     <div className="flex-1 min-w-0">
