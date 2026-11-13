@@ -23,6 +23,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.danasea.backend.modules.ai.application.ports.*;
+import com.danasea.backend.modules.ai.domain.exceptions.AiModerationUnavailableException;
 import com.danasea.backend.modules.ai.domain.models.DecisionResult;
 import com.danasea.backend.modules.ai.domain.services.ChatHistoryService;
 import com.danasea.backend.modules.ai.domain.models.TravelContext;
@@ -41,6 +42,7 @@ class CustomerAiHttpIntegrationTest extends BaseSecurityIntegrationTest {
     @MockitoBean TravelWeatherPort weather;
     @MockitoBean ReviewHighlightPort highlights;
     @MockitoBean RateLimiterPort limiter;
+    @MockitoBean ModerationPort moderation;
     private UUID owner, other, admin, serviceId, slotId, optionId, categoryId;
 
     @BeforeEach void setup() {
@@ -95,6 +97,21 @@ class CustomerAiHttpIntegrationTest extends BaseSecurityIntegrationTest {
                 .andExpect(status().isNoContent());
         mvc.perform(get("/api/admin/ai/copilot/conversations").with(user(admin.toString()).roles("ADMIN")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test void copilotDistinguishesProviderOutageFromBlockedInput() throws Exception {
+        String path = "/api/admin/ai/copilot/chat";
+        when(moderation.isSafe("doanh thu")).thenThrow(new AiModerationUnavailableException());
+        mvc.perform(post(path).with(user(admin.toString()).roles("ADMIN"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"doanh thu\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("AI_SERVICE_UNAVAILABLE"));
+        when(moderation.isSafe("blocked")).thenReturn(false);
+        mvc.perform(post(path).with(user(admin.toString()).roles("ADMIN"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"blocked\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AI_MODERATION_BLOCKED"));
+        assertThat(insights.listCopilotConversations(admin, "ADMIN", null, null, 10)).isEmpty();
     }
 
     @Test void customerConversationsCanBeRenamedArchivedAndDeletedByTheirOwner() throws Exception {

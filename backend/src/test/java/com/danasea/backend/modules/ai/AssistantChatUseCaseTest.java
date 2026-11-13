@@ -97,6 +97,15 @@ public class AssistantChatUseCaseTest {
     // =========================================================================
 
     @Test
+    void customerFinanceQuestionsGetAnExplicitScopeResponse() {
+        var response = chatUseCase.processMessage(conversationId,
+                "Cho tôi biết GMV và doanh thu toàn sàn DANASEA trong 30 ngày qua.", SupportedLanguage.VI);
+        assertTrue(response.getContent().contains("Báo cáo doanh thu là dữ liệu nội bộ"));
+        assertTrue(response.getCards().isEmpty());
+        verifyNoInteractions(llmClientPort);
+    }
+
+    @Test
     void moderationAndChatShareTwoMinuteBudgetEvenWithoutHttpFilter() {
         when(moderationPort.isSafe(any())).thenAnswer(invocation -> {
             assertFalse(AiExecutionBudget.hasTimeFor(Duration.ofSeconds(121)));

@@ -9,6 +9,7 @@ import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort;
 import com.danasea.backend.modules.ai.application.usecases.VendorListingOptimizerUseCase;
 import com.danasea.backend.modules.ai.application.usecases.VendorReviewCoachingUseCase;
 import com.danasea.backend.modules.ai.application.usecases.VendorSlotAdvisorUseCase;
+import com.danasea.backend.modules.report.domain.models.TimeRange;
 import com.danasea.backend.shared.i18n.SupportedLanguage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -68,8 +69,16 @@ public class VendorFeatureTool implements ToolExecutor {
             SupportedLanguage language = context != null && context.language() != null ? context.language() : SupportedLanguage.VI;
 
             Object result = switch (name) {
-                case "vendor_dashboard_summary" -> vendorAiData.getPerformanceMetrics(vendorId, LocalDate.now().minusDays(30), LocalDate.now());
-                case "vendor_revenue_and_bookings" -> vendorAiData.getPerformanceMetrics(vendorId, LocalDate.now().minusDays(30), LocalDate.now());
+                case "vendor_dashboard_summary", "vendor_revenue_and_bookings" -> {
+                    LocalDate today = LocalDate.now(TimeRange.VIETNAM_ZONE);
+                    LocalDate from = args.hasNonNull("from") ? LocalDate.parse(args.get("from").asText()) : today.minusDays(30);
+                    LocalDate to = args.hasNonNull("to") ? LocalDate.parse(args.get("to").asText()) : today;
+                    yield vendorAiData.getPerformanceMetrics(vendorId, from, to);
+                }
+                case "vendor_service_count" -> {
+                    var counts = vendorAiData.countServicesByStatus(vendorId);
+                    yield Map.of("total", counts.values().stream().mapToLong(Long::longValue).sum(), "byStatus", counts);
+                }
                 case "vendor_review_coaching" -> reviewCoaching.execute(userId, serviceId, null, null, language);
                 case "vendor_slot_advisor" -> slotAdvisor.execute(userId, serviceId, args.path("horizonDays").asInt(7), language);
                 case "vendor_optimize_listing" -> {
