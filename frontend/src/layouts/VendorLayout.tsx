@@ -127,8 +127,13 @@ export function VendorLayout() {
   useEffect(() => {
     if (!accessToken || !isAuthenticated) {
       navigate("/auth", { replace: true });
+      return;
     }
-  }, [accessToken, isAuthenticated, navigate]);
+    if (user && user.role !== "VENDOR" && user.role !== "ADMIN") {
+      toast.warning("Tài khoản chưa được kích hoạt quyền Đối tác vận hành.");
+      navigate("/profile", { replace: true });
+    }
+  }, [accessToken, isAuthenticated, user, navigate]);
 
   const [prevPath, setPrevPath] = useState(location.pathname);
   const [animationClass, setAnimationClass] = useState("animate-fade-in-up");
