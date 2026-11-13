@@ -5,6 +5,7 @@ import com.danasea.backend.modules.partner.application.usecases.ResubmitPartnerA
 import com.danasea.backend.modules.partner.application.usecases.SubmitPartnerApplicationUseCase;
 import com.danasea.backend.modules.partner.domain.exceptions.ApplicationNotFoundException;
 import com.danasea.backend.modules.partner.domain.exceptions.ApplicationStatusConflictException;
+import com.danasea.backend.modules.partner.domain.exceptions.CustomerHasActiveObligationsException;
 import com.danasea.backend.modules.partner.domain.models.PartnerApplicationStatus;
 import com.danasea.backend.modules.partner.presentation.dtos.PartnerApplicationResponse;
 import com.danasea.backend.modules.partner.presentation.dtos.ResubmitPartnerApplicationRequest;
@@ -297,7 +298,7 @@ class PartnerApplicationControllerTest {
         );
 
         when(submitUseCase.execute(eq(userId), any()))
-                .thenThrow(new com.danasea.backend.modules.partner.domain.exceptions.CustomerHasActiveObligationsException(
+                .thenThrow(new CustomerHasActiveObligationsException(
                         "Customer has active booking hold or pending payment"));
 
         mockMvc.perform(post("/api/partner-applications")

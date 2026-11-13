@@ -15,6 +15,7 @@ import com.danasea.backend.modules.checkin.infrastructure.persistence.repositori
 import com.danasea.backend.modules.checkin.presentation.dtos.GenerateQrResponse;
 import com.danasea.backend.modules.checkin.presentation.dtos.VerifyCheckinRequest;
 import com.danasea.backend.modules.checkin.presentation.dtos.VerifyCheckinResponse;
+import com.danasea.backend.modules.dispute.application.services.DisputeWindowService;
 import com.danasea.backend.modules.dispute.application.usecases.CreateDisputeUseCase;
 import com.danasea.backend.modules.dispute.application.usecases.ResolveDisputeUseCase;
 import com.danasea.backend.modules.dispute.domain.exceptions.DisputeAlreadyResolvedException;
@@ -70,6 +71,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -205,7 +207,8 @@ public class FullLifecycleServiceIntegrationTest {
                 checkinTokenRepository, subOrderRepository, vendorLookupPort, qrTokenSigner);
 
         createDisputeUseCase = new CreateDisputeUseCase(
-                disputeRepository, masterOrderRepository, subOrderRepository, slotRepository);
+                disputeRepository, masterOrderRepository, subOrderRepository,
+                new DisputeWindowService(slotRepository, Clock.systemDefaultZone()));
 
         resolveDisputeUseCase = new ResolveDisputeUseCase(
                 disputeRepository, subOrderRepository, refundRepository);

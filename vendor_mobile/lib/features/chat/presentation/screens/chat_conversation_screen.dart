@@ -2,7 +2,7 @@ import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
-import '../../../../core/data/vendor_mock_database.dart';
+import '../../../../core/data/vendor_store.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../orders/presentation/screens/sub_order_detail_screen.dart';
 
@@ -23,7 +23,7 @@ class ChatConversationScreen extends StatefulWidget {
 }
 
 class _ChatConversationScreenState extends State<ChatConversationScreen> {
-  final _db = VendorMockDatabase.instance;
+  final _db = VendorStore.instance;
   final _msgController = TextEditingController();
   final _scrollController = ScrollController();
 

@@ -3,6 +3,7 @@ import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/order_repository.dart';
+import '../../../../core/data/booking_repository.dart';
 import '../../../../core/data/payment_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -34,9 +35,17 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final OrderRepository _orderRepository = OrderRepository();
+  final BookingRepository _bookingRepository = BookingRepository();
+  BookingHold? _cartHold;
+  bool _cartHoldUncertain = false;
+  final String _cartOrderKey = OrderRepository.generateIdempotencyKey('cart');
   final PaymentRepository _paymentRepository = PaymentRepository();
 
   PaymentProvider _selectedProvider = PaymentProvider.vnpay;
+  List<PaymentProvider> _availableProviders = const [
+    PaymentProvider.vnpay,
+    PaymentProvider.paypal,
+  ];
   bool _waiverAccepted = false;
   final TextEditingController _discountController = TextEditingController();
 
@@ -52,9 +61,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       <PaymentProvider, String>{};
   String? _error;
   Timer? _countdownTimer;
-  Duration _holdRemaining = const Duration(minutes: 14, seconds: 55);
+  Duration _holdRemaining = Duration.zero;
 
-  String? get _targetOrderId => widget.orderId ?? widget.masterOrder?.id;
+  String? get _targetOrderId => _order?.id ?? widget.orderId ?? widget.masterOrder?.id;
   String? get _targetBookingId => widget.bookingId ?? _order?.bookingId;
 
   @override
@@ -67,8 +76,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
     }
     _initHoldCountdown();
-    if (_targetOrderId != null && _targetOrderId!.isNotEmpty) {
+    _loadAvailableProviders();
+    if ((_targetOrderId != null && _targetOrderId!.isNotEmpty) ||
+        widget.selectedItems.isNotEmpty) {
       _loadOrderAndPaymentStatus();
+    }
+  }
+
+  Future<void> _loadAvailableProviders() async {
+    final list = await _paymentRepository.getAvailableProviders();
+    if (mounted && list.isNotEmpty) {
+      setState(() {
+        _availableProviders = list;
+        if (!_availableProviders.contains(_selectedProvider)) {
+          _selectedProvider = _availableProviders.first;
+        }
+      });
     }
   }
 
@@ -96,7 +119,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       });
     } else {
       setState(() {
-        _holdRemaining = const Duration(minutes: 4, seconds: 55);
+        _holdRemaining = Duration.zero;
       });
     }
   }
@@ -116,6 +139,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _loadOrderAndPaymentStatus() async {
+    if (_loadingOrder) return;
+    if (_targetOrderId == null && widget.selectedItems.isNotEmpty) {
+      await _createCartOrder();
+      return;
+    }
     final targetId = _targetOrderId;
     if (targetId == null || targetId.isEmpty) return;
     setState(() {
@@ -123,6 +151,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _error = null;
     });
     try {
+      PaymentRepository.validateOrderId(targetId);
       final results = await Future.wait<dynamic>([
         _orderRepository.detail(targetId),
         _paymentRepository.getOrderStatus(targetId),
@@ -137,7 +166,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           (s) => !s.waiverRequired || s.waiverAccepted,
         );
       });
-      _updateHoldCountdown();
+      _initHoldCountdown();
     } on AuthFailure catch (e) {
       if (mounted) {
         setState(() => _error = e.message);
@@ -152,6 +181,60 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (mounted) {
         setState(() => _loadingOrder = false);
       }
+    }
+  }
+
+  Future<void> _createCartOrder() async {
+    setState(() {
+      _loadingOrder = true;
+      _error = null;
+    });
+    try {
+      if (_cartHoldUncertain) {
+        throw AuthFailure('Chưa xác định được kết quả giữ chỗ. Vui lòng kiểm tra mục Đặt chỗ của tôi trước khi thử lại.');
+      }
+      if (_cartHold == null) {
+        final items = widget.selectedItems.map((item) {
+          final optionId = item.optionId;
+          if (optionId == null || optionId.isEmpty) {
+            throw AuthFailure('Vui lòng chọn lại gói dịch vụ và khung giờ trong giỏ hàng.');
+          }
+          return <String, dynamic>{
+            'slotId': item.slot.id,
+            'optionId': optionId,
+            'quantity': item.quantity,
+            'participantsCount': item.quantity,
+            'allowSplit': item.allowSplit,
+          };
+        }).toList();
+        try {
+          _cartHold = await _bookingRepository.holdItems(items);
+        } on AuthFailure catch (e) {
+          _cartHoldUncertain = e.status == 0 || e.status >= 500;
+          rethrow;
+        } catch (_) {
+          _cartHoldUncertain = true;
+          rethrow;
+        }
+      }
+      final order = await _orderRepository.createOrder(
+        bookingId: _cartHold!.id,
+        idempotencyKey: _cartOrderKey,
+      );
+      if (!mounted) return;
+      setState(() {
+        _order = order;
+        _waiverAccepted = order.subOrders.every(
+          (s) => !s.waiverRequired || s.waiverAccepted,
+        );
+      });
+      _initHoldCountdown();
+    } on AuthFailure catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Không thể tạo đơn hàng từ giỏ hàng. Vui lòng kiểm tra mục Đặt chỗ của tôi.');
+    } finally {
+      if (mounted) setState(() => _loadingOrder = false);
     }
   }
 
@@ -197,6 +280,172 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     }
     return '${buffer.toString().split('').reversed.join()} đ';
+  }
+
+  Future<void> _openVoucherWalletSheet() async {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.outline.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.wallet_giftcard_rounded,
+                    color: AppColors.secondary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 10),
+                  LocalizedText(
+                    'Ví voucher của tôi',
+                    style: AppTypography.headlineSm(
+                      color: AppColors.onSurface,
+                    ).copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              LocalizedText(
+                'Chọn mã ưu đãi hoặc voucher đền bù có sẵn trong tài khoản để áp dụng.',
+                style: AppTypography.bodySm(color: AppColors.onSurfaceVariant),
+              ),
+              const SizedBox(height: 16),
+              FutureBuilder<List<CustomerDiscountCode>>(
+                future: _orderRepository.getMyDiscountCodes(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+                  final list = snapshot.data ?? const [];
+                  if (list.isEmpty) {
+                    return Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.confirmation_number_outlined, size: 36, color: AppColors.outline),
+                          const SizedBox(height: 8),
+                          LocalizedText(
+                            'Bạn chưa có mã ưu đãi cá nhân nào trong ví.',
+                            style: AppTypography.bodySm(color: AppColors.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.45,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: list.length,
+                      separatorBuilder: (_, index) => const SizedBox(height: 10),
+                      itemBuilder: (context, idx) {
+                        final item = list[idx];
+                        return InkWell(
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            _discountController.text = item.code;
+                            _applyDiscount();
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceContainerLowest,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.secondary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.discount_rounded, color: AppColors.secondary, size: 22),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.code,
+                                        style: AppTypography.labelMd(
+                                          color: AppColors.onSurface,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        item.discountType == 'PERCENTAGE'
+                                            ? 'Giảm ${item.discountValue}% (tối đa ${_formatPrice(item.maxDiscountAmount)})'
+                                            : 'Giảm ${_formatPrice(item.discountValue)}',
+                                        style: AppTypography.bodySm(
+                                          color: AppColors.primary,
+                                        ).copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.secondary,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'Dùng ngay',
+                                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _applyDiscount() async {
@@ -280,7 +529,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _processPayment() async {
-    if (_submitting) return;
+    if (_submitting || _loadingOrder) return;
     if (_uncertainProviders.contains(_selectedProvider)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -538,7 +787,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         centerTitle: true,
         actions: [
-          if (_targetOrderId != null)
+          if (_targetOrderId != null || widget.selectedItems.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.refresh, color: AppColors.secondary),
               onPressed: (_loadingOrder || _submitting)
@@ -564,6 +813,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 1. COUNTDOWN INVENTORY LOCK BANNER (Trải nghiệm FOMO trực quan, không dùng mã kỹ thuật)
+                  if (order != null)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
@@ -1002,6 +1252,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             ),
                           ),
                         ),
+                        IconButton(
+                          tooltip: tr(context, 'Ví voucher của tôi'),
+                          icon: const Icon(
+                            Icons.wallet_giftcard_rounded,
+                            size: 20,
+                            color: AppColors.secondary,
+                          ),
+                          onPressed: (_previewingDiscount || _submitting)
+                              ? null
+                              : _openVoucherWalletSheet,
+                        ),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.secondary,
@@ -1064,20 +1325,57 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           ],
                         ),
                         const SizedBox(height: 10),
-                        _buildPaymentRadio(
-                          provider: PaymentProvider.vnpay,
-                          title: 'VNPAY Cổng thanh toán',
-                          subtitle:
-                              'Hỗ trợ thẻ ATM nội địa, QR Pay, Visa/Mastercard',
-                          icon: Icons.credit_card,
-                        ),
-                        _buildPaymentRadio(
-                          provider: PaymentProvider.paypal,
-                          title: 'PayPal Quốc tế',
-                          subtitle:
-                              'Thanh toán quốc tế an toàn qua tài khoản PayPal',
-                          icon: Icons.public,
-                        ),
+                        ..._availableProviders.map((p) {
+                          switch (p) {
+                            case PaymentProvider.vnpay:
+                              return _buildPaymentRadio(
+                                provider: PaymentProvider.vnpay,
+                                title: 'VNPAY Cổng thanh toán',
+                                subtitle:
+                                    'Hỗ trợ thẻ ATM nội địa, QR Pay, Visa/Mastercard',
+                                icon: Icons.credit_card,
+                              );
+                            case PaymentProvider.payos:
+                              return _buildPaymentRadio(
+                                provider: PaymentProvider.payos,
+                                title: 'PayOS (VietQR)',
+                                subtitle:
+                                    'Quét mã VietQR chuyển khoản nhanh qua 30+ ngân hàng',
+                                icon: Icons.qr_code_2,
+                                badge: 'Phổ biến',
+                              );
+                            case PaymentProvider.zalopay:
+                              return _buildPaymentRadio(
+                                provider: PaymentProvider.zalopay,
+                                title: 'Ví điện tử ZaloPay',
+                                subtitle:
+                                    'Thanh toán trực tiếp qua ví ZaloPay hoặc thẻ',
+                                icon: Icons.account_balance_wallet,
+                              );
+                            case PaymentProvider.paypal:
+                              return _buildPaymentRadio(
+                                provider: PaymentProvider.paypal,
+                                title: 'PayPal Quốc tế',
+                                subtitle:
+                                    'Thanh toán quốc tế an toàn qua tài khoản PayPal',
+                                icon: Icons.public,
+                              );
+                            case PaymentProvider.momo:
+                              return _buildPaymentRadio(
+                                provider: PaymentProvider.momo,
+                                title: 'Ví điện tử MoMo',
+                                subtitle: 'Thanh toán tức thì qua ứng dụng MoMo',
+                                icon: Icons.account_balance_wallet_outlined,
+                              );
+                            case PaymentProvider.sepay:
+                              return _buildPaymentRadio(
+                                provider: PaymentProvider.sepay,
+                                title: 'VietQR (SePay)',
+                                subtitle: 'Chuyển khoản VietQR tự động nhận diện',
+                                icon: Icons.qr_code,
+                              );
+                          }
+                        }),
                       ],
                     ),
                   ),
@@ -1372,6 +1670,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     required String title,
     required String subtitle,
     required IconData icon,
+    String? badge,
   }) {
     final isSelected = _selectedProvider == provider;
     return InkWell(
@@ -1426,12 +1725,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  LocalizedText(
-                    title,
-                    style: AppTypography.labelMd(
-                      color: AppColors.onSurface,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: LocalizedText(
+                          title,
+                          style: AppTypography.labelMd(
+                            color: AppColors.onSurface,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      if (badge != null) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 1.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            badge,
+                            style: AppTypography.bodySm(
+                              color: AppColors.secondary,
+                            ).copyWith(fontSize: 9, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   LocalizedText(
                     subtitle,

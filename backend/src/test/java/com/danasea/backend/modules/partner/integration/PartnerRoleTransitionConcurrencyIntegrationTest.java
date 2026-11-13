@@ -37,6 +37,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -46,14 +47,21 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
@@ -223,6 +231,44 @@ public class PartnerRoleTransitionConcurrencyIntegrationTest extends BaseSecurit
             assertThat(refreshedUser.getRole()).isEqualTo(Role.VENDOR);
             assertThat(refreshedUser.getSessionVersion()).isEqualTo(1L);
         }
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void adminCanFindOlderPendingApplicationBeyondFirstHundredResults() throws Exception {
+        String search = UUID.randomUUID().toString();
+        User olderCustomer = createCustomer("old_application_" + search + "@danasea.test");
+        VendorRoleApplicationJpaEntity older = createApplication(olderCustomer.getId());
+        older.setBusinessName("Tour " + search + " 100%");
+        older.setCreatedAt(OffsetDateTime.now().minusDays(1));
+        applicationRepository.save(older);
+
+        for (int i = 0; i < 101; i++) {
+            User customer = createCustomer("application_" + i + "_" + search + "@danasea.test");
+            VendorRoleApplicationJpaEntity newer = createApplication(customer.getId());
+            newer.setBusinessName("Tour " + search + " 100 guests");
+            newer.setStatus(PartnerApplicationStatus.APPROVED);
+            applicationRepository.save(newer);
+        }
+
+        mockMvc.perform(get("/api/admin/partner-applications")
+                        .param("search", search).param("page", "12").param("size", "8"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(102))
+                .andExpect(jsonPath("$.totalPages").value(13))
+                .andExpect(jsonPath("$.content[5].id").value(older.getId().toString()));
+
+        mockMvc.perform(get("/api/admin/partner-applications")
+                        .param("status", "PENDING").param("search", search).param("size", "8"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(older.getId().toString()));
+
+        mockMvc.perform(get("/api/admin/partner-applications")
+                        .param("search", search + " 100%"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(older.getId().toString()));
     }
 
     @Test

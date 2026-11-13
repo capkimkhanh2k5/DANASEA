@@ -8,15 +8,10 @@ import type {
 
 export const adminPartnerApplicationService = {
   // GET /api/admin/partner-applications
-  async getApplications(params?: PartnerApplicationQueryParams): Promise<SpringPage<PartnerApplicationResponse>> {
-    const queryParams: Record<string, string | number> = {};
-    if (params?.status) queryParams.status = params.status;
-    if (params?.page !== undefined) queryParams.page = params.page;
-    if (params?.size !== undefined) queryParams.size = params.size;
-    if (params?.sort) queryParams.sort = params.sort;
-
+  async getApplications(params: PartnerApplicationQueryParams, signal?: AbortSignal): Promise<SpringPage<PartnerApplicationResponse>> {
     const response = await apiClient.get<SpringPage<PartnerApplicationResponse>>('/admin/partner-applications', {
-      params: queryParams,
+      params,
+      signal,
     });
     return response.data;
   },

@@ -754,7 +754,7 @@ class _SearchScreenState extends State<SearchScreen> {
           // CONTENT: LIST OR MAP
           Expanded(
             child: _isMapView
-                ? _buildMapViewMock(services)
+                ? _buildMapPreview(services)
                 : services.isEmpty && !_loading
                 ? _buildEmptyState()
                 : ListView.separated(
@@ -1086,7 +1086,7 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildMapViewMock(List<ServiceModel> services) {
+  Widget _buildMapPreview(List<ServiceModel> services) {
     return Container(
       color: AppColors.secondaryContainer.withValues(alpha: 0.2),
       child: Stack(

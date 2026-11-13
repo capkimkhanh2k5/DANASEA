@@ -3,25 +3,27 @@ package com.danasea.backend.modules.vendor.application.services;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
-import com.danasea.backend.modules.vendor.domain.models.Vendor;
-import com.danasea.backend.modules.vendor.domain.models.VerificationStatus;
-import com.danasea.backend.modules.vendor.infrastructure.mappers.VendorMapper;
-import com.danasea.backend.modules.vendor.infrastructure.mappers.VendorDocumentMapper;
-import com.danasea.backend.modules.vendor.domain.models.VendorDocument;
-import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
-import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
-import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorDocumentRepository;
 import com.danasea.backend.modules.vendor.domain.models.DocStatus;
 import com.danasea.backend.modules.vendor.domain.models.DocType;
-import java.util.Set;
-import java.util.stream.Collectors;
+import com.danasea.backend.modules.vendor.domain.models.Vendor;
+import com.danasea.backend.modules.vendor.domain.models.VendorDocument;
+import com.danasea.backend.modules.vendor.domain.models.VerificationStatus;
+import com.danasea.backend.modules.vendor.infrastructure.mappers.VendorDocumentMapper;
+import com.danasea.backend.modules.vendor.infrastructure.mappers.VendorMapper;
+import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorDocumentJpaEntity;
+import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
+import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorDocumentRepository;
+import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
+
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -93,19 +95,17 @@ public class VendorInternalService implements VendorInternalApi {
         if (vendorId == null) {
             return Set.of();
         }
-        List<com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorDocumentJpaEntity> docs =
-                vendorDocumentRepository.findByVendorId(vendorId);
+        List<VendorDocumentJpaEntity> docs = vendorDocumentRepository.findByVendorId(vendorId);
         if (docs == null || docs.isEmpty()) {
             return Set.of();
         }
-        Map<DocType, com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorDocumentJpaEntity> latestByDocType =
-                docs.stream()
-                    .filter(d -> d.getDocType() != null && d.getCreatedAt() != null)
-                    .collect(Collectors.toMap(
-                            com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorDocumentJpaEntity::getDocType,
-                            d -> d,
-                            (d1, d2) -> d1.getCreatedAt().isAfter(d2.getCreatedAt()) ? d1 : d2
-                    ));
+        Map<DocType, VendorDocumentJpaEntity> latestByDocType = docs.stream()
+                .filter(d -> d.getDocType() != null && d.getCreatedAt() != null)
+                .collect(Collectors.toMap(
+                        VendorDocumentJpaEntity::getDocType,
+                        d -> d,
+                        (d1, d2) -> d1.getCreatedAt().isAfter(d2.getCreatedAt()) ? d1 : d2
+                ));
 
         return latestByDocType.entrySet().stream()
                 .filter(e -> e.getValue().getStatus() == DocStatus.APPROVED)

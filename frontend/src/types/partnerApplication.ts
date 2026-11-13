@@ -41,6 +41,7 @@ export interface AdminRejectApplicationRequest {
 
 export interface PartnerApplicationQueryParams {
   status?: PartnerApplicationStatus;
+  search?: string;
   page?: number;
   size?: number;
   sort?: string;

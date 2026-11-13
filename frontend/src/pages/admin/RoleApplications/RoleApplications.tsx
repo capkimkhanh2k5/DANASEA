@@ -1,82 +1,98 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Eye, Search, UserCheck, RefreshCw, XCircle } from 'lucide-react';
 import { adminPartnerApplicationService, getAdminPartnerApplicationError } from '../../../services/adminPartnerApplicationService';
-import type { PartnerApplicationResponse } from '../../../types/partnerApplication';
+import type { PartnerApplicationResponse, PartnerApplicationStatus, SpringPage } from '../../../types/partnerApplication';
 import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
 import { AdminButton, AdminFilterTabs, AdminNotice, AdminPagination } from '../../../components/admin/AdminWorkspace';
 import { filterApplications, formatDate, getStatusTone, getStatusLabel, MOCK_PARTNER_APPLICATIONS } from './roleApplicationsModel';
 import { RoleApplicationDetail } from './RoleApplicationDetail';
 import './RoleApplications.css';
 
+const PAGE_SIZE = 8;
+const SEARCH_DELAY_MS = 250;
+
+type ApplicationListResult = {
+  requestKey: string;
+} & (
+  | { page: SpringPage<PartnerApplicationResponse>; error?: never }
+  | { page?: never; error: string }
+);
+
 export function RoleApplications() {
   const location = useLocation();
   const demo = import.meta.env.DEV && new URLSearchParams(location.search).get('demo') === '1';
 
-  const [applications, setApplications] = useState<PartnerApplicationResponse[]>(() => demo ? MOCK_PARTNER_APPLICATIONS : []);
-  const [loading, setLoading] = useState(() => !demo);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [demoApplications, setDemoApplications] = useState(MOCK_PARTNER_APPLICATIONS);
+  const [result, setResult] = useState<ApplicationListResult>();
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('all');
+  const [status, setStatus] = useState<PartnerApplicationStatus | 'all'>('all');
   const [selectedApp, setSelectedApp] = useState<PartnerApplicationResponse | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const fetchApplications = () => {
-    if (demo) {
-      setApplications(MOCK_PARTNER_APPLICATIONS);
-      setNotice('Đã làm mới danh sách đơn mẫu trong phiên demo.');
-      return;
-    }
-    setLoading(true);
-    setErrorMessage(null);
-    adminPartnerApplicationService.getApplications({ page: 0, size: 100 })
-      .then(res => {
-        setApplications(res.content || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        setErrorMessage(getAdminPartnerApplicationError(err, 'Không thể tải danh sách đơn xét duyệt vai trò đối tác.'));
-        setLoading(false);
-      });
-  };
+  const query = search.trim();
+  const requestKey = JSON.stringify([currentPage, status, query, refreshVersion]);
 
   useEffect(() => {
     if (demo) return;
-    let isMounted = true;
-    adminPartnerApplicationService.getApplications({ page: 0, size: 100 })
-      .then(res => {
-        if (!isMounted) return;
-        setApplications(res.content || []);
-        setLoading(false);
-      })
-      .catch(err => {
-        if (!isMounted) return;
-        setErrorMessage(getAdminPartnerApplicationError(err, 'Không thể tải danh sách đơn xét duyệt vai trò đối tác.'));
-        setLoading(false);
-      });
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const page = await adminPartnerApplicationService.getApplications({
+          page: currentPage - 1,
+          size: PAGE_SIZE,
+          status: status === 'all' ? undefined : status,
+          search: query || undefined,
+        }, controller.signal);
+        if (controller.signal.aborted) return;
+
+        const lastPage = Math.max(1, page.totalPages);
+        if (currentPage > lastPage) {
+          setCurrentPage(lastPage);
+        } else {
+          setResult({ requestKey, page });
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setResult({
+            requestKey,
+            error: getAdminPartnerApplicationError(error, 'Không thể tải danh sách đơn xét duyệt vai trò đối tác.'),
+          });
+        }
+      }
+    }, query ? SEARCH_DELAY_MS : 0);
 
     return () => {
-      isMounted = false;
+      window.clearTimeout(timer);
+      controller.abort();
     };
-  }, [demo]);
+  }, [demo, currentPage, status, query, requestKey]);
 
-  const filtered = useMemo(() => {
-    return filterApplications(applications, search, status);
-  }, [applications, search, status]);
+  const currentResult = result?.requestKey === requestKey ? result : undefined;
+  const loading = !demo && !currentResult;
+  const errorMessage = demo ? undefined : currentResult?.error;
+  const demoMatches = demo ? filterApplications(demoApplications, query, status) : [];
+  const totalRecords = demo ? demoMatches.length : currentResult?.page?.totalElements ?? 0;
+  const totalPages = demo ? Math.ceil(totalRecords / PAGE_SIZE) : currentResult?.page?.totalPages ?? 0;
+  const activePage = Math.min(currentPage, Math.max(1, totalPages));
+  const pageStart = (activePage - 1) * PAGE_SIZE;
+  const paginated = demo ? demoMatches.slice(pageStart, pageStart + PAGE_SIZE) : currentResult?.page?.content ?? [];
 
-  const countByStatus = (st: string) => applications.filter(a => a.status === st).length;
+  const countDemoStatus = (value: PartnerApplicationStatus) =>
+    demo ? demoApplications.filter(app => app.status === value).length : undefined;
 
-  const PAGE_SIZE = 8;
-  const [currentPage, setCurrentPage] = useState(1);
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
-  const activePage = Math.min(Math.max(1, currentPage), totalPages);
-
-  const paginated = useMemo(() => {
-    const start = (activePage - 1) * PAGE_SIZE;
-    return filtered.slice(start, start + PAGE_SIZE);
-  }, [filtered, activePage]);
+  const fetchApplications = () => {
+    if (demo) {
+      setDemoApplications(MOCK_PARTNER_APPLICATIONS);
+      setNotice('Đã làm mới danh sách đơn mẫu trong phiên demo.');
+    } else {
+      setRefreshVersion(version => version + 1);
+    }
+  };
 
   const resetFilters = () => {
     setSearch('');
@@ -91,7 +107,7 @@ export function RoleApplications() {
 
   const handleApprove = async (id: string) => {
     if (demo) {
-      setApplications(prev => prev.map(a => a.id === id ? {
+      setDemoApplications(prev => prev.map(a => a.id === id ? {
         ...a,
         status: 'APPROVED' as const,
         reviewedBy: 'Quản trị viên DANASEA',
@@ -111,7 +127,7 @@ export function RoleApplications() {
     try {
       setIsSubmitting(true);
       const updated = await adminPartnerApplicationService.approveApplication(id);
-      setApplications(prev => prev.map(a => a.id === id ? updated : a));
+      setRefreshVersion(version => version + 1);
       if (selectedApp?.id === id) {
         setSelectedApp(updated);
       }
@@ -125,7 +141,7 @@ export function RoleApplications() {
 
   const handleReject = async (id: string, reason: string) => {
     if (demo) {
-      setApplications(prev => prev.map(a => a.id === id ? {
+      setDemoApplications(prev => prev.map(a => a.id === id ? {
         ...a,
         status: 'REJECTED' as const,
         rejectionReason: reason,
@@ -147,7 +163,7 @@ export function RoleApplications() {
     try {
       setIsSubmitting(true);
       const updated = await adminPartnerApplicationService.rejectApplication(id, reason);
-      setApplications(prev => prev.map(a => a.id === id ? updated : a));
+      setRefreshVersion(version => version + 1);
       if (selectedApp?.id === id) {
         setSelectedApp(updated);
       }
@@ -176,7 +192,7 @@ export function RoleApplications() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-500 tabular-nums">
-              {filtered.length} / {applications.length} đơn
+              {totalRecords} đơn
             </span>
             <AdminButton onClick={fetchApplications} disabled={loading} className="p-2!">
               <RefreshCw size={15} className={loading ? 'admin-spin' : ''} aria-hidden="true" />
@@ -190,12 +206,17 @@ export function RoleApplications() {
           <AdminFilterTabs
             label="Lọc theo trạng thái xét duyệt"
             value={status}
-            onChange={(val) => { setStatus(val); setCurrentPage(1); }}
+            onChange={(value) => {
+              if (value === 'all' || value === 'PENDING' || value === 'APPROVED' || value === 'REJECTED') {
+                setStatus(value);
+                setCurrentPage(1);
+              }
+            }}
             items={[
-              { value: 'all', label: 'Tất cả', count: applications.length },
-              { value: 'PENDING', label: 'Chờ duyệt', count: countByStatus('PENDING') },
-              { value: 'APPROVED', label: 'Đã duyệt', count: countByStatus('APPROVED') },
-              { value: 'REJECTED', label: 'Từ chối', count: countByStatus('REJECTED') },
+              { value: 'all', label: 'Tất cả', count: demo ? demoApplications.length : undefined },
+              { value: 'PENDING', label: 'Chờ duyệt', count: countDemoStatus('PENDING') },
+              { value: 'APPROVED', label: 'Đã duyệt', count: countDemoStatus('APPROVED') },
+              { value: 'REJECTED', label: 'Từ chối', count: countDemoStatus('REJECTED') },
             ]}
           />
         </div>
@@ -238,7 +259,7 @@ export function RoleApplications() {
         {/* Table View */}
         {!loading && !errorMessage && (
           <>
-            {filtered.length === 0 ? (
+            {totalRecords === 0 ? (
               <div className="py-8">
                 <AdminState
                   kind="empty"
@@ -299,12 +320,12 @@ export function RoleApplications() {
               </div>
             )}
 
-            {filtered.length > PAGE_SIZE && (
+            {totalPages > 1 && (
               <div className="mt-4 pt-4 border-t border-slate-100">
                 <AdminPagination
                   currentPage={activePage}
                   totalPages={totalPages}
-                  totalRecords={filtered.length}
+                  totalRecords={totalRecords}
                   pageSize={PAGE_SIZE}
                   recordLabel="đơn"
                   onPageChange={setCurrentPage}
@@ -315,7 +336,7 @@ export function RoleApplications() {
         )}
 
         <div className="admin-vendors-list-footer mt-4 text-xs text-slate-500 text-center">
-          Hiển thị {filtered.length} đơn {demo ? 'mẫu (Demo Mode)' : 'từ hệ thống DANASEA'} · Chi tiết thẩm định mở trong ngăn riêng, giữ nguyên danh sách và bộ lọc.
+          Hiển thị {paginated.length} đơn {demo ? 'mẫu (Demo Mode)' : 'từ hệ thống DANASEA'} · Chi tiết thẩm định mở trong ngăn riêng, giữ nguyên danh sách và bộ lọc.
         </div>
       </section>
 

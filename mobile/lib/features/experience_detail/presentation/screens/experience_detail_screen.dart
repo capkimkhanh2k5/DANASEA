@@ -85,41 +85,15 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
     return days[dt.weekday - 1];
   }
 
-  List<ServiceSlotModel> _getDisplaySlots() {
-    final list = List<ServiceSlotModel>.from(_availableSlots);
-    final defaults = [
-      ('08:00', '10:00'),
-      ('10:30', '12:30'),
-      ('15:00', '17:00'),
-      ('19:00', '21:00'),
-    ];
-
-    while (list.length < 4) {
-      final idx = list.length;
-      final (start, end) = defaults[idx];
-      list.add(
-        ServiceSlotModel(
-          id: 'slot-default-$idx',
-          serviceId: widget.service.id,
-          date: _selectedDate,
-          startTime: start,
-          endTime: end,
-          capacity: widget.service.capacityPerSlot,
-          bookedCount: 0,
-          status: SlotStatus.open,
-        ),
-      );
-    }
-    return list.take(4).toList();
-  }
+  List<ServiceSlotModel> _getDisplaySlots() => _availableSlots;
 
   Widget _buildTimePill(ServiceSlotModel slot) {
     final isSelected = _selectedSlot != null &&
-        (_selectedSlot!.id == slot.id || _selectedSlot!.startTime == slot.startTime);
+        (_selectedSlot!.id == slot.id && _selectedSlot!.optionId == slot.optionId);
 
     return Expanded(
       child: InkWell(
-        onTap: () {
+        onTap: !slot.isAvailable ? null : () {
           HapticFeedback.selectionClick();
           setState(() {
             _selectedSlot = slot;
@@ -554,6 +528,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
         final cap = cs.availableCapacity ?? widget.service.capacityPerSlot;
         return ServiceSlotModel(
           id: cs.id,
+          optionId: cs.optionId,
           serviceId: widget.service.id,
           date: date,
           startTime: cs.startTime,
@@ -606,6 +581,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
       } else {
         final catalogSlot = CatalogSlot(
           id: slot.id,
+          optionId: slot.optionId,
           date:
               '${slot.date.year}-${slot.date.month.toString().padLeft(2, '0')}-${slot.date.day.toString().padLeft(2, '0')}',
           startTime: slot.startTime,
@@ -637,71 +613,44 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
 
     setState(() => _isBookingSubmitting = true);
     try {
-      final optId = widget.service.options.isNotEmpty
+      final optId = slot.optionId ?? (widget.service.options.length == 1
           ? widget.service.options.first.id
-          : null;
-      if (optId != null) {
-        try {
-          final hold = await _bookingRepository.hold(
-            slotId: slot.id,
-            optionId: optId,
-            quantity: _guestCount,
-            participantsCount: _guestCount,
-          );
-          final idempotencyKey = OrderRepository.generateIdempotencyKey('ord');
-          final order = await _orderRepository.createOrder(
-            bookingId: hold.id,
-            idempotencyKey: idempotencyKey,
-          );
-          if (!mounted) return;
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => CheckoutScreen(masterOrder: order),
-            ),
-          );
-          return;
-        } catch (_) {
-          // Fallback to direct mock order navigation
-        }
+          : null);
+      if (optId == null) {
+        throw AuthFailure('Vui lòng chọn gói dịch vụ trước khi đặt chỗ.');
       }
-
-      final orderId = 'DNS-${DateTime.now().millisecondsSinceEpoch % 100000}';
-      final subOrderId = 'DNS-SUB-${DateTime.now().millisecondsSinceEpoch % 100000}';
-      final totalAmount = widget.service.price * _guestCount;
-      final fallbackOrder = MasterOrderModel(
-        id: orderId,
-        customerId: AuthSession.instance.profile?['id']?.toString() ?? 'usr-001',
-        status: MasterOrderStatus.pendingPayment,
-        totalAmount: totalAmount,
-        createdAt: DateTime.now(),
-        subOrders: [
-          SubOrderModel(
-            id: subOrderId,
-            masterOrderId: orderId,
-            vendorId: widget.service.vendorId,
-            vendorName: widget.service.vendorName,
-            serviceId: widget.service.id,
-            serviceName: widget.service.name,
-            serviceImageUrl: widget.service.imageUrls.isNotEmpty
-                ? widget.service.imageUrls.first
-                : '',
-            locationName: widget.service.locationName,
-            slotId: slot.id,
-            slotDate: slot.date,
-            slotTime: '${slot.startTime} - ${slot.endTime}',
-            quantity: _guestCount,
-            unitPrice: widget.service.price,
-            subtotalAmount: totalAmount,
-            status: SubOrderStatus.pending,
-            qrSecret: 'qr-$orderId-secret',
-          ),
-        ],
+      final hold = await _bookingRepository.hold(
+        slotId: slot.id,
+        optionId: optId,
+        quantity: _guestCount,
+        participantsCount: _guestCount,
       );
-
+      final order = await _orderRepository.createOrder(
+        bookingId: hold.id,
+        idempotencyKey: OrderRepository.generateIdempotencyKey('ord'),
+      );
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => CheckoutScreen(masterOrder: fallbackOrder),
+          builder: (_) => CheckoutScreen(masterOrder: order),
+        ),
+      );
+    } on AuthFailure catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: LocalizedText(e.message),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText(
+            'Chưa xác định được kết quả đặt chỗ. Vui lòng kiểm tra mục Đặt chỗ của tôi trước khi thử lại.',
+          ),
+          backgroundColor: AppColors.error,
         ),
       );
     } finally {
@@ -745,6 +694,7 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
 
         final catalogSlot = CatalogSlot(
           id: slot.id,
+          optionId: slot.optionId,
           date:
               '${slot.date.year}-${slot.date.month.toString().padLeft(2, '0')}-${slot.date.day.toString().padLeft(2, '0')}',
           startTime: slot.startTime,
@@ -926,9 +876,6 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
           Builder(
             builder: (context) {
               final displaySlots = _getDisplaySlots();
-              if (_selectedSlot == null && displaySlots.isNotEmpty) {
-                _selectedSlot = displaySlots.first;
-              }
 
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -994,29 +941,27 @@ class _ExperienceDetailScreenState extends State<ExperienceDetailScreen>
                   ),
                   const SizedBox(width: 10),
 
-                  // BÊN PHẢI: 4 KHUNG GIỜ (2 HÀNG x 2 CỘT)
                   Expanded(
-                    child: Column(
-                      children: [
-                        // Hàng 1: 2 khung giờ
-                        Row(
-                          children: [
-                            _buildTimePill(displaySlots[0]),
-                            const SizedBox(width: 8),
-                            _buildTimePill(displaySlots[1]),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        // Hàng 2: 2 khung giờ
-                        Row(
-                          children: [
-                            _buildTimePill(displaySlots[2]),
-                            const SizedBox(width: 8),
-                            _buildTimePill(displaySlots[3]),
-                          ],
-                        ),
-                      ],
-                    ),
+                    child: displaySlots.isEmpty
+                        ? const LocalizedText('Không có khung giờ khả dụng cho ngày này.')
+                        : Column(
+                            children: [
+                              for (var i = 0; i < displaySlots.length; i += 2)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Row(
+                                    children: [
+                                      _buildTimePill(displaySlots[i]),
+                                      const SizedBox(width: 8),
+                                      if (i + 1 < displaySlots.length)
+                                        _buildTimePill(displaySlots[i + 1])
+                                      else
+                                        const Expanded(child: SizedBox()),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
                   ),
                 ],
               );
