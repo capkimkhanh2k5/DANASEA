@@ -30,14 +30,15 @@ import {
   ChevronsRight,
   Inbox,
   AlertCircle,
-  ScanLine
+  ScanLine,
+  FastForward
 } from "lucide-react";
 
 import { toast } from "../../../store/useToastStore";
 import { extractErrorMessage } from "../../../utils/errorHandler";
 import { getAuthoritativeCustomer } from "../../../data/demoCustomerMap";
 import type { VendorServiceDto, VendorServiceSlotDto } from "../../../types/vendorService";
-import type { VendorSubOrderDto, VendorBookingItemDto } from "../../../types/vendorOrder";
+import type { VendorSubOrderDto, VendorBookingItemDto, EarlyDispatchSuggestion } from "../../../types/vendorOrder";
 
 export type SubOrderStatus = 
   | "PENDING" 
@@ -82,6 +83,8 @@ export interface OrderItem {
   image: string;
   paymentMethod?: string;
   refundInfo?: RefundDetail;
+  isEarlyDispatched?: boolean;
+  originalTimeSlot?: string;
 }
 
 
@@ -104,10 +107,13 @@ export function VendorOrders() {
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [manualCode, setManualCode] = useState("");
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [isDispatchingEarly, setIsDispatchingEarly] = useState(false);
   const [scannerResult, setScannerResult] = useState<{
     type: "SUCCESS" | "USED" | "INVALID" | "WRONG_VENDOR" | null;
     order?: OrderItem;
     message?: string;
+    subOrderId?: string;
+    earlyDispatchSuggestion?: EarlyDispatchSuggestion | null;
   }>({ type: null });
 
   // Reject dialog
@@ -350,6 +356,8 @@ export function VendorOrders() {
       setScannerResult({
         type: "SUCCESS",
         order: matched,
+        subOrderId: verifyRes.subOrderId || rawInput,
+        earlyDispatchSuggestion: verifyRes.earlyDispatchSuggestion?.available ? verifyRes.earlyDispatchSuggestion : null,
         message: `Xác thực thành công! Đơn #${(verifyRes.subOrderId || rawInput).slice(0, 8)}... (${verifyRes.quantity || 1} khách) sẵn sàng xuất bến!`
       });
       toast.success(`Check-in thành công đơn #${(verifyRes.subOrderId || rawInput).slice(0, 8)}...!`);
@@ -440,6 +448,42 @@ export function VendorOrders() {
       message: `Đã check-in thành công và cấp phát phao bảo hộ cho đơn #${orderId.slice(0, 8)}...! (${checkinTime})`
     });
     toast.success(`Check-in thành công đơn #${orderId.slice(0, 8)}...! Đã ghi nhận thời gian xuất bến.`);
+  };
+
+  // Điều phối khách chơi ca sớm (FIFO Early Dispatch)
+  const handleConfirmEarlyDispatch = async (subOrderId: string, targetSlotId: string) => {
+    setIsDispatchingEarly(true);
+    try {
+      const res = await vendorOrderService.earlyDispatch({
+        subOrderId,
+        targetSlotId,
+        dispatchReason: "Du khách đến sớm, điều phối xuất bến sớm theo thuật toán FIFO"
+      });
+      const formattedSlot = `${res.startTime.slice(0, 5)} - ${res.endTime.slice(0, 5)}`;
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === res.subOrderId
+            ? {
+                ...o,
+                originalTimeSlot: o.originalTimeSlot || o.timeSlot,
+                timeSlot: formattedSlot,
+                dateStr: res.slotDate,
+                isEarlyDispatched: true
+              }
+            : o
+        )
+      );
+      toast.success(`Đã điều phối đơn sang ca sớm ${res.startTime.slice(0, 5)} thành công (FIFO)!`);
+      setScannerResult((prev) => ({
+        ...prev,
+        earlyDispatchSuggestion: null,
+        message: `Đã xác thực & chuyển sang ca sớm ${formattedSlot} thành công (FIFO)!`
+      }));
+    } catch (err: unknown) {
+      toast.error(extractErrorMessage(err) || "Không thể điều phối sang ca sớm.");
+    } finally {
+      setIsDispatchingEarly(false);
+    }
   };
 
   // Confirm pending order
@@ -831,7 +875,14 @@ export function VendorOrders() {
 
                         {/* 2. DATE (Ngày & giờ - Dedicated separate column, font-mono) */}
                         <td className="py-3.5 px-4 whitespace-nowrap text-xs font-mono text-slate-600">
-                          {cleanDate} {cleanTime}
+                          <div className="flex items-center gap-1.5">
+                            <span>{cleanDate} {cleanTime}</span>
+                            {order.isEarlyDispatched && (
+                              <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] bg-sky-50 text-sky-700 border border-sky-200/80 font-medium" title={`Ca gốc: ${order.originalTimeSlot || "N/A"}`}>
+                                <FastForward className="w-2.5 h-2.5 text-sky-600" /> FIFO
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* 3. CUSTOMER (Khách hàng - Avatar + Name + Contact) */}
@@ -1047,9 +1098,14 @@ export function VendorOrders() {
                   <h3 className="font-semibold text-sm text-slate-900 leading-snug line-clamp-2">
                     {drawerOrder.serviceTitle}
                   </h3>
-                  <div className="text-xs text-slate-600 flex items-center gap-1.5 mt-1">
+                  <div className="text-xs text-slate-600 flex flex-wrap items-center gap-1.5 mt-1">
                     <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span className="font-mono">{drawerOrder.timeSlot} • {drawerOrder.dateStr}</span>
+                    {drawerOrder.isEarlyDispatched && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 text-[10px] font-medium border border-sky-200">
+                        <FastForward className="w-3 h-3 text-sky-600" /> Ca sớm FIFO
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                     <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -1285,6 +1341,52 @@ export function VendorOrders() {
                   </span>
                 </div>
                 <p className="text-xs leading-relaxed">{scannerResult.message}</p>
+
+                {/* FIFO Early Dispatch Candidate Banner */}
+                {scannerResult.type === "SUCCESS" && scannerResult.earlyDispatchSuggestion?.available && scannerResult.subOrderId && (
+                  <div className="mt-2 p-3 bg-white rounded-xl border border-sky-200/90 shadow-2xs flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-sky-950 font-semibold text-xs">
+                        <FastForward className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                        <span>Du khách đến trước giờ khởi hành (FIFO)</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-sky-50 text-sky-700 border border-sky-100">
+                        Còn {scannerResult.earlyDispatchSuggestion.availableCapacity} chỗ
+                      </span>
+                    </div>
+                    <p className="text-slate-600 text-xs">
+                      Ca sớm cùng ngày:{" "}
+                      <span className="font-semibold text-slate-900 font-mono">
+                        {scannerResult.earlyDispatchSuggestion.startTime.slice(0, 5)} - {scannerResult.earlyDispatchSuggestion.endTime.slice(0, 5)}
+                      </span>{" "}
+                      đang trống chỗ. Điều phối du khách chơi ngay ca này?
+                    </p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={isDispatchingEarly}
+                        onClick={() =>
+                          handleConfirmEarlyDispatch(
+                            scannerResult.subOrderId!,
+                            scannerResult.earlyDispatchSuggestion!.suggestedSlotId
+                          )
+                        }
+                        className="flex-1 py-2 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer"
+                      >
+                        <FastForward className="w-3.5 h-3.5" />
+                        {isDispatchingEarly ? "Đang điều phối..." : `Chuyển ca ${scannerResult.earlyDispatchSuggestion.startTime.slice(0, 5)}`}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isDispatchingEarly}
+                        onClick={() => setScannerResult((prev) => ({ ...prev, earlyDispatchSuggestion: null }))}
+                        className="py-2 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs cursor-pointer"
+                      >
+                        Giữ ca gốc
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {scannerResult.type === "SUCCESS" && scannerResult.order && (
                   <button

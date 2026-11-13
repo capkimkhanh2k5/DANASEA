@@ -5,7 +5,7 @@ import { vendorOrderService } from "../../../services/vendorOrderService";
 import { vendorService } from "../../../services/vendorService";
 import { getAuthoritativeCustomer } from "../../../data/demoCustomerMap";
 import type { VendorServiceDto, VendorServiceSlotDto } from "../../../types/vendorService";
-import type { VendorBookingItemDto } from "../../../types/vendorOrder";
+import type { VendorBookingItemDto, EarlyDispatchSuggestion } from "../../../types/vendorOrder";
 import { toast } from "../../../store/useToastStore";
 import { 
   Wallet, 
@@ -16,7 +16,8 @@ import {
   CheckCircle2, 
   X, 
   Loader2, 
-  AlertCircle
+  AlertCircle,
+  FastForward
 } from "lucide-react";
 
 interface UrgentOrder {
@@ -64,6 +65,7 @@ export function Dashboard() {
   const [isCheckinModalOpen, setIsCheckinModalOpen] = useState(false);
   const [qrInput, setQrInput] = useState("");
   const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [isDispatchingEarly, setIsDispatchingEarly] = useState(false);
   const [checkinResult, setCheckinResult] = useState<{
     success: boolean;
     message: string;
@@ -71,6 +73,7 @@ export function Dashboard() {
       subOrderId?: string;
       serviceId?: string;
       verifiedAt?: string;
+      earlyDispatchSuggestion?: EarlyDispatchSuggestion | null;
     };
   } | null>(null);
 
@@ -247,6 +250,7 @@ export function Dashboard() {
           subOrderId: res.subOrderId,
           serviceId: res.serviceId,
           verifiedAt: res.checkedInAt || new Date().toISOString(),
+          earlyDispatchSuggestion: res.earlyDispatchSuggestion?.available ? res.earlyDispatchSuggestion : null,
         },
       });
       toast.success("Xác thực soát vé thành công!");
@@ -261,6 +265,35 @@ export function Dashboard() {
       toast.error(msg);
     } finally {
       setIsCheckingIn(false);
+    }
+  };
+
+  const handleConfirmEarlyDispatch = async (subOrderId: string, targetSlotId: string) => {
+    setIsDispatchingEarly(true);
+    try {
+      const res = await vendorOrderService.earlyDispatch({
+        subOrderId,
+        targetSlotId,
+        dispatchReason: "Du khách đến sớm, điều phối xuất bến sớm theo thuật toán FIFO"
+      });
+      const formattedSlot = `${res.startTime.slice(0, 5)} - ${res.endTime.slice(0, 5)}`;
+      toast.success(`Đã điều phối đơn sang ca sớm ${res.startTime.slice(0, 5)} thành công (FIFO)!`);
+      setCheckinResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              message: `Đã xác thực & chuyển sang ca sớm ${formattedSlot} thành công (FIFO)!`,
+              details: prev.details
+                ? { ...prev.details, earlyDispatchSuggestion: null }
+                : undefined,
+            }
+          : null
+      );
+      loadDashboardData();
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Không thể điều phối sang ca sớm.");
+    } finally {
+      setIsDispatchingEarly(false);
     }
   };
 
@@ -975,24 +1008,83 @@ export function Dashboard() {
 
               {/* Status Result Message */}
               {checkinResult && (
-                <div className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
-                  checkinResult.success 
-                    ? "bg-emerald-50/80 border-emerald-200 text-emerald-900" 
-                    : "bg-rose-50/80 border-rose-200 text-rose-900"
-                }`}>
-                  {checkinResult.success ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                  )}
-                  <div className="space-y-1">
-                    <p className="font-semibold">{checkinResult.message}</p>
-                    {checkinResult.details?.subOrderId && (
-                      <p className="font-mono text-[11px] text-emerald-700">
-                        Mã đơn: #{checkinResult.details.subOrderId.slice(0, 8)}
-                      </p>
+                <div className="space-y-2">
+                  <div className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
+                    checkinResult.success 
+                      ? "bg-emerald-50/80 border-emerald-200 text-emerald-900" 
+                      : "bg-rose-50/80 border-rose-200 text-rose-900"
+                  }`}>
+                    {checkinResult.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                     )}
+                    <div className="space-y-1">
+                      <p className="font-semibold">{checkinResult.message}</p>
+                      {checkinResult.details?.subOrderId && (
+                        <p className="font-mono text-[11px] text-emerald-700">
+                          Mã đơn: #{checkinResult.details.subOrderId.slice(0, 8)}
+                        </p>
+                      )}
+                    </div>
                   </div>
+
+                  {/* FIFO Early Dispatch Candidate Banner */}
+                  {checkinResult.success && checkinResult.details?.earlyDispatchSuggestion?.available && checkinResult.details.subOrderId && (
+                    <div className="p-3 bg-sky-50/80 rounded-xl border border-sky-200 text-xs flex flex-col gap-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-sky-950 font-semibold">
+                          <FastForward className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                          <span>Phát hiện du khách đến trước giờ đặt (FIFO)</span>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-medium bg-white text-sky-700 border border-sky-200">
+                          Còn {checkinResult.details.earlyDispatchSuggestion.availableCapacity} chỗ
+                        </span>
+                      </div>
+                      <p className="text-slate-600 text-xs">
+                        Ca sớm hơn cùng ngày:{" "}
+                        <span className="font-semibold text-slate-900 font-mono">
+                          {checkinResult.details.earlyDispatchSuggestion.startTime.slice(0, 5)} - {checkinResult.details.earlyDispatchSuggestion.endTime.slice(0, 5)}
+                        </span>{" "}
+                        đang trống chỗ. Điều phối du khách chơi ngay ca này?
+                      </p>
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={isDispatchingEarly}
+                          onClick={() =>
+                            handleConfirmEarlyDispatch(
+                              checkinResult.details!.subOrderId!,
+                              checkinResult.details!.earlyDispatchSuggestion!.suggestedSlotId
+                            )
+                          }
+                          className="flex-1 py-2 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer"
+                        >
+                          <FastForward className="w-3.5 h-3.5" />
+                          {isDispatchingEarly ? "Đang điều phối..." : `Chuyển ca ${checkinResult.details.earlyDispatchSuggestion.startTime.slice(0, 5)}`}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isDispatchingEarly}
+                          onClick={() =>
+                            setCheckinResult((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    details: prev.details
+                                      ? { ...prev.details, earlyDispatchSuggestion: null }
+                                      : undefined,
+                                  }
+                                : null
+                            )
+                          }
+                          className="py-2 px-3 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-medium text-xs cursor-pointer"
+                        >
+                          Giữ ca gốc
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
