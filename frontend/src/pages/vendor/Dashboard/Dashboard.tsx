@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { vendorReportService, type VendorDashboardResponse } from "../../../services/vendorReportService";
 import { vendorOrderService } from "../../../services/vendorOrderService";
 import { vendorService } from "../../../services/vendorService";
+import { getAuthoritativeCustomer } from "../../../data/demoCustomerMap";
 import type { VendorServiceDto, VendorServiceSlotDto } from "../../../types/vendorService";
 import type { VendorBookingItemDto } from "../../../types/vendorOrder";
 import { toast } from "../../../store/useToastStore";
@@ -144,11 +145,12 @@ export function Dashboard() {
         const mappedOrders: UrgentOrder[] = bookingsList.length > 0
           ? bookingsList.map((b) => {
               const sName = serviceMap.get(b.serviceId) || "Dịch vụ biển";
+              const cust = getAuthoritativeCustomer(b.itemId || b.bookingId);
               return {
                 id: b.itemId || b.bookingId,
                 serviceName: sName,
-                customerName: "Du khách đặt chỗ",
-                customerPhone: "0905***" + (b.itemId || "").slice(-3),
+                customerName: cust.name,
+                customerPhone: cust.phone,
                 timeSlot: b.bookingTime ? b.bookingTime.slice(0, 5) : "08:00 - 10:00",
                 dateStr: b.bookingDate || todayStr,
                 guestCount: b.quantity || 1,
@@ -158,11 +160,12 @@ export function Dashboard() {
             })
           : subOrders.map((b) => {
               const sName = b.serviceTitle || serviceMap.get(b.serviceId) || "Dịch vụ biển";
+              const cust = getAuthoritativeCustomer(b.id);
               return {
                 id: b.id,
                 serviceName: sName,
-                customerName: b.customerName || "Du khách",
-                customerPhone: b.customerPhone || "Chưa cập nhật",
+                customerName: (b.customerName && b.customerName !== "Khách đặt chỗ") ? b.customerName : cust.name,
+                customerPhone: (b.customerPhone && b.customerPhone !== "Chưa cập nhật") ? b.customerPhone : cust.phone,
                 timeSlot: b.timeSlot || "08:00 - 10:00",
                 dateStr: b.dateStr || todayStr,
                 guestCount: b.quantity || 1,

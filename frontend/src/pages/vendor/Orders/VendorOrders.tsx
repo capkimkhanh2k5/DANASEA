@@ -174,7 +174,9 @@ export function VendorOrders() {
           status = matchedSub.status;
         }
 
-        const authCustomer = getAuthoritativeCustomer(b.itemId) || getAuthoritativeCustomer(subId) || getAuthoritativeCustomer(b.bookingId);
+        const authCustomer = getAuthoritativeCustomer(b.itemId) 
+          || getAuthoritativeCustomer(subId) 
+          || getAuthoritativeCustomer(b.bookingId);
 
         mergedList.push({
           id: subId,
@@ -183,9 +185,15 @@ export function VendorOrders() {
           serviceId: b.serviceId,
           slotId: b.slotId || undefined,
           serviceTitle: srv?.name || "Dịch vụ thể thao biển",
-          customerName: matchedSub?.customerName || authCustomer?.name || "Khách đặt chỗ",
-          customerPhone: matchedSub?.customerPhone || authCustomer?.phone || "Chưa cập nhật",
-          customerEmail: matchedSub?.customerEmail || authCustomer?.email || "—",
+          customerName: (matchedSub?.customerName && matchedSub.customerName !== "Khách đặt chỗ")
+            ? matchedSub.customerName
+            : authCustomer.name,
+          customerPhone: (matchedSub?.customerPhone && matchedSub.customerPhone !== "Chưa cập nhật")
+            ? matchedSub.customerPhone
+            : authCustomer.phone,
+          customerEmail: (matchedSub?.customerEmail && matchedSub.customerEmail !== "—")
+            ? matchedSub.customerEmail
+            : authCustomer.email,
           timeSlot: b.bookingTime ? b.bookingTime.slice(0, 5) : "08:00 - 10:00",
           dateStr: b.bookingDate || "Hôm nay",
           guestCount: b.quantity || 1,
@@ -217,9 +225,15 @@ export function VendorOrders() {
             serviceId: so.serviceId,
             slotId: so.slotId || undefined,
             serviceTitle: srv?.name || "Trải nghiệm thể thao biển",
-            customerName: so.customerName || authCustomer?.name || "Khách đặt chỗ",
-            customerPhone: so.customerPhone || authCustomer?.phone || "Chưa cập nhật",
-            customerEmail: so.customerEmail || authCustomer?.email || "—",
+            customerName: (so.customerName && so.customerName !== "Khách đặt chỗ")
+              ? so.customerName
+              : authCustomer.name,
+            customerPhone: (so.customerPhone && so.customerPhone !== "Chưa cập nhật")
+              ? so.customerPhone
+              : authCustomer.phone,
+            customerEmail: (so.customerEmail && so.customerEmail !== "—")
+              ? so.customerEmail
+              : authCustomer.email,
             timeSlot: "08:00 - 10:00",
             dateStr: "Hôm nay",
             guestCount: so.quantity || 1,
