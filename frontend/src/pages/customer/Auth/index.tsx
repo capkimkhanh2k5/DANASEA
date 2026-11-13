@@ -198,7 +198,7 @@ export function Auth() {
           : trimmedEmail === 'customer_2@danasea.test'
           ? 'Trần Thị Mai Anh'
           : trimmedEmail === 'customer_clean@danasea.test'
-          ? 'Hoàng Trọng Nghĩa (Tài Khoản Trống)'
+          ? 'Hoàng Trọng Nghĩa'
           : trimmedEmail === 'customer_13@danasea.test'
           ? 'Bùi Khánh Linh'
           : trimmedEmail === 'admin_demo@danasea.test'
