@@ -27,6 +27,7 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle2,
+  MessageSquare,
 } from "lucide-react";
 import type { NotificationResponse } from "../../types/notification";
 
@@ -43,6 +44,18 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
   const r = (relatedEntityType || '').toUpperCase();
   const normTitle = normalizeText(title);
   const commonBg = 'bg-white border border-slate-200/90 shadow-2xs';
+
+  // Phản hồi đánh giá -> MessageSquare màu đen nền trắng
+  if (
+    normTitle.includes('danh gia') ||
+    normTitle.includes('phan hoi') ||
+    t.includes('REVIEW')
+  ) {
+    return {
+      icon: <MessageSquare className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
+    };
+  }
 
   // 1. Hoàn tiền / Yêu cầu hoàn tiền / Hủy đơn -> RotateCcw màu đen nền trắng
   if (

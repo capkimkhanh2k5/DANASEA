@@ -589,12 +589,15 @@ export function Inbox() {
                 <div className="flex flex-col gap-3">
                   {notifications.map((notif) => {
                     const isProposal = notif.type === "RESCHEDULE_PROPOSAL" || notif.type === "DISRUPTION_DECISION";
+                    const isReviewReply = notif.type === "REVIEW_REPLY";
                     return (
                       <div
                         key={notif.id}
                         className={`p-5 rounded-2xl shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 border ${
                           isProposal
                             ? "bg-amber-50/60 border-amber-200"
+                            : isReviewReply
+                            ? "bg-sky-50/50 border-sky-200/80"
                             : "bg-white border-slate-200/80"
                         }`}
                       >
@@ -603,6 +606,8 @@ export function Inbox() {
                             className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                               isProposal
                                 ? "bg-amber-100 text-amber-800"
+                                : isReviewReply
+                                ? "bg-sky-100 text-sky-800"
                                 : "bg-slate-100 text-slate-800"
                             }`}
                           >
@@ -618,10 +623,16 @@ export function Inbox() {
                                 className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
                                   isProposal
                                     ? "bg-amber-200 text-amber-900"
+                                    : isReviewReply
+                                    ? "bg-sky-200 text-sky-900"
                                     : "bg-slate-100 text-slate-700"
                                 }`}
                               >
-                                {isProposal ? (isEn ? "RESCHEDULE PROPOSAL" : "ĐỀ XUẤT ĐỔI CA") : (isEn ? "NOTIFICATION" : "THÔNG BÁO")}
+                                {isProposal
+                                  ? (isEn ? "RESCHEDULE PROPOSAL" : "ĐỀ XUẤT ĐỔI CA")
+                                  : isReviewReply
+                                  ? (isEn ? "REVIEW REPLY" : "PHẢN HỒI ĐÁNH GIÁ")
+                                  : (isEn ? "NOTIFICATION" : "THÔNG BÁO")}
                               </span>
                               <span className="text-xs text-slate-500 font-mono">
                                 {new Date(notif.createdAt).toLocaleTimeString(isEn ? "en-US" : "vi-VN", { hour: "2-digit", minute: "2-digit" })} • {new Date(notif.createdAt).toLocaleDateString(isEn ? "en-US" : "vi-VN")}

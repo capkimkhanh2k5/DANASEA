@@ -3,6 +3,9 @@ package com.danasea.backend.modules.operation.application.usecases;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import com.danasea.backend.modules.communication.application.usecases.SendNotificationUseCase;
+import com.danasea.backend.modules.communication.domain.models.NotificationChannel;
 import com.danasea.backend.modules.operation.domain.exceptions.ReviewNotFoundException;
 import com.danasea.backend.modules.operation.domain.exceptions.UnauthorizedReviewAccessException;
 import com.danasea.backend.modules.operation.infrastructure.persistence.entities.ReviewJpaEntity;
@@ -14,19 +17,39 @@ import com.danasea.backend.modules.vendor.domain.exceptions.VendorNotFoundExcept
 import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ReplyVendorReviewUseCase {
 
     private final JpaReviewRepository reviewRepository;
     private final JpaVendorRepository vendorRepository;
     private final ReviewMapper reviewMapper;
+    private SendNotificationUseCase sendNotificationUseCase;
+
+    public ReplyVendorReviewUseCase(
+            JpaReviewRepository reviewRepository,
+            JpaVendorRepository vendorRepository,
+            ReviewMapper reviewMapper) {
+        this.reviewRepository = reviewRepository;
+        this.vendorRepository = vendorRepository;
+        this.reviewMapper = reviewMapper;
+    }
+
+    @Autowired
+    public ReplyVendorReviewUseCase(
+            JpaReviewRepository reviewRepository,
+            JpaVendorRepository vendorRepository,
+            ReviewMapper reviewMapper,
+            @Autowired(required = false) SendNotificationUseCase sendNotificationUseCase) {
+        this.reviewRepository = reviewRepository;
+        this.vendorRepository = vendorRepository;
+        this.reviewMapper = reviewMapper;
+        this.sendNotificationUseCase = sendNotificationUseCase;
+    }
 
     @Transactional
     public ReviewResponse execute(UUID reviewId, VendorReplyRequest request) {
@@ -53,6 +76,27 @@ public class ReplyVendorReviewUseCase {
         review.setVendorRepliedAt(OffsetDateTime.now());
 
         ReviewJpaEntity saved = reviewRepository.save(review);
+
+        try {
+            if (sendNotificationUseCase != null && saved.getCustomerId() != null) {
+                String replySnippet = request.reply().length() > 100
+                        ? request.reply().substring(0, 97) + "..."
+                        : request.reply();
+                sendNotificationUseCase.execute(
+                        saved.getCustomerId(),
+                        "REVIEW_REPLY",
+                        NotificationChannel.IN_APP,
+                        "Nhà cung cấp đã phản hồi đánh giá của bạn",
+                        "Đơn vị tổ chức đã gửi phản hồi: \"" + replySnippet + "\"",
+                        "SUB_ORDER",
+                        saved.getSubOrderId(),
+                        null
+                );
+            }
+        } catch (Exception e) {
+            log.error("Failed to send review reply notification to customer: {}", saved.getCustomerId(), e);
+        }
+
         return reviewMapper.toResponse(saved);
     }
 }

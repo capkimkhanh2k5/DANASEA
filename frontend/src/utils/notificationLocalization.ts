@@ -22,6 +22,7 @@ export function localizeNotificationTitle(title?: string | null, language: strin
     'Đã tiếp nhận yêu cầu hỗ trợ': 'Support request received',
     'Có yêu cầu hỗ trợ khách hàng đang chờ': 'Customer support request waiting',
     'Yêu cầu hỗ trợ đã được cập nhật': 'Support request updated',
+    'Phản hồi đánh giá từ nhà cung cấp': 'Review response from operator',
   };
 
   if (exactMap[trimmed]) {

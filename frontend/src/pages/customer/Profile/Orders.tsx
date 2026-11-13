@@ -228,6 +228,19 @@ export function Orders() {
         // Non-critical, ignore
       });
 
+      // Load existing customer reviews from backend to display ratings and vendor replies
+      reviewService.getCustomerReviews().then((reviews) => {
+        if (reviews && Array.isArray(reviews)) {
+          const map: Record<string, ReviewResponse> = {};
+          reviews.forEach((r) => {
+            if (r.subOrderId) map[r.subOrderId] = r;
+          });
+          setReviewsMap((prev) => ({ ...prev, ...map }));
+        }
+      }).catch(() => {
+        // Non-critical, ignore
+      });
+
       // Load public services catalog in one batch to enrich order card titles and thumbnails
       serviceCatalogService.getServices({ size: 100 }).then((catalogRes) => {
         const list = catalogRes.content || [];
