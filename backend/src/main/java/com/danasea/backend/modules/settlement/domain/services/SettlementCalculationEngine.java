@@ -115,21 +115,7 @@ public class SettlementCalculationEngine {
                     .build();
         }
 
-        // 4. Kiểm tra cửa sổ khiếu nại 7 ngày (D+7) theo CreateDisputeUseCase -> Tạm giữ tiền
-        if (context.isDisputeWindowOpen()) {
-            return SettlementLineItem.builder()
-                    .id(UUID.randomUUID())
-                    .subOrderId(context.getSubOrderId())
-                    .grossAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
-                    .refundAmount(refund.setScale(SCALE, ROUNDING))
-                    .commissionRate(rate)
-                    .commissionAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
-                    .netAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
-                    .excludedReason(LineItemExclusionReason.DISPUTE_WINDOW_OPEN)
-                    .build();
-        }
-
-        // 2. Kiểm tra hoàn tiền 100% (Full Refund)
+        // 4. Kiểm tra hoàn tiền 100% (Full Refund) -> Đơn đã hoàn toàn bộ không cần chờ D+7
         boolean isFullRefund = status == SubOrderStatus.REFUNDED
                 || (context.getRefundPercentage() != null
                         && context.getRefundPercentage().compareTo(new BigDecimal("100")) >= 0)
@@ -145,6 +131,20 @@ public class SettlementCalculationEngine {
                     .commissionAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
                     .netAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
                     .excludedReason(LineItemExclusionReason.FULL_REFUND)
+                    .build();
+        }
+
+        // 5. Kiểm tra cửa sổ khiếu nại 7 ngày (D+7) theo CreateDisputeUseCase -> Tạm giữ tiền
+        if (context.isDisputeWindowOpen()) {
+            return SettlementLineItem.builder()
+                    .id(UUID.randomUUID())
+                    .subOrderId(context.getSubOrderId())
+                    .grossAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .refundAmount(refund.setScale(SCALE, ROUNDING))
+                    .commissionRate(rate)
+                    .commissionAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .netAmount(BigDecimal.ZERO.setScale(SCALE, ROUNDING))
+                    .excludedReason(LineItemExclusionReason.DISPUTE_WINDOW_OPEN)
                     .build();
         }
 
