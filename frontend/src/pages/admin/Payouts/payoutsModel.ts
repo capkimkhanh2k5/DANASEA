@@ -1,8 +1,13 @@
 import type { MOCK_ADMIN_PAYOUTS } from '../../../data/adminMockData';
 import type { PayoutRequestStatus } from '../../../types';
 
-export type PayoutExtended = (typeof MOCK_ADMIN_PAYOUTS)[0];
-export type PayoutStatusFilter = 'all' | 'REQUESTED' | 'PAID' | 'REJECTED';
+export type PayoutExtended = (typeof MOCK_ADMIN_PAYOUTS)[0] & {
+  bankReference?: string | null;
+  rejectionReason?: string | null;
+  adminNote?: string | null;
+  note?: string | null;
+};
+export type PayoutStatusFilter = 'all' | 'REQUESTED' | 'APPROVED' | 'PAID' | 'REJECTED';
 
 export function filterPayouts(
   payouts: PayoutExtended[],
@@ -27,15 +32,20 @@ export function filterPayouts(
 export function calculatePayoutMetrics(payouts: PayoutExtended[]) {
   const totalCount = payouts.length;
   let pendingCount = 0;
+  let approvedCount = 0;
   let paidCount = 0;
   let rejectedCount = 0;
   let totalPendingAmount = 0;
+  let totalApprovedAmount = 0;
   let totalPaidAmount = 0;
 
   for (const p of payouts) {
     if (p.status === 'REQUESTED') {
       pendingCount++;
       totalPendingAmount += p.amount;
+    } else if (p.status === 'APPROVED') {
+      approvedCount++;
+      totalApprovedAmount += p.amount;
     } else if (p.status === 'PAID') {
       paidCount++;
       totalPaidAmount += p.amount;
@@ -47,9 +57,11 @@ export function calculatePayoutMetrics(payouts: PayoutExtended[]) {
   return {
     totalCount,
     pendingCount,
+    approvedCount,
     paidCount,
     rejectedCount,
     totalPendingAmount,
+    totalApprovedAmount,
     totalPaidAmount,
   };
 }
