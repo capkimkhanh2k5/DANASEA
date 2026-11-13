@@ -977,6 +977,16 @@ const englishTranslations = <String, String>{
   "Tỷ lệ: {0}%": "Rate: {0}%",
   "VNPAY (Thẻ ATM Quốc tế / Visa)": "VNPAY (International ATM card / Visa)",
   "VNPAY Cổng thanh toán": "VNPAY payment gateway",
+  "PayOS (VietQR)": "PayOS (VietQR)",
+  "Quét mã VietQR chuyển khoản nhanh qua 30+ ngân hàng":
+      "Scan VietQR quick bank transfer via 30+ banking apps",
+  "Ví điện tử ZaloPay": "ZaloPay E-Wallet",
+  "Thanh toán trực tiếp qua ví ZaloPay hoặc thẻ":
+      "Pay directly via ZaloPay wallet or linked cards",
+  "Phổ biến": "Popular",
+  "Thanh toán tức thì qua ứng dụng MoMo": "Instant payment via MoMo app",
+  "VietQR (SePay)": "VietQR (SePay)",
+  "Chuyển khoản VietQR tự động nhận diện": "Auto-reconciled VietQR transfer",
   "VNĐ": "VND",
   "Viết phản hồi tới khách hàng:": "Write a reply to the customer:",
   "Vui lòng chia sẻ cảm nhận của bạn.": "Please share your experience.",

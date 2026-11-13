@@ -15,9 +15,14 @@ class CartManager extends ChangeNotifier {
     required ServiceModel service,
     required CatalogSlot slot,
     required int quantity,
+    String? optionId,
+    bool allowSplit = false,
   }) {
+    final selectedOption = optionId ?? slot.optionId ??
+        (service.options.length == 1 ? service.options.first.id : null);
     final existingIndex = _items.indexWhere(
-      (item) => item.service.id == service.id && item.slot.id == slot.id,
+      (item) => item.service.id == service.id && item.slot.id == slot.id &&
+          item.optionId == selectedOption && item.allowSplit == allowSplit,
     );
     if (existingIndex >= 0) {
       _items[existingIndex].quantity += quantity;
@@ -36,6 +41,8 @@ class CartManager extends ChangeNotifier {
             bookedCount: 0,
           ),
           quantity: quantity,
+          optionId: selectedOption,
+          allowSplit: allowSplit,
           isSelected: true,
         ),
       );

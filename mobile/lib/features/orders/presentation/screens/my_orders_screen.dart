@@ -544,6 +544,7 @@ class MyOrdersScreenState extends State<MyOrdersScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => ETicketQrScreen(
+                              masterOrder: order,
                               subOrder: sub,
                               allSubOrders: order.subOrders,
                             ),
@@ -655,7 +656,8 @@ class MyOrdersScreenState extends State<MyOrdersScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => ETicketQrScreen(
-                            subOrder: order.subOrders.first,
+                            masterOrder: order,
+                            subOrder: order.subOrders.isNotEmpty ? order.subOrders.first : null,
                             allSubOrders: order.subOrders,
                           ),
                         ),

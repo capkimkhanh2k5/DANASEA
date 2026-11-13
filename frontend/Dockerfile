@@ -26,7 +26,7 @@ RUN if [ -z "$VITE_GOOGLE_CLIENT_ID" ]; then \
 FROM nginxinc/nginx-unprivileged:alpine@sha256:b5047b9b76845eac124358373c6852377c52e4b05834a47647e955dd91cb8f1e
 
 USER root
-RUN apk upgrade --no-cache && apk add --no-cache 'libexpat>=2.10.0-r0'
+RUN apk upgrade --no-cache && apk add --no-cache 'libexpat>=2.10.0-r0' 'libxslt>=1.1.43-r4'
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 

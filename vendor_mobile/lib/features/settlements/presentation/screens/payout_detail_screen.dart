@@ -6,8 +6,8 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../core/widgets/toast_notification.dart';
 import '../../../../core/models/vendor_models.dart';
-import '../../../../core/data/vendor_mock_database.dart';
-import '../../../../core/data/vendor_mock_repositories.dart';
+import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
 import '../../../profile/presentation/screens/edit_profile_bank_screen.dart';
 import '../../../orders/presentation/screens/sub_order_detail_screen.dart';
 
@@ -22,7 +22,7 @@ class PayoutDetailScreen extends StatefulWidget {
 
 class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
   final VendorSettlementRepository _settlementRepo = VendorSettlementRepository();
-  final VendorMockDatabase _db = VendorMockDatabase.instance;
+  final VendorStore _db = VendorStore.instance;
 
   late String _currentSettlementId;
   bool _isSubmitting = false;
