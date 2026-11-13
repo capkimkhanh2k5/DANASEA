@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Sparkles,
+  CalendarDays,
   ChevronDown,
   ChevronUp,
   Clock,
   RefreshCw,
-  Loader2,
 } from 'lucide-react';
 import { vendorAiService } from '../../../services/vendorAiService';
 import type { SlotAdvisorResult, SlotRecommendation } from '../../../types/vendorAi';
@@ -35,17 +34,18 @@ export const SlotAdvisorBanner: React.FC<SlotAdvisorBannerProps> = ({ serviceId 
     fetchAdvisor();
   }, [fetchAdvisor]);
 
+  // Tailored Skeleton loader matching banner geometry
   if (loading) {
     return (
-      <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 flex items-center justify-between animate-pulse">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-sky-100 flex items-center justify-center">
-            <Loader2 className="w-4 h-4 text-[#0284c7] animate-spin" />
+          <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 shrink-0" />
+          <div className="space-y-1.5">
+            <div className="h-4 w-44 bg-slate-200 rounded" />
+            <div className="h-3 w-80 bg-slate-100 rounded" />
           </div>
-          <span className="text-xs font-medium text-slate-600">
-            AI đang tính toán công suất ca vận hành 7 ngày tới và đối chiếu dữ liệu hải văn...
-          </span>
         </div>
+        <div className="h-7 w-28 bg-slate-100 rounded-xl" />
       </div>
     );
   }
@@ -59,25 +59,25 @@ export const SlotAdvisorBanner: React.FC<SlotAdvisorBannerProps> = ({ serviceId 
       case 'EXPAND_CAPACITY':
       case 'ADD_SLOT':
         return (
-          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800">
+          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80">
             Mở rộng công suất
           </span>
         );
       case 'WEATHER_WATCH':
         return (
-          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800">
+          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/80">
             Theo dõi thời tiết
           </span>
         );
       case 'PROMOTE_OR_CONSOLIDATE':
         return (
-          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-100 text-sky-800">
+          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-sky-50 text-sky-800 border border-sky-200/80">
             Kích cầu / Gộp ca
           </span>
         );
       default:
         return (
-          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">
+          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
             Tối ưu
           </span>
         );
@@ -85,26 +85,21 @@ export const SlotAdvisorBanner: React.FC<SlotAdvisorBannerProps> = ({ serviceId 
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-sky-200/80 shadow-2xs overflow-hidden transition-all">
-      {/* Header Strip */}
-      <div className="p-4 bg-linear-to-r from-sky-50/70 via-white to-sky-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+      {/* Header Strip - Grounded white, clean hairline border */}
+      <div className="p-4 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-[#0284c7]/10 text-[#0284c7] flex items-center justify-center border border-[#0284c7]/20 shrink-0">
-            <Sparkles className="w-4 h-4 text-[#0284c7]" />
+          <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center border border-slate-200/80 shrink-0">
+            <CalendarDays className="w-4 h-4 text-slate-700" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                Cố vấn Lịch & Công suất vận hành (AI Slot Advisor)
+              <h3 className="text-xs font-semibold text-slate-900 tracking-tight">
+                Cố vấn lịch trình & Tồn chỗ 7 ngày
               </h3>
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-sky-100 text-sky-800 font-mono">
-                7 NGÀY
-              </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Đã rà soát <strong className="font-mono text-slate-800">{data.totalSlotsEvaluated}</strong> ca vận hành. Tìm thấy{' '}
-              <strong className="text-emerald-700 font-semibold">{data.highDemandSlotsCount}</strong> ca đắt khách,{' '}
-              <strong className="text-amber-700 font-semibold">{data.lowDemandSlotsCount}</strong> ca vắng khách.
+            <p className="text-xs text-slate-600 font-mono tabular-nums mt-0.5">
+              Đã rà soát {data.totalSlotsEvaluated} ca vận hành • {data.highDemandSlotsCount} ca đắt khách • {data.lowDemandSlotsCount} ca vắng khách
             </p>
           </div>
         </div>
@@ -112,16 +107,16 @@ export const SlotAdvisorBanner: React.FC<SlotAdvisorBannerProps> = ({ serviceId 
         <div className="flex items-center gap-2 self-end sm:self-center">
           <button
             onClick={fetchAdvisor}
-            className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer"
-            title="Làm mới phân tích AI"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            title="Làm mới phân tích"
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => setIsExpanded((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold cursor-pointer transition-colors shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold cursor-pointer transition-colors"
           >
-            <span>{isExpanded ? 'Thu gọn gợi ý' : 'Xem chi tiết gợi ý'}</span>
+            <span>{isExpanded ? 'Thu gọn' : 'Xem chi tiết gợi ý'}</span>
             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
         </div>
@@ -129,24 +124,24 @@ export const SlotAdvisorBanner: React.FC<SlotAdvisorBannerProps> = ({ serviceId 
 
       {/* Expanded Recommendations */}
       {isExpanded && (
-        <div className="p-4 border-t border-sky-100 bg-slate-50/50 space-y-3">
+        <div className="p-4 bg-slate-50/60 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {data.recommendations.slice(0, 6).map((rec, idx) => (
               <div
                 key={rec.slotId || idx}
-                className="p-3.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs space-y-2 flex flex-col justify-between"
+                className="p-3.5 bg-white rounded-xl border border-slate-200/80 space-y-2 flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
-                    <span className="text-xs font-bold text-slate-900 truncate">
+                    <span className="text-xs font-semibold text-slate-900 truncate">
                       {rec.serviceTitle}
                     </span>
                     {renderBadge(rec.recommendationType)}
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs text-slate-600 mt-2 font-mono">
+                  <div className="flex items-center gap-3 text-xs text-slate-600 mt-2 font-mono tabular-nums">
                     <span className="inline-flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-sky-600" />
+                      <Clock className="w-3 h-3 text-slate-400" />
                       {rec.date} • {rec.startTime?.slice(0, 5)} - {rec.endTime?.slice(0, 5)}
                     </span>
                     <span className="font-semibold text-slate-800">
@@ -154,7 +149,7 @@ export const SlotAdvisorBanner: React.FC<SlotAdvisorBannerProps> = ({ serviceId 
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-700 font-semibold mt-1.5">
+                  <p className="text-xs text-slate-800 font-semibold mt-1.5">
                     {rec.actionTitle}
                   </p>
                   <p className="text-[11px] text-slate-500 leading-relaxed mt-0.5">

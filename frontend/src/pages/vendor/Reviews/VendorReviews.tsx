@@ -13,7 +13,8 @@ import {
   X, 
   Reply, 
   CheckCircle2,
-  Sparkles 
+  Target,
+  PenLine
 } from 'lucide-react';
 import { 
   AtlasPageHeader, 
@@ -299,8 +300,8 @@ export function VendorReviews() {
                 }`} 
                 type="button"
               >
-                <Sparkles className="w-3.5 h-3.5 text-sky-600" />
-                <span>AI Coaching 4 Trụ Cột</span>
+                <Target className="w-3.5 h-3.5 text-slate-700" />
+                <span>Phân tích 4 Trụ Cột</span>
               </button>
 
               <button 
@@ -646,11 +647,11 @@ export function VendorReviews() {
                   type="button"
                   onClick={handleAiDraftReply}
                   disabled={isDraftingReply}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-[#0284c7] hover:bg-sky-100 border border-sky-200 cursor-pointer transition-colors disabled:opacity-50 shadow-2xs"
-                  title="AI viết bản nháp phản hồi lịch sự, cầu thị, chuẩn an toàn"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-200 cursor-pointer transition-colors disabled:opacity-50"
+                  title="Gợi ý phản hồi chu đáo, chuẩn văn phong dịch vụ"
                 >
-                  {isDraftingReply ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-[#0284c7]" />}
-                  <span>{isDraftingReply ? 'AI đang soạn...' : '✨ AI Soạn phản hồi'}</span>
+                  {isDraftingReply ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PenLine className="w-3.5 h-3.5 text-slate-600" />}
+                  <span>{isDraftingReply ? 'Đang tạo gợi ý...' : 'Gợi ý phản hồi'}</span>
                 </button>
               </div>
               <textarea 
