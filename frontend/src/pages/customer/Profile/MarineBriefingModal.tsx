@@ -164,13 +164,13 @@ export const MarineBriefingModal: React.FC<MarineBriefingModalProps> = ({
               <div className="space-y-2">
                 <div className="h-4 w-36 bg-slate-200 rounded-md" />
                 <div className="rounded-xl border border-slate-200/80 divide-y divide-slate-100 overflow-hidden bg-white">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="p-3.5 flex items-center gap-3">
-                      <div className="w-4 h-4 rounded bg-slate-200 shrink-0" />
-                      <div className="flex-1 space-y-1.5">
-                        <div className="h-3.5 w-1/3 bg-slate-200 rounded" />
-                        <div className="h-3 w-2/3 bg-slate-100 rounded" />
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="px-3.5 py-2.5 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 rounded bg-slate-200 shrink-0" />
+                        <div className="h-3.5 w-40 bg-slate-200 rounded" />
                       </div>
+                      <div className="h-4 w-14 bg-slate-100 rounded" />
                     </div>
                   ))}
                 </div>
@@ -252,14 +252,14 @@ export const MarineBriefingModal: React.FC<MarineBriefingModalProps> = ({
                               key={itemKey}
                               type="button"
                               onClick={() => toggleItem(itemKey)}
-                              className={`w-full text-left flex items-start gap-3 p-3.5 transition-colors cursor-pointer select-none ${
+                              className={`w-full text-left flex items-center gap-3 px-3.5 py-2.5 transition-colors cursor-pointer select-none ${
                                 isChecked
                                   ? 'bg-slate-50/70'
                                   : 'hover:bg-slate-50/50'
                               }`}
                             >
                               <div
-                                className={`w-4 h-4 rounded mt-0.5 flex items-center justify-center border shrink-0 transition-colors ${
+                                className={`w-4 h-4 rounded flex items-center justify-center border shrink-0 transition-colors ${
                                   isChecked
                                     ? 'bg-[#0284c7] border-[#0284c7] text-white'
                                     : 'border-slate-300 bg-white hover:border-slate-400'
@@ -267,35 +267,24 @@ export const MarineBriefingModal: React.FC<MarineBriefingModalProps> = ({
                               >
                                 {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span
-                                    className={`text-xs font-medium transition-colors ${
-                                      isChecked
-                                        ? 'line-through text-slate-400'
-                                        : 'text-slate-800'
-                                    }`}
-                                  >
-                                    {item.itemName}
+                              <div className="flex-1 min-w-0 flex items-center justify-between gap-3">
+                                <span
+                                  className={`text-xs font-medium transition-colors ${
+                                    isChecked
+                                      ? 'line-through text-slate-400'
+                                      : 'text-slate-800'
+                                  }`}
+                                >
+                                  {item.itemName}
+                                </span>
+                                {item.mandatory ? (
+                                  <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/70">
+                                    {isEn ? 'Required' : 'Bắt buộc'}
                                   </span>
-                                  {item.mandatory ? (
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200/70">
-                                      {isEn ? 'Required' : 'Bắt buộc'}
-                                    </span>
-                                  ) : (
-                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
-                                      {isEn ? 'Optional' : 'Khuyên dùng'}
-                                    </span>
-                                  )}
-                                </div>
-                                {item.tip && (
-                                  <p
-                                    className={`text-[11px] mt-0.5 leading-relaxed ${
-                                      isChecked ? 'text-slate-400' : 'text-slate-500'
-                                    }`}
-                                  >
-                                    {item.tip}
-                                  </p>
+                                ) : (
+                                  <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-600">
+                                    {isEn ? 'Optional' : 'Khuyên dùng'}
+                                  </span>
                                 )}
                               </div>
                             </button>
