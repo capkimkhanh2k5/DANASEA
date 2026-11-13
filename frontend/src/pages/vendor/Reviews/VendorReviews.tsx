@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { reviewService } from '../../../services/reviewService';
+import { vendorAiService } from '../../../services/vendorAiService';
+import { ReviewCoachingView } from './ReviewCoachingView';
 import { toast } from '../../../store/useToastStore';
 import { 
   Loader2, 
@@ -10,7 +12,8 @@ import {
   Send, 
   X, 
   Reply, 
-  CheckCircle2 
+  CheckCircle2,
+  Sparkles 
 } from 'lucide-react';
 import { 
   AtlasPageHeader, 
@@ -67,13 +70,14 @@ interface Conversation {
 }
 
 export function VendorReviews() {
-  const [activeTab, setActiveTab] = useState<'reviews' | 'chat'>('reviews');
+  const [activeTab, setActiveTab] = useState<'reviews' | 'coaching' | 'chat'>('reviews');
   const [starFilter, setStarFilter] = useState<number | 'ALL'>('ALL');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [_isLoading, setIsLoading] = useState(false);
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+  const [isDraftingReply, setIsDraftingReply] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeChatId, setActiveChatId] = useState<number>(1);
   const [messageInput, setMessageInput] = useState('');
@@ -86,6 +90,23 @@ export function VendorReviews() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleAiDraftReply = async () => {
+    if (!replyingReviewId) return;
+    try {
+      setIsDraftingReply(true);
+      const res = await vendorAiService.draftReply(replyingReviewId, 'PROFESSIONAL');
+      if (res && res.draftedReply) {
+        setReplyText(res.draftedReply);
+        showToast('AI đã soạn phản hồi chu đáo!');
+      }
+    } catch (err) {
+      console.error('[ReplyDraft] Failed:', err);
+      toast.error('Không thể sinh phản hồi AI lúc này.');
+    } finally {
+      setIsDraftingReply(false);
+    }
   };
 
   const fetchReviews = useCallback(async () => {
@@ -267,6 +288,19 @@ export function VendorReviews() {
               >
                 <Star className="w-3.5 h-3.5" />
                 <span>Đánh giá ({reviews.length})</span>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('coaching')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+                  activeTab === 'coaching' 
+                    ? 'bg-white text-slate-900 shadow-xs' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`} 
+                type="button"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-sky-600" />
+                <span>AI Coaching 4 Trụ Cột</span>
               </button>
 
               <button 
@@ -469,7 +503,10 @@ export function VendorReviews() {
         </div>
       )}
 
-      {/* 4. TAB 2: CHAT (INBOX) VIEW */}
+      {/* 4. TAB 2: REVIEW COACHING 4 PILLARS */}
+      {activeTab === 'coaching' && <ReviewCoachingView />}
+
+      {/* 5. TAB 3: CHAT (INBOX) VIEW */}
       {activeTab === 'chat' && (
         conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-16 text-center bg-white rounded-xl border border-slate-200/80">
@@ -603,7 +640,19 @@ export function VendorReviews() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Nội dung phản hồi từ đại diện đối tác</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-700">Nội dung phản hồi từ đại diện đối tác</label>
+                <button
+                  type="button"
+                  onClick={handleAiDraftReply}
+                  disabled={isDraftingReply}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-50 text-[#0284c7] hover:bg-sky-100 border border-sky-200 cursor-pointer transition-colors disabled:opacity-50 shadow-2xs"
+                  title="AI viết bản nháp phản hồi lịch sự, cầu thị, chuẩn an toàn"
+                >
+                  {isDraftingReply ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-[#0284c7]" />}
+                  <span>{isDraftingReply ? 'AI đang soạn...' : '✨ AI Soạn phản hồi'}</span>
+                </button>
+              </div>
               <textarea 
                 rows={4}
                 value={replyText}

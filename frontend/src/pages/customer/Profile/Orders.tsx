@@ -25,9 +25,11 @@ import {
   Info,
   Loader2,
   ArrowLeft,
+  Waves,
 } from "lucide-react";
 import { orderService } from "../../../services/orderService";
 import { ContinuePaymentDialog } from "./ContinuePaymentDialog";
+import { MarineBriefingModal } from "./MarineBriefingModal";
 import { reviewService, type ReviewResponse } from "../../../services/reviewService";
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import { disputeService } from "../../../services/disputeService";
@@ -141,6 +143,9 @@ export function Orders() {
   const [disputeReason, setDisputeReason] = useState("");
   const [isSubmittingDispute, setIsSubmittingDispute] = useState(false);
   const [submittedDisputes, setSubmittedDisputes] = useState<Record<string, DisputeResponse>>({});
+
+  // Marine Briefing Modal state
+  const [briefingOrder, setBriefingOrder] = useState<OrderResponse | null>(null);
 
   const serviceDetailsCache = useRef<Record<string, ServiceDetailDto>>({});
 
@@ -1030,6 +1035,17 @@ export function Orders() {
                             >
                               <QrCode className="w-4 h-4" />
                               <span>{isEn ? "All-in-One Pass" : "Vé QR toàn đơn"}</span>
+                            </button>
+                          )}
+                          {canDownloadPdf && (
+                            <button
+                              type="button"
+                              onClick={() => setBriefingOrder(masterOrder)}
+                              className="px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284c7] border border-sky-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                              title={isEn ? "View 24h Marine Briefing & Checklist" : "Xem cẩm nang ra khơi 24h & checklist đồ cần mang"}
+                            >
+                              <Waves className="w-4 h-4 text-[#0284c7]" />
+                              <span>{isEn ? "24h Briefing" : "Cẩm nang 24h"}</span>
                             </button>
                           )}
                           {canDownloadPdf && (
@@ -2340,6 +2356,15 @@ export function Orders() {
         )}
       {paymentOrderId && (
         <ContinuePaymentDialog orderId={paymentOrderId} onClose={() => setPaymentOrderId(null)} />
+      )}
+      {briefingOrder && (
+        <MarineBriefingModal
+          orderId={briefingOrder.id}
+          orderCode={`#ORD-${(briefingOrder.id || "").slice(0, 8).toUpperCase()}`}
+          isOpen={Boolean(briefingOrder)}
+          onClose={() => setBriefingOrder(null)}
+          isEn={isEn}
+        />
       )}
     </main>
   );
