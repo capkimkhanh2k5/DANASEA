@@ -1,5 +1,5 @@
 {
-  "reviewedMigrations": "V1-V57",
+  "reviewedMigrations": "V1-V58",
   "classification": {
     "ai_assessment_cases": "replace",
     "ai_chat_requests": "replace",
@@ -3511,6 +3511,30 @@
             "character varying(255)",
             false,
             ""
+          ],
+          [
+            "rejection_reason",
+            "character varying(500)",
+            false,
+            ""
+          ],
+          [
+            "bank_reference",
+            "character varying(100)",
+            false,
+            ""
+          ],
+          [
+            "admin_note",
+            "character varying(1000)",
+            false,
+            ""
+          ],
+          [
+            "vendor_note",
+            "character varying(1000)",
+            false,
+            ""
           ]
         ]
       },
@@ -4567,6 +4591,12 @@
             "integer",
             true,
             ""
+          ],
+          [
+            "operation_type",
+            "character varying(50)",
+            true,
+            ""
           ]
         ]
       },
@@ -5305,6 +5335,24 @@
             "character varying(40)",
             true,
             ""
+          ],
+          [
+            "actual_slot_id",
+            "uuid",
+            false,
+            ""
+          ],
+          [
+            "is_late",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "late_checkin_reason",
+            "character varying(255)",
+            false,
+            ""
           ]
         ]
       },
@@ -5670,6 +5718,18 @@
             "cancelled_at",
             "timestamp with time zone",
             true,
+            ""
+          ],
+          [
+            "is_incident",
+            "boolean",
+            true,
+            ""
+          ],
+          [
+            "incident_type",
+            "character varying(50)",
+            false,
             ""
           ]
         ]
@@ -7173,6 +7233,19 @@
           "id"
         ],
         "definition": "FOREIGN KEY (vendor_id) REFERENCES vendors(id)",
+        "validated": true
+      },
+      {
+        "name": "sub_orders_actual_slot_id_fkey",
+        "child": "public.sub_orders",
+        "parent": "public.service_slots",
+        "childcolumns": [
+          "actual_slot_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (actual_slot_id) REFERENCES service_slots(id)",
         "validated": true
       },
       {

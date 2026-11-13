@@ -30,6 +30,15 @@ public class SubOrderJpaEntity extends BaseJpaEntity {
 
     private UUID slotId;
 
+    @Column(name = "actual_slot_id")
+    private UUID actualSlotId;
+
+    @Column(name = "is_late")
+    private Boolean isLate = false;
+
+    @Column(name = "late_checkin_reason")
+    private String lateCheckinReason;
+
     private Integer quantity;
 
     private BigDecimal unitPrice;

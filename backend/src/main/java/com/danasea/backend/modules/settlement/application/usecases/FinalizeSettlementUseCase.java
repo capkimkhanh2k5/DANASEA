@@ -9,7 +9,9 @@ import com.danasea.backend.modules.settlement.domain.exceptions.SettlementAlread
 import com.danasea.backend.modules.settlement.domain.exceptions.SettlementNotFoundException;
 import com.danasea.backend.modules.settlement.domain.models.SettlementStatus;
 import com.danasea.backend.modules.settlement.infrastructure.persistence.entities.SettlementJpaEntity;
+import com.danasea.backend.modules.settlement.infrastructure.persistence.entities.SettlementLineItemJpaEntity;
 import com.danasea.backend.modules.settlement.infrastructure.persistence.mappers.SettlementMapper;
+import com.danasea.backend.modules.settlement.infrastructure.persistence.repositories.JpaSettlementLineItemRepository;
 import com.danasea.backend.modules.settlement.infrastructure.persistence.repositories.JpaSettlementRepository;
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
@@ -34,10 +36,17 @@ public class FinalizeSettlementUseCase {
     private final VendorFaultCompensationService compensation;
 
     @Autowired(required = false)
+    private JpaSettlementLineItemRepository lineItemRepository;
+
+    @Autowired(required = false)
     private TransactionalEmailPort transactionalEmailPort;
 
     @Autowired(required = false)
     private VendorInternalApi vendorInternalApi;
+
+    public void setLineItemRepository(JpaSettlementLineItemRepository lineItemRepository) {
+        this.lineItemRepository = lineItemRepository;
+    }
 
     public void setTransactionalEmailPort(TransactionalEmailPort transactionalEmailPort) {
         this.transactionalEmailPort = transactionalEmailPort;
@@ -52,10 +61,21 @@ public class FinalizeSettlementUseCase {
             SettlementMapper mapper,
             AuditLogInternalApi auditLogInternalApi,
             VendorFaultCompensationService compensation) {
+        this(settlementRepository, mapper, auditLogInternalApi, compensation, null);
+    }
+
+    @Autowired
+    public FinalizeSettlementUseCase(
+            JpaSettlementRepository settlementRepository,
+            SettlementMapper mapper,
+            AuditLogInternalApi auditLogInternalApi,
+            VendorFaultCompensationService compensation,
+            @Autowired(required = false) JpaSettlementLineItemRepository lineItemRepository) {
         this.settlementRepository = settlementRepository;
         this.mapper = mapper;
         this.auditLogInternalApi = auditLogInternalApi;
         this.compensation = compensation;
+        this.lineItemRepository = lineItemRepository;
     }
 
     @Transactional
@@ -71,6 +91,31 @@ public class FinalizeSettlementUseCase {
         if (settlement.getStatus() == SettlementStatus.FINALIZED || settlement.getStatus() == SettlementStatus.PAID) {
             throw new SettlementAlreadyFinalizedException(
                     "Settlement is already FINALIZED or PAID and cannot be finalized again.");
+        }
+
+        // Chống double payout xuyên nhiều kỳ: kiểm tra xem các đơn trong kỳ này có bị finalize ở kỳ khác chưa
+        if (lineItemRepository != null) {
+            var items = lineItemRepository.findBySettlementId(id);
+            if (items != null && !items.isEmpty()) {
+                var activeSubOrderIds = items.stream()
+                        .filter(li -> li.getExcludedReason() == null || li.getExcludedReason() == com.danasea.backend.modules.settlement.domain.models.LineItemExclusionReason.NONE)
+                        .map(SettlementLineItemJpaEntity::getSubOrderId)
+                        .filter(java.util.Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toSet());
+                if (!activeSubOrderIds.isEmpty()) {
+                    var settledIds = lineItemRepository.findSettledSubOrderIdsByVendorId(settlement.getVendorId());
+                    if (settledIds != null && !settledIds.isEmpty()) {
+                        var duplicateSettled = activeSubOrderIds.stream()
+                                .filter(settledIds::contains)
+                                .toList();
+                        if (!duplicateSettled.isEmpty()) {
+                            throw new SettlementAlreadyFinalizedException(
+                                    "Cannot finalize settlement: one or more sub-orders have already been settled and finalized in another settlement period: "
+                                            + duplicateSettled);
+                        }
+                    }
+                }
+            }
         }
 
         var deducted = compensation.recoverAtFinalization(
