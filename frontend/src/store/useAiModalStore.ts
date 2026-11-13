@@ -93,19 +93,21 @@ export const useAiModalStore = create<AiModalState>((set, get) => ({
         conversationId: response.conversationId || state.conversationId,
         isGenerating: false,
       }));
-    } catch (err) {
-      console.debug('Lỗi khi gọi API AI:', err);
-      // Fallback thân thiện bảo đảm không crash
-      const fallbackMessage: AiChatMessage = {
-        id: `ai-${Date.now()}`,
+    } catch (err: unknown) {
+      console.error('[AI Chat] API request failed:', err);
+      const apiError = err as { response?: { data?: { message?: string; code?: string } } };
+      const errorMessage = apiError.response?.data?.message || (isEn 
+        ? 'AI service is currently unavailable or disconnected from language model. Please try again later.' 
+        : 'Dịch vụ Trợ lý AI hiện không khả dụng hoặc chưa kết nối được máy chủ ngôn ngữ. Vui lòng thử lại sau.');
+
+      const systemErrorMessage: AiChatMessage = {
+        id: `ai-err-${Date.now()}`,
         role: 'ai',
-        content: isEn
-          ? 'Da Nang ocean data: Son Tra Peninsula & My Khe Beach currently have favorable conditions (waves 0.4 - 0.7m, gentle breeze). Check out snorkeling and SUP tours on the system!'
-          : 'Dữ liệu hải văn Đà Nẵng: Khu vực Bán đảo Sơn Trà & Mỹ Khê đang có điều kiện biển thuận lợi (sóng 0.4 - 0.7m, gió cấp 2). Bạn có thể tham khảo các tour lặn san hô hoặc chèo SUP trên hệ thống!',
+        content: errorMessage,
         timestamp: Date.now(),
       };
       set((state) => ({
-        messages: [...state.messages, fallbackMessage],
+        messages: [...state.messages, systemErrorMessage],
         isGenerating: false,
       }));
     }

@@ -52,14 +52,17 @@ export function AiAssistant() {
         role: "ai",
         content: res.message || (isEn ? "The system has recorded your request." : "Hệ thống đã ghi nhận yêu cầu của bạn."),
       }]);
-    } catch (err) {
-      console.debug("Lỗi khi kết nối Trợ lý AI:", err);
+    } catch (err: unknown) {
+      console.error("[AI Assistant] Chat request failed:", err);
+      const apiError = err as { response?: { data?: { message?: string; code?: string } } };
+      const errorMessage = apiError.response?.data?.message || (isEn
+        ? "AI service is temporarily unavailable or disconnected from language model. Please try again later."
+        : "Trợ lý AI hiện không khả dụng hoặc chưa kết nối được máy chủ ngôn ngữ. Vui lòng thử lại sau.");
+
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: "ai",
-        content: isEn
-          ? `I noted your request: "${userMsg}". Based on marine weather at Son Tra Peninsula and My Khe Beach (waves ≤ 0.8m, wind level 2), sea conditions are ideal. Consider the Sunrise SUP Tour (05:00 - 07:00) or Hon Sup Snorkeling Tour for the best experience.`
-          : `Tôi đã ghi nhận yêu cầu: "${userMsg}". Dựa trên dữ liệu thời tiết biển hôm nay tại bán đảo Sơn Trà và bãi biển Mỹ Khê (sóng ≤ 0.8m, gió cấp 2), điều kiện biển rất thuận lợi. Bạn nên ưu tiên tour Chèo SUP đón bình minh (05:00 - 07:00) hoặc Lặn biển ngắm san hô Hòn Sụp để có trải nghiệm tốt nhất.`,
+        content: errorMessage,
       }]);
     } finally {
       setIsLoading(false);
