@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
@@ -26,6 +28,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -68,6 +72,7 @@ import com.danasea.backend.modules.ai.application.usecases.VendorSlotAdvisorUseC
 import com.danasea.backend.modules.ai.domain.models.DecisionResult;
 import com.danasea.backend.modules.ai.domain.models.DecisionTask;
 import com.danasea.backend.modules.ai.domain.models.LlmResponse;
+import com.danasea.backend.modules.ai.domain.models.ToolCall;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
@@ -512,6 +517,100 @@ class VendorAdminAiFeaturesTest {
         assertThat(failure.message()).contains("chưa tra cứu được");
         assertThat(failure.artifacts()).isEmpty();
         verifyNoInteractions(llmClient);
+    }
+
+    @Test
+    void vendorServiceCountIncludesAllManagedStatusesInEnglish() {
+        var conversation = vendorConversation();
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Vendor", BigDecimal.ZERO, 0, "NONE")));
+        var counts = Map.of("PUBLISHED", 2L, "DRAFT", 2L, "PENDING_REVIEW", 1L, "REJECTED", 1L, "PAUSED", 1L);
+        when(vendorAiData.countServicesByStatus(vendorId)).thenReturn(counts).thenReturn(Map.of());
+
+        var all = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                "How many services do I have?", null, null, SupportedLanguage.EN);
+        assertThat(all.message()).contains("7 services", "2 published", "2 drafts", "1 pending review", "1 rejected", "1 paused");
+        assertThat(all.artifacts()).singleElement().satisfies(card ->
+                assertThat(mapper.valueToTree(card.get("data")).path("total").asLong()).isEqualTo(7));
+
+        var empty = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                "How many services do I have?", null, null, SupportedLanguage.EN);
+        assertThat(empty.message()).isEqualTo("Your shop has 0 services.");
+        assertThat(empty.toolsUsed()).containsExactly("vendor_service_count");
+        verifyNoInteractions(llmClient);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "Doanh thu từ 01/10 đến 31/10?, true",
+            "Doanh thu từ 2026-10-01 đến 2026-10-31?, false"
+    })
+    void vendorRevenueParsesBothExplicitDateFormats(String question, boolean currentYear) {
+        var conversation = vendorConversation();
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Vendor", BigDecimal.ZERO, 0, "NONE")));
+        when(vendorAiData.getPerformanceMetrics(eq(vendorId), any(), any())).thenReturn(
+                new VendorAiDataPort.VendorPerformanceMetrics(BigDecimal.ZERO, BigDecimal.ZERO, 0, 0, 0, 0, 0,
+                        0, BigDecimal.ZERO, 0, "NONE", List.of()));
+        int year = currentYear ? LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).getYear() : 2026;
+        var from = LocalDate.of(year, 10, 1);
+        var to = LocalDate.of(year, 10, 31);
+
+        var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                question, null, null, SupportedLanguage.VI);
+
+        verify(vendorAiData).getPerformanceMetrics(vendorId, from, to);
+        assertThat(response.message()).contains("GMV 0 ₫", "thực thu dự kiến 0 ₫");
+        assertThat(response.artifacts()).singleElement().satisfies(card ->
+                assertThat(card.get("period")).isEqualTo(Map.of("from", from.toString(), "to", to.toString())));
+        verifyNoInteractions(llmClient);
+    }
+
+    @Test
+    void vendorRevenueRejectsInvalidRangesBeforeQueryingReports() {
+        var conversation = vendorConversation();
+        for (String question : List.of("Revenue from 2026-11-10 to 2026-11-09?",
+                "Revenue in the last 0 days?", "Revenue on 31/02/2026?")) {
+            var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                    question, null, null, SupportedLanguage.EN);
+            assertThat(response.message()).isEqualTo("Please enter a valid reporting period.");
+            assertThat(response.artifacts()).isEmpty();
+        }
+        verifyNoInteractions(vendorAiData, llmClient);
+    }
+
+    @Test
+    void copilotUsesScopedModelTextAndFallsBackOnIncompleteResponses() {
+        var conversation = vendorConversation();
+        String question = "What can you help me with?";
+        when(insightStore.listCopilotMessages(conversation.id())).thenReturn(List.of(new CopilotMessage(
+                UUID.randomUUID(), conversation.id(), "USER", question, null, null, true, OffsetDateTime.now())));
+        var answer = new LlmResponse();
+        answer.setContent("I can help you manage your listings.");
+        var partial = new LlmResponse();
+        partial.setResponseStatus("PARTIAL");
+        partial.setContent("Incomplete answer");
+        var unexpectedToolCall = new LlmResponse();
+        unexpectedToolCall.setContent("I am searching for tours");
+        unexpectedToolCall.setToolCalls(List.of(new ToolCall("call", "ai_smart_search", "{}")));
+        when(llmClient.generateText(any(), eq(SupportedLanguage.EN), anyString()))
+                .thenReturn(answer, partial, unexpectedToolCall)
+                .thenThrow(new IllegalStateException("model unavailable"));
+
+        var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                question, null, null, SupportedLanguage.EN);
+        assertThat(response.message()).isEqualTo(answer.getContent());
+        verify(llmClient).generateText(argThat(messages ->
+                messages.size() == 1 && question.equals(messages.getFirst().getContent())), eq(SupportedLanguage.EN),
+                contains("Vendor Growth & Operations Copilot"));
+
+        for (int attempt = 0; attempt < 3; attempt++) {
+            var fallback = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                    question, null, null, SupportedLanguage.EN);
+            assertThat(fallback.message()).contains("Please try again");
+            assertThat(fallback.artifacts()).isEmpty();
+        }
+        verifyNoInteractions(vendorAiData);
     }
 
     @Test
