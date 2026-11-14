@@ -21,7 +21,7 @@
     },
     {
       "id": "55555555-5555-5555-5555-000000000003",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000008",
       "vendor_id": "2680f19f-8b5a-5aa8-8474-cb13e2ff1c22",
       "master_order_id": "00010000-0000-0000-0000-000000000011",
       "last_message_sequence": 5,
@@ -48,7 +48,7 @@
     },
     {
       "id": "55555555-5555-5555-5555-000000000006",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "customer_id": "c1010000-0000-0000-0000-000000000010",
       "vendor_id": "5fb18fee-16fd-5b9f-bcbd-759b47768d9b",
       "master_order_id": "00010000-0000-0000-0000-000000000014",
       "last_message_sequence": 4,
@@ -184,7 +184,7 @@
     {
       "id": "56565656-5656-5656-5656-000000000009",
       "conversation_id": "55555555-5555-5555-5555-000000000003",
-      "sender_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "sender_id": "c1010000-0000-0000-0000-000000000008",
       "content": "Chào shop, đoàn mình có 4 người, ngày mai xuất bến lúc 8h sáng thì cần có mặt trước bao lâu ạ?",
       "message_sequence": 1,
       "attachment_url": null,
@@ -206,7 +206,7 @@
     {
       "id": "56565656-5656-5656-5656-000000000011",
       "conversation_id": "55555555-5555-5555-5555-000000000003",
-      "sender_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "sender_id": "c1010000-0000-0000-0000-000000000008",
       "content": "Bên mình có chuẩn bị túi chống nước cho điện thoại không shop?",
       "message_sequence": 3,
       "attachment_url": null,
@@ -316,7 +316,7 @@
     {
       "id": "56565656-5656-5656-5656-000000000021",
       "conversation_id": "55555555-5555-5555-5555-000000000006",
-      "sender_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "sender_id": "c1010000-0000-0000-0000-000000000010",
       "content": "Chào shop, đoàn mình có 4 người, ngày mai xuất bến lúc 8h sáng thì cần có mặt trước bao lâu ạ?",
       "message_sequence": 1,
       "attachment_url": null,
@@ -338,7 +338,7 @@
     {
       "id": "56565656-5656-5656-5656-000000000023",
       "conversation_id": "55555555-5555-5555-5555-000000000006",
-      "sender_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "sender_id": "c1010000-0000-0000-0000-000000000010",
       "content": "Bên mình có chuẩn bị túi chống nước cho điện thoại không shop?",
       "message_sequence": 3,
       "attachment_url": null,
@@ -558,7 +558,7 @@
     {
       "id": "56565656-5656-5656-5656-000000000043",
       "conversation_id": "55555555-5555-5555-5555-000000000003",
-      "sender_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "sender_id": "c1010000-0000-0000-0000-000000000008",
       "content": "Dạ cảm ơn shop nhiều nhé, mình đã lưu thông tin bến!",
       "message_sequence": 5,
       "attachment_url": null,

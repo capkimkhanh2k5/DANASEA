@@ -61,8 +61,8 @@ class UnifiedInstallerTest(unittest.TestCase):
         base_count = sum(len(rs) for rs in base_rows.values())
         trans_count = sum(len(rs) for rs in trans_rows.values())
         self.assertEqual(339, base_count, "Expected canonical fixtures and anchored inventory")
-        self.assertEqual(344, trans_count, "Expected 344 transaction records")
-        self.assertEqual(683, base_count + trans_count, "Expected canonical records without the rolling schedule")
+        self.assertEqual(348, trans_count, "Expected 348 transaction records")
+        self.assertEqual(687, base_count + trans_count, "Expected canonical records without the rolling schedule")
         self.assertEqual(77, len(manifest), "Expected 77 storage manifest mappings")
 
     def test_align_schema_defaults_populates_missing_columns(self):

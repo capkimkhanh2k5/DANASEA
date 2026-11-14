@@ -66,7 +66,7 @@
     },
     {
       "id": "b0010000-0000-0000-0000-000000000006",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "customer_id": "c1010000-0000-0000-0000-000000000003",
       "status": "CONFIRMED",
       "total_amount": "1100000.00",
       "hold_expires_at": "2026-10-24T08:55:00+00:00",
@@ -111,7 +111,7 @@
     },
     {
       "id": "b0010000-0000-0000-0000-000000000011",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000008",
       "status": "CONFIRMED",
       "total_amount": "350000.00",
       "hold_expires_at": "2026-10-24T09:20:00+00:00",
@@ -129,7 +129,7 @@
     },
     {
       "id": "b0010000-0000-0000-0000-000000000013",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000009",
       "status": "CONFIRMED",
       "total_amount": "1500000.00",
       "hold_expires_at": "2026-10-24T09:30:00+00:00",
@@ -138,7 +138,7 @@
     },
     {
       "id": "b0010000-0000-0000-0000-000000000014",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "customer_id": "c1010000-0000-0000-0000-000000000010",
       "status": "CONFIRMED",
       "total_amount": "750000.00",
       "hold_expires_at": "2026-10-24T09:35:00+00:00",
@@ -183,7 +183,7 @@
     },
     {
       "id": "b0010000-0000-0000-0000-000000000019",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000003",
       "status": "CONFIRMED",
       "total_amount": "650000.00",
       "hold_expires_at": "2026-10-24T10:15:00+00:00",
@@ -201,7 +201,7 @@
     },
     {
       "id": "b0010000-0000-0000-0000-000000000021",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000004",
       "status": "CONFIRMED",
       "total_amount": "650000.00",
       "hold_expires_at": "2026-10-28T09:15:00+00:00",
@@ -237,7 +237,7 @@
     },
     {
       "id": "b0010000-0000-0000-0000-000000000025",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000005",
       "status": "CONFIRMED",
       "total_amount": "800000.00",
       "hold_expires_at": "2026-11-01T10:30:00+00:00",
@@ -246,7 +246,7 @@
     },
     {
       "id": "b0010000-0000-0000-0000-000000000026",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "customer_id": "c1010000-0000-0000-0000-000000000006",
       "status": "CONFIRMED",
       "total_amount": "850000.00",
       "hold_expires_at": "2026-11-01T14:15:00+00:00",
@@ -255,7 +255,7 @@
     },
     {
       "id": "b0010000-0000-0000-0000-000000000027",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000007",
       "status": "CONFIRMED",
       "total_amount": "1000000.00",
       "hold_expires_at": "2026-11-02T08:45:00+00:00",
@@ -329,7 +329,7 @@
       "id": "b0010000-0000-0000-0000-000000000035",
       "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
       "status": "CONFIRMED",
-      "total_amount": "1000000.00",
+      "total_amount": "1250000.00",
       "hold_expires_at": "2026-11-03T12:00:00+00:00",
       "created_at": "2026-11-03T11:45:00+00:00",
       "updated_at": "2026-11-03T11:50:00+00:00"
@@ -409,7 +409,7 @@
     {
       "id": "b0010000-0000-0000-0000-000000000044",
       "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
-      "status": "CANCELLED",
+      "status": "CONFIRMED",
       "total_amount": "650000.00",
       "hold_expires_at": "2026-10-23T10:15:00+00:00",
       "created_at": "2026-10-23T10:00:00+00:00",
@@ -1420,6 +1420,25 @@
       "price": "800000.00",
       "created_at": "2026-11-01T10:00:00+00:00",
       "updated_at": "2026-11-01T10:00:00+00:00"
+    },
+    {
+      "id": "b0020000-0000-0000-0000-000000000051",
+      "booking_id": "b0010000-0000-0000-0000-000000000035",
+      "service_id": "bf8626cd-2271-59ab-9273-4fdd10eb451e",
+      "vendor_id": "631db4cf-1ec4-5b06-8f98-56abcf3406d0",
+      "slot_id": "f52fb85f-5d4c-586c-a78e-72b4658433a9",
+      "option_id": "e2803a6c-76ea-5d4e-96d5-ba230ef97808",
+      "pricing_unit": "PER_PACKAGE",
+      "participants_count": null,
+      "max_pax_per_package": 2,
+      "allow_split": false,
+      "capacity_released": false,
+      "quantity": 1,
+      "booking_date": "2026-11-08",
+      "booking_time": "08:00:00",
+      "price": "250000.00",
+      "created_at": "2026-11-03T11:45:00+00:00",
+      "updated_at": "2026-11-03T11:50:00+00:00"
     }
   ],
   "master_orders": [
@@ -1496,7 +1515,7 @@
     {
       "id": "00010000-0000-0000-0000-000000000006",
       "booking_id": "b0010000-0000-0000-0000-000000000006",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "customer_id": "c1010000-0000-0000-0000-000000000003",
       "status": "COMPLETED",
       "payment_status": "PAID",
       "total_amount": "1000000.00",
@@ -1566,7 +1585,7 @@
     {
       "id": "00010000-0000-0000-0000-000000000011",
       "booking_id": "b0010000-0000-0000-0000-000000000011",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000008",
       "status": "COMPLETED",
       "payment_status": "PAID",
       "total_amount": "300000.00",
@@ -1594,7 +1613,7 @@
     {
       "id": "00010000-0000-0000-0000-000000000013",
       "booking_id": "b0010000-0000-0000-0000-000000000013",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000009",
       "status": "COMPLETED",
       "payment_status": "PAID",
       "total_amount": "1450000.00",
@@ -1608,7 +1627,7 @@
     {
       "id": "00010000-0000-0000-0000-000000000014",
       "booking_id": "b0010000-0000-0000-0000-000000000014",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "customer_id": "c1010000-0000-0000-0000-000000000010",
       "status": "COMPLETED",
       "payment_status": "PAID",
       "total_amount": "700000.00",
@@ -1678,7 +1697,7 @@
     {
       "id": "00010000-0000-0000-0000-000000000019",
       "booking_id": "b0010000-0000-0000-0000-000000000019",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000003",
       "status": "COMPLETED",
       "payment_status": "PAID",
       "total_amount": "585000.00",
@@ -1706,7 +1725,7 @@
     {
       "id": "00010000-0000-0000-0000-000000000021",
       "booking_id": "b0010000-0000-0000-0000-000000000021",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000004",
       "status": "COMPLETED",
       "payment_status": "PAID",
       "total_amount": "585000.00",
@@ -1762,7 +1781,7 @@
     {
       "id": "00010000-0000-0000-0000-000000000025",
       "booking_id": "b0010000-0000-0000-0000-000000000025",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000005",
       "status": "COMPLETED",
       "payment_status": "PAID",
       "total_amount": "720000.00",
@@ -1776,7 +1795,7 @@
     {
       "id": "00010000-0000-0000-0000-000000000026",
       "booking_id": "b0010000-0000-0000-0000-000000000026",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "customer_id": "c1010000-0000-0000-0000-000000000006",
       "status": "COMPLETED",
       "payment_status": "PAID",
       "total_amount": "765000.00",
@@ -1790,7 +1809,7 @@
     {
       "id": "00010000-0000-0000-0000-000000000027",
       "booking_id": "b0010000-0000-0000-0000-000000000027",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "customer_id": "c1010000-0000-0000-0000-000000000007",
       "status": "COMPLETED",
       "payment_status": "PAID",
       "total_amount": "900000.00",
@@ -1903,9 +1922,9 @@
       "id": "00010000-0000-0000-0000-000000000035",
       "booking_id": "b0010000-0000-0000-0000-000000000035",
       "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
-      "status": "COMPLETED",
+      "status": "PARTIALLY_COMPLETED",
       "payment_status": "PAID",
-      "total_amount": "1000000.00",
+      "total_amount": "1250000.00",
       "discount_amount": "0.00",
       "discount_code_id": null,
       "idempotency_key": "IDEMP-MO-000035",
@@ -2029,8 +2048,8 @@
       "id": "00010000-0000-0000-0000-000000000044",
       "booking_id": "b0010000-0000-0000-0000-000000000044",
       "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
-      "status": "CANCELLED",
-      "payment_status": "REFUNDED",
+      "status": "COMPLETED",
+      "payment_status": "PAID",
       "total_amount": "650000.00",
       "discount_amount": "0.00",
       "discount_code_id": null,
@@ -2337,7 +2356,7 @@
       "waiver_content_en": "Standard marine safety regulations and life jacket requirements apply.",
       "waiver_accepted": true,
       "waiver_accepted_at": "2026-10-24T08:40:00+00:00",
-      "waiver_accepted_by": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "waiver_accepted_by": "c1010000-0000-0000-0000-000000000003",
       "waiver_accepted_language": "VI",
       "waiver_accepted_content": "Standard marine safety regulations and life jacket requirements apply.",
       "qr_secret": "c0010000-0000-0000-0000-000000000006",
@@ -2522,7 +2541,7 @@
       "waiver_content_en": "Standard marine safety regulations and life jacket requirements apply.",
       "waiver_accepted": true,
       "waiver_accepted_at": "2026-10-24T09:05:00+00:00",
-      "waiver_accepted_by": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "waiver_accepted_by": "c1010000-0000-0000-0000-000000000008",
       "waiver_accepted_language": "VI",
       "waiver_accepted_content": "Standard marine safety regulations and life jacket requirements apply.",
       "qr_secret": "c0010000-0000-0000-0000-000000000011",
@@ -2596,7 +2615,7 @@
       "waiver_content_en": "Standard marine safety regulations and life jacket requirements apply.",
       "waiver_accepted": true,
       "waiver_accepted_at": "2026-10-24T09:15:00+00:00",
-      "waiver_accepted_by": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "waiver_accepted_by": "c1010000-0000-0000-0000-000000000009",
       "waiver_accepted_language": "VI",
       "waiver_accepted_content": "Standard marine safety regulations and life jacket requirements apply.",
       "qr_secret": "c0010000-0000-0000-0000-000000000013",
@@ -2633,7 +2652,7 @@
       "waiver_content_en": "Standard marine safety regulations and life jacket requirements apply.",
       "waiver_accepted": true,
       "waiver_accepted_at": "2026-10-24T09:20:00+00:00",
-      "waiver_accepted_by": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "waiver_accepted_by": "c1010000-0000-0000-0000-000000000010",
       "waiver_accepted_language": "VI",
       "waiver_accepted_content": "Standard marine safety regulations and life jacket requirements apply.",
       "qr_secret": "c0010000-0000-0000-0000-000000000014",
@@ -2818,7 +2837,7 @@
       "waiver_content_en": "Standard marine safety regulations and life jacket requirements apply.",
       "waiver_accepted": true,
       "waiver_accepted_at": "2026-10-24T10:00:00+00:00",
-      "waiver_accepted_by": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "waiver_accepted_by": "c1010000-0000-0000-0000-000000000003",
       "waiver_accepted_language": "VI",
       "waiver_accepted_content": "Standard marine safety regulations and life jacket requirements apply.",
       "qr_secret": "c0010000-0000-0000-0000-000000000019",
@@ -2892,7 +2911,7 @@
       "waiver_content_en": "Standard marine safety regulations and life jacket requirements apply.",
       "waiver_accepted": true,
       "waiver_accepted_at": "2026-10-28T09:00:00+00:00",
-      "waiver_accepted_by": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "waiver_accepted_by": "c1010000-0000-0000-0000-000000000004",
       "waiver_accepted_language": "VI",
       "waiver_accepted_content": "Standard marine safety regulations and life jacket requirements apply.",
       "qr_secret": "c0010000-0000-0000-0000-000000000021",
@@ -3040,7 +3059,7 @@
       "waiver_content_en": "Standard marine safety regulations and life jacket requirements apply.",
       "waiver_accepted": true,
       "waiver_accepted_at": "2026-11-01T10:15:00+00:00",
-      "waiver_accepted_by": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "waiver_accepted_by": "c1010000-0000-0000-0000-000000000005",
       "waiver_accepted_language": "VI",
       "waiver_accepted_content": "Standard marine safety regulations and life jacket requirements apply.",
       "qr_secret": "c0010000-0000-0000-0000-000000000025",
@@ -3077,7 +3096,7 @@
       "waiver_content_en": "Standard marine safety regulations and life jacket requirements apply.",
       "waiver_accepted": true,
       "waiver_accepted_at": "2026-11-01T14:00:00+00:00",
-      "waiver_accepted_by": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
+      "waiver_accepted_by": "c1010000-0000-0000-0000-000000000006",
       "waiver_accepted_language": "VI",
       "waiver_accepted_content": "Standard marine safety regulations and life jacket requirements apply.",
       "qr_secret": "c0010000-0000-0000-0000-000000000026",
@@ -3114,7 +3133,7 @@
       "waiver_content_en": "Standard marine safety regulations and life jacket requirements apply.",
       "waiver_accepted": true,
       "waiver_accepted_at": "2026-11-02T08:30:00+00:00",
-      "waiver_accepted_by": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "waiver_accepted_by": "c1010000-0000-0000-0000-000000000007",
       "waiver_accepted_language": "VI",
       "waiver_accepted_content": "Standard marine safety regulations and life jacket requirements apply.",
       "qr_secret": "c0010000-0000-0000-0000-000000000027",
@@ -3623,7 +3642,7 @@
       "commission_rate": "0.1000",
       "commission_amount": "14000.00",
       "vendor_payout_amount": "126000.00",
-      "status": "CANCELLED",
+      "status": "REFUNDED",
       "cancellation_reason": "CUSTOMER_CANCEL",
       "cancellation_policy_version": "STANDARD_24H_V2",
       "waiver_required": true,
@@ -3660,7 +3679,7 @@
       "commission_rate": "0.1000",
       "commission_amount": "15000.00",
       "vendor_payout_amount": "135000.00",
-      "status": "CANCELLED",
+      "status": "REFUNDED",
       "cancellation_reason": "CUSTOMER_CANCEL",
       "cancellation_policy_version": "STANDARD_24H_V2",
       "waiver_required": true,
@@ -3697,7 +3716,7 @@
       "commission_rate": "0.1000",
       "commission_amount": "75000.00",
       "vendor_payout_amount": "675000.00",
-      "status": "CANCELLED",
+      "status": "REFUNDED",
       "cancellation_reason": "CUSTOMER_CANCEL",
       "cancellation_policy_version": "STANDARD_24H_V2",
       "waiver_required": true,
@@ -3734,7 +3753,7 @@
       "commission_rate": "0.1000",
       "commission_amount": "65000.00",
       "vendor_payout_amount": "585000.00",
-      "status": "CANCELLED",
+      "status": "PARTIALLY_REFUNDED",
       "cancellation_reason": "CUSTOMER_CANCEL",
       "cancellation_policy_version": "STANDARD_24H_V2",
       "waiver_required": true,
@@ -3771,7 +3790,7 @@
       "commission_rate": "0.1000",
       "commission_amount": "35000.00",
       "vendor_payout_amount": "315000.00",
-      "status": "CANCELLED",
+      "status": "REFUNDED",
       "cancellation_reason": "WEATHER",
       "cancellation_policy_version": "STANDARD_24H_V2",
       "waiver_required": true,
@@ -3808,7 +3827,7 @@
       "commission_rate": "0.1000",
       "commission_amount": "55000.00",
       "vendor_payout_amount": "495000.00",
-      "status": "CANCELLED",
+      "status": "REFUNDED",
       "cancellation_reason": "WEATHER",
       "cancellation_policy_version": "STANDARD_24H_V2",
       "waiver_required": true,
@@ -3974,6 +3993,43 @@
       "reschedule_version": 0,
       "created_at": "2026-11-01T10:00:00+00:00",
       "updated_at": "2026-11-01T10:00:00+00:00"
+    },
+    {
+      "id": "00020000-0000-0000-0000-000000000051",
+      "master_order_id": "00010000-0000-0000-0000-000000000035",
+      "booking_item_id": "b0020000-0000-0000-0000-000000000051",
+      "vendor_id": "631db4cf-1ec4-5b06-8f98-56abcf3406d0",
+      "service_id": "bf8626cd-2271-59ab-9273-4fdd10eb451e",
+      "slot_id": "f52fb85f-5d4c-586c-a78e-72b4658433a9",
+      "quantity": 1,
+      "unit_price": "250000.00",
+      "subtotal_amount": "250000.00",
+      "discount_amount": "0.00",
+      "vendor_discount_amount": "0.00",
+      "platform_discount_amount": "0.00",
+      "commission_basis_amount": "250000.00",
+      "final_amount": "250000.00",
+      "commission_rate": "0.1000",
+      "commission_amount": "25000.00",
+      "vendor_payout_amount": "225000.00",
+      "status": "CONFIRMED",
+      "cancellation_reason": null,
+      "cancellation_policy_version": "STANDARD_24H_V2",
+      "waiver_required": true,
+      "waiver_version": 1,
+      "waiver_content": "Du khách cam kết đủ sức khỏe tham gia, bắt buộc mặc áo phao trong suốt hành trình và tuân thủ nghiêm ngặt chỉ dẫn của hướng dẫn viên cứu hộ.",
+      "waiver_content_en": "Participants confirm good health condition, must wear life jackets throughout the trip, and strictly follow rescue guide instructions.",
+      "waiver_accepted": true,
+      "waiver_accepted_at": "2026-11-03T11:45:00+00:00",
+      "waiver_accepted_by": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "waiver_accepted_language": "VI",
+      "waiver_accepted_content": "Du khách cam kết đủ sức khỏe tham gia, bắt buộc mặc áo phao trong suốt hành trình và tuân thủ nghiêm ngặt chỉ dẫn của hướng dẫn viên cứu hộ.",
+      "qr_secret": "c0010000-0000-0000-0000-000000000051",
+      "checked_in_at": null,
+      "vendor_notified_at": "2026-11-03T11:45:00+00:00",
+      "reschedule_version": 0,
+      "created_at": "2026-11-03T11:45:00+00:00",
+      "updated_at": "2026-11-03T11:50:00+00:00"
     }
   ],
   "payments": [
@@ -4630,7 +4686,7 @@
       "provider_transaction_id": null,
       "provider_order_id": null,
       "idempotency_key": "IDEMP-PAY-000035",
-      "amount": "1000000.00",
+      "amount": "1250000.00",
       "status": "SUCCESS",
       "paid_at": "2026-11-03T11:50:00+00:00",
       "payment_url": null,
@@ -4658,7 +4714,7 @@
       "webhook_event_id": null,
       "reconciliation_attempts": 0,
       "last_reconciled_at": null,
-      "created_at": "2026-11-03T13:00:00+00:00",
+      "created_at": "2026-11-03T13:03:00+00:00",
       "updated_at": "2026-11-03T13:05:00+00:00"
     },
     {
@@ -4745,7 +4801,7 @@
       "provider_order_id": null,
       "idempotency_key": "IDEMP-PAY-000041",
       "amount": "140000.00",
-      "status": "SUCCESS",
+      "status": "REFUNDED",
       "paid_at": "2026-10-22T08:05:00+00:00",
       "payment_url": null,
       "qr_code_url": null,
@@ -4764,7 +4820,7 @@
       "provider_order_id": null,
       "idempotency_key": "IDEMP-PAY-000042",
       "amount": "150000.00",
-      "status": "SUCCESS",
+      "status": "REFUNDED",
       "paid_at": "2026-10-22T09:05:00+00:00",
       "payment_url": null,
       "qr_code_url": null,
@@ -4783,7 +4839,7 @@
       "provider_order_id": null,
       "idempotency_key": "IDEMP-PAY-000043",
       "amount": "750000.00",
-      "status": "SUCCESS",
+      "status": "REFUNDED",
       "paid_at": "2026-10-23T08:05:00+00:00",
       "payment_url": null,
       "qr_code_url": null,
@@ -4821,7 +4877,7 @@
       "provider_order_id": null,
       "idempotency_key": "IDEMP-PAY-000045",
       "amount": "350000.00",
-      "status": "SUCCESS",
+      "status": "REFUNDED",
       "paid_at": "2026-10-30T09:05:00+00:00",
       "payment_url": null,
       "qr_code_url": null,
@@ -4840,7 +4896,7 @@
       "provider_order_id": null,
       "idempotency_key": "IDEMP-PAY-000046",
       "amount": "550000.00",
-      "status": "SUCCESS",
+      "status": "REFUNDED",
       "paid_at": "2026-10-30T10:05:00+00:00",
       "payment_url": null,
       "qr_code_url": null,
@@ -4926,6 +4982,25 @@
       "last_reconciled_at": null,
       "created_at": "2026-11-01T10:00:00+00:00",
       "updated_at": "2026-11-01T10:00:00+00:00"
+    },
+    {
+      "id": "00040000-0000-0000-0000-000000000051",
+      "master_order_id": "00010000-0000-0000-0000-000000000036",
+      "provider": "PAYPAL",
+      "provider_transaction_id": null,
+      "provider_order_id": null,
+      "idempotency_key": "IDEMP-PAY-000051",
+      "amount": "950000.00",
+      "status": "FAILED",
+      "paid_at": null,
+      "payment_url": null,
+      "qr_code_url": null,
+      "raw_webhook_payload": null,
+      "webhook_event_id": null,
+      "reconciliation_attempts": 0,
+      "last_reconciled_at": null,
+      "created_at": "2026-11-03T13:01:00+00:00",
+      "updated_at": "2026-11-03T13:02:00+00:00"
     }
   ],
   "refunds": [
@@ -5596,9 +5671,9 @@
       "amount": "1170000.00",
       "status": "PAID",
       "processed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-      "processed_at": null,
+      "processed_at": "2026-10-26T12:00:00Z",
       "created_at": "2026-10-26T10:00:00Z",
-      "updated_at": "2026-10-26T10:00:00Z"
+      "updated_at": "2026-10-26T12:00:00Z"
     },
     {
       "id": "00090000-0000-0000-0000-000000000002",
@@ -5607,9 +5682,9 @@
       "amount": "1134000.00",
       "status": "APPROVED",
       "processed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-      "processed_at": null,
+      "processed_at": "2026-10-26T12:00:00Z",
       "created_at": "2026-10-26T10:00:00Z",
-      "updated_at": "2026-10-26T10:00:00Z"
+      "updated_at": "2026-10-26T12:00:00Z"
     },
     {
       "id": "00090000-0000-0000-0000-000000000003",
@@ -5618,9 +5693,9 @@
       "amount": "2970000.00",
       "status": "APPROVED",
       "processed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-      "processed_at": null,
+      "processed_at": "2026-10-26T12:00:00Z",
       "created_at": "2026-10-26T10:00:00Z",
-      "updated_at": "2026-10-26T10:00:00Z"
+      "updated_at": "2026-10-26T12:00:00Z"
     },
     {
       "id": "00090000-0000-0000-0000-000000000004",
@@ -5629,9 +5704,9 @@
       "amount": "810000.00",
       "status": "APPROVED",
       "processed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-      "processed_at": null,
+      "processed_at": "2026-10-26T12:00:00Z",
       "created_at": "2026-10-26T10:00:00Z",
-      "updated_at": "2026-10-26T10:00:00Z"
+      "updated_at": "2026-10-26T12:00:00Z"
     },
     {
       "id": "00090000-0000-0000-0000-000000000005",
@@ -5640,9 +5715,9 @@
       "amount": "2160000.00",
       "status": "APPROVED",
       "processed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-      "processed_at": null,
+      "processed_at": "2026-10-26T12:00:00Z",
       "created_at": "2026-10-26T10:00:00Z",
-      "updated_at": "2026-10-26T10:00:00Z"
+      "updated_at": "2026-10-26T12:00:00Z"
     },
     {
       "id": "00090000-0000-0000-0000-000000000006",
@@ -5651,9 +5726,9 @@
       "amount": "945000.00",
       "status": "APPROVED",
       "processed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-      "processed_at": null,
+      "processed_at": "2026-10-26T12:00:00Z",
       "created_at": "2026-10-26T10:00:00Z",
-      "updated_at": "2026-10-26T10:00:00Z"
+      "updated_at": "2026-10-26T12:00:00Z"
     },
     {
       "id": "00090000-0000-0000-0000-000000000007",
@@ -5662,9 +5737,9 @@
       "amount": "2025000.00",
       "status": "APPROVED",
       "processed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-      "processed_at": null,
+      "processed_at": "2026-10-26T12:00:00Z",
       "created_at": "2026-10-26T10:00:00Z",
-      "updated_at": "2026-10-26T10:00:00Z"
+      "updated_at": "2026-10-26T12:00:00Z"
     },
     {
       "id": "00090000-0000-0000-0000-000000000008",
@@ -5673,9 +5748,9 @@
       "amount": "405000.00",
       "status": "APPROVED",
       "processed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-      "processed_at": null,
+      "processed_at": "2026-10-26T12:00:00Z",
       "created_at": "2026-10-26T10:00:00Z",
-      "updated_at": "2026-10-26T10:00:00Z"
+      "updated_at": "2026-10-26T12:00:00Z"
     },
     {
       "id": "00090000-0000-0000-0000-000000000009",
@@ -5684,9 +5759,9 @@
       "amount": "252000.00",
       "status": "APPROVED",
       "processed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-      "processed_at": null,
+      "processed_at": "2026-10-26T12:00:00Z",
       "created_at": "2026-10-26T10:00:00Z",
-      "updated_at": "2026-10-26T10:00:00Z"
+      "updated_at": "2026-10-26T12:00:00Z"
     },
     {
       "id": "00090000-0000-0000-0000-000000000010",
@@ -5706,9 +5781,9 @@
       "amount": "135000.00",
       "status": "REJECTED",
       "processed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-      "processed_at": null,
+      "processed_at": "2026-11-02T12:00:00Z",
       "created_at": "2026-11-02T10:00:00Z",
-      "updated_at": "2026-11-02T10:00:00Z",
+      "updated_at": "2026-11-02T12:00:00Z",
       "rejection_reason": "Tài khoản thụ hưởng chưa khớp với hồ sơ đăng ký của đối tác"
     }
   ],
@@ -6179,6 +6254,14 @@
       "slot_id": "ff3410cb-c474-55e3-827e-1e403260d0d8",
       "unit_number": 2,
       "allocated_seats": 1,
+      "is_private_lock": true
+    },
+    {
+      "id": "484e346b-4c3f-517e-bf32-8e324cd4a8ad",
+      "booking_item_id": "b0020000-0000-0000-0000-000000000051",
+      "slot_id": "f52fb85f-5d4c-586c-a78e-72b4658433a9",
+      "unit_number": 3,
+      "allocated_seats": 2,
       "is_private_lock": true
     }
   ]

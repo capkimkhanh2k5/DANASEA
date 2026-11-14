@@ -42,16 +42,16 @@ class TransactionDatasetContract(unittest.TestCase):
         self.assertEqual('0.1000', meta['platformCommissionRate'])
         self.assertEqual(228, meta['baseRecordsReferenced'])
         self.assertEqual(50, len(self.data['bookings']))
-        self.assertEqual(50, len(self.data['booking_items']))
+        self.assertEqual(51, len(self.data['booking_items']))
         self.assertEqual(50, len(self.data['master_orders']))
-        self.assertEqual(50, len(self.data['sub_orders']))
-        self.assertEqual(50, len(self.data['payments']))
+        self.assertEqual(51, len(self.data['sub_orders']))
+        self.assertEqual(51, len(self.data['payments']))
         self.assertEqual(6, len(self.data['refunds']))
         self.assertEqual(20, len(self.data['invoices']))
         self.assertEqual(11, len(self.data['settlements']))
         self.assertEqual(19, len(self.data['settlement_line_items']))
         self.assertEqual(11, len(self.data['payout_requests']))
-        self.assertEqual(27, len(self.data.get('booking_item_allocations', [])))
+        self.assertEqual(28, len(self.data.get('booking_item_allocations', [])))
 
     def test_referential_integrity_to_base_package(self):
         # Customer checks
@@ -240,7 +240,7 @@ class TransactionDatasetContract(unittest.TestCase):
 
     def test_private_allocations_integrity(self):
         allocs = self.data.get('booking_item_allocations', [])
-        self.assertEqual(27, len(allocs))
+        self.assertEqual(28, len(allocs))
         items_by_id = {i['id']: i for i in self.data['booking_items']}
         sub_by_item = {s['booking_item_id']: s for s in self.data['sub_orders']}
         active_units = {}
@@ -252,11 +252,11 @@ class TransactionDatasetContract(unittest.TestCase):
             self.assertGreater(a['unit_number'], 0)
             self.assertGreater(a['allocated_seats'], 0)
             so = sub_by_item[a['booking_item_id']]
-            if so['status'] != 'CANCELLED':
+            if so['status'] not in ('CANCELLED', 'REFUNDED', 'REJECTED') and not item.get('capacity_released', False):
                 key = (a['slot_id'], a['unit_number'])
                 self.assertNotIn(key, active_units, f"Conflicting unit allocation on slot {a['slot_id']} unit {a['unit_number']}")
                 active_units[key] = a['id']
-        self.assertEqual(22, len(active_units))
+        self.assertEqual(23, len(active_units))
 
 
 if __name__ == '__main__':
