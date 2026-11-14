@@ -137,7 +137,7 @@ export const DisputeAiArbitrationCard: React.FC<DisputeAiArbitrationCardProps> =
           <button
             type="button"
             onClick={handleOpenCopilot}
-            title="Mở hội thoại riêng về vụ này trên Admin Copilot"
+            title="Mở hội thoại riêng về vụ này trên Admin DaNaBot"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -153,7 +153,7 @@ export const DisputeAiArbitrationCard: React.FC<DisputeAiArbitrationCardProps> =
             }}
           >
             <MessageSquare size={13} />
-            <span>Hỏi Copilot</span>
+            <span>Hỏi DaNaBot</span>
           </button>
 
           <AdminButton

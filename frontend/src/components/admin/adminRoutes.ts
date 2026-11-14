@@ -4,7 +4,7 @@ export const adminNavigation = [
   {
     id: 'overview', label: 'Điều hành', icon: LayoutDashboard, items: [
       { to: '/admin', label: 'Tổng quan', pageTitle: 'Dashboard', icon: LayoutDashboard },
-      { to: '/admin/copilot', label: 'Trợ lý Copilot', pageTitle: 'Trợ lý AI Copilot', icon: Bot },
+      { to: '/admin/copilot', label: 'Trợ lý DaNaBot', pageTitle: 'Trợ lý AI DaNaBot', icon: Bot },
     ]
   },
   {
