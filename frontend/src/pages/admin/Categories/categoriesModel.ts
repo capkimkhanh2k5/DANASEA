@@ -1,7 +1,7 @@
 import type { Category } from '../../../types';
 
 export type CategoryStatusFilter = 'all' | 'active' | 'inactive';
-export type CategoryCertFilter = 'all' | 'required' | 'optional';
+export type CategoryCertFilter = 'all' | 'required' | 'optional' | 'unknown';
 
 export function slugifyCategory(name: string): string {
   return name
@@ -37,8 +37,9 @@ export function filterCategories(
 
     const matchesCert =
       certFilter === 'all' ||
-      (certFilter === 'required' && category.requiresSafetyCert) ||
-      (certFilter === 'optional' && !category.requiresSafetyCert);
+      (certFilter === 'required' && category.requiresSafetyCert === true) ||
+      (certFilter === 'optional' && category.requiresSafetyCert === false) ||
+      (certFilter === 'unknown' && (category.requiresSafetyCert === null || category.requiresSafetyCert === undefined));
 
     return matchesSearch && matchesStatus && matchesCert;
   });
@@ -51,7 +52,7 @@ export type CategoryFormData = {
   parentId: string;
   iconUrl: string;
   isActive: boolean;
-  requiresSafetyCert: boolean;
+  requiresSafetyCert: boolean | null;
 };
 
 export function validateCategoryForm(data: CategoryFormData): { valid: boolean; error?: string } {

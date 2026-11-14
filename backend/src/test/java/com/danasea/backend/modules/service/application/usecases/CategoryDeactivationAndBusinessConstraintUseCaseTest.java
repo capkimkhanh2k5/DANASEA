@@ -564,5 +564,18 @@ class CategoryDeactivationAndBusinessConstraintUseCaseTest {
             assertEquals("Tours Updated", response.getBody().name());
             verify(updateUseCase).execute(id, new UpdateCategoryCommand("Tours Updated", null, null, null, null));
         }
+
+        @Test
+        @DisplayName("AdminCategoryController: deleteCategory delegates to DeleteCategoryUseCase and returns 204 NO_CONTENT")
+        void adminCategoryController_ShouldDeleteCategory() {
+            DeleteCategoryUseCase deleteUseCase = mock(DeleteCategoryUseCase.class);
+            AdminCategoryController controller = new AdminCategoryController(
+                    null, null, null, null, deleteUseCase, null
+            );
+            UUID id = UUID.randomUUID();
+            ResponseEntity<Void> response = controller.deleteCategory(id);
+            assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+            verify(deleteUseCase).execute(id);
+        }
     }
 }

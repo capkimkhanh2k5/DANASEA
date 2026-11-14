@@ -43,17 +43,26 @@ public class CreateCategoryUseCase {
                 .parentId(command.parentId())
                 .iconUrl(command.iconUrl())
                 .isActive(true)
+                .requiresSafetyCert(Boolean.TRUE.equals(command.requiresSafetyCert()))
                 .build();
 
         return categoryRepositoryPort.save(category);
     }
 
     public Category execute(String name, String nameEn, String slug, UUID parentId, String iconUrl) {
-        return execute(new CreateCategoryCommand(null, name, nameEn, slug, parentId, iconUrl));
+        return execute(new CreateCategoryCommand(null, name, nameEn, slug, parentId, iconUrl, false));
+    }
+
+    public Category execute(String name, String nameEn, String slug, UUID parentId, String iconUrl, Boolean requiresSafetyCert) {
+        return execute(new CreateCategoryCommand(null, name, nameEn, slug, parentId, iconUrl, requiresSafetyCert));
     }
 
     public Category execute(UUID id, String name, String nameEn, String slug, UUID parentId, String iconUrl) {
-        return execute(new CreateCategoryCommand(id, name, nameEn, slug, parentId, iconUrl));
+        return execute(new CreateCategoryCommand(id, name, nameEn, slug, parentId, iconUrl, false));
+    }
+
+    public Category execute(UUID id, String name, String nameEn, String slug, UUID parentId, String iconUrl, Boolean requiresSafetyCert) {
+        return execute(new CreateCategoryCommand(id, name, nameEn, slug, parentId, iconUrl, requiresSafetyCert));
     }
 
     private void validateNoHierarchyLoop(UUID categoryId, UUID targetParentId) {

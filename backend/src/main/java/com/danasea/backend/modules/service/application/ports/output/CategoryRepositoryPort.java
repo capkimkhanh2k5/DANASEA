@@ -14,4 +14,9 @@ public interface CategoryRepositoryPort {
     boolean existsById(UUID id);
     List<Category> findAll();
     List<Category> findAllActive();
+    void deleteById(UUID id);
+    boolean hasLinkedServices(UUID categoryId);
+    boolean hasChildren(UUID parentId);
+    boolean hasCommissionRules(UUID categoryId);
+    boolean hasSafetyRules(UUID categoryId);
 }

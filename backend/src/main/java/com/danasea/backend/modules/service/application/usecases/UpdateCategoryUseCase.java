@@ -65,12 +65,21 @@ public class UpdateCategoryUseCase {
         if (command.isActive() != null) {
             category.setIsActive(command.isActive());
         }
+
+        if (command.requiresSafetyCert() != null) {
+            category.setRequiresSafetyCert(command.requiresSafetyCert());
+        }
         return categoryRepositoryPort.save(category);
     }
 
     @Transactional
     public Category execute(UUID id, String name, String nameEn, String slug, UUID parentId, String iconUrl) {
         return execute(id, new UpdateCategoryCommand(name, nameEn, slug, parentId, iconUrl));
+    }
+
+    @Transactional
+    public Category execute(UUID id, String name, String nameEn, String slug, UUID parentId, String iconUrl, Boolean isActive, Boolean requiresSafetyCert) {
+        return execute(id, new UpdateCategoryCommand(name, nameEn, slug, parentId, iconUrl, isActive, requiresSafetyCert));
     }
 
     private void validateNoHierarchyLoop(UUID categoryId, UUID targetParentId) {

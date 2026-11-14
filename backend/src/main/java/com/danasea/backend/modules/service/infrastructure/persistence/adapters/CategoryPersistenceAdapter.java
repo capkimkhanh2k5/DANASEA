@@ -70,4 +70,29 @@ public class CategoryPersistenceAdapter implements CategoryRepositoryPort, Activ
     public boolean hasActiveServices(UUID categoryId) {
         return jpaServiceRepository.existsByCategoryIdAndStatus(categoryId, ServiceStatus.PUBLISHED);
     }
+
+    @Override
+    public void deleteById(UUID id) {
+        jpaCategoryRepository.deleteById(id);
+    }
+
+    @Override
+    public boolean hasLinkedServices(UUID categoryId) {
+        return jpaServiceRepository.existsByCategoryId(categoryId);
+    }
+
+    @Override
+    public boolean hasChildren(UUID parentId) {
+        return jpaCategoryRepository.existsByParentId(parentId);
+    }
+
+    @Override
+    public boolean hasCommissionRules(UUID categoryId) {
+        return jpaCategoryRepository.existsCommissionRulesByCategoryId(categoryId);
+    }
+
+    @Override
+    public boolean hasSafetyRules(UUID categoryId) {
+        return jpaCategoryRepository.existsCategorySafetyRulesByCategoryId(categoryId);
+    }
 }

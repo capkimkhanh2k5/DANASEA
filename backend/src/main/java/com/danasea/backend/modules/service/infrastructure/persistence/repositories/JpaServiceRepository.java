@@ -27,6 +27,8 @@ public interface JpaServiceRepository extends JpaRepository<ServiceJpaEntity, UU
 
     boolean existsByCategoryIdAndStatus(UUID categoryId, ServiceStatus status);
 
+    boolean existsByCategoryId(UUID categoryId);
+
     List<ServiceJpaEntity> findByVendorId(UUID vendorId);
 
     List<ServiceJpaEntity> findByVendorIdOrderByCreatedAtDesc(UUID vendorId);
