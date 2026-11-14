@@ -44,6 +44,7 @@ export function Logs() {
   const [loading, setLoading] = useState(() => !demo);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedAction, setSelectedAction] = useState<LogActionFilter>('ALL');
   const [selectedEntity, setSelectedEntity] = useState<LogEntityFilter>('ALL');
   const [selectedLog, setSelectedLog] = useState<AdminAuditLogItem | null>(null);
@@ -57,18 +58,47 @@ export function Logs() {
   const [totalElements, setTotalElements] = useState(() => demo ? MOCK_ADMIN_AUDIT_LOGS.length : 0);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Debounce search input (350ms) to prevent request flooding
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(prev => {
+        if (prev !== search) {
+          setCurrentPage(1);
+          return search;
+        }
+        return prev;
+      });
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  const handleActionChange = (action: LogActionFilter) => {
+    setSelectedAction(action);
+    setCurrentPage(1);
+  };
+
+  const handleEntityChange = (entity: LogEntityFilter) => {
+    setSelectedEntity(entity);
+    setCurrentPage(1);
+  };
+
   useEffect(() => {
     if (demo) {
       return;
     }
 
-    let isMounted = true;
+    const abortController = new AbortController();
     setLoading(true);
     setErrorMessage(null);
 
-    adminAuditLogService.getAuditLogs(currentPage - 1, PAGE_SIZE)
+    const filters = {
+      action: selectedAction !== 'ALL' ? selectedAction : undefined,
+      entityType: selectedEntity !== 'ALL' ? selectedEntity : undefined,
+      search: debouncedSearch.trim() ? debouncedSearch.trim() : undefined,
+    };
+
+    adminAuditLogService.getAuditLogs(currentPage - 1, PAGE_SIZE, filters, abortController.signal)
       .then(res => {
-        if (!isMounted) return;
         const mapped: AdminAuditLogItem[] = (res.content || []).map(l => ({
           id: l.id,
           actorUserId: l.actorUserId || '',
@@ -82,21 +112,23 @@ export function Logs() {
           updatedAt: l.timestamp,
         }));
         setLogs(mapped);
-        setTotalPages(res.totalPages || 1);
-        setTotalElements(res.totalElements || mapped.length);
+        setTotalPages(res.totalPages || 0);
+        setTotalElements(res.totalElements || 0);
         setLoading(false);
       })
       .catch(err => {
-        if (!isMounted) return;
+        if (abortController.signal.aborted) {
+          return;
+        }
         const info = getAdminAuditLogError(err);
         setErrorMessage(info.message);
         setLoading(false);
       });
 
     return () => {
-      isMounted = false;
+      abortController.abort();
     };
-  }, [demo, currentPage, refreshKey]);
+  }, [demo, currentPage, debouncedSearch, selectedAction, selectedEntity, refreshKey]);
 
   // Extract available action options dynamically from current logs & known actions
   const availableActionOptions = useMemo(() => {
@@ -128,14 +160,12 @@ export function Logs() {
     const allActionKeys = Array.from(new Set([...pageActions, ...predefinedActions]));
 
     return allActionKeys.map(actionKey => {
-      const countOnPage = logs.filter(l => l.action === actionKey).length;
       const meta = getActionMeta(actionKey);
       return {
         value: actionKey,
         label: meta.label,
-        countOnPage,
       };
-    }).sort((a, b) => b.countOnPage - a.countOnPage || a.label.localeCompare(b.label, 'vi'));
+    }).sort((a, b) => a.label.localeCompare(b.label, 'vi'));
   }, [logs]);
 
   // Extract available entity options dynamically
@@ -159,24 +189,25 @@ export function Logs() {
     const allEntityKeys = Array.from(new Set([...pageEntities, ...predefinedEntities]));
 
     return allEntityKeys.map(entKey => {
-      const countOnPage = logs.filter(l => l.entityType === entKey).length;
       const label = ENTITY_LABELS[entKey] || entKey;
       return {
         value: entKey,
         label,
-        countOnPage,
       };
-    }).sort((a, b) => b.countOnPage - a.countOnPage || a.label.localeCompare(b.label, 'vi'));
+    }).sort((a, b) => a.label.localeCompare(b.label, 'vi'));
   }, [logs]);
 
-  // Filtered data (applied to currently loaded page)
+  // Filtered data (Demo mode filters in-memory; live mode uses server-side filtered logs)
   const filteredLogs = useMemo(() => {
-    return filterAuditLogs(logs, search, selectedAction, selectedEntity);
-  }, [logs, search, selectedAction, selectedEntity]);
+    if (demo) {
+      return filterAuditLogs(logs, search, selectedAction, selectedEntity);
+    }
+    return logs;
+  }, [demo, logs, search, selectedAction, selectedEntity]);
 
   const calculatedTotalPages = demo
     ? (Math.ceil(filteredLogs.length / PAGE_SIZE) || 1)
-    : totalPages;
+    : Math.max(1, totalPages);
   const activePage = Math.min(Math.max(1, currentPage), calculatedTotalPages);
 
   const paginatedLogs = useMemo(() => {
@@ -187,7 +218,7 @@ export function Logs() {
 
   // Transparent statistics: Global total vs. page-level operational indicators
   const stats = useMemo(() => {
-    const totalStored = demo ? MOCK_ADMIN_AUDIT_LOGS.length : totalElements;
+    const totalStored = demo ? filteredLogs.length : totalElements;
     const pageApprovals = logs.filter(l =>
       l.action.includes('APPROVE') ||
       l.action.includes('VERIFY') ||
@@ -201,14 +232,16 @@ export function Logs() {
       l.action.includes('FAILED')
     ).length;
     return { totalStored, pageApprovals, pageResolutions };
-  }, [demo, totalElements, logs]);
+  }, [demo, filteredLogs.length, totalElements, logs]);
 
   // Reset all filters
   const handleResetFilters = () => {
     setSearch('');
+    setDebouncedSearch('');
     setSelectedAction('ALL');
     setSelectedEntity('ALL');
-    setNotice('Đã đặt lại bộ lọc nhật ký trên trang hiện tại.');
+    setCurrentPage(1);
+    setNotice('Đã đặt lại toàn bộ bộ lọc và từ khóa tìm kiếm.');
   };
 
   // Real data refresh handler
@@ -307,19 +340,19 @@ export function Logs() {
             style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}
           >
             <div className="admin-workspace-metric">
-              <span>Tổng số bản ghi lưu trữ</span>
+              <span>{hasActiveFilters ? 'Số bản ghi khớp bộ lọc' : 'Tổng số bản ghi lưu trữ'}</span>
               <strong>{stats.totalStored.toLocaleString('vi-VN')}</strong>
-              <small>Toàn hệ thống CSDL · Toàn thời gian</small>
+              <small>{hasActiveFilters ? 'Toàn hệ thống (Server-side)' : 'Toàn hệ thống CSDL · Toàn thời gian'}</small>
             </div>
             <div className="admin-workspace-metric">
               <span>Hồ sơ &amp; Quyết toán đã duyệt</span>
               <strong style={{ color: 'var(--admin-primary)' }}>{stats.pageApprovals}</strong>
-              <small>Trong {logs.length} bản ghi trang {activePage} (Giới hạn API)</small>
+              <small>Trong {logs.length} bản ghi trang {activePage}</small>
             </div>
             <div className="admin-workspace-metric">
               <span>Xử lý kỷ luật &amp; Đối soát</span>
               <strong style={{ color: '#b45309' }}>{stats.pageResolutions}</strong>
-              <small>Trong {logs.length} bản ghi trang {activePage} (Giới hạn API)</small>
+              <small>Trong {logs.length} bản ghi trang {activePage}</small>
             </div>
           </section>
 
@@ -338,7 +371,11 @@ export function Logs() {
                 {search && (
                   <button
                     type="button"
-                    onClick={() => setSearch('')}
+                    onClick={() => {
+                      setSearch('');
+                      setDebouncedSearch('');
+                      setCurrentPage(1);
+                    }}
                     aria-label="Xóa nội dung tìm kiếm"
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--admin-muted)' }}
                   >
@@ -351,13 +388,13 @@ export function Logs() {
               <select
                 aria-label="Lọc theo loại hành động"
                 value={selectedAction}
-                onChange={e => setSelectedAction(e.target.value as LogActionFilter)}
+                onChange={e => handleActionChange(e.target.value as LogActionFilter)}
                 className="admin-logs-select"
               >
-                <option value="ALL">Tất cả hành động ({logs.length} trên trang)</option>
+                <option value="ALL">Tất cả hành động</option>
                 {availableActionOptions.map(opt => (
                   <option key={opt.value} value={opt.value}>
-                    {opt.label}{opt.countOnPage > 0 ? ` (${opt.countOnPage})` : ''}
+                    {opt.label}
                   </option>
                 ))}
               </select>
@@ -366,13 +403,13 @@ export function Logs() {
               <select
                 aria-label="Lọc theo đối tượng tác động"
                 value={selectedEntity}
-                onChange={e => setSelectedEntity(e.target.value as LogEntityFilter)}
+                onChange={e => handleEntityChange(e.target.value as LogEntityFilter)}
                 className="admin-logs-select"
               >
                 <option value="ALL">Tất cả đối tượng</option>
                 {availableEntityOptions.map(opt => (
                   <option key={opt.value} value={opt.value}>
-                    {opt.label}{opt.countOnPage > 0 ? ` (${opt.countOnPage})` : ''}
+                    {opt.label}
                   </option>
                 ))}
               </select>
@@ -380,22 +417,8 @@ export function Logs() {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 13, color: 'var(--admin-muted)', fontWeight: 550, whiteSpace: 'nowrap' }}>
-                Hiển thị <strong>{filteredLogs.length}</strong> / {logs.length} bản ghi (Trang {activePage}/{calculatedTotalPages})
+                Hiển thị <strong>{logs.length}</strong> bản ghi (Trang {activePage}/{calculatedTotalPages}) · Tổng cộng {totalElements.toLocaleString('vi-VN')} bản ghi
               </div>
-              <span
-                style={{
-                  fontSize: 11,
-                  background: '#f1f5f9',
-                  color: '#475569',
-                  padding: '3px 8px',
-                  borderRadius: 6,
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                }}
-                title="API máy chủ phân trang theo thời gian; các bộ lọc áp dụng trên trang hiện tại đang tải."
-              >
-                Bộ lọc trang hiện tại
-              </span>
               {hasActiveFilters && (
                 <AdminButton
                   variant="secondary"
@@ -448,16 +471,18 @@ export function Logs() {
                 <AdminState
                   compact
                   kind="empty"
-                  title={logs.length === 0 ? 'Chưa có bản ghi nhật ký nào' : `Không tìm thấy bản ghi phù hợp trên trang ${activePage}`}
+                  title={hasActiveFilters ? 'Không tìm thấy nhật ký phù hợp với bộ lọc hiện tại' : 'Chưa có bản ghi nhật ký nào'}
                   description={
-                    logs.length === 0
-                      ? 'Hiện tại hệ thống chưa ghi nhận bản ghi nhật ký kiểm toán nào trong cơ sở dữ liệu.'
-                      : `Trong số ${logs.length} bản ghi của trang ${activePage} không có kết quả khớp với điều kiện lọc hiện tại. Bộ lọc đang áp dụng trên trang đang tải do hệ thống phân trang máy chủ theo thời gian. Bạn có thể đặt lại bộ lọc hoặc chuyển sang các trang khác.`
+                    hasActiveFilters
+                      ? 'Không tìm thấy bản ghi nhật ký kiểm toán nào khớp với bộ lọc hoặc từ khóa tìm kiếm. Bạn có thể thay đổi tiêu chí hoặc đặt lại bộ lọc.'
+                      : 'Hiện tại hệ thống chưa ghi nhận bản ghi nhật ký kiểm toán nào trong cơ sở dữ liệu.'
                   }
                   action={
-                    <AdminButton variant="secondary" onClick={handleResetFilters}>
-                      Đặt lại bộ lọc
-                    </AdminButton>
+                    hasActiveFilters ? (
+                      <AdminButton variant="secondary" onClick={handleResetFilters}>
+                        Đặt lại bộ lọc
+                      </AdminButton>
+                    ) : undefined
                   }
                 />
               </div>
