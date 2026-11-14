@@ -17,6 +17,7 @@ MAX_ENVELOPE = 65536
 MAX_REQUEST = 8192
 NAMESPACE = 'danasea-demo-data'
 IDENTITY = 'github-actions'
+DEFAULT_DEMO_PASSWORD = 'danasea@2026'
 FIELDS = {'version', 'repository', 'sha', 'package_sha256', 'action', 'run_id', 'run_attempt',
           'issued_at', 'nonce', 'confirmation'}
 
@@ -84,6 +85,13 @@ def _password(value):
     return value
 
 
+def _replacement_password(value):
+    password = _password(value)
+    if password is None or len(password) < 12:
+        raise ValueError('Replacement requires a demo password of at least 12 characters')
+    return password
+
+
 def verify(envelope, signers, sha, repository):
     if not isinstance(envelope, str) or len(envelope.encode()) > MAX_ENVELOPE:
         raise ValueError('Demo envelope too large')
@@ -105,9 +113,8 @@ def verify(envelope, signers, sha, repository):
         if result.returncode:
             raise ValueError('Demo signature verification failed')
     body = validate(_json(data), sha, repository)
-    password = _password(payload.get('password'))
-    if body['action'] == 'replace' and (password is None or len(password) < 12):
-        raise ValueError('Replacement requires a private demo password')
+    validator = _replacement_password if body['action'] == 'replace' else _password
+    password = validator(payload.get('password'))
     return body, password
 
 
@@ -158,10 +165,11 @@ def main():
                 raise ValueError('Demo request or signature size invalid')
             body = validate(_json(data))
             payload = {'request': base64.b64encode(data).decode(), 'signature': base64.b64encode(signature).decode()}
-            if args.password_env:
+            if body['action'] == 'replace':
+                configured = os.environ.get(args.password_env) if args.password_env else None
+                payload['password'] = _replacement_password(configured or DEFAULT_DEMO_PASSWORD)
+            elif args.password_env:
                 payload['password'] = _password(os.environ[args.password_env])
-            if body['action'] == 'replace' and len(payload.get('password') or '') < 12:
-                raise ValueError('Replacement requires a private demo password')
             print(json.dumps(payload))
     except (ValueError, OSError, KeyError, TypeError, subprocess.SubprocessError):
         print('Demo request rejected: invalid request, signature or private input.', file=sys.stderr)

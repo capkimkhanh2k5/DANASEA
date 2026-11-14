@@ -322,19 +322,30 @@ def validate_transactions(base, trans):
         require(sum(Decimal(p['amount']) for p in trans['payout_requests'] if p['settlement_id'] == s['id'] and p['status'] != 'REJECTED') <= Decimal(s['net_payable_amount']), 'Payout exceeds eligible balance')
         require(all(p['vendor_id'] == s['vendor_id'] for p in trans['payout_requests'] if p['settlement_id'] == s['id']), 'Payout vendor mismatch')
     for p in trans['payout_requests']:
+        processor = p.get('processed_by')
         if p['status'] in ('APPROVED', 'PAID', 'REJECTED'):
-            require(bool(p.get('processed_by')) and bool(p.get('processed_at')), 'Processed payout request missing processed_by or processed_at')
-            require(p['processed_at'] >= p['created_at'], 'Payout processed_at before created_at')
+            require(indexes['users'].get(processor, {}).get('role') == 'ADMIN' and p.get('processed_at'),
+                    'Processed payout request requires an admin and processed_at')
+            require(datetime.fromisoformat(p['processed_at']) >= datetime.fromisoformat(p['created_at']),
+                    'Payout processed_at before created_at')
         elif p['status'] == 'REQUESTED':
-            require(p.get('processed_at') is None, 'Pending payout request must not have processed_at')
+            require(processor is None and p.get('processed_at') is None,
+                    'Pending payout request has processing metadata')
+
+
+DEFAULT_DEMO_PASSWORD = 'danasea@2026'
 
 
 def resolve_demo_password(args):
     password = sys.stdin.readline().rstrip('\r\n') if args.demo_password_stdin else os.environ.get('DEMO_USER_PASSWORD')
-    if not password and sys.stdin.isatty():
+    if not password and args.replace and not args.demo_password_stdin:
+        password = DEFAULT_DEMO_PASSWORD
+    if not password and not args.demo_password_stdin and sys.stdin.isatty():
         password = getpass.getpass('Demo account password (hidden; required): ')
-    require(password is not None and len(password) >= 12 and len(password.encode('utf8')) <= 72,
-            'Supply a demo password of 12+ characters and <=72 UTF-8 bytes through DEMO_USER_PASSWORD or --demo-password-stdin')
+    require(password is not None and len(password) >= 12
+            and len(password.encode('utf8')) <= 72 and not any(ord(char) < 32 or ord(char) == 127 for char in password),
+            'Use the demo replacement default or supply a password of 12+ characters and <=72 UTF-8 bytes '
+            'through DEMO_USER_PASSWORD or --demo-password-stdin')
     return password
 
 
@@ -532,8 +543,9 @@ def load_fixtures():
     for table, col in MEDIA_TABLES.items():
         for rec, row in zip(base_records[table], base_rows[table]):
             sha = rec.get('mediaSha256')
-            if sha and sha in manifest_data:
-                row[col] = manifest_data[sha]['url']
+            entry = manifest_data.get(sha)
+            require(entry and entry.get('sha256') == sha and entry.get('url') == row[col],
+                    f"Missing or inconsistent media manifest entry: {table} {row['id']}")
 
     trans_data = json.loads((TRANS_DIR / 'demo_transactions.json').read_text(encoding='utf8'))
     trans_rows = {t: copy.deepcopy(trans_data[t]) for t in TRANSACTION_TABLES}
@@ -1199,6 +1211,18 @@ def verify_extended_business_integrity(session, fixtures_by_table=None):
     require(invalid_reviews == 0, f"Integrity check failed: {invalid_reviews} reviews attached to incomplete orders or mismatched users/services")
 
     # 2. Quan hệ Khiếu nại - Hoàn tiền & Trạng thái hoàn tiền theo RefundProcessingService
+    invalid_dispute_orders = session.query("""
+        SELECT to_json(count(*))
+        FROM public.disputes d
+        LEFT JOIN public.sub_orders s ON s.id = d.sub_order_id
+        LEFT JOIN public.master_orders m ON m.id = s.master_order_id
+        WHERE m.id IS NULL
+           OR d.order_id IS DISTINCT FROM m.id
+           OR d.customer_id IS DISTINCT FROM m.customer_id
+    """)
+    require(invalid_dispute_orders == 0,
+            f"Integrity check failed: {invalid_dispute_orders} disputes with the wrong order or customer")
+
     missing_refunds = session.query("""
         SELECT to_json(count(*))
         FROM public.disputes d
@@ -1212,42 +1236,60 @@ def verify_extended_business_integrity(session, fixtures_by_table=None):
                 AND r.amount = ROUND(s.final_amount * d.refund_percentage / 100.0, 2)
                 AND r.requested_by = d.resolved_by
                 AND r.created_at >= d.resolved_at
-                AND (r.processed_at IS NULL OR r.processed_at >= r.created_at)
+                AND (r.status = 'PENDING' OR r.processed_at >= r.created_at)
           )
     """)
     require(missing_refunds == 0, f"Integrity check failed: {missing_refunds} resolved disputes missing valid/timely refund")
 
     invalid_refund_states = session.query("""
+        WITH processed AS (
+            SELECT sub_order_id, payment_id, amount, provider, created_at, processed_at
+            FROM public.refunds
+            WHERE status = 'PROCESSED' AND sub_order_id IS NOT NULL
+        ), by_item AS (
+            SELECT sub_order_id, SUM(amount) AS total FROM processed GROUP BY sub_order_id
+        ), by_payment AS (
+            SELECT payment_id, SUM(amount) AS total FROM processed GROUP BY payment_id
+        )
         SELECT to_json(count(*))
         FROM (
-            SELECT s.id
-            FROM public.sub_orders s
-            JOIN public.master_orders m ON m.id = s.master_order_id
+            SELECT r.sub_order_id
+            FROM processed r
+            LEFT JOIN public.sub_orders s ON s.id = r.sub_order_id
+            LEFT JOIN public.payments p ON p.id = r.payment_id
+            WHERE s.id IS NULL OR p.id IS NULL
+               OR p.master_order_id IS DISTINCT FROM s.master_order_id
+               OR p.provider IS DISTINCT FROM r.provider
+               OR r.processed_at IS NULL OR r.processed_at < r.created_at
+            UNION ALL
+            SELECT s.id FROM by_item r JOIN public.sub_orders s ON s.id = r.sub_order_id
+            WHERE r.total > s.final_amount
+               OR s.status IS DISTINCT FROM
+                    CASE WHEN r.total = s.final_amount THEN 'REFUNDED' ELSE 'PARTIALLY_REFUNDED' END
+            UNION ALL
+            SELECT p.id
+            FROM by_payment r
+            JOIN public.payments p ON p.id = r.payment_id
+            JOIN public.master_orders m ON m.id = p.master_order_id
+            WHERE r.total > p.amount
+               OR p.status IS DISTINCT FROM CASE WHEN r.total = p.amount THEN 'REFUNDED' ELSE 'SUCCESS' END
+               OR m.payment_status IS DISTINCT FROM CASE WHEN r.total = p.amount THEN 'REFUNDED' ELSE 'PAID' END
+            UNION ALL
+            SELECT m.id
+            FROM public.master_orders m
             JOIN public.bookings b ON b.id = m.booking_id
-            JOIN (
-                SELECT r.sub_order_id, r.payment_id, SUM(r.amount) AS refunded_total
-                FROM public.refunds r
-                WHERE r.status = 'PROCESSED'
-                GROUP BY r.sub_order_id, r.payment_id
-            ) ref ON ref.sub_order_id = s.id
-            JOIN public.payments p ON p.id = ref.payment_id
-            WHERE (ref.refunded_total >= s.final_amount AND (
-                       s.status <> 'REFUNDED'
-                    OR p.status <> 'REFUNDED'
-                    OR m.payment_status <> 'REFUNDED'
-                    OR m.status <> 'CANCELLED'
-                    OR b.status <> 'CANCELLED'
-                   ))
-               OR (ref.refunded_total < s.final_amount AND (
-                       s.status <> 'PARTIALLY_REFUNDED'
-                    OR p.status <> 'SUCCESS'
-                    OR m.payment_status <> 'PAID'
-                    OR m.status = 'CANCELLED'
-                    OR b.status <> 'CONFIRMED'
-                   ))
+            WHERE EXISTS (
+                SELECT 1 FROM public.sub_orders s JOIN by_item r ON r.sub_order_id = s.id
+                WHERE s.master_order_id = m.id
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM public.sub_orders s WHERE s.master_order_id = m.id
+                  AND s.status NOT IN ('REFUNDED', 'CANCELLED', 'REJECTED')
+            )
+            AND (m.status IS DISTINCT FROM 'CANCELLED' OR b.status IS DISTINCT FROM 'CANCELLED')
         ) bad
     """)
-    require(invalid_refund_states == 0, f"Integrity check failed: {invalid_refund_states} sub_orders with invalid refund state transitions")
+    require(invalid_refund_states == 0, f"Integrity check failed: {invalid_refund_states} invalid refund state transitions")
 
     # 3. Quan hệ Đề xuất đổi ca - Đúng vendor, cùng dịch vụ, slot tương lai & chưa hết hạn
     invalid_proposals = session.query("""
@@ -1415,10 +1457,11 @@ def verify_extended_business_integrity(session, fixtures_by_table=None):
     invalid_payouts = session.query("""
         SELECT to_json(count(*))
         FROM public.payout_requests pr
+        LEFT JOIN public.users u ON u.id = pr.processed_by
         WHERE (pr.status IN ('APPROVED', 'PAID', 'REJECTED') AND (
-                  pr.processed_by IS NULL OR pr.processed_at IS NULL OR pr.processed_at < pr.created_at
+                  u.role IS DISTINCT FROM 'ADMIN' OR pr.processed_at IS NULL OR pr.processed_at < pr.created_at
               ))
-           OR (pr.status = 'REQUESTED' AND pr.processed_at IS NOT NULL)
+           OR (pr.status = 'REQUESTED' AND (pr.processed_by IS NOT NULL OR pr.processed_at IS NOT NULL))
     """)
     require(invalid_payouts == 0, f"Integrity check failed: {invalid_payouts} payout_requests with invalid processed_at/processed_by state")
 

@@ -76,8 +76,12 @@ class TransactionDatasetContract(unittest.TestCase):
 
         # Admin user check in payout requests
         for pr in self.data['payout_requests']:
-            self.assertIn(pr['processed_by'], self.users)
-            self.assertEqual('ADMIN', self.users[pr['processed_by']]['role'])
+            if pr['status'] == 'REQUESTED':
+                self.assertIsNone(pr['processed_by'])
+                self.assertIsNone(pr['processed_at'])
+            else:
+                self.assertIn(pr['processed_by'], self.users)
+                self.assertEqual('ADMIN', self.users[pr['processed_by']]['role'])
 
     def test_internal_transaction_linkages(self):
         booking_ids = {b['id'] for b in self.data['bookings']}

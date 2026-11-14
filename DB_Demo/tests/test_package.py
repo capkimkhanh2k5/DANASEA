@@ -26,6 +26,45 @@ class PackageContract(unittest.TestCase):
     def test_reviewed_package_matches_manifest(self):
         INSTALLER['manifest']()
 
+    def test_catalog_covers_both_operation_types(self):
+        services = {row['slug']: row for row in self.rows()['services']}
+        self.assertEqual(24, len(services))
+        self.assertEqual({'PUBLISHED'}, {row['status'] for row in services.values()})
+        self.assertEqual('DURATION_BASED', services['mo-to-nuoc-kajin-vina'].get('operation_type'))
+        self.assertEqual('DURATION_BASED', services['thue-van-sup-surf-shack'].get('operation_type'))
+        self.assertEqual('FIXED_DEPARTURE', services['cau-ca-bien-bang-cano-rieng-d2tour'].get('operation_type'))
+
+    def test_catalog_media_identifies_the_verified_original(self):
+        _, _, manifest = INSTALLER['load_fixtures']()
+        for table, column in INSTALLER['MEDIA_TABLES'].items():
+            records = json.loads((BASE_DIR / f'{table}.json').read_text())['records']
+            for record in records:
+                with self.subTest(table=table, row=record['sqlRow']['id']):
+                    entry = manifest.get(record.get('mediaSha256'))
+                    self.assertIsNotNone(entry)
+                    self.assertEqual(record['sqlRow'][column], entry['url'])
+
+    def test_dispute_attachment_urls_have_reviewed_media_entries(self):
+        _, _, manifest = INSTALLER['load_fixtures']()
+        reviewed_urls = {entry['url']: entry for entry in manifest.values()}
+        data = json.loads((INSTALLER['TRANS_DIR'] / 'disputes.json').read_text())
+        self.assertEqual(4, len(data['disputes']))
+        attachments = set()
+        for dispute in data['disputes']:
+            urls = json.loads(dispute['evidence_urls'])
+            self.assertEqual(1, len(urls))
+            self.assertNotIn(urls[0], attachments)
+            attachments.add(urls[0])
+            for field in ('evidence_urls', 'vendor_evidence_urls'):
+                with self.subTest(dispute=dispute['id'], field=field):
+                    for url in json.loads(dispute[field]):
+                        entry = reviewed_urls[url]
+                        self.assertEqual(dispute['id'], entry['disputeId'])
+                        self.assertEqual(entry, manifest[entry['sha256']])
+                        self.assertEqual('DEMO_ILLUSTRATION', entry['classification'])
+                        self.assertTrue(entry['creator'] and entry['sourceUrl'] and entry['licenseUrl'])
+                        self.assertIn(entry['subject'], dispute['description'])
+
     def rows(self):
         return {p.stem: [r['sqlRow'] for r in json.loads(p.read_text(encoding='utf8'))['records']]
                 for p in BASE_DIR.glob('*.json')

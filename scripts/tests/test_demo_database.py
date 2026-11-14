@@ -155,17 +155,26 @@ class DemoDatabaseAcceptance(unittest.TestCase):
             self.sql('UPDATE categories SET name=' + IMPORTER.lit(category['name']) + " WHERE id='a0000001-0000-0000-0000-000000000001'")
 
     def test_05_cli_commits_private_receipt_and_rejects_pending_replay(self):
+        import bcrypt
+
         command = [os.sys.executable, '-B', str(ROOT / 'DB_Demo/install_demo_data.py'), '--replace', '--apply',
                    '--confirm-backup', '--docker-container', self.container, '--database', 'demo_acceptance',
-                   '--ownership-file', str(self.receipt), '--demo-password-stdin']
-        result = subprocess.run(command, input='local-acceptance-secret\n', text=True, capture_output=True, check=False)
+                   '--ownership-file', str(self.receipt)]
+        env = {**os.environ, 'DEMO_USER_PASSWORD': ''}
+        result = subprocess.run(command, env=env, text=True, capture_output=True, check=False)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual('COMMITTED', json.loads(result.stdout)['transaction'])
+        base_rows, _, _ = IMPORTER.load_fixtures()
+        expected_emails = {row['email'] for row in base_rows['users']}
+        hashes = self.sql("SELECT json_object_agg(email, password_hash) FROM users WHERE email LIKE '%@danasea.test'")
+        self.assertEqual(expected_emails, set(hashes))
+        self.assertTrue(all(bcrypt.checkpw(b'danasea@2026', value.encode()) for value in hashes.values()))
+        self.assertNotIn('danasea@2026', result.stdout)
         if os.name != 'nt':
             self.assertEqual(0o600, self.receipt.stat().st_mode & 0o777)
         pending = self.receipt.with_suffix('.json.pending')
         pending.write_text(self.receipt.read_text())
-        result = subprocess.run(command, input='local-acceptance-secret\n', text=True, capture_output=True, check=False)
+        result = subprocess.run(command, env=env, text=True, capture_output=True, check=False)
         self.assertNotEqual(0, result.returncode)
         self.assertIn('pending', result.stderr.lower())
         self.assertTrue(pending.exists())
@@ -490,6 +499,11 @@ class DemoDatabaseAcceptance(unittest.TestCase):
               )
         """)
         self.assertEqual(0, missing_refunds, "Resolved dispute missing valid/timely refund record")
+        imported_evidence = self.sql("""
+            SELECT json_object_agg(id::text, evidence_urls::jsonb) FROM public.disputes
+        """)
+        disputes = json.loads((ROOT / 'DB_Demo/transactions/disputes.json').read_text())['disputes']
+        self.assertEqual({row['id']: json.loads(row['evidence_urls']) for row in disputes}, imported_evidence)
 
         # 4. Zero reschedule proposals targeting foreign service, terminal order, or non-future slot
         invalid_proposals = self.sql("""
@@ -573,7 +587,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
 
     def test_12_validator_rejects_mutations_and_sync_preserves_external_data(self):
         """Validator phai chan tat ca ca pha hoai nghiep vu, clock drift, va sync khong duoc sua dich vu ngoai goi demo."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
         self.replace()
         base, trans, _manifest = IMPORTER.load_fixtures()
         fixtures_by_table = {}
@@ -600,6 +614,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
             ("conversation_wrong_vendor", f"UPDATE public.conversations SET vendor_id = '{other_conv_vendor}' WHERE master_order_id IS NOT NULL AND id = '55555555-5555-5555-5555-000000000001'"),
             ("redemption_wrong_customer", f"UPDATE public.discount_redemptions SET customer_id = '{other_cust}' WHERE id = '12121212-1212-1212-1212-000000000001'"),
             ("proposal_wrong_vendor", f"UPDATE public.sub_order_reschedule_proposals SET vendor_id = '{other_prop_vendor}' WHERE id = 'fa010000-0000-0000-0000-000000000001'"),
+            ("dispute_wrong_order", "UPDATE public.disputes SET order_id = '00010000-0000-0000-0000-000000000002' WHERE id = '77777777-7777-7777-7777-777777777701'"),
             ("expired_proposal", "UPDATE public.sub_order_reschedule_proposals SET expires_at = CURRENT_TIMESTAMP - interval '1 hour' WHERE id = 'fa010000-0000-0000-0000-000000000001'"),
             ("expired_disruption", "UPDATE public.sub_order_disruptions SET original_departure_at = CURRENT_TIMESTAMP + interval '11 hours', decision_deadline = CURRENT_TIMESTAMP - interval '1 hour' WHERE id = 'da010000-0000-0000-0000-000000000001'"),
             ("compensation_bad_math", "UPDATE public.vendor_fault_compensations SET paid_basis = 650000.00 WHERE disruption_id = 'da010000-0000-0000-0000-000000000002'"),
@@ -671,6 +686,35 @@ class DemoDatabaseAcceptance(unittest.TestCase):
             IMPORTER.seed_extended_simulation_fixtures(session, base)
             ext_rating = session.query(f"SELECT to_json(avg_rating) FROM public.services WHERE id = '{ext_service}'")
             self.assertEqual(0.0, float(ext_rating), "Sync must never mutate rating of external services outside demo fixture")
+        finally:
+            session.finish(commit=False)
+            session.close()
+
+    def test_validator_accepts_a_full_refund_for_only_one_item_in_a_paid_order(self):
+        self.replace()
+        session = IMPORTER.Session(self.args)
+        try:
+            session.send("""
+                WITH refunded_item AS (
+                    UPDATE public.sub_orders SET status = 'REFUNDED'
+                    WHERE id = '00020000-0000-0000-0000-000000000051'
+                    RETURNING id, master_order_id, final_amount
+                )
+                INSERT INTO public.refunds (
+                    id, sub_order_id, payment_id, amount, refund_percentage,
+                    provider, reason, status, created_at, updated_at, processed_at
+                )
+                SELECT 'ffffffff-0000-0000-0000-000000000051', s.id, p.id,
+                       s.final_amount, 100, p.provider, 'ADMIN_OVERRIDE', 'PROCESSED',
+                       now(), now(), now()
+                FROM refunded_item s
+                JOIN public.payments p ON p.master_order_id = s.master_order_id AND p.is_canonical
+            """)
+            self.assertEqual(1, session.query("""
+                SELECT to_json(count(*)) FROM public.refunds
+                WHERE id = 'ffffffff-0000-0000-0000-000000000051'
+            """))
+            IMPORTER.verify_extended_business_integrity(session)
         finally:
             session.finish(commit=False)
             session.close()
