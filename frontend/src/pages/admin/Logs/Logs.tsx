@@ -35,6 +35,72 @@ import {
 import { formatDisplayCode } from '../Orders/ordersModel';
 import './Logs.css';
 
+// Active Backend actions that currently produce audit logs
+const ACTIVE_BE_ACTIONS: { value: LogActionFilter; label: string }[] = [
+  { value: 'RECONCILE_PAYMENT_PENDING', label: 'Đối soát thanh toán (Chờ xác nhận)' },
+  { value: 'RECONCILE_PAYMENT_SUCCESS', label: 'Đối soát thanh toán thành công' },
+  { value: 'RECONCILE_PAYMENT_FAILED', label: 'Đối soát thanh toán thất bại' },
+  { value: 'RECONCILE_PAYMENT_SKIPPED', label: 'Bỏ qua đối soát thanh toán' },
+  { value: 'PARTNER_APPLICATION_APPROVAL', label: 'Duyệt đơn đăng ký đối tác' },
+  { value: 'PARTNER_APPLICATION_REJECTION', label: 'Từ chối đơn đăng ký đối tác' },
+  { value: 'VENDOR_APPROVAL', label: 'Phê duyệt hồ sơ đối tác' },
+  { value: 'VENDOR_REJECTION', label: 'Từ chối hồ sơ đối tác' },
+  { value: 'VENDOR_DOCUMENT_APPROVED', label: 'Duyệt chứng từ đối tác' },
+  { value: 'VENDOR_DOCUMENT_REJECTED', label: 'Từ chối chứng từ đối tác' },
+  { value: 'VENDOR_PROFILE_RESUBMITTED', label: 'Nộp lại hồ sơ đối tác' },
+  { value: 'SERVICE_APPROVED', label: 'Phê duyệt dịch vụ' },
+  { value: 'SERVICE_REJECTED', label: 'Từ chối dịch vụ' },
+  { value: 'FINALIZE_SETTLEMENT', label: 'Chốt kỳ quyết toán' },
+  { value: 'REFUND_MANUALLY_COMPLETED', label: 'Hoàn tiền thủ công thành công' },
+  { value: 'USER_LOCKED', label: 'Khóa tài khoản' },
+  { value: 'USER_UNLOCKED', label: 'Mở khóa tài khoản' },
+  { value: 'CHANGE_PASSWORD', label: 'Thay đổi mật khẩu' },
+  { value: 'PASSWORD_RESET', label: 'Đặt lại mật khẩu' },
+  { value: 'FLASH_SALE_CREATED', label: 'Tạo chương trình Flash Sale' },
+  { value: 'FLASH_SALE_APPROVED', label: 'Phê duyệt Flash Sale' },
+  { value: 'FLASH_SALE_CANCELLED', label: 'Hủy Flash Sale' },
+  { value: 'COMPLETE_SUB_ORDER', label: 'Hoàn tất đơn dịch vụ' },
+  { value: 'COMPLETE_SUB_ORDER_NO_SHOW', label: 'Đơn dịch vụ khách vắng mặt (No-show)' },
+  { value: 'DISPATCH_OVERDUE_SLOT', label: 'Điều phối khung giờ quá hạn' },
+  { value: 'EARLY_DISPATCH_SLOT', label: 'Điều phối khung giờ sớm' },
+];
+
+// Planned actions that do not yet emit backend audit logs
+const PLANNED_ACTIONS: { value: LogActionFilter; label: string }[] = [
+  { value: 'APPROVE_PAYOUT', label: 'Duyệt quyết toán (Chưa có log BE)' },
+  { value: 'REJECT_PAYOUT', label: 'Từ chối quyết toán (Chưa có log BE)' },
+  { value: 'MARK_PAYOUT_PAID', label: 'Xác nhận đã chuyển tiền (Chưa có log BE)' },
+  { value: 'VERIFY_VENDOR', label: 'Xác minh đối tác (Chưa có log BE)' },
+  { value: 'RESOLVE_DISPUTE', label: 'Giải quyết khiếu nại (Chưa có log BE)' },
+  { value: 'PROCESS_REFUND', label: 'Xử lý hoàn tiền (Chưa có log BE)' },
+  { value: 'UPDATE_SYSTEM_CONFIG', label: 'Cập nhật cấu hình (Chưa có log BE)' },
+  { value: 'CREATE_PROMOTION', label: 'Tạo mã khuyến mãi (Chưa có log BE)' },
+  { value: 'UPDATE_PROMOTION', label: 'Cập nhật khuyến mãi (Chưa có log BE)' },
+  { value: 'ADMIN_LOGIN', label: 'Đăng nhập quản trị (Chưa có log BE)' },
+];
+
+// Standard uppercase entity types supported by Backend
+const ACTIVE_BE_ENTITIES: { value: LogEntityFilter; label: string }[] = [
+  { value: 'PAYMENT', label: 'Giao dịch thanh toán' },
+  { value: 'PARTNER_APPLICATION', label: 'Đơn đăng ký đối tác' },
+  { value: 'VENDOR', label: 'Hồ sơ đối tác' },
+  { value: 'VENDOR_DOCUMENT', label: 'Chứng từ đối tác' },
+  { value: 'SERVICE', label: 'Dịch vụ trải nghiệm' },
+  { value: 'SETTLEMENT', label: 'Kỳ quyết toán' },
+  { value: 'REFUND', label: 'Yêu cầu hoàn tiền' },
+  { value: 'USER', label: 'Tài khoản người dùng' },
+  { value: 'ORDER', label: 'Đơn hàng' },
+  { value: 'FLASH_SALE', label: 'Flash Sale' },
+];
+
+// Planned entity types (not yet actively logged)
+const PLANNED_ENTITIES: { value: LogEntityFilter; label: string }[] = [
+  { value: 'PAYOUT_REQUEST', label: 'Yêu cầu quyết toán (Chưa có log BE)' },
+  { value: 'DISPUTE', label: 'Khiếu nại khách hàng (Chưa có log BE)' },
+  { value: 'SYSTEM_CONFIG', label: 'Tham số hệ thống (Chưa có log BE)' },
+  { value: 'PROMOTION', label: 'Mã khuyến mãi (Chưa có log BE)' },
+];
+
 export function Logs() {
   const location = useLocation();
   const demo = import.meta.env.DEV && new URLSearchParams(location.search).get('demo') === '1';
@@ -130,72 +196,55 @@ export function Logs() {
     };
   }, [demo, currentPage, debouncedSearch, selectedAction, selectedEntity, refreshKey]);
 
-  // Extract available action options dynamically from current logs & known actions
-  const availableActionOptions = useMemo(() => {
-    const predefinedActions: string[] = [
-      'RECONCILE_PAYMENT_PENDING',
-      'RECONCILE_PAYMENT_FAILED',
-      'RECONCILE_PAYMENT_SUCCESS',
-      'APPROVE_PAYOUT',
-      'GENERATE_SETTLEMENT',
-      'VERIFY_VENDOR',
-      'APPROVE_VENDOR',
-      'REJECT_VENDOR',
-      'PARTNER_APPLICATION_APPROVAL',
-      'PARTNER_APPLICATION_REJECTION',
-      'VENDOR_DOCUMENT_APPROVE',
-      'VENDOR_DOCUMENT_REJECT',
-      'RESOLVE_DISPUTE',
-      'PROCESS_REFUND',
-      'REFUND_MANUALLY_COMPLETED',
-      'UPDATE_PROMOTION',
-      'CREATE_PROMOTION',
-      'UPDATE_SYSTEM_CONFIG',
-      'LOCK_USER_ACCOUNT',
-      'UNLOCK_USER_ACCOUNT',
-      'ADMIN_LOGIN',
-    ];
+  // Action options categorized into active Backend actions and planned actions
+  const activeActionOptions = useMemo(() => {
+    const activeMap = new Map<string, string>();
+    ACTIVE_BE_ACTIONS.forEach(a => activeMap.set(a.value, a.label));
+    const plannedSet = new Set(PLANNED_ACTIONS.map(p => p.value));
 
-    const pageActions = Array.from(new Set(logs.map(l => l.action)));
-    const allActionKeys = Array.from(new Set([...pageActions, ...predefinedActions]));
+    // Dynamic inclusion of any action appearing in loaded logs
+    logs.forEach(l => {
+      if (!activeMap.has(l.action) && !plannedSet.has(l.action)) {
+        activeMap.set(l.action, getActionMeta(l.action).label);
+      }
+    });
 
-    return allActionKeys.map(actionKey => {
-      const meta = getActionMeta(actionKey);
-      return {
-        value: actionKey,
-        label: meta.label,
-      };
-    }).sort((a, b) => a.label.localeCompare(b.label, 'vi'));
-  }, [logs]);
-
-  // Extract available entity options dynamically
-  const availableEntityOptions = useMemo(() => {
-    const predefinedEntities = [
-      'PAYMENT',
-      'PARTNER_APPLICATION',
-      'VENDOR_DOCUMENT',
-      'PayoutRequest',
-      'Vendor',
-      'Dispute',
-      'SystemConfig',
-      'User',
-      'Promotion',
-      'Order',
-      'Settlement',
-      'Refund',
-    ];
-
-    const pageEntities = Array.from(new Set(logs.map(l => l.entityType)));
-    const allEntityKeys = Array.from(new Set([...pageEntities, ...predefinedEntities]));
-
-    return allEntityKeys.map(entKey => {
-      const label = ENTITY_LABELS[entKey] || entKey;
-      return {
-        value: entKey,
+    return Array.from(activeMap.entries())
+      .map(([value, label]) => ({
+        value: value as LogActionFilter,
         label,
-      };
-    }).sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
   }, [logs]);
+
+  const plannedActionOptions = useMemo(() => {
+    return [...PLANNED_ACTIONS].sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, []);
+
+  // Entity options categorized into active Backend entities and planned entities
+  const activeEntityOptions = useMemo(() => {
+    const activeMap = new Map<string, string>();
+    ACTIVE_BE_ENTITIES.forEach(e => activeMap.set(e.value, e.label));
+    const plannedSet = new Set(PLANNED_ENTITIES.map(p => p.value));
+
+    logs.forEach(l => {
+      const upper = l.entityType.toUpperCase();
+      if (!activeMap.has(upper) && !plannedSet.has(upper)) {
+        activeMap.set(upper, ENTITY_LABELS[upper] || ENTITY_LABELS[l.entityType] || l.entityType);
+      }
+    });
+
+    return Array.from(activeMap.entries())
+      .map(([value, label]) => ({
+        value: value as LogEntityFilter,
+        label,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [logs]);
+
+  const plannedEntityOptions = useMemo(() => {
+    return [...PLANNED_ENTITIES].sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, []);
 
   // Filtered data (Demo mode filters in-memory; live mode uses server-side filtered logs)
   const filteredLogs = useMemo(() => {
@@ -392,11 +441,20 @@ export function Logs() {
                 className="admin-logs-select"
               >
                 <option value="ALL">Tất cả hành động</option>
-                {availableActionOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
+                <optgroup label="Hành động đã hỗ trợ ghi nhận (Backend)">
+                  {activeActionOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Hành động dự kiến (Chưa có nguồn log BE)">
+                  {plannedActionOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
 
               {/* Entity Type Filter */}
@@ -407,11 +465,20 @@ export function Logs() {
                 className="admin-logs-select"
               >
                 <option value="ALL">Tất cả đối tượng</option>
-                {availableEntityOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
+                <optgroup label="Đối tượng đã hỗ trợ ghi nhận (Backend)">
+                  {activeEntityOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Đối tượng dự kiến (Chưa có log BE)">
+                  {plannedEntityOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </div>
 

@@ -17,9 +17,41 @@ describe('Audit Logs Model & Transformations', () => {
     assert.equal(reconcileMeta.label, 'Đối soát thanh toán (Chờ xác nhận)');
     assert.equal(reconcileMeta.tone, 'amber');
 
-    const approveMeta = getActionMeta('APPROVE_VENDOR');
-    assert.equal(approveMeta.label, 'Phê duyệt đối tác');
-    assert.equal(approveMeta.tone, 'teal');
+    const approveVendorMeta = getActionMeta('VENDOR_APPROVAL');
+    assert.equal(approveVendorMeta.label, 'Phê duyệt hồ sơ đối tác');
+    assert.equal(approveVendorMeta.tone, 'teal');
+
+    const rejectVendorMeta = getActionMeta('VENDOR_REJECTION');
+    assert.equal(rejectVendorMeta.label, 'Từ chối hồ sơ đối tác');
+    assert.equal(rejectVendorMeta.tone, 'rose');
+
+    const docApproveMeta = getActionMeta('VENDOR_DOCUMENT_APPROVED');
+    assert.equal(docApproveMeta.label, 'Duyệt chứng từ đối tác');
+    assert.equal(docApproveMeta.tone, 'teal');
+
+    const serviceApproveMeta = getActionMeta('SERVICE_APPROVED');
+    assert.equal(serviceApproveMeta.label, 'Phê duyệt dịch vụ');
+    assert.equal(serviceApproveMeta.tone, 'teal');
+
+    const serviceRejectMeta = getActionMeta('SERVICE_REJECTED');
+    assert.equal(serviceRejectMeta.label, 'Từ chối dịch vụ');
+    assert.equal(serviceRejectMeta.tone, 'rose');
+
+    const finalizeSettleMeta = getActionMeta('FINALIZE_SETTLEMENT');
+    assert.equal(finalizeSettleMeta.label, 'Chốt kỳ quyết toán');
+    assert.equal(finalizeSettleMeta.tone, 'teal');
+
+    const userLockMeta = getActionMeta('USER_LOCKED');
+    assert.equal(userLockMeta.label, 'Khóa tài khoản');
+    assert.equal(userLockMeta.tone, 'rose');
+
+    const userUnlockMeta = getActionMeta('USER_UNLOCKED');
+    assert.equal(userUnlockMeta.label, 'Mở khóa tài khoản');
+    assert.equal(userUnlockMeta.tone, 'teal');
+
+    const plannedPayout = getActionMeta('APPROVE_PAYOUT');
+    assert.equal(plannedPayout.label, 'Duyệt quyết toán (Chưa có log BE)');
+    assert.equal(plannedPayout.tone, 'neutral');
 
     const rejectMeta = getActionMeta('PARTNER_APPLICATION_REJECTION');
     assert.equal(rejectMeta.label, 'Từ chối đơn đăng ký đối tác');
@@ -36,8 +68,15 @@ describe('Audit Logs Model & Transformations', () => {
   it('correctly maps entity types to human-readable Vietnamese labels', () => {
     assert.equal(ENTITY_LABELS['PAYMENT'], 'Giao dịch thanh toán');
     assert.equal(ENTITY_LABELS['PARTNER_APPLICATION'], 'Đơn đăng ký đối tác');
+    assert.equal(ENTITY_LABELS['VENDOR'], 'Hồ sơ đối tác');
     assert.equal(ENTITY_LABELS['VENDOR_DOCUMENT'], 'Chứng từ đối tác');
-    assert.equal(ENTITY_LABELS['PayoutRequest'], 'Yêu cầu quyết toán');
+    assert.equal(ENTITY_LABELS['SERVICE'], 'Dịch vụ trải nghiệm');
+    assert.equal(ENTITY_LABELS['SETTLEMENT'], 'Kỳ quyết toán');
+    assert.equal(ENTITY_LABELS['USER'], 'Tài khoản người dùng');
+    assert.equal(ENTITY_LABELS['ORDER'], 'Đơn hàng');
+    assert.equal(ENTITY_LABELS['FLASH_SALE'], 'Flash Sale');
+    assert.equal(ENTITY_LABELS['PAYOUT_REQUEST'], 'Yêu cầu quyết toán (Dự kiến)');
+    assert.equal(ENTITY_LABELS['PayoutRequest'], 'Yêu cầu quyết toán (Dự kiến)');
     assert.equal(ENTITY_LABELS['Order'], 'Đơn hàng');
   });
 
@@ -165,9 +204,26 @@ describe('Audit Logs Model & Transformations', () => {
     assert.equal(searchByMeta.length, 1);
     assert.equal(searchByMeta[0].id, 'log-3');
 
-    // 7. No match
-    const noMatch = filterAuditLogs(mockLogs, 'NonExistentXYZ', 'ALL', 'ALL');
-    assert.equal(noMatch.length, 0);
+    // 8. Action alias matching (VENDOR_APPROVAL matches APPROVE_VENDOR, etc.)
+    const legacyVendorLog: AdminAuditLogItem = {
+      id: 'log-legacy-1',
+      actorUserId: 'admin-1',
+      action: 'APPROVE_VENDOR',
+      entityType: 'Vendor',
+      entityId: 'v-1',
+      metadata: '{}',
+      createdAt: '2026-11-14T10:15:00Z',
+      updatedAt: '2026-11-14T10:15:00Z',
+    };
+    const testList = [...mockLogs, legacyVendorLog];
+    const vendorApprovalMatch = filterAuditLogs(testList, '', 'VENDOR_APPROVAL', 'ALL');
+    assert.equal(vendorApprovalMatch.length, 1);
+    assert.equal(vendorApprovalMatch[0].id, 'log-legacy-1');
+
+    // 9. Case-insensitive entity match in filterAuditLogs (e.g., PAYOUT_REQUEST matches PayoutRequest)
+    const payoutEntityMatch = filterAuditLogs(testList, '', 'ALL', 'PAYOUT_REQUEST');
+    assert.equal(payoutEntityMatch.length, 1);
+    assert.equal(payoutEntityMatch[0].id, 'log-2');
   });
 
   it('formats dates into Vietnamese locale string with ICT time', () => {
