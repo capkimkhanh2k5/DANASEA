@@ -1,0 +1,37 @@
+{
+  "classification": "DEVELOPMENT_SYNTHETIC",
+  "vendor_role_applications": [
+    {
+      "id": "bb010000-0000-0000-0000-000000000001",
+      "user_id": "c1010000-0000-0000-0000-000000000015",
+      "business_name": "Sơn Trà Ocean Adventures",
+      "tax_code": "0402999015",
+      "address": "Bãi Rạng, Bán đảo Sơn Trà, Đà Nẵng",
+      "bank_account_number": "090123456789",
+      "bank_name": "Vietcombank",
+      "bank_account_holder": "NGO PHUONG THAO",
+      "status": "PENDING",
+      "rejection_reason": null,
+      "reviewed_by": null,
+      "reviewed_at": null,
+      "created_at": "2026-11-05T08:00:00.000000+00:00",
+      "updated_at": "2026-11-05T08:00:00.000000+00:00"
+    },
+    {
+      "id": "bb010000-0000-0000-0000-000000000002",
+      "user_id": "c1010000-0000-0000-0000-000000000014",
+      "business_name": "Mỹ Khê Wave Riders Club",
+      "tax_code": "0402999014",
+      "address": "Bãi tắm Mỹ An, Ngũ Hành Sơn, Đà Nẵng",
+      "bank_account_number": "080123456788",
+      "bank_name": "Techcombank",
+      "bank_account_holder": "VO MINH TRI",
+      "status": "REJECTED",
+      "rejection_reason": "Chưa cung cấp đủ giấy chứng nhận huấn luyện viên thể thao biển đạt chuẩn",
+      "reviewed_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+      "reviewed_at": "2026-11-06T10:00:00.000000+00:00",
+      "created_at": "2026-11-04T09:00:00.000000+00:00",
+      "updated_at": "2026-11-06T10:00:00.000000+00:00"
+    }
+  ]
+}

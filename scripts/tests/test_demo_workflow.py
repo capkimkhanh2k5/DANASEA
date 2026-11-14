@@ -11,6 +11,9 @@ class DemoWorkflowTest(unittest.TestCase):
     def test_manual_production_operation_shares_deployment_lock(self):
         body = yaml.load((ROOT / '.github/workflows/demo-data.yml').read_text(), Loader=yaml.BaseLoader)
         self.assertEqual({'workflow_dispatch'}, set(body['on']))
+        self.assertEqual(['inspect', 'replace', 'restore'],
+                         body['on']['workflow_dispatch']['inputs']['action']['options'])
+        self.assertEqual({'demo'}, set(body['jobs']))
         self.assertEqual('cd-production', body['concurrency']['group'])
         self.assertEqual('false', body['concurrency']['cancel-in-progress'])
         job = body['jobs']['demo']

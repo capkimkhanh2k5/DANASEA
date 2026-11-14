@@ -326,7 +326,7 @@ finally:s.close()
                      '--database', database, '--user', self.admin, '--backup-file', str(archive),
                      '--ownership-file', str(ownership), '--demo-password-stdin']
         result = json.loads(self.command(arguments, input=(password + '\n').encode(), timeout=600))
-        if apply and (result.get('transaction') != 'COMMITTED' or result.get('totalVerifiedInDb') != 646):
+        if apply and (result.get('transaction') != 'COMMITTED' or result.get('totalVerifiedInDb') != 687):
             raise ValueError('Replacement did not return a verified committed receipt')
         return result
 

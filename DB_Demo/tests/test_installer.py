@@ -24,6 +24,17 @@ class UnifiedInstallerTest(unittest.TestCase):
         with patch.dict('os.environ', {'DEMO_USER_PASSWORD': 'short'}, clear=True), self.assertRaises(ValueError):
             resolve(args)
 
+    def test_replace_uses_the_demo_default_and_accepts_it_through_stdin(self):
+        resolve = INSTALLER['resolve_demo_password']
+        parse = INSTALLER['build_parser']().parse_args
+        with patch.dict('os.environ', {}, clear=True), patch('sys.stdin.isatty', return_value=False):
+            self.assertEqual('danasea@2026', resolve(parse(['--replace', '--dry-run'])))
+            args = parse(['--replace', '--apply', '--demo-password-stdin'])
+            with patch('sys.stdin.readline', return_value='danasea@2026\n'):
+                self.assertEqual('danasea@2026', resolve(args))
+            with patch('sys.stdin.readline', return_value='danasea123\n'), self.assertRaises(ValueError):
+                resolve(args)
+
     def test_booking_anchor_dates_are_preserved_when_import_date_moves(self):
         from datetime import date
 
@@ -60,10 +71,10 @@ class UnifiedInstallerTest(unittest.TestCase):
         base_rows, trans_rows, manifest = INSTALLER['load_fixtures']()
         base_count = sum(len(rs) for rs in base_rows.values())
         trans_count = sum(len(rs) for rs in trans_rows.values())
-        self.assertEqual(302, base_count, "Expected canonical fixtures and anchored inventory")
-        self.assertEqual(344, trans_count, "Expected 344 transaction records")
-        self.assertEqual(646, base_count + trans_count, "Expected canonical records without the rolling schedule")
-        self.assertEqual(77, len(manifest), "Expected 77 storage manifest mappings")
+        self.assertEqual(339, base_count, "Expected canonical fixtures and anchored inventory")
+        self.assertEqual(348, trans_count, "Expected 348 transaction records")
+        self.assertEqual(687, base_count + trans_count, "Expected canonical records without the rolling schedule")
+        self.assertEqual(81, len(manifest), "Expected 77 catalog assets and four dispute illustrations")
 
     def test_align_schema_defaults_populates_missing_columns(self):
         sample = {

@@ -73,7 +73,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         before = self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM system_configs t")
         rules = self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM category_safety_rules t")
         result = self.replace()
-        self.assertEqual(646, result['totalVerifiedInDb'])
+        self.assertEqual(687, result['totalVerifiedInDb'])
         self.assertEqual('REPLACE_SUCCESS', result['status'])
         self.assertEqual(0, self.sql("SELECT to_json(count(*)) FROM users WHERE email='old@local.test'"))
         self.assertEqual(1, self.sql("SELECT to_json(count(*)) FROM users WHERE email='config@local.test'"))
@@ -81,7 +81,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         self.assertEqual(rules, self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM category_safety_rules t"))
         self.assertEqual(24, self.sql("SELECT to_json(count(*)) FROM service_safety_documents WHERE status='APPROVED' AND reviewed_by IS NOT NULL"))
         self.replace()
-        self.assertEqual(13, self.sql("SELECT to_json(count(*)) FROM users"))
+        self.assertEqual(36, self.sql("SELECT to_json(count(*)) FROM users"))
 
     def test_01b_replacement_materializes_bookable_demo_horizon(self):
         result = self.replace()
@@ -155,17 +155,26 @@ class DemoDatabaseAcceptance(unittest.TestCase):
             self.sql('UPDATE categories SET name=' + IMPORTER.lit(category['name']) + " WHERE id='a0000001-0000-0000-0000-000000000001'")
 
     def test_05_cli_commits_private_receipt_and_rejects_pending_replay(self):
+        import bcrypt
+
         command = [os.sys.executable, '-B', str(ROOT / 'DB_Demo/install_demo_data.py'), '--replace', '--apply',
                    '--confirm-backup', '--docker-container', self.container, '--database', 'demo_acceptance',
-                   '--ownership-file', str(self.receipt), '--demo-password-stdin']
-        result = subprocess.run(command, input='local-acceptance-secret\n', text=True, capture_output=True, check=False)
+                   '--ownership-file', str(self.receipt)]
+        env = {**os.environ, 'DEMO_USER_PASSWORD': ''}
+        result = subprocess.run(command, env=env, text=True, capture_output=True, check=False)
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual('COMMITTED', json.loads(result.stdout)['transaction'])
+        base_rows, _, _ = IMPORTER.load_fixtures()
+        expected_emails = {row['email'] for row in base_rows['users']}
+        hashes = self.sql("SELECT json_object_agg(email, password_hash) FROM users WHERE email LIKE '%@danasea.test'")
+        self.assertEqual(expected_emails, set(hashes))
+        self.assertTrue(all(bcrypt.checkpw(b'danasea@2026', value.encode()) for value in hashes.values()))
+        self.assertNotIn('danasea@2026', result.stdout)
         if os.name != 'nt':
             self.assertEqual(0o600, self.receipt.stat().st_mode & 0o777)
         pending = self.receipt.with_suffix('.json.pending')
         pending.write_text(self.receipt.read_text())
-        result = subprocess.run(command, input='local-acceptance-secret\n', text=True, capture_output=True, check=False)
+        result = subprocess.run(command, env=env, text=True, capture_output=True, check=False)
         self.assertNotEqual(0, result.returncode)
         self.assertIn('pending', result.stderr.lower())
         self.assertTrue(pending.exists())
@@ -365,7 +374,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
             runtime.restore(point)
         self.assertIn(b'22012', failure.exception.stderr)
         self.assertEqual(0, self.sql("SELECT to_json(count(*)) FROM users WHERE email='original-recovery@local.test'"))
-        self.assertEqual(12, self.sql("SELECT to_json(count(*)) FROM users WHERE email LIKE '%@danasea.test'"))
+        self.assertEqual(35, self.sql("SELECT to_json(count(*)) FROM users WHERE email LIKE '%@danasea.test'"))
         try:
             runtime.restore(point)
         except subprocess.CalledProcessError as error:
@@ -380,6 +389,378 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         forbidden = subprocess.run(command, input='DELETE FROM flyway_schema_history WHERE false;', text=True, capture_output=True, check=False)
         self.assertNotEqual(0, forbidden.returncode)
         self.assertIn('permission denied', forbidden.stderr)
+
+    def test_11_extended_business_integrity_zero_violations(self):
+        """Buoc toan bo cac vi pham quan he nghiep vu mo rong ve 0 tren PostgreSQL 17."""
+        self.replace()
+
+        # 1. Zero mismatched discount, commission basis, payment amount, or non-canonical payments
+        mismatched_discounts = self.sql("""
+            SELECT to_json(count(*))
+            FROM master_orders m
+            JOIN (
+                SELECT master_order_id,
+                       SUM(discount_amount) AS total_sub_disc,
+                       SUM(final_amount) AS total_sub_final
+                FROM sub_orders
+                GROUP BY master_order_id
+            ) s ON s.master_order_id = m.id
+            JOIN payments p ON p.master_order_id = m.id
+            WHERE m.discount_amount <> s.total_sub_disc
+               OR m.total_amount <> s.total_sub_final
+               OR p.amount <> m.total_amount
+               OR (p.status = 'SUCCESS' AND m.status IN ('PAID', 'COMPLETED', 'PARTIALLY_COMPLETED') AND NOT EXISTS (
+                   SELECT 1 FROM payments pc WHERE pc.master_order_id = m.id AND pc.is_canonical = true
+               ))
+        """)
+        self.assertEqual(0, mismatched_discounts, "Discount, payment amount, or is_canonical mismatched")
+
+        # 1b. Zero refund state machine mismatches (100% vs partial refunds)
+        invalid_refund_states = self.sql("""
+            SELECT to_json(count(*))
+            FROM (
+                SELECT s.id
+                FROM sub_orders s
+                JOIN master_orders m ON m.id = s.master_order_id
+                JOIN bookings b ON b.id = m.booking_id
+                JOIN (
+                    SELECT r.sub_order_id, r.payment_id, SUM(r.amount) AS refunded_total
+                    FROM refunds r WHERE r.status = 'PROCESSED'
+                    GROUP BY r.sub_order_id, r.payment_id
+                ) ref ON ref.sub_order_id = s.id
+                JOIN payments p ON p.id = ref.payment_id
+                WHERE (ref.refunded_total >= s.final_amount AND (
+                           s.status <> 'REFUNDED' OR p.status <> 'REFUNDED'
+                        OR m.payment_status <> 'REFUNDED' OR m.status <> 'CANCELLED' OR b.status <> 'CANCELLED'
+                       ))
+                   OR (ref.refunded_total < s.final_amount AND (
+                           s.status <> 'PARTIALLY_REFUNDED' OR p.status <> 'SUCCESS'
+                        OR m.payment_status <> 'PAID' OR m.status = 'CANCELLED' OR b.status <> 'CONFIRMED'
+                       ))
+            ) bad
+        """)
+        self.assertEqual(0, invalid_refund_states, "Refund status transitions must match RefundProcessingService")
+
+        # 1c. Voucher per-user quotas, used_count sync, and customer alignment
+        invalid_vouchers = self.sql("""
+            SELECT to_json(
+                (SELECT count(*) FROM discount_codes d
+                 LEFT JOIN (SELECT discount_code_id, COUNT(*)::int AS cnt FROM discount_redemptions GROUP BY discount_code_id) rc
+                   ON rc.discount_code_id = d.id
+                 WHERE d.used_count <> COALESCE(rc.cnt, 0) OR (d.max_uses IS NOT NULL AND d.used_count > d.max_uses))
+                +
+                (SELECT count(*) FROM (
+                    SELECT d.id, r.customer_id
+                    FROM discount_codes d
+                    JOIN discount_redemptions r ON r.discount_code_id = d.id
+                    WHERE d.max_uses_per_user IS NOT NULL
+                    GROUP BY d.id, r.customer_id, d.max_uses_per_user
+                    HAVING COUNT(*) > d.max_uses_per_user
+                ) overages)
+                +
+                (SELECT count(*) FROM discount_redemptions r JOIN master_orders m ON m.id = r.master_order_id
+                 WHERE r.customer_id <> m.customer_id)
+            )
+        """)
+        self.assertEqual(0, invalid_vouchers, "Voucher used_count, per-user limits, or customer links violated")
+
+        mismatched_basis = self.sql("""
+            SELECT to_json(count(*))
+            FROM sub_orders
+            WHERE commission_basis_amount <> (subtotal_amount - COALESCE(vendor_discount_amount, 0))
+        """)
+        self.assertEqual(0, mismatched_basis, "Commission basis amount mismatched with platform/vendor voucher rules")
+
+        # 2. Zero vendor vouchers applied to orders of another vendor
+        invalid_vendor_vouchers = self.sql("""
+            SELECT to_json(count(*))
+            FROM master_orders m
+            JOIN discount_codes d ON d.id = m.discount_code_id
+            JOIN sub_orders s ON s.master_order_id = m.id
+            WHERE d.scope = 'VENDOR' AND d.vendor_id <> s.vendor_id
+        """)
+        self.assertEqual(0, invalid_vendor_vouchers, "Vendor voucher applied to different vendor")
+
+        # 3. Zero resolved refund disputes missing matching non-failed, admin-requested, timely refunds
+        missing_refunds = self.sql("""
+            SELECT to_json(count(*))
+            FROM disputes d
+            JOIN sub_orders s ON s.id = d.sub_order_id
+            WHERE d.status IN ('RESOLVED_REFUND', 'RESOLVED_PARTIAL')
+              AND NOT EXISTS (
+                  SELECT 1 FROM refunds r
+                  WHERE r.sub_order_id = d.sub_order_id
+                    AND r.status IN ('PENDING', 'PROCESSED')
+                    AND r.refund_percentage = d.refund_percentage
+                    AND r.amount = ROUND(s.final_amount * d.refund_percentage / 100.0, 2)
+                    AND r.requested_by = d.resolved_by
+                    AND r.created_at >= d.resolved_at
+                    AND (r.processed_at IS NULL OR r.processed_at >= r.created_at)
+              )
+        """)
+        self.assertEqual(0, missing_refunds, "Resolved dispute missing valid/timely refund record")
+        imported_evidence = self.sql("""
+            SELECT json_object_agg(id::text, evidence_urls::jsonb) FROM public.disputes
+        """)
+        disputes = json.loads((ROOT / 'DB_Demo/transactions/disputes.json').read_text())['disputes']
+        self.assertEqual({row['id']: json.loads(row['evidence_urls']) for row in disputes}, imported_evidence)
+
+        # 4. Zero reschedule proposals targeting foreign service, terminal order, or non-future slot
+        invalid_proposals = self.sql("""
+            SELECT to_json(count(*))
+            FROM sub_order_reschedule_proposals p
+            JOIN sub_orders s ON s.id = p.sub_order_id
+            JOIN service_slots sl ON sl.id = p.proposed_slot_id
+            WHERE sl.service_id <> s.service_id
+               OR s.status IN ('COMPLETED', 'CANCELLED', 'REJECTED')
+               OR (p.status = 'PENDING' AND (
+                   sl.status <> 'OPEN'
+                   OR (sl.date + sl.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh' <= p.created_at
+                   OR (sl.date + sl.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh' <= CURRENT_TIMESTAMP
+               ))
+        """)
+        self.assertEqual(0, invalid_proposals, "Reschedule proposal foreign service, terminal order, or past slot")
+
+        # 5. Zero disruptions with invalid order status or departure time mismatched from original slot
+        invalid_disruptions = self.sql("""
+            SELECT to_json(count(*))
+            FROM sub_order_disruptions d
+            JOIN service_slots s ON s.id = d.original_slot_id
+            JOIN sub_orders so ON so.id = d.sub_order_id
+            WHERE d.original_departure_at <> (s.date + s.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'
+               OR (d.status = 'AWAITING_DECISION' AND so.status IN ('COMPLETED', 'CANCELLED', 'REJECTED'))
+        """)
+        self.assertEqual(0, invalid_disruptions, "Disruption invalid order status or original_departure_at mismatched from slot")
+
+        # 5b. Zero vendor fault compensations attached to non-VENDOR_FAULT disruption
+        invalid_compensations = self.sql("""
+            SELECT to_json(count(*))
+            FROM vendor_fault_compensations c
+            JOIN sub_order_disruptions d ON d.id = c.disruption_id
+            JOIN sub_orders s ON s.id = c.sub_order_id
+            WHERE d.reason <> 'VENDOR_FAULT'
+               OR c.sub_order_id <> d.sub_order_id
+               OR c.original_slot_id <> d.original_slot_id
+               OR c.vendor_id <> s.vendor_id
+        """)
+        self.assertEqual(0, invalid_compensations, "Vendor fault compensation invalid disruption reason or mismatched keys")
+
+        # 6. Reviews present and zero reviews on incomplete orders or mismatched users/services
+        review_count = self.sql("SELECT to_json(count(*)) FROM reviews")
+        self.assertGreater(review_count, 0, "Reviews must not be empty")
+        invalid_reviews = self.sql("""
+            SELECT to_json(count(*))
+            FROM reviews r
+            JOIN sub_orders s ON s.id = r.sub_order_id
+            JOIN master_orders m ON m.id = s.master_order_id
+            WHERE s.status <> 'COMPLETED'
+               OR r.customer_id <> m.customer_id
+               OR r.service_id <> s.service_id
+               OR r.vendor_id <> s.vendor_id
+        """)
+        self.assertEqual(0, invalid_reviews, "Reviews attached to incomplete orders or wrong entity")
+
+        # 7. Diversity of payout statuses, processed_at completeness, multi-item order & payment retry coverage
+        payout_statuses = self.sql("SELECT json_agg(DISTINCT status) FROM payout_requests")
+        self.assertIn('PAID', payout_statuses)
+        self.assertIn('REJECTED', payout_statuses)
+        missing_payout_ts = self.sql("""
+            SELECT to_json(count(*)) FROM payout_requests
+            WHERE (status IN ('APPROVED', 'PAID', 'REJECTED') AND (processed_by IS NULL OR processed_at IS NULL))
+               OR (status = 'REQUESTED' AND processed_at IS NOT NULL)
+        """)
+        self.assertEqual(0, missing_payout_ts, "Processed payout requests must carry processed_at and processed_by")
+        multi_item_orders = self.sql("""
+            SELECT to_json(count(*)) FROM (
+                SELECT master_order_id FROM sub_orders GROUP BY master_order_id HAVING count(*) > 1
+            ) m
+        """)
+        self.assertGreaterEqual(multi_item_orders, 1, "Expected at least 1 multi-item order")
+        retry_orders = self.sql("""
+            SELECT to_json(count(*)) FROM (
+                SELECT master_order_id FROM payments
+                GROUP BY master_order_id
+                HAVING bool_or(status = 'FAILED') AND bool_or(status = 'SUCCESS')
+            ) r
+        """)
+        self.assertGreaterEqual(retry_orders, 1, "Expected at least 1 order with FAILED + SUCCESS payment retry")
+
+    def test_12_validator_rejects_mutations_and_sync_preserves_external_data(self):
+        """Validator phai chan tat ca ca pha hoai nghiep vu, clock drift, va sync khong duoc sua dich vu ngoai goi demo."""
+        from datetime import datetime, timedelta, timezone
+        self.replace()
+        base, trans, _manifest = IMPORTER.load_fixtures()
+        fixtures_by_table = {}
+        for fname, tables in IMPORTER.EXTENDED_FIXTURE_FILES.items():
+            fpath = IMPORTER.TRANS_DIR / fname
+            if fpath.is_file():
+                data = json.loads(fpath.read_text(encoding='utf8'))
+                for t in tables:
+                    if t in data:
+                        fixtures_by_table[t] = data[t]
+
+        # Test all business & temporal mutation rejections inside rolled-back sessions
+        conv01 = next(c for c in fixtures_by_table['conversations'] if c['id'] == '55555555-5555-5555-5555-000000000001')
+        other_conv_vendor = next(v['id'] for v in base['vendors'] if v['id'] != conv01['vendor_id'])
+        prop01 = next(p for p in fixtures_by_table['sub_order_reschedule_proposals'] if p['id'] == 'fa010000-0000-0000-0000-000000000001')
+        other_prop_vendor = next(v['id'] for v in base['vendors'] if v['id'] != prop01['vendor_id'])
+        red01 = next(r for r in fixtures_by_table['discount_redemptions'] if r['id'] == '12121212-1212-1212-1212-000000000001')
+        other_cust = next(u['id'] for u in base['users'] if u['role'] == 'CUSTOMER' and u['id'] != red01['customer_id'])
+        mutations = [
+            ("delete_reviews", "DELETE FROM public.reviews"),
+            ("fail_dispute_refunds", "UPDATE public.refunds SET status = 'FAILED' WHERE idempotency_key LIKE 'dispute-%'"),
+            ("awaiting_on_cancelled", "UPDATE public.sub_orders SET status = 'CANCELLED' WHERE id = '00020000-0000-0000-0000-000000000010'"),
+            ("weather_compensation", "UPDATE public.sub_order_disruptions SET reason = 'WEATHER' WHERE id = 'da010000-0000-0000-0000-000000000002'"),
+            ("conversation_wrong_vendor", f"UPDATE public.conversations SET vendor_id = '{other_conv_vendor}' WHERE master_order_id IS NOT NULL AND id = '55555555-5555-5555-5555-000000000001'"),
+            ("redemption_wrong_customer", f"UPDATE public.discount_redemptions SET customer_id = '{other_cust}' WHERE id = '12121212-1212-1212-1212-000000000001'"),
+            ("proposal_wrong_vendor", f"UPDATE public.sub_order_reschedule_proposals SET vendor_id = '{other_prop_vendor}' WHERE id = 'fa010000-0000-0000-0000-000000000001'"),
+            ("dispute_wrong_order", "UPDATE public.disputes SET order_id = '00010000-0000-0000-0000-000000000002' WHERE id = '77777777-7777-7777-7777-777777777701'"),
+            ("expired_proposal", "UPDATE public.sub_order_reschedule_proposals SET expires_at = CURRENT_TIMESTAMP - interval '1 hour' WHERE id = 'fa010000-0000-0000-0000-000000000001'"),
+            ("expired_disruption", "UPDATE public.sub_order_disruptions SET original_departure_at = CURRENT_TIMESTAMP + interval '11 hours', decision_deadline = CURRENT_TIMESTAMP - interval '1 hour' WHERE id = 'da010000-0000-0000-0000-000000000001'"),
+            ("compensation_bad_math", "UPDATE public.vendor_fault_compensations SET paid_basis = 650000.00 WHERE disruption_id = 'da010000-0000-0000-0000-000000000002'"),
+        ]
+        for name, stmt in mutations:
+            with self.subTest(mutation=name):
+                session = IMPORTER.Session(self.args)
+                try:
+                    session.send(stmt)
+                    with self.assertRaises(Exception, msg=f"Validator failed to reject mutation {name}"):
+                        IMPORTER.verify_extended_business_integrity(session, fixtures_by_table)
+                finally:
+                    session.finish(commit=False)
+                    session.close()
+
+        # Verify dynamic reschedule rebasing works cleanly on simulated future dates (2026-11-20 & 2026-11-22)
+        vn_tz = timezone(timedelta(hours=7))
+        for sim_dt in (datetime(2026, 11, 20, 10, 0, tzinfo=vn_tz), datetime(2026, 11, 22, 10, 0, tzinfo=vn_tz)):
+            with self.subTest(simulated_date=sim_dt.date().isoformat()):
+                b_copy, t_copy, _ = IMPORTER.load_fixtures()
+                IMPORTER.prepare_slots(b_copy, t_copy, {}, today=sim_dt.date())
+                with patch.object(IMPORTER, 'db_now_vn', return_value=sim_dt):
+                    session = IMPORTER.Session(self.args)
+                    try:
+                        res = IMPORTER.execute_replace(session, b_copy, t_copy, 'local-acceptance-secret')
+                        self.assertEqual('REPLACE_SUCCESS', res['status'])
+                        prop_slot = session.query("SELECT json_build_object('prop', p.proposed_slot_id, 'sl_date', sl.date::text, 'exp', p.expires_at > now()) FROM public.sub_order_reschedule_proposals p JOIN public.service_slots sl ON sl.id = p.proposed_slot_id")
+                        self.assertEqual((sim_dt.date() + timedelta(days=7)).isoformat(), prop_slot['sl_date'])
+                        self.assertTrue(prop_slot['exp'])
+                    finally:
+                        session.finish(commit=False)
+                        session.close()
+
+        # Test that sync/seed_extended_simulation_fixtures never modifies ratings of external services
+        ext_vendor = '99999999-0000-0000-0000-000000000001'
+        ext_service = '99999999-0000-0000-0000-000000000002'
+        ext_user = '99999999-0000-0000-0000-000000000003'
+        ext_cust = '99999999-0000-0000-0000-000000000004'
+        ext_book = '99999999-0000-0000-0000-000000000005'
+        ext_bi = '99999999-0000-0000-0000-000000000006'
+        ext_mo = '99999999-0000-0000-0000-000000000007'
+        ext_so = '99999999-0000-0000-0000-000000000008'
+        ext_slot = '99999999-0000-0000-0000-000000000009'
+        ext_rev = '99999999-0000-0000-0000-000000000010'
+        ext_cat = base['categories'][0]['id']
+        session = IMPORTER.Session(self.args)
+        try:
+            session.send(f"""
+                INSERT INTO public.users (id, email, password_hash, full_name, role, is_locked, is_email_verified, session_version, created_at, updated_at)
+                VALUES ('{ext_user}', 'ext.v@danasea.local', 'hash', 'Ext V', 'VENDOR', false, true, 1, now(), now()),
+                       ('{ext_cust}', 'ext.c@danasea.local', 'hash', 'Ext C', 'CUSTOMER', false, true, 1, now(), now());
+                INSERT INTO public.vendors (id, user_id, business_name, verification_status, rating_avg, rating_count, badge_tier, created_at, updated_at)
+                VALUES ('{ext_vendor}', '{ext_user}', 'External Vendor', 'APPROVED', 0.00, 0, 'NONE', now(), now());
+                INSERT INTO public.services (id, vendor_id, category_id, name, slug, description, price, status, avg_rating, rating_count, created_at, updated_at)
+                VALUES ('{ext_service}', '{ext_vendor}', '{ext_cat}', 'Ext Service', 'ext-service-sync', 'Ext', 100000, 'PUBLISHED', 0.00, 0, now(), now());
+                INSERT INTO public.service_slots (id, service_id, date, start_time, end_time, capacity, booked_count, status, inventory_type, created_at, updated_at)
+                VALUES ('{ext_slot}', '{ext_service}', '2026-10-20', '08:00:00', '10:00:00', 10, 0, 'OPEN', 'PERSON_LIMIT', now(), now());
+                INSERT INTO public.bookings (id, customer_id, status, total_amount, hold_expires_at, created_at, updated_at)
+                VALUES ('{ext_book}', '{ext_cust}', 'CONFIRMED', 100000, '2026-10-19T08:15:00+00', now(), now());
+                INSERT INTO public.booking_items (id, booking_id, service_id, vendor_id, slot_id, booking_date, booking_time, quantity, price, created_at, updated_at)
+                VALUES ('{ext_bi}', '{ext_book}', '{ext_service}', '{ext_vendor}', '{ext_slot}', '2026-10-20', '08:00:00', 1, 100000, now(), now());
+                INSERT INTO public.master_orders (id, booking_id, customer_id, status, payment_status, total_amount, discount_amount, created_at, updated_at)
+                VALUES ('{ext_mo}', '{ext_book}', '{ext_cust}', 'COMPLETED', 'PAID', 100000, 0, now(), now());
+                INSERT INTO public.sub_orders (id, master_order_id, booking_item_id, vendor_id, service_id, slot_id, quantity, unit_price, subtotal_amount, discount_amount, final_amount, commission_basis_amount, commission_rate, commission_amount, vendor_payout_amount, status, created_at, updated_at)
+                VALUES ('{ext_so}', '{ext_mo}', '{ext_bi}', '{ext_vendor}', '{ext_service}', '{ext_slot}', 1, 100000, 100000, 0, 100000, 100000, 0.15, 15000, 85000, 'COMPLETED', now(), now());
+                INSERT INTO public.reviews (id, service_id, vendor_id, customer_id, sub_order_id, rating, is_visible, created_at, updated_at)
+                VALUES ('{ext_rev}', '{ext_service}', '{ext_vendor}', '{ext_cust}', '{ext_so}', 5, true, now(), now());
+            """)
+            IMPORTER.seed_extended_simulation_fixtures(session, base)
+            ext_rating = session.query(f"SELECT to_json(avg_rating) FROM public.services WHERE id = '{ext_service}'")
+            self.assertEqual(0.0, float(ext_rating), "Sync must never mutate rating of external services outside demo fixture")
+        finally:
+            session.finish(commit=False)
+            session.close()
+
+    def test_validator_accepts_a_full_refund_for_only_one_item_in_a_paid_order(self):
+        self.replace()
+        session = IMPORTER.Session(self.args)
+        try:
+            session.send("""
+                WITH refunded_item AS (
+                    UPDATE public.sub_orders SET status = 'REFUNDED'
+                    WHERE id = '00020000-0000-0000-0000-000000000051'
+                    RETURNING id, master_order_id, final_amount
+                )
+                INSERT INTO public.refunds (
+                    id, sub_order_id, payment_id, amount, refund_percentage,
+                    provider, reason, status, created_at, updated_at, processed_at
+                )
+                SELECT 'ffffffff-0000-0000-0000-000000000051', s.id, p.id,
+                       s.final_amount, 100, p.provider, 'ADMIN_OVERRIDE', 'PROCESSED',
+                       now(), now(), now()
+                FROM refunded_item s
+                JOIN public.payments p ON p.master_order_id = s.master_order_id AND p.is_canonical
+            """)
+            self.assertEqual(1, session.query("""
+                SELECT to_json(count(*)) FROM public.refunds
+                WHERE id = 'ffffffff-0000-0000-0000-000000000051'
+            """))
+            IMPORTER.verify_extended_business_integrity(session)
+        finally:
+            session.finish(commit=False)
+            session.close()
+
+    def test_13_replace_apply_then_cleanup_round_trip(self):
+        """replace --apply -> cleanup --dry-run -> cleanup --apply must succeed cleanly including extended & schedule tables."""
+        with tempfile.TemporaryDirectory(prefix='danasea-cli-receipt-') as tmp:
+            receipt_path = Path(tmp) / 'cli_receipt.json'
+            base_cmd = [
+                'python3', str(ROOT / 'DB_Demo/install_demo_data.py'),
+                '--docker-container', self.container,
+                '--database', 'demo_acceptance',
+                '--ownership-file', str(receipt_path),
+            ]
+            rep = subprocess.run(
+                base_cmd + ['--replace', '--apply', '--confirm-backup', '--demo-password-stdin'],
+                input='local-acceptance-secret\n', text=True, capture_output=True, check=False
+            )
+            self.assertEqual(0, rep.returncode, rep.stdout + rep.stderr)
+            self.assertEqual('REPLACE_SUCCESS', json.loads(rep.stdout)['status'])
+            self.assertTrue(receipt_path.is_file())
+            receipt_data = json.loads(receipt_path.read_text(encoding='utf8'))
+            self.assertIn('extendedOwned', receipt_data)
+            self.assertIn('scheduleOwned', receipt_data)
+            self.assertIn('flash_sales', receipt_data['extendedOwned'])
+
+            dry_clean = subprocess.run(
+                base_cmd + ['--cleanup', '--dry-run'],
+                text=True, capture_output=True, check=False
+            )
+            self.assertEqual(0, dry_clean.returncode, dry_clean.stdout + dry_clean.stderr)
+            self.assertEqual('CLEANUP_SUCCESS', json.loads(dry_clean.stdout)['status'])
+
+            apply_clean = subprocess.run(
+                base_cmd + ['--cleanup', '--apply', '--confirm-backup'],
+                text=True, capture_output=True, check=False
+            )
+            self.assertEqual(0, apply_clean.returncode, apply_clean.stdout + apply_clean.stderr)
+            self.assertEqual('CLEANUP_SUCCESS', json.loads(apply_clean.stdout)['status'])
+            self.assertEqual(0, self.sql("SELECT to_json(count(*)) FROM bookings"))
+            self.assertEqual(0, self.sql("SELECT to_json(count(*)) FROM flash_sales"))
+            self.assertEqual(0, self.sql("SELECT to_json(count(*)) FROM reviews"))
+            self.assertGreater(self.sql("SELECT to_json(count(*)) FROM system_configs"), 0)
+
+            # Re-seed so test suite leaves a healthy database regardless of test execution order
+            self.replace()
 
 
 if __name__ == '__main__':

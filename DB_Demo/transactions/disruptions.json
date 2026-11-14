@@ -1,0 +1,67 @@
+{
+  "classification": "DEVELOPMENT_SYNTHETIC",
+  "sub_order_disruptions": [
+    {
+      "id": "da010000-0000-0000-0000-000000000001",
+      "sub_order_id": "00020000-0000-0000-0000-000000000010",
+      "original_slot_id": "ed7319d7-6309-5277-bb88-43a2c5c87620",
+      "original_departure_at": "2026-11-20T07:00:00.000000+07:00",
+      "decision_deadline": "2026-11-19T19:00:00.000000+07:00",
+      "reason": "WEATHER",
+      "details": "Cảng vụ Hàng hải Đà Nẵng phát lệnh cấm tàu xuất bến do dông lốc cục bộ ngoài khơi bán đảo Sơn Trà",
+      "source_key": "DANANG-PORT-NOTICE-20261120-01",
+      "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+      "status": "AWAITING_DECISION",
+      "refund_id": null,
+      "notification_sent_at": "2026-11-14T08:00:00.000000+00:00",
+      "created_at": "2026-11-14T08:00:00.000000+00:00",
+      "updated_at": "2026-11-14T08:00:00.000000+00:00"
+    },
+    {
+      "id": "da010000-0000-0000-0000-000000000002",
+      "sub_order_id": "00020000-0000-0000-0000-000000000012",
+      "original_slot_id": "a593f000-eaf6-5927-aee7-d4746e892837",
+      "original_departure_at": "2026-10-25T18:00:00.000000+07:00",
+      "decision_deadline": "2026-10-25T06:00:00.000000+07:00",
+      "reason": "VENDOR_FAULT",
+      "details": "Động cơ cano gặp sự cố kỹ thuật trước giờ xuất bến, đối tác không kịp bố trí phương tiện thay thế",
+      "source_key": "VENDOR-FAULT-INCIDENT-20261120-02",
+      "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+      "status": "CLOSED",
+      "refund_id": null,
+      "notification_sent_at": "2026-10-26T08:30:00.000000+00:00",
+      "created_at": "2026-10-26T08:30:00.000000+00:00",
+      "updated_at": "2026-10-26T08:30:00.000000+00:00"
+    }
+  ],
+  "sub_order_reschedule_proposals": [
+    {
+      "id": "fa010000-0000-0000-0000-000000000001",
+      "sub_order_id": "00020000-0000-0000-0000-000000000010",
+      "vendor_id": "128672c5-94e7-5560-896c-158794913b8c",
+      "proposed_slot_id": "c74db6d3-33e0-5e30-a7e6-fab1188e0846",
+      "reason": "Đề xuất chuyển ca sang sáng mai 07:00 khi thời tiết biển êm trở lại",
+      "reason_type": "WEATHER",
+      "status": "PENDING",
+      "proposal_version": 1,
+      "notification_sent_at": "2026-11-14T08:15:00.000000+00:00",
+      "expires_at": "2026-11-19T19:00:00.000000+07:00",
+      "created_at": "2026-11-14T08:15:00.000000+00:00",
+      "updated_at": "2026-11-14T08:15:00.000000+00:00"
+    }
+  ],
+  "vendor_fault_compensations": [
+    {
+      "disruption_id": "da010000-0000-0000-0000-000000000002",
+      "sub_order_id": "00020000-0000-0000-0000-000000000012",
+      "original_slot_id": "a593f000-eaf6-5927-aee7-d4746e892837",
+      "vendor_id": "2680f19f-8b5a-5aa8-8474-cb13e2ff1c22",
+      "voucher_id": "11111111-1111-1111-1111-111111111107",
+      "paid_basis": 630000.0,
+      "rate_bps": 1000,
+      "amount": 63000.0,
+      "remaining_amount": 63000.0,
+      "created_at": "2026-10-26T08:35:00.000000+00:00"
+    }
+  ]
+}
