@@ -10,6 +10,7 @@ import tempfile
 import time
 import unittest
 import uuid
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -118,6 +119,8 @@ class DemoDatabaseAcceptance(unittest.TestCase):
             SELECT json_object_agg(s.id, s.date) FROM service_slots s
             WHERE s.id IN (SELECT slot_id FROM booking_items)
         """)
+        schedule_start = date.fromisoformat(schedule['through']) - timedelta(days=schedule['horizonDays'] - 1)
+        original_dates[IMPORTER.RESCHEDULE_ORIG_SLOT_ID] = (schedule_start + timedelta(days=6)).isoformat()
         self.assertEqual(original_dates, actual_dates)
 
     def test_02_failed_import_and_dry_run_restore_old_data(self):
@@ -127,6 +130,40 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         self.assertEqual(1, self.sql("SELECT to_json(count(*)) FROM users WHERE email='rollback@local.test'"))
         self.replace(commit=False)
         self.assertEqual(1, self.sql("SELECT to_json(count(*)) FROM users WHERE email='rollback@local.test'"))
+
+    def test_replacement_preserves_the_original_slot_id_when_its_old_departure_is_reused(self):
+        for import_day in (13, 15):
+            now = datetime(2026, 11, import_day, 0, tzinfo=timezone(timedelta(hours=7)))
+            with self.subTest(import_date=now.date()):
+                base, trans, _ = IMPORTER.load_fixtures()
+                IMPORTER.prepare_slots(base, trans, {}, today=now.date())
+                session = IMPORTER.Session(self.args)
+                try:
+                    with patch.object(IMPORTER, 'db_now_vn', return_value=now):
+                        send = session.send
+                        # Keep SQL deadline checks on the same fixed clock as the importer.
+                        with patch.object(session, 'send', side_effect=lambda sql: send(
+                            sql.replace('CURRENT_TIMESTAMP', f"TIMESTAMPTZ '{now.isoformat()}'")
+                        )):
+                            result = IMPORTER.execute_replace(session, base, trans, 'local-acceptance-secret')
+                    self.assertEqual('REPLACE_SUCCESS', result['status'])
+                    slots = session.query("""
+                        SELECT json_object_agg(s.date::text, s.id)
+                        FROM service_slots s
+                        WHERE s.service_id = '88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08'
+                          AND s.start_time = '07:00' AND s.date BETWEEN '2026-11-19' AND '2026-11-22'
+                    """)
+                    original_date = (now.date() + timedelta(days=6)).isoformat()
+                    self.assertEqual(IMPORTER.RESCHEDULE_ORIG_SLOT_ID, slots[original_date])
+                    self.assertIn('2026-11-20', slots)
+                    self.assertNotEqual(IMPORTER.RESCHEDULE_ORIG_SLOT_ID, slots['2026-11-20'])
+                    proposal_slot = session.query("""
+                        SELECT to_json(proposed_slot_id) FROM sub_order_reschedule_proposals
+                        WHERE id = 'fa010000-0000-0000-0000-000000000001'
+                    """)
+                    self.assertEqual(slots[(now.date() + timedelta(days=7)).isoformat()], proposal_slot)
+                finally:
+                    session.close()
 
     def test_03_unknown_table_schema_and_foreign_key_block_before_deletion(self):
         self.sql("INSERT INTO users(id,created_at,updated_at,email,role) VALUES ('ffffffff-0000-0000-0000-000000000009',now(),now(),'unknown-guard@local.test','CUSTOMER')")
@@ -588,7 +625,6 @@ class DemoDatabaseAcceptance(unittest.TestCase):
 
     def test_12_validator_rejects_mutations_and_sync_preserves_external_data(self):
         """Validator phai chan tat ca ca pha hoai nghiep vu, clock drift, va sync khong duoc sua dich vu ngoai goi demo."""
-        from datetime import datetime, timedelta, timezone
         self.replace()
         base, trans, _manifest = IMPORTER.load_fixtures()
         fixtures_by_table = {}

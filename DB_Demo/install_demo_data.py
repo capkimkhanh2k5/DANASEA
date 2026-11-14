@@ -912,12 +912,21 @@ def db_now_vn(session):
     return datetime.fromisoformat(raw).replace(tzinfo=timezone(timedelta(hours=7)))
 
 
+def scheduled_slot_id(service_id, day, start):
+    key = f'{service_id}|{day}|{start}'
+    slot_id = str(uuid.uuid5(SLOT_NAMESPACE, key))
+    # The original slot moves with the demo booking while retaining its fixture ID.
+    if slot_id == RESCHEDULE_ORIG_SLOT_ID:
+        return str(uuid.uuid5(SLOT_NAMESPACE, f'replacement-departure|{key}'))
+    return slot_id
+
+
 def resolve_reschedule_schedule(now_vn):
     demo_today = now_vn.date()
     orig_day = (demo_today + timedelta(days=6)).isoformat()
     deadline_day = (demo_today + timedelta(days=5)).isoformat()
     target_day = (demo_today + timedelta(days=7)).isoformat()
-    target_slot_id = str(uuid.uuid5(SLOT_NAMESPACE, f'{RESCHEDULE_SERVICE_ID}|{target_day}|07:00:00'))
+    target_slot_id = scheduled_slot_id(RESCHEDULE_SERVICE_ID, target_day, '07:00:00')
     target_unit_id = str(uuid.uuid5(SLOT_NAMESPACE, f'{target_slot_id}|unit|1'))
     return {
         'today': demo_today,
@@ -1710,7 +1719,7 @@ def seed_demo_operating_schedule(session, base_rows):
                 clock = time.fromisoformat(start)
                 if datetime.combine(day, clock) <= now or (service_id, day.isoformat(), clock) in existing_departures:
                     continue
-                slot_id = str(uuid.uuid5(SLOT_NAMESPACE, f'{service_id}|{day}|{start}'))
+                slot_id = scheduled_slot_id(service_id, day, start)
                 slots.append({'id': slot_id, 'service_id': service_id, 'date': day.isoformat(),
                               'start_time': start, 'end_time': end, 'capacity': capacity,
                               'booked_count': 0, 'status': 'OPEN', 'inventory_type': inventory_type})
