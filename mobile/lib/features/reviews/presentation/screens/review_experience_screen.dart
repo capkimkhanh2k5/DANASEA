@@ -1,6 +1,8 @@
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/auth/auth_session.dart';
+import '../../../../core/data/dispute_repository.dart';
 import '../../../../core/data/review_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -99,58 +101,61 @@ class _ReviewExperienceScreenState extends State<ReviewExperienceScreen> {
       );
       return;
     }
-    final urlController = TextEditingController(
-      text:
-          'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=500&auto=format&fit=crop&q=80',
-    );
-    final entered = await showDialog<String>(
+    final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const LocalizedText('Thêm liên kết ảnh chuyến đi'),
-          content: TextField(
-            controller: urlController,
-            decoration: InputDecoration(
-              hintText: tr(context, 'https://...'),
-            ),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: LocalizedText(
+                  'Tải ảnh chuyến đi lên Cloud',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined, color: AppColors.secondary),
+                title: const LocalizedText('Chọn ảnh từ Thư viện'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+                title: const LocalizedText('Chụp ảnh từ Camera'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const LocalizedText('Hủy'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.secondary,
-              ),
-              onPressed: () =>
-                  Navigator.pop(dialogContext, urlController.text.trim()),
-              child: const LocalizedText(
-                'Thêm ảnh',
-                style: TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        );
-      },
+        ),
+      ),
     );
-    if (entered == null || entered.isEmpty || !mounted) return;
-    if (!entered.startsWith('http://') && !entered.startsWith('https://')) {
+    if (source == null || !mounted) return;
+    try {
+      final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+      if (picked == null || !mounted) return;
+      final cloudUrl = await DisputeRepository().uploadEvidenceFromPath(picked.path);
+      if (!mounted) return;
+      setState(() {
+        if (_photos.length < 5) {
+          _photos.add(cloudUrl);
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: LocalizedText(
-            'Liên kết ảnh phải bắt đầu bằng http:// hoặc https://.',
-          ),
+        SnackBar(
+          content: Text('Không thể tải ảnh lên Cloud: $e'),
           backgroundColor: AppColors.error,
         ),
       );
-      return;
     }
-    setState(() {
-      if (_photos.length < 5) {
-        _photos.add(entered);
-      }
-    });
   }
 
   Future<void> _submitReview() async {

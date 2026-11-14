@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../core/widgets/toast_notification.dart';
@@ -47,6 +48,212 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
         _order = fresh;
       });
     }
+  }
+
+  Future<void> _openRescheduleProposalSheet() async {
+    final slotRepo = VendorSlotRepository();
+    final orderRepo = VendorOrderRepository();
+    if (_order.serviceId.isNotEmpty) {
+      await slotRepo.getSlotsForService(_order.serviceId, DateTime.now()).catchError((_) => <ServiceSlotModel>[]);
+    }
+    if (!mounted) return;
+    final availableSlots = _db.slots.where((s) {
+      if (_order.serviceId.isNotEmpty && s.serviceId != _order.serviceId) return false;
+      return s.status == SlotStatus.open && s.availableCount >= _order.quantity && s.slotId != _order.slotId;
+    }).toList();
+
+    String? selectedSlotId = availableSlots.isNotEmpty ? availableSlots.first.slotId : null;
+    String reasonType = 'WEATHER';
+    final reasonCtrl = TextEditingController(
+      text: 'Thời tiết biển có sóng gió bất lợi, đề xuất chuyển sang khung giờ an toàn hơn.',
+    );
+    bool submitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Container(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + MediaQuery.of(ctx).padding.bottom + 20,
+          ),
+          decoration: const BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const Row(
+                  children: [
+                    Icon(Icons.event_repeat, color: AppColors.secondary, size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Đề xuất dời lịch khởi hành cho khách',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Loại nguyên nhân:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    ChoiceChip(
+                      label: const Text('Thời tiết xấu (WEATHER)'),
+                      selected: reasonType == 'WEATHER',
+                      onSelected: (v) {
+                        if (v) setSheetState(() => reasonType = 'WEATHER');
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    ChoiceChip(
+                      label: const Text('Vận hành (OPERATIONAL)'),
+                      selected: reasonType == 'OPERATIONAL',
+                      onSelected: (v) {
+                        if (v) setSheetState(() => reasonType = 'OPERATIONAL');
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Chọn ca thay thế:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                ),
+                const SizedBox(height: 6),
+                if (availableSlots.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'Chưa có ca mở bán khác đủ chỗ trống cho dịch vụ này. Vui lòng mở thêm slot trong Lịch hoạt động.',
+                      style: TextStyle(fontSize: 12, color: AppColors.tertiary),
+                    ),
+                  )
+                else
+                  DropdownButtonFormField<String>(
+                    value: selectedSlotId,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: AppColors.surfaceContainerLow,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                    items: availableSlots.map((s) {
+                      return DropdownMenuItem<String>(
+                        value: s.slotId,
+                        child: Text(
+                          '${s.slotDate} • ${s.startTime}-${s.endTime} (Trống ${s.availableCount})',
+                          style: const TextStyle(fontSize: 12.5),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) => setSheetState(() => selectedSlotId = val),
+                  ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Lý do gửi khách hàng:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: reasonCtrl,
+                  maxLines: 3,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppColors.surfaceContainerLow,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    onPressed: (submitting || selectedSlotId == null)
+                        ? null
+                        : () async {
+                            final reason = reasonCtrl.text.trim();
+                            if (reason.isEmpty) {
+                              ToastNotification.showError(ctx, 'Vui lòng nhập lý do dời lịch');
+                              return;
+                            }
+                            setSheetState(() => submitting = true);
+                            try {
+                              await orderRepo.createRescheduleProposal(
+                                subOrderId: _order.subOrderId,
+                                proposedSlotId: selectedSlotId!,
+                                reason: reason,
+                                reasonType: reasonType,
+                              );
+                              if (!mounted) return;
+                              Navigator.pop(ctx);
+                              ToastNotification.showSuccess(
+                                context,
+                                'Đã gửi đề xuất dời lịch cho khách hàng thành công!',
+                              );
+                            } catch (e) {
+                              setSheetState(() => submitting = false);
+                              if (mounted) {
+                                ToastNotification.showError(ctx, 'Lỗi gửi đề xuất: $e');
+                              }
+                            }
+                          },
+                    icon: submitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.send, size: 16),
+                    label: const Text('Gửi đề xuất đổi ca', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -169,10 +376,16 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () {
+                              final matchedConv = _db.conversations.where(
+                                (c) => c.subOrderId == _order.subOrderId || c.masterOrderId == _order.masterOrderId || c.customerName == _order.customerName,
+                              );
+                              final convId = matchedConv.isNotEmpty
+                                  ? matchedConv.first.id
+                                  : (_db.conversations.isNotEmpty ? _db.conversations.first.id : _order.subOrderId);
                               Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => ChatConversationScreen(
-                                    conversationId: 'conv-001',
+                                    conversationId: convId,
                                     customerName: _order.customerName,
                                     subOrderCode: _order.subOrderCode,
                                   ),
@@ -238,7 +451,14 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: BorderRadius.circular(8)),
-                          child: const LocalizedText('Mỹ Khê Ocean', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.onSecondaryFixed)),
+                          child: LocalizedText(
+                            _db.services.any((s) => s.id == _order.serviceId && s.locationName.isNotEmpty)
+                                ? _db.services.firstWhere((s) => s.id == _order.serviceId).locationName
+                                : (_db.vendor.businessAddress != null && _db.vendor.businessAddress!.isNotEmpty
+                                    ? _db.vendor.businessAddress!
+                                    : 'Đà Nẵng'),
+                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.onSecondaryFixed),
+                          ),
                         ),
                       ],
                     ),
@@ -254,11 +474,15 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
                     ),
                     const SizedBox(height: 6),
                     Row(
-                      children: const [
-                        Icon(Icons.storefront, size: 16, color: AppColors.tertiary),
-                        SizedBox(width: 6),
+                      children: [
+                        const Icon(Icons.storefront, size: 16, color: AppColors.tertiary),
+                        const SizedBox(width: 6),
                         Expanded(
-                          child: LocalizedText('Nhà cung cấp: Danang Ocean Club', style: TextStyle(fontSize: 12, color: AppColors.tertiary), overflow: TextOverflow.ellipsis),
+                          child: LocalizedText(
+                            'Nhà cung cấp: ${_db.vendor.businessName.isNotEmpty ? _db.vendor.businessName : "Đối tác DANASEA"}',
+                            style: const TextStyle(fontSize: 12, color: AppColors.tertiary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -458,7 +682,7 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
                           LocalizedText(
                             _order.checkedInAt != null
                                 ? 'Thời gian vào bãi: ${_order.checkedInAt!.day}/${_order.checkedInAt!.month} lúc ${_order.checkedInAt!.hour}:${_order.checkedInAt!.minute.toString().padLeft(2, '0')}'
-                                : 'Sẵn sàng quét mã QR khi khách tập trung tại bãi cát Mỹ Khê.',
+                                : 'Sẵn sàng quét mã QR khi khách tập trung tại điểm hẹn.',
                             style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
                           ),
                         ],
@@ -543,6 +767,26 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 10),
+              ],
+
+              if (_order.status == SubOrderStatus.pending || _order.status == SubOrderStatus.confirmed) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _openRescheduleProposalSheet,
+                    icon: const Icon(Icons.event_repeat, size: 17, color: AppColors.secondary),
+                    label: const LocalizedText(
+                      'Đề xuất dời lịch (Thời tiết / Vận hành)',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.secondary),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 10),
               ],

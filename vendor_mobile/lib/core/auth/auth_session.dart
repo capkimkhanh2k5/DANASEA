@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../l10n/app_localizations.dart';
@@ -164,6 +165,210 @@ class AuthSession {
     } on TimeoutException {
       throw AuthFailure('Máy chủ phản hồi quá lâu. Vui lòng thử lại.');
     }
+  }
+
+  Future<String> requestText(
+    String path, {
+    String method = 'GET',
+    Map<String, String>? headers,
+    bool retry = true,
+    bool authenticated = true,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    if (kReleaseMode && uri.scheme != 'https') {
+      throw AuthFailure('Backend phải dùng HTTPS.');
+    }
+    try {
+      final req = await client
+          .openUrl(method, uri)
+          .timeout(const Duration(seconds: 15));
+      req.followRedirects = false;
+      req.headers.set('Accept-Language', AppLanguage.instance.code);
+      if (authenticated && _access != null) {
+        req.headers.set('Authorization', 'Bearer $_access');
+      }
+      if (headers != null) {
+        headers.forEach(req.headers.set);
+      }
+      final response = await req.close().timeout(const Duration(seconds: 20));
+      final text = await utf8.decoder
+          .bind(response)
+          .join()
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode == 401 &&
+          authenticated &&
+          _access != null &&
+          retry &&
+          !pendingVerification &&
+          !path.startsWith('/api/auth/')) {
+        await refresh();
+        return requestText(
+          path,
+          method: method,
+          headers: headers,
+          retry: false,
+          authenticated: authenticated,
+        );
+      }
+      if (response.statusCode >= 300) {
+        dynamic body;
+        try {
+          body = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
+        } catch (_) {}
+        throw AuthFailure(
+          (body is Map ? body['message']?.toString() : null) ??
+              'Không thể thực hiện yêu cầu. Vui lòng thử lại.',
+          response.statusCode,
+          body is Map<String, dynamic> ? body : null,
+        );
+      }
+      return text;
+    } on SocketException {
+      throw AuthFailure(
+        'Không kết nối được máy chủ. Kiểm tra mạng và địa chỉ backend.',
+      );
+    } on TimeoutException {
+      throw AuthFailure('Máy chủ phản hồi quá lâu. Vui lòng thử lại.');
+    }
+  }
+
+  Future<Map<String, dynamic>> requestMultipart(
+    String path, {
+    String fieldName = 'file',
+    required Uint8List fileBytes,
+    required String filename,
+    required String contentType,
+    Map<String, String>? fields,
+    bool retry = true,
+    bool authenticated = true,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    if (kReleaseMode && uri.scheme != 'https') {
+      throw AuthFailure('Backend phải dùng HTTPS.');
+    }
+    final boundary =
+        '----DanaseaFormBoundary${DateTime.now().microsecondsSinceEpoch}';
+    final safeFilename = filename.replaceAll('"', '_');
+    final payloadBytes = BytesBuilder(copy: false);
+
+    if (fields != null && fields.isNotEmpty) {
+      for (final entry in fields.entries) {
+        final fieldPart =
+            '--$boundary\r\n'
+            'Content-Disposition: form-data; name="${entry.key}"\r\n\r\n'
+            '${entry.value}\r\n';
+        payloadBytes.add(utf8.encode(fieldPart));
+      }
+    }
+
+    final headerStr =
+        '--$boundary\r\n'
+        'Content-Disposition: form-data; name="$fieldName"; filename="$safeFilename"\r\n'
+        'Content-Type: $contentType\r\n\r\n';
+    final footerStr = '\r\n--$boundary--\r\n';
+    payloadBytes
+      ..add(utf8.encode(headerStr))
+      ..add(fileBytes)
+      ..add(utf8.encode(footerStr));
+    final rawPayload = payloadBytes.toBytes();
+
+    try {
+      final req = await client
+          .openUrl('POST', uri)
+          .timeout(const Duration(seconds: 60));
+      req.followRedirects = false;
+      req.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'multipart/form-data; boundary=$boundary',
+      );
+      req.headers.contentLength = rawPayload.length;
+      req.headers.set('Accept-Language', AppLanguage.instance.code);
+      if (authenticated && _access != null) {
+        req.headers.set('Authorization', 'Bearer $_access');
+      }
+      req.add(rawPayload);
+      final response = await req.close().timeout(const Duration(seconds: 45));
+      final text = await utf8.decoder
+          .bind(response)
+          .join()
+          .timeout(const Duration(seconds: 60));
+      dynamic body;
+      try {
+        body = text.isEmpty ? <String, dynamic>{} : jsonDecode(text);
+      } catch (_) {
+        if (response.statusCode < 300) {
+          throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+        }
+      }
+      if (response.statusCode == 401 &&
+          authenticated &&
+          _access != null &&
+          retry &&
+          !pendingVerification &&
+          !path.startsWith('/api/auth/')) {
+        await refresh();
+        return requestMultipart(
+          path,
+          fieldName: fieldName,
+          fileBytes: fileBytes,
+          filename: filename,
+          contentType: contentType,
+          fields: fields,
+          retry: false,
+          authenticated: authenticated,
+        );
+      }
+      if (response.statusCode >= 300) {
+        throw AuthFailure(
+          (body is Map ? body['message']?.toString() : null) ??
+              'Không thể tải tệp lên đám mây. Vui lòng thử lại.',
+          response.statusCode,
+          body is Map<String, dynamic> ? body : null,
+        );
+      }
+      if (body is! Map<String, dynamic>) {
+        throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+      }
+      return body;
+    } on SocketException {
+      throw AuthFailure(
+        'Không kết nối được máy chủ. Kiểm tra mạng và địa chỉ backend.',
+      );
+    } on TimeoutException {
+      throw AuthFailure('Máy chủ phản hồi quá lâu khi tải tệp lên.');
+    }
+  }
+
+  Future<Map<String, dynamic>> requestMultipartFromPath(
+    String path, {
+    required String filePath,
+    String fieldName = 'file',
+    Map<String, String>? fields,
+  }) async {
+    final file = File(filePath.trim());
+    if (!await file.exists()) {
+      throw AuthFailure('Không tìm thấy tệp tại đường dẫn đã chọn.');
+    }
+    final bytes = await file.readAsBytes();
+    final lower = filePath.toLowerCase();
+    final contentType = lower.endsWith('.pdf')
+        ? 'application/pdf'
+        : lower.endsWith('.webp')
+        ? 'image/webp'
+        : (lower.endsWith('.jpg') || lower.endsWith('.jpeg'))
+        ? 'image/jpeg'
+        : 'image/png';
+    final name = file.uri.pathSegments.isNotEmpty
+        ? file.uri.pathSegments.last
+        : 'upload.jpg';
+    return requestMultipart(
+      path,
+      fieldName: fieldName,
+      fileBytes: bytes,
+      filename: name,
+      contentType: contentType,
+      fields: fields,
+    );
   }
 
   Future<void> _save() => !remember

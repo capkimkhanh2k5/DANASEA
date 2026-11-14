@@ -1,5 +1,6 @@
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -41,101 +42,115 @@ class _DisputeManagementScreenState extends State<DisputeManagementScreen> {
 
   void _showAddEvidenceDialog(DisputeModel dispute) {
     final noteController = TextEditingController();
+    String? pickedFilePath;
+    String? pickedFileName;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppShapes.rXl)),
-        title: Row(
-          children: [
-            const Icon(Icons.upload_file, color: AppColors.secondary, size: 22),
-            const SizedBox(width: 8),
-            Expanded(
-              child: LocalizedText(
-                'Nộp minh chứng giải trình',
-                style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            LocalizedText(
-              'Khiếu nại #${dispute.id} (Đơn #${dispute.subOrderId})',
-              style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
-            ),
-            const SizedBox(height: 12),
-            LocalizedText(
-              'Nội dung biên bản / giải trình:',
-              style: AppTypography.labelSm.copyWith(color: AppColors.tertiary),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: noteController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: tr(context, 'Nhập thông tin xác nhận bến bãi, camera an ninh...'),
-                hintStyle: AppTypography.bodySm.copyWith(color: AppColors.outline),
-                filled: true,
-                fillColor: AppColors.surfaceContainerLow,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppShapes.rMd),
-                  borderSide: BorderSide.none,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppShapes.rXl)),
+          title: Row(
+            children: [
+              const Icon(Icons.upload_file, color: AppColors.secondary, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: LocalizedText(
+                  'Nộp minh chứng giải trình',
+                  style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
                 ),
               ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              LocalizedText(
+                'Khiếu nại #${dispute.id} (Đơn #${dispute.subOrderId})',
+                style: AppTypography.labelMd.copyWith(color: AppColors.secondary),
+              ),
+              const SizedBox(height: 12),
+              LocalizedText(
+                'Nội dung biên bản / giải trình:',
+                style: AppTypography.labelSm.copyWith(color: AppColors.tertiary),
+              ),
+              const SizedBox(height: 6),
+              TextField(
+                controller: noteController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: tr(context, 'Nhập thông tin xác nhận bến bãi, camera an ninh...'),
+                  hintStyle: AppTypography.bodySm.copyWith(color: AppColors.outline),
+                  filled: true,
+                  fillColor: AppColors.surfaceContainerLow,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppShapes.rMd),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final picked = await ImagePicker().pickImage(
+                    source: ImageSource.gallery,
+                    imageQuality: 85,
+                  );
+                  if (picked != null) {
+                    setModalState(() {
+                      pickedFilePath = picked.path;
+                      pickedFileName = picked.name;
+                    });
+                  }
+                },
+                icon: const Icon(Icons.cloud_upload_outlined, size: 16),
+                label: LocalizedText(
+                  pickedFileName != null
+                      ? 'Đã chọn: $pickedFileName'
+                      : 'Tải ảnh minh chứng lên Cloud (Tùy chọn)',
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.secondary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppShapes.rFull)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const LocalizedText('Hủy'),
             ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () {
+            ElevatedButton(
+              onPressed: () async {
+                final note = noteController.text.trim();
+                if (note.isEmpty) {
+                  ToastNotification.show(context, message: 'Vui lòng nhập nội dung giải trình.', type: ToastType.error);
+                  return;
+                }
+                await _disputeRepo.submitDisputeEvidence(
+                  dispute.id,
+                  pickedFilePath ?? '',
+                  message: note,
+                );
+                if (!mounted) return;
+                Navigator.pop(ctx);
                 ToastNotification.show(
                   context,
-                  message: 'Đã đính kèm ảnh chụp camera an ninh bến bãi.',
-                  type: ToastType.info,
+                  message: 'Đã gửi minh chứng giải trình lên Cloud & Ban quản trị DANASEA.',
+                  type: ToastType.success,
                 );
               },
-              icon: const Icon(Icons.add_photo_alternate, size: 16),
-              label: const LocalizedText('Đính kèm ảnh hiện trường (Tùy chọn)'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.secondary,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+                foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppShapes.rFull)),
               ),
+              child: const LocalizedText('Gửi giải trình'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const LocalizedText('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final note = noteController.text.trim();
-              if (note.isEmpty) {
-                ToastNotification.show(context, message: 'Vui lòng nhập nội dung giải trình.', type: ToastType.error);
-                return;
-              }
-              await _disputeRepo.submitDisputeEvidence(
-                dispute.id,
-                'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=300&auto=format&fit=crop&q=80',
-              );
-              if (!mounted) return;
-              Navigator.pop(ctx);
-              ToastNotification.show(
-                context,
-                message: 'Đã gửi minh chứng giải trình tới thẩm định viên DANASEA.',
-                type: ToastType.success,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.secondary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppShapes.rFull)),
-            ),
-            child: const LocalizedText('Gửi giải trình'),
-          ),
-        ],
       ),
     );
   }

@@ -266,7 +266,9 @@ class _BookingSlotSheetState extends State<BookingSlotSheet> {
                           size: 12, color: AppColors.onSecondaryFixedVariant),
                       const SizedBox(width: 4),
                       LocalizedText(
-                        'Sóng êm: 0.4m',
+                        (widget.service.maxWaveM != null && widget.service.maxWaveM! > 0)
+                            ? 'Ngưỡng sóng: <${widget.service.maxWaveM!.toStringAsFixed(1)}m'
+                            : 'Còn ${_selectedSlot.remainingSlots}/${_selectedSlot.capacity} chỗ',
                         style: AppTypography.labelSm(
                           color: AppColors.onSecondaryFixedVariant,
                         ),

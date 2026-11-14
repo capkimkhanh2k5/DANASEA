@@ -192,10 +192,9 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final service = _db.services.firstWhere(
+    final service = _db.services.where(
       (s) => s.serviceId == widget.serviceId,
-      orElse: () => _db.services.first,
-    );
+    ).firstOrNull ?? (_db.services.isNotEmpty ? _db.services.first : null);
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -267,14 +266,14 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                             child: const LocalizedText('DỊCH VỤ ĐANG CHỌN', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.onSecondaryContainer)),
                           ),
                           const SizedBox(height: 4),
-                          LocalizedText(service.nameVi, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          LocalizedText(service?.nameVi ?? 'Dịch vụ trải nghiệm biển', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 2),
                           Row(
                             children: [
                               const Icon(Icons.location_on, size: 12, color: AppColors.secondary),
                               const SizedBox(width: 3),
                               Expanded(
-                                child: LocalizedText(service.meetingPointName, style: const TextStyle(fontSize: 11, color: AppColors.tertiary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                child: LocalizedText(service?.meetingPointName ?? 'Đà Nẵng', style: const TextStyle(fontSize: 11, color: AppColors.tertiary), maxLines: 1, overflow: TextOverflow.ellipsis),
                               ),
                             ],
                           ),
@@ -395,7 +394,7 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(color: AppColors.primaryFixed, borderRadius: BorderRadius.circular(10)),
-                          child: LocalizedText('Thời lượng: ${service.durationMinutes} phút',
+                          child: LocalizedText('Thời lượng: ${service?.durationMinutes ?? 60} phút',
                               style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.onPrimaryFixedVariant)),
                         ),
                       ],

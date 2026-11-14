@@ -2,6 +2,7 @@ import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/order_repository.dart';
+import '../../../../core/data/weather_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
@@ -26,6 +27,7 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
   RefundReason _selectedReason = RefundReason.customerCancel;
   final TextEditingController _noteController = TextEditingController();
   OrderCancellationPreview? _preview;
+  WeatherSnapshotModel? _weatherSnapshot;
   bool _loadingPreview = true;
   String? _previewError;
   bool _submitting = false;
@@ -38,6 +40,9 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
   void initState() {
     super.initState();
     _loadPreview();
+    WeatherRepository.instance.getCurrentWeather().then((snap) {
+      if (mounted) setState(() => _weatherSnapshot = snap);
+    }).catchError((_) {});
   }
 
   @override
@@ -439,7 +444,9 @@ class _CancelBookingScreenState extends State<CancelBookingScreen> {
                           ),
                         ),
                         LocalizedText(
-                          'Cập nhật: 06:00 • Sóng 0.4m • Gió 8 km/h • Mưa 0mm',
+                          _weatherSnapshot != null
+                              ? 'Sóng ${_weatherSnapshot!.waveHeight?.toStringAsFixed(1) ?? "--"}m • Gió ${_weatherSnapshot!.windSpeed?.toStringAsFixed(0) ?? "--"} km/h • Mưa ${_weatherSnapshot!.precipitation?.toStringAsFixed(0) ?? "0"}mm'
+                              : 'Đang đồng bộ dữ liệu quan trắc thời tiết biển thực tế từ máy chủ',
                           style: AppTypography.bodySm(
                             color: AppColors.onSurfaceVariant,
                           ).copyWith(fontSize: 11),

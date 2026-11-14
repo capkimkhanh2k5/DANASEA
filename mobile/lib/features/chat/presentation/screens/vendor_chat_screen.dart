@@ -306,8 +306,10 @@ class _VendorChatScreenState extends State<VendorChatScreen> {
             ),
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: LocalizedText('Gọi hotline đối tác: 0905 888 999'),
+                SnackBar(
+                  content: LocalizedText(
+                    'Liên hệ trực tiếp đối tác ${conv.vendorName} qua kênh tin nhắn này',
+                  ),
                 ),
               );
             },

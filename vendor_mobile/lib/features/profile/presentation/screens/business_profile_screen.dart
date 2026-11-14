@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
 import '../../../../core/widgets/vendor_button.dart';
 import '../../../../core/widgets/vendor_text_field.dart';
 import '../../../../core/widgets/toast_notification.dart';
 import 'vendor_documents_screen.dart';
 import 'edit_profile_bank_screen.dart';
+import '../../../services/presentation/screens/vendor_equipment_screen.dart';
 
 class BusinessProfileScreen extends StatefulWidget {
   const BusinessProfileScreen({super.key});
@@ -31,11 +33,13 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
     super.initState();
     final v = _db.vendor;
     _businessNameController = TextEditingController(text: v.businessName);
-    _addressController = TextEditingController(text: v.businessAddress ?? 'Lô 12 Võ Nguyên Giáp, Phường Phước Mỹ, Quận Sơn Trà, Đà Nẵng');
-    _taxCodeController = TextEditingController(text: v.taxCode ?? '0402123456');
-    _phoneController = TextEditingController(text: v.phone ?? '0905 888 999');
+    _addressController = TextEditingController(text: v.businessAddress ?? '');
+    _taxCodeController = TextEditingController(text: v.taxCode ?? '');
+    _phoneController = TextEditingController(
+      text: (v.phone != null && v.phone!.isNotEmpty) ? v.phone! : (_db.currentUser.phone ?? ''),
+    );
     _descController = TextEditingController(
-      text: v.description ?? 'Câu lạc bộ thể thao biển chuyên nghiệp tại bờ biển Mỹ Khê và Bán đảo Sơn Trà. Chuyên cung cấp dịch vụ chèo SUP, lướt sóng, lặn ngắm san hô với đội ngũ cứu hộ và HLV chứng chỉ quốc tế.',
+      text: v.description ?? '',
     );
   }
 
@@ -49,17 +53,42 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
     super.dispose();
   }
 
-  void _saveProfile() {
+  Future<void> _saveProfile() async {
     final v = _db.vendor;
-    final updated = v.copyWith(
-      businessName: _businessNameController.text.trim(),
-      businessAddress: _addressController.text.trim(),
-      taxCode: _taxCodeController.text.trim(),
-      phone: _phoneController.text.trim(),
-      description: _descController.text.trim(),
-    );
-    _db.updateVendor(updated);
-    ToastNotification.showSuccess(context, 'Đã lưu hồ sơ doanh nghiệp thành công');
+    final businessName = _businessNameController.text.trim();
+    final address = _addressController.text.trim();
+    final taxCode = _taxCodeController.text.trim();
+    final phone = _phoneController.text.trim();
+    final description = _descController.text.trim();
+    try {
+      await VendorProfileRepository().updateVendorProfile(
+        businessName: businessName,
+        address: address,
+        taxCode: taxCode,
+        phone: phone,
+      );
+      final updated = _db.vendor.copyWith(
+        businessName: businessName,
+        businessAddress: address,
+        taxCode: taxCode,
+        phone: phone,
+        description: description,
+      );
+      _db.updateVendor(updated);
+      if (!mounted) return;
+      ToastNotification.showSuccess(context, 'Đã lưu hồ sơ doanh nghiệp thành công');
+    } catch (e) {
+      final updated = v.copyWith(
+        businessName: businessName,
+        businessAddress: address,
+        taxCode: taxCode,
+        phone: phone,
+        description: description,
+      );
+      _db.updateVendor(updated);
+      if (!mounted) return;
+      ToastNotification.showError(context, 'Lỗi đồng bộ máy chủ: $e');
+    }
   }
 
   @override
@@ -110,14 +139,14 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
-                              const Row(
+                              Row(
                                 children: [
-                                  Icon(Icons.event_available, size: 13, color: AppColors.tertiary),
-                                  SizedBox(width: 4),
+                                  const Icon(Icons.event_available, size: 13, color: AppColors.tertiary),
+                                  const SizedBox(width: 4),
                                   Flexible(
                                     child: LocalizedText(
-                                      'Gia nhập: 15/03/2023',
-                                      style: TextStyle(fontSize: 11, color: AppColors.tertiary),
+                                      'Gia nhập: ${_db.vendor.createdAt.day.toString().padLeft(2, "0")}/${_db.vendor.createdAt.month.toString().padLeft(2, "0")}/${_db.vendor.createdAt.year}',
+                                      style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -127,15 +156,15 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(color: AppColors.secondary.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
-                                child: const Row(
+                                child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.verified, size: 12, color: AppColors.secondary),
-                                    SizedBox(width: 3),
+                                    const Icon(Icons.verified, size: 12, color: AppColors.secondary),
+                                    const SizedBox(width: 3),
                                     Flexible(
                                       child: LocalizedText(
-                                        'Hồ sơ pháp nhân chính thức',
-                                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                                        _db.vendor.badgeTier.labelVi,
+                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -152,11 +181,29 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                     // Stats ribbon
                     Row(
                       children: [
-                        Expanded(child: _buildStat('4.9★', '142 Đánh giá', AppColors.secondary)),
+                        Expanded(
+                          child: _buildStat(
+                            '${_db.vendor.ratingAvg.toStringAsFixed(1)}★',
+                            '${_db.reviews.isNotEmpty ? _db.reviews.length : _db.vendor.ratingCount} Đánh giá',
+                            AppColors.secondary,
+                          ),
+                        ),
                         const SizedBox(width: 8),
-                        Expanded(child: _buildStat('98%', 'Nhận tour chuẩn', AppColors.primary)),
+                        Expanded(
+                          child: _buildStat(
+                            '${_db.services.length}',
+                            'Dịch vụ',
+                            AppColors.primary,
+                          ),
+                        ),
                         const SizedBox(width: 8),
-                        Expanded(child: _buildStat('2.4k', 'Khách biển', AppColors.secondary)),
+                        Expanded(
+                          child: _buildStat(
+                            '${_db.subOrders.length}',
+                            'Đơn đặt',
+                            AppColors.secondary,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -293,7 +340,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                             MaterialPageRoute(builder: (_) => const EditProfileBankScreen()),
                           );
                         },
-                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                        borderRadius: BorderRadius.zero,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           child: Row(
@@ -315,6 +362,46 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                     LocalizedText('Tài khoản ngân hàng nhận tiền', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
                                     SizedBox(height: 2),
                                     LocalizedText('Cấu hình tài khoản nhận đối soát doanh thu', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right, color: AppColors.outlineVariant),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 1, color: AppColors.surfaceContainerHigh),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const VendorEquipmentScreen()),
+                          );
+                        },
+                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondaryContainer.withOpacity(0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.handyman_outlined, color: AppColors.secondary, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: const [
+                                    LocalizedText('Quản lý thiết bị & Bảo trì', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
+                                    SizedBox(height: 2),
+                                    LocalizedText('Danh mục Cano, Kayak, SUP, Áo phao & lịch bảo dưỡng', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
                                   ],
                                 ),
                               ),
@@ -367,7 +454,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                       controller: _businessNameController,
                       label: 'Tên doanh nghiệp / CLB *',
                       isRequired: true,
-                      hint: 'Danang Ocean Club',
+                      hint: 'nhà cung cấp',
                     ),
                     const SizedBox(height: 12),
                     VendorTextField(
