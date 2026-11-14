@@ -7,7 +7,7 @@ interface AdminNavigationProps {
 }
 
 export function AdminNavigation({ isExpanded, onNavigate }: AdminNavigationProps) {
-  const { pathname, search } = useLocation();
+  const { search } = useLocation();
   const demo = import.meta.env.DEV && new URLSearchParams(search).get('demo') === '1';
 
   return (
