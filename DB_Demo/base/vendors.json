@@ -180,6 +180,146 @@
         "bank_account_number": "00700648686",
         "verification_status": "APPROVED"
       }
+    },
+    {
+      "sqlRow": {
+        "id": "ba010000-0000-0000-0000-000000000010",
+        "user_id": "b1010000-0000-0000-0000-000000000010",
+        "business_name": "Mỹ Khê Jet Sports",
+        "address": "Bãi tắm số 3, Đường Võ Nguyên Giáp, Phường Phước Mỹ, Sơn Trà, Đà Nẵng",
+        "tax_code": "0402111010",
+        "bank_name": "Vietcombank",
+        "bank_account_holder": "MY KHE JET SPORTS CO LTD",
+        "bank_account_number": "0041000999010",
+        "badge_tier": "NONE",
+        "rating_avg": "0.00",
+        "rating_count": 0,
+        "verification_status": "PENDING",
+        "verified_at": null,
+        "verified_by": null,
+        "created_at": "2026-11-01T08:00:00.000000+00:00",
+        "updated_at": "2026-11-01T08:00:00.000000+00:00"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "ba010000-0000-0000-0000-000000000011",
+        "user_id": "b1010000-0000-0000-0000-000000000011",
+        "business_name": "Bán Đảo Xanh SUP Club",
+        "address": "Bến Mân Thái, Đường Hoàng Sa, Phường Mân Thái, Sơn Trà, Đà Nẵng",
+        "tax_code": "0402111011",
+        "bank_name": "Techcombank",
+        "bank_account_holder": "BAN DAO XANH SUP CLUB",
+        "bank_account_number": "1903678999011",
+        "badge_tier": "NONE",
+        "rating_avg": "0.00",
+        "rating_count": 0,
+        "verification_status": "PENDING",
+        "verified_at": null,
+        "verified_by": null,
+        "created_at": "2026-11-02T08:00:00.000000+00:00",
+        "updated_at": "2026-11-02T08:00:00.000000+00:00"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "ba010000-0000-0000-0000-000000000012",
+        "user_id": "b1010000-0000-0000-0000-000000000012",
+        "business_name": "Biển Đông Water Sports",
+        "address": "Bãi tắm Phạm Văn Đồng, Sơn Trà, Đà Nẵng",
+        "tax_code": "0402111012",
+        "bank_name": "MB Bank",
+        "bank_account_holder": "BIEN DONG WATER SPORTS",
+        "bank_account_number": "0801100999012",
+        "badge_tier": "NONE",
+        "rating_avg": "0.00",
+        "rating_count": 0,
+        "verification_status": "REJECTED",
+        "verified_at": "2026-11-03T10:00:00.000000+00:00",
+        "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "created_at": "2026-10-28T08:00:00.000000+00:00",
+        "updated_at": "2026-11-03T10:00:00.000000+00:00"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "ba010000-0000-0000-0000-000000000013",
+        "user_id": "b1010000-0000-0000-0000-000000000013",
+        "business_name": "Nam Ô Eco Marine Tours",
+        "address": "Làng chài Nam Ô, Phường Hòa Hiệp Nam, Liên Chiểu, Đà Nẵng",
+        "tax_code": "0402111013",
+        "bank_name": "VietinBank",
+        "bank_account_holder": "NAM O ECO MARINE TOURS",
+        "bank_account_number": "7119999013",
+        "badge_tier": "NONE",
+        "rating_avg": "0.00",
+        "rating_count": 0,
+        "verification_status": "REJECTED",
+        "verified_at": "2026-11-04T14:30:00.000000+00:00",
+        "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "created_at": "2026-10-29T08:00:00.000000+00:00",
+        "updated_at": "2026-11-04T14:30:00.000000+00:00"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "ba010000-0000-0000-0000-000000000014",
+        "user_id": "b1010000-0000-0000-0000-000000000014",
+        "business_name": "Sông Hàn Night Cruise",
+        "address": "Bến tàu du lịch Sông Hàn, Đường Bạch Đằng, Hải Châu, Đà Nẵng",
+        "tax_code": "0402111014",
+        "bank_name": "BIDV",
+        "bank_account_holder": "SONG HAN NIGHT CRUISE JSC",
+        "bank_account_number": "621140119014",
+        "badge_tier": "VERIFIED",
+        "rating_avg": "3.20",
+        "rating_count": 15,
+        "verification_status": "APPROVED",
+        "verified_at": "2026-10-18T10:00:00.000000+00:00",
+        "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-11-05T09:00:00.000000+00:00"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "ba010000-0000-0000-0000-000000000015",
+        "user_id": "b1010000-0000-0000-0000-000000000015",
+        "business_name": "Non Nước Speedboat Club",
+        "address": "Bãi tắm Non Nước, Phường Hòa Hải, Ngũ Hành Sơn, Đà Nẵng",
+        "tax_code": "0402111015",
+        "bank_name": "VPBank",
+        "bank_account_holder": "NON NUOC SPEEDBOAT CLUB",
+        "bank_account_number": "155999015",
+        "badge_tier": "NONE",
+        "rating_avg": "2.80",
+        "rating_count": 8,
+        "verification_status": "APPROVED",
+        "verified_at": "2026-10-19T10:00:00.000000+00:00",
+        "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-11-05T11:00:00.000000+00:00"
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "ba010000-0000-0000-0000-000000000016",
+        "user_id": "b1010000-0000-0000-0000-000000000016",
+        "business_name": "An Thượng Beach Rental",
+        "address": "Khu phố du lịch An Thượng, Mỹ An, Ngũ Hành Sơn, Đà Nẵng",
+        "tax_code": "0402111016",
+        "bank_name": "ACB",
+        "bank_account_holder": "AN THUONG BEACH RENTAL",
+        "bank_account_number": "234999016",
+        "badge_tier": "VERIFIED",
+        "rating_avg": "4.85",
+        "rating_count": 22,
+        "verification_status": "APPROVED",
+        "verified_at": "2026-10-20T10:00:00.000000+00:00",
+        "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-20T10:00:00.000000+00:00"
+      }
     }
   ]
 }

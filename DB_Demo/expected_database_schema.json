@@ -1,5 +1,5 @@
 {
-  "reviewedMigrations": "V1-V58",
+  "reviewedMigrations": "V1-V55",
   "classification": {
     "ai_assessment_cases": "replace",
     "ai_chat_requests": "replace",
@@ -78,7 +78,6 @@
     "vendor_equipment": "replace",
     "vendor_fault_compensation_recoveries": "replace",
     "vendor_fault_compensations": "replace",
-    "vendor_role_applications": "replace",
     "vendors": "replace",
     "weather_caches": "replace",
     "wishlists": "replace"
@@ -3511,30 +3510,6 @@
             "character varying(255)",
             false,
             ""
-          ],
-          [
-            "rejection_reason",
-            "character varying(500)",
-            false,
-            ""
-          ],
-          [
-            "bank_reference",
-            "character varying(100)",
-            false,
-            ""
-          ],
-          [
-            "admin_note",
-            "character varying(1000)",
-            false,
-            ""
-          ],
-          [
-            "vendor_note",
-            "character varying(1000)",
-            false,
-            ""
           ]
         ]
       },
@@ -4591,12 +4566,6 @@
             "integer",
             true,
             ""
-          ],
-          [
-            "operation_type",
-            "character varying(50)",
-            true,
-            ""
           ]
         ]
       },
@@ -5335,24 +5304,6 @@
             "character varying(40)",
             true,
             ""
-          ],
-          [
-            "actual_slot_id",
-            "uuid",
-            false,
-            ""
-          ],
-          [
-            "is_late",
-            "boolean",
-            true,
-            ""
-          ],
-          [
-            "late_checkin_reason",
-            "character varying(255)",
-            false,
-            ""
           ]
         ]
       },
@@ -5719,18 +5670,6 @@
             "timestamp with time zone",
             true,
             ""
-          ],
-          [
-            "is_incident",
-            "boolean",
-            true,
-            ""
-          ],
-          [
-            "incident_type",
-            "character varying(50)",
-            false,
-            ""
           ]
         ]
       },
@@ -5933,96 +5872,6 @@
         ]
       },
       {
-        "name": "public.vendor_role_applications",
-        "kind": "r",
-        "columns": [
-          [
-            "id",
-            "uuid",
-            true,
-            ""
-          ],
-          [
-            "user_id",
-            "uuid",
-            true,
-            ""
-          ],
-          [
-            "business_name",
-            "character varying(255)",
-            true,
-            ""
-          ],
-          [
-            "tax_code",
-            "character varying(255)",
-            true,
-            ""
-          ],
-          [
-            "address",
-            "character varying(255)",
-            true,
-            ""
-          ],
-          [
-            "bank_account_number",
-            "character varying(255)",
-            true,
-            ""
-          ],
-          [
-            "bank_name",
-            "character varying(255)",
-            true,
-            ""
-          ],
-          [
-            "bank_account_holder",
-            "character varying(255)",
-            true,
-            ""
-          ],
-          [
-            "status",
-            "character varying(50)",
-            true,
-            ""
-          ],
-          [
-            "rejection_reason",
-            "text",
-            false,
-            ""
-          ],
-          [
-            "reviewed_by",
-            "uuid",
-            false,
-            ""
-          ],
-          [
-            "reviewed_at",
-            "timestamp with time zone",
-            false,
-            ""
-          ],
-          [
-            "created_at",
-            "timestamp with time zone",
-            true,
-            ""
-          ],
-          [
-            "updated_at",
-            "timestamp with time zone",
-            true,
-            ""
-          ]
-        ]
-      },
-      {
         "name": "public.vendors",
         "kind": "r",
         "columns": [
@@ -6119,12 +5968,6 @@
           [
             "verification_status",
             "character varying(255)",
-            false,
-            ""
-          ],
-          [
-            "rejection_reason",
-            "character varying(1000)",
             false,
             ""
           ]
@@ -7236,19 +7079,6 @@
         "validated": true
       },
       {
-        "name": "sub_orders_actual_slot_id_fkey",
-        "child": "public.sub_orders",
-        "parent": "public.service_slots",
-        "childcolumns": [
-          "actual_slot_id"
-        ],
-        "parentcolumns": [
-          "id"
-        ],
-        "definition": "FOREIGN KEY (actual_slot_id) REFERENCES service_slots(id)",
-        "validated": true
-      },
-      {
         "name": "sub_orders_booking_item_id_fkey",
         "child": "public.sub_orders",
         "parent": "public.booking_items",
@@ -7454,32 +7284,6 @@
           "id"
         ],
         "definition": "FOREIGN KEY (voucher_id) REFERENCES discount_codes(id)",
-        "validated": true
-      },
-      {
-        "name": "vendor_role_applications_reviewed_by_fkey",
-        "child": "public.vendor_role_applications",
-        "parent": "public.users",
-        "childcolumns": [
-          "reviewed_by"
-        ],
-        "parentcolumns": [
-          "id"
-        ],
-        "definition": "FOREIGN KEY (reviewed_by) REFERENCES users(id)",
-        "validated": true
-      },
-      {
-        "name": "vendor_role_applications_user_id_fkey",
-        "child": "public.vendor_role_applications",
-        "parent": "public.users",
-        "childcolumns": [
-          "user_id"
-        ],
-        "parentcolumns": [
-          "id"
-        ],
-        "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
         "validated": true
       }
     ],

@@ -1,0 +1,57 @@
+{
+  "classification": "DEVELOPMENT_SYNTHETIC",
+  "disputes": [
+    {
+      "id": "77777777-7777-7777-7777-777777777701",
+      "order_id": "00010000-0000-0000-0000-000000000001",
+      "sub_order_id": "00020000-0000-0000-0000-000000000001",
+      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "reason": "SERVICE_NOT_AS_DESCRIBED",
+      "description": "Tôi đã có mặt lúc 7h00 sáng tại bãi biển Mỹ Khê nhưng cano bị sự cố kỹ thuật không xuất bến được. Đề nghị hoàn tiền 100%.",
+      "evidence_urls": "[\"https://res.cloudinary.com/xmxguqpi/image/upload/v1793219663/danasea_demo_data_package/evidence/delay_receipt.jpg\"]",
+      "status": "RESOLVED_REFUND",
+      "refund_percentage": 100.0,
+      "created_at": "2026-11-03T09:00:00.000000+00:00",
+      "updated_at": "2026-11-03T14:00:00.000000+00:00"
+    },
+    {
+      "id": "77777777-7777-7777-7777-777777777702",
+      "order_id": "00010000-0000-0000-0000-000000000003",
+      "sub_order_id": "00020000-0000-0000-0000-000000000003",
+      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "reason": "OTHER",
+      "description": "Chuyến lặn san hô Bãi Nam diễn ra được 30 phút thì có lệnh khẩn từ Cảng vụ yêu cầu tàu quay về bến. Hai bên thống nhất hoàn 50%.",
+      "evidence_urls": "[\"https://res.cloudinary.com/xmxguqpi/image/upload/v1793219663/danasea_demo_data_package/evidence/weather_bulletin.jpg\"]",
+      "status": "RESOLVED_PARTIAL",
+      "refund_percentage": 50.0,
+      "created_at": "2026-11-04T10:00:00.000000+00:00",
+      "updated_at": "2026-11-04T16:00:00.000000+00:00"
+    },
+    {
+      "id": "77777777-7777-7777-7777-777777777703",
+      "order_id": "00010000-0000-0000-0000-000000000005",
+      "sub_order_id": "00020000-0000-0000-0000-000000000005",
+      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "reason": "OTHER",
+      "description": "Khách đến trễ 45 phút, cano theo hợp đồng đã rời bến đúng giờ để phục vụ đoàn khác. Bác bỏ khiếu nại.",
+      "evidence_urls": "[\"https://res.cloudinary.com/xmxguqpi/image/upload/v1793219663/danasea_demo_data_package/evidence/gps_departure_log.jpg\"]",
+      "status": "RESOLVED_REJECTED",
+      "refund_percentage": 0.0,
+      "created_at": "2026-11-02T11:00:00.000000+00:00",
+      "updated_at": "2026-11-02T17:00:00.000000+00:00"
+    },
+    {
+      "id": "77777777-7777-7777-7777-777777777704",
+      "order_id": "00010000-0000-0000-0000-000000000007",
+      "sub_order_id": "00020000-0000-0000-0000-000000000007",
+      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
+      "reason": "SAFETY_CONCERN",
+      "description": "Ván SUP bị xì van hơi khi mới chèo được 10 phút, khách phải bơi vào bờ. Đang chờ Trọng tài Admin xem xét nhật ký bến bãi.",
+      "evidence_urls": "[\"https://res.cloudinary.com/xmxguqpi/image/upload/v1793219663/danasea_demo_data_package/evidence/sup_valve_photo.jpg\"]",
+      "status": "OPEN",
+      "refund_percentage": null,
+      "created_at": "2026-11-06T08:30:00.000000+00:00",
+      "updated_at": "2026-11-06T08:30:00.000000+00:00"
+    }
+  ]
+}
