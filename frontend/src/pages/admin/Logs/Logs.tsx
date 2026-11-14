@@ -51,6 +51,12 @@ const ACTIVE_BE_ACTIONS: { value: LogActionFilter; label: string }[] = [
   { value: 'SERVICE_APPROVED', label: 'Phê duyệt dịch vụ' },
   { value: 'SERVICE_REJECTED', label: 'Từ chối dịch vụ' },
   { value: 'FINALIZE_SETTLEMENT', label: 'Chốt kỳ quyết toán' },
+  { value: 'PAYOUT_REQUEST_APPROVED', label: 'Phê duyệt yêu cầu chi trả' },
+  { value: 'PAYOUT_REQUEST_REJECTED', label: 'Từ chối yêu cầu chi trả' },
+  { value: 'PAYOUT_REQUEST_PAID', label: 'Đánh dấu đã chi trả' },
+  { value: 'DISPUTE_RESOLVED', label: 'Giải quyết khiếu nại' },
+  { value: 'SYSTEM_CONFIG_UPDATED', label: 'Cập nhật cấu hình hệ thống' },
+  { value: 'COMMISSION_RULE_UPDATED', label: 'Cập nhật quy tắc hoa hồng' },
   { value: 'REFUND_MANUALLY_COMPLETED', label: 'Hoàn tiền thủ công thành công' },
   { value: 'USER_LOCKED', label: 'Khóa tài khoản' },
   { value: 'USER_UNLOCKED', label: 'Mở khóa tài khoản' },
@@ -67,13 +73,8 @@ const ACTIVE_BE_ACTIONS: { value: LogActionFilter; label: string }[] = [
 
 // Planned actions that do not yet emit backend audit logs
 const PLANNED_ACTIONS: { value: LogActionFilter; label: string }[] = [
-  { value: 'APPROVE_PAYOUT', label: 'Duyệt quyết toán (Chưa có log BE)' },
-  { value: 'REJECT_PAYOUT', label: 'Từ chối quyết toán (Chưa có log BE)' },
-  { value: 'MARK_PAYOUT_PAID', label: 'Xác nhận đã chuyển tiền (Chưa có log BE)' },
   { value: 'VERIFY_VENDOR', label: 'Xác minh đối tác (Chưa có log BE)' },
-  { value: 'RESOLVE_DISPUTE', label: 'Giải quyết khiếu nại (Chưa có log BE)' },
   { value: 'PROCESS_REFUND', label: 'Xử lý hoàn tiền (Chưa có log BE)' },
-  { value: 'UPDATE_SYSTEM_CONFIG', label: 'Cập nhật cấu hình (Chưa có log BE)' },
   { value: 'CREATE_PROMOTION', label: 'Tạo mã khuyến mãi (Chưa có log BE)' },
   { value: 'UPDATE_PROMOTION', label: 'Cập nhật khuyến mãi (Chưa có log BE)' },
   { value: 'ADMIN_LOGIN', label: 'Đăng nhập quản trị (Chưa có log BE)' },
@@ -87,6 +88,10 @@ const ACTIVE_BE_ENTITIES: { value: LogEntityFilter; label: string }[] = [
   { value: 'VENDOR_DOCUMENT', label: 'Chứng từ đối tác' },
   { value: 'SERVICE', label: 'Dịch vụ trải nghiệm' },
   { value: 'SETTLEMENT', label: 'Kỳ quyết toán' },
+  { value: 'PAYOUT_REQUEST', label: 'Yêu cầu chi trả' },
+  { value: 'DISPUTE', label: 'Khiếu nại khách hàng' },
+  { value: 'SYSTEM_CONFIG', label: 'Cấu hình hệ thống' },
+  { value: 'COMMISSION_RULE', label: 'Quy tắc hoa hồng' },
   { value: 'REFUND', label: 'Yêu cầu hoàn tiền' },
   { value: 'USER', label: 'Tài khoản người dùng' },
   { value: 'ORDER', label: 'Đơn hàng' },
@@ -95,9 +100,6 @@ const ACTIVE_BE_ENTITIES: { value: LogEntityFilter; label: string }[] = [
 
 // Planned entity types (not yet actively logged)
 const PLANNED_ENTITIES: { value: LogEntityFilter; label: string }[] = [
-  { value: 'PAYOUT_REQUEST', label: 'Yêu cầu quyết toán (Chưa có log BE)' },
-  { value: 'DISPUTE', label: 'Khiếu nại khách hàng (Chưa có log BE)' },
-  { value: 'SYSTEM_CONFIG', label: 'Tham số hệ thống (Chưa có log BE)' },
   { value: 'PROMOTION', label: 'Mã khuyến mãi (Chưa có log BE)' },
 ];
 

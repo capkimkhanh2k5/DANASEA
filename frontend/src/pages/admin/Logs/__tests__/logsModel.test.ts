@@ -49,9 +49,29 @@ describe('Audit Logs Model & Transformations', () => {
     assert.equal(userUnlockMeta.label, 'Mở khóa tài khoản');
     assert.equal(userUnlockMeta.tone, 'teal');
 
-    const plannedPayout = getActionMeta('APPROVE_PAYOUT');
-    assert.equal(plannedPayout.label, 'Duyệt quyết toán (Chưa có log BE)');
-    assert.equal(plannedPayout.tone, 'neutral');
+    const payoutApprovedMeta = getActionMeta('PAYOUT_REQUEST_APPROVED');
+    assert.equal(payoutApprovedMeta.label, 'Phê duyệt yêu cầu chi trả');
+    assert.equal(payoutApprovedMeta.tone, 'teal');
+
+    const payoutRejectedMeta = getActionMeta('PAYOUT_REQUEST_REJECTED');
+    assert.equal(payoutRejectedMeta.label, 'Từ chối yêu cầu chi trả');
+    assert.equal(payoutRejectedMeta.tone, 'rose');
+
+    const payoutPaidMeta = getActionMeta('PAYOUT_REQUEST_PAID');
+    assert.equal(payoutPaidMeta.label, 'Đánh dấu đã chi trả');
+    assert.equal(payoutPaidMeta.tone, 'teal');
+
+    const disputeResolvedMeta = getActionMeta('DISPUTE_RESOLVED');
+    assert.equal(disputeResolvedMeta.label, 'Giải quyết khiếu nại');
+    assert.equal(disputeResolvedMeta.tone, 'teal');
+
+    const systemConfigMeta = getActionMeta('SYSTEM_CONFIG_UPDATED');
+    assert.equal(systemConfigMeta.label, 'Cập nhật cấu hình hệ thống');
+    assert.equal(systemConfigMeta.tone, 'amber');
+
+    const commissionRuleMeta = getActionMeta('COMMISSION_RULE_UPDATED');
+    assert.equal(commissionRuleMeta.label, 'Cập nhật quy tắc hoa hồng');
+    assert.equal(commissionRuleMeta.tone, 'amber');
 
     const rejectMeta = getActionMeta('PARTNER_APPLICATION_REJECTION');
     assert.equal(rejectMeta.label, 'Từ chối đơn đăng ký đối tác');
@@ -75,8 +95,11 @@ describe('Audit Logs Model & Transformations', () => {
     assert.equal(ENTITY_LABELS['USER'], 'Tài khoản người dùng');
     assert.equal(ENTITY_LABELS['ORDER'], 'Đơn hàng');
     assert.equal(ENTITY_LABELS['FLASH_SALE'], 'Flash Sale');
-    assert.equal(ENTITY_LABELS['PAYOUT_REQUEST'], 'Yêu cầu quyết toán (Dự kiến)');
-    assert.equal(ENTITY_LABELS['PayoutRequest'], 'Yêu cầu quyết toán (Dự kiến)');
+    assert.equal(ENTITY_LABELS['PAYOUT_REQUEST'], 'Yêu cầu chi trả');
+    assert.equal(ENTITY_LABELS['DISPUTE'], 'Khiếu nại khách hàng');
+    assert.equal(ENTITY_LABELS['SYSTEM_CONFIG'], 'Cấu hình hệ thống');
+    assert.equal(ENTITY_LABELS['COMMISSION_RULE'], 'Quy tắc hoa hồng');
+    assert.equal(ENTITY_LABELS['PayoutRequest'], 'Yêu cầu chi trả');
     assert.equal(ENTITY_LABELS['Order'], 'Đơn hàng');
   });
 
@@ -224,6 +247,38 @@ describe('Audit Logs Model & Transformations', () => {
     const payoutEntityMatch = filterAuditLogs(testList, '', 'ALL', 'PAYOUT_REQUEST');
     assert.equal(payoutEntityMatch.length, 1);
     assert.equal(payoutEntityMatch[0].id, 'log-2');
+
+    // 10. Newly added action alias match: filter by PAYOUT_REQUEST_APPROVED matches legacy APPROVE_PAYOUT
+    const payoutActionAliasMatch = filterAuditLogs(testList, '', 'PAYOUT_REQUEST_APPROVED', 'ALL');
+    assert.equal(payoutActionAliasMatch.length, 1);
+    assert.equal(payoutActionAliasMatch[0].id, 'log-2');
+  });
+
+  it('parses newly supported dispute, payout, and system config metadata into readable outcomes', () => {
+    const disputeMeta = JSON.stringify({
+      disputeId: 'dsp-123',
+      previousStatus: 'OPEN',
+      newStatus: 'CUSTOMER_REFUND',
+      resolution: 'CUSTOMER_REFUND',
+      refundPercentage: 100,
+      amount: 1500000,
+      note: 'Khách hàng có bằng chứng thời tiết xấu hủy tour',
+    });
+
+    const outcomes = parseAuditOutcome(disputeMeta);
+    assert.equal(outcomes.length, 7);
+
+    const amountItem = outcomes.find(o => o.key === 'amount');
+    assert.ok(amountItem);
+    assert.ok(amountItem.value.includes('1.500.000'));
+
+    const resolutionItem = outcomes.find(o => o.key === 'resolution');
+    assert.ok(resolutionItem);
+    assert.ok(resolutionItem.value.includes('Hoàn tiền cho khách hàng'));
+
+    const noteItem = outcomes.find(o => o.key === 'note');
+    assert.ok(noteItem);
+    assert.equal(noteItem.value, 'Khách hàng có bằng chứng thời tiết xấu hủy tour');
   });
 
   it('formats dates into Vietnamese locale string with ICT time', () => {

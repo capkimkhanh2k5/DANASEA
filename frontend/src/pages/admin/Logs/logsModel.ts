@@ -22,6 +22,12 @@ export type LogActionFilter =
   | 'SERVICE_APPROVED'
   | 'SERVICE_REJECTED'
   | 'FINALIZE_SETTLEMENT'
+  | 'PAYOUT_REQUEST_APPROVED'
+  | 'PAYOUT_REQUEST_REJECTED'
+  | 'PAYOUT_REQUEST_PAID'
+  | 'DISPUTE_RESOLVED'
+  | 'SYSTEM_CONFIG_UPDATED'
+  | 'COMMISSION_RULE_UPDATED'
   | 'REFUND_MANUALLY_COMPLETED'
   | 'USER_LOCKED'
   | 'USER_UNLOCKED'
@@ -35,17 +41,17 @@ export type LogActionFilter =
   | 'DISPATCH_OVERDUE_SLOT'
   | 'EARLY_DISPATCH_SLOT'
   // Planned Actions (Chưa có log BE)
-  | 'APPROVE_PAYOUT'
-  | 'REJECT_PAYOUT'
-  | 'MARK_PAYOUT_PAID'
   | 'VERIFY_VENDOR'
-  | 'RESOLVE_DISPUTE'
   | 'PROCESS_REFUND'
   | 'UPDATE_PROMOTION'
   | 'CREATE_PROMOTION'
-  | 'UPDATE_SYSTEM_CONFIG'
   | 'ADMIN_LOGIN'
-  // Legacy Aliases
+  // Legacy / Planned Aliases
+  | 'APPROVE_PAYOUT'
+  | 'REJECT_PAYOUT'
+  | 'MARK_PAYOUT_PAID'
+  | 'RESOLVE_DISPUTE'
+  | 'UPDATE_SYSTEM_CONFIG'
   | 'APPROVE_VENDOR'
   | 'REJECT_VENDOR'
   | 'VENDOR_DOCUMENT_APPROVE'
@@ -64,6 +70,10 @@ export type LogEntityFilter =
   | 'VENDOR_DOCUMENT'
   | 'SERVICE'
   | 'SETTLEMENT'
+  | 'PAYOUT_REQUEST'
+  | 'DISPUTE'
+  | 'SYSTEM_CONFIG'
+  | 'COMMISSION_RULE'
   | 'REFUND'
   | 'USER'
   | 'ORDER'
@@ -71,9 +81,6 @@ export type LogEntityFilter =
   | 'SUB_ORDER'
   | 'FLASH_SALE'
   // Planned Entities
-  | 'PAYOUT_REQUEST'
-  | 'DISPUTE'
-  | 'SYSTEM_CONFIG'
   | 'PROMOTION'
   // Legacy PascalCase aliases
   | 'PayoutRequest'
@@ -167,6 +174,36 @@ export const ACTION_METAS: Record<string, ActionMeta> = {
     tone: 'teal',
     description: 'Quản trị viên tổng hợp đối soát và chốt chuyển doanh thu kỳ hạn cho đối tác.',
   },
+  PAYOUT_REQUEST_APPROVED: {
+    label: 'Phê duyệt yêu cầu chi trả',
+    tone: 'teal',
+    description: 'Quản trị viên phê duyệt yêu cầu chi trả / rút tiền của đối tác.',
+  },
+  PAYOUT_REQUEST_REJECTED: {
+    label: 'Từ chối yêu cầu chi trả',
+    tone: 'rose',
+    description: 'Quản trị viên từ chối yêu cầu chi trả do thông tin không hợp lệ.',
+  },
+  PAYOUT_REQUEST_PAID: {
+    label: 'Đánh dấu đã chi trả',
+    tone: 'teal',
+    description: 'Quản trị viên xác nhận đã hoàn tất chuyển tiền chi trả cho đối tác.',
+  },
+  DISPUTE_RESOLVED: {
+    label: 'Giải quyết khiếu nại',
+    tone: 'teal',
+    description: 'Quản trị viên đưa ra phán quyết và giải quyết khiếu nại của khách hàng.',
+  },
+  SYSTEM_CONFIG_UPDATED: {
+    label: 'Cập nhật cấu hình hệ thống',
+    tone: 'amber',
+    description: 'Quản trị viên cập nhật giá trị tham số cấu hình vận hành toàn sàn.',
+  },
+  COMMISSION_RULE_UPDATED: {
+    label: 'Cập nhật quy tắc hoa hồng',
+    tone: 'amber',
+    description: 'Quản trị viên điều chỉnh tỷ lệ hoặc điều kiện quy tắc hoa hồng sàn.',
+  },
   REFUND_MANUALLY_COMPLETED: {
     label: 'Hoàn tiền thủ công thành công',
     tone: 'teal',
@@ -229,30 +266,10 @@ export const ACTION_METAS: Record<string, ActionMeta> = {
   },
 
   // Planned Actions (Chưa có log BE)
-  APPROVE_PAYOUT: {
-    label: 'Duyệt quyết toán (Chưa có log BE)',
-    tone: 'neutral',
-    description: 'Chấp thuận yêu cầu rút tiền hoặc giải ngân cho đối tác (Hành động dự kiến).',
-  },
-  REJECT_PAYOUT: {
-    label: 'Từ chối quyết toán (Chưa có log BE)',
-    tone: 'neutral',
-    description: 'Từ chối yêu cầu rút tiền của đối tác (Hành động dự kiến).',
-  },
-  MARK_PAYOUT_PAID: {
-    label: 'Xác nhận đã chuyển tiền (Chưa có log BE)',
-    tone: 'neutral',
-    description: 'Đánh dấu ngân hàng đã chuyển tiền thành công cho đối tác (Hành động dự kiến).',
-  },
   VERIFY_VENDOR: {
     label: 'Xác minh đối tác (Chưa có log BE)',
     tone: 'neutral',
     description: 'Thẩm định hồ sơ năng lực và cấp huy hiệu đối tác tin cậy (Hành động dự kiến).',
-  },
-  RESOLVE_DISPUTE: {
-    label: 'Giải quyết khiếu nại (Chưa có log BE)',
-    tone: 'neutral',
-    description: 'Phân xử tranh chấp giữa khách hàng và nhà cung cấp dịch vụ (Hành động dự kiến).',
   },
   PROCESS_REFUND: {
     label: 'Xử lý hoàn tiền (Chưa có log BE)',
@@ -269,18 +286,38 @@ export const ACTION_METAS: Record<string, ActionMeta> = {
     tone: 'neutral',
     description: 'Phát hành chương trình ưu đãi hoặc mã voucher toàn sàn mới (Hành động dự kiến).',
   },
-  UPDATE_SYSTEM_CONFIG: {
-    label: 'Cập nhật cấu hình (Chưa có log BE)',
-    tone: 'neutral',
-    description: 'Thay đổi tham số vận hành sàn hoặc tiêu chuẩn an toàn biển (Hành động dự kiến).',
-  },
   ADMIN_LOGIN: {
     label: 'Đăng nhập quản trị (Chưa có log BE)',
     tone: 'neutral',
     description: 'Phiên xác thực bảo mật truy cập bảng điều khiển quản trị (Hành động dự kiến).',
   },
 
-  // Legacy Aliases (Tương thích ngược)
+  // Legacy / Planned Aliases (Tương thích ngược)
+  APPROVE_PAYOUT: {
+    label: 'Phê duyệt yêu cầu chi trả',
+    tone: 'teal',
+    description: 'Phê duyệt yêu cầu chi trả cho đối tác (Mã cũ / Alias: APPROVE_PAYOUT).',
+  },
+  REJECT_PAYOUT: {
+    label: 'Từ chối yêu cầu chi trả',
+    tone: 'rose',
+    description: 'Từ chối yêu cầu chi trả của đối tác (Mã cũ / Alias: REJECT_PAYOUT).',
+  },
+  MARK_PAYOUT_PAID: {
+    label: 'Đánh dấu đã chi trả',
+    tone: 'teal',
+    description: 'Xác nhận đã chuyển tiền chi trả thành công (Mã cũ / Alias: MARK_PAYOUT_PAID).',
+  },
+  RESOLVE_DISPUTE: {
+    label: 'Giải quyết khiếu nại',
+    tone: 'teal',
+    description: 'Phân xử tranh chấp giữa khách hàng và đối tác (Mã cũ / Alias: RESOLVE_DISPUTE).',
+  },
+  UPDATE_SYSTEM_CONFIG: {
+    label: 'Cập nhật cấu hình hệ thống',
+    tone: 'amber',
+    description: 'Thay đổi tham số cấu hình vận hành hệ thống (Mã cũ / Alias: UPDATE_SYSTEM_CONFIG).',
+  },
   APPROVE_VENDOR: {
     label: 'Phê duyệt hồ sơ đối tác',
     tone: 'teal',
@@ -326,16 +363,17 @@ export const ENTITY_LABELS: Record<string, string> = {
   VENDOR_DOCUMENT: 'Chứng từ đối tác',
   SERVICE: 'Dịch vụ trải nghiệm',
   SETTLEMENT: 'Kỳ quyết toán',
+  PAYOUT_REQUEST: 'Yêu cầu chi trả',
+  DISPUTE: 'Khiếu nại khách hàng',
+  SYSTEM_CONFIG: 'Cấu hình hệ thống',
+  COMMISSION_RULE: 'Quy tắc hoa hồng',
   REFUND: 'Yêu cầu hoàn tiền',
   USER: 'Tài khoản người dùng',
   ORDER: 'Đơn hàng',
   MASTER_ORDER: 'Đơn hàng tổng',
   SUB_ORDER: 'Đơn hàng dịch vụ',
   FLASH_SALE: 'Flash Sale',
-  PAYOUT_REQUEST: 'Yêu cầu quyết toán (Dự kiến)',
-  DISPUTE: 'Khiếu nại khách hàng (Dự kiến)',
-  SYSTEM_CONFIG: 'Tham số hệ thống (Dự kiến)',
-  PROMOTION: 'Mã khuyến mãi (Dự kiến)',
+  PROMOTION: 'Mã khuyến mãi (Chưa có log BE)',
 
   // Legacy / PascalCase aliases
   Payment: 'Giao dịch thanh toán',
@@ -347,10 +385,11 @@ export const ENTITY_LABELS: Record<string, string> = {
   Refund: 'Yêu cầu hoàn tiền',
   User: 'Tài khoản người dùng',
   Order: 'Đơn hàng',
-  PayoutRequest: 'Yêu cầu quyết toán (Dự kiến)',
-  Dispute: 'Khiếu nại khách hàng (Dự kiến)',
-  SystemConfig: 'Tham số hệ thống (Dự kiến)',
-  Promotion: 'Mã khuyến mãi (Dự kiến)',
+  PayoutRequest: 'Yêu cầu chi trả',
+  Dispute: 'Khiếu nại khách hàng',
+  SystemConfig: 'Cấu hình hệ thống',
+  CommissionRule: 'Quy tắc hoa hồng',
+  Promotion: 'Mã khuyến mãi (Chưa có log BE)',
   DiscountCode: 'Mã giảm giá',
 };
 
@@ -488,14 +527,38 @@ export interface FormattedAuditOutcome {
 }
 
 export const FIELD_LABELS: Record<string, string> = {
-  amount: 'Số tiền quyết toán',
+  amount: 'Số tiền giao dịch / quyết toán',
+  totalAmount: 'Tổng giá trị quyết toán',
   bankRef: 'Mã tham chiếu ngân hàng',
   vendor: 'Đối tác thụ hưởng',
   vendorId: 'Mã đối tác liên quan',
+  payoutRequestId: 'Mã yêu cầu chi trả',
+  disputeId: 'Mã khiếu nại',
+  subOrderId: 'Mã đơn dịch vụ liên quan',
+  subOrderCount: 'Số đơn dịch vụ quyết toán',
+  refundId: 'Mã giao dịch hoàn tiền',
+  refundPercentage: 'Tỷ lệ hoàn tiền (%)',
+  previousStatus: 'Trạng thái trước đó',
+  newStatus: 'Trạng thái mới',
+  resolution: 'Phương án giải quyết',
+  key: 'Khóa cấu hình',
+  previousValue: 'Giá trị trước thay đổi',
+  newValue: 'Giá trị mới áp dụng',
+  ruleId: 'Mã quy tắc hoa hồng',
+  ruleCode: 'Mã định danh quy tắc',
+  ruleName: 'Tên quy tắc hoa hồng',
+  targetType: 'Đối tượng áp dụng',
+  previousRate: 'Tỷ lệ hoa hồng trước (%)',
+  newRate: 'Tỷ lệ hoa hồng mới (%)',
+  previousActive: 'Kích hoạt trước đó',
+  isActive: 'Trạng thái kích hoạt',
+  previousDurationDays: 'Thời hạn trước đó (ngày)',
+  durationDays: 'Thời hạn áp dụng (ngày)',
+  updatedBy: 'Người cập nhật',
+  description: 'Mô tả chi tiết',
   badgeTier: 'Hạng đối tác cấp',
   licenseNo: 'Giấy phép kinh doanh',
   verifiedDocs: 'Chứng từ đã duyệt',
-  resolution: 'Phương án giải quyết',
   penalty: 'Biện pháp chế tài',
   oldVal: 'Giá trị trước thay đổi',
   newVal: 'Giá trị mới áp dụng',
@@ -509,6 +572,7 @@ export const FIELD_LABELS: Record<string, string> = {
   lastReconciledAt: 'Thời điểm đối soát gần nhất',
   actorRole: 'Vai trò người thực hiện',
   note: 'Ghi chú thẩm định',
+  adminNote: 'Ghi chú quản trị',
   ipAddress: 'Địa chỉ IP',
   userAgent: 'Trình duyệt / Thiết bị',
 };
@@ -529,6 +593,13 @@ export const VALUE_TRANSLATIONS: Record<string, string> = {
   EXPIRED: 'Hết hạn thanh toán (EXPIRED)',
   VERIFIED: 'Đã xác minh (VERIFIED)',
   REJECTED: 'Đã từ chối (REJECTED)',
+  APPROVED: 'Đã phê duyệt (APPROVED)',
+  PAID: 'Đã chi trả (PAID)',
+  RESOLVED: 'Đã giải quyết (RESOLVED)',
+  CUSTOMER_REFUND: 'Hoàn tiền cho khách hàng (CUSTOMER_REFUND)',
+  VENDOR_PAYOUT: 'Thanh toán cho đối tác (VENDOR_PAYOUT)',
+  SPLIT_EQUAL: 'Phân chia 50-50 (SPLIT_EQUAL)',
+  DISMISSED: 'Bác đơn khiếu nại (DISMISSED)',
 };
 
 /**
@@ -605,7 +676,17 @@ export function filterAuditLogs(
         (actionFilter === 'USER_LOCKED' && log.action === 'LOCK_USER_ACCOUNT') ||
         (actionFilter === 'LOCK_USER_ACCOUNT' && log.action === 'USER_LOCKED') ||
         (actionFilter === 'USER_UNLOCKED' && log.action === 'UNLOCK_USER_ACCOUNT') ||
-        (actionFilter === 'UNLOCK_USER_ACCOUNT' && log.action === 'USER_UNLOCKED');
+        (actionFilter === 'UNLOCK_USER_ACCOUNT' && log.action === 'USER_UNLOCKED') ||
+        (actionFilter === 'PAYOUT_REQUEST_APPROVED' && log.action === 'APPROVE_PAYOUT') ||
+        (actionFilter === 'APPROVE_PAYOUT' && log.action === 'PAYOUT_REQUEST_APPROVED') ||
+        (actionFilter === 'PAYOUT_REQUEST_REJECTED' && log.action === 'REJECT_PAYOUT') ||
+        (actionFilter === 'REJECT_PAYOUT' && log.action === 'PAYOUT_REQUEST_REJECTED') ||
+        (actionFilter === 'PAYOUT_REQUEST_PAID' && log.action === 'MARK_PAYOUT_PAID') ||
+        (actionFilter === 'MARK_PAYOUT_PAID' && log.action === 'PAYOUT_REQUEST_PAID') ||
+        (actionFilter === 'DISPUTE_RESOLVED' && log.action === 'RESOLVE_DISPUTE') ||
+        (actionFilter === 'RESOLVE_DISPUTE' && log.action === 'DISPUTE_RESOLVED') ||
+        (actionFilter === 'SYSTEM_CONFIG_UPDATED' && log.action === 'UPDATE_SYSTEM_CONFIG') ||
+        (actionFilter === 'UPDATE_SYSTEM_CONFIG' && log.action === 'SYSTEM_CONFIG_UPDATED');
 
       if (!matchAction) {
         return false;
