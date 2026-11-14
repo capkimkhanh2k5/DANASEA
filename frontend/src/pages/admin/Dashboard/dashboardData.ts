@@ -144,7 +144,7 @@ export async function loadAdminDashboard(get: DashboardGet, range: DateRange, si
       vendors, services, refunds,
       disputes: disputesOpen === null || disputesReview === null ? null : disputesOpen + disputesReview,
       settlements: settlementDraft === null || settlementPending === null ? null : settlementDraft + settlementPending,
-      roleApplications: roleApplications !== null ? roleApplications : 1,
+      roleApplications,
     },
   };
 }
