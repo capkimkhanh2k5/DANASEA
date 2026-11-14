@@ -31,7 +31,7 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
   void initState() {
     super.initState();
     _currentSettlementId = widget.initialSettlementId ??
-        (_db.settlements.isNotEmpty ? _db.settlements.first.id : 'SETTLE-202410-01');
+        (_db.settlements.isNotEmpty ? _db.settlements.first.id : '');
     _db.addListener(_onDbChanged);
   }
 
@@ -200,9 +200,11 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                               shape: BoxShape.circle,
                             ),
                             alignment: Alignment.center,
-                            child: const Text(
-                              'VCB',
-                              style: TextStyle(
+                            child: Text(
+                              (vendor.bankName != null && vendor.bankName!.isNotEmpty)
+                                  ? vendor.bankName!.substring(0, vendor.bankName!.length >= 3 ? 3 : vendor.bankName!.length).toUpperCase()
+                                  : 'BANK',
+                              style: const TextStyle(
                                 color: AppColors.secondary,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
@@ -215,7 +217,9 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  vendor.bankAccountNumber ?? '0041000889988',
+                                  (vendor.bankAccountNumber != null && vendor.bankAccountNumber!.isNotEmpty)
+                                      ? vendor.bankAccountNumber!
+                                      : 'Chưa cấu hình số tài khoản',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
@@ -223,7 +227,7 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '${vendor.bankAccountHolder ?? "TRAN HAI DANG"} • ${vendor.bankName ?? "Vietcombank"} CN Đà Nẵng',
+                                  '${(vendor.bankAccountHolder != null && vendor.bankAccountHolder!.isNotEmpty) ? vendor.bankAccountHolder : "Chưa nhập chủ TK"} • ${(vendor.bankName != null && vendor.bankName!.isNotEmpty) ? vendor.bankName : "Chưa chọn ngân hàng"}',
                                   style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -439,12 +443,16 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_db.settlements.any((s) => s.id == _currentSettlementId)) {
+      return Scaffold(appBar: AppBar(title: const Text('Chi tiết kỳ đối soát')), body: const Center(child: Text('Chưa có dữ liệu kỳ đối soát.')));
+    }
     final currentSettlement = _db.settlements.firstWhere(
       (s) => s.id == _currentSettlementId,
       orElse: () => _db.settlements.first,
     );
     final isPending = currentSettlement.status == SettlementStatus.pending;
-    final sampleSubOrders = _db.subOrders.take(3).toList();
+    // The API does not supply settlement membership; do not infer it from cached orders.
+    final settlementOrders = <SubOrderModel>[];
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -734,13 +742,15 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
             LocalizedText('Các đơn đã hoàn thành thực tế được chốt đối soát', style: AppTypography.bodySm.copyWith(color: AppColors.tertiary)),
             const SizedBox(height: 10),
 
+            if (settlementOrders.isEmpty)
+              const Text('Chưa có danh sách đơn thuộc kỳ đối soát từ máy chủ.'),
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: sampleSubOrders.length,
+              itemCount: settlementOrders.length,
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, idx) {
-                final o = sampleSubOrders[idx];
+                final o = settlementOrders[idx];
                 return Material(
                   color: Colors.transparent,
                   child: InkWell(

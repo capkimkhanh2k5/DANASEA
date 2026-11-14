@@ -143,6 +143,19 @@ class DemoRequestTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertNotIn('private-demo-password', result.stderr)
 
+    def test_replace_envelope_defaults_to_the_demo_login_password(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            _, signers = self.signed(directory)
+            result = subprocess.run(
+                [sys.executable, demo_request.__file__, 'envelope', '--request', str(directory / 'request.json'),
+                 '--signature', str(directory / 'request.json.sig'), '--password-env', 'DEMO_USER_PASSWORD'],
+                env=dict(os.environ, DEMO_USER_PASSWORD=''), capture_output=True, text=True, check=True,
+            )
+            body, password = demo_request.verify(result.stdout, signers, SHA, REPO)
+            self.assertEqual('replace', body['action'])
+            self.assertEqual('danasea@2026', password)
+
 
 if __name__ == '__main__':
     unittest.main()

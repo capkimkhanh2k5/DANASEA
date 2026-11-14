@@ -40,6 +40,7 @@ const VendorDisputes = lazy(() => import("./pages/vendor/Disputes/Disputes").the
 const VendorDisputeDetail = lazy(() => import("./pages/vendor/Disputes/DisputeDetail").then((m) => ({ default: m.DisputeDetail })));
 const VendorProfile = lazy(() => import("./pages/vendor/Profile/Profile").then((m) => ({ default: m.Profile })));
 const VendorMessages = lazy(() => import("./pages/vendor/Messages/VendorMessages").then((m) => ({ default: m.VendorMessages })));
+const VendorCopilotPage = lazy(() => import("./pages/vendor/Copilot/VendorCopilotPage").then((m) => ({ default: m.VendorCopilotPage })));
 
 // Admin Phase 5
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard/AdminDashboard").then((m) => ({ default: m.AdminDashboard })));
@@ -90,26 +91,27 @@ function App() {
             <Route path="inbox" element={<Inbox />} />
           </Route>
 
-          {/* NHÀ CUNG CẤP */}
-          <Route path="/vendor" element={<VendorLayout />}>
-            <Route index element={<VendorDashboard />} />
-            <Route path="analytics" element={<AnalyticsDashboard />} />
-            <Route path="profile" element={<VendorProfile />} />
-            <Route path="services" element={<Services />} />
-            <Route path="equipment" element={<Equipment />} />
-            <Route path="services/new" element={<ServiceForm />} />
-            <Route path="services/:serviceId/edit" element={<ServiceForm />} />
-            <Route path="services/:serviceId" element={<ServiceForm />} />
-            <Route path="schedule" element={<Schedule />} />
-            <Route path="messages" element={<VendorMessages />} />
-            <Route path="orders" element={<VendorOrders />} />
-            <Route path="promotions" element={<Promotions />} />
-            <Route path="reviews" element={<VendorReviews />} />
-            <Route path="revenue" element={<Revenue />} />
-            <Route path="payouts" element={<Payouts />} />
-            <Route path="disputes" element={<VendorDisputes />} />
-            <Route path="disputes/:id" element={<VendorDisputeDetail />} />
-          </Route>
+        {/* NHÀ CUNG CẤP */}
+        <Route path="/vendor" element={<VendorLayout />}>
+          <Route index element={<VendorDashboard />} />
+          <Route path="copilot" element={<VendorCopilotPage />} />
+          <Route path="analytics" element={<AnalyticsDashboard />} />
+          <Route path="profile" element={<VendorProfile />} />
+          <Route path="services" element={<Services />} />
+          <Route path="equipment" element={<Equipment />} />
+          <Route path="services/new" element={<ServiceForm />} />
+          <Route path="services/:serviceId/edit" element={<ServiceForm />} />
+          <Route path="services/:serviceId" element={<ServiceForm />} />
+          <Route path="schedule" element={<Schedule />} />
+          <Route path="messages" element={<VendorMessages />} />
+          <Route path="orders" element={<VendorOrders />} />
+          <Route path="promotions" element={<Promotions />} />
+          <Route path="reviews" element={<VendorReviews />} />
+          <Route path="revenue" element={<Revenue />} />
+          <Route path="payouts" element={<Payouts />} />
+          <Route path="disputes" element={<VendorDisputes />} />
+          <Route path="disputes/:id" element={<VendorDisputeDetail />} />
+        </Route>
 
           {/* QUẢN TRỊ VIÊN */}
           <Route path="/admin" element={<AdminLayout />}>

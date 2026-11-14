@@ -1,3 +1,4 @@
+import '../../../../core/data/vendor_repositories.dart';
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -60,16 +61,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   bool _isMyMessage(MessageModel msg) {
     final s = msg.senderId.trim().toLowerCase();
-    return s == 'vnd-001' ||
-        s == 'usr-vnd-001' ||
-        s.contains('vnd') ||
+    return s.isNotEmpty && (
         s == _db.currentVendor.id ||
-        s == _db.currentUser.id;
+        s == _db.currentUser.id);
   }
 
-  void _sendMessage(String text) {
+  Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
-    _db.sendMessage(widget.conversationId, 'vnd-001', text.trim());
+    try {
+      await VendorChatRepository().sendMessage(widget.conversationId, text.trim());
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Không gửi được tin nhắn: $error')));
+      return;
+    }
+    if (!mounted) return;
     _msgController.clear();
     _scrollToBottom();
   }
@@ -260,7 +265,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   const SizedBox(width: 8),
                   _buildQuickPill('Gửi đồ tại quầy', 'Dạ có tủ gửi đồ an toàn tại quầy luôn bạn nhé.'),
                   const SizedBox(width: 8),
-                  _buildQuickPill('Vị trí tập kết', 'Quầy Danang Ocean Club tại Lô 12 Võ Nguyên Giáp, bãi tắm số 3 Mỹ Khê ạ.'),
+                  _buildQuickPill('Vị trí tập kết', _db.currentVendor.address ?? ''),
                 ],
               ),
             ),
@@ -279,7 +284,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   IconButton(
                     icon: const Icon(Icons.add_photo_alternate_outlined, color: AppColors.secondary, size: 22),
                     onPressed: () {
-                      _sendMessage('📍 Đã gửi vị trí: Bến bãi Danang Ocean Club - Bãi biển Mỹ Khê');
+                      _sendMessage(_db.currentVendor.address ?? '');
                     },
                   ),
                   Expanded(

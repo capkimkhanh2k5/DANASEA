@@ -17,6 +17,7 @@ interface WishlistState {
   removeFromWishlist: (serviceId: string, serviceName?: string) => void;
   fetchWishlistFromServer: () => Promise<void>;
   clearToast: () => void;
+  resetWishlist: () => void;
 }
 
 export const useWishlistStore = create<WishlistState>()(
@@ -39,18 +40,27 @@ export const useWishlistStore = create<WishlistState>()(
         set({ isLoading: true });
         try {
           const items = await wishlistService.getWishlists();
-          const serverIds = items.map((i) => i.serviceId);
-          // Merge server IDs with local IDs to avoid losing state
-          const merged = Array.from(new Set([...get().wishlistIds, ...serverIds]));
+          const serverIds = items.map((i) => i.serviceId).filter(Boolean);
+          // Grounding to actual server database items (avoid stale local cache ghost counts)
           set({
             serverItems: items,
-            wishlistIds: merged,
+            wishlistIds: serverIds,
             isLoading: false,
           });
         } catch (err) {
           console.warn('[useWishlistStore] Không thể đồng bộ từ máy chủ:', err);
           set({ isLoading: false });
         }
+      },
+
+      resetWishlist: () => {
+        set({
+          wishlistIds: [],
+          serverItems: [],
+          isLoading: false,
+          toastMessage: null,
+          toastTimestamp: 0,
+        });
       },
 
       toggleWishlist: (serviceId: string, serviceName?: string) => {
@@ -120,3 +130,10 @@ export const useWishlistStore = create<WishlistState>()(
     }
   )
 );
+
+// Auto-reset local wishlist store when user logs out
+useAuthStore.subscribe((state, prevState) => {
+  if (prevState.isAuthenticated && !state.isAuthenticated) {
+    useWishlistStore.getState().resetWishlist();
+  }
+});

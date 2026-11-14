@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/data/vendor_store.dart';
+import '../../../../core/data/vendor_repositories.dart';
+import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/toast_notification.dart';
 
 class NotificationSafetyScreen extends StatefulWidget {
@@ -16,12 +18,51 @@ class NotificationSafetyScreen extends StatefulWidget {
 
 class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
   final _db = VendorStore.instance;
+  final _notifRepo = VendorNotificationRepository();
   String _selectedFilter = 'all'; // all, sea_safety, order, system
+  AdvanceSafetyCheckModel? _advanceSafety;
+  bool _loadingWeather = false;
 
   @override
   void initState() {
     super.initState();
     _db.addListener(_onDbChanged);
+    _refreshLiveMarineSafety();
+    _notifRepo.getNotifications().catchError((_) => _db.notifications);
+  }
+
+  Future<void> _refreshLiveMarineSafety() async {
+    if (_loadingWeather) return;
+    setState(() => _loadingWeather = true);
+    try {
+      final firstService = _db.services.isNotEmpty ? _db.services.first : null;
+      final firstSlot = _db.slots.isNotEmpty ? _db.slots.first : null;
+      final firstCategory = _db.categories.isNotEmpty ? _db.categories.first : null;
+      final results = await Future.wait([
+        _notifRepo.getWeatherInfo(
+          lat: firstService?.latitude,
+          lng: firstService?.longitude,
+        ),
+        _notifRepo.checkAdvanceSafety(
+          slotId: firstSlot?.slotId,
+          categoryId: firstService?.categoryId ?? firstCategory?.id,
+          categorySlug: firstCategory?.slug,
+          latitude: firstService?.latitude,
+          longitude: firstService?.longitude,
+          bookingDate: firstSlot?.date ?? DateTime.now(),
+          startTime: firstSlot?.startTime,
+          endTime: firstSlot?.endTime,
+        ),
+      ]);
+      if (mounted) {
+        setState(() {
+          _advanceSafety = results[1] as AdvanceSafetyCheckModel;
+          _loadingWeather = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingWeather = false);
+    }
   }
 
   @override
@@ -63,11 +104,13 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.8,
                     )),
-            LocalizedText('Danang Ocean Club',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.onSurface,
-                    )),
+            LocalizedText(
+              _db.vendor.businessName.isNotEmpty ? _db.vendor.businessName : 'nhà cung cấp',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.onSurface,
+                  ),
+            ),
           ],
         ),
         actions: [
@@ -179,7 +222,10 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                         color: AppColors.secondaryContainer.withOpacity(0.5),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const LocalizedText('Trạm Mỹ Khê #02', style: TextStyle(fontSize: 10, color: AppColors.secondary, fontWeight: FontWeight.bold)),
+                      child: LocalizedText(
+                        weather.locationKey.isNotEmpty ? 'Trạm ${weather.locationKey}' : 'Trạm Đà Nẵng',
+                        style: const TextStyle(fontSize: 10, color: AppColors.secondary, fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ],
                 ),
@@ -197,12 +243,26 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                LocalizedText('Khung giờ hoạt động: 05:00 - 07:00', style: TextStyle(fontSize: 11, color: AppColors.tertiary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                LocalizedText('Bãi biển Mỹ Khê', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                LocalizedText(
+                                  _db.slots.isNotEmpty
+                                      ? 'Khung giờ hoạt động: ${_db.slots.first.startTime} - ${_db.slots.first.endTime}'
+                                      : 'Khung giờ hoạt động hôm nay',
+                                  style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                LocalizedText(
+                                  _db.services.isNotEmpty && _db.services.first.locationName.isNotEmpty
+                                      ? _db.services.first.locationName
+                                      : weather.locationName,
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ],
                             ),
                           ),
@@ -211,18 +271,36 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(
-                                color: AppColors.secondaryContainer,
+                                color: (_advanceSafety?.canBook ?? true)
+                                    ? AppColors.secondaryContainer
+                                    : AppColors.errorContainer,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.verified, size: 12, color: AppColors.onSecondaryContainer),
-                                  SizedBox(width: 3),
+                                  Icon(
+                                    (_advanceSafety?.canBook ?? true)
+                                        ? Icons.verified
+                                        : Icons.warning_amber_rounded,
+                                    size: 12,
+                                    color: (_advanceSafety?.canBook ?? true)
+                                        ? AppColors.onSecondaryContainer
+                                        : AppColors.onErrorContainer,
+                                  ),
+                                  const SizedBox(width: 3),
                                   Flexible(
                                     child: LocalizedText(
-                                      'Đủ điều kiện xuất bến',
-                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.onSecondaryContainer),
+                                      (_advanceSafety?.canBook ?? true)
+                                          ? 'Đủ điều kiện xuất bến'
+                                          : 'Cần theo dõi sóng gió',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: (_advanceSafety?.canBook ?? true)
+                                            ? AppColors.onSecondaryContainer
+                                            : AppColors.onErrorContainer,
+                                      ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
@@ -240,7 +318,9 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                               icon: Icons.air,
                               label: 'Sức gió',
                               value: '${weather.windSpeedKmh.toStringAsFixed(0)} km/h',
-                              sub: 'Ngưỡng: <25',
+                              sub: _db.services.isNotEmpty && _db.services.first.minWindKmh > 0
+                                  ? 'Tối thiểu: ${_db.services.first.minWindKmh.toStringAsFixed(0)}'
+                                  : (_advanceSafety?.safetyStatus ?? 'Trực tuyến'),
                               color: AppColors.secondary,
                             ),
                           ),
@@ -250,7 +330,9 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                               icon: Icons.tsunami,
                               label: 'Độ cao sóng',
                               value: '${weather.waveHeightM.toStringAsFixed(1)} m',
-                              sub: 'Ngưỡng: <1.2',
+                              sub: _db.services.isNotEmpty && _db.services.first.maxWaveM > 0
+                                  ? 'Ngưỡng: <${_db.services.first.maxWaveM.toStringAsFixed(1)}'
+                                  : (_advanceSafety?.safetyStatus ?? 'Trực tuyến'),
                               color: AppColors.secondary,
                             ),
                           ),
@@ -259,8 +341,8 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                             child: _buildMetricBox(
                               icon: Icons.wb_sunny_outlined,
                               label: 'Lượng mưa',
-                              value: '0.0 mm',
-                              sub: 'Trời quang',
+                              value: '${weather.precipitationMm.toStringAsFixed(1)} mm',
+                              sub: weather.precipitationMm <= 0.5 ? 'Trời quang' : 'Có mưa',
                               color: AppColors.secondary,
                             ),
                           ),
@@ -273,22 +355,47 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                           color: AppColors.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Row(
+                        child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.info_outline, size: 16, color: AppColors.secondary),
-                            SizedBox(width: 8),
+                            const Icon(Icons.info_outline, size: 16, color: AppColors.secondary),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   LocalizedText(
-                                    'Mặt nước êm ái, hướng gió thuận lợi cho hoạt động chèo SUP và lướt sóng có huấn luyện viên.',
-                                    style: TextStyle(fontSize: 12, color: AppColors.onSurface),
+                                    (_advanceSafety != null && _advanceSafety!.summaryMessage.isNotEmpty)
+                                        ? _advanceSafety!.summaryMessage
+                                        : ((weather.windSpeedKmh <= 25 && weather.waveHeightM <= 1.2)
+                                            ? 'Mặt nước êm ái, hướng gió thuận lợi cho các hoạt động thể thao biển.'
+                                            : 'Sóng gió đang tăng cao, vui lòng kiểm tra trang thiết bị bảo hộ trước khi xuất bến.'),
+                                    style: const TextStyle(fontSize: 12, color: AppColors.onSurface),
                                   ),
-                                  SizedBox(height: 4),
-                                  LocalizedText('Đánh giá lúc: 04:30 sáng nay cho slot 05:00 - 07:00',
-                                      style: TextStyle(fontSize: 10, color: AppColors.tertiary)),
+                                  if (_advanceSafety != null && _advanceSafety!.advisoryDetails.isNotEmpty) ...[
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      _advanceSafety!.advisoryDetails.first,
+                                      style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      LocalizedText(
+                                        'Cập nhật lúc: ${weather.fetchedAt.hour.toString().padLeft(2, "0")}:${weather.fetchedAt.minute.toString().padLeft(2, "0")} • Trạng thái: ${_advanceSafety?.safetyStatus ?? "SAFE"}',
+                                        style: const TextStyle(fontSize: 10, color: AppColors.tertiary),
+                                      ),
+                                      InkWell(
+                                        onTap: _loadingWeather ? null : _refreshLiveMarineSafety,
+                                        child: Text(
+                                          _loadingWeather ? 'Đang tải...' : 'Làm mới',
+                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),
@@ -340,10 +447,12 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                const Expanded(
+                                Expanded(
                                   child: LocalizedText(
-                                    'Khung giờ liên quan: 15:30',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                                    _db.slots.isNotEmpty
+                                        ? 'Khung giờ liên quan: ${_db.slots.last.startTime}'
+                                        : 'Khung giờ theo dõi tiếp theo',
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -354,11 +463,17 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: AppColors.errorContainer,
+                              color: weather.windSpeedKmh > 25 ? AppColors.errorContainer : AppColors.secondaryContainer,
                               borderRadius: BorderRadius.circular(10),
                             ),
-                            child: const LocalizedText('Gió giật cục bộ',
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.onErrorContainer)),
+                            child: LocalizedText(
+                              weather.windSpeedKmh > 25 ? 'Gió giật cục bộ' : 'Theo dõi định kỳ',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: weather.windSpeedKmh > 25 ? AppColors.onErrorContainer : AppColors.onSecondaryContainer,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -374,19 +489,26 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                             Container(
                               width: 34,
                               height: 34,
-                              decoration: const BoxDecoration(
+                              decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: AppColors.errorContainer,
+                                color: weather.windSpeedKmh > 25 ? AppColors.errorContainer : AppColors.secondaryContainer,
                               ),
-                              child: const Icon(Icons.storm, color: AppColors.error, size: 18),
+                              child: Icon(
+                                weather.windSpeedKmh > 25 ? Icons.storm : Icons.air,
+                                color: weather.windSpeedKmh > 25 ? AppColors.error : AppColors.secondary,
+                                size: 18,
+                              ),
                             ),
                             const SizedBox(width: 10),
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  LocalizedText('Sức gió ghi nhận: 28 km/h', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
-                                  LocalizedText('Kết quả đánh giá theo khung giờ', style: TextStyle(fontSize: 10, color: AppColors.tertiary)),
+                                  LocalizedText(
+                                    'Sức gió ghi nhận: ${weather.windSpeedKmh.toStringAsFixed(0)} km/h • Sóng: ${weather.waveHeightM.toStringAsFixed(1)} m',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                                  ),
+                                  const LocalizedText('Kết quả đánh giá theo khung giờ từ máy chủ', style: TextStyle(fontSize: 10, color: AppColors.tertiary)),
                                 ],
                               ),
                             ),
@@ -403,11 +525,17 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                         children: [
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () {
-                                final afternoonSlot = _db.slots.firstWhere((s) => s.startTime.startsWith('15:'), orElse: () => _db.slots.first);
-                                _db.toggleSlotBlocked(afternoonSlot.slotId);
-                                ToastNotification.showSuccess(context, 'Đã tạm khóa slot 15:30 để đảm bảo an toàn gió');
-                              },
+                              onPressed: _db.slots.isEmpty
+                                  ? null
+                                  : () async {
+                                      final targetSlot = _db.slots.last;
+                                      await VendorSlotRepository().toggleBlockSlot(targetSlot.slotId, !targetSlot.isBlocked);
+                                      if (!mounted) return;
+                                      ToastNotification.showSuccess(
+                                        context,
+                                        'Đã cập nhật trạng thái slot ${targetSlot.startTime}',
+                                      );
+                                    },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primaryContainer,
                                 foregroundColor: AppColors.onPrimary,

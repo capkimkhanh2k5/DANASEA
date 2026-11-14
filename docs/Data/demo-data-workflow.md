@@ -1,7 +1,8 @@
 # Demo Data on the server
 
 The `Demo Data` workflow replaces application data with the canonical
-`DB_Demo` package. Existing accounts, bookings and other application
+`DB_Demo` package on the server already configured for production CD.
+Existing accounts, bookings and other application
 data are removed unless needed by preserved system configuration. Schema,
 Flyway history, system configuration and safety rules are retained. Importing
 the package does not approve pending safety documents or prove every booking
@@ -14,26 +15,33 @@ records. Migrating an existing database keeps the dates and IDs of existing
 departures and bookings. Recurring rules and equipment links start empty.
 The scheduler generates the rolling 90-day horizon after a vendor saves a rule.
 
-The reviewed `DB_Demo` replacement on Flyway V49 keeps the 25 departures
-referenced by the 50 booking fixtures, including the departure originally
-derived from a booking's recorded time. It seeds daily rules for all 24
-published demo services and materializes future departures through the 90th
-calendar day in Vietnam time. Each service keeps its reviewed demo hours and
-capacity. The backend scheduler extends the window over time.
+The reviewed `DB_Demo` replacement on Flyway V58 preserves historical booking
+departures and sets the upcoming reschedule example relative to the import date.
+It seeds daily rules for all 24 published demo services and materializes future
+departures through the 90th calendar day in Vietnam time. Each service keeps its
+reviewed demo hours and capacity. The backend scheduler extends the window over
+time.
 
 Replacement creates named synthetic equipment for the private package examples
 and the shared snorkelling example. It skips dates and start times already
 represented by a fixture booking anchor. The `demoOperatingSchedule` report
-counts the generated records separately from the 646 canonical rows.
+counts the generated records separately from the 687 canonical rows.
 
 Replacement clears the target's previous operating rules, exceptions and
 equipment before seeding the demo set. Normal migrations and non-replacement
-sync do not seed the rolling window. The legacy generated SQL only creates
-concrete slots for disposable local databases.
+sync do not seed the rolling window.
 
 The V45 → V49 rehearsal on disposable PostgreSQL preserved the existing values
 of 24 departures, 6 bookings, their order and payment records, and a legacy
 seat allocation. New schedule and equipment tables remained empty.
+
+## Demo media
+
+The four synthetic disputes each include an illustration for the corresponding
+activity. The `DB_Demo/base/storage_manifest.json` entries record the author,
+source page, license, linked dispute and SHA-256. To check external media before
+a demo, fetch the original URLs and compare the response bytes with the
+manifest hashes.
 
 ## Before the first run
 
@@ -53,11 +61,14 @@ seat allocation. New schedule and equipment tables remained empty.
    Ensure the production backend uses the distinct, non-superuser database
    runtime role provisioned by `scripts/ops/production.py init-db`. Application
    maintenance must be able to stop database writers before replacement.
-4. Set the GitHub environment `production` secret `DEMO_USER_PASSWORD` to a
-   strong demo account password, at least 12 characters and at most 72 UTF-8
-   bytes. Do not enter it as a workflow input. Reuse CD's `TS_OAUTH_CLIENT_ID`,
+4. Use the GitHub environment `production` with CD's `TS_OAUTH_CLIENT_ID`,
    `TS_OAUTH_SECRET`, `SERVER_TAILSCALE_IP`, `SERVER_USER`, `SSH_PRIVATE_KEY`
    and `SSH_KNOWN_HOSTS` secrets. Keep production restricted to protected branches.
+   The shared password for imported demo accounts defaults to `danasea@2026`.
+   An existing `DEMO_USER_PASSWORD` secret overrides it. Remove the secret
+   from the workflow's applicable scopes or set it to the same value to use
+   the default. Overrides must be at least 12 characters and at most 72 UTF-8
+   bytes.
 5. Ensure private local backup storage has room for the source dump and a
    disposable restored database. Resolve pending notification work before
    replacement. Active inventory holds also block replacement; let them finish
@@ -68,6 +79,7 @@ seat allocation. New schedule and equipment tables remained empty.
 ## Run
 
 Open GitHub Actions → **Demo Data** → **Run workflow**, select branch `main`.
+Run `inspect` first and check its summary before selecting `replace`.
 
 - `inspect`: review preflight metadata without committing a replacement. It can
   also safely resume an interrupted operation proven to have stopped before
@@ -79,6 +91,11 @@ Open GitHub Actions → **Demo Data** → **Run workflow**, select branch `main`
 - `restore`: select the local backup identifier reported by a previous demo
   operation and enter confirmation `RESTORE_DEMO_DATA`. Arbitrary filesystem
   paths are rejected. Restore also protects the current state before recovery.
+
+After a successful `replace`, sign in on the existing site using a demo account
+such as `admin_demo@danasea.test` or `customer_1@danasea.test` and the password
+used for the import. The workflow verifies admin sign-in after restarting the
+backend.
 
 CD and Demo Data share a concurrency group, and operations take the server's
 deployment lock. Do not cancel an operation during replacement/recovery or

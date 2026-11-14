@@ -115,7 +115,7 @@ class AiAssistantSection extends StatelessWidget {
                       ),
                     ),
                     child: LocalizedText(
-                      'Bọn mình có 3 người, muốn trải nghiệm vào sáng sớm mai ở Mỹ Khê, ngân sách tầm 300k/người.',
+                      'Mình muốn tìm hoạt động biển phù hợp điều kiện sóng gió và ngân sách nhóm.',
                       style: AppTypography.bodySm(
                         color: AppColors.onSecondary,
                       ),
@@ -166,17 +166,17 @@ class AiAssistantSection extends StatelessWidget {
                             style: AppTypography.bodySm(color: AppColors.onSurface),
                             children: [
                               TextSpan(
-                                text: tr(context, 'Chào bạn! Gợi ý hoàn hảo nhất là buổi '),
+                                text: tr(context, 'Chào bạn! Nhấn vào nút bên dưới để '),
                               ),
                               TextSpan(
-                                text: tr(context, 'Chèo SUP đón bình minh'),
+                                text: tr(context, 'DANASEA AI'),
                                 style: const TextStyle(
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               TextSpan(
-                                text: tr(context, ' lúc 5:00 sáng tại Mỹ Khê (280.000đ/người) có huấn luyện viên kèm và chụp ảnh lưu niệm.'),
+                                text: tr(context, ' phân tích thời tiết biển thực tế và gợi ý các dịch vụ đang mở bán trên hệ thống.'),
                               ),
                             ],
                           ),

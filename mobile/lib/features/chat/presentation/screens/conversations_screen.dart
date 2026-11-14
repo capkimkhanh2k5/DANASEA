@@ -3,6 +3,7 @@ import 'package:mobile/core/l10n/app_localizations.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/conversation_repository.dart';
 import '../../../../core/data/order_repository.dart';
+import '../../../../core/data/weather_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
@@ -26,6 +27,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   bool _isCreatingConversation = false;
   String? _errorMessage;
   String _searchQuery = '';
+  WeatherSnapshotModel? _weatherSnapshot;
 
   @override
   void initState() {
@@ -37,6 +39,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
       }
     });
     _loadConversations();
+    WeatherRepository.instance.getCurrentWeather().then((snap) {
+      if (mounted) setState(() => _weatherSnapshot = snap);
+    }).catchError((_) {});
   }
 
   @override
@@ -369,7 +374,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: LocalizedText(
-                      'Biển Mỹ Khê sóng êm (0.4m) • Kênh phản hồi trực tiếp',
+                      _weatherSnapshot?.waveHeight != null
+                          ? 'Biển Đà Nẵng sóng ${_weatherSnapshot!.waveHeight!.toStringAsFixed(1)}m • Kênh phản hồi trực tiếp'
+                          : 'Kênh phản hồi trực tiếp với đối tác DANASEA',
                       style: AppTypography.bodySm(
                         color: AppColors.onSurface,
                       ).copyWith(fontSize: 11),

@@ -29,7 +29,6 @@ COMMAND_MAP = {
     "ops:release": SCRIPTS_DIR / "ops" / "release.py",
 
     # Demo Group
-    "demo:builder": SCRIPTS_DIR / "demo" / "seed_database_demo_builder.py",
     "demo:data": SCRIPTS_DIR / "demo" / "demo_data.py",
     "demo:report": SCRIPTS_DIR / "demo" / "demo_report.py",
     "demo:request": SCRIPTS_DIR / "demo" / "demo_request.py",

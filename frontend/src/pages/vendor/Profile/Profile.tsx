@@ -274,22 +274,6 @@ export function Profile() {
       {/* 1. Header Toolbar (Atlas Page Header) */}
       <AtlasPageHeader
         title="Hồ sơ & Pháp lý Doanh nghiệp"
-        actions={
-          <div className="flex items-center gap-2">
-            {profile.verification_status === 'APPROVED' && (
-              <AtlasBadge label="ĐÃ DUYỆT (APPROVED)" variant="success" />
-            )}
-            {profile.verification_status === 'PENDING' && (
-              <AtlasBadge label="CHỜ DUYỆT (PENDING)" variant="warning" />
-            )}
-            {profile.verification_status === 'REJECTED' && (
-              <AtlasBadge label="TỪ CHỐI (REJECTED)" variant="danger" />
-            )}
-            <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-semibold border border-slate-200">
-              Hạng: {profile.badge_tier}
-            </span>
-          </div>
-        }
       />
 
       {/* Rejection Alert & Resubmit CTA */}

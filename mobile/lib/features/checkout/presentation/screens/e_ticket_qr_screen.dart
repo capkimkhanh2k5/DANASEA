@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/order_repository.dart';
+import '../../../../core/data/weather_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
@@ -31,6 +32,8 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
   bool _loadingQr = false;
   String? _qrError;
   int _generation = 0;
+  MarineBriefingOverview? _marineBriefing;
+  WeatherSnapshotModel? _weatherSnapshot;
 
   String get _targetId {
     if (widget.masterOrder != null && widget.masterOrder!.id.isNotEmpty) {
@@ -71,6 +74,54 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
   void initState() {
     super.initState();
     _loadQrForCurrentTicket();
+    _loadMarineBriefingAndWeather();
+  }
+
+  Future<void> _loadMarineBriefingAndWeather() async {
+    final masterOrderId =
+        (widget.masterOrder != null && widget.masterOrder!.id.isNotEmpty)
+        ? widget.masterOrder!.id
+        : (widget.subOrder?.masterOrderId ?? '');
+    try {
+      final weatherFuture = WeatherRepository.instance.getCurrentWeather();
+      final briefingFuture = masterOrderId.isNotEmpty
+          ? _orderRepository.getMarineBriefing(masterOrderId)
+          : Future<MarineBriefingOverview?>.value(null);
+      final results = await Future.wait<dynamic>([
+        weatherFuture.catchError((_) => const WeatherSnapshotModel(latitude: 16.0544, longitude: 108.2022)),
+        briefingFuture,
+      ]);
+      if (!mounted) return;
+      setState(() {
+        final w = results[0] as WeatherSnapshotModel?;
+        if (w != null && (w.waveHeight != null || w.windSpeed != null)) {
+          _weatherSnapshot = w;
+        }
+        _marineBriefing = results[1] as MarineBriefingOverview?;
+      });
+    } catch (_) {}
+  }
+
+  String get _liveOceanBadgeText {
+    final w = _weatherSnapshot;
+    if (w != null && (w.waveHeight != null || w.windSpeed != null)) {
+      final wave = w.waveHeight != null
+          ? 'Sóng ${w.waveHeight!.toStringAsFixed(1)}m'
+          : '';
+      final wind = w.windSpeed != null
+          ? 'Gió ${w.windSpeed!.toStringAsFixed(0)} km/h'
+          : '';
+      if (wave.isNotEmpty && wind.isNotEmpty) return '$wave • $wind';
+      if (wave.isNotEmpty) return wave;
+      if (wind.isNotEmpty) return wind;
+    }
+    if (_marineBriefing != null && _marineBriefing!.activities.isNotEmpty) {
+      final status = _marineBriefing!.activities.first.weatherSafetyStatus.toUpperCase();
+      if (status == 'ACCEPTABLE') return 'Biển êm • An toàn';
+      if (status == 'CAUTION') return 'Lưu ý sóng gió';
+      if (status == 'UNSAFE') return 'Cảnh báo biển động';
+    }
+    return 'Dự báo biển trực tuyến';
   }
 
   Future<void> _loadQrForCurrentTicket({bool forceRefresh = false}) async {
@@ -268,7 +319,7 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                                 ),
                                 const SizedBox(width: 4),
                                 LocalizedText(
-                                  'Sóng 0.4m • Gió 8 km/h',
+                                  _liveOceanBadgeText,
                                   style: AppTypography.labelSm(
                                     color: AppColors.onSurface,
                                     fontWeight: FontWeight.w700,
@@ -610,7 +661,7 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                                       ),
                                       SizedBox(width: 6),
                                       Text(
-                                        'Hỗ trợ bãi biển: 1900 6868',
+                                        'Liên hệ nhà cung cấp qua tin nhắn',
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w600,
@@ -950,6 +1001,10 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                 ),
               ),
             ],
+            if (_marineBriefing != null && _marineBriefing!.activities.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _buildTicketMarineBriefingCard(_marineBriefing!),
+            ],
             const SizedBox(height: 16),
 
             // SUPPORT NOTICE
@@ -966,7 +1021,7 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: LocalizedText(
-                      'Cần hỗ trợ tại bãi biển? Gọi hotline điều phối Danang Ocean: 1900 6868',
+                      'Cần hỗ trợ tại bãi biển? Liên hệ nhà cung cấp qua tin nhắn.',
                       style: AppTypography.bodySm(
                         color: AppColors.onSurfaceVariant,
                       ).copyWith(fontSize: 11),
@@ -978,6 +1033,181 @@ class _ETicketQrScreenState extends State<ETicketQrScreen> {
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTicketMarineBriefingCard(MarineBriefingOverview briefing) {
+    final activity = briefing.activities.first;
+    final statusUpper = activity.weatherSafetyStatus.toUpperCase();
+    final isSafe = statusUpper == 'ACCEPTABLE' || statusUpper == 'NOT_REQUIRED';
+    final isCaution = statusUpper == 'CAUTION';
+    final isUnknown = statusUpper == 'UNKNOWN';
+    final badgeColor = isSafe
+        ? const Color(0xFF10B981)
+        : isCaution
+        ? const Color(0xFFF59E0B)
+        : isUnknown
+        ? AppColors.secondary
+        : const Color(0xFFEF4444);
+    final statusText = isSafe
+        ? 'Thời tiết thuận lợi'
+        : isCaution
+        ? 'Cần lưu ý thời tiết'
+        : isUnknown
+        ? 'Đang cập nhật dự báo'
+        : 'Cảnh báo biển động';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppShapes.spaceMd),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: AppShapes.radiusLg,
+        boxShadow: AppShapes.shadowLevel1,
+        border: Border.all(color: badgeColor.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.waves, size: 18, color: badgeColor),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LocalizedText(
+                      'Bản tin an toàn biển trước chuyến đi (AI)',
+                      style: AppTypography.labelMd(
+                        color: AppColors.onSurface,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: badgeColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (activity.marineConditionsSummary.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                activity.marineConditionsSummary,
+                style: AppTypography.bodySm(
+                  color: AppColors.onSurface,
+                ).copyWith(fontSize: 12, height: 1.4),
+              ),
+            ),
+          ],
+          if (activity.packingChecklist.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            LocalizedText(
+              'Hành trang khuyến nghị:',
+              style: AppTypography.labelSm(
+                color: AppColors.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: activity.packingChecklist.take(6).map((item) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: AppColors.secondary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        size: 12,
+                        color: AppColors.secondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          item,
+                          style: AppTypography.bodySm(
+                            color: AppColors.secondary,
+                          ).copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+          if (activity.safetyGuidelines.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            LocalizedText(
+              'Hướng dẫn an toàn & check-in:',
+              style: AppTypography.labelSm(
+                color: AppColors.onSurface,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            ...activity.safetyGuidelines.map(
+              (guide) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 3),
+                      child: Icon(
+                        Icons.shield_outlined,
+                        size: 13,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        guide,
+                        style: AppTypography.bodySm(
+                          color: AppColors.onSurfaceVariant,
+                        ).copyWith(fontSize: 11.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

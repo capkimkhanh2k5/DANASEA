@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { vendorSettlementService } from '../../../services/vendorSettlementService';
 import { vendorProfileService, type VendorProfileDto } from '../../../services/vendorProfileService';
 import { vendorOrderService } from '../../../services/vendorOrderService';
+import { getAuthoritativeCustomer } from '../../../data/demoCustomerMap';
 import type { VendorSubOrderDto } from '../../../types/vendorOrder';
 import { 
   Printer, 
@@ -155,7 +156,7 @@ export function Revenue() {
         dateStr: o.checkedInAt ? o.checkedInAt.slice(0, 10) : 'Hôm nay',
         timestamp: createdDate.getTime(),
         serviceName: 'Dịch vụ trải nghiệm biển',
-        customerName: o.customerName || 'Khách đặt chỗ',
+        customerName: (o.customerName && o.customerName !== 'Khách đặt chỗ') ? o.customerName : getAuthoritativeCustomer(o.id).name,
         quantity: o.quantity || 1,
         grossAmount: gross,
         commissionRate: 0.1,

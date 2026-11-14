@@ -1,7 +1,12 @@
 import type { MOCK_ADMIN_PAYOUTS } from '../../../data/adminMockData';
 import type { PayoutRequestStatus } from '../../../types';
 
-export type PayoutExtended = (typeof MOCK_ADMIN_PAYOUTS)[0];
+export type PayoutExtended = (typeof MOCK_ADMIN_PAYOUTS)[0] & {
+  bankReference?: string | null;
+  rejectionReason?: string | null;
+  adminNote?: string | null;
+  note?: string | null;
+};
 export type PayoutStatusFilter = 'all' | 'REQUESTED' | 'APPROVED' | 'PAID' | 'REJECTED';
 
 export function formatDisplayCode(id: string, prefix = 'PAY'): string {

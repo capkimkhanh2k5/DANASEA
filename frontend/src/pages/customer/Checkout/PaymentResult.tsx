@@ -6,6 +6,7 @@ import { orderService } from "../../../services/orderService";
 import { paymentService } from "../../../services/paymentService";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useCartStore } from "../../../store/useCartStore";
+import { useLanguageStore } from "../../../store/useLanguageStore";
 import type { PaymentResponse } from "../../../types/order";
 import { takePurchasedItems } from "../../../utils/checkoutPaymentSession";
 
@@ -24,6 +25,8 @@ function clearPurchasedItems(paymentId: string) {
 export function PaymentResult({ cancelled = false }: { cancelled?: boolean }) {
   const { pathname, search } = useLocation();
   const [searchParams] = useSearchParams();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
   const customerId = useAuthStore((state) => state.isAuthenticated ? state.user?.id : undefined);
   const [retry, setRetry] = useState(0);
   const [status, setStatus] = useState<{ key: string; payment?: PaymentResponse }>();
@@ -103,38 +106,54 @@ export function PaymentResult({ cancelled = false }: { cancelled?: boolean }) {
     };
   }, [canVerify, customerId, leftGateway, orderId, paymentId, requestKey, token]);
 
-  let title = "Đang xác minh thanh toán";
-  let description = "DANASEA đang kiểm tra trạng thái giao dịch với hệ thống thanh toán.";
+  let title = isEn ? "Verifying Payment" : "Đang xác minh thanh toán";
+  let description = isEn
+    ? "DANASEA is checking the transaction status with the payment gateway."
+    : "DANASEA đang kiểm tra trạng thái giao dịch với hệ thống thanh toán.";
   let Icon = Clock;
   let iconClass = "bg-sky-50 text-sky-700";
 
   if (!canVerify || (verified && !payment)) {
-    title = "Chưa thể xác minh giao dịch";
-    description = "Quý khách có thể kiểm tra trạng thái trong mục Đơn hàng.";
+    title = isEn ? "Unable to Verify Transaction" : "Chưa thể xác minh giao dịch";
+    description = isEn
+      ? "You can check the booking status in your Orders section."
+      : "Quý khách có thể kiểm tra trạng thái trong mục Đơn hàng.";
     Icon = AlertCircle;
     iconClass = "bg-amber-50 text-amber-700";
   } else if (!customerId) {
-    title = "Đăng nhập để kiểm tra thanh toán";
-    description = "Vui lòng đăng nhập vào tài khoản đã dùng để đặt vé.";
+    title = isEn ? "Sign In to Check Payment" : "Đăng nhập để kiểm tra thanh toán";
+    description = isEn
+      ? "Please sign in to the account used to make this booking."
+      : "Vui lòng đăng nhập vào tài khoản đã dùng để đặt vé.";
   } else if (payment?.status === "SUCCESS") {
-    title = "Thanh toán đã được xác nhận";
-    description = "Xem tình trạng đơn hàng và vé của quý khách trong mục Đơn hàng.";
+    title = isEn ? "Payment Confirmed!" : "Thanh toán đã được xác nhận";
+    description = isEn
+      ? "View your order status and digital tickets in your Orders history."
+      : "Xem tình trạng đơn hàng và vé của quý khách trong mục Đơn hàng.";
     Icon = CheckCircle2;
     iconClass = "bg-emerald-50 text-emerald-700";
   } else if (payment?.status === "FAILED") {
-    title = "Thanh toán chưa hoàn tất";
-    description = "Quý khách có thể xem trạng thái đơn hàng và chọn cách tiếp tục trong mục Đơn hàng.";
+    title = isEn ? "Payment Not Completed" : "Thanh toán chưa hoàn tất";
+    description = isEn
+      ? "You can review the order status and choose how to proceed in your Orders section."
+      : "Quý khách có thể xem trạng thái đơn hàng và chọn cách tiếp tục trong mục Đơn hàng.";
     Icon = AlertCircle;
     iconClass = "bg-amber-50 text-amber-700";
   } else if (payment?.status === "REFUNDED") {
-    title = "Giao dịch đã được hoàn tiền";
-    description = "Chi tiết hoàn tiền được hiển thị trong mục Đơn hàng.";
+    title = isEn ? "Transaction Refunded" : "Giao dịch đã được hoàn tiền";
+    description = isEn
+      ? "Refund details can be found in your Orders section."
+      : "Chi tiết hoàn tiền được hiển thị trong mục Đơn hàng.";
   } else if (leftGateway) {
-    title = "Quý khách đã rời cổng thanh toán";
-    description = "DANASEA đang chờ xác nhận. Vui lòng kiểm tra trạng thái đơn hàng trước khi thanh toán lại.";
+    title = isEn ? "You Left the Payment Gateway" : "Quý khách đã rời cổng thanh toán";
+    description = isEn
+      ? "DANASEA is awaiting confirmation. Please check order status before trying again."
+      : "DANASEA đang chờ xác nhận. Vui lòng kiểm tra trạng thái đơn hàng trước khi thanh toán lại.";
   } else if (payment?.status === "PENDING") {
-    title = "Đang chờ xác nhận thanh toán";
-    description = "DANASEA sẽ cập nhật đơn hàng sau khi nhận được kết quả từ cổng thanh toán.";
+    title = isEn ? "Awaiting Payment Confirmation" : "Đang chờ xác nhận thanh toán";
+    description = isEn
+      ? "DANASEA will update your order once the gateway sends final payment results."
+      : "DANASEA sẽ cập nhật đơn hàng sau khi nhận được kết quả từ cổng thanh toán.";
   }
 
   return (
@@ -152,11 +171,11 @@ export function PaymentResult({ cancelled = false }: { cancelled?: boolean }) {
           {payment && (
             <dl className="mt-5 flex flex-wrap justify-between gap-3 border-t border-slate-200 pt-4 text-sm">
               <div>
-                <dt className="text-slate-600">Cổng thanh toán</dt>
+                <dt className="text-slate-600">{isEn ? "Payment Gateway" : "Cổng thanh toán"}</dt>
                 <dd className="mt-1 font-semibold text-slate-900">{providerNames[payment.provider]}</dd>
               </div>
               <div>
-                <dt className="text-slate-600">Số tiền giao dịch</dt>
+                <dt className="text-slate-600">{isEn ? "Transaction Amount" : "Số tiền giao dịch"}</dt>
                 <dd className="mt-1 font-semibold tabular-nums text-slate-900">{payment.amount.toLocaleString("vi-VN")}₫</dd>
               </div>
             </dl>
@@ -169,14 +188,14 @@ export function PaymentResult({ cancelled = false }: { cancelled?: boolean }) {
               state={{ paymentReturnTo: pathname + search }}
               className="inline-flex items-center gap-2 rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-800"
             >
-              Đăng nhập <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              {isEn ? "Sign In" : "Đăng nhập"} <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           ) : (
             <Link
               to="/profile/orders"
               className="inline-flex items-center gap-2 rounded-xl bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-800"
             >
-              Xem đơn hàng <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              {isEn ? "View Bookings" : "Xem đơn hàng"} <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           )}
           {customerId && verified && (!payment || payment.status === "PENDING") && (
@@ -185,7 +204,7 @@ export function PaymentResult({ cancelled = false }: { cancelled?: boolean }) {
               onClick={() => setRetry((value) => value + 1)}
               className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
-              Kiểm tra lại
+              {isEn ? "Check Again" : "Kiểm tra lại"}
             </button>
           )}
         </div>

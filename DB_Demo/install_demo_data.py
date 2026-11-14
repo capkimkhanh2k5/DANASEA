@@ -116,7 +116,7 @@ def jlit(value):
 
 
 def source(table, rows):
-    require(table in ALL_TABLES, f'Unsupported table: {table}')
+    require(table in ALL_TABLES or table in EXTENDED_TABLES, f'Unsupported table: {table}')
     return 'jsonb_populate_recordset(NULL::public.' + table + ',' + jlit(rows) + ')'
 
 
@@ -142,8 +142,8 @@ def manifest():
 
 
 def validate_rows(rows):
-    expected = dict(categories=12, users=12, vendors=9, services=24,
-                    service_options=33, service_slots=24, vendor_documents=18, service_images=72)
+    expected = dict(categories=12, users=35, vendors=16, services=24,
+                    service_options=33, service_slots=24, vendor_documents=25, service_images=72)
     require(all(t in rows and len(rows[t]) == n for t, n in expected.items()), 'Unexpected package counts')
     require('service_safety_documents' in rows, 'Missing safety document dataset')
     ids = [r['id'] for rs in rows.values() for r in rs]
@@ -190,10 +190,9 @@ def validate_rows(rows):
             require(d.get('reviewed_by') is None and d.get('reviewed_at') is None,
                     'Pending vendor document must not have reviewed_by or reviewed_at')
 
-    required_accounts = {'admin_demo@danasea.test': 'ADMIN', 'customer_1@danasea.test': 'CUSTOMER',
-                         'customer_2@danasea.test': 'CUSTOMER',
-                         **{'vender_' + str(i) + '@danasea.test': 'VENDOR' for i in range(1, 10)}}
-    require({u['email']: u['role'] for u in rows['users']} == required_accounts, 'Account role/email mapping differs')
+    require(len([u for u in rows['users'] if u['role'] == 'ADMIN']) == 4, 'Expected 4 ADMIN users')
+    require(len([u for u in rows['users'] if u['role'] == 'VENDOR']) == 16, 'Expected 16 VENDOR users')
+    require(len([u for u in rows['users'] if u['role'] == 'CUSTOMER']) == 15, 'Expected 15 CUSTOMER users')
     categories = {c['id']: c for c in rows['categories']}
     needed = {s['id'] for s in rows['services'] if s.get('weather_sensitive') is True or
               categories[s['category_id']].get('requires_safety_cert') is True}
@@ -239,13 +238,15 @@ def validate_transactions(base, trans):
             for row in trans[table]:
                 require(all(row.get(c) is None or row[c] in indexes[parent] for c, parent in cols.items()), 'Orphan transaction: ' + table)
     if 'booking_item_allocations' in trans:
+        item_by_id = {i['id']: i for i in trans['booking_items']}
         sub_by_item = {s['booking_item_id']: s for s in trans['sub_orders']}
         active_allocs = set()
         for a in trans['booking_item_allocations']:
             require(a['allocated_seats'] > 0 and a['unit_number'] > 0, 'Invalid allocation seats or unit')
             require(a['is_private_lock'] is True, 'Demo allocations must be private locks')
             so = sub_by_item[a['booking_item_id']]
-            if so['status'] != 'CANCELLED':
+            bi = item_by_id[a['booking_item_id']]
+            if so['status'] not in ('CANCELLED', 'REFUNDED', 'REJECTED') and not bi.get('capacity_released', False):
                 key = (a['slot_id'], a['unit_number'])
                 require(key not in active_allocs, f'Conflicting unit allocation on slot {a["slot_id"]} unit {a["unit_number"]}')
                 active_allocs.add(key)
@@ -262,28 +263,41 @@ def validate_transactions(base, trans):
     for o in trans['master_orders']:
         b = indexes['bookings'][o['booking_id']]
         subs = [s for s in trans['sub_orders'] if s['master_order_id'] == o['id']]
-        require(o['customer_id'] == b['customer_id'] and Decimal(o['total_amount']) == Decimal(b['total_amount']) ==
-                sum(Decimal(s['final_amount']) for s in subs), 'Order ownership/amount mismatch')
+        require(o['customer_id'] == b['customer_id'] and
+                Decimal(o['total_amount']) == Decimal(b['total_amount']) - Decimal(o['discount_amount']) and
+                Decimal(o['total_amount']) == sum(Decimal(s['final_amount']) for s in subs),
+                'Order ownership/amount mismatch')
     for s in trans['sub_orders']:
         i = indexes['booking_items'][s['booking_item_id']]
         require(all(s[c] == i[c] for c in ('vendor_id', 'service_id', 'slot_id', 'quantity')) and
                 indexes['master_orders'][s['master_order_id']]['booking_id'] == i['booking_id'] and
                 Decimal(s['unit_price']) == Decimal(i['price']) and
                 Decimal(s['subtotal_amount']) == Decimal(s['unit_price']) * s['quantity'], 'Sub-order snapshot mismatch')
+        v_disc = Decimal(s.get('vendor_discount_amount', '0.00'))
+        p_disc = Decimal(s.get('platform_discount_amount', '0.00'))
+        require(v_disc + p_disc == Decimal(s['discount_amount']) and
+                Decimal(s['commission_basis_amount']) == Decimal(s['subtotal_amount']) - v_disc,
+                'Sub-order discount/commission basis mismatch')
         commission = (Decimal(s['commission_basis_amount']) * Decimal(s['commission_rate'])).quantize(Decimal('.01'), rounding=ROUND_HALF_UP)
         require(Decimal(s['commission_amount']) == commission and Decimal(s['vendor_payout_amount']) == Decimal(s['commission_basis_amount']) - commission, 'Commission snapshot mismatch')
+    payments_by_order = {}
+    for p in trans['payments']:
+        payments_by_order.setdefault(p['master_order_id'], []).append(p)
     for p in trans['payments']:
         order = indexes['master_orders'][p['master_order_id']]
         booking = indexes['bookings'][order['booking_id']]
-        require(Decimal(p['amount']) == Decimal(order['total_amount']), 'Payment amount mismatch')
+        require(Decimal(p['amount']) == Decimal(order['total_amount']),
+                'Payment amount mismatch')
         require(all(p.get(c) is None for c in ('provider_order_id', 'provider_transaction_id', 'raw_webhook_payload', 'webhook_event_id', 'payment_url', 'qr_code_url')), 'Synthetic gateway evidence forbidden')
         valid_states = {
-            'SUCCESS': [('PAID', 'CONFIRMED'), ('NO_REFUND', 'CANCELLED'), ('REFUNDED', 'CANCELLED')],
+            'SUCCESS': [('PAID', 'CONFIRMED'), ('NO_REFUND', 'CANCELLED')],
             'REFUNDED': [('REFUNDED', 'CANCELLED')],
             'FAILED': [('UNPAID', 'CANCELLED')],
             'PENDING': [('UNPAID', 'PENDING_PAYMENT'), ('UNPAID', 'HOLD')]
         }
-        require(p['status'] in valid_states and (order['payment_status'], booking['status']) in valid_states[p['status']] and
+        retry_ok = (p['status'] == 'FAILED' and (order['payment_status'], booking['status']) == ('PAID', 'CONFIRMED')
+                    and any(o['status'] == 'SUCCESS' for o in payments_by_order[order['id']]))
+        require(p['status'] in valid_states and ((order['payment_status'], booking['status']) in valid_states[p['status']] or retry_ok) and
                 bool(p['paid_at']) == (p['status'] in ('SUCCESS', 'REFUNDED')), 'Payment/order/booking status contradiction')
     for r in trans['refunds']:
         s = indexes['sub_orders'][r['sub_order_id']]
@@ -307,14 +321,31 @@ def validate_transactions(base, trans):
                     [('gross_amount', 'gross_amount'), ('commission_amount', 'commission_amount'), ('net_payable_amount', 'net_amount')]), 'Settlement totals mismatch')
         require(sum(Decimal(p['amount']) for p in trans['payout_requests'] if p['settlement_id'] == s['id'] and p['status'] != 'REJECTED') <= Decimal(s['net_payable_amount']), 'Payout exceeds eligible balance')
         require(all(p['vendor_id'] == s['vendor_id'] for p in trans['payout_requests'] if p['settlement_id'] == s['id']), 'Payout vendor mismatch')
+    for p in trans['payout_requests']:
+        processor = p.get('processed_by')
+        if p['status'] in ('APPROVED', 'PAID', 'REJECTED'):
+            require(indexes['users'].get(processor, {}).get('role') == 'ADMIN' and p.get('processed_at'),
+                    'Processed payout request requires an admin and processed_at')
+            require(datetime.fromisoformat(p['processed_at']) >= datetime.fromisoformat(p['created_at']),
+                    'Payout processed_at before created_at')
+        elif p['status'] == 'REQUESTED':
+            require(processor is None and p.get('processed_at') is None,
+                    'Pending payout request has processing metadata')
+
+
+DEFAULT_DEMO_PASSWORD = 'danasea@2026'
 
 
 def resolve_demo_password(args):
     password = sys.stdin.readline().rstrip('\r\n') if args.demo_password_stdin else os.environ.get('DEMO_USER_PASSWORD')
-    if not password and sys.stdin.isatty():
+    if not password and args.replace and not args.demo_password_stdin:
+        password = DEFAULT_DEMO_PASSWORD
+    if not password and not args.demo_password_stdin and sys.stdin.isatty():
         password = getpass.getpass('Demo account password (hidden; required): ')
-    require(password is not None and len(password) >= 12 and len(password.encode('utf8')) <= 72,
-            'Supply a demo password of 12+ characters and <=72 UTF-8 bytes through DEMO_USER_PASSWORD or --demo-password-stdin')
+    require(password is not None and len(password) >= 12
+            and len(password.encode('utf8')) <= 72 and not any(ord(char) < 32 or ord(char) == 127 for char in password),
+            'Use the demo replacement default or supply a password of 12+ characters and <=72 UTF-8 bytes '
+            'through DEMO_USER_PASSWORD or --demo-password-stdin')
     return password
 
 
@@ -462,6 +493,44 @@ def validate_identity(identity, database):
             'Database/schema/Flyway mismatch; Flyway version >= 43 required')
 
 
+def synchronize_review_metrics(base_rows):
+    reviews_file = TRANS_DIR / 'reviews.json'
+    if not reviews_file.is_file():
+        return
+    try:
+        reviews = json.loads(reviews_file.read_text(encoding='utf8')).get('reviews', [])
+    except Exception:
+        return
+    from collections import defaultdict
+    srv_r = defaultdict(list)
+    vnd_r = defaultdict(list)
+    for r in reviews:
+        if r.get('is_visible', True):
+            srv_r[r['service_id']].append(r['rating'])
+            vnd_r[r['vendor_id']].append(r['rating'])
+
+    for s in base_rows.get('services', []):
+        rates = srv_r.get(s['id'], [])
+        if rates:
+            s['avg_rating'] = str((Decimal(sum(rates)) / Decimal(len(rates))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+            s['rating_count'] = len(rates)
+        else:
+            s['avg_rating'] = '0.00'
+            s['rating_count'] = 0
+
+    for v in base_rows.get('vendors', []):
+        rates = vnd_r.get(v['id'], [])
+        if rates:
+            avg = (Decimal(sum(rates)) / Decimal(len(rates))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            v['rating_avg'] = str(avg)
+            v['rating_count'] = len(rates)
+            v['badge_tier'] = 'TOP_RATED' if len(rates) >= 5 and avg >= Decimal('4.0') else ('VERIFIED' if len(rates) >= 1 else 'NONE')
+        else:
+            v['rating_avg'] = '0.00'
+            v['rating_count'] = 0
+            v['badge_tier'] = 'NONE'
+
+
 def load_fixtures():
     base_records = {t: json.loads((BASE_DIR / f'{t}.json').read_text(encoding='utf8'))['records']
                     for t in BASE_JSON_TABLES}
@@ -474,13 +543,15 @@ def load_fixtures():
     for table, col in MEDIA_TABLES.items():
         for rec, row in zip(base_records[table], base_rows[table]):
             sha = rec.get('mediaSha256')
-            if sha and sha in manifest_data:
-                row[col] = manifest_data[sha]['url']
+            entry = manifest_data.get(sha)
+            require(entry and entry.get('sha256') == sha and entry.get('url') == row[col],
+                    f"Missing or inconsistent media manifest entry: {table} {row['id']}")
 
     trans_data = json.loads((TRANS_DIR / 'demo_transactions.json').read_text(encoding='utf8'))
     trans_rows = {t: copy.deepcopy(trans_data[t]) for t in TRANSACTION_TABLES}
     require(trans_data['classification'] == 'DEVELOPMENT_SYNTHETIC', 'Synthetic classification required')
 
+    synchronize_review_metrics(base_rows)
     prepare_slots_and_inventory(base_rows, trans_rows)
 
     validate_transactions(base_rows, trans_rows)
@@ -515,8 +586,8 @@ def align_payment_attempt_defaults(rows):
             successful = [p for p in payments if p['status'] == 'SUCCESS' and Decimal(p['amount']) == Decimal(order['total_amount'])]
             canonical = min(successful, key=lambda p: (datetime.fromisoformat(p['paid_at']),
                                                        datetime.fromisoformat(p['created_at']), p['id']), default=None)
-        for p in payments:
-            p.setdefault('attempt_number', 1)
+        for idx, p in enumerate(sorted(payments, key=lambda row: (datetime.fromisoformat(row['created_at']), row['id'])), start=1):
+            p.setdefault('attempt_number', idx)
             p.setdefault('attempt_state', states.get(p['status'], 'TERMINATED'))
             p.setdefault('danasea_deadline_at', deadline if p['status'] == 'PENDING' else None)
             p.setdefault('cancel_status', 'NONE')
@@ -749,10 +820,657 @@ def preflight_audit(session, base_rows, trans_rows):
     }
 
 
+
+EXTENDED_TABLES = [
+    'reviews', 'discount_codes', 'discount_redemptions', 'flash_sales',
+    'disputes', 'conversations', 'messages',
+    'notifications', 'wishlists', 'recently_vieweds', 'checkin_tokens',
+    'vendor_equipment', 'equipment_maintenance', 'sub_order_disruptions',
+    'sub_order_reschedule_proposals', 'vendor_fault_compensations',
+    'vendor_role_applications'
+]
+
+EXTENDED_FIXTURE_FILES = {
+    'reviews.json': ['reviews'],
+    'discounts.json': ['discount_codes', 'discount_redemptions', 'flash_sales'],
+    'disputes.json': ['disputes'],
+    'communications.json': ['conversations', 'messages', 'notifications', 'wishlists', 'recently_vieweds'],
+    'checkin.json': ['checkin_tokens'],
+    'maintenance.json': ['vendor_equipment', 'equipment_maintenance'],
+    'disruptions.json': ['sub_order_disruptions', 'sub_order_reschedule_proposals', 'vendor_fault_compensations'],
+    'partner_applications.json': ['vendor_role_applications']
+}
+
+EXTENDED_TABLE_ORDER = [
+    'sub_order_disruptions',
+    'sub_order_reschedule_proposals',
+    'discount_codes',
+    'discount_redemptions',
+    'flash_sales',
+    'vendor_fault_compensations',
+    'reviews',
+    'disputes',
+    'conversations',
+    'messages',
+    'notifications',
+    'wishlists',
+    'recently_vieweds',
+    'checkin_tokens',
+    'vendor_equipment',
+    'equipment_maintenance',
+    'vendor_role_applications'
+]
+
+TABLE_PK = {
+    'vendor_fault_compensations': 'disruption_id',
+    'service_operating_schedules': 'service_id',
+    'service_operating_schedule_slots': 'slot_id',
+}
+
+SCHEDULE_TABLES = (
+    'vendor_equipment',
+    'service_operating_schedules',
+    'service_slots',
+    'service_slot_units',
+    'service_operating_schedule_slots',
+)
+
+EXTRA_CLEANUP_ORDER = [
+    'vendor_fault_compensations',
+    'discount_redemptions',
+    'discount_codes',
+    'sub_order_reschedule_proposals',
+    'sub_order_disruptions',
+    'equipment_maintenance',
+    'service_operating_schedule_slots',
+    'service_operating_schedules',
+    'service_slot_units',
+    'vendor_equipment',
+    'service_slots',
+    'checkin_tokens',
+    'recently_vieweds',
+    'wishlists',
+    'notifications',
+    'messages',
+    'conversations',
+    'disputes',
+    'flash_sales',
+    'reviews',
+    'vendor_role_applications',
+]
+
+RESCHEDULE_SERVICE_ID = '88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08'
+RESCHEDULE_ORIG_SLOT_ID = 'ed7319d7-6309-5277-bb88-43a2c5c87620'
+
+
+def pk_col(table):
+    return TABLE_PK.get(table, 'id')
+
+
+def db_now_vn(session):
+    raw = session.query("SELECT to_json(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')")
+    return datetime.fromisoformat(raw).replace(tzinfo=timezone(timedelta(hours=7)))
+
+
+def resolve_reschedule_schedule(now_vn):
+    demo_today = now_vn.date()
+    orig_day = (demo_today + timedelta(days=6)).isoformat()
+    deadline_day = (demo_today + timedelta(days=5)).isoformat()
+    target_day = (demo_today + timedelta(days=7)).isoformat()
+    target_slot_id = str(uuid.uuid5(SLOT_NAMESPACE, f'{RESCHEDULE_SERVICE_ID}|{target_day}|07:00:00'))
+    target_unit_id = str(uuid.uuid5(SLOT_NAMESPACE, f'{target_slot_id}|unit|1'))
+    return {
+        'today': demo_today,
+        'orig_day': orig_day,
+        'target_day': target_day,
+        'deadline': f'{deadline_day}T19:00:00.000000+07:00',
+        'orig_departure': f'{orig_day}T07:00:00.000000+07:00',
+        'target_slot_id': target_slot_id,
+        'target_unit_id': target_unit_id,
+        'disrupt_at': (now_vn - timedelta(minutes=30)).isoformat(),
+        'proposal_at': (now_vn - timedelta(minutes=15)).isoformat(),
+    }
+
+
+def rebase_reschedule_fixtures(base_rows, trans_rows, now_vn, fixtures_by_table=None):
+    sched = resolve_reschedule_schedule(now_vn)
+    for slot in base_rows.get('service_slots', []):
+        if slot['id'] == RESCHEDULE_ORIG_SLOT_ID:
+            slot['date'] = sched['orig_day']
+    for item in trans_rows.get('booking_items', []):
+        if item['slot_id'] == RESCHEDULE_ORIG_SLOT_ID:
+            item['booking_date'] = sched['orig_day']
+    if fixtures_by_table:
+        for d in fixtures_by_table.get('sub_order_disruptions', []):
+            if d['id'] == 'da010000-0000-0000-0000-000000000001':
+                d['original_slot_id'] = RESCHEDULE_ORIG_SLOT_ID
+                d['original_departure_at'] = sched['orig_departure']
+                d['decision_deadline'] = sched['deadline']
+                d['notification_sent_at'] = sched['disrupt_at']
+                d['created_at'] = sched['disrupt_at']
+                d['updated_at'] = sched['disrupt_at']
+        for p in fixtures_by_table.get('sub_order_reschedule_proposals', []):
+            if p['id'] == 'fa010000-0000-0000-0000-000000000001':
+                p['proposed_slot_id'] = sched['target_slot_id']
+                p['expires_at'] = sched['deadline']
+                p['notification_sent_at'] = sched['proposal_at']
+                p['created_at'] = sched['proposal_at']
+                p['updated_at'] = sched['proposal_at']
+    return sched
+
+
+def seed_extended_simulation_fixtures(session, base_rows=None, trans_rows=None):
+    """Nạp toàn bộ dữ liệu nghiệp vụ mở rộng và đồng bộ 2 chiều (Rule 17)"""
+    fixtures_by_table = {}
+    for fname, tables in EXTENDED_FIXTURE_FILES.items():
+        fpath = TRANS_DIR / fname
+        if not fpath.is_file():
+            continue
+        data = json.loads(fpath.read_text(encoding='utf8'))
+        for table in tables:
+            if table in data:
+                fixtures_by_table[table] = data[table]
+
+    now_vn = db_now_vn(session)
+    sched = rebase_reschedule_fixtures(base_rows or {}, trans_rows or {}, now_vn, fixtures_by_table)
+
+    extended_ids = {t: [] for t in EXTENDED_TABLE_ORDER}
+    schedule_ids = {t: [] for t in SCHEDULE_TABLES}
+
+    # Ensure deterministic future target slot for reschedule proposals exists before FK check
+    if fixtures_by_table.get('sub_order_reschedule_proposals'):
+        inserted_target_slots = session.query(f"""
+            WITH added AS (
+                INSERT INTO public.service_slots (
+                    id, service_id, date, start_time, end_time, capacity, booked_count, status, inventory_type, created_at, updated_at
+                ) VALUES (
+                    {lit(sched['target_slot_id'])}::uuid,
+                    {lit(RESCHEDULE_SERVICE_ID)}::uuid,
+                    {lit(sched['target_day'])}::date,
+                    '07:00:00',
+                    '11:30:00',
+                    8,
+                    0,
+                    'OPEN',
+                    'SHARED_CAPACITY_UNITS',
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
+                ) ON CONFLICT (id) DO NOTHING
+                RETURNING id
+            ) SELECT coalesce(json_agg(id),'[]'::json) FROM added
+        """)
+        schedule_ids['service_slots'].extend(inserted_target_slots)
+
+        inserted_target_units = session.query(f"""
+            WITH added AS (
+                INSERT INTO public.service_slot_units (
+                    id, slot_id, unit_number, capacity, booked_count, created_at, updated_at
+                ) VALUES (
+                    {lit(sched['target_unit_id'])}::uuid,
+                    {lit(sched['target_slot_id'])}::uuid,
+                    1,
+                    8,
+                    0,
+                    CURRENT_TIMESTAMP,
+                    CURRENT_TIMESTAMP
+                ) ON CONFLICT (id) DO NOTHING
+                RETURNING id
+            ) SELECT coalesce(json_agg(id),'[]'::json) FROM added
+        """)
+        schedule_ids['service_slot_units'].extend(inserted_target_units)
+
+    for table in EXTENDED_TABLE_ORDER:
+        rows = fixtures_by_table.get(table, [])
+        if not rows:
+            continue
+        pk = pk_col(table)
+        exp = source(table, rows)
+        names = list(rows[0].keys())
+        targets = ','.join('"' + k + '"' for k in names)
+        expressions = ','.join('coalesce(r."' + k + '",CURRENT_TIMESTAMP)' if k in ('created_at', 'updated_at')
+                               else 'r."' + k + '"' for k in names)
+
+        if table == 'reviews':
+            inserted = session.query(f"""
+                WITH added AS (
+                    INSERT INTO public.reviews ({targets})
+                    SELECT {expressions} FROM {exp} r
+                    ON CONFLICT (sub_order_id) DO UPDATE
+                    SET rating = EXCLUDED.rating, comment = EXCLUDED.comment,
+                        is_visible = EXCLUDED.is_visible, vendor_reply = EXCLUDED.vendor_reply,
+                        updated_at = CURRENT_TIMESTAMP
+                    RETURNING "{pk}"
+                ) SELECT coalesce(json_agg("{pk}"),'[]'::json) FROM added
+            """)
+        elif table == 'checkin_tokens':
+            inserted = session.query(f"""
+                WITH added AS (
+                    INSERT INTO public.checkin_tokens ({targets})
+                    SELECT {expressions} FROM {exp} r
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM public.checkin_tokens c
+                        WHERE c.sub_order_id = r.sub_order_id OR c.qr_token_hash = r.qr_token_hash OR c.id = r.id
+                    )
+                    RETURNING "{pk}"
+                ) SELECT coalesce(json_agg("{pk}"),'[]'::json) FROM added
+            """)
+        elif table == 'vendor_fault_compensations':
+            inserted = session.query(f"""
+                WITH added AS (
+                    INSERT INTO public.vendor_fault_compensations ({targets})
+                    SELECT {expressions} FROM {exp} r
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM public.vendor_fault_compensations c
+                        WHERE c.disruption_id = r.disruption_id OR c.voucher_id = r.voucher_id
+                    )
+                    RETURNING "{pk}"
+                ) SELECT coalesce(json_agg("{pk}"),'[]'::json) FROM added
+            """)
+        elif table == 'sub_order_disruptions':
+            inserted = session.query(f"""
+                WITH added AS (
+                    INSERT INTO public.sub_order_disruptions ({targets})
+                    SELECT {expressions} FROM {exp} r
+                    ON CONFLICT (sub_order_id, source_key) DO NOTHING
+                    RETURNING "{pk}"
+                ) SELECT coalesce(json_agg("{pk}"),'[]'::json) FROM added
+            """)
+        else:
+            inserted = session.query(f"""
+                WITH added AS (
+                    INSERT INTO public.{table} ({targets})
+                    SELECT {expressions} FROM {exp} r
+                    ON CONFLICT (id) DO NOTHING
+                    RETURNING "{pk}"
+                ) SELECT coalesce(json_agg("{pk}"),'[]'::json) FROM added
+            """)
+        extended_ids[table].extend(inserted)
+
+    # Two-Way Synchronization (Rule 17):
+    # Synchronize review metrics, vendor badge tiers, conversations, and discount counts strictly within demo scope
+    if base_rows and base_rows.get('services'):
+        srv_exp = source('services', base_rows['services'])
+        session.send(f"""
+            -- 1. Sync service ratings only for demo services
+            UPDATE public.services s
+            SET avg_rating = COALESCE(sub.avg_r, 0.00),
+                rating_count = COALESCE(sub.cnt_r, 0)
+            FROM {srv_exp} ds
+            LEFT JOIN (
+                SELECT service_id,
+                       ROUND(AVG(rating)::numeric, 2) AS avg_r,
+                       COUNT(*)::int AS cnt_r
+                FROM public.reviews
+                WHERE is_visible = true
+                GROUP BY service_id
+            ) sub ON sub.service_id = ds.id
+            WHERE s.id = ds.id;
+        """)
+
+    if base_rows and base_rows.get('vendors'):
+        vnd_exp = source('vendors', base_rows['vendors'])
+        session.send(f"""
+            -- 2. Sync vendor ratings and badge tiers only for demo vendors
+            UPDATE public.vendors v
+            SET rating_avg = COALESCE(sub.avg_r, 0.00),
+                rating_count = COALESCE(sub.cnt_r, 0),
+                badge_tier = CASE
+                    WHEN COALESCE(sub.cnt_r, 0) >= 5 AND COALESCE(sub.avg_r, 0) >= 4.0 THEN 'TOP_RATED'
+                    WHEN COALESCE(sub.cnt_r, 0) >= 1 THEN 'VERIFIED'
+                    ELSE 'NONE'
+                END
+            FROM {vnd_exp} dv
+            LEFT JOIN (
+                SELECT vendor_id,
+                       ROUND(AVG(rating)::numeric, 2) AS avg_r,
+                       COUNT(*)::int AS cnt_r
+                FROM public.reviews
+                WHERE is_visible = true
+                GROUP BY vendor_id
+            ) sub ON sub.vendor_id = dv.id
+            WHERE v.id = dv.id;
+        """)
+
+    if fixtures_by_table.get('conversations'):
+        conv_exp = source('conversations', fixtures_by_table['conversations'])
+        session.send(f"""
+            -- 3. Sync conversation last_message_sequence only for demo conversations
+            UPDATE public.conversations c
+            SET last_message_sequence = sub.max_seq
+            FROM {conv_exp} dc
+            JOIN (
+                SELECT conversation_id, MAX(message_sequence) AS max_seq
+                FROM public.messages
+                GROUP BY conversation_id
+            ) sub ON sub.conversation_id = dc.id
+            WHERE c.id = dc.id;
+        """)
+
+    demo_codes = fixtures_by_table.get('discount_codes', [])
+    if demo_codes:
+        dc_exp = source('discount_codes', demo_codes)
+        session.send(f"""
+            -- 4. Sync discount_codes used_count only for demo codes (including zero-redemption codes)
+            UPDATE public.discount_codes d
+            SET used_count = COALESCE(sub.cnt_red, 0)
+            FROM {dc_exp} dc
+            LEFT JOIN (
+                SELECT discount_code_id, COUNT(*)::int AS cnt_red
+                FROM public.discount_redemptions
+                GROUP BY discount_code_id
+            ) sub ON sub.discount_code_id = dc.id
+            WHERE d.id = dc.id;
+        """)
+
+    demo_redemptions = fixtures_by_table.get('discount_redemptions', [])
+    if demo_redemptions:
+        red_exp = source('discount_redemptions', demo_redemptions)
+        session.send(f"""
+            -- 5. Sync master_orders discount fields from redemptions only for demo master orders
+            UPDATE public.master_orders m
+            SET discount_code_id = r.discount_code_id,
+                discount_amount = r.amount_deducted
+            FROM public.discount_redemptions r
+            JOIN {red_exp} dr ON dr.id = r.id
+            WHERE m.id = r.master_order_id AND m.id = dr.master_order_id;
+        """)
+
+    verify_extended_business_integrity(session, fixtures_by_table)
+    return extended_ids, schedule_ids
+
+
+def verify_extended_business_integrity(session, fixtures_by_table=None):
+    """Xác minh toàn vẹn quan hệ nghiệp vụ mở rộng trước khi commit."""
+    # 0. Kiểm tra sự hiện diện đầy đủ của các bản ghi mở rộng đã nạp (chống xóa rỗng bảng như reviews)
+    if fixtures_by_table:
+        for table in EXTENDED_TABLE_ORDER:
+            rows = fixtures_by_table.get(table, [])
+            if not rows:
+                continue
+            pk = pk_col(table)
+            exp = source(table, rows)
+            missing = session.query(f"""
+                SELECT to_json(count(*))
+                FROM {exp} e
+                LEFT JOIN public.{table} t ON t."{pk}" = e."{pk}"
+                WHERE t."{pk}" IS NULL
+            """)
+            require(missing == 0, f"Integrity check failed: {missing} expected rows missing from {table}")
+
+    # 1. Quan hệ Review - Đơn hàng: phải hoàn tất và khớp thông tin
+    invalid_reviews = session.query("""
+        SELECT to_json(count(*))
+        FROM public.reviews r
+        JOIN public.sub_orders s ON s.id = r.sub_order_id
+        JOIN public.master_orders m ON m.id = s.master_order_id
+        WHERE s.status <> 'COMPLETED'
+           OR r.customer_id <> m.customer_id
+           OR r.service_id <> s.service_id
+           OR r.vendor_id <> s.vendor_id
+    """)
+    require(invalid_reviews == 0, f"Integrity check failed: {invalid_reviews} reviews attached to incomplete orders or mismatched users/services")
+
+    # 2. Quan hệ Khiếu nại - Hoàn tiền & Trạng thái hoàn tiền theo RefundProcessingService
+    invalid_dispute_orders = session.query("""
+        SELECT to_json(count(*))
+        FROM public.disputes d
+        LEFT JOIN public.sub_orders s ON s.id = d.sub_order_id
+        LEFT JOIN public.master_orders m ON m.id = s.master_order_id
+        WHERE m.id IS NULL
+           OR d.order_id IS DISTINCT FROM m.id
+           OR d.customer_id IS DISTINCT FROM m.customer_id
+    """)
+    require(invalid_dispute_orders == 0,
+            f"Integrity check failed: {invalid_dispute_orders} disputes with the wrong order or customer")
+
+    missing_refunds = session.query("""
+        SELECT to_json(count(*))
+        FROM public.disputes d
+        JOIN public.sub_orders s ON s.id = d.sub_order_id
+        WHERE d.status IN ('RESOLVED_REFUND', 'RESOLVED_PARTIAL')
+          AND NOT EXISTS (
+              SELECT 1 FROM public.refunds r
+              WHERE r.sub_order_id = d.sub_order_id
+                AND r.status IN ('PENDING', 'PROCESSED')
+                AND r.refund_percentage = d.refund_percentage
+                AND r.amount = ROUND(s.final_amount * d.refund_percentage / 100.0, 2)
+                AND r.requested_by = d.resolved_by
+                AND r.created_at >= d.resolved_at
+                AND (r.status = 'PENDING' OR r.processed_at >= r.created_at)
+          )
+    """)
+    require(missing_refunds == 0, f"Integrity check failed: {missing_refunds} resolved disputes missing valid/timely refund")
+
+    invalid_refund_states = session.query("""
+        WITH processed AS (
+            SELECT sub_order_id, payment_id, amount, provider, created_at, processed_at
+            FROM public.refunds
+            WHERE status = 'PROCESSED' AND sub_order_id IS NOT NULL
+        ), by_item AS (
+            SELECT sub_order_id, SUM(amount) AS total FROM processed GROUP BY sub_order_id
+        ), by_payment AS (
+            SELECT payment_id, SUM(amount) AS total FROM processed GROUP BY payment_id
+        )
+        SELECT to_json(count(*))
+        FROM (
+            SELECT r.sub_order_id
+            FROM processed r
+            LEFT JOIN public.sub_orders s ON s.id = r.sub_order_id
+            LEFT JOIN public.payments p ON p.id = r.payment_id
+            WHERE s.id IS NULL OR p.id IS NULL
+               OR p.master_order_id IS DISTINCT FROM s.master_order_id
+               OR p.provider IS DISTINCT FROM r.provider
+               OR r.processed_at IS NULL OR r.processed_at < r.created_at
+            UNION ALL
+            SELECT s.id FROM by_item r JOIN public.sub_orders s ON s.id = r.sub_order_id
+            WHERE r.total > s.final_amount
+               OR s.status IS DISTINCT FROM
+                    CASE WHEN r.total = s.final_amount THEN 'REFUNDED' ELSE 'PARTIALLY_REFUNDED' END
+            UNION ALL
+            SELECT p.id
+            FROM by_payment r
+            JOIN public.payments p ON p.id = r.payment_id
+            JOIN public.master_orders m ON m.id = p.master_order_id
+            WHERE r.total > p.amount
+               OR p.status IS DISTINCT FROM CASE WHEN r.total = p.amount THEN 'REFUNDED' ELSE 'SUCCESS' END
+               OR m.payment_status IS DISTINCT FROM CASE WHEN r.total = p.amount THEN 'REFUNDED' ELSE 'PAID' END
+            UNION ALL
+            SELECT m.id
+            FROM public.master_orders m
+            JOIN public.bookings b ON b.id = m.booking_id
+            WHERE EXISTS (
+                SELECT 1 FROM public.sub_orders s JOIN by_item r ON r.sub_order_id = s.id
+                WHERE s.master_order_id = m.id
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM public.sub_orders s WHERE s.master_order_id = m.id
+                  AND s.status NOT IN ('REFUNDED', 'CANCELLED', 'REJECTED')
+            )
+            AND (m.status IS DISTINCT FROM 'CANCELLED' OR b.status IS DISTINCT FROM 'CANCELLED')
+        ) bad
+    """)
+    require(invalid_refund_states == 0, f"Integrity check failed: {invalid_refund_states} invalid refund state transitions")
+
+    # 3. Quan hệ Đề xuất đổi ca - Đúng vendor, cùng dịch vụ, slot tương lai & chưa hết hạn
+    invalid_proposals = session.query("""
+        SELECT to_json(count(*))
+        FROM public.sub_order_reschedule_proposals p
+        JOIN public.sub_orders s ON s.id = p.sub_order_id
+        JOIN public.service_slots sl ON sl.id = p.proposed_slot_id
+        WHERE sl.service_id <> s.service_id
+           OR p.vendor_id <> s.vendor_id
+           OR s.status IN ('COMPLETED', 'CANCELLED', 'REJECTED')
+           OR (p.status = 'PENDING' AND (
+               sl.status <> 'OPEN'
+               OR p.expires_at <= p.created_at
+               OR p.expires_at <= CURRENT_TIMESTAMP
+               OR (sl.date + sl.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh' <= p.created_at
+               OR (sl.date + sl.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh' <= CURRENT_TIMESTAMP
+           ))
+    """)
+    require(invalid_proposals == 0, f"Integrity check failed: {invalid_proposals} reschedule proposals invalid (wrong vendor/service, expired, terminal order, or non-future slot)")
+
+    # 4. Quan hệ Gián đoạn - Trạng thái đơn, thời hạn xử lý & khởi hành slot gốc
+    invalid_disruptions = session.query("""
+        SELECT to_json(count(*))
+        FROM public.sub_order_disruptions d
+        JOIN public.service_slots s ON s.id = d.original_slot_id
+        JOIN public.sub_orders so ON so.id = d.sub_order_id
+        WHERE d.original_departure_at <> (s.date + s.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'
+           OR (d.status = 'AWAITING_DECISION' AND (
+               so.status IN ('COMPLETED', 'CANCELLED', 'REJECTED')
+               OR d.decision_deadline <= CURRENT_TIMESTAMP
+               OR d.original_departure_at <= CURRENT_TIMESTAMP
+           ))
+    """)
+    require(invalid_disruptions == 0, f"Integrity check failed: {invalid_disruptions} disruptions with invalid order status, expired deadline, or departure time mismatch")
+
+    # 5. Quan hệ Bồi thường Vendor - Gián đoạn VENDOR_FAULT & đúng công thức paid_basis/rate_bps/voucher
+    invalid_compensations = session.query("""
+        SELECT to_json(count(*))
+        FROM public.vendor_fault_compensations c
+        JOIN public.sub_order_disruptions d ON d.id = c.disruption_id
+        JOIN public.sub_orders s ON s.id = c.sub_order_id
+        JOIN public.master_orders m ON m.id = s.master_order_id
+        JOIN public.discount_codes v ON v.id = c.voucher_id
+        WHERE d.reason <> 'VENDOR_FAULT'
+           OR c.sub_order_id <> d.sub_order_id
+           OR c.original_slot_id <> d.original_slot_id
+           OR c.vendor_id <> s.vendor_id
+           OR c.paid_basis <> s.final_amount
+           OR c.rate_bps <= 0
+           OR c.amount <> FLOOR((c.paid_basis * c.rate_bps) / 10000.0)
+           OR c.remaining_amount < 0
+           OR c.remaining_amount > c.amount
+           OR v.compensation_disruption_id <> c.disruption_id
+           OR v.recipient_customer_id <> m.customer_id
+           OR v.discount_value <> c.amount
+           OR v.max_discount_amount <> c.amount
+    """)
+    require(invalid_compensations == 0, f"Integrity check failed: {invalid_compensations} vendor fault compensations invalid or misaligned with order/voucher")
+
+    # 6. Quan hệ Mã giảm giá, lượt dùng, hạn mức theo khách & đồng bộ used_count
+    invalid_vendor_vouchers = session.query("""
+        SELECT to_json(count(*))
+        FROM public.master_orders m
+        JOIN public.discount_codes d ON d.id = m.discount_code_id
+        JOIN public.sub_orders s ON s.master_order_id = m.id
+        WHERE d.scope = 'VENDOR' AND d.vendor_id <> s.vendor_id
+    """)
+    require(invalid_vendor_vouchers == 0, f"Integrity check failed: {invalid_vendor_vouchers} vendor vouchers applied to orders of other vendors")
+
+    invalid_redemptions = session.query("""
+        SELECT to_json(count(*))
+        FROM public.discount_redemptions r
+        JOIN public.master_orders m ON m.id = r.master_order_id
+        JOIN public.discount_codes d ON d.id = r.discount_code_id
+        WHERE r.customer_id <> m.customer_id
+           OR m.discount_code_id IS DISTINCT FROM r.discount_code_id
+           OR m.discount_amount IS DISTINCT FROM r.amount_deducted
+           OR (d.scope = 'VENDOR' AND NOT EXISTS (
+               SELECT 1 FROM public.sub_orders s
+               WHERE s.master_order_id = m.id AND s.vendor_id = d.vendor_id
+           ))
+    """)
+    require(invalid_redemptions == 0, f"Integrity check failed: {invalid_redemptions} discount_redemptions mismatched with order customer/voucher/amount")
+
+    invalid_voucher_counts = session.query("""
+        SELECT to_json(count(*))
+        FROM public.discount_codes d
+        LEFT JOIN (
+            SELECT discount_code_id, COUNT(*)::int AS actual_cnt
+            FROM public.discount_redemptions
+            GROUP BY discount_code_id
+        ) rc ON rc.discount_code_id = d.id
+        WHERE d.used_count <> COALESCE(rc.actual_cnt, 0)
+           OR (d.max_uses IS NOT NULL AND d.used_count > d.max_uses)
+    """)
+    require(invalid_voucher_counts == 0, f"Integrity check failed: {invalid_voucher_counts} discount_codes with out-of-sync used_count or exceeding max_uses")
+
+    per_user_overage = session.query("""
+        SELECT to_json(count(*))
+        FROM (
+            SELECT d.id, r.customer_id
+            FROM public.discount_codes d
+            JOIN public.discount_redemptions r ON r.discount_code_id = d.id
+            WHERE d.max_uses_per_user IS NOT NULL
+            GROUP BY d.id, r.customer_id, d.max_uses_per_user
+            HAVING COUNT(*) > d.max_uses_per_user
+        ) overages
+    """)
+    require(per_user_overage == 0, f"Integrity check failed: {per_user_overage} (voucher, customer) pairs exceed max_uses_per_user")
+
+    # 7. Quan hệ Hội thoại & Tin nhắn: đúng customer, đúng vendor thuộc sub_orders của đơn hàng
+    invalid_conversations = session.query("""
+        SELECT to_json(count(*))
+        FROM public.conversations c
+        LEFT JOIN public.master_orders m ON m.id = c.master_order_id
+        WHERE (c.master_order_id IS NOT NULL AND (
+                  c.customer_id <> m.customer_id
+               OR NOT EXISTS (
+                   SELECT 1 FROM public.sub_orders s
+                   WHERE s.master_order_id = m.id AND s.vendor_id = c.vendor_id
+               )
+              ))
+    """)
+    require(invalid_conversations == 0, f"Integrity check failed: {invalid_conversations} conversations with mismatched customer or vendor")
+
+    invalid_messages = session.query("""
+        SELECT to_json(count(*))
+        FROM public.messages msg
+        JOIN public.conversations c ON c.id = msg.conversation_id
+        JOIN public.vendors v ON v.id = c.vendor_id
+        WHERE msg.sender_id NOT IN (c.customer_id, v.user_id)
+    """)
+    require(invalid_messages == 0, f"Integrity check failed: {invalid_messages} messages sent by non-participant users")
+
+    # 8. Đồng bộ số tiền giảm giá, thanh toán canonical và cơ sở tính hoa hồng
+    mismatched_financials = session.query("""
+        SELECT to_json(count(*))
+        FROM public.master_orders m
+        JOIN (
+            SELECT master_order_id,
+                   SUM(discount_amount) AS total_sub_disc,
+                   SUM(final_amount) AS total_sub_final
+            FROM public.sub_orders
+            GROUP BY master_order_id
+        ) s ON s.master_order_id = m.id
+        JOIN public.payments p ON p.master_order_id = m.id
+        WHERE m.discount_amount <> s.total_sub_disc
+           OR m.total_amount <> s.total_sub_final
+           OR p.amount <> m.total_amount
+           OR (p.status = 'SUCCESS' AND m.status IN ('PAID', 'COMPLETED', 'PARTIALLY_COMPLETED') AND NOT EXISTS (
+               SELECT 1 FROM public.payments pc
+               WHERE pc.master_order_id = m.id AND pc.is_canonical = true
+           ))
+    """)
+    require(mismatched_financials == 0, f"Integrity check failed: {mismatched_financials} orders with mismatched discount, payment, or missing canonical payment")
+
+    mismatched_basis = session.query("""
+        SELECT to_json(count(*))
+        FROM public.sub_orders s
+        WHERE s.commission_basis_amount <> (s.subtotal_amount - COALESCE(s.vendor_discount_amount, 0))
+    """)
+    require(mismatched_basis == 0, f"Integrity check failed: {mismatched_basis} sub_orders with incorrect commission_basis_amount")
+
+    # 9. Payout requests: trạng thái đã xử lý phải có processed_at >= created_at
+    invalid_payouts = session.query("""
+        SELECT to_json(count(*))
+        FROM public.payout_requests pr
+        LEFT JOIN public.users u ON u.id = pr.processed_by
+        WHERE (pr.status IN ('APPROVED', 'PAID', 'REJECTED') AND (
+                  u.role IS DISTINCT FROM 'ADMIN' OR pr.processed_at IS NULL OR pr.processed_at < pr.created_at
+              ))
+           OR (pr.status = 'REQUESTED' AND (pr.processed_by IS NOT NULL OR pr.processed_at IS NOT NULL))
+    """)
+    require(invalid_payouts == 0, f"Integrity check failed: {invalid_payouts} payout_requests with invalid processed_at/processed_by state")
+
+
 def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
     require(audit['flywayCompliant'], 'Cannot sync demo data: target database Flyway version is below 43')
     require(audit['conflictsCount'] == 0, 'Cannot sync demo data: unrelated field conflicts detected in database')
 
+    rebase_reschedule_fixtures(base_rows, trans_rows, db_now_vn(session))
     all_rows = dict(**base_rows, **trans_rows)
 
     session.send('LOCK TABLE ' + ','.join('public.' + t for t in ALL_TABLES) + ' IN SHARE ROW EXCLUSIVE MODE')
@@ -835,11 +1553,15 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
             cnt = session.query(f"SELECT to_json(count(*)) FROM public.{table} WHERE id IN ({id_list})")
         require(cnt == len(rs), f"Post-sync fixture count incomplete for table: {table}")
 
+    extended_ids, schedule_ids = seed_extended_simulation_fixtures(session, base_rows, trans_rows)
+
     return {
         'status': 'SYNC_SUCCESS',
         'urlsReconciled': reconciled_count,
         'insertedByTable': inserted_results,
         'insertedIds': inserted_ids,
+        'extendedIds': extended_ids,
+        'scheduleIds': schedule_ids,
         'existingNullCredentialsProvisioned': provisioned,
         'totalInserted': sum(inserted_results.values()),
         'totalVerifiedInDb': sum(len(rs) for rs in all_rows.values())
@@ -933,8 +1655,8 @@ def protected_references(reviewed):
 def seed_demo_operating_schedule(session, base_rows):
     # Derive synthetic departures only for reviewed, published demo services.
     # Keep all canonical slots (including historical booking anchors) untouched.
-    now = datetime.fromisoformat(session.query(
-        "SELECT to_json(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')"))
+    now = db_now_vn(session).replace(tzinfo=None)
+    sched_info = resolve_reschedule_schedule(db_now_vn(session))
     today = now.date()
     horizon_days = DEMO_HORIZON_DAYS
     days = ('MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY')
@@ -951,6 +1673,7 @@ def seed_demo_operating_schedule(session, base_rows):
     schedules, slots, equipment, units = [], [], [], []
     existing_departures = {(s['service_id'], s['date'], time.fromisoformat(s['start_time']))
                            for s in base_rows['service_slots']}
+    existing_departures.add((RESCHEDULE_SERVICE_ID, sched_info['target_day'], time(7, 0)))
     for service in base_rows['services']:
         service_id = service['id']
         if service_id not in published:
@@ -998,6 +1721,7 @@ def seed_demo_operating_schedule(session, base_rows):
                                   'booked_count': 0, 'equipment_id': rule['equipmentId']})
 
     markers = [{'slot_id': slot['id']} for slot in slots]
+    schedule_ids = {t: [] for t in SCHEDULE_TABLES}
     for table, rows, timestamped in (
             ('vendor_equipment', equipment, False),
             ('service_operating_schedules', schedules, False),
@@ -1006,6 +1730,7 @@ def seed_demo_operating_schedule(session, base_rows):
             ('service_operating_schedule_slots', markers, False)):
         if not rows:
             continue
+        pk = pk_col(table)
         columns = ','.join(rows[0])
         timestamps = ',created_at,updated_at' if timestamped else ''
         clock = ',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP' if timestamped else ''
@@ -1014,14 +1739,15 @@ def seed_demo_operating_schedule(session, base_rows):
                 INSERT INTO public.{table} ({columns}{timestamps})
                 SELECT {columns}{clock}
                 FROM jsonb_populate_recordset(NULL::public.{table}, {jlit(rows)})
-                RETURNING 1
-            ) SELECT to_json(count(*)) FROM inserted
+                RETURNING "{pk}"
+            ) SELECT coalesce(json_agg("{pk}"),'[]'::json) FROM inserted
             """)
-        require(inserted == len(rows), f'Demo operating schedule insert incomplete: {table}')
+        require(len(inserted) == len(rows), f'Demo operating schedule insert incomplete: {table}')
+        schedule_ids[table].extend(inserted)
 
-    return {'services': len(schedules), 'horizonDays': horizon_days,
-            'departures': len(slots), 'equipment': len(equipment), 'slotUnits': len(units),
-            'through': (today + timedelta(days=horizon_days - 1)).isoformat()}
+    return ({'services': len(schedules), 'horizonDays': horizon_days,
+             'departures': len(slots), 'equipment': len(equipment), 'slotUnits': len(units),
+             'through': (today + timedelta(days=horizon_days - 1)).isoformat()}, schedule_ids)
 
 
 def execute_replace(session, base_rows, trans_rows, demo_password):
@@ -1081,6 +1807,7 @@ def execute_replace(session, base_rows, trans_rows, demo_password):
             deleted[table] = session.query(f'WITH removed AS (DELETE FROM public.{table} t' + condition + ' RETURNING 1) SELECT to_json(count(*)) FROM removed')
             remaining.remove(table)
     session.send('ALTER TABLE public.flash_sales ENABLE TRIGGER flash_sale_terms_immutable')
+    rebase_reschedule_fixtures(base_rows, trans_rows, db_now_vn(session))
     clean_audit = preflight_audit(session, base_rows, trans_rows)
     result = execute_sync(session, base_rows, trans_rows, clean_audit, demo_password)
     # Re-read all fixtures, relationships, amounts and statuses before the caller can commit.
@@ -1090,9 +1817,12 @@ def execute_replace(session, base_rows, trans_rows, demo_password):
     expected_canonical = sum(len(rs) for rs in base_rows.values()) + sum(len(rs) for rs in trans_rows.values())
     require(result['totalVerifiedInDb'] == expected_canonical, f'Replacement requires {expected_canonical} canonical rows')
     historical = {i['slot_id'] for i in trans_rows['booking_items']}
-    today = datetime.now(timezone(timedelta(hours=7))).date().isoformat()
+    today = db_now_vn(session).date().isoformat()
     require(all(s['date'] > today for s in base_rows['service_slots'] if s['id'] not in historical), 'Replacement requires future demo slots')
-    result['demoOperatingSchedule'] = seed_demo_operating_schedule(session, base_rows)
+    schedule_summary, sched_extra_ids = seed_demo_operating_schedule(session, base_rows)
+    result['demoOperatingSchedule'] = schedule_summary
+    for tbl, ids in sched_extra_ids.items():
+        result['scheduleIds'].setdefault(tbl, []).extend(ids)
     after = protected_snapshot(session, snapshot_tables)
     require(before == after, 'Protected configuration fingerprint changed; replacement rolled back')
     session.send('SET CONSTRAINTS ALL IMMEDIATE')
@@ -1132,12 +1862,16 @@ def validate_modes(args):
 def row_fingerprints(session, table, ids):
     if not ids:
         return {}
-    if len(ids) > 500:
+    id_values = list(ids)
+    pk = pk_col(table)
+    if len(id_values) > 500:
         return session.query(
-            f"SELECT coalesce(json_object_agg(t.id,md5(to_jsonb(t)::text)), '{{}}'::json) "
-            f"FROM public.{table} t JOIN jsonb_array_elements_text({jlit(ids)}) x ON t.id = x::uuid")
-    id_list = ','.join(lit(i) + '::uuid' for i in ids)
-    return session.query(f"SELECT coalesce(json_object_agg(id,md5(to_jsonb(t)::text)), '{{}}'::json) FROM public.{table} t WHERE id IN ({id_list})")
+            f'SELECT coalesce(json_object_agg(t."{pk}",md5(to_jsonb(t)::text)), \'{{}}\'::json) '
+            f'FROM public.{table} t JOIN jsonb_array_elements_text({jlit(id_values)}) x ON t."{pk}" = x::uuid')
+    id_list = ','.join(lit(i) + '::uuid' for i in id_values)
+    return session.query(
+        f'SELECT coalesce(json_object_agg("{pk}",md5(to_jsonb(t)::text)), \'{{}}\'::json) '
+        f'FROM public.{table} t WHERE "{pk}" IN ({id_list})')
 
 
 def ownership_target(args):
@@ -1160,6 +1894,12 @@ def load_ownership(args, base, trans):
     for table, records in data['owned'].items():
         allowed = {r['id'] for r in rows[table]} - (FLYWAY_BASELINE_CATEGORIES if table == 'categories' else set())
         require(set(records).issubset(allowed) and all(re.fullmatch('[0-9a-f]{32}', v) for v in records.values()), 'Invalid ownership receipt IDs/fingerprints')
+    for ext_key, valid_tables in (('extendedOwned', set(EXTENDED_TABLE_ORDER)), ('scheduleOwned', set(SCHEDULE_TABLES))):
+        if ext_key in data:
+            require(isinstance(data[ext_key], dict) and set(data[ext_key]).issubset(valid_tables), f'Invalid {ext_key} tables')
+            for table, records in data[ext_key].items():
+                require(isinstance(records, dict) and all(str(uuid.UUID(i)) == i and re.fullmatch('[0-9a-f]{32}', v) for i, v in records.items()),
+                        f'Invalid {ext_key} IDs/fingerprints in {table}')
     allowed_dates = {s['id'] for s in base['service_slots']} - {i['slot_id'] for i in trans['booking_items']}
     require(set(data.get('slotDates', {})).issubset(allowed_dates), 'Invalid ownership slot dates')
     return data
@@ -1168,12 +1908,27 @@ def load_ownership(args, base, trans):
 def execute_cleanup(session, base_rows, trans_rows, ownership=None):
     require(ownership and ownership.get('owned'), 'Cleanup requires the original import ownership receipt')
 
-    session.send('LOCK TABLE ' + ','.join('public.' + t for t in ALL_TABLES) + ' IN SHARE ROW EXCLUSIVE MODE')
+    lock_tables = sorted(set(ALL_TABLES) | set(EXTENDED_TABLE_ORDER) | set(SCHEDULE_TABLES))
+    session.send('LOCK TABLE ' + ','.join('public.' + t for t in lock_tables) + ' IN SHARE ROW EXCLUSIVE MODE')
 
     for table in ALL_TABLES:
         current = row_fingerprints(session, table, ownership['owned'][table])
         require(all(ownership['owned'][table][i] == digest for i, digest in current.items()),
                 'Cleanup blocked: imported row changed in ' + table)
+    for ext_key in ('extendedOwned', 'scheduleOwned'):
+        for table, expected in ownership.get(ext_key, {}).items():
+            if not expected:
+                continue
+            current = row_fingerprints(session, table, expected)
+            require(all(expected[i] == digest for i, digest in current.items()),
+                    'Cleanup blocked: imported row changed in ' + table)
+
+    owned_by_table = {t: set(ownership['owned'].get(t, {})) for t in ALL_TABLES}
+    for ext_key in ('extendedOwned', 'scheduleOwned'):
+        for table, records in ownership.get(ext_key, {}).items():
+            owned_by_table.setdefault(table, set()).update(records)
+    all_owned_ids = {i for records in owned_by_table.values() for i in records}
+
     # Explicitly inspect cascading references, including tables outside this package.
     fks = session.query("SELECT coalesce(json_agg(x),'[]'::json) FROM (SELECT c.conrelid::regclass::text child, "
                         "c.confrelid::regclass::text parent, a.attname col, cardinality(c.conkey) n "
@@ -1192,30 +1947,53 @@ def execute_cleanup(session, base_rows, trans_rows, ownership=None):
     for fk in fks:
         parent = fk['parent'].removeprefix('public.')
         child = fk['child'].removeprefix('public.')
-        ids = {i for records in ownership['owned'].values() for i in records} if parent == '__owned__' else ownership['owned'].get(parent, {})
+        ids = all_owned_ids if parent == '__owned__' else owned_by_table.get(parent, set())
         if not ids:
             continue
         require(fk['n'] == 1 and all(re.fullmatch('[a-z_]+', x) for x in (parent, child, fk['col'])), 'Unsupported cleanup FK; manual review required')
         parent_ids = ','.join(lit(i) + '::uuid' for i in ids)
-        owned_children = ownership['owned'].get(child, {})
-        exclude = ' AND id NOT IN (' + ','.join(lit(i) + '::uuid' for i in owned_children) + ')' if owned_children else ''
+        owned_children = owned_by_table.get(child, set())
+        child_pk = pk_col(child)
+        exclude = f' AND "{child_pk}" NOT IN (' + ','.join(lit(i) + '::uuid' for i in owned_children) + ')' if owned_children else ''
         external = session.query(f'SELECT to_json(count(*)) FROM public.{child} WHERE "{fk["col"]}" IN ({parent_ids}){exclude}')
         require(external == 0, 'Cleanup blocked: non-owned references in ' + child)
 
     deleted_counts = {}
+    ext_owned = ownership.get('extendedOwned', {})
+    sched_owned = ownership.get('scheduleOwned', {})
+    for table in EXTRA_CLEANUP_ORDER:
+        combined = []
+        if table in ext_owned:
+            combined.extend(ext_owned.get(table, {}))
+        if table in sched_owned:
+            combined.extend(sched_owned.get(table, {}))
+        target_ids = list(dict.fromkeys(combined))
+        if not target_ids:
+            continue
+        pk = pk_col(table)
+        id_list = ','.join(lit(i) + '::uuid' for i in target_ids)
+        if table == 'flash_sales':
+            session.send('ALTER TABLE public.flash_sales DISABLE TRIGGER flash_sale_terms_immutable')
+        deleted = session.query(
+            f'WITH removed AS (DELETE FROM public.{table} WHERE "{pk}" IN ({id_list}) RETURNING "{pk}") '
+            f'SELECT to_json(count(*)) FROM removed')
+        if table == 'flash_sales':
+            session.send('ALTER TABLE public.flash_sales ENABLE TRIGGER flash_sale_terms_immutable')
+        deleted_counts[table] = deleted_counts.get(table, 0) + deleted
+
     for table in REVERSE_CLEANUP_ORDER:
         target_ids = [i for i in ownership['owned'][table]
                       if table != 'categories' or i not in FLYWAY_BASELINE_CATEGORIES]
 
         if not target_ids:
-            deleted_counts[table] = 0
+            deleted_counts.setdefault(table, 0)
             continue
 
         id_list = ','.join(lit(i) + '::uuid' for i in target_ids)
         deleted = session.query(
             f"WITH removed AS (DELETE FROM public.{table} WHERE id IN ({id_list}) RETURNING id) "
             f"SELECT to_json(count(*)) FROM removed")
-        deleted_counts[table] = deleted
+        deleted_counts[table] = deleted_counts.get(table, 0) + deleted
 
     return {
         'status': 'CLEANUP_SUCCESS',
@@ -1305,6 +2083,9 @@ def main():
     if args.validate_only:
         session = Session(args, readonly=True)
         try:
+            now_vn = db_now_vn(session)
+            prepare_slots(base_rows, trans_rows, ownership, today=now_vn.date())
+            rebase_reschedule_fixtures(base_rows, trans_rows, now_vn)
             report = preflight_audit(session, base_rows, trans_rows)
             validate_identity(report['identity'], args.database)
             session.finish(commit=False)
@@ -1348,6 +2129,9 @@ def main():
 
     session = Session(args, readonly=False)
     try:
+        now_vn = db_now_vn(session)
+        prepare_slots(base_rows, trans_rows, {} if args.replace else ownership, today=now_vn.date())
+        rebase_reschedule_fixtures(base_rows, trans_rows, now_vn)
         audit = preflight_audit(session, base_rows, trans_rows)
         validate_identity(audit['identity'], args.database)
         require(audit['flywayCompliant'],
@@ -1367,9 +2151,21 @@ def main():
                 ids = [i for i in ids if i not in FLYWAY_BASELINE_CATEGORIES]
             ids = [i for i in ids if (t, i) not in protected_ids]
             owned[t].update(row_fingerprints(session, t, ids))
+        extended_owned = {} if args.replace else {t: dict(v) for t, v in ownership.get('extendedOwned', {}).items()}
+        for t, ids in result.pop('extendedIds', {}).items():
+            if ids:
+                extended_owned.setdefault(t, {}).update(row_fingerprints(session, t, ids))
+        schedule_owned = {} if args.replace else {t: dict(v) for t, v in ownership.get('scheduleOwned', {}).items()}
+        for t, ids in result.pop('scheduleIds', {}).items():
+            if ids:
+                schedule_owned.setdefault(t, {}).update(row_fingerprints(session, t, ids))
         receipt = {'version': 1, 'target': ownership_target(args), 'owned': owned,
                    'slotDates': {s['id']: s['date'] for s in base_rows['service_slots']
                                  if s['id'] not in {i['slot_id'] for i in trans_rows['booking_items']}}}
+        if extended_owned:
+            receipt['extendedOwned'] = extended_owned
+        if schedule_owned:
+            receipt['scheduleOwned'] = schedule_owned
         if args.apply:
             receipt['state'] = 'COMMIT_PENDING'
             receipt['replacement'] = args.replace

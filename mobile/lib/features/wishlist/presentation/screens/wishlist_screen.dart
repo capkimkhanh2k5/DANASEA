@@ -60,37 +60,6 @@ class _WishlistScreenState extends State<WishlistScreen> {
     } catch (_) {}
   }
 
-  ServiceModel _resolveServiceModel(SavedService saved) {
-    final cached = _serviceCache[saved.serviceId];
-    if (cached != null) return cached;
-
-    return ServiceModel(
-      id: saved.serviceId,
-      vendorId: 'vnd-001',
-      vendorName: 'Danang Ocean Club',
-      categoryId: 'cat-001',
-      categoryName: 'Trải nghiệm biển',
-      name: saved.name,
-      slug: saved.serviceId,
-      description: '',
-      price: 350000,
-      durationMinutes: 120,
-      capacityPerSlot: 15,
-      locationName: 'Biển Mỹ Khê, Đà Nẵng',
-      address: 'Biển Mỹ Khê, Đà Nẵng',
-      latitude: 16.0601,
-      longitude: 108.2465,
-      waiverContent: '',
-      avgRating: 4.8,
-      ratingCount: 24,
-      imageUrls: [
-        if (saved.imageUrl != null && saved.imageUrl!.isNotEmpty)
-          saved.imageUrl!,
-      ],
-      isFavorite: true,
-    );
-  }
-
   Future<void> _removeFromWishlist(SavedService saved) async {
     try {
       await store.toggle(saved);
@@ -163,7 +132,10 @@ class _WishlistScreenState extends State<WishlistScreen> {
                     const SizedBox(height: AppShapes.spaceMd),
                 itemBuilder: (context, index) {
                   final saved = items[index];
-                  final srv = _resolveServiceModel(saved);
+                  final srv = _serviceCache[saved.serviceId];
+                  if (srv == null) {
+                    return ListTile(title: Text(saved.name), subtitle: const Text('Chưa tải được thông tin dịch vụ.'), trailing: IconButton(icon: const Icon(Icons.refresh), onPressed: () => _hydrateService(saved.serviceId)));
+                  }
                   return _buildWishlistCard(srv, saved);
                 },
               ),
@@ -223,7 +195,7 @@ class _WishlistScreenState extends State<WishlistScreen> {
                         LocalizedText(
                           item.vendorName.isNotEmpty
                               ? item.vendorName
-                              : 'Danang Ocean Club',
+                              : 'Chưa có thông tin nhà cung cấp',
                           style: AppTypography.labelSm(
                             color: AppColors.onSecondary,
                             fontWeight: FontWeight.w700,

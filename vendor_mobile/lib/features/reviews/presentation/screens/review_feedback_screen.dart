@@ -21,7 +21,30 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
 
   String _currentFilter = 'all'; // all, pending, 5star, 4star, flagged
   final Map<String, TextEditingController> _replyControllers = {};
+  final Map<String, bool> _isDraftingReply = {};
   String? _editingReplyReviewId;
+
+  Future<void> _draftReplyWithAi(String reviewId) async {
+    setState(() => _isDraftingReply[reviewId] = true);
+    try {
+      final draft = await VendorAiRepository().draftReviewReply(reviewId: reviewId);
+      final ctrl = _getReplyController(reviewId, null);
+      ctrl.text = draft.draftedReply;
+      if (mounted) {
+        ToastNotification.show(
+          context,
+          message: 'AI đã tạo gợi ý câu trả lời chuẩn nghiệp vụ.',
+          type: ToastType.success,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ToastNotification.show(context, message: 'Lỗi tạo phản hồi AI: $e', type: ToastType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _isDraftingReply[reviewId] = false);
+    }
+  }
 
   @override
   void initState() {
@@ -96,6 +119,13 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.maybePop(context),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'AI Review Coaching',
+            icon: const Icon(Icons.auto_awesome, color: AppColors.secondary),
+            onPressed: _showCoachingSheet,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -181,7 +211,7 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             LocalizedText(
-                              'DANANG OCEAN CLUB',
+                              'NHÀ CUNG CẤP',
                               style: AppTypography.labelSm.copyWith(
                                 color: AppColors.secondary,
                                 letterSpacing: 0.5,
@@ -609,7 +639,7 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: LocalizedText(
-                                'Phản hồi từ Danang Ocean Club',
+                                'Phản hồi từ nhà cung cấp',
                                 style: AppTypography.labelSm.copyWith(
                                   color: AppColors.secondary,
                                   fontWeight: FontWeight.bold,
@@ -660,12 +690,31 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  LocalizedText(
-                    hasReply ? 'Chỉnh sửa phản hồi của bạn:' : 'Viết phản hồi tới khách hàng:',
-                    style: AppTypography.labelSm.copyWith(
-                      color: AppColors.tertiary,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      LocalizedText(
+                        hasReply ? 'Chỉnh sửa phản hồi của bạn:' : 'Viết phản hồi tới khách hàng:',
+                        style: AppTypography.labelSm.copyWith(
+                          color: AppColors.tertiary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: _isDraftingReply[review.id] == true ? null : () => _draftReplyWithAi(review.id),
+                        icon: _isDraftingReply[review.id] == true
+                            ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.secondary))
+                            : const Icon(Icons.auto_awesome, size: 14, color: AppColors.secondary),
+                        label: const Text(
+                          'AI Gợi ý trả lời',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                        ),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   TextField(
@@ -715,6 +764,266 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  void _showCoachingSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const _ReviewCoachingModal(),
+    );
+  }
+}
+
+class _ReviewCoachingModal extends StatefulWidget {
+  const _ReviewCoachingModal();
+
+  @override
+  State<_ReviewCoachingModal> createState() => _ReviewCoachingModalState();
+}
+
+class _ReviewCoachingModalState extends State<_ReviewCoachingModal> {
+  final _aiRepo = VendorAiRepository();
+  bool _isLoading = true;
+  ReviewCoachingResultModel _result = const ReviewCoachingResultModel();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCoaching();
+  }
+
+  Future<void> _loadCoaching() async {
+    setState(() => _isLoading = true);
+    final res = await _aiRepo.getReviewCoaching();
+    if (mounted) {
+      setState(() {
+        _result = res;
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 16,
+        bottom: MediaQuery.of(context).padding.bottom + 16,
+      ),
+      decoration: const BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.auto_awesome, color: AppColors.secondary, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'AI Huấn luyện đánh giá & Dịch vụ',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                    ),
+                    Text(
+                      'Phân tích phản hồi khách hàng theo chuẩn du lịch biển',
+                      style: TextStyle(fontSize: 11, color: AppColors.tertiary),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 20, color: AppColors.tertiary),
+                onPressed: _loadCoaching,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Rating overview
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 28),
+                    const SizedBox(width: 6),
+                    Text(
+                      _result.averageRating.toStringAsFixed(1),
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                    ),
+                    const Text(' / 5.0', style: TextStyle(fontSize: 12, color: AppColors.tertiary)),
+                  ],
+                ),
+                Container(width: 1, height: 28, color: const Color(0xFFCBD5E1)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_result.totalReviewsAnalyzed} đánh giá',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                    ),
+                    const Text('Đã được AI phân tích', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Trụ cột dịch vụ & Điểm hài lòng:',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildPillarTile('Hướng dẫn viên', _result.pillars['GUIDE']),
+                        _buildPillarTile('An toàn biển & Thiết bị', _result.pillars['SAFETY']),
+                        _buildPillarTile('Đúng giờ khởi hành', _result.pillars['PUNCTUALITY']),
+                        _buildPillarTile('Giá trị & Trải nghiệm', _result.pillars['VALUE']),
+                        const SizedBox(height: 16),
+
+                        if (_result.actionItems.isNotEmpty) ...[
+                          const Text(
+                            'Khuyến nghị hành động để tăng điểm:',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                          ),
+                          const SizedBox(height: 8),
+                          ..._result.actionItems.map((item) {
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(Icons.check_circle_outline, size: 16, color: AppColors.secondary),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          item['title']?.toString() ?? item['action']?.toString() ?? 'Hành động đề xuất',
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                                        ),
+                                        if (item['description'] != null || item['reason'] != null)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 2),
+                                            child: Text(
+                                              (item['description'] ?? item['reason']).toString(),
+                                              style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPillarTile(String title, dynamic data) {
+    if (data == null || data is! Map) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant)),
+            const Text('Tích cực (100%)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
+          ],
+        ),
+      );
+    }
+    final score = (data['sentimentScore'] as num?)?.toDouble() ?? 1.0;
+    final pct = (score * 100).clamp(0, 100).toInt();
+    final isGood = pct >= 70;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.navyAnchor)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: isGood ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '$pct% hài lòng',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: isGood ? const Color(0xFF166534) : const Color(0xFFB45309),
+              ),
+            ),
+          ),
         ],
       ),
     );

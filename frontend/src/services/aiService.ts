@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import type { MarineBriefingOverview } from '../types/marineBriefing';
 
 export interface AssistantChatRequest {
   message: string;
@@ -92,6 +93,14 @@ export const aiService = {
    */
   async getReviewSummary(serviceId: string) {
     const res = await apiClient.get(`/ai/review-summaries/${serviceId}`);
+    return res.data;
+  },
+
+  /**
+   * GET /api/ai/orders/{orderId}/marine-briefing — Cẩm nang ra khơi 24h & checklist an toàn
+   */
+  async getMarineBriefing(orderId: string): Promise<MarineBriefingOverview> {
+    const res = await apiClient.get<MarineBriefingOverview>(`/ai/orders/${orderId}/marine-briefing`);
     return res.data;
   },
 };

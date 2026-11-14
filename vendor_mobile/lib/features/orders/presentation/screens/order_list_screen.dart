@@ -182,26 +182,37 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
             // Sub-Orders List
             Expanded(
-              child: subOrders.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.receipt_long_outlined, size: 48, color: AppColors.tertiary),
-                          const SizedBox(height: 8),
-                          const LocalizedText('Không tìm thấy đơn hàng nào', style: TextStyle(color: AppColors.tertiary, fontSize: 14)),
-
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await VendorOrderRepository().getSubOrders();
+                  if (mounted) setState(() {});
+                },
+                child: subOrders.isEmpty
+                    ? ListView(
+                        children: const [
+                          SizedBox(height: 120),
+                          Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.receipt_long_outlined, size: 48, color: AppColors.tertiary),
+                                SizedBox(height: 8),
+                                LocalizedText('Không tìm thấy đơn hàng nào', style: TextStyle(color: AppColors.tertiary, fontSize: 14)),
+                              ],
+                            ),
+                          ),
                         ],
+                      )
+                    : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+                        itemCount: subOrders.length,
+                        itemBuilder: (context, index) {
+                          final order = subOrders[index];
+                          return _buildSubOrderCard(order);
+                        },
                       ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
-                      itemCount: subOrders.length,
-                      itemBuilder: (context, index) {
-                        final order = subOrders[index];
-                        return _buildSubOrderCard(order);
-                      },
-                    ),
+              ),
             ),
           ],
         ),

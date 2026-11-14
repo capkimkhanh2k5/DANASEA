@@ -294,7 +294,7 @@ export function Explore() {
     return featuredServices.map((svc) => ({
       id: svc.id,
       name: svc.name,
-      nameEn: svc.name,
+      nameEn: svc.nameEn || svc.name,
       location: svc.address || 'Đà Nẵng',
       rating: formatRating(svc.averageRating, 4.9),
       reviewCount: svc.reviewCount || 24,
@@ -316,7 +316,7 @@ export function Explore() {
         return {
           id: s.id,
           name: s.name,
-          nameEn: s.name,
+          nameEn: s.nameEn || s.name,
           location: s.address || fallback.location,
           visitorsText: `${views}+ du khách quan tâm`,
           visitorsTextEn: `${views}+ travelers viewed`,
@@ -341,7 +341,7 @@ export function Explore() {
       return {
         id: s.id,
         name: s.name,
-        nameEn: s.name,
+        nameEn: s.nameEn || s.name,
         location: s.address || fallback.location,
         conditionReason: fallback.conditionReason,
         conditionReasonEn: fallback.conditionReasonEn,

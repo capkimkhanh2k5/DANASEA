@@ -289,6 +289,8 @@ class AssistantRepository {
     bool weatherSafeOnly = false,
     double? latitude,
     double? longitude,
+    double? radiusKm,
+    int? limit,
   }) async {
     final endpoint =
         mode == 'RECOMMENDATION'
@@ -306,6 +308,8 @@ class AssistantRepository {
         'weatherSafeOnly': weatherSafeOnly,
         if (latitude != null) 'latitude': latitude,
         if (longitude != null) 'longitude': longitude,
+        if (radiusKm != null) 'radiusKm': radiusKm,
+        if (limit != null) 'limit': limit,
       },
       authenticated: true,
     );
@@ -317,13 +321,21 @@ class AssistantRepository {
   Future<Map<String, dynamic>> compareServices({
     required List<String> serviceIds,
     required String query,
+    int? partySize,
+    double? latitude,
+    double? longitude,
   }) async {
     final body = await _session.requestJson(
       '/api/ai/services/compare',
       method: 'POST',
       data: <String, dynamic>{
         'serviceIds': serviceIds,
-        'context': {'query': query.trim()},
+        'context': {
+          'query': query.trim(),
+          if (partySize != null) 'partySize': partySize,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+        },
       },
       authenticated: true,
     );

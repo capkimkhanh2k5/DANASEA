@@ -13,9 +13,6 @@ export interface SEOHeadProps {
   jsonLd?: Record<string, unknown> | Array<Record<string, unknown>>;
 }
 
-const DEFAULT_TITLE_VI = 'DANASEA - Nền tảng Đặt Tour & Trải Nghiệm Biển Đà Nẵng';
-const DEFAULT_TITLE_EN = 'DANASEA - Da Nang Marine Tours & Ocean Experiences Platform';
-
 const DEFAULT_DESCRIPTION_VI =
   'Khám phá và đặt vé các hoạt động thể thao biển, lặn ngắm san hô, chèo SUP, cano dù bay tại Đà Nẵng cùng DANASEA. Giá minh bạch, cảnh báo thời tiết AI và bảo hiểm an toàn.';
 const DEFAULT_DESCRIPTION_EN =
@@ -57,13 +54,10 @@ export function SEOHead({
     const isEnglish = language === 'en';
     const baseUrl = getSiteOrigin();
     const defaultImage = `${baseUrl}/logo192.png`;
-    const defaultTitle = isEnglish ? DEFAULT_TITLE_EN : DEFAULT_TITLE_VI;
     const defaultDescription = isEnglish ? DEFAULT_DESCRIPTION_EN : DEFAULT_DESCRIPTION_VI;
 
-    // 1. Title
-    const formattedTitle = title
-      ? `${title} | DANASEA`
-      : defaultTitle;
+    // 1. Title (Cố định tên tab là DANASEA theo yêu cầu)
+    const formattedTitle = 'DANASEA';
     document.title = formattedTitle;
 
     // 2. Language attribute on <html>

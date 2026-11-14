@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { vendorSettlementService } from "../../../services/vendorSettlementService";
+import React, { useState, useEffect, useCallback } from "react";
+import { 
+  vendorPayoutService, 
+  type EligibleSettlementPayout, 
+  type PayoutRequestItem 
+} from "../../../services/vendorPayoutService";
 import { vendorProfileService } from "../../../services/vendorProfileService";
 import { 
   Building2, 
@@ -8,7 +12,9 @@ import {
   Copy, 
   Send, 
   FileText, 
-  CheckCircle2 
+  CheckCircle2,
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 import { 
   AtlasPageHeader, 
@@ -17,107 +23,127 @@ import {
   AtlasButton 
 } from "../../../components/vendor/atlas/AtlasDesignSystem";
 
-interface PayoutHistoryItem {
-  id: string;
-  cycleId: string;
-  amount: number;
-  status: "REQUESTED" | "APPROVED" | "PAID" | "REJECTED";
-  createdAt: string;
-  processedAt: string | null;
-  bankRef: string;
-}
-
 export function Payouts() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const showToast = (msg: string) => {
+  const [toastType, setToastType] = useState<"success" | "error">("success");
+
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToastMessage(msg);
+    setToastType(type);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  // Available Balance for withdrawal
+  // Available Balance & Cycles for withdrawal
   const [availableBalance, setAvailableBalance] = useState(0);
   const [selectedCycle, setSelectedCycle] = useState("");
-  const [availableCycles, setAvailableCycles] = useState<{ id: string; label: string; amount: number }[]>([]);
+  const [eligibleCycles, setEligibleCycles] = useState<EligibleSettlementPayout[]>([]);
   const [payoutAmount, setPayoutAmount] = useState<string>("0");
   const [payoutNote, setPayoutNote] = useState("");
   const [showAccount, setShowAccount] = useState(false);
   const [bankInfo, setBankInfo] = useState<{ bankName?: string; accountNumber?: string; accountHolder?: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Payout History State
-  const [history, setHistory] = useState<PayoutHistoryItem[]>([]);
+  const [history, setHistory] = useState<PayoutRequestItem[]>([]);
 
-  useEffect(() => {
-    // 1. Load real settlements
-    vendorSettlementService.getSettlements().then((res) => {
-      if (res && res.content && res.content.length > 0) {
-        const cycles = res.content.map((s) => ({
-          id: s.id,
-          label: `#SET-${s.periodStart.replace(/-/g, "").substring(0, 6)} (${s.periodStart} - ${s.periodEnd})`,
-          amount: Number(s.netPayableAmount) || 0,
-        }));
-        setAvailableCycles(cycles);
-        setSelectedCycle(cycles[0].id);
-        const total = cycles.reduce((acc, c) => acc + c.amount, 0);
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [eligibleRes, historyRes, profileRes] = await Promise.allSettled([
+        vendorPayoutService.getEligibleSettlements(),
+        vendorPayoutService.getPayoutRequests('ALL', 0, 50),
+        vendorProfileService.getProfile(),
+      ]);
+
+      // 1. Eligible Settlements
+      if (eligibleRes.status === "fulfilled" && eligibleRes.value.length > 0) {
+        const cycles = eligibleRes.value;
+        setEligibleCycles(cycles);
+        setSelectedCycle(cycles[0].settlementId);
+        const total = cycles.reduce((acc, c) => acc + (Number(c.remainingEligibleBalance) || 0), 0);
         setAvailableBalance(total);
-        setPayoutAmount(total.toString());
+        setPayoutAmount(total > 0 ? total.toString() : "0");
       } else {
-        setAvailableCycles([]);
+        setEligibleCycles([]);
         setAvailableBalance(0);
         setPayoutAmount("0");
       }
-    }).catch(() => {
-      setAvailableBalance(0);
-    });
 
-    // 2. Load real vendor bank account
-    vendorProfileService.getProfile().then((p) => {
-      setBankInfo({
-        bankName: p.bankName || "Vietcombank",
-        accountNumber: p.bankAccountNumber || "",
-        accountHolder: p.bankAccountHolder || p.businessName || "",
-      });
-    }).catch(() => {});
+      // 2. Payout History
+      if (historyRes.status === "fulfilled") {
+        setHistory(historyRes.value.content || []);
+      }
+
+      // 3. Vendor Bank Info
+      if (profileRes.status === "fulfilled" && profileRes.value) {
+        const p = profileRes.value;
+        setBankInfo({
+          bankName: p.bankName || "Vietcombank (Hàng hải)",
+          accountNumber: p.bankAccountNumber || "",
+          accountHolder: p.bankAccountHolder || p.businessName || "",
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Validation
   const numericAmount = Number(payoutAmount.replace(/\D/g, "")) || 0;
-  const isAmountOver = numericAmount > availableBalance;
+  const currentSelectedCycle = eligibleCycles.find((c) => c.settlementId === selectedCycle);
+  const maxCycleBalance = currentSelectedCycle ? Number(currentSelectedCycle.remainingEligibleBalance) || 0 : availableBalance;
+  const isAmountOver = numericAmount > maxCycleBalance;
 
   // Handle Fill Max
   const handleFillMax = () => {
-    setPayoutAmount(availableBalance.toString());
+    if (maxCycleBalance > 0) {
+      setPayoutAmount(maxCycleBalance.toString());
+    } else {
+      setPayoutAmount(availableBalance.toString());
+    }
   };
 
   // Submit Payout Request
-  const handleSubmitPayout = (e: React.FormEvent) => {
+  const handleSubmitPayout = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (numericAmount <= 0) {
-      showToast("Vui lòng nhập số tiền hợp lệ lớn hơn 0 đ!");
+    if (!selectedCycle) {
+      showToast("Vui lòng chọn kỳ đối soát có số dư khả dụng!", "error");
       return;
     }
 
-    if (numericAmount > availableBalance) {
-      showToast("Lỗi: Số tiền rút không được vượt quá số dư khả dụng!");
+    if (numericAmount < 1000) {
+      showToast("Số tiền rút tối thiểu là 1.000 đ!", "error");
       return;
     }
 
-    const newPayout: PayoutHistoryItem = {
-      id: `PAY-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(history.length + 1).padStart(2, "0")}`,
-      cycleId: selectedCycle,
-      amount: numericAmount,
-      status: "REQUESTED",
-      createdAt: new Date().toLocaleDateString("vi-VN"),
-      processedAt: null,
-      bankRef: "CHỜ-DUYỆT-VITA",
-    };
+    if (numericAmount > maxCycleBalance) {
+      showToast(`Số tiền rút không được vượt quá số dư kỳ này (${maxCycleBalance.toLocaleString("vi-VN")} đ)!`, "error");
+      return;
+    }
 
-    setHistory((prev) => [newPayout, ...prev]);
-    setAvailableBalance((prev) => prev - numericAmount);
-    setPayoutAmount("0");
-    showToast(
-      `Đã tạo lệnh yêu cầu rút ${numericAmount.toLocaleString("vi-VN")} đ (Mã: #${newPayout.id}). Hồ sơ gửi tới Kế toán Cảng vụ.`
-    );
+    setIsSubmitting(true);
+    try {
+      const created = await vendorPayoutService.createPayoutRequest({
+        settlementId: selectedCycle,
+        amount: numericAmount,
+        note: payoutNote.trim() || undefined,
+      });
+
+      showToast(`Tạo lệnh rút ${numericAmount.toLocaleString("vi-VN")} đ thành công (Mã #${created.id.slice(0, 8).toUpperCase()}).`);
+      setPayoutNote("");
+      await loadData();
+    } catch (err: unknown) {
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Không thể gửi yêu cầu rút tiền. Vui lòng thử lại sau.";
+      showToast(errorMsg, "error");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const copyBankInfo = () => {
@@ -125,9 +151,21 @@ export function Payouts() {
       navigator.clipboard?.writeText(bankInfo.accountNumber);
       showToast("Đã sao chép số tài khoản vào bộ nhớ tạm!");
     } else {
-      showToast("Chưa có số tài khoản để sao chép!");
+      showToast("Chưa có số tài khoản để sao chép!", "error");
     }
   };
+
+  const pendingAmount = history
+    .filter((h) => h.status === "REQUESTED")
+    .reduce((sum, h) => sum + Number(h.amount), 0);
+
+  const approvedAmount = history
+    .filter((h) => h.status === "APPROVED")
+    .reduce((sum, h) => sum + Number(h.amount), 0);
+
+  const paidAmount = history
+    .filter((h) => h.status === "PAID")
+    .reduce((sum, h) => sum + Number(h.amount), 0);
 
   return (
     <div className="w-full max-w-[1400px] mx-auto px-6 py-5 space-y-5">
@@ -145,20 +183,14 @@ export function Payouts() {
         />
 
         <AtlasMetricCard
-          label="Lệnh đang chờ duyệt"
-          value={`${history
-            .filter((h) => h.status === "REQUESTED")
-            .reduce((sum, h) => sum + h.amount, 0)
-            .toLocaleString("vi-VN")} đ`}
+          label="Chờ duyệt & Đang chi trả"
+          value={`${(pendingAmount + approvedAmount).toLocaleString("vi-VN")} đ`}
           accent="amber"
         />
 
         <AtlasMetricCard
           label="Đã giải ngân thành công"
-          value={`${history
-            .filter((h) => h.status === "PAID")
-            .reduce((sum, h) => sum + h.amount, 0)
-            .toLocaleString("vi-VN")} đ`}
+          value={`${paidAmount.toLocaleString("vi-VN")} đ`}
         />
       </div>
 
@@ -223,20 +255,26 @@ export function Payouts() {
               {/* Settlement select */}
               <div>
                 <label className="text-xs font-semibold text-slate-700 block mb-1.5">
-                  Chọn kỳ đối soát liên kết
+                  Chọn kỳ đối soát liên kết *
                 </label>
                 <select
                   value={selectedCycle}
-                  onChange={(e) => setSelectedCycle(e.target.value)}
-                  disabled={availableCycles.length === 0}
+                  onChange={(e) => {
+                    setSelectedCycle(e.target.value);
+                    const sel = eligibleCycles.find((c) => c.settlementId === e.target.value);
+                    if (sel) {
+                      setPayoutAmount(Number(sel.remainingEligibleBalance || 0).toString());
+                    }
+                  }}
+                  disabled={eligibleCycles.length === 0}
                   className="w-full h-11 px-3.5 rounded-xl bg-slate-50/70 border border-slate-200 text-slate-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-100"
                 >
-                  {availableCycles.length === 0 ? (
-                    <option value="">Chưa có kỳ đối soát khả dụng</option>
+                  {eligibleCycles.length === 0 ? (
+                    <option value="">Chưa có kỳ đối soát khả dụng (cần được chốt FINALIZED)</option>
                   ) : (
-                    availableCycles.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.label} — Khả dụng: {c.amount.toLocaleString("vi-VN")} đ
+                    eligibleCycles.map((c) => (
+                      <option key={c.settlementId} value={c.settlementId}>
+                        #SET-{c.periodStart.replace(/-/g, "").substring(0, 6)} ({c.periodStart} – {c.periodEnd}) — Khả dụng: {Number(c.remainingEligibleBalance).toLocaleString("vi-VN")} đ
                       </option>
                     ))
                   )}
@@ -254,7 +292,7 @@ export function Payouts() {
                     onClick={handleFillMax}
                     className="text-xs font-bold text-primary hover:underline cursor-pointer"
                   >
-                    Rút toàn bộ số dư
+                    Rút toàn bộ số dư kỳ này
                   </button>
                 </div>
 
@@ -262,8 +300,8 @@ export function Payouts() {
                   <input
                     type="number"
                     required
-                    min={100000}
-                    max={availableBalance}
+                    min={1000}
+                    max={maxCycleBalance}
                     value={payoutAmount}
                     onChange={(e) => setPayoutAmount(e.target.value)}
                     className={`w-full h-11 pl-3.5 pr-10 rounded-xl bg-white border font-mono font-bold text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900 ${
@@ -277,7 +315,7 @@ export function Payouts() {
 
                 {isAmountOver && (
                   <p className="text-rose-600 text-xs mt-1.5 font-medium">
-                    Số tiền yêu cầu không được vượt quá số dư khả dụng ({availableBalance.toLocaleString("vi-VN")} đ).
+                    Số tiền yêu cầu không được vượt quá số dư khả dụng kỳ này ({maxCycleBalance.toLocaleString("vi-VN")} đ).
                   </p>
                 )}
               </div>
@@ -291,7 +329,7 @@ export function Payouts() {
                   rows={2}
                   value={payoutNote}
                   onChange={(e) => setPayoutNote(e.target.value)}
-                  placeholder="Ghi chú thêm nếu có..."
+                  placeholder="Ghi chú thêm nếu có (ví dụ: chuyển khoản gấp)..."
                   className="w-full p-3 rounded-xl bg-white border border-slate-200 text-slate-800 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
               </div>
@@ -301,11 +339,11 @@ export function Payouts() {
                   type="submit"
                   variant="primary"
                   size="lg"
-                  disabled={isAmountOver || availableBalance <= 0}
+                  disabled={isSubmitting || isAmountOver || maxCycleBalance <= 0 || !selectedCycle}
                   className="w-full"
-                  icon={<Send className="w-4 h-4" />}
+                  icon={isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 >
-                  Gửi yêu cầu giải ngân ({numericAmount.toLocaleString("vi-VN")} đ)
+                  {isSubmitting ? "Đang xử lý..." : `Gửi yêu cầu giải ngân (${numericAmount.toLocaleString("vi-VN")} đ)`}
                 </AtlasButton>
               </div>
             </form>
@@ -334,34 +372,61 @@ export function Payouts() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {history.length === 0 ? (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={3} className="py-12 text-center text-slate-400 text-sm">
+                      <div className="inline-flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                        <span>Đang tải sổ cái giao dịch...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : history.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="py-12 text-center text-slate-400 text-sm">
                       Chưa có lệnh yêu cầu rút tiền nào.
                     </td>
                   </tr>
                 ) : (
-                  history.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <div className="font-mono font-bold text-slate-900 text-sm">#{item.id}</div>
-                        <div className="text-xs text-slate-500 font-mono mt-0.5">{item.createdAt}</div>
-                      </td>
-                      <td className="py-3.5 px-3 text-center">
-                        {item.status === "PAID" ? (
-                          <AtlasBadge label="Đã chi trả" variant="success" />
-                        ) : (
-                          <AtlasBadge label="Chờ duyệt" variant="warning" />
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <span className="font-mono text-sm font-bold text-slate-900 tabular-nums">
-                          {item.amount.toLocaleString("vi-VN")}
-                        </span>
-                        <span className="text-xs text-slate-400 ml-1">đ</span>
-                      </td>
-                    </tr>
-                  ))
+                  history.map((item) => {
+                    const shortId = item.id.replace(/-/g, '').slice(0, 8).toUpperCase();
+                    const createdDate = item.createdAt ? item.createdAt.slice(0, 10) : "—";
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-3.5 px-4">
+                          <div className="font-mono font-bold text-slate-900 text-sm">#PAY-{shortId}</div>
+                          <div className="text-xs text-slate-500 font-mono mt-0.5">{createdDate}</div>
+                          {item.bankReference && (
+                            <div className="text-[11px] text-emerald-600 font-mono font-semibold mt-0.5">
+                              Ref: {item.bankReference}
+                            </div>
+                          )}
+                          {item.rejectionReason && (
+                            <div className="text-[11px] text-rose-600 mt-0.5">
+                              Lý do: {item.rejectionReason}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-3 text-center">
+                          {item.status === "PAID" ? (
+                            <AtlasBadge label="Đã chi trả" variant="success" />
+                          ) : item.status === "APPROVED" ? (
+                            <AtlasBadge label="Đã duyệt" variant="info" />
+                          ) : item.status === "REJECTED" ? (
+                            <AtlasBadge label="Từ chối" variant="danger" />
+                          ) : (
+                            <AtlasBadge label="Chờ duyệt" variant="warning" />
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <span className="font-mono text-sm font-bold text-slate-900 tabular-nums">
+                            {Number(item.amount).toLocaleString("vi-VN")}
+                          </span>
+                          <span className="text-xs text-slate-400 ml-1">đ</span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -371,8 +436,16 @@ export function Payouts() {
 
       {/* Toast Alert */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-sm border border-slate-700">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-sm border ${
+          toastType === "error" 
+            ? "bg-rose-950 text-rose-100 border-rose-800" 
+            : "bg-slate-900 text-white border-slate-700"
+        }`}>
+          {toastType === "error" ? (
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          )}
           <span>{toastMessage}</span>
         </div>
       )}

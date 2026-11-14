@@ -2007,14 +2007,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
       return const SizedBox.shrink();
     }
     final activity = _marineBriefing!.activities.first;
-    final isSafe = activity.weatherSafetyStatus.toUpperCase() == 'ACCEPTABLE';
-    final isCaution = activity.weatherSafetyStatus.toUpperCase() == 'CAUTION';
+    final statusUpper = activity.weatherSafetyStatus.toUpperCase();
+    final isSafe = statusUpper == 'ACCEPTABLE' || statusUpper == 'NOT_REQUIRED';
+    final isCaution = statusUpper == 'CAUTION';
+    final isUnknown = statusUpper == 'UNKNOWN';
     final badgeColor = isSafe
         ? const Color(0xFF10B981)
-        : (isCaution ? const Color(0xFFF59E0B) : const Color(0xFFEF4444));
+        : isCaution
+        ? const Color(0xFFF59E0B)
+        : isUnknown
+        ? AppColors.secondary
+        : const Color(0xFFEF4444);
     final statusText = isSafe
-        ? 'Thời tiết lý tưởng'
-        : (isCaution ? 'Cần lưu ý thời tiết' : 'Thời tiết không thuận lợi');
+        ? 'Thời tiết thuận lợi'
+        : isCaution
+        ? 'Cần lưu ý thời tiết'
+        : isUnknown
+        ? 'Đang cập nhật dự báo'
+        : 'Cảnh báo thời tiết biển';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -2047,7 +2057,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
                       children: [
                         Flexible(
                           child: LocalizedText(
-                            'Bản tin biển AI cho chuyến đi',
+                            'Bản tin an toàn biển trước chuyến đi',
                             style: AppTypography.labelMd(
                               color: AppColors.onSurface,
                               fontWeight: FontWeight.w800,
@@ -2074,7 +2084,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      activity.serviceTitle,
+                      activity.meetingLocation.isNotEmpty
+                          ? '${activity.serviceTitle} • ${activity.meetingLocation}'
+                          : activity.serviceTitle,
                       style: AppTypography.bodySm(color: AppColors.onSurfaceVariant).copyWith(fontSize: 11),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -2121,14 +2133,51 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
                     children: [
                       const Icon(Icons.check_circle_outline, size: 12, color: AppColors.secondary),
                       const SizedBox(width: 4),
-                      Text(
-                        item,
-                        style: AppTypography.bodySm(color: AppColors.secondary).copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+                      Flexible(
+                        child: Text(
+                          item,
+                          style: AppTypography.bodySm(color: AppColors.secondary).copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
                       ),
                     ],
                   ),
                 );
               }).toList(),
+            ),
+          ],
+          if (activity.safetyGuidelines.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            LocalizedText(
+              'Hướng dẫn an toàn & điểm danh:',
+              style: AppTypography.labelSm(color: AppColors.onSurface, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            ...activity.safetyGuidelines.map(
+              (guide) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 3),
+                      child: Icon(
+                        Icons.shield_outlined,
+                        size: 13,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        guide,
+                        style: AppTypography.bodySm(
+                          color: AppColors.onSurfaceVariant,
+                        ).copyWith(fontSize: 11.5, height: 1.35),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ],

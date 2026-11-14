@@ -110,22 +110,9 @@ class PaymentRepository {
   }
 
   Future<List<PaymentProvider>> getAvailableProviders() async {
-    try {
-      final raw = await session.requestJson('/api/payments/providers');
-      if (raw is List) {
-        final providers = raw
-            .map((e) => e?.toString())
-            .whereType<String>()
-            .map(providerFromBackend)
-            .toSet()
-            .toList();
-        if (providers.isNotEmpty) return providers;
-      }
-    } catch (_) {}
-    return const [
-      PaymentProvider.vnpay,
-      PaymentProvider.paypal,
-    ];
+    final raw = await session.requestJson('/api/payments/providers');
+    if (raw is! List) throw AuthFailure('Dữ liệu cổng thanh toán không hợp lệ.');
+    return raw.whereType<String>().map(providerFromBackend).toSet().toList();
   }
 
   static PaymentStatus statusFromBackend(String? raw) {

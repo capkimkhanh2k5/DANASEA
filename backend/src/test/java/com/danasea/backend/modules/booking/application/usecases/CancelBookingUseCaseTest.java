@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockMakers;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -34,9 +35,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 @ExtendWith(MockitoExtension.class)
 class CancelBookingUseCaseTest {
@@ -127,23 +131,29 @@ class CancelBookingUseCaseTest {
     @Test
     @DisplayName("Hủy trễ (< 24h) booking CONFIRMED: không được hoàn tiền (0%) nhưng vẫn khôi phục capacity PostgreSQL")
     void execute_WhenConfirmedBookingCancelledLessThan24hBefore_ShouldDenyRefundAndReleaseCapacity() {
-        // Dịch vụ diễn ra sau vài giờ nữa (< 24h tính từ hiện tại)
-        LocalDate serviceDate = LocalDate.now();
-        LocalTime serviceTime = LocalTime.now().plusHours(2);
+        OffsetDateTime cancellationTime = OffsetDateTime.parse("2026-11-14T23:50:00+07:00");
+        OffsetDateTime departure = cancellationTime.plusHours(2);
         BigDecimal totalAmount = BigDecimal.valueOf(500000);
 
-        Booking booking = createBooking(BookingStatus.CONFIRMED, serviceDate, serviceTime, totalAmount);
+        Booking booking = createBooking(
+                BookingStatus.CONFIRMED, departure.toLocalDate(), departure.toLocalTime(), totalAmount);
         when(bookingRepository.findByIdWithItemsForUpdate(bookingId)).thenReturn(Optional.of(booking));
         when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(financialPort.requestRefund(eq(bookingId), eq(customerId), any(), any()))
                 .thenReturn(CancellationFinancialResult.noRefund());
 
         CancelBookingCommand command = new CancelBookingCommand(bookingId, customerId, false, null);
-        BookingCancelResult result = useCase.execute(command);
+        BookingCancelResult result;
+        try (var time = mockStatic(OffsetDateTime.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(OffsetDateTime::now).thenReturn(cancellationTime);
+            result = useCase.execute(command);
+        }
 
         assertThat(result).isNotNull();
         assertThat(result.bookingId()).isEqualTo(bookingId);
         assertThat(result.status()).isEqualTo(BookingStatus.CANCELLED);
+        assertThat(result.earliestServiceTime()).isEqualTo(departure);
         assertThat(result.refundEligible()).isFalse();
         assertThat(result.refundPercentage()).isEqualTo(0);
         assertThat(result.refundAmount()).isEqualByComparingTo(BigDecimal.ZERO);

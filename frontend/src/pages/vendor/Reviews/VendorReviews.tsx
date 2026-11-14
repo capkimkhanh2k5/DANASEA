@@ -1,16 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { reviewService } from '../../../services/reviewService';
+import { vendorAiService } from '../../../services/vendorAiService';
 import { toast } from '../../../store/useToastStore';
 import { 
-  Loader2, 
   Star, 
-  MessageSquare, 
   Download, 
-  Send, 
   X, 
   Reply, 
-  CheckCircle2 
+  Loader2,
+  CheckCircle2,
+  PenLine
 } from 'lucide-react';
 import { 
   AtlasPageHeader, 
@@ -45,38 +45,14 @@ interface ReviewItem {
   };
 }
 
-interface ChatMessage {
-  id: string;
-  sender: 'customer' | 'vendor';
-  senderName: string;
-  avatarText: string;
-  time: string;
-  text: string;
-}
-
-interface Conversation {
-  id: number;
-  customerName: string;
-  avatarText: string;
-  orderCode: string;
-  serviceName: string;
-  lastMessage: string;
-  time: string;
-  unread: boolean;
-  messages: ChatMessage[];
-}
-
 export function VendorReviews() {
-  const [activeTab, setActiveTab] = useState<'reviews' | 'chat'>('reviews');
   const [starFilter, setStarFilter] = useState<number | 'ALL'>('ALL');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(5);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [_isLoading, setIsLoading] = useState(false);
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeChatId, setActiveChatId] = useState<number>(1);
-  const [messageInput, setMessageInput] = useState('');
+  const [isDraftingReply, setIsDraftingReply] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Reply to review modal
@@ -86,6 +62,23 @@ export function VendorReviews() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleAiDraftReply = async () => {
+    if (!replyingReviewId) return;
+    try {
+      setIsDraftingReply(true);
+      const res = await vendorAiService.draftReply(replyingReviewId, 'PROFESSIONAL');
+      if (res && res.draftedReply) {
+        setReplyText(res.draftedReply);
+        showToast('AI đã soạn phản hồi chu đáo!');
+      }
+    } catch (err) {
+      console.error('[ReplyDraft] Failed:', err);
+      toast.error('Không thể sinh phản hồi AI lúc này.');
+    } finally {
+      setIsDraftingReply(false);
+    }
   };
 
   const fetchReviews = useCallback(async () => {
@@ -128,38 +121,6 @@ export function VendorReviews() {
   useEffect(() => {
     fetchReviews();
   }, [fetchReviews]);
-
-  const activeConversation = conversations.find(c => c.id === activeChatId) || conversations[0] || null;
-
-  // Send chat message
-  const handleSendMessage = (textToSend?: string) => {
-    const text = (textToSend || messageInput).trim();
-    if (!text || !activeConversation) return;
-
-    const newMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      sender: 'vendor',
-      senderName: 'DOC Support',
-      avatarText: 'DOC',
-      time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      text: text,
-    };
-
-    setConversations(prev => prev.map(c => {
-      if (c.id === activeConversation.id) {
-        return {
-          ...c,
-          lastMessage: text,
-          time: 'Vừa xong',
-          messages: [...c.messages, newMsg]
-        };
-      }
-      return c;
-    }));
-
-    setMessageInput('');
-    showToast('Đã gửi tin nhắn phản hồi tới du khách!');
-  };
 
   // Save review reply
   const handleSaveReply = async () => {
@@ -252,79 +213,46 @@ export function VendorReviews() {
     <div className="w-full max-w-[1400px] mx-auto px-6 py-5 space-y-5">
       {/* 1. Top Page Header (Atlas Page Header) */}
       <AtlasPageHeader
-        title="Đánh giá & Tin nhắn Du khách"
+        title="Đánh giá của khách"
         actions={
-          <div className="flex items-center gap-3">
-            <div className="bg-slate-100 p-1 rounded-xl inline-flex border border-slate-200/80 text-sm">
-              <button 
-                onClick={() => setActiveTab('reviews')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
-                  activeTab === 'reviews' 
-                    ? 'bg-white text-slate-900 shadow-xs' 
-                    : 'text-slate-600 hover:text-slate-900'
-                }`} 
-                type="button"
-              >
-                <Star className="w-3.5 h-3.5" />
-                <span>Đánh giá ({reviews.length})</span>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('chat')}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
-                  activeTab === 'chat' 
-                    ? 'bg-white text-slate-900 shadow-xs' 
-                    : 'text-slate-600 hover:text-slate-900'
-                }`} 
-                type="button"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>Tin nhắn</span>
-              </button>
-            </div>
-
-            <AtlasButton
-              variant="outline"
-              size="md"
-              onClick={handleExportCSAT}
-              icon={<Download className="w-4 h-4 text-slate-500" />}
-            >
-              Xuất CSAT
-            </AtlasButton>
-          </div>
+          <AtlasButton
+            variant="outline"
+            size="md"
+            onClick={handleExportCSAT}
+            icon={<Download className="w-4 h-4 text-slate-500" />}
+          >
+            Xuất CSAT
+          </AtlasButton>
         }
       />
 
       {/* 2. 4-Card Summary Strip for Reviews Tab (Atlas CSAT Metrics) */}
-      {activeTab === 'reviews' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <AtlasMetricCard
-            label="Điểm CSAT trung bình"
-            value={avgRating}
-            accent="amber"
-          />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <AtlasMetricCard
+          label="Điểm CSAT trung bình"
+          value={avgRating}
+          accent="amber"
+        />
 
-          <AtlasMetricCard
-            label="Tổng lượt đánh giá"
-            value={totalReviews}
-          />
+        <AtlasMetricCard
+          label="Tổng lượt đánh giá"
+          value={totalReviews}
+        />
 
-          <AtlasMetricCard
-            label="Tỷ lệ phản hồi CSKH"
-            value={replyRate}
-            accent="emerald"
-          />
+        <AtlasMetricCard
+          label="Tỷ lệ phản hồi CSKH"
+          value={replyRate}
+          accent="emerald"
+        />
 
-          <AtlasMetricCard
-            label="Đánh giá cần phản hồi"
-            value={totalReviews - repliedCount}
-          />
-        </div>
-      )}
+        <AtlasMetricCard
+          label="Đánh giá cần phản hồi"
+          value={totalReviews - repliedCount}
+        />
+      </div>
 
-      {/* 3. TAB 1: REVIEWS VIEW */}
-      {activeTab === 'reviews' && (
-        <div className="space-y-4">
+      {/* 3. REVIEWS VIEW */}
+      <div className="space-y-4">
           {/* Star Filter Tabs */}
           <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/70 inline-flex">
             <button 
@@ -394,7 +322,6 @@ export function VendorReviews() {
                       <div>
                         <div className="flex items-center gap-2">
                           <h3 className="text-sm font-bold text-slate-900">{rev.customerName}</h3>
-                          <AtlasBadge label="Đã đi tour" variant="success" />
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5">{rev.serviceName} • {rev.slotTime}</p>
                       </div>
@@ -467,126 +394,6 @@ export function VendorReviews() {
             </div>
           )}
         </div>
-      )}
-
-      {/* 4. TAB 2: CHAT (INBOX) VIEW */}
-      {activeTab === 'chat' && (
-        conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center p-16 text-center bg-white rounded-xl border border-slate-200/80">
-            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
-              <MessageSquare className="w-6 h-6" />
-            </div>
-            <h3 className="text-sm font-bold text-slate-900">Hộp thư tin nhắn trống</h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-md">
-              Chưa có cuộc hội thoại nào giữa đối tác và du khách. Tin nhắn trao đổi trực tiếp sẽ hiển thị tại đây khi khách hàng gửi câu hỏi từ đơn đặt dịch vụ.
-            </p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-slate-200/80 overflow-hidden grid grid-cols-1 lg:grid-cols-12 min-h-[580px]">
-            {/* Sidebar (4 Cols) */}
-            <div className="lg:col-span-4 bg-slate-50 flex flex-col border-r border-slate-200">
-              <div className="p-3 border-b border-slate-200 bg-white">
-                <input 
-                  className="w-full h-9 pl-3 pr-2.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900" 
-                  placeholder="Tìm tên khách hoặc mã đơn..." 
-                  type="text"
-                />
-              </div>
-
-              <div className="flex-1 overflow-y-auto flex flex-col divide-y divide-slate-200">
-                {conversations.map((conv) => (
-                  <div 
-                    key={conv.id}
-                    onClick={() => setActiveChatId(conv.id)}
-                    className={`p-3.5 flex items-start gap-2.5 cursor-pointer transition-colors ${
-                      activeChatId === conv.id ? 'bg-slate-100 border-l-4 border-l-slate-900' : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    <AtlasAvatar name={conv.customerName} size="md" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900 truncate">{conv.customerName}</span>
-                        <span className="text-xs text-slate-500 font-mono">{conv.time}</span>
-                      </div>
-                      <div className="text-xs text-slate-700 font-medium truncate">{conv.orderCode} • {conv.serviceName}</div>
-                      <p className="text-xs text-slate-500 truncate mt-0.5">{conv.lastMessage}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Main Chat Area (8 Cols) */}
-            <div className="lg:col-span-8 flex flex-col justify-between bg-white">
-              {/* Chat Top Bar */}
-              <div className="p-3 bg-slate-50 flex items-center justify-between border-b border-slate-200">
-                <div className="flex items-center gap-2.5">
-                  <AtlasAvatar name={activeConversation.customerName} size="md" />
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-900">{activeConversation.customerName}</span>
-                      <AtlasBadge label="Trực tuyến" variant="success" />
-                    </div>
-                    <span className="text-xs text-slate-500">
-                      Đơn: <strong className="text-slate-900 font-mono">{activeConversation.orderCode}</strong>
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Chat Messages Stream */}
-              <div className="p-4 flex-1 overflow-y-auto flex flex-col gap-3 max-h-[440px]">
-                {activeConversation.messages.map((msg) => (
-                  <div 
-                    key={msg.id} 
-                    className={`flex items-start gap-2 max-w-lg ${msg.sender === 'vendor' ? 'justify-end self-end' : ''}`}
-                  >
-                    {msg.sender === 'customer' && (
-                      <AtlasAvatar name={msg.senderName} size="sm" />
-                    )}
-                    <div className={`flex flex-col gap-1 ${msg.sender === 'vendor' ? 'items-end' : ''}`}>
-                      <div className={`p-3 rounded-2xl text-xs ${
-                        msg.sender === 'vendor' 
-                          ? 'bg-slate-900 text-white' 
-                          : 'bg-slate-100 text-slate-800'
-                      }`}>
-                        {msg.text}
-                      </div>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {msg.time} • {msg.sender === 'vendor' ? 'Đã gửi' : 'Đã nhận'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Chat Input Bar */}
-              <div className="p-3 bg-slate-50 flex flex-col gap-2 border-t border-slate-200">
-                <div className="flex items-center gap-2">
-                  <input 
-                    className="flex-1 h-10 px-3.5 rounded-xl bg-white border border-slate-200 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900" 
-                    placeholder="Nhập tin nhắn hỗ trợ cho du khách..." 
-                    type="text"
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSendMessage();
-                    }}
-                  />
-                  <AtlasButton
-                    variant="primary"
-                    size="md"
-                    onClick={() => handleSendMessage()}
-                    icon={<Send className="w-4 h-4" />}
-                  >
-                    Gửi
-                  </AtlasButton>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      )}
 
       {/* Reply Review Modal */}
       {replyingReviewId && createPortal(
@@ -603,7 +410,19 @@ export function VendorReviews() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Nội dung phản hồi từ đại diện đối tác</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-700">Nội dung phản hồi từ đại diện đối tác</label>
+                <button
+                  type="button"
+                  onClick={handleAiDraftReply}
+                  disabled={isDraftingReply}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-800 hover:bg-slate-200 border border-slate-200 cursor-pointer transition-colors disabled:opacity-50"
+                  title="Gợi ý phản hồi chu đáo, chuẩn văn phong dịch vụ"
+                >
+                  {isDraftingReply ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PenLine className="w-3.5 h-3.5 text-slate-600" />}
+                  <span>{isDraftingReply ? 'Đang tạo gợi ý...' : 'Gợi ý phản hồi'}</span>
+                </button>
+              </div>
               <textarea 
                 rows={4}
                 value={replyText}

@@ -1,5 +1,6 @@
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/dispute_repository.dart';
 import '../../../../core/data/order_repository.dart';
@@ -410,9 +411,12 @@ class _CreateDisputeScreenState extends State<CreateDisputeScreen> {
     if (mode == null || !mounted) return;
     final input = pathController.text.trim();
     if (mode == 'url') {
-      final url = input.isNotEmpty
-          ? input
-          : 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=500&auto=format&fit=crop&q=80';
+      final uri = Uri.tryParse(input);
+      if (uri == null || !uri.hasAuthority || !['http', 'https'].contains(uri.scheme)) {
+        setState(() => _error = 'Vui lòng nhập URL ảnh hợp lệ.');
+        return;
+      }
+      final url = input;
       setState(() => _attachedImages.add(url));
       return;
     }
@@ -422,18 +426,25 @@ class _CreateDisputeScreenState extends State<CreateDisputeScreen> {
       _error = null;
     });
     try {
-      String uploadedUrl;
-      if (input.isNotEmpty &&
-          !input.startsWith('http://') &&
-          !input.startsWith('https://')) {
-        uploadedUrl = await _disputeRepository.uploadEvidenceFromPath(input);
-      } else {
-        uploadedUrl = await _disputeRepository.uploadEvidenceBytes(
-          fileBytes: DisputeRepository.sampleValidPngBytes,
-          filename:
-              'evidence-${DateTime.now().millisecondsSinceEpoch}.png',
-          contentType: 'image/png',
+      String targetPath = input;
+      if (targetPath.isEmpty) {
+        final picked = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+          imageQuality: 85,
         );
+        if (picked == null) {
+          if (mounted) setState(() => _uploadingEvidence = false);
+          return;
+        }
+        targetPath = picked.path;
+      }
+      String uploadedUrl;
+      if (targetPath.isNotEmpty &&
+          !targetPath.startsWith('http://') &&
+          !targetPath.startsWith('https://')) {
+        uploadedUrl = await _disputeRepository.uploadEvidenceFromPath(targetPath);
+      } else {
+        throw AuthFailure('Vui lòng chọn tệp bằng chứng từ thiết bị.');
       }
       if (!mounted) return;
       setState(() => _attachedImages.add(uploadedUrl));
