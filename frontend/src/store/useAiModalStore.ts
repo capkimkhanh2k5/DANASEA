@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { aiService } from '../services/aiService';
 import { useAuthStore } from './useAuthStore';
+import { useLanguageStore } from './useLanguageStore';
 
 export interface AiChatMessage {
   id: string;
@@ -56,11 +57,14 @@ export const useAiModalStore = create<AiModalState>((set, get) => ({
     };
 
     const { isAuthenticated, accessToken } = useAuthStore.getState();
+    const isEn = useLanguageStore.getState().language === 'en';
     if (!isAuthenticated || !accessToken) {
       const loginNotice: AiChatMessage = {
         id: `ai-${Date.now()}`,
         role: 'ai',
-        content: 'Vui lòng đăng nhập tài khoản để gửi câu hỏi và lưu lịch sử tư vấn hải trình.',
+        content: isEn
+          ? 'Please sign in to send questions and save your maritime travel history.'
+          : 'Vui lòng đăng nhập tài khoản để gửi câu hỏi và lưu lịch sử tư vấn hải trình.',
         timestamp: Date.now(),
       };
       set((state) => ({
@@ -80,7 +84,7 @@ export const useAiModalStore = create<AiModalState>((set, get) => ({
       const aiMessage: AiChatMessage = {
         id: `ai-${Date.now()}`,
         role: 'ai',
-        content: response.message || 'Hệ thống đã ghi nhận yêu cầu của bạn.',
+        content: response.message || (isEn ? 'Your request has been received.' : 'Hệ thống đã ghi nhận yêu cầu của bạn.'),
         timestamp: Date.now(),
       };
 
@@ -89,30 +93,37 @@ export const useAiModalStore = create<AiModalState>((set, get) => ({
         conversationId: response.conversationId || state.conversationId,
         isGenerating: false,
       }));
-    } catch (err) {
-      console.debug('Lỗi khi gọi API AI:', err);
-      // Fallback thân thiện bảo đảm không crash
-      const fallbackMessage: AiChatMessage = {
-        id: `ai-${Date.now()}`,
+    } catch (err: unknown) {
+      console.error('[AI Chat] API request failed:', err);
+      const apiError = err as { response?: { data?: { message?: string; code?: string } } };
+      const errorMessage = apiError.response?.data?.message || (isEn 
+        ? 'AI service is currently unavailable or disconnected from language model. Please try again later.' 
+        : 'Dịch vụ Trợ lý AI hiện không khả dụng hoặc chưa kết nối được máy chủ ngôn ngữ. Vui lòng thử lại sau.');
+
+      const systemErrorMessage: AiChatMessage = {
+        id: `ai-err-${Date.now()}`,
         role: 'ai',
-        content: 'Dữ liệu hải văn Đà Nẵng: Khu vực Bán đảo Sơn Trà & Mỹ Khê đang có điều kiện biển thuận lợi (sóng 0.4 - 0.7m, gió cấp 2). Bạn có thể tham khảo các tour lặn san hô hoặc chèo SUP trên hệ thống!',
+        content: errorMessage,
         timestamp: Date.now(),
       };
       set((state) => ({
-        messages: [...state.messages, fallbackMessage],
+        messages: [...state.messages, systemErrorMessage],
         isGenerating: false,
       }));
     }
   },
 
   clearHistory: () => {
+    const isEn = useLanguageStore.getState().language === 'en';
     set({
       conversationId: undefined,
       messages: [
         {
           id: `welcome-${Date.now()}`,
           role: 'ai',
-          content: 'Cuộc trò chuyện đã được làm mới. Tôi sẵn sàng giải đáp thắc mắc về điều kiện biển, tour thể thao nước và an toàn hàng hải!',
+          content: isEn
+            ? 'Conversation reset. I am ready to assist with marine conditions, watersports tours, and ocean safety!'
+            : 'Cuộc trò chuyện đã được làm mới. Tôi sẵn sàng giải đáp thắc mắc về điều kiện biển, tour thể thao nước và an toàn hàng hải!',
           timestamp: Date.now(),
         },
       ],

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLanguageStore } from "../../../store/useLanguageStore";
 import {
   Sparkles,
   ArrowLeft,
@@ -14,13 +15,17 @@ import { aiService } from "../../../services/aiService";
 
 export function AiAssistant() {
   const navigate = useNavigate();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [messages, setMessages] = useState([
     { 
       id: 1, 
       role: "ai", 
-      content: "Xin chào! Tôi là Trợ lý AI DANASEA. Tôi có thể hỗ trợ bạn lên lịch trình trải nghiệm biển tại Đà Nẵng, kiểm tra thời tiết sóng gió hoặc giải đáp tiêu chuẩn an toàn cho tour cano, lặn ngắm san hô và chèo SUP. Bạn cần hỗ trợ gì cho chuyến đi sắp tới?" 
+      content: isEn 
+        ? "Hello! I am DANASEA's AI Trip Assistant. I can help you plan your marine adventures in Da Nang, check sea conditions, or answer questions about safety standards for speedboats, snorkeling, and SUP tours. How can I help with your upcoming trip?"
+        : "Xin chào! Tôi là Trợ lý AI DANASEA. Tôi có thể hỗ trợ bạn lên lịch trình trải nghiệm biển tại Đà Nẵng, kiểm tra thời tiết sóng gió hoặc giải đáp tiêu chuẩn an toàn cho tour cano, lặn ngắm san hô và chèo SUP. Bạn cần hỗ trợ gì cho chuyến đi sắp tới?" 
     }
   ]);
   const [input, setInput] = useState("");
@@ -45,14 +50,19 @@ export function AiAssistant() {
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: "ai",
-        content: res.message || "Hệ thống đã ghi nhận yêu cầu của bạn.",
+        content: res.message || (isEn ? "The system has recorded your request." : "Hệ thống đã ghi nhận yêu cầu của bạn."),
       }]);
-    } catch (err) {
-      console.debug("Lỗi khi kết nối Trợ lý AI:", err);
+    } catch (err: unknown) {
+      console.error("[AI Assistant] Chat request failed:", err);
+      const apiError = err as { response?: { data?: { message?: string; code?: string } } };
+      const errorMessage = apiError.response?.data?.message || (isEn
+        ? "AI service is temporarily unavailable or disconnected from language model. Please try again later."
+        : "Trợ lý AI hiện không khả dụng hoặc chưa kết nối được máy chủ ngôn ngữ. Vui lòng thử lại sau.");
+
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: "ai",
-        content: `Tôi đã ghi nhận yêu cầu: "${userMsg}". Dựa trên dữ liệu thời tiết biển hôm nay tại bán đảo Sơn Trà và bãi biển Mỹ Khê (sóng ≤ 0.8m, gió cấp 2), điều kiện biển rất thuận lợi. Bạn nên ưu tiên tour Chèo SUP đón bình minh (05:00 - 07:00) hoặc Lặn biển ngắm san hô Hòn Sụp để có trải nghiệm tốt nhất.`,
+        content: errorMessage,
       }]);
     } finally {
       setIsLoading(false);
@@ -69,10 +79,10 @@ export function AiAssistant() {
             className="hover:text-slate-900 transition-colors cursor-pointer bg-transparent border-0 p-0 flex items-center gap-1 text-slate-600 font-semibold"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Tài khoản của bạn</span>
+            <span>{isEn ? "Your Account" : "Tài khoản của bạn"}</span>
           </button>
           <span className="text-slate-300">/</span>
-          <span className="text-slate-900 font-semibold">Trợ lý lịch trình biển AI</span>
+          <span className="text-slate-900 font-semibold">{isEn ? "AI Marine Trip Assistant" : "Trợ lý lịch trình biển AI"}</span>
         </div>
 
         {/* Header Bar */}
@@ -83,11 +93,11 @@ export function AiAssistant() {
             </div>
             <div>
               <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                Trợ lý AI Lên lịch trình
+                {isEn ? "AI Trip Planner Assistant" : "Trợ lý AI Lên lịch trình"}
               </h1>
               <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>Tư vấn trải nghiệm biển &amp; điều kiện sóng gió Đà Nẵng</span>
+                <span>{isEn ? "Da Nang ocean experiences & marine weather advisory" : "Tư vấn trải nghiệm biển & điều kiện sóng gió Đà Nẵng"}</span>
               </p>
             </div>
           </div>
@@ -97,43 +107,43 @@ export function AiAssistant() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button
             type="button"
-            onClick={() => setInput("Lên lịch trình 1 ngày khám phá bán đảo Sơn Trà & Lặn ngắm san hô")}
+            onClick={() => setInput(isEn ? "1-day Son Tra Peninsula exploration and coral snorkeling itinerary" : "Lên lịch trình 1 ngày khám phá bán đảo Sơn Trà & Lặn ngắm san hô")}
             className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-left hover:bg-slate-100 transition-colors cursor-pointer group"
           >
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900 mb-1">
               <Compass className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-900" />
-              <span>Tour 1 ngày Sơn Trà</span>
+              <span>{isEn ? "1-Day Son Tra Tour" : "Tour 1 ngày Sơn Trà"}</span>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Lặn biển ngắm san hô Hòn Sụp, cano cao tốc và thưởng thức hải sản.
+              {isEn ? "Hon Sup coral snorkeling, high-speed boat, and seafood dining." : "Lặn biển ngắm san hô Hòn Sụp, cano cao tốc và thưởng thức hải sản."}
             </p>
           </button>
 
           <button
             type="button"
-            onClick={() => setInput("Gợi ý trải nghiệm chèo SUP đón bình minh tại Mỹ Khê sáng mai")}
+            onClick={() => setInput(isEn ? "Recommend sunrise SUP paddle experience at My Khe beach tomorrow" : "Gợi ý trải nghiệm chèo SUP đón bình minh tại Mỹ Khê sáng mai")}
             className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-left hover:bg-slate-100 transition-colors cursor-pointer group"
           >
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900 mb-1">
               <CloudSun className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-900" />
-              <span>Chèo SUP bình minh</span>
+              <span>{isEn ? "Sunrise SUP Tour" : "Chèo SUP bình minh"}</span>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Khởi hành 05:00 sáng tại bãi biển Mỹ Khê, sóng êm &lt; 0.5m.
+              {isEn ? "Depart 05:00 AM at My Khe Beach, calm waters < 0.5m." : "Khởi hành 05:00 sáng tại bãi biển Mỹ Khê, sóng êm < 0.5m."}
             </p>
           </button>
 
           <button
             type="button"
-            onClick={() => setInput("Tiêu chuẩn an toàn hàng hải và bảo hiểm du lịch của các tour")}
+            onClick={() => setInput(isEn ? "Maritime safety standards and travel insurance for tour bookings" : "Tiêu chuẩn an toàn hàng hải và bảo hiểm du lịch của các tour")}
             className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-left hover:bg-slate-100 transition-colors cursor-pointer group"
           >
             <div className="flex items-center gap-2 text-xs font-bold text-slate-900 mb-1">
               <ShieldCheck className="w-3.5 h-3.5 text-slate-600 group-hover:text-slate-900" />
-              <span>An toàn &amp; Bảo hiểm</span>
+              <span>{isEn ? "Safety & Insurance" : "An toàn & Bảo hiểm"}</span>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Áo phao SOLAS, chứng chỉ thuyền trưởng và bảo hiểm du lịch 100 triệu.
+              {isEn ? "SOLAS life jackets, licensed captains, and 100M VND insurance." : "Áo phao SOLAS, chứng chỉ thuyền trưởng và bảo hiểm du lịch 100 triệu."}
             </p>
           </button>
         </div>
@@ -169,7 +179,7 @@ export function AiAssistant() {
             {isLoading && (
               <div className="flex items-center gap-2 text-xs text-slate-500 italic">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-600" />
-                <span>Trợ lý AI đang suy nghĩ và tra cứu dữ liệu hải văn...</span>
+                <span>{isEn ? "AI Assistant is analyzing marine and oceanographic data..." : "Trợ lý AI đang suy nghĩ và tra cứu dữ liệu hải văn..."}</span>
               </div>
             )}
             <div ref={endRef} />
@@ -181,7 +191,7 @@ export function AiAssistant() {
               <input 
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder="Nhập câu hỏi hoặc yêu cầu tư vấn lịch trình biển..." 
+                placeholder={isEn ? "Ask questions or request a marine itinerary..." : "Nhập câu hỏi hoặc yêu cầu tư vấn lịch trình biển..."} 
                 className="w-full pl-4 pr-14 py-3 rounded-xl bg-white border border-slate-200 text-xs sm:text-sm text-slate-900 outline-none focus:border-slate-400 transition-colors shadow-2xs"
               />
               <button 

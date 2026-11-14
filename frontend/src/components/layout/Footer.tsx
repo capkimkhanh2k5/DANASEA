@@ -1,7 +1,11 @@
 import { Link } from 'react-router-dom';
 import { PhoneCall, ShieldCheck, Mail, LifeBuoy, Award } from 'lucide-react';
+import { useLanguageStore } from '../../store/useLanguageStore';
 
 export function Footer() {
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
+
   return (
     <footer className="w-full bg-[#031d44] text-white border-t border-sky-950 relative z-10 selection:bg-sky-500 selection:text-white" data-ui="footer">
       <div className="max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-5">
@@ -29,29 +33,31 @@ export function Footer() {
 
             {/* Micro Tagline */}
             <p className="text-white text-xs sm:text-sm leading-relaxed max-w-md font-normal">
-              Hệ thống đặt trước trải nghiệm biển chất lượng cao tại Đà Nẵng. Cam kết an toàn hàng hải tuyệt đối với hướng dẫn viên 1:1 và trang thiết bị cứu sinh chuẩn SOLAS.
+              {isEn
+                ? 'High-quality ocean experiences booking platform in Da Nang. Absolute maritime safety commitment with 1:1 certified instructors and SOLAS life-saving equipment.'
+                : 'Hệ thống đặt trước trải nghiệm biển chất lượng cao tại Đà Nẵng. Cam kết an toàn hàng hải tuyệt đối với hướng dẫn viên 1:1 và trang thiết bị cứu sinh chuẩn SOLAS.'}
             </p>
 
             {/* Trust & Certification Badges */}
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-white text-xs font-normal">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Bảo hiểm Bảo Việt 100M</span>
+                <span>{isEn ? 'Bao Viet 100M Insurance' : 'Bảo hiểm Bảo Việt 100M'}</span>
               </div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-white text-xs font-normal">
                 <LifeBuoy className="w-3.5 h-3.5 text-sky-400" />
-                <span>Chuẩn cứu sinh SOLAS</span>
+                <span>{isEn ? 'SOLAS Rescue Standard' : 'Chuẩn cứu sinh SOLAS'}</span>
               </div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 border border-white/10 text-white text-xs font-normal">
                 <Award className="w-3.5 h-3.5 text-amber-400" />
-                <span>Hiệp hội Du lịch ĐN</span>
+                <span>{isEn ? 'Da Nang Tourism Assoc.' : 'Hiệp hội Du lịch ĐN'}</span>
               </div>
             </div>
 
             {/* Đối tác thanh toán (Payment Partners Grid như Traveloka) */}
             <div className="mt-1">
               <p className="text-xs font-normal text-white mb-2.5">
-                Đối tác thanh toán an toàn
+                {isEn ? 'Secure payment partners' : 'Đối tác thanh toán an toàn'}
               </p>
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 max-w-sm">
                 
@@ -135,33 +141,33 @@ export function Footer() {
           {/* Cột 2: Hỗ trợ & Chính sách lữ hành (chiếm 3 cột) */}
           <div className="lg:col-span-3 flex flex-col gap-3">
             <h3 className="font-bold text-sm text-white tracking-tight">
-              Hỗ trợ &amp; Pháp lý
+              {isEn ? 'Support & Legal' : 'Hỗ trợ & Pháp lý'}
             </h3>
             <ul className="flex flex-col gap-2.5 text-xs text-white list-none p-0 m-0 font-normal">
               <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                Cách đặt tour &amp; quét mã QR
+                {isEn ? 'Booking guide & QR check-in' : 'Cách đặt tour & quét mã QR'}
               </li>
               <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                Chính sách hoàn tiền khi thời tiết xấu
+                {isEn ? 'Bad weather refund policy' : 'Chính sách hoàn tiền khi thời tiết xấu'}
               </li>
               <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                Quy chuẩn an toàn hàng hải &amp; cứu sinh
+                {isEn ? 'Maritime safety & rescue standards' : 'Quy chuẩn an toàn hàng hải & cứu sinh'}
               </li>
               <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                Cam kết bảo tồn san hô Sơn Trà
+                {isEn ? 'Son Tra coral protection pledge' : 'Cam kết bảo tồn san hô Sơn Trà'}
               </li>
               <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                Tuyển dụng HDV bản địa 1:1
+                {isEn ? 'Local 1:1 instructor careers' : 'Tuyển dụng HDV bản địa 1:1'}
               </li>
               <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                Về chúng tôi &amp; Giấy phép lữ hành
+                {isEn ? 'About us & Travel license' : 'Về chúng tôi & Giấy phép lữ hành'}
               </li>
             </ul>
 
             {/* Huy hiệu Đăng ký & Thông báo Bộ Công Thương */}
             <div className="mt-2 pt-3 border-t border-white/10 flex flex-col gap-2.5">
               <span className="text-[11px] font-semibold text-white/80 tracking-wide">
-                Chứng nhận Bộ Công Thương
+                {isEn ? 'Ministry of Industry & Trade Certification' : 'Chứng nhận Bộ Công Thương'}
               </span>
               <div className="flex flex-wrap items-center gap-2.5">
                 <a
@@ -203,7 +209,7 @@ export function Footer() {
           <div className="lg:col-span-3 flex flex-col gap-4">
             <div>
               <h3 className="font-bold text-sm text-white tracking-tight mb-3">
-                Kênh kết nối
+                {isEn ? 'Connect With Us' : 'Kênh kết nối'}
               </h3>
               <div className="flex flex-col gap-2.5 text-xs text-white font-normal">
                 {/* Facebook Authentic SVG Logo */}
@@ -256,7 +262,7 @@ export function Footer() {
             {/* Hotline & Email Cứu hộ bờ biển */}
             <div className="pt-3 border-t border-white/10 flex flex-col gap-2">
               <span className="text-xs font-normal text-white">
-                Hotline khẩn cấp &amp; Cứu hộ biển
+                {isEn ? 'Emergency Hotline & Sea Rescue' : 'Hotline khẩn cấp & Cứu hộ biển'}
               </span>
               <a href="tel:19008468" className="flex items-center gap-2 text-sky-400 hover:text-sky-300 font-bold text-sm transition-colors">
                 <PhoneCall className="w-4 h-4 text-sky-400" />
@@ -271,15 +277,25 @@ export function Footer() {
 
         </div>
 
-{/* Chân trang bản quyền (Bottom Bar) */}
+        {/* Chân trang bản quyền (Bottom Bar) */}
         <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/80 font-normal">
-          <p>© 2026 DANASEA Marine Experiences. Bảo lưu mọi quyền.</p>
+          <p>
+            {isEn
+              ? '© 2026 DANASEA Marine Experiences. All rights reserved.'
+              : '© 2026 DANASEA Marine Experiences. Bảo lưu mọi quyền.'}
+          </p>
           <div className="flex items-center gap-3 text-xs text-white/90 font-normal">
-            <Link to="/terms" className="hover:text-white transition-colors">Điều khoản</Link>
+            <Link to="/terms" className="hover:text-white transition-colors">
+              {isEn ? 'Terms of Service' : 'Điều khoản'}
+            </Link>
             <span>•</span>
-            <Link to="/privacy" className="hover:text-white transition-colors">Bảo mật</Link>
+            <Link to="/privacy" className="hover:text-white transition-colors">
+              {isEn ? 'Privacy Policy' : 'Bảo mật'}
+            </Link>
             <span>•</span>
-            <span>Giấy phép lữ hành số 48-0024/2026</span>
+            <span>
+              {isEn ? 'Tour Operator License No. 48-0024/2026' : 'Giấy phép lữ hành số 48-0024/2026'}
+            </span>
           </div>
         </div>
 

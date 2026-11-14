@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Navigate } from "react-router-dom";
 import {
-  Lock,
   Compass,
   Receipt,
   FileText,
@@ -29,13 +28,14 @@ import {
 } from "lucide-react";
 import { orderService } from "../../../services/orderService";
 import { ContinuePaymentDialog } from "./ContinuePaymentDialog";
+import { MarineBriefingModal } from "./MarineBriefingModal";
 import { reviewService, type ReviewResponse } from "../../../services/reviewService";
 import { serviceCatalogService } from "../../../services/serviceCatalogService";
 import { disputeService } from "../../../services/disputeService";
 import { notificationService } from "../../../services/notificationService";
 import type { DisputeReason, DisputeResponse } from "../../../types/dispute";
 import { useAuthStore } from "../../../store/useAuthStore";
-import { authService } from "../../../services/authService";
+import { useLanguageStore } from "../../../store/useLanguageStore";
 import { toast } from "../../../store/useToastStore";
 import type {
   OrderResponse,
@@ -53,7 +53,9 @@ type OrderFilter = "all" | "upcoming" | "pending" | "completed" | "cancelled";
 export function Orders() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, isAuthenticated, accessToken, setAuth } = useAuthStore();
+  const { user, isAuthenticated, accessToken } = useAuthStore();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
 
   // State management
   const [filter, setFilter] = useState<OrderFilter>("all");
@@ -63,10 +65,9 @@ export function Orders() {
   const loading = isAuthenticated && Boolean(accessToken) && loadingState;
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<number>(0);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [previousRequest, setPreviousRequest] = useState({ page, accessToken });
-  if (previousRequest.page !== page || previousRequest.accessToken !== accessToken) {
-    setPreviousRequest({ page, accessToken });
+  const [previousRequest, setPreviousRequest] = useState({ accessToken });
+  if (previousRequest.accessToken !== accessToken) {
+    setPreviousRequest({ accessToken });
     setLoading(true);
   }
 
@@ -141,17 +142,18 @@ export function Orders() {
   const [isSubmittingDispute, setIsSubmittingDispute] = useState(false);
   const [submittedDisputes, setSubmittedDisputes] = useState<Record<string, DisputeResponse>>({});
 
+  // Marine Briefing Modal state
+  const [briefingOrder, setBriefingOrder] = useState<OrderResponse | null>(null);
+
   const serviceDetailsCache = useRef<Record<string, ServiceDetailDto>>({});
 
   // Fetch orders from API
-  const fetchOrders = useCallback((targetPage = 0) => {
+  const fetchOrders = useCallback(() => {
     if (!isAuthenticated || !accessToken) return;
 
-    return orderService.getMyOrders(targetPage, 20).then((res) => {
+    return orderService.getMyOrders(0, 100).then((res) => {
       setError(null);
       setOrders(res.content || []);
-      setPage(res.page || 0);
-      setTotalPages(res.totalPages || 1);
 
       // Extract unique service IDs to fetch service details and fetch refund history
       const serviceIds = new Set<string>();
@@ -278,40 +280,9 @@ export function Orders() {
 
   useEffect(() => {
     if (isAuthenticated && accessToken) {
-      fetchOrders(page);
+      fetchOrders();
     }
-  }, [page, isAuthenticated, accessToken, fetchOrders]);
-
-  // Quick Login helper for testing / unauthenticated state
-  const handleQuickLogin = async () => {
-    try {
-      setLoading(true);
-      const res = await authService.login({
-        email: "customer@danasea.vn",
-        password: "password123",
-      });
-      setAuth(
-        {
-          id: res.userId,
-          email: res.email,
-          fullName: "Nguyễn Văn Khách",
-          role: res.role,
-          avatarUrl: "",
-          isEmailVerified: true,
-          isLocked: false,
-          passwordHash: "",
-          phone: "0905000003",
-          locale: "vi",
-        },
-        res.accessToken
-      );
-    } catch (err) {
-      console.error("[Orders] Đăng nhập nhanh thất bại:", err);
-      navigate("/auth");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [isAuthenticated, accessToken, fetchOrders]);
 
   // Filtered orders
   const filteredOrders = useMemo(() => {
@@ -357,6 +328,94 @@ export function Orders() {
     });
   }, [orders, filter]);
 
+  // Client-side pagination over filtered orders
+  const PAGE_SIZE = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
+  const paginatedOrders = useMemo(() => {
+    const start = page * PAGE_SIZE;
+    return filteredOrders.slice(start, start + PAGE_SIZE);
+  }, [filteredOrders, page]);
+
+  // Handle targeted deep-linking from notifications or URL parameters (subOrderId, orderId, tab)
+  useEffect(() => {
+    if (orders.length === 0) return;
+
+    const targetSubOrderId = searchParams.get('subOrderId') || searchParams.get('rescheduleSubOrderId');
+    const targetOrderId = searchParams.get('orderId');
+    const targetTab = searchParams.get('tab') as OrderFilter | null;
+
+    if (targetTab && ['all', 'upcoming', 'pending', 'completed', 'cancelled'].includes(targetTab)) {
+      setFilter(targetTab);
+      setPage(0);
+      return;
+    }
+
+    if (!targetSubOrderId && !targetOrderId) return;
+
+    // Find the target order
+    const targetOrder = orders.find((o) => {
+      if (targetOrderId && o.id === targetOrderId) return true;
+      if (targetSubOrderId) {
+        const items = o.items || o.subOrders || [];
+        return items.some((s) => s.id === targetSubOrderId);
+      }
+      return false;
+    });
+
+    if (!targetOrder) return;
+
+    const subOrders = targetOrder.items || targetOrder.subOrders || [];
+    const masterStatus = (targetOrder.status || '').toUpperCase();
+
+    // Determine appropriate filter so targetOrder is visible
+    let nextFilter: OrderFilter = 'all';
+    if (subOrders.some((s) => (s.status || '').toUpperCase() === 'COMPLETED' || (s.status || '').toUpperCase() === 'CHECKED_IN')) {
+      nextFilter = 'completed';
+    } else if (subOrders.some((s) => (s.status || '').toUpperCase() === 'CONFIRMED' || (s.status || '').toUpperCase() === 'PENDING')) {
+      nextFilter = 'upcoming';
+    } else if (subOrders.some((s) => (s.status || '').toUpperCase() === 'CANCELLED' || (s.status || '').toUpperCase() === 'REFUNDED')) {
+      nextFilter = 'cancelled';
+    } else if (masterStatus === 'PENDING_PAYMENT') {
+      nextFilter = 'pending';
+    }
+
+    setFilter(nextFilter);
+
+    // Compute index in list for pagination
+    const matchingOrders = orders.filter((o) => {
+      const itms = o.items || o.subOrders || [];
+      const mst = (o.status || '').toUpperCase();
+      if (nextFilter === 'all') return true;
+      if (nextFilter === 'pending') return mst === 'PENDING_PAYMENT';
+      if (nextFilter === 'upcoming') return itms.some((i) => (i.status || '').toUpperCase() === 'CONFIRMED' || (i.status || '').toUpperCase() === 'PENDING');
+      if (nextFilter === 'completed') return itms.some((i) => (i.status || '').toUpperCase() === 'COMPLETED' || (i.status || '').toUpperCase() === 'CHECKED_IN');
+      if (nextFilter === 'cancelled') return itms.some((i) => (i.status || '').toUpperCase() === 'CANCELLED' || (i.status || '').toUpperCase() === 'REFUNDED' || (i.status || '').toUpperCase() === 'PARTIALLY_REFUNDED');
+      return true;
+    });
+
+    const targetIdx = matchingOrders.findIndex((o) => o.id === targetOrder.id);
+    if (targetIdx >= 0) {
+      const targetPage = Math.floor(targetIdx / PAGE_SIZE);
+      setPage(targetPage);
+    }
+
+    // Scroll and highlight
+    const timer = setTimeout(() => {
+      const el =
+        (targetSubOrderId && document.getElementById(`suborder-${targetSubOrderId}`)) ||
+        document.getElementById(`order-${targetOrder.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-2', 'ring-sky-500', 'ring-offset-2', 'transition-all');
+        setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-sky-500', 'ring-offset-2');
+        }, 3000);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchParams, orders]);
+
   // Confirm reschedule proposal handler
   const handleConfirmReschedule = async (
     subOrderId: string,
@@ -376,7 +435,7 @@ export function Orders() {
         delete next[subOrderId];
         return next;
       });
-      fetchOrders(page);
+      fetchOrders();
     } catch (err: unknown) {
       let msg = "Không thể xác nhận đổi ca.";
       if (err && typeof err === "object" && "response" in err) {
@@ -490,7 +549,7 @@ export function Orders() {
       setTimeout(() => {
         setCancellationOrder(null);
         setLoading(true);
-        fetchOrders(page);
+        fetchOrders();
       }, 1500);
     } catch (err: unknown) {
       console.error("[Orders] Lỗi khi xác nhận hủy đơn:", err);
@@ -656,19 +715,19 @@ export function Orders() {
   };
 
   const formatPolicyDescription = (rawPolicy?: string | null, percentage?: number) => {
-    if (!rawPolicy) return "Chính sách tiêu chuẩn 24 giờ";
+    if (!rawPolicy) return isEn ? "Standard 24-hour cancellation policy" : "Chính sách tiêu chuẩn 24 giờ";
     const lower = rawPolicy.toLowerCase();
     if (lower.includes("within 24 hours") || lower.includes("no refund") || percentage === 0) {
-      return "Không hoàn tiền do hủy trong vòng 24h trước giờ khởi hành";
+      return isEn ? "No refund for cancellation within 24 hours before departure" : "Không hoàn tiền do hủy trong vòng 24h trước giờ khởi hành";
     }
     if (lower.includes("more than 24 hours") || lower.includes("100% refund") || percentage === 100) {
-      return "Hoàn tiền 100% khi hủy trước giờ khởi hành trên 24 giờ";
+      return isEn ? "100% refund for cancellation more than 24 hours before departure" : "Hoàn tiền 100% khi hủy trước giờ khởi hành trên 24 giờ";
     }
     if (lower.includes("weather") || lower.includes("disruption")) {
-      return "Hoàn tiền 100% do thời tiết biển bất khả kháng";
+      return isEn ? "100% refund due to severe ocean weather conditions" : "Hoàn tiền 100% do thời tiết biển bất khả kháng";
     }
     if (lower.includes("vendor") || lower.includes("operator")) {
-      return "Hoàn tiền 100% do đối tác hủy ca hoạt động";
+      return isEn ? "100% refund due to partner departure cancellation" : "Hoàn tiền 100% do đối tác hủy ca hoạt động";
     }
     return rawPolicy;
   };
@@ -677,7 +736,7 @@ export function Orders() {
     if (!dateStr) return "N/A";
     try {
       const d = new Date(dateStr);
-      return d.toLocaleDateString("vi-VN", {
+      return d.toLocaleDateString(isEn ? "en-US" : "vi-VN", {
         day: "2-digit",
         month: "2-digit",
         year: "numeric",
@@ -693,23 +752,23 @@ export function Orders() {
     const s = (status || "").toUpperCase();
     switch (s) {
       case "PAID":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ THANH TOÁN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">{isEn ? "PAID" : "ĐÃ THANH TOÁN"}</span>;
       case "PENDING_PAYMENT":
       case "UNPAID":
-        return <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-xs font-semibold tracking-tight">CHỜ THANH TOÁN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-xs font-semibold tracking-tight">{isEn ? "PENDING PAYMENT" : "CHỜ THANH TOÁN"}</span>;
       case "CONFIRMED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ XÁC NHẬN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">{isEn ? "CONFIRMED" : "ĐÃ XÁC NHẬN"}</span>;
       case "CHECKED_IN":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">ĐÃ CHECK-IN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">{isEn ? "CHECKED IN" : "ĐÃ CHECK-IN"}</span>;
       case "PARTIALLY_COMPLETED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold tracking-tight">HOÀN TẤT MỘT PHẦN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold tracking-tight">{isEn ? "PARTIALLY COMPLETED" : "HOÀN TẤT MỘT PHẦN"}</span>;
       case "COMPLETED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">HOÀN TẤT</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">{isEn ? "COMPLETED" : "HOÀN TẤT"}</span>;
       case "CANCELLED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold tracking-tight">ĐÃ HỦY</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold tracking-tight">{isEn ? "CANCELLED" : "ĐÃ HỦY"}</span>;
       case "REFUNDED":
       case "PARTIALLY_REFUNDED":
-        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">ĐÃ HOÀN TIỀN</span>;
+        return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">{isEn ? "REFUNDED" : "ĐÃ HOÀN TIỀN"}</span>;
       default:
         return <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">{s}</span>;
     }
@@ -723,7 +782,7 @@ export function Orders() {
     if (m === "PENDING_PAYMENT" || m === "UNPAID") {
       return (
         <span className="px-2.5 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-xs font-semibold tracking-tight">
-          CHỜ THANH TOÁN
+          {isEn ? "PENDING PAYMENT" : "CHỜ THANH TOÁN"}
         </span>
       );
     }
@@ -733,44 +792,44 @@ export function Orders() {
       case "PENDING":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold tracking-tight">
-            CHỜ TIẾP NHẬN
+            {isEn ? "PENDING ACCEPTANCE" : "CHỜ TIẾP NHẬN"}
           </span>
         );
       case "CONFIRMED":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
-            ĐÃ XÁC NHẬN
+            {isEn ? "CONFIRMED" : "ĐÃ XÁC NHẬN"}
           </span>
         );
       case "CHECKED_IN":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
-            ĐÃ CHECK-IN
+            {isEn ? "CHECKED IN" : "ĐÃ CHECK-IN"}
           </span>
         );
       case "IN_PROGRESS":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold tracking-tight">
-            ĐANG DIỄN RA
+            {isEn ? "IN PROGRESS" : "ĐANG DIỄN RA"}
           </span>
         );
       case "COMPLETED":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 text-xs font-semibold tracking-tight">
-            HOÀN TẤT
+            {isEn ? "COMPLETED" : "HOÀN TẤT"}
           </span>
         );
       case "CANCELLED":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200 text-xs font-semibold tracking-tight">
-            ĐÃ HỦY
+            {isEn ? "CANCELLED" : "ĐÃ HỦY"}
           </span>
         );
       case "REFUNDED":
       case "PARTIALLY_REFUNDED":
         return (
           <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold tracking-tight">
-            ĐÃ HOÀN TIỀN
+            {isEn ? "REFUNDED" : "ĐÃ HOÀN TIỀN"}
           </span>
         );
       default:
@@ -784,37 +843,9 @@ export function Orders() {
 
 
 
-  // Unauthenticated Guard Screen
+  // Redirect unauthenticated user directly to login
   if (!isAuthenticated || !user) {
-    return (
-      <main className="w-full min-h-[calc(100vh-80px)] bg-slate-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-8 text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center mx-auto text-sky-700">
-            <Lock className="w-8 h-8" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 tracking-tight">Vui lòng đăng nhập tài khoản</h1>
-            <p className="text-base text-slate-700 max-w-sm mx-auto leading-relaxed">
-              Bạn cần đăng nhập tài khoản khách hàng để xem vé điện tử, mã QR check-in và gửi đánh giá dịch vụ biển.
-            </p>
-          </div>
-          <div className="space-y-3 pt-2">
-            <button
-              onClick={() => navigate("/auth")}
-              className="w-full py-3 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-base font-bold cursor-pointer transition-colors"
-            >
-              Đến trang Đăng nhập
-            </button>
-            <button
-              onClick={handleQuickLogin}
-              className="w-full py-2.5 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-800 text-sm font-semibold cursor-pointer transition-colors"
-            >
-              Đăng nhập nhanh (customer@danasea.vn)
-            </button>
-          </div>
-        </div>
-      </main>
-    );
+    return <Navigate to="/auth" replace />;
   }
 
   return (
@@ -830,22 +861,24 @@ export function Orders() {
                 className="hover:text-slate-900 transition-colors cursor-pointer bg-transparent border-0 p-0 flex items-center gap-1 text-slate-600 font-semibold"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>Tài khoản của bạn</span>
+                <span>{isEn ? "Your Account" : "Tài khoản của bạn"}</span>
               </button>
               <span className="text-slate-300">/</span>
-              <span className="text-slate-900 font-semibold">Lịch sử đặt tour &amp; Vé QR</span>
+              <span className="text-slate-900 font-semibold">
+                {isEn ? "Booking History & QR Tickets" : "Lịch sử đặt tour & Vé QR"}
+              </span>
             </div>
 
             <div className="mb-4">
               <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                Quản lý vé &amp; Đơn trải nghiệm
+                {isEn ? "Manage Tickets & Bookings" : "Quản lý vé & Đơn trải nghiệm"}
               </h1>
             </div>
 
             {/* Airbnb Signature Underline Tabs */}
             <div className="flex items-center gap-6 sm:gap-8 border-b border-slate-200 overflow-x-auto no-scrollbar pt-2">
               <button
-                onClick={() => setFilter("all")}
+                onClick={() => { setFilter("all"); setPage(0); }}
                 className={`pb-3.5 text-sm font-semibold transition-all relative whitespace-nowrap cursor-pointer ${
                   filter === "all"
                     ? "text-[#0284c7] font-bold"
@@ -853,14 +886,14 @@ export function Orders() {
                 }`}
                 type="button"
               >
-                <span>Tất cả đơn hàng</span>
+                <span>{isEn ? "All Bookings" : "Tất cả đơn hàng"}</span>
                 {filter === "all" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0284c7] rounded-full" />
                 )}
               </button>
 
               <button
-                onClick={() => setFilter("upcoming")}
+                onClick={() => { setFilter("upcoming"); setPage(0); }}
                 className={`pb-3.5 text-sm font-semibold transition-all relative whitespace-nowrap cursor-pointer ${
                   filter === "upcoming"
                     ? "text-[#0284c7] font-bold"
@@ -868,14 +901,14 @@ export function Orders() {
                 }`}
                 type="button"
               >
-                <span>Sắp diễn ra</span>
+                <span>{isEn ? "Upcoming" : "Sắp diễn ra"}</span>
                 {filter === "upcoming" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0284c7] rounded-full" />
                 )}
               </button>
 
               <button
-                onClick={() => setFilter("pending")}
+                onClick={() => { setFilter("pending"); setPage(0); }}
                 className={`pb-3.5 text-sm font-semibold transition-all relative whitespace-nowrap cursor-pointer ${
                   filter === "pending"
                     ? "text-[#0284c7] font-bold"
@@ -883,14 +916,14 @@ export function Orders() {
                 }`}
                 type="button"
               >
-                <span>Chờ thanh toán</span>
+                <span>{isEn ? "Pending Payment" : "Chờ thanh toán"}</span>
                 {filter === "pending" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0284c7] rounded-full" />
                 )}
               </button>
 
               <button
-                onClick={() => setFilter("completed")}
+                onClick={() => { setFilter("completed"); setPage(0); }}
                 className={`pb-3.5 text-sm font-semibold transition-all relative whitespace-nowrap cursor-pointer ${
                   filter === "completed"
                     ? "text-[#0284c7] font-bold"
@@ -898,14 +931,14 @@ export function Orders() {
                 }`}
                 type="button"
               >
-                <span>Đã hoàn thành</span>
+                <span>{isEn ? "Completed" : "Đã hoàn thành"}</span>
                 {filter === "completed" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0284c7] rounded-full" />
                 )}
               </button>
 
               <button
-                onClick={() => setFilter("cancelled")}
+                onClick={() => { setFilter("cancelled"); setPage(0); }}
                 className={`pb-3.5 text-sm font-semibold transition-all relative whitespace-nowrap cursor-pointer ${
                   filter === "cancelled"
                     ? "text-[#0284c7] font-bold"
@@ -913,7 +946,7 @@ export function Orders() {
                 }`}
                 type="button"
               >
-                <span>Đã hủy &amp; Hoàn tiền</span>
+                <span>{isEn ? "Cancelled & Refunded" : "Đã hủy & Hoàn tiền"}</span>
                 {filter === "cancelled" && (
                   <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0284c7] rounded-full" />
                 )}
@@ -953,7 +986,7 @@ export function Orders() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => { setLoading(true); fetchOrders(page); }}
+                    onClick={() => { setLoading(true); fetchOrders(); }}
                     className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold cursor-pointer"
                   >
                     Thử lại
@@ -969,13 +1002,15 @@ export function Orders() {
               <div className="w-14 h-14 rounded-2xl bg-cyan-50 border border-cyan-200 flex items-center justify-center mx-auto text-cyan-700">
                 <Compass className="w-7 h-7" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900">Chưa có đơn đặt tour nào</h3>
+              <h3 className="text-lg font-bold text-slate-900">
+                {isEn ? "No bookings found" : "Chưa có đơn đặt tour nào"}
+              </h3>
               <div>
                 <button
                   onClick={() => navigate("/")}
                   className="px-6 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold shadow-xs cursor-pointer transition-all"
                 >
-                  Khám phá ngay
+                  {isEn ? "Explore Experiences Now" : "Khám phá ngay"}
                 </button>
               </div>
             </div>
@@ -984,7 +1019,7 @@ export function Orders() {
           {/* Orders List */}
           {!loading && !error && filteredOrders.length > 0 && (
             <div className="w-full flex flex-col gap-6">
-              {filteredOrders.map((masterOrder) => {
+              {paginatedOrders.map((masterOrder) => {
                 const subOrders = masterOrder.items || masterOrder.subOrders || [];
                 const orderCode = `#ORD-${(masterOrder.id || "").slice(0, 8).toUpperCase()}`;
                 const allSubCancelled = subOrders.length > 0 && subOrders.every((s) => {
@@ -1029,6 +1064,7 @@ export function Orders() {
                 return (
                   <article
                     key={masterOrder.id}
+                    id={`order-${masterOrder.id}`}
                     data-ui="order-card"
                     className="bg-white rounded-2xl p-6 border border-slate-200/90 flex flex-col gap-6"
                   >
@@ -1040,7 +1076,9 @@ export function Orders() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Đơn hàng:</span>
+                            <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
+                              {isEn ? "Order:" : "Đơn hàng:"}
+                            </span>
                             <span className="text-base font-bold text-slate-900 font-mono">{orderCode}</span>
                             {!hasRefund && getMasterStatusBadge(masterOrder.status || "PENDING")}
                             {hasRefund && (
@@ -1048,22 +1086,24 @@ export function Orders() {
                                 className="px-2.5 py-0.5 rounded-md text-xs font-semibold border tracking-tight bg-slate-100 text-slate-800 border-slate-200"
                               >
                                 {isPartialRefund
-                                  ? `Hoàn tiền 1 phần (${cancelledCount}/${subOrders.length} dịch vụ)`
+                                  ? (isEn ? `Partial refund (${cancelledCount}/${subOrders.length} services)` : `Hoàn tiền 1 phần (${cancelledCount}/${subOrders.length} dịch vụ)`)
                                   : latestRefund?.status === "COMPLETED" || latestRefund?.status === "PROCESSED"
-                                  ? "Đã hoàn tiền"
-                                  : "Đang xử lý hoàn"}
+                                  ? (isEn ? "Refunded" : "Đã hoàn tiền")
+                                  : (isEn ? "Refund processing" : "Đang xử lý hoàn")}
                               </span>
                             )}
                           </div>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            Ngày tạo: {formatDateTime(masterOrder.createdAt)}
+                            {isEn ? "Created:" : "Ngày tạo:"} {formatDateTime(masterOrder.createdAt)}
                           </p>
                         </div>
                       </div>
 
                       <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3">
                         <div className="text-right">
-                          <span className="text-xs text-slate-500 uppercase tracking-wider block font-medium">Tổng tiền</span>
+                          <span className="text-xs text-slate-500 uppercase tracking-wider block font-medium">
+                            {isEn ? "Total Amount" : "Tổng tiền"}
+                          </span>
                           <span className="text-xl text-[#991b1b] font-extrabold tabular-nums">
                             {formatVnd(masterOrder.finalAmount ?? masterOrder.totalAmount)}
                           </span>
@@ -1076,10 +1116,21 @@ export function Orders() {
                               type="button"
                               onClick={() => handleOpenMasterQrModal(masterOrder)}
                               className="px-3.5 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer active:scale-95"
-                              title="Xem mã QR dùng chung cho toàn bộ hoạt động trong đơn"
+                              title={isEn ? "View unified QR pass for all activities" : "Xem mã QR dùng chung cho toàn bộ hoạt động trong đơn"}
                             >
                               <QrCode className="w-4 h-4" />
-                              <span>Vé QR toàn đơn</span>
+                              <span>{isEn ? "All-in-One Pass" : "Vé QR toàn đơn"}</span>
+                            </button>
+                          )}
+                          {canDownloadPdf && (
+                            <button
+                              type="button"
+                              onClick={() => setBriefingOrder(masterOrder)}
+                              className="px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#0284c7] border border-sky-200 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                              title={isEn ? "View 24h Marine Briefing & Checklist" : "Xem cẩm nang ra khơi 24h & checklist đồ cần mang"}
+                            >
+                              <Compass className="w-4 h-4 text-[#0284c7]" />
+                              <span>{isEn ? "24h Briefing" : "Cẩm nang 24h"}</span>
                             </button>
                           )}
                           {canDownloadPdf && (
@@ -1087,14 +1138,14 @@ export function Orders() {
                               onClick={() => handleDownloadReceiptPdf(masterOrder.id)}
                               disabled={downloadingPdfId === masterOrder.id}
                               className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                              title="Tải hóa đơn & Vé điện tử PDF"
+                              title={isEn ? "Download PDF e-ticket & receipt" : "Tải hóa đơn & Vé điện tử PDF"}
                             >
                               {downloadingPdfId === masterOrder.id ? (
                                 <Loader2 className="w-4 h-4 animate-spin text-slate-700" />
                               ) : (
                                 <FileText className="w-4 h-4 text-slate-700" />
                               )}
-                              <span>{downloadingPdfId === masterOrder.id ? "Đang xuất..." : "Tải vé PDF"}</span>
+                              <span>{downloadingPdfId === masterOrder.id ? (isEn ? "Exporting..." : "Đang xuất...") : (isEn ? "Download PDF" : "Tải vé PDF")}</span>
                             </button>
                           )}
 
@@ -1103,7 +1154,7 @@ export function Orders() {
                               onClick={() => handleOpenCancellationModal(masterOrder)}
                               className="px-3 py-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-bold transition-colors cursor-pointer"
                             >
-                              Yêu cầu hủy đơn
+                              {isEn ? "Cancel Booking" : "Yêu cầu hủy đơn"}
                             </button>
                           )}
 
@@ -1112,9 +1163,9 @@ export function Orders() {
                               type="button"
                               onClick={() => setViewingRefundOrder({ order: masterOrder, refunds })}
                               className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold border border-slate-200 shadow-xs transition-colors cursor-pointer"
-                              title="Xem chi tiết biên nhận hoàn tiền"
+                              title={isEn ? "View refund transaction receipt" : "Xem chi tiết biên nhận hoàn tiền"}
                             >
-                              Chi tiết hoàn tiền
+                              {isEn ? "Refund Details" : "Chi tiết hoàn tiền"}
                             </button>
                           )}
 
@@ -1123,7 +1174,7 @@ export function Orders() {
                               {isOrderPaymentExpired(masterOrder) && (
                                 <span className="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-800 text-[11px] font-semibold border border-amber-200 flex items-center gap-1 shadow-2xs">
                                   <Clock className="w-3.5 h-3.5 text-amber-600" />
-                                  <span>Quá hạn giữ chỗ</span>
+                                  <span>{isEn ? "Payment Expired" : "Quá hạn giữ chỗ"}</span>
                                 </span>
                               )}
                               <button
@@ -1131,7 +1182,7 @@ export function Orders() {
                                 disabled={isOrderPaymentExpired(masterOrder)}
                                 className="px-4 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold shadow-xs cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1.5"
                               >
-                                <span>Thanh toán ngay</span>
+                                <span>{isEn ? "Pay Now" : "Thanh toán ngay"}</span>
                               </button>
                             </div>
                           )}
@@ -1145,8 +1196,8 @@ export function Orders() {
                         <span className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
                           <Layers className="w-4 h-4 text-cyan-700" />
                           {filter === "all"
-                            ? `Các dịch vụ (${subOrders.length})`
-                            : `Dịch vụ thuộc mục này (${displayedSubOrders.length}/${subOrders.length})`}
+                            ? (isEn ? `Services (${subOrders.length})` : `Các dịch vụ (${subOrders.length})`)
+                            : (isEn ? `Services in this tab (${displayedSubOrders.length}/${subOrders.length})` : `Dịch vụ thuộc mục này (${displayedSubOrders.length}/${subOrders.length})`)}
                         </span>
                         {filter !== "all" && displayedSubOrders.length < subOrders.length && (
                           <span className="text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded-md">
@@ -1164,7 +1215,9 @@ export function Orders() {
                       ) : (
                         displayedSubOrders.map((subOrder) => {
                           const serviceDetail = serviceDetails[subOrder.serviceId];
-                          const serviceName = serviceDetail?.name || subOrder.serviceName || `Dịch vụ #${subOrder.serviceId.slice(0, 8)}`;
+                          const serviceName = (language === 'en' && serviceDetail?.nameEn)
+                            ? serviceDetail.nameEn
+                            : (serviceDetail?.name || subOrder.serviceName || `Dịch vụ #${subOrder.serviceId.slice(0, 8)}`);
                           const serviceImage = serviceDetail?.imageUrls?.[0] || subOrder.serviceThumbnail || "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80";
                           const matchedSlot = serviceDetail?.slots?.find((s) => s.slotId === subOrder.slotId);
                           const displaySlotTime = subOrder.slotTime || (matchedSlot ? `${matchedSlot.startTime.slice(0, 5)} - ${matchedSlot.endTime.slice(0, 5)} • ${matchedSlot.date}` : undefined);
@@ -1178,6 +1231,7 @@ export function Orders() {
                           return (
                             <div
                               key={subOrder.id}
+                              id={`suborder-${subOrder.id}`}
                               className="bg-white rounded-xl p-3.5 flex flex-col md:flex-row gap-3.5 border border-slate-200/70 hover:border-slate-300 transition-all shadow-2xs"
                             >
                               {/* Thumbnail */}
@@ -1226,12 +1280,12 @@ export function Orders() {
                                       {displaySlotTime ? (
                                         <div className="flex items-center gap-1.5 mt-1 text-xs text-sky-700 font-semibold">
                                           <Clock className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                                          <span>Khởi hành: {displaySlotTime}</span>
+                                          <span>{isEn ? "Departure:" : "Khởi hành:"} {displaySlotTime}</span>
                                         </div>
                                       ) : subOrder.slotId ? (
                                         <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500">
                                           <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                          <span>Ca khởi hành: #{subOrder.slotId.slice(0, 8)}</span>
+                                          <span>{isEn ? "Departure slot:" : "Ca khởi hành:"} #{subOrder.slotId.slice(0, 8)}</span>
                                         </div>
                                       ) : null}
                                     </div>
@@ -1241,7 +1295,7 @@ export function Orders() {
                                         {formatVnd(subOrder.finalAmount ?? subOrder.subtotalAmount)}
                                       </span>
                                       <span className="text-xs text-slate-500">
-                                        Số lượng: <strong>{subOrder.quantity} khách</strong>
+                                        {isEn ? "Quantity:" : "Số lượng:"} <strong>{subOrder.quantity} {isEn ? "guest(s)" : "khách"}</strong>
                                       </span>
                                     </div>
                                   </div>
@@ -1254,15 +1308,15 @@ export function Orders() {
                                     {submittedDisputes[subOrder.id] && (
                                       submittedDisputes[subOrder.id].status === "RESOLVED_REJECTED" ? (
                                         <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-xs font-semibold">
-                                          Khiếu nại bị từ chối
+                                          {isEn ? "Dispute Rejected" : "Khiếu nại bị từ chối"}
                                         </span>
                                       ) : submittedDisputes[subOrder.id].status === "RESOLVED_REFUND" || submittedDisputes[subOrder.id].status === "RESOLVED_PARTIAL" ? (
                                         <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
-                                          Đã giải quyết hoàn tiền
+                                          {isEn ? "Refunded via Dispute" : "Đã giải quyết hoàn tiền"}
                                         </span>
                                       ) : (
                                         <span className="px-2.5 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold">
-                                          Đang khiếu nại
+                                          {isEn ? "Dispute in progress" : "Đang khiếu nại"}
                                         </span>
                                       )
                                     )}
@@ -1276,7 +1330,7 @@ export function Orders() {
                                         className="px-3.5 py-1.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95 disabled:opacity-50"
                                         type="button"
                                       >
-                                        <span>Thanh toán ngay</span>
+                                        <span>{isEn ? "Pay Now" : "Thanh toán ngay"}</span>
                                       </button>
                                     )}
                                     {/* Check-in QR button (P0 for CONFIRMED suborders) */}
@@ -1287,7 +1341,7 @@ export function Orders() {
                                         type="button"
                                       >
                                         <QrCode className="w-4 h-4" />
-                                        <span>Mã QR Check-in</span>
+                                        <span>{isEn ? "Check-in QR Pass" : "Mã QR Check-in"}</span>
                                       </button>
                                     )}
 
@@ -1295,7 +1349,7 @@ export function Orders() {
                                     {subOrder.status === "REFUNDED" && (
                                       <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-500 text-xs font-semibold flex items-center gap-1">
                                         <Ban className="w-3.5 h-3.5 text-slate-400" />
-                                        <span>Vé đã hủy</span>
+                                        <span>{isEn ? "Booking Cancelled" : "Vé đã hủy"}</span>
                                       </span>
                                     )}
 
@@ -1303,7 +1357,7 @@ export function Orders() {
                                     {isCheckedIn && (
                                       <span className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-800 border border-slate-200 text-xs font-semibold flex items-center gap-1">
                                         <CheckCheck className="w-4 h-4 text-slate-700" />
-                                        <span>Đã quét vé lên tàu</span>
+                                        <span>{isEn ? "Boarded / Checked-in" : "Đã quét vé lên tàu"}</span>
                                       </span>
                                     )}
 
@@ -1338,14 +1392,14 @@ export function Orders() {
                                         className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
                                         type="button"
                                       >
-                                        Hỗ trợ / Khiếu nại
+                                        {isEn ? "Support / Dispute" : "Hỗ trợ / Khiếu nại"}
                                       </button>
                                     )}
                                   </div>
                                 </div>
 
                                 {/* Comprehensive Review Section for COMPLETED sub-orders */}
-                                {isCompleted && (
+                                {(isCompleted || Boolean(reviewsMap[subOrder.id])) && (
                                   <div className="mt-3.5 pt-3.5 border-t border-slate-200/70">
                                     {reviewsMap[subOrder.id] ? (
                                       <div data-ui="suborder-review-card" className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2.5">
@@ -1365,10 +1419,10 @@ export function Orders() {
                                             </div>
                                             <span className="text-xs font-bold text-slate-900">
                                               {reviewsMap[subOrder.id]?.rating === 5
-                                                ? "5/5 • Tuyệt vời"
+                                                ? (isEn ? "5/5 • Excellent" : "5/5 • Tuyệt vời")
                                                 : reviewsMap[subOrder.id]?.rating === 4
-                                                ? "4/5 • Rất tốt"
-                                                : `${reviewsMap[subOrder.id]?.rating}/5 • Đã đánh giá`}
+                                                ? (isEn ? "4/5 • Very Good" : "4/5 • Rất tốt")
+                                                : `${reviewsMap[subOrder.id]?.rating}/5 • ${isEn ? "Reviewed" : "Đã đánh giá"}`}
                                             </span>
                                             <span className="text-[11px] text-slate-500 font-medium">
                                               • {formatDateTime(reviewsMap[subOrder.id]?.createdAt)}
@@ -1381,7 +1435,7 @@ export function Orders() {
                                             className="text-xs font-semibold text-sky-700 hover:text-sky-800 flex items-center gap-1 hover:underline cursor-pointer"
                                           >
                                             <Edit3 className="w-3.5 h-3.5" />
-                                            <span>Sửa đánh giá</span>
+                                            <span>{isEn ? "Edit Review" : "Sửa đánh giá"}</span>
                                           </button>
                                         </div>
 
@@ -1395,7 +1449,7 @@ export function Orders() {
                                               <img
                                                 key={i}
                                                 src={img}
-                                                alt="Ảnh thực tế chuyến đi"
+                                                alt={isEn ? "Trip photo" : "Ảnh thực tế chuyến đi"}
                                                 className="w-16 h-16 rounded-lg object-cover border border-slate-200 shadow-xs"
                                               />
                                             ))}
@@ -1405,7 +1459,9 @@ export function Orders() {
                                         {reviewsMap[subOrder.id]?.vendorReply && (
                                           <div className="mt-2 p-3 rounded-lg bg-sky-50/80 border border-sky-100 text-xs space-y-1">
                                             <div className="flex items-center justify-between">
-                                              <strong className="font-bold text-sky-950">Phản hồi từ đơn vị tổ chức:</strong>
+                                              <strong className="font-bold text-sky-950">
+                                                {isEn ? "Partner Response:" : "Phản hồi từ đơn vị tổ chức:"}
+                                              </strong>
                                               {reviewsMap[subOrder.id]?.vendorRepliedAt && (
                                                 <span className="text-[11px] text-sky-700">
                                                   {formatDateTime(reviewsMap[subOrder.id]?.vendorRepliedAt)}
@@ -1426,10 +1482,12 @@ export function Orders() {
                                           </div>
                                           <div className="space-y-0.5">
                                             <h4 className="text-sm font-bold text-slate-900">
-                                              Đánh giá dịch vụ &amp; Tiêu chuẩn an toàn
+                                              {isEn ? "Review Service & Safety Standards" : "Đánh giá dịch vụ & Tiêu chuẩn an toàn"}
                                             </h4>
                                             <p className="text-xs text-slate-700 leading-relaxed">
-                                              Trải nghiệm đã hoàn tất. Hãy chia sẻ cảm nhận về hướng dẫn viên, áo phao cứu sinh và độ hài lòng thực tế.
+                                              {isEn
+                                                ? "Your experience is completed. Share your feedback on instructors, safety equipment, and overall satisfaction."
+                                                : "Trải nghiệm đã hoàn tất. Hãy chia sẻ cảm nhận về hướng dẫn viên, áo phao cứu sinh và độ hài lòng thực tế."}
                                             </p>
                                           </div>
                                         </div>
@@ -1440,7 +1498,7 @@ export function Orders() {
                                           className="px-4 py-2 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0 transition-transform active:scale-95"
                                         >
                                           <Star className="w-3.5 h-3.5 fill-white text-white" />
-                                          <span>Viết đánh giá ngay</span>
+                                          <span>{isEn ? "Write Review" : "Viết đánh giá ngay"}</span>
                                         </button>
                                       </div>
                                     )}
@@ -1651,7 +1709,9 @@ export function Orders() {
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                     {(selectedMasterOrder.items || selectedMasterOrder.subOrders || []).map((item, idx) => {
                       const itemDetail = serviceDetails[item.serviceId];
-                      const sName = itemDetail?.name || item.serviceName || `Dịch vụ #${item.serviceId.slice(0, 8)}`;
+                      const sName = (language === 'en' && itemDetail?.nameEn)
+                        ? itemDetail.nameEn
+                        : (itemDetail?.name || item.serviceName || `Dịch vụ #${item.serviceId.slice(0, 8)}`);
                       const st = (item.status || "").toUpperCase();
                       const matchedSlot = itemDetail?.slots?.find((s) => s.slotId === item.slotId);
                       const slotDisplay = item.slotTime || (matchedSlot ? `${matchedSlot.startTime.slice(0, 5)} - ${matchedSlot.endTime.slice(0, 5)} • ${matchedSlot.date}` : undefined);
@@ -1740,7 +1800,9 @@ export function Orders() {
                     </span>
                   </div>
                   <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-1 pt-0.5">
-                    {serviceDetails[selectedSubOrder.serviceId]?.name || selectedSubOrder.serviceName || "Trải nghiệm biển Đà Nẵng"}
+                    {(language === 'en' && serviceDetails[selectedSubOrder.serviceId]?.nameEn)
+                      ? serviceDetails[selectedSubOrder.serviceId]?.nameEn
+                      : (serviceDetails[selectedSubOrder.serviceId]?.name || selectedSubOrder.serviceName || "Trải nghiệm biển Đà Nẵng")}
                   </h3>
                   {(() => {
                     const modalMatchedSlot = serviceDetails[selectedSubOrder.serviceId]?.slots?.find((s) => s.slotId === selectedSubOrder.slotId);
@@ -2169,33 +2231,51 @@ export function Orders() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Phân loại sự cố</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  {isEn ? "Incident Category" : "Phân loại sự cố"}
+                </label>
                 <select
                   value={disputeReasonType}
                   onChange={(e) => setDisputeReasonType(e.target.value as DisputeReason)}
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 bg-white"
                 >
-                  <option value="SERVICE_NOT_AS_DESCRIBED">Dịch vụ không đúng mô tả / cam kết</option>
-                  <option value="VENDOR_NO_SHOW">Nhà cung cấp không đến / vắng mặt tại điểm hẹn</option>
-                  <option value="SAFETY_CONCERN">Vấn đề an toàn / thiếu trang thiết bị cứu sinh</option>
-                  <option value="PAYMENT_ISSUE">Sự cố thanh toán / phụ thu sai quy định</option>
-                  <option value="OTHER">Lý do khác</option>
+                  <option value="SERVICE_NOT_AS_DESCRIBED">
+                    {isEn ? "Service not as described" : "Dịch vụ không đúng mô tả / cam kết"}
+                  </option>
+                  <option value="VENDOR_NO_SHOW">
+                    {isEn ? "Operator no-show at meeting point" : "Nhà cung cấp không đến / vắng mặt tại điểm hẹn"}
+                  </option>
+                  <option value="SAFETY_CONCERN">
+                    {isEn ? "Safety concern / missing life-saving equipment" : "Vấn đề an toàn / thiếu trang thiết bị cứu sinh"}
+                  </option>
+                  <option value="PAYMENT_ISSUE">
+                    {isEn ? "Payment issue / incorrect surcharge" : "Sự cố thanh toán / phụ thu sai quy định"}
+                  </option>
+                  <option value="OTHER">{isEn ? "Other reason" : "Lý do khác"}</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">Mô tả chi tiết</label>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  {isEn ? "Detailed Description" : "Mô tả chi tiết"}
+                </label>
                 <textarea
                   rows={4}
                   value={disputeReason}
                   onChange={(e) => setDisputeReason(e.target.value)}
-                  placeholder="Mô tả sự cố bạn gặp phải (ví dụ: nhà cung cấp trễ ca không báo trước, trang thiết bị không đảm bảo an toàn...)"
+                  placeholder={
+                    isEn
+                      ? "Describe the issue (e.g. operator late without notice, unsafe equipment, incorrect charges...)"
+                      : "Mô tả sự cố bạn gặp phải (ví dụ: nhà cung cấp trễ ca không báo trước, trang thiết bị không đảm bảo an toàn...)"
+                  }
                   className="w-full p-3 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-rose-500 resize-none"
                 />
               </div>
 
               <p className="text-[11px] text-slate-500">
-                Đội ngũ điều phối và hỗ trợ khách hàng DANASEA sẽ tiếp nhận và phản hồi trong vòng 24 giờ.
+                {isEn
+                  ? "DANASEA operations and customer support team will process and respond within 24 hours."
+                  : "Đội ngũ điều phối và hỗ trợ khách hàng DANASEA sẽ tiếp nhận và phản hồi trong vòng 24 giờ."}
               </p>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
@@ -2205,7 +2285,7 @@ export function Orders() {
                   onClick={() => setDisputingSubOrder(null)}
                   className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-semibold cursor-pointer disabled:opacity-50"
                 >
-                  Hủy
+                  {isEn ? "Cancel" : "Hủy"}
                 </button>
                 <button
                   type="button"
@@ -2214,7 +2294,7 @@ export function Orders() {
                   className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {isSubmittingDispute && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{isSubmittingDispute ? "Đang gửi..." : "Gửi khiếu nại"}</span>
+                  <span>{isSubmittingDispute ? (isEn ? "Submitting..." : "Đang gửi...") : (isEn ? "Submit Dispute" : "Gửi khiếu nại")}</span>
                 </button>
               </div>
             </div>
@@ -2235,7 +2315,9 @@ export function Orders() {
                     <Receipt className="w-5 h-5 text-amber-700" />
                   </div>
                   <div>
-                    <h3 className="text-base font-extrabold text-slate-900">Chi tiết hoàn tiền</h3>
+                    <h3 className="text-base font-extrabold text-slate-900">
+                      {isEn ? "Refund Details" : "Chi tiết hoàn tiền"}
+                    </h3>
                     <p className="text-xs text-slate-500 font-mono">
                       #ORD-{(viewingRefundOrder.order.id || "").slice(0, 8).toUpperCase()}
                     </p>
@@ -2245,7 +2327,7 @@ export function Orders() {
                   type="button"
                   onClick={() => setViewingRefundOrder(null)}
                   className="p-1.5 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                  aria-label="Đóng"
+                  aria-label={isEn ? "Close" : "Đóng"}
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -2262,7 +2344,9 @@ export function Orders() {
                       className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2.5 text-xs"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Trạng thái hoàn:</span>
+                        <span className="text-slate-500 font-medium">
+                          {isEn ? "Refund Status:" : "Trạng thái hoàn:"}
+                        </span>
                         <span
                           className={`px-2.5 py-0.5 rounded-md font-bold text-[11px] ${
                             isProcessed
@@ -2273,37 +2357,37 @@ export function Orders() {
                           }`}
                         >
                           {isProcessed
-                            ? "Đã hoàn tất"
+                            ? (isEn ? "Completed" : "Đã hoàn tất")
                             : isFailed
-                            ? "Thất bại"
-                            : "Đang chờ đối soát (Pending)"}
+                            ? (isEn ? "Failed" : "Thất bại")
+                            : (isEn ? "Pending Settlement" : "Đang chờ đối soát (Pending)")}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Số tiền hoàn:</span>
+                        <span className="text-slate-500 font-medium">{isEn ? "Refund Amount:" : "Số tiền hoàn:"}</span>
                         <span className="font-extrabold text-slate-900 text-sm tabular-nums">
                           {formatVnd(ref.amount)}
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Tỷ lệ hoàn:</span>
+                        <span className="text-slate-500 font-medium">{isEn ? "Refund Rate:" : "Tỷ lệ hoàn:"}</span>
                         <span className="font-bold text-blue-600 tabular-nums">
                           {ref.percentage ?? ref.refundPercentage ?? 100}%
                         </span>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Cổng nhận hoàn:</span>
+                        <span className="text-slate-500 font-medium">{isEn ? "Refund Gateway:" : "Cổng nhận hoàn:"}</span>
                         <span className="font-semibold text-slate-800">
-                          {ref.provider || "VNPAY"} (về thẻ/tài khoản gốc)
+                          {ref.provider || "VNPAY"} {isEn ? "(to original card/account)" : "(về thẻ/tài khoản gốc)"}
                         </span>
                       </div>
 
                       {ref.providerRefundId && (
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-500 font-medium">Mã giao dịch hoàn:</span>
+                          <span className="text-slate-500 font-medium">{isEn ? "Refund Transaction ID:" : "Mã giao dịch hoàn:"}</span>
                           <span className="font-mono font-bold text-slate-700">
                             #{ref.providerRefundId}
                           </span>
@@ -2311,7 +2395,7 @@ export function Orders() {
                       )}
 
                       <div className="flex items-center justify-between">
-                        <span className="text-slate-500 font-medium">Ngày yêu cầu:</span>
+                        <span className="text-slate-500 font-medium">{isEn ? "Requested Date:" : "Ngày yêu cầu:"}</span>
                         <span className="text-slate-700">
                           {formatDateTime(ref.createdAt)}
                         </span>
@@ -2319,7 +2403,7 @@ export function Orders() {
 
                       {ref.processedAt && (
                         <div className="flex items-center justify-between">
-                          <span className="text-slate-500 font-medium">Ngày hoàn tất:</span>
+                          <span className="text-slate-500 font-medium">{isEn ? "Completed Date:" : "Ngày hoàn tất:"}</span>
                           <span className="text-emerald-700 font-semibold">
                             {formatDateTime(ref.processedAt)}
                           </span>
@@ -2334,10 +2418,12 @@ export function Orders() {
               <div className="p-3 bg-blue-50/80 border border-blue-200/80 rounded-xl text-[11px] text-blue-900 space-y-1">
                 <div className="flex items-center gap-1.5 font-bold text-blue-950">
                   <Clock className="w-3.5 h-3.5 text-blue-700" />
-                  <span>Thời gian nhận tiền dự kiến</span>
+                  <span>{isEn ? "Estimated Settlement Time" : "Thời gian nhận tiền dự kiến"}</span>
                 </div>
                 <p className="leading-relaxed">
-                  DANASEA đã xác nhận hoàn tiền. Thời gian tiền về tài khoản phụ thuộc vào ngân hàng hoặc phương thức nhận tiền.
+                  {isEn
+                    ? "DANASEA has processed the refund. Actual arrival time depends on the banking network or payment provider."
+                    : "DANASEA đã xác nhận hoàn tiền. Thời gian tiền về tài khoản phụ thuộc vào ngân hàng hoặc phương thức nhận tiền."}
                 </p>
               </div>
 
@@ -2347,7 +2433,7 @@ export function Orders() {
                   onClick={() => setViewingRefundOrder(null)}
                   className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer"
                 >
-                  Đóng
+                  {isEn ? "Close" : "Đóng"}
                 </button>
               </div>
             </div>
@@ -2356,6 +2442,15 @@ export function Orders() {
         )}
       {paymentOrderId && (
         <ContinuePaymentDialog orderId={paymentOrderId} onClose={() => setPaymentOrderId(null)} />
+      )}
+      {briefingOrder && (
+        <MarineBriefingModal
+          orderId={briefingOrder.id}
+          orderCode={`#ORD-${(briefingOrder.id || "").slice(0, 8).toUpperCase()}`}
+          isOpen={Boolean(briefingOrder)}
+          onClose={() => setBriefingOrder(null)}
+          isEn={isEn}
+        />
       )}
     </main>
   );

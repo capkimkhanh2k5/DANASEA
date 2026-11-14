@@ -10,6 +10,8 @@ import type {
   VendorRejectBookingRequest,
   CreateRescheduleProposalRequest,
   RescheduleProposalResponse,
+  EarlyDispatchRequest,
+  EarlyDispatchResponse,
 } from '../types/vendorOrder';
 
 export const vendorOrderService = {
@@ -75,6 +77,17 @@ export const vendorOrderService = {
   ): Promise<RescheduleProposalResponse> {
     const response = await apiClient.post<RescheduleProposalResponse>(
       `/vendor/sub-orders/${subOrderId}/reschedule-proposals`,
+      request
+    );
+    return response.data;
+  },
+
+  /**
+   * V12: Vendor điều phối khách chơi ca sớm hơn (FIFO Early Dispatch)
+   */
+  async earlyDispatch(request: EarlyDispatchRequest): Promise<EarlyDispatchResponse> {
+    const response = await apiClient.post<EarlyDispatchResponse>(
+      '/vendor/checkin/early-dispatch',
       request
     );
     return response.data;

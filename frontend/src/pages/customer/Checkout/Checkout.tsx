@@ -2,6 +2,7 @@ import { BookingStepper } from "../../../components/customer/BookingStepper";
 import { useNavigate } from "react-router-dom";
 import { useCartStore } from "../../../store/useCartStore";
 import { useAuthStore } from "../../../store/useAuthStore";
+import { useLanguageStore } from "../../../store/useLanguageStore";
 import { bookingService } from "../../../services/bookingService";
 import { orderService } from "../../../services/orderService";
 import { customerDiscountService } from "../../../services/customerDiscountService";
@@ -35,25 +36,33 @@ const paymentMethods = [
   {
     provider: "VNPAY",
     name: "Cổng VNPAY (QR Pay / Thẻ ATM & Quốc tế)",
+    nameEn: "VNPAY Gateway (QR Pay / ATM & International Cards)",
     description: "Hỗ trợ quét mã QR qua 30+ ứng dụng ngân hàng",
+    descriptionEn: "Supports QR scanning via 30+ Vietnamese banking apps",
     icon: QrCode,
   },
   {
     provider: "PAYPAL",
     name: "Cổng PayPal (Thẻ quốc tế Visa, MasterCard)",
+    nameEn: "PayPal Gateway (Visa, MasterCard, Amex)",
     description: "Dành cho du khách quốc tế hoặc thanh toán ngoại tệ",
+    descriptionEn: "Recommended for international travelers and multi-currency",
     icon: CreditCard,
   },
   {
     provider: "PAYOS",
     name: "payOS (VietQR)",
+    nameEn: "payOS (VietQR)",
     description: "Quét mã VietQR bằng ứng dụng ngân hàng",
+    descriptionEn: "Instant VietQR code scanning with banking apps",
     icon: QrCode,
   },
   {
     provider: "ZALOPAY",
     name: "ZaloPay",
+    nameEn: "ZaloPay Wallet",
     description: "Thanh toán qua ví điện tử ZaloPay",
+    descriptionEn: "Fast checkout using ZaloPay e-wallet",
     icon: Wallet,
   },
 ] as const;
@@ -74,6 +83,8 @@ interface CheckoutPaymentError {
 
 export function Checkout() {
   const navigate = useNavigate();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
   const { items, getTotalPrice } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
 
@@ -411,7 +422,7 @@ export function Checkout() {
           return;
         } else {
           setIsProcessingPayment(false);
-          setPaymentError("Không nhận được liên kết thanh toán từ cổng. Vui lòng thử lại hoặc chọn phương thức khác.");
+          setPaymentError(isEn ? "Failed to get payment link from gateway. Please try again or select another method." : "Không nhận được liên kết thanh toán từ cổng. Vui lòng thử lại hoặc chọn phương thức khác.");
           return;
         }
       } catch (err) {
@@ -422,12 +433,12 @@ export function Checkout() {
           setBookingHold(null);
         }
         setIsProcessingPayment(false);
-        setPaymentError(error.response?.data?.message || "Không thể khởi tạo giao dịch thanh toán. Vui lòng kiểm tra lại kết nối và thử lại.");
+        setPaymentError(error.response?.data?.message || (isEn ? "Failed to initialize payment transaction. Please check your connection and retry." : "Không thể khởi tạo giao dịch thanh toán. Vui lòng kiểm tra lại kết nối và thử lại."));
         return;
       }
     } else {
       setIsProcessingPayment(false);
-      setPaymentError("Vui lòng đăng nhập tài khoản Khách hàng để tiến hành thanh toán vé.");
+      setPaymentError(isEn ? "Please log in with your customer account to complete payment." : "Vui lòng đăng nhập tài khoản Khách hàng để tiến hành thanh toán vé.");
       return;
     }
   };
@@ -446,10 +457,12 @@ export function Checkout() {
         <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="pb-6 border-b border-slate-200/80 mb-8">
             <h1 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight">
-              Xác nhận thông tin &amp; Thanh toán
+              {isEn ? "Review Booking & Checkout" : "Xác nhận thông tin & Thanh toán"}
             </h1>
             <p className="text-[13px] text-slate-600 mt-1">
-              Kiểm tra lịch trình biển Sơn Trà, người tham gia và lựa chọn phương thức thanh toán an toàn
+              {isEn 
+                ? "Review your marine itinerary, traveler details, and select a secure payment method"
+                : "Kiểm tra lịch trình biển Sơn Trà, người tham gia và lựa chọn phương thức thanh toán an toàn"}
             </p>
           </div>
 
@@ -471,13 +484,13 @@ export function Checkout() {
                   {isHoldExpired ? (
                     <div className="flex items-center gap-2 text-rose-600 font-bold text-sm">
                       <Timer className="w-4 h-4 text-rose-600" />
-                      <span>{pendingOrderId ? "Hết hạn thanh toán" : "Hết thời gian giữ chỗ"}</span>
+                      <span>{pendingOrderId ? (isEn ? "Payment expired" : "Hết hạn thanh toán") : (isEn ? "Hold expired" : "Hết thời gian giữ chỗ")}</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 text-slate-900 text-sm">
                       <Timer className="w-4 h-4 text-slate-700" />
                       <span className="font-medium text-slate-700">
-                        {pendingOrderId ? "Thời gian thanh toán" : "Thời gian giữ chỗ"}
+                        {pendingOrderId ? (isEn ? "Payment window" : "Thời gian thanh toán") : (isEn ? "Hold time" : "Thời gian giữ chỗ")}
                       </span>
                       <span className="font-bold font-mono text-base text-slate-900 tabular-nums">
                         {countdown === undefined ? "—" : formatTime(countdown)}
@@ -485,7 +498,7 @@ export function Checkout() {
                     </div>
                   )}
                   <div className="text-xs font-mono text-slate-600">
-                    Mã phiên: <span className="font-bold text-slate-900">DNS-{sessionCode}</span>
+                    {isEn ? "Session:" : "Mã phiên:"} <span className="font-bold text-slate-900">DNS-{sessionCode}</span>
                   </div>
                 </div>
 
@@ -493,57 +506,57 @@ export function Checkout() {
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center justify-between border-b pb-2 border-slate-100">
                     <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                      1. Thông tin người đặt vé
+                      {isEn ? "1. Lead Traveler Information" : "1. Thông tin người đặt vé"}
                     </h2>
                     {isAuthenticated && (
                       <span className="text-xs text-emerald-700 font-medium flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Đã đồng bộ tài khoản
+                        <CheckCircle2 className="w-3.5 h-3.5" /> {isEn ? "Synced from account" : "Đã đồng bộ tài khoản"}
                       </span>
                     )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-slate-700">Họ và tên *</label>
+                      <label className="text-xs font-semibold text-slate-700">{isEn ? "Full Name *" : "Họ và tên *"}</label>
                       <input 
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors" 
                         type="text" 
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
-                        placeholder="Nhập họ và tên"
+                        placeholder={isEn ? "Enter full name" : "Nhập họ và tên"}
                       />
                     </div>
                     
                     <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-slate-700">Số điện thoại liên hệ *</label>
+                      <label className="text-xs font-semibold text-slate-700">{isEn ? "Contact Phone Number *" : "Số điện thoại liên hệ *"}</label>
                       <input 
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors" 
                         type="tel" 
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
-                        placeholder="Số điện thoại nhận vé"
+                        placeholder={isEn ? "Phone number for ticket confirmation" : "Số điện thoại nhận vé"}
                       />
                     </div>
 
                     <div className="flex flex-col gap-1.5 sm:col-span-2">
-                      <label className="text-xs font-semibold text-slate-700">Địa chỉ Email nhận mã QR vé *</label>
+                      <label className="text-xs font-semibold text-slate-700">{isEn ? "Email Address for QR Pass *" : "Địa chỉ Email nhận mã QR vé *"}</label>
                       <input 
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors" 
                         type="email" 
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Email nhận xác nhận đặt chỗ"
+                        placeholder={isEn ? "Email for booking confirmation" : "Email nhận xác nhận đặt chỗ"}
                       />
                     </div>
 
                     <div className="flex flex-col gap-1.5 sm:col-span-2">
-                      <label className="text-xs font-semibold text-slate-700">Ghi chú đặc biệt (tùy chọn)</label>
+                      <label className="text-xs font-semibold text-slate-700">{isEn ? "Special Requests (optional)" : "Ghi chú đặc biệt (tùy chọn)"}</label>
                       <input 
                         className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors" 
                         type="text" 
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Yêu cầu kích thước áo phao, hỗ trợ quay chụp..."
+                        placeholder={isEn ? "Life jacket sizing, photography requests..." : "Yêu cầu kích thước áo phao, hỗ trợ quay chụp..."}
                       />
                     </div>
                   </div>
@@ -553,46 +566,51 @@ export function Checkout() {
                 <div className="flex flex-col gap-4 pt-2 border-t border-slate-100">
                   <div className="border-b pb-2 border-slate-100">
                     <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                      2. Phương thức thanh toán
+                      {isEn ? "2. Payment Method" : "2. Phương thức thanh toán"}
                     </h2>
                   </div>
 
                   <div className="flex flex-col gap-3">
-                    {visiblePaymentMethods.map(({ provider, name, description, icon: Icon }) => (
-                      <label
-                        key={provider}
-                        className={`p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
-                          paymentProvider === provider
-                            ? "border-slate-900 bg-slate-50/80 shadow-xs"
-                            : "border-slate-200 bg-white hover:bg-slate-50"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            checked={paymentProvider === provider}
-                            onChange={() => setSelectedProvider(provider)}
-                            disabled={isProcessingPayment || !paymentProvider}
-                            className="w-4 h-4 accent-slate-900 cursor-pointer"
-                            name="payment_method"
-                            type="radio"
-                            value={provider}
-                          />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-bold text-slate-900">{name}</span>
-                              {provider === "VNPAY" && (
-                                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
-                                  Phổ biến
-                                </span>
-                              )}
+                    {visiblePaymentMethods.map((method) => {
+                      const { provider, icon: Icon } = method;
+                      const methodName = isEn ? method.nameEn : method.name;
+                      const methodDesc = isEn ? method.descriptionEn : method.description;
+                      return (
+                        <label
+                          key={provider}
+                          className={`p-4 rounded-xl border transition-all flex items-center justify-between cursor-pointer ${
+                            paymentProvider === provider
+                              ? "border-slate-900 bg-slate-50/80 shadow-xs"
+                              : "border-slate-200 bg-white hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              checked={paymentProvider === provider}
+                              onChange={() => setSelectedProvider(provider)}
+                              disabled={isProcessingPayment || !paymentProvider}
+                              className="w-4 h-4 accent-slate-900 cursor-pointer"
+                              name="payment_method"
+                              type="radio"
+                              value={provider}
+                            />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-slate-900">{methodName}</span>
+                                {provider === "VNPAY" && (
+                                  <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                                    {isEn ? "Popular" : "Phổ biến"}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5">{methodDesc}</p>
                             </div>
-                            <p className="text-xs text-slate-500 mt-0.5">{description}</p>
                           </div>
-                        </div>
-                        <Icon className="w-5 h-5 text-slate-700 shrink-0" aria-hidden="true" />
-                      </label>
-                    ))}
-                    {!paymentProvider && <p className="text-sm text-slate-600">Hiện chưa có phương thức thanh toán khả dụng.</p>}
+                          <Icon className="w-5 h-5 text-slate-700 shrink-0" aria-hidden="true" />
+                        </label>
+                      );
+                    })}
+                    {!paymentProvider && <p className="text-sm text-slate-600">{isEn ? "No payment methods currently available." : "Hiện chưa có phương thức thanh toán khả dụng."}</p>}
                   </div>
                 </div>
 
@@ -600,9 +618,11 @@ export function Checkout() {
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5 text-xs">
                   <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                   <div className="text-slate-600 leading-relaxed">
-                    <p className="font-bold text-slate-900">Chính sách bảo vệ quyền lợi du khách</p>
+                    <p className="font-bold text-slate-900">{isEn ? "Traveler Protection Policy" : "Chính sách bảo vệ quyền lợi du khách"}</p>
                     <p className="mt-0.5">
-                      Cam kết hoàn tiền 100% khi thời tiết biển động hoặc cảng vụ cấm xuất bến. Mọi thông tin thanh toán đều được mã hóa SSL an toàn.
+                      {isEn
+                        ? "100% refund guarantee for severe weather or port authority cancellations. All payment data is encrypted via secure SSL."
+                        : "Cam kết hoàn tiền 100% khi thời tiết biển động hoặc cảng vụ cấm xuất bến. Mọi thông tin thanh toán đều được mã hóa SSL an toàn."}
                     </p>
                   </div>
                 </div>
@@ -613,19 +633,19 @@ export function Checkout() {
             <aside className="lg:col-span-5 flex flex-col gap-4 lg:sticky lg:top-24">
               <div className="p-6 rounded-2xl bg-white shadow-xs border border-slate-200/80 flex flex-col gap-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <h3 className="text-lg font-bold text-slate-900">Tóm tắt đơn hàng</h3>
+                  <h3 className="text-lg font-bold text-slate-900">{isEn ? "Order Summary" : "Tóm tắt đơn hàng"}</h3>
                   <span className="text-xs text-slate-600 font-medium">
-                    {items.length} trải nghiệm
+                    {items.length} {isEn ? (items.length > 1 ? "experiences" : "experience") : "trải nghiệm"}
                   </span>
                 </div>
 
                 {/* Items List */}
                 <div className="flex flex-col gap-3">
                   {items.map((item) => {
-                    const title = item.serviceName || 'Trải nghiệm biển';
+                    const title = item.serviceName || (isEn ? 'Marine Experience' : 'Trải nghiệm biển');
                     const image = item.thumbnailUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800';
                     const location = item.locationName || 'Đà Nẵng';
-                    const dateStr = item.selectedDate || item.date || 'Hôm nay';
+                    const dateStr = item.selectedDate || item.date || (isEn ? 'Today' : 'Hôm nay');
                     const timeStr = item.timeSlot || '08:00 - 10:00';
 
                     return (
@@ -647,7 +667,7 @@ export function Checkout() {
                             {timeStr} • {dateStr}
                           </p>
                           <p className="text-xs text-slate-500 mt-0.5">
-                            {item.quantity} khách × {item.unitPrice.toLocaleString('vi-VN')}₫
+                            {item.quantity} {isEn ? (item.quantity > 1 ? 'guests' : 'guest') : 'khách'} × {item.unitPrice.toLocaleString('vi-VN')}₫
                           </p>
                         </div>
                       </div>
@@ -658,13 +678,13 @@ export function Checkout() {
                 {/* Promo Code Input */}
                 <div className="pt-3 border-t border-slate-100">
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-slate-700">Mã ưu đãi chuyến đi</label>
+                    <label className="text-xs font-semibold text-slate-700">{isEn ? "Promo Code" : "Mã ưu đãi chuyến đi"}</label>
                     <button
                       type="button"
                       onClick={() => setIsVoucherModalOpen(true)}
                       className="text-xs text-[#0284c7] hover:text-[#0369a1] font-semibold underline underline-offset-4 cursor-pointer transition-colors"
                     >
-                      Xem mã ưu đãi
+                      {isEn ? "View Available Vouchers" : "Xem mã ưu đãi"}
                     </button>
                   </div>
                   {appliedPromoCode ? (
@@ -679,7 +699,7 @@ export function Checkout() {
                         className="text-slate-600 hover:text-rose-600 font-semibold cursor-pointer"
                         type="button"
                       >
-                        Gỡ bỏ
+                        {isEn ? "Remove" : "Gỡ bỏ"}
                       </button>
                     </div>
                   ) : (
@@ -689,7 +709,7 @@ export function Checkout() {
                           type="text"
                           value={promoInput}
                           onChange={(e) => setPromoInput(e.target.value)}
-                          placeholder="Nhập mã ưu đãi..."
+                          placeholder={isEn ? "Enter promo code..." : "Nhập mã ưu đãi..."}
                           className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-900 uppercase focus:outline-none focus:border-slate-400 bg-slate-50"
                         />
                         <button
@@ -698,7 +718,7 @@ export function Checkout() {
                           type="button"
                           className="px-4 py-2 bg-[#0284c7] hover:bg-[#0369a1] disabled:opacity-50 text-white rounded-xl text-xs font-semibold cursor-pointer transition-colors shadow-xs"
                         >
-                          {isApplyingPromo ? 'Đang kiểm tra...' : 'Áp dụng'}
+                          {isApplyingPromo ? (isEn ? 'Checking...' : 'Đang kiểm tra...') : (isEn ? 'Apply' : 'Áp dụng')}
                         </button>
                       </div>
                       {promoError && <p className="text-xs text-rose-600">{promoError}</p>}
@@ -709,20 +729,20 @@ export function Checkout() {
                 {/* Subtotal & Price breakdown */}
                 <div className="flex flex-col gap-2 pt-3 border-t border-slate-100 text-xs text-slate-600">
                   <div className="flex justify-between items-center text-sm">
-                    <span>Tạm tính</span>
+                    <span>{isEn ? "Subtotal" : "Tạm tính"}</span>
                     <span className="text-slate-900 font-semibold tabular-nums">
                       {rawTotal.toLocaleString('vi-VN')}₫
                     </span>
                   </div>
                   {appliedPromoCode && (
                     <div className="flex justify-between items-center text-sm text-emerald-700 font-bold">
-                      <span>Ưu đãi áp dụng ({appliedPromoCode})</span>
+                      <span>{isEn ? `Discount (${appliedPromoCode})` : `Ưu đãi áp dụng (${appliedPromoCode})`}</span>
                       <span className="tabular-nums">-{discountAmount.toLocaleString('vi-VN')}₫</span>
                     </div>
                   )}
                   <div className="flex justify-between items-center text-xs text-slate-500">
-                    <span>Phí dịch vụ</span>
-                    <span className="text-emerald-700 font-medium">Miễn phí</span>
+                    <span>{isEn ? "Service Fee" : "Phí dịch vụ"}</span>
+                    <span className="text-emerald-700 font-medium">{isEn ? "Free" : "Miễn phí"}</span>
                   </div>
                 </div>
 
@@ -730,8 +750,8 @@ export function Checkout() {
                 <div className="pt-3 border-t border-slate-100 flex flex-col gap-4">
                   <div className="flex justify-between items-baseline">
                     <div>
-                      <span className="text-xs text-slate-700 font-semibold">Tổng thanh toán:</span>
-                      <p className="text-xs text-slate-500">Đã gồm thuế &amp; bảo hiểm</p>
+                      <span className="text-xs text-slate-700 font-semibold">{isEn ? "Total Payment:" : "Tổng thanh toán:"}</span>
+                      <p className="text-xs text-slate-500">{isEn ? "Includes taxes & marine insurance" : "Đã gồm thuế & bảo hiểm"}</p>
                     </div>
                     <span className="text-2xl sm:text-3xl leading-tight text-[#991b1b] font-extrabold tracking-tight tabular-nums">
                       {finalTotal.toLocaleString('vi-VN')}₫
@@ -748,7 +768,7 @@ export function Checkout() {
                       className="w-full py-3.5 rounded-xl font-bold text-sm bg-rose-600 hover:bg-rose-700 text-white shadow-xs flex items-center justify-center gap-2 cursor-pointer transition-colors"
                     >
                       <ArrowLeft className="w-4 h-4" />
-                      <span>Quay lại giỏ hàng</span>
+                      <span>{isEn ? "Back to Cart" : "Quay lại giỏ hàng"}</span>
                     </button>
                   ) : (
                     <button 
@@ -764,11 +784,14 @@ export function Checkout() {
                       {isProcessingPayment ? (
                         <span className="flex items-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Đang kết nối cổng thanh toán...</span>
+                          <span>{isEn ? "Connecting to payment gateway..." : "Đang kết nối cổng thanh toán..."}</span>
                         </span>
                       ) : (
-                        <span>{paymentStatus?.activeProvider && paymentStatus.activeProvider !== paymentProvider
-                          ? "Đổi cổng và thanh toán" : "Xác nhận & Thanh toán"}</span>
+                        <span>
+                          {paymentStatus?.activeProvider && paymentStatus.activeProvider !== paymentProvider
+                            ? (isEn ? "Switch Gateway & Pay" : "Đổi cổng và thanh toán")
+                            : (isEn ? "Confirm & Pay" : "Xác nhận & Thanh toán")}
+                        </span>
                       )}
                     </button>
                   )}
@@ -785,7 +808,7 @@ export function Checkout() {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Tag className="w-5 h-5 text-[#0284c7]" />
-                <h3 className="text-base font-bold text-slate-900">Mã ưu đãi DANASEA khả dụng</h3>
+                <h3 className="text-base font-bold text-slate-900">{isEn ? "Available DANASEA Vouchers" : "Mã ưu đãi DANASEA khả dụng"}</h3>
               </div>
               <button
                 type="button"
@@ -799,7 +822,7 @@ export function Checkout() {
             <div className="py-4 space-y-3 max-h-[60vh] overflow-y-auto">
               {isLoadingVouchers ? (
                 <div className="p-8 text-center text-xs text-slate-500">
-                  Đang kiểm tra mã ưu đãi khả dụng...
+                  {isEn ? "Checking available vouchers..." : "Đang kiểm tra mã ưu đãi khả dụng..."}
                 </div>
               ) : availableVouchers.length > 0 ? (
                 availableVouchers.map((voucher) => (
@@ -814,14 +837,14 @@ export function Checkout() {
                         </span>
                         <span className="text-xs font-bold text-[#991b1b]">
                           {voucher.discountType === 'PERCENTAGE'
-                            ? `Giảm ${voucher.discountValue}%`
-                            : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}₫`}
+                            ? (isEn ? `${voucher.discountValue}% OFF` : `Giảm ${voucher.discountValue}%`)
+                            : (isEn ? `${voucher.discountValue.toLocaleString('vi-VN')}₫ OFF` : `Giảm ${voucher.discountValue.toLocaleString('vi-VN')}₫`)}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
                         {voucher.minOrderAmount
-                          ? `Đơn tối thiểu ${voucher.minOrderAmount.toLocaleString('vi-VN')}₫`
-                          : 'Áp dụng cho đơn dịch vụ biển'}
+                          ? (isEn ? `Min order ${voucher.minOrderAmount.toLocaleString('vi-VN')}₫` : `Đơn tối thiểu ${voucher.minOrderAmount.toLocaleString('vi-VN')}₫`)
+                          : (isEn ? 'Valid for all marine activities' : 'Áp dụng cho đơn dịch vụ biển')}
                       </p>
                     </div>
                     <button
@@ -832,7 +855,7 @@ export function Checkout() {
                       }}
                       className="px-3 py-1.5 rounded-lg bg-[#0284c7] hover:bg-[#0369a1] text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors shadow-xs"
                     >
-                      Áp dụng
+                      {isEn ? "Apply" : "Áp dụng"}
                     </button>
                   </div>
                 ))
@@ -843,10 +866,12 @@ export function Checkout() {
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-slate-800">
-                      Chưa có mã ưu đãi cá nhân
+                      {isEn ? "No personal vouchers yet" : "Chưa có mã ưu đãi cá nhân"}
                     </p>
                     <p className="text-[11px] text-slate-500 max-w-xs leading-relaxed">
-                      Bạn hiện chưa có mã giảm giá cá nhân hoặc voucher đền bù nào khả dụng. Nếu có mã từ chương trình ưu đãi, bạn có thể nhập trực tiếp tại ô bên ngoài.
+                      {isEn 
+                        ? "You currently have no personal vouchers or compensation credits. If you have an event promo code, enter it directly into the input above."
+                        : "Bạn hiện chưa có mã giảm giá cá nhân hoặc voucher đền bù nào khả dụng. Nếu có mã từ chương trình ưu đãi, bạn có thể nhập trực tiếp tại ô bên ngoài."}
                     </p>
                   </div>
                 </div>
@@ -859,7 +884,7 @@ export function Checkout() {
                 onClick={() => setIsVoucherModalOpen(false)}
                 className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
               >
-                Đóng
+                {isEn ? "Close" : "Đóng"}
               </button>
             </div>
           </div>

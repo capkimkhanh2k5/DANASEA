@@ -99,6 +99,16 @@ export interface VerifyCheckinRequest {
   qrToken: string;
 }
 
+// Gợi ý điều phối ca sớm (FIFO Early Dispatch)
+export interface EarlyDispatchSuggestion {
+  available: boolean;
+  suggestedSlotId: string;
+  date?: string;
+  startTime: string;
+  endTime: string;
+  availableCapacity: number;
+}
+
 // Response xác thực check-in
 export interface VerifyCheckinResponse {
   subOrderId: string;
@@ -110,6 +120,10 @@ export interface VerifyCheckinResponse {
   checkedInAt?: string | null;
   verifiedByStaffId?: string | null;
   message?: string;
+  isLate?: boolean;
+  lateReason?: string;
+  earlyDispatchSuggestion?: EarlyDispatchSuggestion | null;
+  availableEarlySlots?: EarlyDispatchSuggestion[];
 }
 
 // Request từ chối lượt đặt
@@ -140,4 +154,21 @@ export interface RescheduleProposalResponse {
   proposalVersion: number;
   expiresAt?: string;
   createdAt: string;
+}
+
+// Request & Response điều phối khách chơi sớm (FIFO Early Dispatch)
+export interface EarlyDispatchRequest {
+  subOrderId: string;
+  targetSlotId: string;
+  dispatchReason?: string;
+}
+
+export interface EarlyDispatchResponse {
+  subOrderId: string;
+  originalSlotId: string;
+  actualSlotId: string;
+  slotDate: string;
+  startTime: string;
+  endTime: string;
+  message: string;
 }

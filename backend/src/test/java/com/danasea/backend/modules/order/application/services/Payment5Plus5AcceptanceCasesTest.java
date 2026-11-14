@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockMakers;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -474,12 +475,17 @@ class Payment5Plus5AcceptanceCasesTest {
     @Test
     @DisplayName("Case 11: Switch rejected when remaining time is less than 5 seconds")
     void testCase11_SwitchProvider_RejectedWhenUnder5Seconds() {
-        masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(4));
+        OffsetDateTime now = OffsetDateTime.parse("2026-11-14T23:59:58+07:00");
+        masterOrder.setPaymentDeadline(now.plusSeconds(4));
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
 
-        assertThatThrownBy(() -> coordinator.switchProvider(customerId, orderId, PaymentProvider.PAYOS, "switch-11"))
-                .isInstanceOf(InvalidOrderStateException.class)
-                .hasMessageContaining("Insufficient time remaining");
+        try (var time = mockStatic(OffsetDateTime.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(OffsetDateTime::now).thenReturn(now);
+            assertThatThrownBy(() -> coordinator.switchProvider(customerId, orderId, PaymentProvider.PAYOS, "switch-11"))
+                    .isInstanceOf(InvalidOrderStateException.class)
+                    .hasMessageContaining("Insufficient time remaining (4s)");
+        }
     }
 
     // 12. Hai webhook của hai attempts về cùng lúc, cả hai báo PAID: commit booking chỉ 1; record khoản dư + refund/review.

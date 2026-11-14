@@ -18,7 +18,9 @@ import {
 import { MOCK_ADMIN_PAYOUTS } from '../../../data/adminMockData';
 import { adminSettlementService, getAdminSettlementError } from '../../../services/adminSettlementService';
 import { adminVendorService } from '../../../services/adminVendorService';
-import type { SettlementDetailResponse } from '../../../types/adminSettlement';
+import { adminPayoutService } from '../../../services/adminPayoutService';
+import type { PayoutRequestItem } from '../../../services/vendorPayoutService';
+import type { SettlementDetailResponse, SettlementResponse } from '../../../types/adminSettlement';
 import type { AdminVendorResponse } from '../../../types/adminVendor';
 import {
   AdminBadge,
@@ -82,34 +84,70 @@ export function AdminPayouts() {
     setErrorMessage(null);
 
     Promise.all([
-      adminSettlementService.getSettlements({ page: 0, size: 50 }),
+      adminPayoutService.getPayoutRequests({ size: 100 }),
+      adminSettlementService.getSettlements({ page: 0, size: 50 }).catch(() => ({ content: [] })),
       adminVendorService.getVendors({ size: 100 }).catch(() => ({ content: [] as AdminVendorResponse[] })),
     ])
-      .then(([res, vRes]) => {
+      .then(([pRes, res, vRes]) => {
         const vList = (vRes as { content?: AdminVendorResponse[] }).content || [];
         setVendors(vList);
         const vMap = new Map(vList.map(v => [v.id, v]));
 
-        const mapped: PayoutExtended[] = (res.content || []).map(s => {
-          const v = vMap.get(s.vendorId);
-          return {
-            id: s.id,
-            vendorId: s.vendorId,
-            settlementId: s.id,
-            amount: s.netPayableAmount,
-            status: ((s.status as string) === 'PAID' || (s.status as string) === 'FINALIZED' ? 'PAID' : (s.status as string) === 'APPROVED' ? 'APPROVED' : 'REQUESTED') as unknown as PayoutExtended['status'],
-            processedBy: s.status === 'FINALIZED' ? 'Ban Quản trị DANASEA' : '',
-            processedAt: s.updatedAt,
-            vendorName: v?.businessName || `Đối tác ${s.vendorId.substring(0, 8)}`,
-            bankName: v?.bankName || 'Chưa cập nhật ngân hàng',
-            bankAccountNumber: v?.bankAccountNumber || 'Chưa cập nhật số TK',
-            bankAccountHolder: v?.bankAccountHolder || v?.businessName || 'Chưa cập nhật chủ TK',
-            periodText: `Kỳ đối soát ${s.periodStart.slice(0, 10)} - ${s.periodEnd.slice(0, 10)}`,
-            totalOrdersCount: 0,
-            createdAt: s.createdAt,
-            updatedAt: s.updatedAt,
-          };
-        });
+        const pList: PayoutRequestItem[] = (pRes as { content?: PayoutRequestItem[] }).content || [];
+        const sList: SettlementResponse[] = (res as { content?: SettlementResponse[] }).content || [];
+        const sMap = new Map(sList.map(s => [s.id, s]));
+
+        let mapped: PayoutExtended[] = [];
+
+        if (pList.length > 0) {
+          mapped = pList.map(p => {
+            const v = vMap.get(p.vendorId);
+            const s = sMap.get(p.settlementId);
+            const periodStr = s ? `${s.periodStart.slice(0, 10)} – ${s.periodEnd.slice(0, 10)}` : 'Kỳ đối soát hoàn tất';
+            return {
+              id: p.id,
+              vendorId: p.vendorId,
+              settlementId: p.settlementId,
+              amount: Number(p.amount) || 0,
+              status: p.status as unknown as PayoutExtended['status'],
+              processedBy: p.processedBy ? 'Ban Quản trị DANASEA' : '',
+              processedAt: p.processedAt || p.updatedAt,
+              vendorName: v?.businessName || `Đối tác ${p.vendorId.substring(0, 8)}`,
+              bankName: v?.bankName || 'Chưa cập nhật ngân hàng',
+              bankAccountNumber: v?.bankAccountNumber || '****',
+              bankAccountHolder: v?.bankAccountHolder || v?.businessName || 'Chủ tài khoản đối tác',
+              periodText: `Kỳ: ${periodStr}`,
+              totalOrdersCount: 0,
+              createdAt: p.createdAt,
+              updatedAt: p.updatedAt,
+              bankReference: p.bankReference,
+              rejectionReason: p.rejectionReason,
+              adminNote: p.adminNote,
+              note: p.note || p.vendorNote,
+            };
+          });
+        } else {
+          mapped = sList.map(s => {
+            const v = vMap.get(s.vendorId);
+            return {
+              id: s.id,
+              vendorId: s.vendorId,
+              settlementId: s.id,
+              amount: s.netPayableAmount,
+              status: (s.status === 'PAID' || s.status === 'FINALIZED' ? 'PAID' : (s.status as string) === 'APPROVED' ? 'APPROVED' : 'REQUESTED') as unknown as PayoutExtended['status'],
+              processedBy: s.status === 'FINALIZED' ? 'Ban Quản trị DANASEA' : '',
+              processedAt: s.updatedAt,
+              vendorName: v?.businessName || `Đối tác ${s.vendorId.substring(0, 8)}`,
+              bankName: v?.bankName || 'Chưa cập nhật ngân hàng',
+              bankAccountNumber: v?.bankAccountNumber || 'Chưa cập nhật số TK',
+              bankAccountHolder: v?.bankAccountHolder || v?.businessName || 'Chưa cập nhật chủ TK',
+              periodText: `Kỳ đối soát ${s.periodStart.slice(0, 10)} - ${s.periodEnd.slice(0, 10)}`,
+              totalOrdersCount: 0,
+              createdAt: s.createdAt,
+              updatedAt: s.updatedAt,
+            };
+          });
+        }
 
         setPayouts(mapped);
         if (mapped.length > 0) {
@@ -137,7 +175,10 @@ export function AdminPayouts() {
     let isMounted = true;
     setLoadingDetail(true);
 
-    adminSettlementService.getSettlementDetail(selectedPayoutId)
+    const targetPayout = payouts.find(p => p.id === selectedPayoutId);
+    const targetSettlementId = targetPayout?.settlementId || selectedPayoutId;
+
+    adminSettlementService.getSettlementDetail(targetSettlementId)
       .then(detail => {
         if (!isMounted) return;
         setSelectedDetail(detail);
@@ -153,7 +194,7 @@ export function AdminPayouts() {
     return () => {
       isMounted = false;
     };
-  }, [demo, selectedPayoutId]);
+  }, [demo, selectedPayoutId, payouts]);
 
   // Metrics
   const metrics = useMemo(() => calculatePayoutMetrics(payouts), [payouts]);
@@ -200,36 +241,80 @@ export function AdminPayouts() {
     }
 
     try {
+      // 1. If status is REQUESTED, approve it
+      if (selectedPayout.status === 'REQUESTED') {
+        await adminPayoutService.approvePayout(selectedPayout.id, bankRefCode);
+        setPayouts(prev => prev.map(p => p.id === selectedPayout.id ? { 
+          ...p, 
+          status: 'APPROVED' as unknown as PayoutExtended['status'], 
+          processedBy: 'Ban Quản trị DANASEA', 
+          processedAt: new Date().toISOString() 
+        } : p));
+        setIsApproveModalOpen(false);
+        setNotice(`Đã phê duyệt lệnh chi trả #${selectedPayout.id.slice(0, 8).toUpperCase()}. Tiếp theo có thể bấm xác nhận giải ngân chuyển khoản.`);
+        return;
+      }
+
+      // 2. If status is APPROVED, mark as PAID with bankRefCode
+      if (selectedPayout.status === 'APPROVED') {
+        await adminPayoutService.markPaid(selectedPayout.id, bankRefCode);
+        setPayouts(prev => prev.map(p => p.id === selectedPayout.id ? { 
+          ...p, 
+          status: 'PAID' as unknown as PayoutExtended['status'], 
+          bankReference: bankRefCode,
+          processedBy: 'Ban Quản trị DANASEA', 
+          processedAt: new Date().toISOString() 
+        } : p));
+        setIsApproveModalOpen(false);
+        setNotice(`Đã xác nhận giải ngân thành công (Ref: ${bankRefCode}) cho đối tác ${selectedPayout.vendorName}.`);
+        return;
+      }
+
+      // 3. Fallback for settlements
       await adminSettlementService.finalizeSettlement(selectedPayout.id);
       setPayouts(prev => prev.map(p => p.id === selectedPayout.id ? { ...p, status: 'PAID' as unknown as PayoutExtended['status'], processedBy: 'Ban Quản trị DANASEA', processedAt: new Date().toISOString() } : p));
       setIsApproveModalOpen(false);
       setNotice(`Đã chốt sổ và chi trả kỳ đối soát #${formatDisplayCode(selectedPayout.id, 'PAY')}.`);
     } catch (err) {
-      const msg = getAdminSettlementError(err, 'Lỗi khi giải ngân kỳ đối soát.');
+      const msg = getAdminSettlementError(err, 'Lỗi khi xử lý lệnh chi trả.');
       setNotice(msg);
       setIsApproveModalOpen(false);
     }
   };
 
-  const handleRejectPayoutSubmit = () => {
+  const handleRejectPayoutSubmit = async () => {
     if (!selectedPayout) return;
-    if (!demo) {
-      setNotice('Thao tác từ chối bị khóa ngoài Demo Mode (?demo=1)');
+    if (demo) {
+      const { updatedList, targetPayout } = rejectPayout(
+        payouts,
+        selectedPayout.id,
+        rejectReason,
+        'Vũ Hải Đăng (Admin)',
+        demo
+      );
+
+      setPayouts(updatedList);
       setIsRejectModalOpen(false);
+      setNotice(`Đã từ chối lệnh chi trả #${targetPayout?.id}`);
       return;
     }
 
-    const { updatedList, targetPayout } = rejectPayout(
-      payouts,
-      selectedPayout.id,
-      rejectReason,
-      'Vũ Hải Đăng (Admin)',
-      demo
-    );
-
-    setPayouts(updatedList);
-    setIsRejectModalOpen(false);
-    setNotice(`Đã từ chối lệnh chi trả #${targetPayout?.id}`);
+    try {
+      await adminPayoutService.rejectPayout(selectedPayout.id, rejectReason);
+      setPayouts(prev => prev.map(p => p.id === selectedPayout.id ? { 
+        ...p, 
+        status: 'REJECTED' as unknown as PayoutExtended['status'], 
+        rejectionReason: rejectReason,
+        processedBy: 'Ban Quản trị DANASEA', 
+        processedAt: new Date().toISOString() 
+      } : p));
+      setIsRejectModalOpen(false);
+      setNotice(`Đã từ chối lệnh chi trả #${selectedPayout.id.slice(0, 8).toUpperCase()}: ${rejectReason}`);
+    } catch (err) {
+      const msg = getAdminSettlementError(err, 'Lỗi khi từ chối lệnh chi trả.');
+      setNotice(msg);
+      setIsRejectModalOpen(false);
+    }
   };
 
   const handleGenerateSettlementSubmit = async (e: React.FormEvent) => {
@@ -692,7 +777,7 @@ export function AdminPayouts() {
                     style={{ width: '100%', justifyContent: 'center' }}
                   >
                     <Check size={16} aria-hidden="true" />
-                    Phê duyệt giải ngân (Mô phỏng Napas247 - Demo)
+                    Phê duyệt yêu cầu rút tiền
                   </AdminButton>
 
                   <AdminButton
@@ -704,14 +789,42 @@ export function AdminPayouts() {
                     Từ chối lệnh chi trả
                   </AdminButton>
                 </>
+              ) : selectedPayout.status === 'APPROVED' ? (
+                <>
+                  <AdminButton
+                    variant="primary"
+                    onClick={() => setIsApproveModalOpen(true)}
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    <CheckCircle2 size={16} aria-hidden="true" />
+                    Xác nhận giải ngân chuyển khoản (Ghi nhận mã Ref)
+                  </AdminButton>
+                  <div style={{ fontSize: 12, color: 'var(--admin-muted, #737373)', textAlign: 'center', marginTop: 4 }}>
+                    Lệnh đã được duyệt. Bấm nút trên sau khi kế toán thực hiện ủy nhiệm chi.
+                  </div>
+                </>
+              ) : selectedPayout.status === 'REJECTED' ? (
+                <div className="admin-payouts__processed-notice" style={{ background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}>
+                  <Ban size={18} />
+                  <span>
+                    Lệnh chi đã bị từ chối: <strong>{selectedPayout.rejectionReason || 'Hồ sơ không hợp lệ'}</strong>.
+                  </span>
+                </div>
               ) : (
                 <div className="admin-payouts__processed-notice">
                   <CheckCircle2 size={18} />
-                  <span>
-                    Lệnh chi đã được xử lý bởi{' '}
-                    <strong>{selectedPayout.processedBy || 'Ban Quản trị DANASEA'}</strong>
-                    {selectedPayout.processedAt ? ` vào ngày ${selectedPayout.processedAt.slice(0, 10)}` : ''}.
-                  </span>
+                  <div>
+                    <div>
+                      Lệnh chi đã được giải ngân thành công bởi{' '}
+                      <strong>{selectedPayout.processedBy || 'Ban Quản trị DANASEA'}</strong>
+                      {selectedPayout.processedAt ? ` vào ngày ${selectedPayout.processedAt.slice(0, 10)}` : ''}.
+                    </div>
+                    {selectedPayout.bankReference && (
+                      <div style={{ fontFamily: 'monospace', fontWeight: 600, color: '#047857', marginTop: 2 }}>
+                        Mã giao dịch / Ref: {selectedPayout.bankReference}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

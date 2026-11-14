@@ -192,7 +192,7 @@ export function Home() {
     return {
       id: s.id,
       title: s.name,
-      titleEn: s.name,
+      titleEn: s.nameEn || s.name,
       category: 'Trải nghiệm biển',
       categoryEn: 'Marine Experience',
       location: s.address || 'Đà Nẵng',
