@@ -45,6 +45,7 @@ public class Service extends BaseDomainModel {
     private BigDecimal avgRating;
     private Integer ratingCount;
     private Integer viewCount;
+    private OperationType operationType = OperationType.FIXED_DEPARTURE;
 
     public boolean isDraft() {
         return ServiceStatus.DRAFT.equals(this.status);

@@ -1,12 +1,26 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Building2, CircleHelp, ListFilter, RotateCcw, Scale, ShieldCheck, Wallet } from 'lucide-react';
+import { ArrowRight, Building2, CircleHelp, ListFilter, RotateCcw, Scale, ShieldCheck, UserCheck, Wallet, type LucideIcon } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
-import { formatNumber, operationGroups, type OperationCounts } from './dashboardModel';
+import { formatNumber, operationGroups, type OperationCounts, type OperationKind } from './dashboardModel';
 
-const icons = { disputes: Scale, refunds: RotateCcw, vendors: Building2, services: ShieldCheck, settlements: Wallet };
-const actions = { disputes: 'Phân xử', refunds: 'Theo dõi đơn', vendors: 'Thẩm định hồ sơ', services: 'Kiểm duyệt', settlements: 'Đối soát' };
+const icons: Record<OperationKind, LucideIcon> = {
+  roleApplications: UserCheck,
+  disputes: Scale,
+  refunds: RotateCcw,
+  vendors: Building2,
+  services: ShieldCheck,
+  settlements: Wallet,
+};
+const actions: Record<OperationKind, string> = {
+  roleApplications: 'Duyệt vai trò',
+  disputes: 'Phân xử',
+  refunds: 'Theo dõi đơn',
+  vendors: 'Thẩm định hồ sơ',
+  services: 'Kiểm duyệt',
+  settlements: 'Đối soát',
+};
 const tabs = [
   { key: 'all', label: 'Tất cả' }, { key: 'vendors', label: 'Đối tác' },
   { key: 'services', label: 'Dịch vụ' }, { key: 'refunds', label: 'Đơn hàng' }, { key: 'finance', label: 'Tài chính' },

@@ -16,6 +16,11 @@ import jakarta.persistence.LockModeType;
 
 @Repository
 public interface JpaServiceRepository extends JpaRepository<ServiceJpaEntity, UUID>, JpaSpecificationExecutor<ServiceJpaEntity> {
+    interface StatusCount {
+        ServiceStatus getStatus();
+        long getTotal();
+    }
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM ServiceJpaEntity s WHERE s.id = :id")
     Optional<ServiceJpaEntity> findByIdForUpdate(@Param("id") UUID id);
@@ -45,4 +50,7 @@ public interface JpaServiceRepository extends JpaRepository<ServiceJpaEntity, UU
     long countByStatus(ServiceStatus status);
 
     long countByVendorIdAndStatus(UUID vendorId, ServiceStatus status);
+
+    @Query("SELECT s.status AS status, COUNT(s) AS total FROM ServiceJpaEntity s WHERE s.vendorId = :vendorId GROUP BY s.status")
+    List<StatusCount> countServicesByStatusForVendor(@Param("vendorId") UUID vendorId);
 }

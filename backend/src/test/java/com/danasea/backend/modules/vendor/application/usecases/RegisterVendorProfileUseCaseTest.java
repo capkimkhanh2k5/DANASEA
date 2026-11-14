@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import com.danasea.backend.modules.account.application.api.AccountInternalApi;
 import com.danasea.backend.modules.account.domain.models.Role;
@@ -62,8 +63,8 @@ class RegisterVendorProfileUseCaseTest {
         userId = UUID.randomUUID();
         testUser = new User();
         testUser.setId(userId);
-        testUser.setEmail("customer@example.com");
-        testUser.setRole(Role.CUSTOMER);
+        testUser.setEmail("vendor@example.com");
+        testUser.setRole(Role.VENDOR);
         testUser.setIsLocked(false);
 
         command = new RegisterVendorProfileCommand(
@@ -77,7 +78,7 @@ class RegisterVendorProfileUseCaseTest {
     }
 
     @Test
-    @DisplayName("Should successfully register vendor profile, set status to PENDING, and update user role to VENDOR")
+    @DisplayName("Should successfully register vendor profile and set status to PENDING for user with VENDOR role")
     void shouldRegisterVendorSuccessfully() {
         when(accountInternalApi.findUserById(userId)).thenReturn(Optional.of(testUser));
         when(jpaVendorRepository.existsByUserId(userId)).thenReturn(false);
@@ -120,10 +121,20 @@ class RegisterVendorProfileUseCaseTest {
         assertEquals(BigDecimal.ZERO, savedEntity.getRatingAvg());
         assertEquals(0, savedEntity.getRatingCount());
 
-        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
-        verify(accountInternalApi).saveUser(userCaptor.capture());
-        User savedUser = userCaptor.getValue();
-        assertEquals(Role.VENDOR, savedUser.getRole());
+        verify(accountInternalApi, never()).saveUser(any(User.class));
+    }
+
+    @Test
+    @DisplayName("Should throw AccessDeniedException when non-vendor user attempts direct profile registration")
+    void shouldThrowAccessDeniedExceptionWhenUserIsNotVendor() {
+        testUser.setRole(Role.CUSTOMER);
+        when(accountInternalApi.findUserById(userId)).thenReturn(Optional.of(testUser));
+
+        assertThrows(AccessDeniedException.class, () ->
+                registerVendorProfileUseCase.execute(userId, command));
+
+        verify(jpaVendorRepository, never()).save(any(VendorJpaEntity.class));
+        verify(accountInternalApi, never()).saveUser(any(User.class));
     }
 
     @Test
@@ -178,7 +189,6 @@ class RegisterVendorProfileUseCaseTest {
 
         assertNotNull(result);
         assertEquals(VerificationStatus.PENDING, result.getVerificationStatus());
-        verify(accountInternalApi).saveUser(testUser);
-        assertEquals(Role.VENDOR, testUser.getRole());
+        verify(accountInternalApi, never()).saveUser(any(User.class));
     }
 }

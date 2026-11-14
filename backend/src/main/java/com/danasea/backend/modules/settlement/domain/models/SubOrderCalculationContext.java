@@ -24,6 +24,9 @@ public class SubOrderCalculationContext {
     private BigDecimal refundPercentage;
     private boolean hasActiveDispute;
     private DisputeStatus disputeStatus;
+    private boolean disputeWindowOpen;
+    private boolean hasPendingRefund;
+    private boolean hasActiveDisruption;
     private BigDecimal commissionRate;
 
     private BigDecimal vendorDiscountAmount;

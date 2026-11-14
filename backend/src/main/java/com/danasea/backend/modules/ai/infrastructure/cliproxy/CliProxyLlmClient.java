@@ -116,22 +116,34 @@ public class CliProxyLlmClient implements LlmClientPort {
 
     @Override
     public LlmResponse generateResponse(List<AiMessage> messages, SupportedLanguage language) {
+        return generate(messages, language, null);
+    }
+
+    @Override
+    public LlmResponse generateText(List<AiMessage> messages, SupportedLanguage language, String systemPrompt) {
+        if (systemPrompt == null || systemPrompt.isBlank()) {
+            throw new IllegalArgumentException("A system prompt is required for text generation");
+        }
+        return generate(messages, language, systemPrompt);
+    }
+
+    private LlmResponse generate(List<AiMessage> messages, SupportedLanguage language, String systemPrompt) {
         SupportedLanguage promptLanguage = language == null ? SupportedLanguage.VI : language;
         try (var budget = AiExecutionBudget.open(AiExecutionBudget.LLM_REQUEST_TIMEOUT, 6)) {
-            return generateWithinBudget(messages, promptLanguage);
+            return generateWithinBudget(messages, promptLanguage, systemPrompt);
         }
     }
 
-    private LlmResponse generateWithinBudget(List<AiMessage> messages, SupportedLanguage promptLanguage) {
+    private LlmResponse generateWithinBudget(List<AiMessage> messages, SupportedLanguage promptLanguage, String systemPrompt) {
         try {
             log.info("Attempting primary CLI Proxy model: {}", defaultModel);
-            return callModel(messages, defaultModel, promptLanguage);
+            return callModel(messages, defaultModel, promptLanguage, systemPrompt);
         } catch (Exception ex) {
             if (!AiExecutionBudget.hasTimeFor(Duration.ofMillis(10))) return partial(promptLanguage);
             log.warn("CLI Proxy primary model {} failed ({}). Attempting secondary model {}",
                     defaultModel, ex.getClass().getSimpleName(), fallbackModel);
             try {
-                return callModel(messages, fallbackModel, promptLanguage);
+                return callModel(messages, fallbackModel, promptLanguage, systemPrompt);
             } catch (Exception fallbackEx) {
                 if (!AiExecutionBudget.hasTimeFor(Duration.ofMillis(10))) return partial(promptLanguage);
                 log.error("CLI Proxy secondary model {} also failed: {}", fallbackModel, fallbackEx.getClass().getSimpleName());
@@ -143,13 +155,14 @@ public class CliProxyLlmClient implements LlmClientPort {
         }
     }
 
-    private LlmResponse callModel(List<AiMessage> messages, String model, SupportedLanguage language) {
+    private LlmResponse callModel(List<AiMessage> messages, String model, SupportedLanguage language, String systemPrompt) {
         if (!AiExecutionBudget.hasTimeFor(Duration.ofMillis(10))) return partial(language);
         if (model == null || model.isBlank()) {
             throw new CliProxyException("CLI Proxy model is not configured");
         }
         List<CliProxyDto.Message> chatMessages = new ArrayList<>();
-        chatMessages.add(new CliProxyDto.Message("system", systemPromptBuilder.buildBasePrompt(language)));
+        chatMessages.add(new CliProxyDto.Message("system",
+                systemPrompt == null ? systemPromptBuilder.buildBasePrompt(language) : systemPrompt));
 
         if (messages != null) {
             for (AiMessage m : messages) {
@@ -178,7 +191,7 @@ public class CliProxyLlmClient implements LlmClientPort {
             }
         }
 
-        List<Map<String, Object>> tools = (aiToolRegistry != null && aiToolRegistry.getToolDefinitions() != null)
+        List<Map<String, Object>> tools = (systemPrompt == null && aiToolRegistry != null && aiToolRegistry.getToolDefinitions() != null)
                 ? aiToolRegistry.getToolDefinitions().stream()
                         .map(t -> {
                             Map<String, Object> toolMap = new LinkedHashMap<>();

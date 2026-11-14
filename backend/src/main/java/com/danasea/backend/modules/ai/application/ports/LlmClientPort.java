@@ -18,4 +18,6 @@ public interface LlmClientPort {
     default LlmResponse generateResponse(List<AiMessage> messages, SupportedLanguage language) {
         return generateResponse(messages);
     }
+
+    LlmResponse generateText(List<AiMessage> messages, SupportedLanguage language, String systemPrompt);
 }

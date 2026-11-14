@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLanguageStore } from "../../../store/useLanguageStore";
 import {
   KeyRound,
   Lock,
@@ -14,6 +15,8 @@ import {
 
 export function ChangePassword() {
   const navigate = useNavigate();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
   const [success, setSuccess] = useState(false);
   const [showCurrentPass, setShowCurrentPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
@@ -38,10 +41,10 @@ export function ChangePassword() {
             className="hover:text-slate-900 transition-colors cursor-pointer bg-transparent border-0 p-0 flex items-center gap-1 text-slate-600 font-semibold"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Tài khoản của bạn</span>
+            <span>{isEn ? "Your Account" : "Tài khoản của bạn"}</span>
           </button>
           <span>/</span>
-          <span className="text-slate-900 font-semibold">Đăng nhập &amp; Bảo mật</span>
+          <span className="text-slate-900 font-semibold">{isEn ? "Login & Security" : "Đăng nhập & Bảo mật"}</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
@@ -54,10 +57,10 @@ export function ChangePassword() {
               </div>
               <div>
                 <h1 className="text-xl sm:text-[22px] font-bold text-slate-900 tracking-tight">
-                  Đổi mật khẩu tài khoản
+                  {isEn ? "Change Account Password" : "Đổi mật khẩu tài khoản"}
                 </h1>
                 <p className="text-[13px] text-slate-600 mt-0.5">
-                  Thiết lập mật khẩu bảo mật mới cho tài khoản DANASEA của bạn
+                  {isEn ? "Set up a secure new password for your DANASEA account" : "Thiết lập mật khẩu bảo mật mới cho tài khoản DANASEA của bạn"}
                 </p>
               </div>
             </div>
@@ -65,19 +68,19 @@ export function ChangePassword() {
             {success ? (
               <div className="p-6 rounded-xl bg-emerald-50 border border-emerald-200 text-center animate-in fade-in zoom-in">
                 <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
-                <h2 className="text-base font-bold text-emerald-900">Đổi mật khẩu thành công!</h2>
-                <p className="text-xs text-emerald-700 mt-1">Hệ thống sẽ chuyển hướng bạn về trang Hồ sơ trong giây lát.</p>
+                <h2 className="text-base font-bold text-emerald-900">{isEn ? "Password changed successfully!" : "Đổi mật khẩu thành công!"}</h2>
+                <p className="text-xs text-emerald-700 mt-1">{isEn ? "Redirecting to your profile shortly." : "Hệ thống sẽ chuyển hướng bạn về trang Hồ sơ trong giây lát."}</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[13px] font-semibold text-slate-700">Mật khẩu hiện tại *</label>
+                  <label className="text-[13px] font-semibold text-slate-700">{isEn ? "Current Password *" : "Mật khẩu hiện tại *"}</label>
                   <div className="relative flex items-center">
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
                     <input 
                       required 
                       type={showCurrentPass ? "text" : "password"} 
-                      placeholder="Nhập mật khẩu hiện tại" 
+                      placeholder={isEn ? "Enter current password" : "Nhập mật khẩu hiện tại"} 
                       className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors font-medium" 
                     />
                     <button
@@ -91,13 +94,13 @@ export function ChangePassword() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[13px] font-semibold text-slate-700">Mật khẩu mới *</label>
+                  <label className="text-[13px] font-semibold text-slate-700">{isEn ? "New Password *" : "Mật khẩu mới *"}</label>
                   <div className="relative flex items-center">
                     <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
                     <input 
                       required 
                       type={showNewPass ? "text" : "password"} 
-                      placeholder="Tối thiểu 8 ký tự, gồm chữ hoa và số" 
+                      placeholder={isEn ? "Minimum 8 chars, uppercase and numbers" : "Tối thiểu 8 ký tự, gồm chữ hoa và số"} 
                       className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors font-medium" 
                     />
                     <button
@@ -111,13 +114,13 @@ export function ChangePassword() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[13px] font-semibold text-slate-700">Xác nhận mật khẩu mới *</label>
+                  <label className="text-[13px] font-semibold text-slate-700">{isEn ? "Confirm New Password *" : "Xác nhận mật khẩu mới *"}</label>
                   <div className="relative flex items-center">
                     <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
                     <input 
                       required 
                       type={showConfirmPass ? "text" : "password"} 
-                      placeholder="Nhập lại mật khẩu mới" 
+                      placeholder={isEn ? "Re-enter new password" : "Nhập lại mật khẩu mới"} 
                       className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors font-medium" 
                     />
                     <button
@@ -134,7 +137,7 @@ export function ChangePassword() {
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5 text-xs text-slate-600 mt-1">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <p>
-                    Mật khẩu an toàn giúp bảo vệ thông tin đặt chỗ và lịch sử giao dịch vé điện tử cano của bạn.
+                    {isEn ? "A secure password protects your bookings and digital ticket history." : "Mật khẩu an toàn giúp bảo vệ thông tin đặt chỗ và lịch sử giao dịch vé điện tử cano của bạn."}
                   </p>
                 </div>
                 
@@ -144,13 +147,13 @@ export function ChangePassword() {
                     onClick={() => navigate('/profile')}
                     className="px-5 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-semibold text-xs sm:text-sm hover:bg-slate-200 transition-colors cursor-pointer"
                   >
-                    Hủy bỏ
+                    {isEn ? "Cancel" : "Hủy bỏ"}
                   </button>
                   <button 
                     type="submit" 
                     className="px-6 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer"
                   >
-                    Cập nhật mật khẩu
+                    {isEn ? "Update Password" : "Cập nhật mật khẩu"}
                   </button>
                 </div>
               </form>
@@ -162,20 +165,20 @@ export function ChangePassword() {
             <div className="p-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col gap-3">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
                 <Shield className="w-4 h-4 text-emerald-600" />
-                <span>Tiêu chuẩn bảo mật</span>
+                <span>{isEn ? "Security Standards" : "Tiêu chuẩn bảo mật"}</span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Sau khi đổi mật khẩu thành công, toàn bộ phiên đăng nhập cũ trên các thiết bị khác sẽ được tự động đăng xuất để bảo đảm an toàn.
+                {isEn ? "After successfully changing your password, old active sessions on other devices will be logged out automatically." : "Sau khi đổi mật khẩu thành công, toàn bộ phiên đăng nhập cũ trên các thiết bị khác sẽ được tự động đăng xuất để bảo đảm an toàn."}
               </p>
             </div>
 
             <div className="p-5 bg-white rounded-2xl border border-slate-200/80 shadow-xs flex flex-col gap-3">
               <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
                 <Smartphone className="w-4 h-4 text-sky-600" />
-                <span>Thiết bị đang dùng</span>
+                <span>{isEn ? "Current Device" : "Thiết bị đang dùng"}</span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Trình duyệt web hiện tại trên thiết bị của bạn được xác thực hợp lệ qua giao thức HTTPS.
+                {isEn ? "Your active web browser on this device is securely authenticated via HTTPS." : "Trình duyệt web hiện tại trên thiết bị của bạn được xác thực hợp lệ qua giao thức HTTPS."}
               </p>
             </div>
           </div>

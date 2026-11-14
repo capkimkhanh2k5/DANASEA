@@ -61,4 +61,9 @@ public interface JpaDisputeRepository extends JpaRepository<DisputeJpaEntity, UU
             @Param("reason") DisputeReason reason,
             Pageable pageable
     );
+
+    @Query("SELECT COUNT(d) > 0 FROM DisputeEntity d WHERE d.customerId = :customerId " +
+           "AND d.status IN (com.danasea.backend.modules.dispute.domain.models.DisputeStatus.OPEN, " +
+           "com.danasea.backend.modules.dispute.domain.models.DisputeStatus.UNDER_REVIEW)")
+    boolean hasActiveDisputes(@Param("customerId") UUID customerId);
 }

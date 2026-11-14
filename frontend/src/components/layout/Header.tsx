@@ -5,6 +5,7 @@ import { useCartStore } from "../../store/useCartStore";
 import { useWishlistStore } from "../../store/useWishlistStore";
 import { useLanguageStore } from "../../store/useLanguageStore";
 import { notificationService } from "../../services/notificationService";
+import { localizeNotificationTitle, localizeNotificationBody } from "../../utils/notificationLocalization";
 import {
   Heart,
   ShoppingCart,
@@ -26,6 +27,8 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle2,
+  MessageSquare,
+  Store,
 } from "lucide-react";
 import type { NotificationResponse } from "../../types/notification";
 
@@ -42,6 +45,18 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
   const r = (relatedEntityType || '').toUpperCase();
   const normTitle = normalizeText(title);
   const commonBg = 'bg-white border border-slate-200/90 shadow-2xs';
+
+  // Phản hồi đánh giá -> MessageSquare màu đen nền trắng
+  if (
+    normTitle.includes('danh gia') ||
+    normTitle.includes('phan hoi') ||
+    t.includes('REVIEW')
+  ) {
+    return {
+      icon: <MessageSquare className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
+    };
+  }
 
   // 1. Hoàn tiền / Yêu cầu hoàn tiền / Hủy đơn -> RotateCcw màu đen nền trắng
   if (
@@ -105,7 +120,20 @@ const getNotificationMeta = (type?: string | null, title?: string | null, relate
     };
   }
 
-  // 5. Thanh toán thành công / Đặt vé xác nhận -> CheckCircle2 màu đen nền trắng
+  // 5. Hồ sơ đối tác / Phê duyệt quyền -> Store màu đen nền trắng
+  if (
+    normTitle.includes('doi tac') ||
+    normTitle.includes('phe duyet') ||
+    t.includes('PARTNER') ||
+    r === 'PARTNER_APPLICATION'
+  ) {
+    return {
+      icon: <Store className="w-4 h-4 text-slate-900" />,
+      bg: commonBg,
+    };
+  }
+
+  // 6. Thanh toán thành công / Đặt vé xác nhận -> CheckCircle2 màu đen nền trắng
   if (
     normTitle.includes('thanh toan thanh cong') ||
     normTitle.includes('xac nhan dat ve') ||
@@ -193,6 +221,13 @@ export function Header() {
   const [selectedNotif, setSelectedNotif] = useState<NotificationResponse | null>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
+  // Sync real-time wishlist state when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      useWishlistStore.getState().fetchWishlistFromServer();
+    }
+  }, [isAuthenticated]);
+
   // Close account menu on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -218,57 +253,10 @@ export function Header() {
     setLoadingNotifs(true);
     try {
       const res = await notificationService.getMyNotifications(0, 10);
-      if (res && res.content && res.content.length > 0) {
+      if (res && res.content) {
         setNotifList(res.content);
       } else {
-        // Default system notifications fallback
-        setNotifList([
-          {
-            id: "notif-1",
-            userId: "user-me",
-            title: "Xác nhận đặt vé thành công",
-            body: "Tour lặn ngắm san hô Hòn Sụp của bạn đã được xác nhận. Mã vé điện tử: #DN-8842.",
-            type: "BOOKING_CONFIRMED",
-            status: "DELIVERED",
-            channel: "IN_APP",
-            locale: "vi",
-            isRead: false,
-            readAt: null,
-            relatedEntityType: "BOOKING",
-            relatedEntityId: "DN-8842",
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: "notif-2",
-            userId: "user-me",
-            title: "Cảnh báo luồng gió & an toàn biển",
-            body: "Tầm nhìn tại bãi biển Mỹ Khê hôm nay đạt 8m, sóng êm cấp 1, cờ xanh an toàn cho hoạt động chèo SUP.",
-            type: "WEATHER_SAFETY",
-            status: "DELIVERED",
-            channel: "IN_APP",
-            locale: "vi",
-            isRead: false,
-            readAt: null,
-            relatedEntityType: "WEATHER",
-            relatedEntityId: "MY_KHE",
-            createdAt: new Date(Date.now() - 3600000).toISOString(),
-          },
-          {
-            id: "notif-3",
-            userId: "user-me",
-            title: "Hợp đồng bảo hiểm điện tử Bảo Việt",
-            body: "Bảo hiểm trách nhiệm du lịch biển 100.000.000 ₫ đã được kích hoạt tự động theo hồ sơ du khách.",
-            type: "INSURANCE_ACTIVE",
-            status: "DELIVERED",
-            channel: "IN_APP",
-            locale: "vi",
-            isRead: true,
-            readAt: new Date().toISOString(),
-            relatedEntityType: "INSURANCE",
-            relatedEntityId: "BV-100M",
-            createdAt: new Date(Date.now() - 86400000).toISOString(),
-          },
-        ]);
+        setNotifList([]);
       }
     } catch (err) {
       console.warn('Lỗi nạp thông báo:', err);
@@ -663,7 +651,7 @@ export function Header() {
                         className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1 cursor-pointer"
                       >
                         <CheckCheck className="w-3 h-3 text-slate-500" />
-                        <span>Đã đọc hết</span>
+                        <span>{language === 'en' ? 'Mark all as read' : 'Đã đọc hết'}</span>
                       </button>
                     ) : <div className="w-12" />}
                   </div>
@@ -671,7 +659,7 @@ export function Header() {
                   <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
                     {loadingNotifs ? (
                       <div className="p-8 text-center text-xs text-slate-500">
-                        Đang tải thông báo...
+                        {language === 'en' ? 'Loading notifications...' : 'Đang tải thông báo...'}
                       </div>
                     ) : notifList.length > 0 ? (
                       notifList.map((n) => (
@@ -693,25 +681,25 @@ export function Header() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-1">
                               <p className="text-xs font-bold text-slate-900 truncate">
-                                {n.title}
+                                {localizeNotificationTitle(n.title, language)}
                               </p>
                               {!n.isRead && (
                                 <span className="w-2 h-2 rounded-full bg-sky-600 shrink-0"></span>
                               )}
                             </div>
                             <p className="text-xs text-slate-600 line-clamp-2 mt-0.5 leading-relaxed">
-                              {n.body}
+                              {localizeNotificationBody(n.body, language)}
                             </p>
                             <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1">
                               <Clock className="w-3 h-3 text-slate-400" />
-                              <span>{new Date(n.createdAt).toLocaleDateString('vi-VN')}</span>
+                              <span>{new Date(n.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'vi-VN')}</span>
                             </div>
                           </div>
                         </div>
                       ))
                     ) : (
                       <div className="p-8 text-center text-xs text-slate-500">
-                        Không có thông báo hệ thống nào
+                        {language === 'en' ? 'No system notifications' : 'Không có thông báo hệ thống nào'}
                       </div>
                     )}
                   </div>
@@ -746,33 +734,42 @@ export function Header() {
                       })()}
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-bold text-slate-900 leading-snug">
-                          {selectedNotif.title}
+                          {localizeNotificationTitle(selectedNotif.title, language)}
                         </h4>
                         <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-1">
                           <Clock className="w-3.5 h-3.5" />
-                          <span>{new Date(selectedNotif.createdAt).toLocaleString('vi-VN')}</span>
+                          <span>{new Date(selectedNotif.createdAt).toLocaleString(language === 'en' ? 'en-US' : 'vi-VN')}</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-700 leading-relaxed whitespace-pre-line select-text">
-                      {selectedNotif.body}
+                      {localizeNotificationBody(selectedNotif.body, language)}
                     </div>
 
                     {(selectedNotif.relatedEntityType === 'ORDER' ||
                       selectedNotif.relatedEntityType === 'SUB_ORDER' ||
                       selectedNotif.type?.includes('ORDER') ||
                       selectedNotif.type?.includes('REFUND') ||
-                      selectedNotif.type?.includes('RESCHEDULE')) && (
+                      selectedNotif.type?.includes('RESCHEDULE') ||
+                      selectedNotif.type?.includes('REVIEW')) && (
                       <button
                         type="button"
                         onClick={() => {
                           setShowAccountMenu(false);
                           setAccountMenuView('menu');
-                          const targetUrl =
-                            selectedNotif.relatedEntityType === 'SUB_ORDER' && selectedNotif.relatedEntityId
-                              ? `/profile/orders?rescheduleSubOrderId=${selectedNotif.relatedEntityId}`
-                              : '/profile/orders';
+                          let targetUrl: string;
+                          if (selectedNotif.relatedEntityType === 'SUB_ORDER' && selectedNotif.relatedEntityId) {
+                            targetUrl = `/profile/orders?subOrderId=${selectedNotif.relatedEntityId}`;
+                            if (selectedNotif.type?.includes('RESCHEDULE')) {
+                              targetUrl += `&rescheduleSubOrderId=${selectedNotif.relatedEntityId}`;
+                            }
+                          } else if (selectedNotif.relatedEntityType === 'ORDER' && selectedNotif.relatedEntityId) {
+                            targetUrl = `/profile/orders?orderId=${selectedNotif.relatedEntityId}`;
+                          } else {
+                            targetUrl = '/profile/orders?tab=all';
+                          }
+                          targetUrl += `${targetUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
                           navigate(targetUrl);
                         }}
                         className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"

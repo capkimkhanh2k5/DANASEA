@@ -6,13 +6,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
-import com.danasea.backend.modules.account.application.api.AccountInternalApi;
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.admin.presentation.dtos.AdminVendorResponse;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import com.danasea.backend.modules.vendor.domain.models.VerificationStatus;
-import com.danasea.backend.modules.account.domain.models.Role;
-import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.vendor.domain.exceptions.VendorNotFoundException;
 import com.danasea.backend.modules.vendor.domain.models.DocType;
 import com.danasea.backend.modules.admin.domain.exceptions.VendorDocumentsIncompleteException;
@@ -26,7 +23,6 @@ import lombok.RequiredArgsConstructor;
 public class ApproveVendorUseCase {
 
     private final VendorInternalApi vendorInternalApi;
-    private final AccountInternalApi accountInternalApi;
     private final AuditLogInternalApi auditLogInternalApi;
 
     @Transactional
@@ -51,15 +47,6 @@ public class ApproveVendorUseCase {
         vendor.setVerifiedAt(OffsetDateTime.now());
 
         Vendor savedVendor = vendorInternalApi.saveVendor(vendor);
-
-        User user = accountInternalApi.findUserById(savedVendor.getUserId())
-                .orElseThrow(() -> new IllegalArgumentException("User not found with id: " + savedVendor.getUserId()));
-
-        user.setRole(Role.VENDOR);
-        accountInternalApi.saveUser(user);
-
-        // Revoke all refresh tokens for the user to force them to login again with new role
-        accountInternalApi.revokeAllRefreshTokensByUserId(savedVendor.getUserId());
 
         // Log audit
         auditLogInternalApi.recordAuditLog(

@@ -40,11 +40,14 @@ const VendorDisputes = lazy(() => import("./pages/vendor/Disputes/Disputes").the
 const VendorDisputeDetail = lazy(() => import("./pages/vendor/Disputes/DisputeDetail").then((m) => ({ default: m.DisputeDetail })));
 const VendorProfile = lazy(() => import("./pages/vendor/Profile/Profile").then((m) => ({ default: m.Profile })));
 const VendorMessages = lazy(() => import("./pages/vendor/Messages/VendorMessages").then((m) => ({ default: m.VendorMessages })));
+const VendorCopilotPage = lazy(() => import("./pages/vendor/Copilot/VendorCopilotPage").then((m) => ({ default: m.VendorCopilotPage })));
 
 // Admin Phase 5
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard/AdminDashboard").then((m) => ({ default: m.AdminDashboard })));
+const AdminCopilot = lazy(() => import("./pages/admin/Copilot/AdminCopilot").then((m) => ({ default: m.AdminCopilot })));
 const Users = lazy(() => import("./pages/admin/Users/Users").then((m) => ({ default: m.Users })));
 const VendorApproval = lazy(() => import("./pages/admin/VendorApproval/VendorApproval").then((m) => ({ default: m.VendorApproval })));
+const RoleApplications = lazy(() => import("./pages/admin/RoleApplications/RoleApplications").then((m) => ({ default: m.RoleApplications })));
 const Categories = lazy(() => import("./pages/admin/Categories/Categories").then((m) => ({ default: m.Categories })));
 const ServiceApproval = lazy(() => import("./pages/admin/ServiceApproval/ServiceApproval").then((m) => ({ default: m.ServiceApproval })));
 const AdminOrders = lazy(() => import("./pages/admin/Orders/AdminOrders").then((m) => ({ default: m.AdminOrders })));
@@ -62,35 +65,36 @@ function App() {
 
       <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
         <Routes>
-        {/* KHÁCH HÀNG */}
-        <Route path="/" element={<CustomerLayout />}>
-          <Route index element={<Home />} />
-          <Route path="auth" element={<Auth />} />
-          <Route path="auth/forgot-password" element={<ForgotPassword />} />
-          <Route path="explore" element={<Explore />} />
-          <Route path="search" element={<Search />} />
-          <Route path="tour/:id" element={<ExperienceDetail />} />
-          <Route path="tours/:id" element={<ExperienceDetail />} />
-          <Route path="experience/:id" element={<ExperienceDetail />} />
-          
-          {/* Phase 3 */}
-          <Route path="cart" element={<Cart />} />
-          <Route path="checkout" element={<Checkout />} />
-          <Route path="checkout/result" element={<PaymentResult />} />
-          <Route path="payment/vnpay-return" element={<PaymentResult />} />
-          <Route path="payment/success" element={<PaymentResult />} />
-          <Route path="payment/cancel" element={<PaymentResult cancelled />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="profile/orders" element={<Orders />} />
-          <Route path="profile/ai-assistant" element={<Navigate to="/profile" replace />} />
-          <Route path="profile/change-password" element={<ChangePassword />} />
-          <Route path="profile/wishlist" element={<Wishlist />} />
-          <Route path="inbox" element={<Inbox />} />
-        </Route>
+          {/* KHÁCH HÀNG */}
+          <Route path="/" element={<CustomerLayout />}>
+            <Route index element={<Home />} />
+            <Route path="auth" element={<Auth />} />
+            <Route path="auth/forgot-password" element={<ForgotPassword />} />
+            <Route path="explore" element={<Explore />} />
+            <Route path="search" element={<Search />} />
+            <Route path="tour/:id" element={<ExperienceDetail />} />
+            <Route path="tours/:id" element={<ExperienceDetail />} />
+            <Route path="experience/:id" element={<ExperienceDetail />} />
+
+            {/* Phase 3 */}
+            <Route path="cart" element={<Cart />} />
+            <Route path="checkout" element={<Checkout />} />
+            <Route path="checkout/result" element={<PaymentResult />} />
+            <Route path="payment/vnpay-return" element={<PaymentResult />} />
+            <Route path="payment/success" element={<PaymentResult />} />
+            <Route path="payment/cancel" element={<PaymentResult cancelled />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="profile/orders" element={<Orders />} />
+            <Route path="profile/ai-assistant" element={<Navigate to="/profile" replace />} />
+            <Route path="profile/change-password" element={<ChangePassword />} />
+            <Route path="profile/wishlist" element={<Wishlist />} />
+            <Route path="inbox" element={<Inbox />} />
+          </Route>
 
         {/* NHÀ CUNG CẤP */}
         <Route path="/vendor" element={<VendorLayout />}>
           <Route index element={<VendorDashboard />} />
+          <Route path="copilot" element={<VendorCopilotPage />} />
           <Route path="analytics" element={<AnalyticsDashboard />} />
           <Route path="profile" element={<VendorProfile />} />
           <Route path="services" element={<Services />} />
@@ -109,19 +113,21 @@ function App() {
           <Route path="disputes/:id" element={<VendorDisputeDetail />} />
         </Route>
 
-        {/* QUẢN TRỊ VIÊN */}
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="users" element={<Users />} />
-          <Route path="vendor-approval" element={<VendorApproval />} />
-          <Route path="categories" element={<Categories />} />
-          <Route path="service-approval" element={<ServiceApproval />} />
-          <Route path="orders" element={<AdminOrders />} />
-          <Route path="promotions" element={<AdminPromotions />} />
-          <Route path="payouts" element={<AdminPayouts />} />
-          <Route path="disputes" element={<Disputes />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="logs" element={<Logs />} />
+          {/* QUẢN TRỊ VIÊN */}
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="copilot" element={<AdminCopilot />} />
+            <Route path="users" element={<Users />} />
+            <Route path="role-applications" element={<RoleApplications />} />
+            <Route path="vendor-approval" element={<VendorApproval />} />
+            <Route path="categories" element={<Categories />} />
+            <Route path="service-approval" element={<ServiceApproval />} />
+            <Route path="orders" element={<AdminOrders />} />
+            <Route path="promotions" element={<AdminPromotions />} />
+            <Route path="payouts" element={<AdminPayouts />} />
+            <Route path="disputes" element={<Disputes />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="logs" element={<Logs />} />
           </Route>
         </Routes>
       </Suspense>

@@ -197,8 +197,22 @@ export function Auth() {
           ? 'Nguyễn Hoàng Long'
           : trimmedEmail === 'customer_2@danasea.test'
           ? 'Trần Thị Mai Anh'
+          : trimmedEmail === 'customer_clean@danasea.test'
+          ? 'Hoàng Trọng Nghĩa'
+          : trimmedEmail === 'customer_13@danasea.test'
+          ? 'Bùi Khánh Linh'
           : trimmedEmail === 'admin_demo@danasea.test'
           ? 'Quản trị viên Hệ thống DANASEA'
+          : trimmedEmail === 'vender_2@danasea.test'
+          ? 'Công ty TNHH Kajin Vina'
+          : trimmedEmail === 'vender_1@danasea.test'
+          ? 'Danabeach Club'
+          : trimmedEmail === 'vender_3@danasea.test'
+          ? 'Da Nang Outdoor Adventures'
+          : trimmedEmail === 'vender_4@danasea.test'
+          ? 'Loca Travel Đà Nẵng'
+          : trimmedEmail === 'vender_5@danasea.test'
+          ? 'Công ty Cổ phần D BLUE'
           : trimmedEmail.split('@')[0],
         avatarUrl: avatarUrl,
         isEmailVerified: true,

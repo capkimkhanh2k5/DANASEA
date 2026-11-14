@@ -20,10 +20,13 @@ import {
   Pin,
   CheckCheck,
   LifeBuoy,
-  Star
+  Star,
+  Bot
 } from "lucide-react";
 import { AtlasAvatar } from "../components/vendor/atlas/AtlasDesignSystem";
 import { toast } from "../store/useToastStore";
+import { useVendorCopilotStore } from "../store/useVendorCopilotStore";
+import { VendorCopilotDrawer } from "../components/vendor/copilot/VendorCopilotDrawer";
 
 interface NavItem {
   to: string;
@@ -42,6 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupTitle: "VẬN HÀNH & ĐIỀU PHỐI",
     items: [
       { to: "/vendor", label: "Tổng quan", icon: LayoutDashboard, exact: true },
+      { to: "/vendor/copilot", label: "Trợ lý Copilot", icon: Bot },
       { to: "/vendor/analytics", label: "Phân tích kinh doanh", icon: TrendingUp },
       { to: "/vendor/orders", label: "Đơn đặt chỗ & Vé", icon: Ticket },
       { to: "/vendor/messages", label: "Tin nhắn khách hàng", icon: MessageSquare },
@@ -69,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
 
 const VENDOR_PAGE_ORDER: Record<string, number> = {
   "/vendor": 0,
+  "/vendor/copilot": 0.5,
   "/vendor/analytics": 1,
   "/vendor/orders": 2,
   "/vendor/messages": 2.5,
@@ -84,16 +89,51 @@ const VENDOR_PAGE_ORDER: Record<string, number> = {
   "/vendor/profile": 11,
 };
 
+const VENDOR_BRAND_MAP: Record<string, string> = {
+  "vender_1@danasea.test": "Danabeach Club",
+  "vender_2@danasea.test": "Công ty TNHH Kajin Vina",
+  "vender_3@danasea.test": "Da Nang Outdoor Adventures",
+  "vender_4@danasea.test": "Loca Travel Đà Nẵng",
+  "vender_5@danasea.test": "Công ty Cổ phần D BLUE",
+  "vender_6@danasea.test": "Khuê Nguyễn – Dịch Vụ Câu Mực",
+  "vender_7@danasea.test": "DaNaFi – Tour Câu Cá",
+  "vender_8@danasea.test": "Go N Chill SUP Club",
+  "vender_9@danasea.test": "Surf Shack Da Nang",
+  "vender_10@danasea.test": "Mỹ Khê Jet Sports",
+  "vender_1": "Danabeach Club",
+  "vender_2": "Công ty TNHH Kajin Vina",
+  "vender_3": "Da Nang Outdoor Adventures",
+  "vender_4": "Loca Travel Đà Nẵng",
+  "vender_5": "Công ty Cổ phần D BLUE",
+  "vender_6": "Khuê Nguyễn – Dịch Vụ Câu Mực",
+  "vender_7": "DaNaFi – Tour Câu Cá",
+  "vender_8": "Go N Chill SUP Club",
+  "vender_9": "Surf Shack Da Nang",
+};
+
 export function VendorLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, accessToken } = useAuthStore();
+  const isCopilotOpen = useVendorCopilotStore((s) => s.isOpen);
+  const toggleCopilot = useVendorCopilotStore((s) => s.toggleCopilot);
+
+  const vendorDisplayName = 
+    (user?.email && VENDOR_BRAND_MAP[user.email]) ||
+    (user?.fullName && VENDOR_BRAND_MAP[user.fullName]) ||
+    user?.fullName ||
+    "Công ty TNHH Kajin Vina";
 
   useEffect(() => {
     if (!accessToken || !isAuthenticated) {
       navigate("/auth", { replace: true });
+      return;
     }
-  }, [accessToken, isAuthenticated, navigate]);
+    if (user && user.role !== "VENDOR" && user.role !== "ADMIN") {
+      toast.warning("Tài khoản chưa được kích hoạt quyền Đối tác vận hành.");
+      navigate("/profile", { replace: true });
+    }
+  }, [accessToken, isAuthenticated, user, navigate]);
 
   const [prevPath, setPrevPath] = useState(location.pathname);
   const [animationClass, setAnimationClass] = useState("animate-fade-in-up");
@@ -428,18 +468,18 @@ export function VendorLayout() {
           {/* Account Profile Card */}
           <div
             onClick={() => navigate("/vendor/profile")}
-            title={!isExpanded ? user?.fullName || "Hồ sơ đối tác" : undefined}
+            title={!isExpanded ? vendorDisplayName : undefined}
             className={`group flex items-center h-12 rounded-xl transition-all duration-150 cursor-pointer ${
               isExpanded 
                 ? "px-2.5 w-full bg-slate-50 hover:bg-slate-100/90 border border-slate-200/60" 
                 : "w-10 justify-center mx-auto"
             }`}
           >
-            <AtlasAvatar name={user?.fullName || "Danabeach"} size="sm" />
+            <AtlasAvatar name={vendorDisplayName} size="sm" />
             {isExpanded && (
               <div className="flex flex-col min-w-0 ml-2.5 text-left flex-1">
                 <span className="text-xs font-bold text-slate-900 truncate leading-tight">
-                  {user?.fullName || "Danabeach Club"}
+                  {vendorDisplayName}
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
                   Đối tác vận hành
@@ -485,6 +525,36 @@ export function VendorLayout() {
           </div>
         </main>
       </div>
+
+      {/* Floating Copilot Trigger Button (Styled identically to Customer deck) */}
+      {location.pathname !== "/vendor/copilot" && (
+        <aside
+          aria-label="Menu Trợ lý Copilot"
+          className="fixed bottom-6 right-6 z-40 flex flex-col items-center select-none print:hidden"
+        >
+          <div className="relative group/btn flex items-center">
+            <span className="absolute right-full mr-2.5 px-2.5 py-1 rounded-lg bg-slate-900/90 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none shadow-md">
+              DANASEA Copilot
+            </span>
+            <button
+              type="button"
+              onClick={toggleCopilot}
+              aria-label="Trợ lý kinh doanh DANASEA Copilot"
+              className={`relative w-11 h-11 rounded-2xl flex items-center justify-center border shadow-md transition-all cursor-pointer ${
+                isCopilotOpen
+                  ? "bg-slate-900 text-white border-slate-900 shadow-slate-900/20"
+                  : "bg-white text-slate-900 border-slate-200/90 hover:border-slate-400 hover:shadow-lg"
+              }`}
+            >
+              <Bot className="w-5 h-5 text-current transition-transform group-hover/btn:scale-110" />
+            </button>
+          </div>
+        </aside>
+      )}
+
+      {/* Vendor Copilot Slide-over Drawer */}
+      <VendorCopilotDrawer />
+
 
       {/* Notification Detail Modal (Portaled directly to document.body) */}
       {selectedNoti && createPortal(

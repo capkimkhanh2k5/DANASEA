@@ -39,6 +39,9 @@ public interface JpaRefundRepository extends JpaRepository<RefundJpaEntity, UUID
     List<RefundJpaEntity> findBySubOrderIdInAndStatus(
             Collection<UUID> subOrderIds, RefundStatus status);
 
+    boolean existsBySubOrderId(UUID subOrderId);
+    boolean existsBySubOrderIdAndStatusIn(UUID subOrderId, Collection<RefundStatus> statuses);
+
     @Query("""
             SELECT r FROM RefundJpaEntity r
             WHERE r.status = :status AND r.retryCount < :maxRetryCount
@@ -77,5 +80,12 @@ public interface JpaRefundRepository extends JpaRepository<RefundJpaEntity, UUID
             Pageable pageable) {
         return findAll(AdminTransactionSpecifications.refunds(status, reason, subOrderId, provider, vendorId, customerId, orderId, fromDate, toDate), pageable);
     }
-}
 
+    @Query("SELECT COUNT(r) > 0 FROM RefundJpaEntity r WHERE " +
+           "(r.requestedBy = :customerId OR r.subOrderId IN " +
+           "(SELECT s.id FROM SubOrderJpaEntity s WHERE s.masterOrderId IN " +
+           "(SELECT o.id FROM MasterOrderJpaEntity o WHERE o.customerId = :customerId))) " +
+           "AND r.status IN (com.danasea.backend.modules.order.domain.models.RefundStatus.PENDING, " +
+           "com.danasea.backend.modules.order.domain.models.RefundStatus.FAILED)")
+    boolean hasUnresolvedRefunds(@Param("customerId") UUID customerId);
+}

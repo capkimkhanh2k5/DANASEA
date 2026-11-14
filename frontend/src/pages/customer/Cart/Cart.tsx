@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { BookingStepper } from "../../../components/customer/BookingStepper";
 import { useCartStore } from "../../../store/useCartStore";
+import { useLanguageStore } from "../../../store/useLanguageStore";
 import {
   ShoppingCart,
   Trash2,
@@ -15,6 +16,8 @@ import {
 
 export function Cart() {
   const navigate = useNavigate();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
   const { items, removeItem, updateQuantity, getTotalPrice } = useCartStore();
 
   const handleCheckout = () => {
@@ -38,10 +41,10 @@ export function Cart() {
             <div className="lg:col-span-8 flex flex-col gap-6">
               <div className="border-b border-slate-200/80 pb-4">
                 <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight">
-                  Giỏ hàng của bạn
+                  {isEn ? "Your Cart" : "Giỏ hàng của bạn"}
                 </h1>
                 <p className="text-sm text-slate-600 mt-1">
-                  {items.length} trải nghiệm đã sẵn sàng để giữ chỗ
+                  {items.length} {isEn ? "experiences ready to reserve" : "trải nghiệm đã sẵn sàng để giữ chỗ"}
                 </p>
               </div>
 
@@ -50,26 +53,30 @@ export function Cart() {
                   <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 flex items-center justify-center mb-4">
                     <ShoppingCart className="w-6 h-6" />
                   </div>
-                  <h2 className="text-lg font-bold text-slate-900 mb-1">Giỏ hàng của bạn đang trống</h2>
+                  <h2 className="text-lg font-bold text-slate-900 mb-1">
+                    {isEn ? "Your cart is empty" : "Giỏ hàng của bạn đang trống"}
+                  </h2>
                   <p className="text-slate-600 text-sm max-w-md mb-6 leading-relaxed">
-                    Khám phá các tour cano lặn biển, chèo SUP bình minh hoặc dù bay tại Đà Nẵng để thêm vào giỏ hàng.
+                    {isEn
+                      ? "Explore sunrise paddleboarding, coral scuba diving, or parasailing in Da Nang to add to your cart."
+                      : "Khám phá các tour cano lặn biển, chèo SUP bình minh hoặc dù bay tại Đà Nẵng để thêm vào giỏ hàng."}
                   </p>
                   <Link 
                     to="/" 
                     className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-medium text-sm shadow-xs transition-colors inline-flex items-center gap-2"
                   >
-                    <span>Khám phá trải nghiệm</span>
+                    <span>{isEn ? "Explore Experiences" : "Khám phá trải nghiệm"}</span>
                     <ArrowRight className="w-4 h-4" />
                   </Link>
                 </div>
               ) : (
                 items.map((item) => {
-                  const title = item.serviceName || 'Trải nghiệm biển Đà Nẵng';
+                  const title = (isEn && item.serviceNameEn) ? item.serviceNameEn : (item.serviceName || (isEn ? 'Da Nang Ocean Experience' : 'Trải nghiệm biển Đà Nẵng'));
                   const image = item.thumbnailUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800';
                   const location = item.locationName || 'Đà Nẵng';
                   const vendor = item.vendorName || 'DANASEA Official Partner';
-                  const dateStr = item.selectedDate || item.date || 'Hôm nay';
-                  const timeStr = item.timeSlot || 'Khung giờ linh hoạt';
+                  const dateStr = item.selectedDate || item.date || (isEn ? 'Today' : 'Hôm nay');
+                  const timeStr = item.timeSlot || (isEn ? 'Flexible slot' : 'Khung giờ linh hoạt');
 
                   return (
                     <article 
@@ -91,8 +98,8 @@ export function Cart() {
                             </div>
                             <button 
                               onClick={() => removeItem(item.id)} 
-                              aria-label="Xoá mục trải nghiệm" 
-                              title="Xoá khỏi giỏ"
+                              aria-label={isEn ? "Remove item" : "Xoá mục trải nghiệm"} 
+                              title={isEn ? "Remove from cart" : "Xoá khỏi giỏ"}
                               className="text-slate-400 hover:text-rose-600 transition-colors p-1 cursor-pointer" 
                               type="button"
                             >
@@ -143,7 +150,7 @@ export function Cart() {
                               to={`/tour/${item.serviceId}?editCartItemId=${item.id}`} 
                               className="text-xs text-slate-600 hover:text-slate-900 hover:underline font-medium"
                             >
-                              Xem lại chi tiết
+                              {isEn ? "View details" : "Xem lại chi tiết"}
                             </Link>
                           </div>
 
@@ -162,8 +169,12 @@ export function Cart() {
               {/* Cross-sell Addons Section */}
               <div className="mt-4 flex flex-col gap-3">
                 <div className="flex items-baseline justify-between">
-                  <h3 className="text-sm font-bold text-slate-900">Tiện ích biển đề xuất</h3>
-                  <span className="text-xs text-slate-500 font-medium">Bổ sung vào chuyến đi</span>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    {isEn ? "Recommended Marine Add-ons" : "Tiện ích biển đề xuất"}
+                  </h3>
+                  <span className="text-xs text-slate-500 font-medium">
+                    {isEn ? "Enhance your trip" : "Bổ sung vào chuyến đi"}
+                  </span>
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -177,13 +188,19 @@ export function Cart() {
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5">
                       <div>
-                        <h4 className="text-xs font-bold text-slate-900 truncate">Máy quay GoPro Hero 11</h4>
-                        <p className="text-[11px] text-slate-500">Kèm phao nổi &amp; thẻ nhớ 64GB</p>
+                        <h4 className="text-xs font-bold text-slate-900 truncate">
+                          {isEn ? "GoPro Hero 11 Camera" : "Máy quay GoPro Hero 11"}
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          {isEn ? "Includes floating grip & 64GB card" : "Kèm phao nổi & thẻ nhớ 64GB"}
+                        </p>
                       </div>
                       <div className="flex items-center justify-between gap-2 pt-1">
-                        <span className="text-xs font-bold text-slate-900">150.000₫/ngày</span>
+                        <span className="text-xs font-bold text-slate-900">
+                          {isEn ? "150,000₫/day" : "150.000₫/ngày"}
+                        </span>
                         <button className="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-xs hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer" type="button">
-                          <Plus className="w-3 h-3" /> Thêm
+                          <Plus className="w-3 h-3" /> {isEn ? "Add" : "Thêm"}
                         </button>
                       </div>
                     </div>
@@ -199,13 +216,19 @@ export function Cart() {
                     </div>
                     <div className="flex-1 min-w-0 flex flex-col justify-between h-full py-0.5">
                       <div>
-                        <h4 className="text-xs font-bold text-slate-900 truncate">Xe đón khách sạn ra bến</h4>
-                        <p className="text-[11px] text-slate-500">Đón trả tận nơi tại Sơn Trà</p>
+                        <h4 className="text-xs font-bold text-slate-900 truncate">
+                          {isEn ? "Hotel to Pier Shuttle Bus" : "Xe đón khách sạn ra bến"}
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          {isEn ? "Pick-up in Son Tra district" : "Đón trả tận nơi tại Sơn Trà"}
+                        </p>
                       </div>
                       <div className="flex items-center justify-between gap-2 pt-1">
-                        <span className="text-xs font-bold text-slate-900">80.000₫/lượt</span>
+                        <span className="text-xs font-bold text-slate-900">
+                          {isEn ? "80,000₫/trip" : "80.000₫/lượt"}
+                        </span>
                         <button className="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-xs hover:bg-slate-800 transition-colors flex items-center gap-1 cursor-pointer" type="button">
-                          <Plus className="w-3 h-3" /> Thêm
+                          <Plus className="w-3 h-3" /> {isEn ? "Add" : "Thêm"}
                         </button>
                       </div>
                     </div>
@@ -218,26 +241,32 @@ export function Cart() {
             <aside className="lg:col-span-4 flex flex-col gap-4 lg:sticky lg:top-24">
               <div className="p-6 rounded-2xl bg-white shadow-xs border border-slate-200/80 flex flex-col gap-4">
                 <h2 className="text-lg font-bold text-slate-900 pb-3 border-b border-slate-100">
-                  Tóm tắt đơn hàng
+                  {isEn ? "Order Summary" : "Tóm tắt đơn hàng"}
                 </h2>
                 
                 <div className="flex flex-col gap-2.5 text-sm text-slate-600">
                   <div className="flex items-center justify-between">
-                    <span>Tạm tính ({items.length} trải nghiệm)</span>
+                    <span>
+                      {isEn ? `Subtotal (${items.length} items)` : `Tạm tính (${items.length} trải nghiệm)`}
+                    </span>
                     <span className="font-semibold text-slate-900 tabular-nums">
                       {getTotalPrice().toLocaleString('vi-VN')}₫
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-emerald-700 font-medium">
-                    <span>Phí dịch vụ DANASEA</span>
-                    <span>Miễn phí</span>
+                    <span>{isEn ? "DANASEA Service Fee" : "Phí dịch vụ DANASEA"}</span>
+                    <span>{isEn ? "Free" : "Miễn phí"}</span>
                   </div>
                 </div>
                 
                 <div className="pt-4 flex items-end justify-between gap-2 border-t border-slate-100">
                   <div>
-                    <p className="text-xs text-slate-700 font-semibold">Tổng thanh toán</p>
-                    <p className="text-xs text-slate-500">Đã gồm thuế &amp; bảo hiểm biển</p>
+                    <p className="text-xs text-slate-700 font-semibold">
+                      {isEn ? "Total Amount" : "Tổng thanh toán"}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {isEn ? "Taxes & marine insurance included" : "Đã gồm thuế & bảo hiểm biển"}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="text-2xl text-slate-900 font-extrabold tabular-nums leading-none">
@@ -250,9 +279,13 @@ export function Cart() {
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5 mt-1">
                   <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                   <div className="flex-1 text-xs">
-                    <p className="font-bold text-slate-900">Bảo vệ đặt chỗ 100%</p>
+                    <p className="font-bold text-slate-900">
+                      {isEn ? "100% Booking Protection" : "Bảo vệ đặt chỗ 100%"}
+                    </p>
                     <p className="text-slate-600 mt-0.5 leading-relaxed">
-                      Cam kết hoàn tiền 100% khi thời tiết biển không đảm bảo an toàn.
+                      {isEn
+                        ? "100% refund guarantee when ocean conditions are unsafe for activities."
+                        : "Cam kết hoàn tiền 100% khi thời tiết biển không đảm bảo an toàn."}
                     </p>
                   </div>
                 </div>
@@ -268,7 +301,7 @@ export function Cart() {
                   }`} 
                   type="button"
                 >
-                  Tiến hành thanh toán
+                  {isEn ? "Proceed to Checkout" : "Tiến hành thanh toán"}
                 </button>
               </div>
             </aside>
