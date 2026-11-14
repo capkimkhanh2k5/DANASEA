@@ -4,11 +4,17 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.UUID;
 
+import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -33,22 +39,35 @@ import com.danasea.backend.security.infrastructure.SecurityUtils;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminSystemConfigController {
 
+    private static final Logger log = LoggerFactory.getLogger(AdminSystemConfigController.class);
+
     private final JpaSystemConfigRepository repository;
     private final JpaCommissionRuleRepository commissionRuleRepository;
     private final JpaCategoryRepository categoryRepository;
+    private final AuditLogInternalApi auditLogInternalApi;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     public AdminSystemConfigController(
             JpaSystemConfigRepository repository,
             @Autowired(required = false) JpaCommissionRuleRepository commissionRuleRepository,
-            @Autowired(required = false) JpaCategoryRepository categoryRepository) {
+            @Autowired(required = false) JpaCategoryRepository categoryRepository,
+            @Autowired(required = false) AuditLogInternalApi auditLogInternalApi) {
         this.repository = repository;
         this.commissionRuleRepository = commissionRuleRepository;
         this.categoryRepository = categoryRepository;
+        this.auditLogInternalApi = auditLogInternalApi;
+    }
+
+    public AdminSystemConfigController(
+            JpaSystemConfigRepository repository,
+            JpaCommissionRuleRepository commissionRuleRepository,
+            JpaCategoryRepository categoryRepository) {
+        this(repository, commissionRuleRepository, categoryRepository, null);
     }
 
     public AdminSystemConfigController(JpaSystemConfigRepository repository) {
-        this(repository, null, null);
+        this(repository, null, null, null);
     }
 
     public record ConfigDto(String key, String value, String description, OffsetDateTime updatedAt, UUID updatedBy) {
@@ -146,13 +165,15 @@ public class AdminSystemConfigController {
             validateMoney(request.value());
         }
 
-        SystemConfigJpaEntity entity = repository.findByKey(key)
-                .orElseGet(() -> {
-                    SystemConfigJpaEntity newEntity = new SystemConfigJpaEntity();
-                    newEntity.setId(UUID.randomUUID());
-                    newEntity.setKey(key);
-                    return newEntity;
-                });
+        Optional<SystemConfigJpaEntity> existingOpt = repository.findByKey(key);
+        String previousValue = existingOpt.map(SystemConfigJpaEntity::getValue).orElse(null);
+
+        SystemConfigJpaEntity entity = existingOpt.orElseGet(() -> {
+            SystemConfigJpaEntity newEntity = new SystemConfigJpaEntity();
+            newEntity.setId(UUID.randomUUID());
+            newEntity.setKey(key);
+            return newEntity;
+        });
 
         entity.setValue(request.value() != null ? request.value().trim() : null);
         if (request.description() != null) {
@@ -161,6 +182,18 @@ public class AdminSystemConfigController {
         entity.setUpdatedBy(actorId);
 
         SystemConfigJpaEntity saved = repository.save(entity);
+
+        if (auditLogInternalApi != null) {
+            String metadata = buildSystemConfigAuditMetadata(key, previousValue, saved.getValue(), saved.getDescription(), actorId);
+            auditLogInternalApi.recordTransactionalAuditLog(
+                    actorId,
+                    "SYSTEM_CONFIG_UPDATED",
+                    "SYSTEM_CONFIG",
+                    saved.getId(),
+                    metadata
+            );
+        }
+
         return ResponseEntity.ok(ConfigDto.fromEntity(saved));
     }
 
@@ -192,6 +225,13 @@ public class AdminSystemConfigController {
         CommissionRuleJpaEntity entity = commissionRuleRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Commission rule not found with ID: " + id));
 
+        BigDecimal previousRate = entity.getCommissionRate();
+        BigDecimal previousRatePercent = previousRate != null
+                ? previousRate.multiply(new BigDecimal("100")).stripTrailingZeros()
+                : null;
+        Integer previousDurationDays = entity.getDurationDays();
+        Boolean previousIsActive = entity.getIsActive();
+
         if (request.commissionRatePercent() != null) {
             BigDecimal percent = request.commissionRatePercent();
             if (percent.compareTo(BigDecimal.ZERO) < 0 || percent.compareTo(new BigDecimal("100")) > 0) {
@@ -218,6 +258,27 @@ public class AdminSystemConfigController {
         entity.setUpdatedBy(actorId);
         CommissionRuleJpaEntity saved = commissionRuleRepository.save(entity);
 
+        if (auditLogInternalApi != null) {
+            BigDecimal newRatePercent = saved.getCommissionRate() != null
+                    ? saved.getCommissionRate().multiply(new BigDecimal("100")).stripTrailingZeros()
+                    : null;
+            String metadata = buildCommissionRuleAuditMetadata(
+                    saved,
+                    previousRatePercent,
+                    newRatePercent,
+                    previousDurationDays,
+                    previousIsActive,
+                    actorId
+            );
+            auditLogInternalApi.recordTransactionalAuditLog(
+                    actorId,
+                    "COMMISSION_RULE_UPDATED",
+                    "COMMISSION_RULE",
+                    saved.getId(),
+                    metadata
+            );
+        }
+
         Map<UUID, String> categoryNames = new HashMap<>();
         Map<UUID, String> categorySlugs = new HashMap<>();
         if (categoryRepository != null && saved.getCategoryId() != null) {
@@ -228,6 +289,77 @@ public class AdminSystemConfigController {
         }
 
         return ResponseEntity.ok(CommissionRuleDto.fromEntity(saved, categoryNames, categorySlugs));
+    }
+
+    private String buildSystemConfigAuditMetadata(
+            String key,
+            String previousValue,
+            String newValue,
+            String description,
+            UUID actorId) {
+        try {
+            boolean isSensitive = key != null && (
+                    key.toUpperCase().contains("SECRET") ||
+                    key.toUpperCase().contains("PASSWORD") ||
+                    key.toUpperCase().contains("TOKEN") ||
+                    key.toUpperCase().contains("KEY") ||
+                    key.toUpperCase().contains("PRIVATE")
+            );
+            Map<String, Object> meta = new LinkedHashMap<>();
+            meta.put("key", key);
+            meta.put("previousValue", isSensitive && previousValue != null ? "***" : previousValue);
+            meta.put("newValue", isSensitive && newValue != null ? "***" : newValue);
+            if (description != null && !description.isBlank()) {
+                meta.put("description", description.trim());
+            }
+            meta.put("updatedBy", actorId.toString());
+            return objectMapper.writeValueAsString(meta);
+        } catch (Exception ex) {
+            log.warn("Could not serialize system config audit metadata as JSON: {}", ex.getMessage());
+            return String.format("key=%s,updatedBy=%s", key, actorId);
+        }
+    }
+
+    private String buildCommissionRuleAuditMetadata(
+            CommissionRuleJpaEntity rule,
+            BigDecimal previousRatePercent,
+            BigDecimal newRatePercent,
+            Integer previousDurationDays,
+            Boolean previousIsActive,
+            UUID actorId) {
+        try {
+            Map<String, Object> meta = new LinkedHashMap<>();
+            meta.put("ruleId", rule.getId().toString());
+            meta.put("ruleCode", rule.getRuleCode());
+            meta.put("ruleName", rule.getRuleName());
+            meta.put("targetType", rule.getTargetType());
+            if (previousRatePercent != null) {
+                meta.put("previousRate", previousRatePercent);
+            }
+            if (newRatePercent != null) {
+                meta.put("newRate", newRatePercent);
+            }
+            if (previousIsActive != null) {
+                meta.put("previousActive", previousIsActive);
+            }
+            if (rule.getIsActive() != null) {
+                meta.put("isActive", rule.getIsActive());
+            }
+            if (previousDurationDays != null) {
+                meta.put("previousDurationDays", previousDurationDays);
+            }
+            if (rule.getDurationDays() != null) {
+                meta.put("durationDays", rule.getDurationDays());
+            }
+            if (rule.getDescription() != null && !rule.getDescription().isBlank()) {
+                meta.put("description", rule.getDescription().trim());
+            }
+            meta.put("updatedBy", actorId.toString());
+            return objectMapper.writeValueAsString(meta);
+        } catch (Exception ex) {
+            log.warn("Could not serialize commission rule audit metadata as JSON: {}", ex.getMessage());
+            return String.format("ruleId=%s,ruleCode=%s,updatedBy=%s", rule.getId(), rule.getRuleCode(), actorId);
+        }
     }
 
     private void validateCommissionRate(String val) {
