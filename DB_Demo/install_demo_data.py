@@ -261,8 +261,9 @@ def validate_transactions(base, trans):
     for o in trans['master_orders']:
         b = indexes['bookings'][o['booking_id']]
         subs = [s for s in trans['sub_orders'] if s['master_order_id'] == o['id']]
-        require(o['customer_id'] == b['customer_id'] and Decimal(o['total_amount']) == Decimal(b['total_amount']) and
-                Decimal(o['total_amount']) - Decimal(o['discount_amount']) == sum(Decimal(s['final_amount']) for s in subs),
+        require(o['customer_id'] == b['customer_id'] and
+                Decimal(o['total_amount']) == Decimal(b['total_amount']) - Decimal(o['discount_amount']) and
+                Decimal(o['total_amount']) == sum(Decimal(s['final_amount']) for s in subs),
                 'Order ownership/amount mismatch')
     for s in trans['sub_orders']:
         i = indexes['booking_items'][s['booking_item_id']]
@@ -270,12 +271,17 @@ def validate_transactions(base, trans):
                 indexes['master_orders'][s['master_order_id']]['booking_id'] == i['booking_id'] and
                 Decimal(s['unit_price']) == Decimal(i['price']) and
                 Decimal(s['subtotal_amount']) == Decimal(s['unit_price']) * s['quantity'], 'Sub-order snapshot mismatch')
+        v_disc = Decimal(s.get('vendor_discount_amount', '0.00'))
+        p_disc = Decimal(s.get('platform_discount_amount', '0.00'))
+        require(v_disc + p_disc == Decimal(s['discount_amount']) and
+                Decimal(s['commission_basis_amount']) == Decimal(s['subtotal_amount']) - v_disc,
+                'Sub-order discount/commission basis mismatch')
         commission = (Decimal(s['commission_basis_amount']) * Decimal(s['commission_rate'])).quantize(Decimal('.01'), rounding=ROUND_HALF_UP)
         require(Decimal(s['commission_amount']) == commission and Decimal(s['vendor_payout_amount']) == Decimal(s['commission_basis_amount']) - commission, 'Commission snapshot mismatch')
     for p in trans['payments']:
         order = indexes['master_orders'][p['master_order_id']]
         booking = indexes['bookings'][order['booking_id']]
-        require(Decimal(p['amount']) == Decimal(order['total_amount']) - Decimal(order['discount_amount']),
+        require(Decimal(p['amount']) == Decimal(order['total_amount']),
                 'Payment amount mismatch')
         require(all(p.get(c) is None for c in ('provider_order_id', 'provider_transaction_id', 'raw_webhook_payload', 'webhook_event_id', 'payment_url', 'qr_code_url')), 'Synthetic gateway evidence forbidden')
         valid_states = {
@@ -830,7 +836,7 @@ EXTENDED_TABLE_ORDER = [
     'vendor_role_applications'
 ]
 
-def seed_extended_simulation_fixtures(session):
+def seed_extended_simulation_fixtures(session, base_rows=None):
     """Nạp toàn bộ dữ liệu nghiệp vụ mở rộng và đồng bộ 2 chiều (Rule 17)"""
     fixtures_by_table = {}
     for fname, tables in EXTENDED_FIXTURE_FILES.items():
@@ -841,6 +847,38 @@ def seed_extended_simulation_fixtures(session):
         for table in tables:
             if table in data:
                 fixtures_by_table[table] = data[table]
+
+    # Ensure deterministic future target slot for reschedule proposals exists before FK check
+    if fixtures_by_table.get('sub_order_reschedule_proposals'):
+        session.send("""
+            INSERT INTO public.service_slots (
+                id, service_id, date, start_time, end_time, capacity, booked_count, status, inventory_type, created_at, updated_at
+            ) VALUES (
+                'c74db6d3-33e0-5e30-a7e6-fab1188e0846',
+                '88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08',
+                '2026-11-21',
+                '07:00:00',
+                '11:30:00',
+                8,
+                0,
+                'OPEN',
+                'SHARED_CAPACITY_UNITS',
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            ) ON CONFLICT (id) DO NOTHING;
+
+            INSERT INTO public.service_slot_units (
+                id, slot_id, unit_number, capacity, booked_count, created_at, updated_at
+            ) VALUES (
+                '49ece10a-97b4-5299-a18b-01609d84092e',
+                'c74db6d3-33e0-5e30-a7e6-fab1188e0846',
+                1,
+                8,
+                0,
+                CURRENT_TIMESTAMP,
+                CURRENT_TIMESTAMP
+            ) ON CONFLICT (id) DO NOTHING;
+        """)
 
     for table in EXTENDED_TABLE_ORDER:
         rows = fixtures_by_table.get(table, [])
@@ -893,51 +931,64 @@ def seed_extended_simulation_fixtures(session):
             """)
 
     # Two-Way Synchronization (Rule 17):
-    # Synchronize review metrics, vendor badge tiers, conversations, and discount counts
-    session.send("""
-        -- 1. Sync service ratings
-        UPDATE public.services s
-        SET avg_rating = COALESCE(sub.avg_r, 0.00),
-            rating_count = COALESCE(sub.cnt_r, 0)
-        FROM (
-            SELECT service_id,
-                   ROUND(AVG(rating)::numeric, 2) AS avg_r,
-                   COUNT(*)::int AS cnt_r
-            FROM public.reviews
-            WHERE is_visible = true
-            GROUP BY service_id
-        ) sub
-        WHERE s.id = sub.service_id;
+    # Synchronize review metrics, vendor badge tiers, conversations, and discount counts strictly within demo scope
+    if base_rows and base_rows.get('services'):
+        srv_exp = source('services', base_rows['services'])
+        session.send(f"""
+            -- 1. Sync service ratings only for demo services
+            UPDATE public.services s
+            SET avg_rating = COALESCE(sub.avg_r, 0.00),
+                rating_count = COALESCE(sub.cnt_r, 0)
+            FROM {srv_exp} ds
+            LEFT JOIN (
+                SELECT service_id,
+                       ROUND(AVG(rating)::numeric, 2) AS avg_r,
+                       COUNT(*)::int AS cnt_r
+                FROM public.reviews
+                WHERE is_visible = true
+                GROUP BY service_id
+            ) sub ON sub.service_id = ds.id
+            WHERE s.id = ds.id;
+        """)
 
-        -- 2. Sync vendor ratings and badge tiers
-        UPDATE public.vendors v
-        SET rating_avg = COALESCE(sub.avg_r, 0.00),
-            rating_count = COALESCE(sub.cnt_r, 0),
-            badge_tier = CASE
-                WHEN sub.cnt_r >= 5 AND sub.avg_r >= 4.0 THEN 'TOP_RATED'
-                WHEN sub.cnt_r >= 1 THEN 'VERIFIED'
-                ELSE 'NONE'
-            END
-        FROM (
-            SELECT vendor_id,
-                   ROUND(AVG(rating)::numeric, 2) AS avg_r,
-                   COUNT(*)::int AS cnt_r
-            FROM public.reviews
-            WHERE is_visible = true
-            GROUP BY vendor_id
-        ) sub
-        WHERE v.id = sub.vendor_id;
+    if base_rows and base_rows.get('vendors'):
+        vnd_exp = source('vendors', base_rows['vendors'])
+        session.send(f"""
+            -- 2. Sync vendor ratings and badge tiers only for demo vendors
+            UPDATE public.vendors v
+            SET rating_avg = COALESCE(sub.avg_r, 0.00),
+                rating_count = COALESCE(sub.cnt_r, 0),
+                badge_tier = CASE
+                    WHEN COALESCE(sub.cnt_r, 0) >= 5 AND COALESCE(sub.avg_r, 0) >= 4.0 THEN 'TOP_RATED'
+                    WHEN COALESCE(sub.cnt_r, 0) >= 1 THEN 'VERIFIED'
+                    ELSE 'NONE'
+                END
+            FROM {vnd_exp} dv
+            LEFT JOIN (
+                SELECT vendor_id,
+                       ROUND(AVG(rating)::numeric, 2) AS avg_r,
+                       COUNT(*)::int AS cnt_r
+                FROM public.reviews
+                WHERE is_visible = true
+                GROUP BY vendor_id
+            ) sub ON sub.vendor_id = dv.id
+            WHERE v.id = dv.id;
+        """)
 
-        -- 3. Sync conversation last_message_sequence
-        UPDATE public.conversations c
-        SET last_message_sequence = sub.max_seq
-        FROM (
-            SELECT conversation_id, MAX(message_sequence) AS max_seq
-            FROM public.messages
-            GROUP BY conversation_id
-        ) sub
-        WHERE c.id = sub.conversation_id;
-    """)
+    if fixtures_by_table.get('conversations'):
+        conv_exp = source('conversations', fixtures_by_table['conversations'])
+        session.send(f"""
+            -- 3. Sync conversation last_message_sequence only for demo conversations
+            UPDATE public.conversations c
+            SET last_message_sequence = sub.max_seq
+            FROM {conv_exp} dc
+            JOIN (
+                SELECT conversation_id, MAX(message_sequence) AS max_seq
+                FROM public.messages
+                GROUP BY conversation_id
+            ) sub ON sub.conversation_id = dc.id
+            WHERE c.id = dc.id;
+        """)
 
     demo_redemptions = fixtures_by_table.get('discount_redemptions', [])
     if demo_redemptions:
@@ -963,11 +1014,27 @@ def seed_extended_simulation_fixtures(session):
             WHERE m.id = r.master_order_id AND m.id = dr.master_order_id;
         """)
 
-    verify_extended_business_integrity(session)
+    verify_extended_business_integrity(session, fixtures_by_table)
 
 
-def verify_extended_business_integrity(session):
+def verify_extended_business_integrity(session, fixtures_by_table=None):
     """Xác minh toàn vẹn quan hệ nghiệp vụ mở rộng trước khi commit."""
+    # 0. Kiểm tra sự hiện diện đầy đủ của các bản ghi mở rộng đã nạp (chống xóa rỗng bảng như reviews)
+    if fixtures_by_table:
+        for table in EXTENDED_TABLE_ORDER:
+            rows = fixtures_by_table.get(table, [])
+            if not rows:
+                continue
+            pk = 'disruption_id' if table == 'vendor_fault_compensations' else 'id'
+            exp = source(table, rows)
+            missing = session.query(f"""
+                SELECT to_json(count(*))
+                FROM {exp} e
+                LEFT JOIN public.{table} t ON t."{pk}" = e."{pk}"
+                WHERE t."{pk}" IS NULL
+            """)
+            require(missing == 0, f"Integrity check failed: {missing} expected rows missing from {table}")
+
     # 1. Quan hệ Review - Đơn hàng: phải hoàn tất và khớp thông tin
     invalid_reviews = session.query("""
         SELECT to_json(count(*))
@@ -981,7 +1048,7 @@ def verify_extended_business_integrity(session):
     """)
     require(invalid_reviews == 0, f"Integrity check failed: {invalid_reviews} reviews attached to incomplete orders or mismatched users/services")
 
-    # 2. Quan hệ Khiếu nại - Hoàn tiền: các ca chấp thuận hoàn tiền phải có refund khớp tỷ lệ và số tiền
+    # 2. Quan hệ Khiếu nại - Hoàn tiền: phải có refund hợp lệ (không FAILED), đúng admin yêu cầu và trình tự thời gian sau khi chốt
     missing_refunds = session.query("""
         SELECT to_json(count(*))
         FROM public.disputes d
@@ -990,33 +1057,57 @@ def verify_extended_business_integrity(session):
           AND NOT EXISTS (
               SELECT 1 FROM public.refunds r
               WHERE r.sub_order_id = d.sub_order_id
+                AND r.status IN ('PENDING', 'PROCESSED')
                 AND r.refund_percentage = d.refund_percentage
                 AND r.amount = ROUND(s.final_amount * d.refund_percentage / 100.0, 2)
+                AND r.requested_by = d.resolved_by
+                AND r.created_at >= d.resolved_at
+                AND (r.processed_at IS NULL OR r.processed_at >= r.created_at)
           )
     """)
-    require(missing_refunds == 0, f"Integrity check failed: {missing_refunds} resolved disputes missing matching refund")
+    require(missing_refunds == 0, f"Integrity check failed: {missing_refunds} resolved disputes missing valid/timely refund")
 
-    # 3. Quan hệ Đề xuất đổi ca - Slot và Trạng thái đơn: slot đề xuất phải cùng dịch vụ, đơn con không được COMPLETED
+    # 3. Quan hệ Đề xuất đổi ca - Slot tương lai cùng dịch vụ và trạng thái đơn
     invalid_proposals = session.query("""
         SELECT to_json(count(*))
         FROM public.sub_order_reschedule_proposals p
         JOIN public.sub_orders s ON s.id = p.sub_order_id
         JOIN public.service_slots sl ON sl.id = p.proposed_slot_id
         WHERE sl.service_id <> s.service_id
-           OR s.status = 'COMPLETED'
+           OR s.status IN ('COMPLETED', 'CANCELLED', 'REJECTED')
+           OR (p.status = 'PENDING' AND (
+               sl.status <> 'OPEN'
+               OR (sl.date + sl.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh' <= p.created_at
+               OR (sl.date + sl.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh' <= CURRENT_TIMESTAMP
+           ))
     """)
-    require(invalid_proposals == 0, f"Integrity check failed: {invalid_proposals} reschedule proposals targeting foreign service or completed order")
+    require(invalid_proposals == 0, f"Integrity check failed: {invalid_proposals} reschedule proposals invalid (foreign service, terminal order, or non-future slot)")
 
-    # 4. Quan hệ Gián đoạn - Khởi hành slot gốc
+    # 4. Quan hệ Gián đoạn - Trạng thái đơn & Khởi hành slot gốc
     invalid_disruptions = session.query("""
         SELECT to_json(count(*))
         FROM public.sub_order_disruptions d
         JOIN public.service_slots s ON s.id = d.original_slot_id
+        JOIN public.sub_orders so ON so.id = d.sub_order_id
         WHERE d.original_departure_at <> (s.date + s.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'
+           OR (d.status = 'AWAITING_DECISION' AND so.status IN ('COMPLETED', 'CANCELLED', 'REJECTED'))
     """)
-    require(invalid_disruptions == 0, f"Integrity check failed: {invalid_disruptions} disruptions with departure time mismatched from original slot")
+    require(invalid_disruptions == 0, f"Integrity check failed: {invalid_disruptions} disruptions with invalid order status or departure time mismatch")
 
-    # 5. Quan hệ Mã giảm giá Vendor - Đơn hàng của đúng Vendor
+    # 5. Quan hệ Bồi thường Vendor - Gián đoạn VENDOR_FAULT
+    invalid_compensations = session.query("""
+        SELECT to_json(count(*))
+        FROM public.vendor_fault_compensations c
+        JOIN public.sub_order_disruptions d ON d.id = c.disruption_id
+        JOIN public.sub_orders s ON s.id = c.sub_order_id
+        WHERE d.reason <> 'VENDOR_FAULT'
+           OR c.sub_order_id <> d.sub_order_id
+           OR c.original_slot_id <> d.original_slot_id
+           OR c.vendor_id <> s.vendor_id
+    """)
+    require(invalid_compensations == 0, f"Integrity check failed: {invalid_compensations} vendor fault compensations attached to non-VENDOR_FAULT disruption or mismatched keys")
+
+    # 6. Quan hệ Mã giảm giá Vendor - Đơn hàng của đúng Vendor
     invalid_vendor_vouchers = session.query("""
         SELECT to_json(count(*))
         FROM public.master_orders m
@@ -1026,20 +1117,31 @@ def verify_extended_business_integrity(session):
     """)
     require(invalid_vendor_vouchers == 0, f"Integrity check failed: {invalid_vendor_vouchers} vendor vouchers applied to orders of other vendors")
 
-    # 6. Đồng bộ số tiền giảm giá và thanh toán
-    mismatched_discounts = session.query("""
+    # 7. Đồng bộ số tiền giảm giá, thanh toán canonical và cơ sở tính hoa hồng
+    mismatched_financials = session.query("""
         SELECT to_json(count(*))
         FROM public.master_orders m
         JOIN (
-            SELECT master_order_id, SUM(discount_amount) AS total_sub_disc
+            SELECT master_order_id,
+                   SUM(discount_amount) AS total_sub_disc,
+                   SUM(final_amount) AS total_sub_final
             FROM public.sub_orders
             GROUP BY master_order_id
         ) s ON s.master_order_id = m.id
         JOIN public.payments p ON p.master_order_id = m.id
         WHERE m.discount_amount <> s.total_sub_disc
-           OR p.amount <> (m.total_amount - m.discount_amount)
+           OR m.total_amount <> s.total_sub_final
+           OR p.amount <> m.total_amount
+           OR (p.status = 'SUCCESS' AND m.status IN ('PAID', 'COMPLETED', 'PARTIALLY_COMPLETED') AND p.is_canonical = false)
     """)
-    require(mismatched_discounts == 0, f"Integrity check failed: {mismatched_discounts} orders with mismatched discount or payment amounts")
+    require(mismatched_financials == 0, f"Integrity check failed: {mismatched_financials} orders with mismatched discount, payment, or non-canonical payment")
+
+    mismatched_basis = session.query("""
+        SELECT to_json(count(*))
+        FROM public.sub_orders s
+        WHERE s.commission_basis_amount <> (s.subtotal_amount - COALESCE(s.vendor_discount_amount, 0))
+    """)
+    require(mismatched_basis == 0, f"Integrity check failed: {mismatched_basis} sub_orders with incorrect commission_basis_amount")
 
 
 def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
@@ -1128,7 +1230,7 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
             cnt = session.query(f"SELECT to_json(count(*)) FROM public.{table} WHERE id IN ({id_list})")
         require(cnt == len(rs), f"Post-sync fixture count incomplete for table: {table}")
 
-    seed_extended_simulation_fixtures(session)
+    seed_extended_simulation_fixtures(session, base_rows)
 
     return {
         'status': 'SYNC_SUCCESS',
@@ -1246,6 +1348,7 @@ def seed_demo_operating_schedule(session, base_rows):
     schedules, slots, equipment, units = [], [], [], []
     existing_departures = {(s['service_id'], s['date'], time.fromisoformat(s['start_time']))
                            for s in base_rows['service_slots']}
+    existing_departures.add(('88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08', '2026-11-21', time(7, 0)))
     for service in base_rows['services']:
         service_id = service['id']
         if service_id not in published:

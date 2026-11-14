@@ -123,13 +123,20 @@ class TransactionDatasetContract(unittest.TestCase):
             final = Decimal(so['final_amount'])
             self.assertEqual(subtotal - discount, final, 'Final amount must equal subtotal - discount')
 
+            vendor_discount = Decimal(so.get('vendor_discount_amount', '0.00'))
+            platform_discount = Decimal(so.get('platform_discount_amount', '0.00'))
+            self.assertEqual(vendor_discount + platform_discount, discount, 'Vendor + platform discount must equal discount_amount')
+
+            basis = Decimal(so['commission_basis_amount'])
+            self.assertEqual(subtotal - vendor_discount, basis, 'Commission basis must equal subtotal - vendor_discount')
+
             rate = Decimal(so['commission_rate'])
             comm = Decimal(so['commission_amount'])
-            expected_comm = (final * rate).quantize(Decimal('0.01'))
-            self.assertEqual(expected_comm, comm, 'Commission must equal final * commission_rate')
+            expected_comm = (basis * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            self.assertEqual(expected_comm, comm, 'Commission must equal commission_basis_amount * commission_rate')
 
             payout = Decimal(so['vendor_payout_amount'])
-            self.assertEqual(final - comm, payout, 'Vendor payout must equal final - commission')
+            self.assertEqual(basis - comm, payout, 'Vendor payout must equal commission_basis_amount - commission')
 
         # Settlement line item and aggregate checks
         line_items_by_settlement = {}
@@ -170,7 +177,7 @@ class TransactionDatasetContract(unittest.TestCase):
         for order in self.data['master_orders']:
             booking = next(b for b in self.data['bookings'] if b['id'] == order['booking_id'])
             self.assertEqual(booking['customer_id'], order['customer_id'])
-            self.assertEqual(Decimal(booking['total_amount']), Decimal(order['total_amount']))
+            self.assertEqual(Decimal(booking['total_amount']) - Decimal(order['discount_amount']), Decimal(order['total_amount']))
 
     def test_refund_payment_links_and_payout_balance(self):
         for refund in self.data['refunds']:
