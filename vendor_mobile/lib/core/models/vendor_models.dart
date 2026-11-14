@@ -2,6 +2,7 @@
 // Strictly aligned with DATABASE_REFERENCE.txt & SCHEMA_MAP.md
 
 import 'dart:math';
+export 'vendor_ai_models.dart';
 
 // ==========================================
 // 1. IAM & USERS
@@ -486,6 +487,71 @@ class ServiceModel {
       imageUrls: images ?? imageUrls ?? this.imageUrls,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+}
+
+class VendorServiceOptionModel {
+  final String id;
+  final String serviceId;
+  final String name;
+  final String optionType; // 'SHARED' | 'PRIVATE'
+  final String pricingUnit; // 'PER_PERSON' | 'PER_PACKAGE'
+  final double price;
+  final int? maxPaxPerPackage;
+  final String? benefits;
+  final String status; // 'ACTIVE' | 'INACTIVE'
+
+  const VendorServiceOptionModel({
+    required this.id,
+    required this.serviceId,
+    required this.name,
+    this.optionType = 'SHARED',
+    this.pricingUnit = 'PER_PERSON',
+    required this.price,
+    this.maxPaxPerPackage,
+    this.benefits,
+    this.status = 'ACTIVE',
+  });
+
+  factory VendorServiceOptionModel.fromJson(
+    Map<String, dynamic> json, {
+    String fallbackServiceId = '',
+  }) {
+    return VendorServiceOptionModel(
+      id: json['id']?.toString() ?? '',
+      serviceId: json['serviceId']?.toString() ?? fallbackServiceId,
+      name: json['name']?.toString() ?? '',
+      optionType: json['optionType']?.toString() ?? 'SHARED',
+      pricingUnit: json['pricingUnit']?.toString() ?? 'PER_PERSON',
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      maxPaxPerPackage: (json['maxPaxPerPackage'] as num?)?.toInt(),
+      benefits: json['benefits']?.toString(),
+      status: json['status']?.toString() ?? 'ACTIVE',
+    );
+  }
+
+  VendorServiceOptionModel copyWith({
+    String? id,
+    String? serviceId,
+    String? name,
+    String? optionType,
+    String? pricingUnit,
+    double? price,
+    int? maxPaxPerPackage,
+    String? benefits,
+    String? status,
+  }) {
+    return VendorServiceOptionModel(
+      id: id ?? this.id,
+      serviceId: serviceId ?? this.serviceId,
+      name: name ?? this.name,
+      optionType: optionType ?? this.optionType,
+      pricingUnit: pricingUnit ?? this.pricingUnit,
+      price: price ?? this.price,
+      maxPaxPerPackage: maxPaxPerPackage ?? this.maxPaxPerPackage,
+      benefits: benefits ?? this.benefits,
+      status: status ?? this.status,
     );
   }
 }
@@ -1217,6 +1283,7 @@ class ConversationModel {
   final String vendorId;
   final String? masterOrderId;
   final String? subOrderId;
+  final String? serviceNameValue;
   final String lastMessage;
   final DateTime lastMessageTime;
   final int unreadCount;
@@ -1229,6 +1296,7 @@ class ConversationModel {
     required this.vendorId,
     this.masterOrderId,
     this.subOrderId,
+    this.serviceNameValue,
     required this.lastMessage,
     required this.lastMessageTime,
     this.unreadCount = 0,
@@ -1237,7 +1305,7 @@ class ConversationModel {
   String get conversationId => id;
   String? get subOrderCode => subOrderId;
   String? get masterOrderCode => masterOrderId;
-  String get serviceName => 'Dịch vụ chèo SUP Mỹ Khê';
+  String get serviceName => serviceNameValue ?? '';
 
   ConversationModel copyWith({
     String? lastMessage,
@@ -1252,6 +1320,7 @@ class ConversationModel {
       vendorId: vendorId,
       masterOrderId: masterOrderId,
       subOrderId: subOrderId,
+      serviceNameValue: serviceNameValue,
       lastMessage: lastMessage ?? this.lastMessage,
       lastMessageTime: lastMessageTime ?? this.lastMessageTime,
       unreadCount: unreadCount ?? this.unreadCount,
@@ -1349,6 +1418,7 @@ class VendorDashboardModel {
 class WeatherCacheModel {
   final String id;
   final String locationKey;
+  final String? locationNameValue;
   final double windSpeedKmh;
   final double waveHeightM;
   final double precipitationMm;
@@ -1358,6 +1428,7 @@ class WeatherCacheModel {
   const WeatherCacheModel({
     required this.id,
     required this.locationKey,
+    this.locationNameValue,
     required this.windSpeedKmh,
     required this.waveHeightM,
     required this.precipitationMm,
@@ -1365,5 +1436,138 @@ class WeatherCacheModel {
     required this.expiresAt,
   });
 
-  String get locationName => 'Bãi biển Mỹ Khê';
+  String get locationName =>
+      (locationNameValue != null && locationNameValue!.isNotEmpty)
+          ? locationNameValue!
+          : locationKey;
 }
+
+class AdvanceSafetyCheckModel {
+  final String safetyStatus; // SAFE, CAUTION, DANGEROUS, BLOCKED
+  final bool bookingAllowed;
+  final String summaryMessage;
+  final List<String> advisoryDetails;
+  final double? windSpeedKmh;
+  final double? waveHeightM;
+  final double? precipitationMm;
+
+  const AdvanceSafetyCheckModel({
+    this.safetyStatus = 'SAFE',
+    this.bookingAllowed = true,
+    this.summaryMessage = '',
+    this.advisoryDetails = const [],
+    this.windSpeedKmh,
+    this.waveHeightM,
+    this.precipitationMm,
+  });
+
+  factory AdvanceSafetyCheckModel.fromJson(Map<String, dynamic> json) {
+    final details = <String>[];
+    if (json['advisoryDetails'] is List) {
+      for (final item in json['advisoryDetails']) {
+        if (item != null && item.toString().isNotEmpty) {
+          details.add(item.toString());
+        }
+      }
+    }
+    return AdvanceSafetyCheckModel(
+      safetyStatus: (json['safetyStatus'] ?? json['status'] ?? 'SAFE').toString(),
+      bookingAllowed: (json['canBook'] ?? json['bookingAllowed']) != false,
+      summaryMessage: (json['summaryMessage'] ?? json['message'] ?? '').toString(),
+      advisoryDetails: details,
+      windSpeedKmh: (json['windSpeedKmh'] ?? json['windSpeed'] as num?)?.toDouble(),
+      waveHeightM: (json['waveHeightM'] ?? json['waveHeight'] as num?)?.toDouble(),
+      precipitationMm: (json['precipitationMm'] ?? json['precipitation'] as num?)?.toDouble(),
+    );
+  }
+
+  bool get canBook => bookingAllowed;
+}
+
+class OperatingScheduleExceptionModel {
+  final String id;
+  final String dateFrom;
+  final String dateTo;
+  final String? startTime;
+  final String reason;
+
+  const OperatingScheduleExceptionModel({
+    required this.id,
+    required this.dateFrom,
+    required this.dateTo,
+    this.startTime,
+    required this.reason,
+  });
+
+  factory OperatingScheduleExceptionModel.fromJson(Map<String, dynamic> json) {
+    final source = json['exception'] is Map<String, dynamic>
+        ? json['exception'] as Map<String, dynamic>
+        : json;
+    return OperatingScheduleExceptionModel(
+      id: source['id']?.toString() ?? '',
+      dateFrom: source['dateFrom']?.toString() ?? '',
+      dateTo: source['dateTo']?.toString() ?? '',
+      startTime: source['startTime']?.toString(),
+      reason: source['reason']?.toString() ?? '',
+    );
+  }
+}
+
+class VendorEquipmentModel {
+  final String id;
+  final String name;
+  final String compatibilityGroup;
+  final int capacity;
+
+  const VendorEquipmentModel({
+    required this.id,
+    required this.name,
+    required this.compatibilityGroup,
+    required this.capacity,
+  });
+
+  factory VendorEquipmentModel.fromJson(Map<String, dynamic> json) {
+    return VendorEquipmentModel(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      compatibilityGroup: json['compatibilityGroup']?.toString() ?? 'WATER_SPORTS',
+      capacity: (json['capacity'] as num?)?.toInt() ?? 1,
+    );
+  }
+}
+
+class EquipmentMaintenanceResultModel {
+  final String maintenanceId;
+  final String equipmentId;
+  final String start;
+  final String end;
+  final bool urgent;
+  final String reason;
+  final int affectedSlotsCount;
+
+  const EquipmentMaintenanceResultModel({
+    required this.maintenanceId,
+    required this.equipmentId,
+    required this.start,
+    required this.end,
+    this.urgent = false,
+    required this.reason,
+    this.affectedSlotsCount = 0,
+  });
+
+  factory EquipmentMaintenanceResultModel.fromJson(Map<String, dynamic> json) {
+    return EquipmentMaintenanceResultModel(
+      maintenanceId: json['maintenanceId']?.toString() ?? json['id']?.toString() ?? '',
+      equipmentId: json['equipmentId']?.toString() ?? '',
+      start: json['start']?.toString() ?? '',
+      end: json['end']?.toString() ?? '',
+      urgent: json['urgent'] == true,
+      reason: json['reason']?.toString() ?? '',
+      affectedSlotsCount: (json['affectedSlots'] is List)
+          ? (json['affectedSlots'] as List).length
+          : ((json['affectedSlotsCount'] as num?)?.toInt() ?? 0),
+    );
+  }
+}
+
+

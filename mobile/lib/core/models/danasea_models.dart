@@ -761,8 +761,12 @@ class MarineBriefingItem {
     final packing = <String>[];
     if (packingRaw is List) {
       for (final p in packingRaw) {
-        if (p is Map && p['item'] != null) {
-          packing.add(p['item'].toString());
+        if (p is Map) {
+          final name = (p['itemName'] ?? p['item'])?.toString().trim() ?? '';
+          final tip = p['tip']?.toString().trim() ?? '';
+          if (name.isNotEmpty) {
+            packing.add(tip.isNotEmpty ? '$name ($tip)' : name);
+          }
         } else if (p != null) {
           packing.add(p.toString());
         }
@@ -772,7 +776,9 @@ class MarineBriefingItem {
     final guides = <String>[];
     if (guideRaw is List) {
       for (final g in guideRaw) {
-        if (g != null) guides.add(g.toString());
+        if (g != null && g.toString().trim().isNotEmpty) {
+          guides.add(g.toString().trim());
+        }
       }
     }
     return MarineBriefingItem(
@@ -781,7 +787,7 @@ class MarineBriefingItem {
       meetingLocation: json['meetingLocation']?.toString() ?? '',
       departureDate: json['departureDate']?.toString(),
       departureTime: json['departureTime']?.toString(),
-      weatherSafetyStatus: json['weatherSafetyStatus']?.toString() ?? 'ACCEPTABLE',
+      weatherSafetyStatus: json['weatherSafetyStatus']?.toString() ?? 'UNKNOWN',
       marineConditionsSummary: json['marineConditionsSummary']?.toString() ?? '',
       packingChecklist: packing,
       safetyGuidelines: guides,

@@ -39,8 +39,8 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
   void initState() {
     super.initState();
     final vendor = _db.currentVendor;
-    _bankAccountController = TextEditingController(text: vendor.bankAccountNumber ?? '0041000889988');
-    _bankHolderController = TextEditingController(text: vendor.bankAccountHolder ?? 'TRAN HAI DANG');
+    _bankAccountController = TextEditingController(text: vendor.bankAccountNumber ?? '');
+    _bankHolderController = TextEditingController(text: vendor.bankAccountHolder ?? '');
     if (vendor.bankName != null && _bankOptions.contains(vendor.bankName)) {
       _selectedBank = vendor.bankName!;
     }

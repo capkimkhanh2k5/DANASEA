@@ -7,6 +7,7 @@ import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../core/widgets/partner_account_app_bar_button.dart';
 import 'service_create_edit_screen.dart';
+import 'vendor_equipment_screen.dart';
 import '../../../slots/presentation/screens/slot_calendar_screen.dart';
 
 class ServiceListScreen extends StatefulWidget {
@@ -107,6 +108,15 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Quản lý thiết bị & Bảo trì (Cano / Kayak / Áo phao)',
+            icon: const Icon(Icons.handyman_outlined, color: AppColors.secondary),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const VendorEquipmentScreen()),
+              );
+            },
+          ),
           PartnerAccountAppBarButton(onPressed: widget.onOpenProfile),
         ],
       ),

@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mobile/core/l10n/app_localizations.dart';
+import '../../../../core/auth/auth_session.dart';
+import '../../../../core/data/assistant_repository.dart';
 import '../../../../core/data/catalog_repository.dart';
+import '../../../../core/data/weather_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
@@ -39,6 +42,15 @@ class _SearchScreenState extends State<SearchScreen> {
   Timer? _debounce;
   int _generation = 0;
 
+  // Live weather & AI Nearby / Compare state
+  WeatherSnapshotModel? _weatherSnapshot;
+  bool _aiNearbyActive = false;
+  bool _loadingAiNearby = false;
+  Map<String, double> _aiDistanceByServiceId = {};
+  Map<String, int> _aiQuoteByServiceId = {};
+  final Set<String> _compareServiceIds = <String>{};
+  bool _loadingAiCompare = false;
+
   @override
   void initState() {
     super.initState();
@@ -46,7 +58,209 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchController = TextEditingController(text: widget.initialQuery ?? '');
     _selectedCategory = widget.initialCategory;
     _loadCategories();
+    _loadLiveWeather();
     _search();
+  }
+
+  Future<void> _loadLiveWeather() async {
+    try {
+      final w = await WeatherRepository.instance.getCurrentWeather();
+      if (mounted) {
+        setState(() => _weatherSnapshot = w);
+      }
+    } catch (_) {}
+  }
+
+  (double, double) _resolveCoordinatesForLocation(String? loc) {
+    final lower = (loc ?? '').toLowerCase();
+    if (lower.contains('sơn trà') || lower.contains('son tra')) {
+      return (16.1060, 108.2615);
+    }
+    if (lower.contains('non nước') || lower.contains('non nuoc')) {
+      return (16.0025, 108.2690);
+    }
+    // Default Da Nang coastal center (My Khe)
+    return (16.0598, 108.2465);
+  }
+
+  Future<void> _toggleAiNearby() async {
+    if (_aiNearbyActive) {
+      setState(() {
+        _aiNearbyActive = false;
+        _aiDistanceByServiceId = {};
+        _aiQuoteByServiceId = {};
+      });
+      await _search();
+      return;
+    }
+
+    setState(() {
+      _loadingAiNearby = true;
+      _aiNearbyActive = true;
+    });
+    try {
+      final (lat, lng) = _resolveCoordinatesForLocation(_selectedLocation);
+      final queryText = _searchController.text.trim().isNotEmpty
+          ? _searchController.text.trim()
+          : (_selectedCategory != null
+                ? _displayCategoryName(_selectedCategory!)
+                : 'trải nghiệm biển gần đây');
+      final res = await AssistantRepository.instance.discoverServices(
+        query: queryText,
+        mode: 'NEARBY',
+        latitude: lat,
+        longitude: lng,
+        radiusKm: 15.0,
+        totalBudget: _maxPrice,
+      );
+      if (!mounted) return;
+      final candidates = res['candidates'];
+      final distMap = <String, double>{};
+      final quoteMap = <String, int>{};
+      final nearbyIds = <String>[];
+      final aiServices = <ServiceModel>[];
+
+      if (candidates is List) {
+        for (final raw in candidates.whereType<Map>()) {
+          final map = Map<String, dynamic>.from(raw);
+          final srvMap = map['service'] is Map
+              ? Map<String, dynamic>.from(map['service'] as Map)
+              : <String, dynamic>{};
+          final srvId = srvMap['id']?.toString() ?? '';
+          if (srvId.isEmpty) continue;
+          nearbyIds.add(srvId);
+          final dist = (map['distanceKm'] as num?)?.toDouble();
+          if (dist != null) distMap[srvId] = dist;
+          final minTotal = (map['minimumPartyTotal'] as num?)?.toInt();
+          if (minTotal != null) quoteMap[srvId] = minTotal;
+
+          final existing = _items.where((s) => s.id == srvId).firstOrNull;
+          if (existing != null) {
+            aiServices.add(existing);
+          } else {
+            aiServices.add(
+              ServiceModel(
+                id: srvId,
+                vendorId: srvMap['vendorId']?.toString() ?? '',
+                vendorName: 'DanaSea Partner',
+                categoryId: srvMap['categoryId']?.toString() ?? '',
+                categoryName: srvMap['categoryName']?.toString() ?? '',
+                name: srvMap['name']?.toString() ?? 'Trải nghiệm biển',
+                slug: srvId,
+                description: srvMap['description']?.toString() ?? '',
+                price: minTotal ?? 0,
+                durationMinutes:
+                    (srvMap['durationMinutes'] as num?)?.toInt() ?? 60,
+                capacityPerSlot: 10,
+                locationName: srvMap['address']?.toString() ?? 'Đà Nẵng',
+                address: srvMap['address']?.toString() ?? 'Đà Nẵng',
+                latitude: (srvMap['latitude'] as num?)?.toDouble() ?? lat,
+                longitude: (srvMap['longitude'] as num?)?.toDouble() ?? lng,
+                waiverContent: '',
+                weatherSensitive: srvMap['weatherSensitive'] == true,
+                avgRating:
+                    (srvMap['averageRating'] as num?)?.toDouble() ?? 5.0,
+                ratingCount: (srvMap['reviewCount'] as num?)?.toInt() ?? 0,
+              ),
+            );
+          }
+        }
+      }
+
+      setState(() {
+        _aiDistanceByServiceId = distMap;
+        _aiQuoteByServiceId = quoteMap;
+        if (aiServices.isNotEmpty) {
+          _items = aiServices;
+        }
+      });
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        setState(() => _aiNearbyActive = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _aiNearbyActive = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText(
+              'Không thể tải gợi ý AI gần bạn. Vui lòng đăng nhập và thử lại.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingAiNearby = false);
+      }
+    }
+  }
+
+  void _toggleCompareSelection(String serviceId) {
+    setState(() {
+      if (_compareServiceIds.contains(serviceId)) {
+        _compareServiceIds.remove(serviceId);
+      } else {
+        if (_compareServiceIds.length >= 4) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: LocalizedText('Chỉ có thể chọn tối đa 4 dịch vụ để so sánh AI.'),
+            ),
+          );
+          return;
+        }
+        _compareServiceIds.add(serviceId);
+      }
+    });
+  }
+
+  Future<void> _openAiComparisonSheet() async {
+    if (_compareServiceIds.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText('Vui lòng chọn từ 2 đến 4 dịch vụ để AI so sánh.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _loadingAiCompare = true);
+    try {
+      final (lat, lng) = _resolveCoordinatesForLocation(_selectedLocation);
+      final queryText = _searchController.text.trim().isNotEmpty
+          ? _searchController.text.trim()
+          : 'So sánh dịch vụ biển phù hợp nhất';
+      final result = await AssistantRepository.instance.compareServices(
+        serviceIds: _compareServiceIds.toList(),
+        query: queryText,
+        latitude: lat,
+        longitude: lng,
+      );
+      if (!mounted) return;
+      await _showAiCompareResultModal(result);
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText(
+              'Không thể thực hiện so sánh AI lúc này. Vui lòng thử lại.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loadingAiCompare = false);
+      }
+    }
   }
 
   @override
@@ -196,16 +410,9 @@ class _SearchScreenState extends State<SearchScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final categoryOptions = _categories.isNotEmpty
-                ? _categories
-                      .map((c) => {'id': c.id, 'label': c.name})
-                      .toList()
-                : [
-                    'Chèo SUP',
-                    'Lặn biển',
-                    'Cano lướt sóng',
-                    'Lướt ván',
-                  ].map((c) => {'id': c, 'label': c}).toList();
+            final categoryOptions = _categories
+                .map((c) => {'id': c.id, 'label': c.name})
+                .toList();
 
             final maxHeight = MediaQuery.of(context).size.height * 0.85;
             return Container(
@@ -622,7 +829,11 @@ class _SearchScreenState extends State<SearchScreen> {
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.centerLeft,
                         child: LocalizedText(
-                          'Phù hợp sóng biển hôm nay',
+                          _aiNearbyActive
+                              ? 'Đã xếp hạng theo AI Gợi ý gần bạn'
+                              : (_weatherSnapshot?.waveHeight != null
+                                    ? 'Sóng hiện tại ${_weatherSnapshot!.waveHeight!.toStringAsFixed(1)}m • Gió ${(_weatherSnapshot!.windSpeed ?? 0).toStringAsFixed(0)} km/h'
+                                    : 'Dữ liệu trực tiếp từ hệ thống'),
                           maxLines: 1,
                           style: AppTypography.bodySm(
                             color: AppColors.onSurfaceVariant,
@@ -632,7 +843,56 @@ class _SearchScreenState extends State<SearchScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
+                InkWell(
+                  onTap: _loadingAiNearby ? null : _toggleAiNearby,
+                  borderRadius: BorderRadius.circular(18),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _aiNearbyActive
+                          ? AppColors.secondary
+                          : AppColors.secondary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: AppColors.secondary.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_loadingAiNearby)
+                          const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 1.8),
+                          )
+                        else
+                          Icon(
+                            Icons.near_me_outlined,
+                            size: 14,
+                            color: _aiNearbyActive
+                                ? Colors.white
+                                : AppColors.secondary,
+                          ),
+                        const SizedBox(width: 4),
+                        LocalizedText(
+                          'AI Gần bạn',
+                          style: AppTypography.labelSm(
+                            color: _aiNearbyActive
+                                ? Colors.white
+                                : AppColors.secondary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
@@ -750,6 +1010,71 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
 
           if (_loading) const LinearProgressIndicator(minHeight: 2),
+
+          if (_compareServiceIds.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(
+                horizontal: AppShapes.gutterMobile,
+                vertical: 4,
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.secondary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColors.secondary.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.compare_arrows,
+                    size: 18,
+                    color: AppColors.secondary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: LocalizedText(
+                      'Đã chọn ${_compareServiceIds.length}/4 dịch vụ để so sánh AI',
+                      style: AppTypography.labelSm(
+                        color: AppColors.onSurface,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() => _compareServiceIds.clear()),
+                    child: const LocalizedText('Bỏ chọn'),
+                  ),
+                  const SizedBox(width: 4),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                      visualDensity: VisualDensity.compact,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    onPressed:
+                        (_compareServiceIds.length < 2 || _loadingAiCompare)
+                        ? null
+                        : _openAiComparisonSheet,
+                    icon: _loadingAiCompare
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.auto_awesome, size: 14),
+                    label: const LocalizedText('So sánh AI'),
+                  ),
+                ],
+              ),
+            ),
 
           // CONTENT: LIST OR MAP
           Expanded(
@@ -886,7 +1211,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
                   ),
-                  // Ocean condition badge
+                  // Ocean condition badge (live weather + AI distance)
                   Positioned(
                     bottom: 10,
                     left: 10,
@@ -909,13 +1234,63 @@ class _SearchScreenState extends State<SearchScreen> {
                           ),
                           const SizedBox(width: 4),
                           LocalizedText(
-                            'Sóng êm: 0.4m',
+                            _aiDistanceByServiceId.containsKey(srv.id)
+                                ? 'Cách bạn ${_aiDistanceByServiceId[srv.id]!.toStringAsFixed(1)} km'
+                                : (_weatherSnapshot?.waveHeight != null
+                                      ? 'Sóng thực tế: ${_weatherSnapshot!.waveHeight!.toStringAsFixed(1)}m'
+                                      : (srv.weatherSensitive
+                                            ? 'Theo dõi sóng biển'
+                                            : 'Hoạt động mọi thời tiết')),
                             style: AppTypography.labelSm(
                               color: AppColors.secondary,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
+                      ),
+                    ),
+                  ),
+                  // AI Compare toggle badge
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: InkWell(
+                      onTap: () => _toggleCompareSelection(srv.id),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _compareServiceIds.contains(srv.id)
+                              ? AppColors.primary
+                              : Colors.black.withValues(alpha: 0.55),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _compareServiceIds.contains(srv.id)
+                                  ? Icons.check_circle
+                                  : Icons.compare_arrows,
+                              size: 13,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _compareServiceIds.contains(srv.id)
+                                  ? 'Đã chọn so sánh'
+                                  : 'So sánh AI',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1087,6 +1462,14 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildMapPreview(List<ServiceModel> services) {
+    final pinPositions = <Alignment>[
+      const Alignment(-0.55, -0.55),
+      const Alignment(0.55, -0.35),
+      const Alignment(-0.45, 0.45),
+      const Alignment(0.45, 0.55),
+    ];
+    final topServices = services.take(4).toList();
+
     return Container(
       color: AppColors.secondaryContainer.withValues(alpha: 0.2),
       child: Stack(
@@ -1107,7 +1490,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 const SizedBox(height: 6),
                 LocalizedText(
-                  'Đang hiển thị ${services.length} điểm dịch vụ ven biển',
+                  'Đang hiển thị ${services.length} điểm dịch vụ ven biển từ hệ thống',
                   style: AppTypography.bodySm(
                     color: AppColors.onSurfaceVariant,
                   ),
@@ -1115,24 +1498,301 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
           ),
-          // Pins simulation
-          Positioned(
-            top: 60,
-            left: 80,
-            child: _buildMapPin('Mỹ Khê', 'SUP & Lướt sóng'),
-          ),
-          Positioned(
-            top: 140,
-            right: 60,
-            child: _buildMapPin('Bán đảo Sơn Trà', 'Lặn ngắm san hô'),
-          ),
-          Positioned(
-            bottom: 120,
-            left: 100,
-            child: _buildMapPin('Non Nước', 'Trường dạy lướt ván'),
-          ),
+          for (var i = 0; i < topServices.length; i++)
+            Align(
+              alignment: pinPositions[i % pinPositions.length],
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CatalogDetailScreen(
+                          serviceId: topServices[i].id,
+                          repository: _repository,
+                        ),
+                      ),
+                    );
+                  },
+                  child: _buildMapPin(
+                    topServices[i].locationName.trim().isNotEmpty
+                        ? topServices[i].locationName.trim()
+                        : topServices[i].name,
+                    '${topServices[i].name} • ${_formatPrice(_aiQuoteByServiceId[topServices[i].id] ?? topServices[i].price)}',
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
+    );
+  }
+
+  Future<void> _showAiCompareResultModal(Map<String, dynamic> result) async {
+    final matrixRaw = result['matrix'];
+    final rows = matrixRaw is List
+        ? matrixRaw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+        : <Map<String, dynamic>>[];
+    final bestFit = result['bestFit'] is Map
+        ? Map<String, dynamic>.from(result['bestFit'] as Map)
+        : null;
+    final bestServiceId = bestFit?['serviceId']?.toString() ?? '';
+    final diffRaw = result['keyDifferences'];
+    final diffs = diffRaw is List
+        ? diffRaw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+        : <Map<String, dynamic>>[];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(sheetCtx).size.height * 0.85,
+          ),
+          decoration: const BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(AppShapes.gutterMobile),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome,
+                      color: AppColors.secondary,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: LocalizedText(
+                      'AI So sánh dịch vụ biển (${rows.length})',
+                      style: AppTypography.headlineSm(
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(sheetCtx),
+                  ),
+                ],
+              ),
+              const Divider(height: 16),
+              Flexible(
+                child: rows.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: LocalizedText(
+                            'Chưa có dữ liệu so sánh từ hệ thống cho các dịch vụ đã chọn.',
+                            style: AppTypography.bodySm(
+                              color: AppColors.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView(
+                        shrinkWrap: true,
+                        children: [
+                          ...rows.map((row) {
+                            final srvId = row['serviceId']?.toString() ?? '';
+                            final isBest =
+                                bestServiceId.isNotEmpty &&
+                                srvId == bestServiceId;
+                            final name =
+                                row['serviceName']?.toString() ?? 'Dịch vụ';
+                            final partyTotal =
+                                (row['partyTotal'] as num?)?.toInt() ??
+                                (row['unitPrice'] as num?)?.toInt() ??
+                                0;
+                            final duration =
+                                (row['durationMinutes'] as num?)?.toInt() ?? 0;
+                            final rating =
+                                (row['rating'] as num?)?.toDouble() ?? 0.0;
+                            final reviews =
+                                (row['reviewCount'] as num?)?.toInt() ?? 0;
+                            final slots =
+                                (row['bookableSlots'] as num?)?.toInt() ?? 0;
+                            final dist = (row['distanceKm'] as num?)
+                                ?.toDouble();
+                            final benefits =
+                                row['benefits']?.toString().trim() ?? '';
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isBest
+                                    ? AppColors.secondary.withValues(
+                                        alpha: 0.07,
+                                      )
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isBest
+                                      ? AppColors.secondary
+                                      : AppColors.borderSubtle,
+                                  width: isBest ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          name,
+                                          style: AppTypography.labelLg(
+                                            color: AppColors.onSurface,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isBest)
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.secondary,
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'AI Đề xuất tối ưu',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 12,
+                                    runSpacing: 6,
+                                    children: [
+                                      Text(
+                                        'Giá: ${_formatPrice(partyTotal)}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Đánh giá: ${rating.toStringAsFixed(1)}★ ($reviews)',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.onSurface,
+                                        ),
+                                      ),
+                                      if (duration > 0)
+                                        Text(
+                                          'Thời lượng: ${duration}p',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      Text(
+                                        'Ca trống: $slots',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.secondary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (dist != null)
+                                        Text(
+                                          'Khoảng cách: ${dist.toStringAsFixed(1)} km',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.onSurfaceVariant,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  if (benefits.isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Quyền lợi gói: $benefits',
+                                      style: AppTypography.bodySm(
+                                        color: AppColors.onSurfaceVariant,
+                                      ).copyWith(fontSize: 11.5),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          }),
+                          if (diffs.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            LocalizedText(
+                              'Điểm khác biệt chính (từ dữ liệu Catalog thực tế):',
+                              style: AppTypography.labelMd(
+                                color: AppColors.onSurface,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: diffs.map((d) {
+                                final field = d['field']?.toString() ?? '';
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.surfaceContainerLow,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    field,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

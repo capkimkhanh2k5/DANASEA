@@ -1,7 +1,8 @@
+import '../../../../core/widgets/toast_notification.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/status_badge.dart';
-import '../../../../core/widgets/toast_notification.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/data/vendor_store.dart';
 import '../../../../core/data/vendor_repositories.dart';
@@ -37,464 +38,89 @@ class _VendorDocumentsScreenState extends State<VendorDocumentsScreen> {
     await _docRepo.getVendorDocuments();
   }
 
-  void _openUploadBottomSheet(VendorDocType type, String currentFileName) {
-    FocusManager.instance.primaryFocus?.unfocus();
-
-    final isSafety = type == VendorDocType.safetyCert;
-    final title = isSafety
-        ? 'Tải lên Chứng nhận an toàn biển'
-        : 'Tải lên Giấy phép đăng ký kinh doanh';
-
-    final sampleFiles = isSafety
-        ? [
-            {
-              'name': 'ChungNhan_AnToanBien_BQL_2024_BanGoc.pdf',
-              'size': '2.4 MB',
-              'desc': 'Bản scan gốc có mộc đỏ Ban Quản lý Bán đảo Sơn Trà',
-            },
-            {
-              'name': 'ChungNhan_CuuHo_BaoHiemBien_2024.pdf',
-              'size': '3.1 MB',
-              'desc': 'Hồ sơ năng lực cứu hộ và chứng thư bảo hiểm du khách',
-            },
-          ]
-        : [
-            {
-              'name': 'GPKD_DanangOceanClub_2024_CapNhat.pdf',
-              'size': '2.1 MB',
-              'desc': 'Bản scan Giấy phép ĐKKD cấp đổi mới nhất',
-            },
-            {
-              'name': 'GPKD_SoKeHoachDauTu_DaNang_CongChung.pdf',
-              'size': '1.9 MB',
-              'desc': 'Bản sao y công chứng điện tử hợp lệ',
-            },
-          ];
-
-    showModalBottomSheet(
+  Future<void> _openUploadBottomSheet(VendorDocType type, String currentFileName) async {
+    final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetCtx) {
-        String selectedFileName = sampleFiles.first['name']!;
-        String selectedFileSize = sampleFiles.first['size']!;
-        bool isSubmitting = false;
-
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            return Container(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 16,
-                bottom: MediaQuery.of(ctx).padding.bottom + 20,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFCBD5E1),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondaryContainer.withAlpha(80),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.upload_file_rounded,
-                            color: AppColors.secondary, size: 22),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.onSurface,
-                              ),
-                            ),
-                            const Text(
-                              'Định dạng hỗ trợ: PDF, JPG, PNG (Dưới 10MB)',
-                              style: TextStyle(fontSize: 11, color: AppColors.tertiary),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    'Chọn tệp tài liệu thay thế:',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  ...sampleFiles.map((file) {
-                    final isChosen = selectedFileName == file['name'];
-                    return GestureDetector(
-                      onTap: () {
-                        setSheetState(() {
-                          selectedFileName = file['name']!;
-                          selectedFileSize = file['size']!;
-                        });
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isChosen ? AppColors.secondary.withAlpha(12) : const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isChosen ? AppColors.secondary : const Color(0xFFE2E8F0),
-                            width: isChosen ? 1.5 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isChosen ? Icons.radio_button_checked : Icons.radio_button_off,
-                              color: isChosen ? AppColors.secondary : const Color(0xFF94A3B8),
-                              size: 18,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    file['name']!,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: isChosen ? AppColors.secondary : AppColors.onSurface,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${file['size']} • ${file['desc']}',
-                                    style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFFDE68A)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Icon(Icons.info_outline, size: 16, color: Color(0xFFD97706)),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Sau khi tải lên thành công, hồ sơ sẽ chuyển sang trạng thái "Đang chờ duyệt" để Admin DANASEA kiểm tra và kích hoạt.',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF92400E), height: 1.35),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      onPressed: isSubmitting
-                          ? null
-                          : () async {
-                              setSheetState(() => isSubmitting = true);
-                              await _docRepo.uploadOrReplaceDocument(
-                                docType: type,
-                                fileName: selectedFileName,
-                                fileSize: selectedFileSize,
-                              );
-                              if (!sheetCtx.mounted) return;
-                              Navigator.pop(sheetCtx);
-                              if (!mounted) return;
-                              ToastNotification.show(
-                                context,
-                                message: 'Đã gửi tài liệu thành công! Hồ sơ đang ở trạng thái Chờ duyệt bởi Admin DANASEA.',
-                                type: ToastType.success,
-                              );
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.secondary,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: isSubmitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Xác nhận gửi hồ sơ xét duyệt',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                            ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _openDocumentViewer(VendorDocumentModel doc, String title) {
-    FocusManager.instance.primaryFocus?.unfocus();
-
-    final isSafety = doc.docType == VendorDocType.safetyCert;
-    final authority = isSafety
-        ? 'Ban Quản lý Bán đảo Sơn Trà và các bãi biển du lịch Đà Nẵng'
-        : 'Sở Kế hoạch và Đầu tư Thành phố Đà Nẵng';
-    final docNumber = isSafety ? 'GCN-ATB: 2024/BQL-SHT' : 'Số ĐKKD: 0401829482';
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (sheetCtx) => Container(
-        height: MediaQuery.of(sheetCtx).size.height * 0.85,
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 16,
-          bottom: MediaQuery.of(sheetCtx).padding.bottom + 16,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(2),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'Tải lên ${type.labelVi} (Cloud)',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface),
                 ),
               ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.onSurface,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                StatusBadge(status: doc.status.toBadgeStatus()),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            // Metadata card
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined, color: AppColors.secondary),
+                title: const Text('Chọn ảnh giấy tờ từ Thư viện'),
+                subtitle: const Text('Tải trực tiếp lên hệ thống lưu trữ đám mây Cloudinary', style: TextStyle(fontSize: 11)),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
               ),
-              child: Column(
-                children: [
-                  _buildViewerMetaRow('Mã hồ sơ:', docNumber),
-                  const SizedBox(height: 6),
-                  _buildViewerMetaRow('Cơ quan cấp:', authority),
-                  const SizedBox(height: 6),
-                  _buildViewerMetaRow(
-                    'Ngày tải lên:',
-                    '${doc.uploadedAt.day.toString().padLeft(2, '0')}/${doc.uploadedAt.month.toString().padLeft(2, '0')}/${doc.uploadedAt.year}',
-                  ),
-                  const SizedBox(height: 6),
-                  _buildViewerMetaRow('Tệp tin số:', '${doc.fileName} (${doc.fileSize})'),
-                ],
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+                title: const Text('Chụp ảnh giấy tờ từ Camera'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
               ),
-            ),
-            const SizedBox(height: 14),
-
-            // Electronic verified certificate preview container
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFCBD5E1)),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0x10000000),
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.picture_as_pdf_rounded,
-                        color: AppColors.primary,
-                        size: 44,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      doc.fileName,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.onSurface,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'BẢN SAO HỢP THỨC HÓA ĐIỆN TỬ',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.secondary,
-                        letterSpacing: 0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'DANASEA CLOUD VERIFIED ELECTRONIC COPY',
-                      style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE2E8F0),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.verified, size: 14, color: AppColors.secondary),
-                          SizedBox(width: 5),
-                          Text(
-                            'Chữ ký số hợp lệ',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.secondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Download CTA
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  ToastNotification.show(
-                    context,
-                    message: 'Đang tải xuống ${doc.fileName}... Tệp đã được lưu vào thư mục Downloads.',
-                    type: ToastType.success,
-                  );
-                },
-                icon: const Icon(Icons.cloud_download_outlined, size: 18),
-                label: const Text('Tải bản sao về máy', style: TextStyle(fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.secondary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+    if (source == null || !mounted) return;
+    try {
+      final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+      if (picked == null || !mounted) return;
+      final bytesLen = await picked.length();
+      final sizeKb = (bytesLen / 1024).toStringAsFixed(0);
+      await _docRepo.uploadOrReplaceDocument(
+        docType: type,
+        fileName: picked.name,
+        fileSize: '$sizeKb KB',
+        filePath: picked.path,
+      );
+      await _loadDocuments();
+      if (!mounted) return;
+      ToastNotification.showSuccess(context, 'Đã tải giấy tờ lên Cloud thành công (Chờ thẩm định)');
+    } catch (e) {
+      if (!mounted) return;
+      ToastNotification.showError(context, 'Lỗi tải giấy tờ lên Cloud: $e');
+    }
   }
 
-  Widget _buildViewerMetaRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 100,
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 11.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-          ),
-        ),
-      ],
-    );
+  void _openDocumentViewer(VendorDocumentModel doc, String title) {
+    showDialog<void>(context: context, builder: (context) => AlertDialog(
+      title: Text(title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (doc.fileUrl.startsWith('http://') || doc.fileUrl.startsWith('https://')) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                doc.fileUrl,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          SelectableText(doc.fileUrl.isEmpty ? 'Chưa có đường dẫn tài liệu trên máy chủ.' : doc.fileUrl),
+        ],
+      ),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng'))],
+    ));
   }
 
   @override
@@ -504,28 +130,28 @@ class _VendorDocumentsScreenState extends State<VendorDocumentsScreen> {
     final businessLicense = docs.firstWhere(
       (d) => d.docType == VendorDocType.businessLicense,
       orElse: () => VendorDocumentModel(
-        id: 'vdoc-001',
+        id: '',
         vendorId: _db.currentVendor.id,
         docType: VendorDocType.businessLicense,
-        fileUrl: 'GPKD_DanangOceanClub_2023.pdf',
-        status: DocumentReviewStatus.approved,
-        fileName: 'GPKD_DanangOceanClub_2023.pdf',
-        fileSize: '1.8 MB',
-        uploadedAt: DateTime(2023, 3, 15),
+        fileUrl: '',
+        status: DocumentReviewStatus.pending,
+        fileName: 'Chưa tải lên giấy phép kinh doanh',
+        fileSize: '0 KB',
+        uploadedAt: DateTime.now(),
       ),
     );
 
     final safetyCert = docs.firstWhere(
       (d) => d.docType == VendorDocType.safetyCert,
       orElse: () => VendorDocumentModel(
-        id: 'vdoc-002',
+        id: '',
         vendorId: _db.currentVendor.id,
         docType: VendorDocType.safetyCert,
-        fileUrl: 'ChungNhan_AnToanBien_SHT_2024.pdf',
-        status: DocumentReviewStatus.approved,
-        fileName: 'ChungNhan_AnToanBien_SHT_2024.pdf',
-        fileSize: '2.4 MB',
-        uploadedAt: DateTime(2024, 1, 12),
+        fileUrl: '',
+        status: DocumentReviewStatus.pending,
+        fileName: 'Chưa tải lên chứng nhận an toàn biển',
+        fileSize: '0 KB',
+        uploadedAt: DateTime.now(),
       ),
     );
 
