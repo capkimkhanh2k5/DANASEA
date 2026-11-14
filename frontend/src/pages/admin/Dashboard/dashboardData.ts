@@ -113,10 +113,18 @@ export async function loadAdminDashboard(get: DashboardGet, range: DateRange, si
       return null;
     }
   }
+  async function readOptional<T>(path: string, params: Record<string, string | number>, parse: (data: unknown) => T): Promise<T | null> {
+    try {
+      const response = await get(path, { params, signal });
+      return parse(response.data);
+    } catch {
+      return null;
+    }
+  }
   const page = { page: 0, size: 1 };
   const [
     bookings, revenue, vendors, services, refunds,
-    disputesOpen, disputesReview, settlementDraft, settlementPending,
+    disputesOpen, disputesReview, settlementDraft, settlementPending, payoutRequested,
     recentOrders, topVendors, roleApplications
   ] = await Promise.all([
     read('/admin/reports/bookings', { ...range, groupBy: 'day' }, data => parseBookings(data, range), 'báo cáo đặt chỗ'),
@@ -128,6 +136,7 @@ export async function loadAdminDashboard(get: DashboardGet, range: DateRange, si
     read('/admin/disputes', { ...page, status: 'UNDER_REVIEW' }, count, 'khiếu nại đang xem xét'),
     read('/admin/settlements', { ...page, status: 'DRAFT' }, count, 'kỳ quyết toán nháp'),
     read('/admin/settlements', { ...page, status: 'PENDING' }, count, 'kỳ quyết toán chờ xử lý'),
+    readOptional('/admin/payout-requests', { ...page, status: 'REQUESTED' }, count),
     read('/admin/orders', { page: 0, size: 5, sort: 'createdAt,desc' }, parseOrders, 'đơn hàng gần đây'),
     read('/admin/reports/vendors', { from: range.from, to: range.to }, data => ({
       topVendors: parseTopVendors(data),
@@ -135,6 +144,12 @@ export async function loadAdminDashboard(get: DashboardGet, range: DateRange, si
     }), 'báo cáo đối tác'),
     read('/admin/partner-applications', { ...page, status: 'PENDING' }, count, 'đơn xét duyệt vai trò'),
   ]);
+  // Khi API payout hoặc settlement trả về null (lỗi mạng hoặc 404), dữ liệu chưa đầy đủ:
+  // tuyệt đối không kết luận 0 payout chờ duyệt mà để settlements = null (unknown).
+  const settlements = (settlementDraft === null || settlementPending === null || payoutRequested === null)
+    ? null
+    : settlementDraft + settlementPending + payoutRequested;
+
   return {
     bookings, revenue, recentOrders, errors,
     hotServices: null,
@@ -143,7 +158,7 @@ export async function loadAdminDashboard(get: DashboardGet, range: DateRange, si
     operations: {
       vendors, services, refunds,
       disputes: disputesOpen === null || disputesReview === null ? null : disputesOpen + disputesReview,
-      settlements: settlementDraft === null || settlementPending === null ? null : settlementDraft + settlementPending,
+      settlements,
       roleApplications,
     },
   };

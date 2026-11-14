@@ -121,3 +121,87 @@ describe('Admin Dashboard Calculations — API Error & Null Safety (Scenario 4, 
   });
 });
 
+describe('Admin Dashboard Operations — Settlements & Payout Requests Aggregation', () => {
+  test('includes requested payout requests in operations.settlements count', async () => {
+    const { loadAdminDashboard } = await import('../dashboardData.ts');
+    const mockGet = async (path: string) => {
+      if (path === '/admin/settlements') {
+        return { data: { content: [], totalElements: 0 } };
+      }
+      if (path === '/admin/payout-requests') {
+        return { data: { content: [{ id: '00090000-0000-0000-0000-000000000010' }], totalElements: 1 } };
+      }
+      if (path === '/admin/disputes') {
+        return { data: { content: [], totalElements: 0 } };
+      }
+      if (path === '/admin/reports/bookings' || path === '/admin/reports/revenue' || path === '/admin/reports/vendors') {
+        return { data: { items: [] } };
+      }
+      if (path === '/admin/services') {
+        return { data: [] };
+      }
+      return { data: { content: [], totalElements: 0 } };
+    };
+
+    const data = await loadAdminDashboard(mockGet as any, { from: '2026-11-08', to: '2026-11-14' }, new AbortController().signal);
+    assert.equal(data.operations.settlements, 1);
+    assert.equal(data.errors.length, 0);
+  });
+
+  test('gracefully handles missing /admin/payout-requests endpoint without fatal dashboard error and does not falsely claim 0 pending payouts', async () => {
+    const { loadAdminDashboard } = await import('../dashboardData.ts');
+    const mockGet = async (path: string) => {
+      if (path === '/admin/payout-requests') {
+        throw new Error('404 Not Found');
+      }
+      if (path === '/admin/settlements') {
+        return { data: { content: [], totalElements: 0 } };
+      }
+      if (path === '/admin/disputes') {
+        return { data: { content: [{ id: '99999999-9999-9999-9999-999999999993' }], totalElements: 1 } };
+      }
+      if (path === '/admin/reports/bookings' || path === '/admin/reports/revenue' || path === '/admin/reports/vendors') {
+        return { data: { items: [] } };
+      }
+      if (path === '/admin/services') {
+        return { data: [] };
+      }
+      return { data: { content: [], totalElements: 0 } };
+    };
+
+    const data = await loadAdminDashboard(mockGet as any, { from: '2026-11-08', to: '2026-11-14' }, new AbortController().signal);
+    // When payout API is 404/incomplete, settlements must be null (unknown), NEVER falsely concluded as 0
+    assert.equal(data.operations.settlements, null);
+    // Disputes OPEN must be accurately counted as 1 (or 2 if both OPEN and UNDER_REVIEW return 1)
+    assert.equal(data.operations.disputes, 2);
+    // 404 on optional payout-requests should not pollute error banner
+    assert.ok(!data.errors.includes('lệnh chi trả chờ duyệt'));
+  });
+
+  test('correctly counts OPEN dispute as 1 when UNDER_REVIEW is 0', async () => {
+    const { loadAdminDashboard } = await import('../dashboardData.ts');
+    const mockGet = async (path: string, config?: any) => {
+      if (path === '/admin/disputes') {
+        if (config?.params?.status === 'OPEN') {
+          return { data: { content: [{ id: '99999999-9999-9999-9999-999999999993' }], totalElements: 1 } };
+        }
+        return { data: { content: [], totalElements: 0 } };
+      }
+      if (path === '/admin/settlements' || path === '/admin/payout-requests') {
+        return { data: { content: [], totalElements: 0 } };
+      }
+      if (path === '/admin/reports/bookings' || path === '/admin/reports/revenue' || path === '/admin/reports/vendors') {
+        return { data: { items: [] } };
+      }
+      if (path === '/admin/services') {
+        return { data: [] };
+      }
+      return { data: { content: [], totalElements: 0 } };
+    };
+
+    const data = await loadAdminDashboard(mockGet as any, { from: '2026-11-08', to: '2026-11-14' }, new AbortController().signal);
+    assert.equal(data.operations.disputes, 1);
+    assert.equal(data.operations.settlements, 0);
+  });
+});
+
