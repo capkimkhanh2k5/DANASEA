@@ -9,11 +9,14 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,6 +31,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockMakers;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.security.access.AccessDeniedException;
@@ -88,6 +92,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 class VendorAdminAiFeaturesTest {
+
+    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final VendorAiDataPort vendorAiData = mock(VendorAiDataPort.class);
     private final AdminAiDataPort adminAiData = mock(AdminAiDataPort.class);
@@ -456,27 +462,34 @@ class VendorAdminAiFeaturesTest {
                 new VendorAiDataPort.VendorPerformanceMetrics(BigDecimal.valueOf(1_300_000),
                         BigDecimal.valueOf(877_500), 2, 0, 0, 0, 0, 80, BigDecimal.ZERO, 0, "NONE", List.of()));
 
-        var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
-                "Doanh thu tháng này là bao nhiêu?", null, null, SupportedLanguage.VI);
+        LocalDate today = LocalDate.of(2027, 1, 1);
+        var earlierReply = new CopilotMessage(UUID.randomUUID(), conversation.id(), "ASSISTANT",
+                "Lời đáp cũ", null, "vendor_dashboard_summary", false, OffsetDateTime.now());
+        CopilotChatResponse response;
+        CopilotChatResponse followUp;
+        try (var time = mockStatic(LocalDate.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(() -> LocalDate.now(VIETNAM_ZONE)).thenReturn(today);
+            response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                    "Doanh thu tháng này là bao nhiêu?", null, null, SupportedLanguage.VI);
+            when(insightStore.listCopilotMessages(conversation.id())).thenReturn(List.of(earlierReply));
+            followUp = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                    "Còn tháng trước thì sao?", null, null, SupportedLanguage.VI);
+        }
 
-        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
-        verify(vendorAiData).getPerformanceMetrics(vendorId, today.withDayOfMonth(1), today);
+        verify(vendorAiData).getPerformanceMetrics(vendorId, today, today);
         assertThat(response.message()).contains("1.300.000", "877.500", "thực thu dự kiến");
         assertThat(response.toolsUsed()).containsExactly("vendor_dashboard_summary");
         assertThat(response.artifacts()).singleElement().satisfies(card -> {
-            assertThat(card.get("period")).isEqualTo(Map.of("from", today.withDayOfMonth(1).toString(), "to", today.toString()));
+            assertThat(card.get("period")).isEqualTo(Map.of("from", "2027-01-01", "to", "2027-01-01"));
             assertThat(mapper.valueToTree(card.get("data")).path("gmv").decimalValue())
                     .isEqualByComparingTo("1300000");
         });
 
-        when(insightStore.listCopilotMessages(conversation.id())).thenReturn(List.of(new CopilotMessage(
-                UUID.randomUUID(), conversation.id(), "ASSISTANT", "Lời đáp cũ", null,
-                "vendor_dashboard_summary", false, OffsetDateTime.now())));
-        var followUp = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
-                "Còn tháng trước thì sao?", null, null, SupportedLanguage.VI);
-        verify(vendorAiData).getPerformanceMetrics(vendorId, today.minusMonths(1).withDayOfMonth(1),
-                today.withDayOfMonth(1).minusDays(1));
+        verify(vendorAiData).getPerformanceMetrics(vendorId, LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 31));
         assertThat(followUp.message()).contains("1.300.000", "877.500");
+        assertThat(followUp.artifacts()).singleElement().satisfies(card ->
+                assertThat(card.get("period")).isEqualTo(Map.of("from", "2026-12-01", "to", "2026-12-31")));
         verifyNoInteractions(llmClient);
     }
 
@@ -552,12 +565,18 @@ class VendorAdminAiFeaturesTest {
         when(vendorAiData.getPerformanceMetrics(eq(vendorId), any(), any())).thenReturn(
                 new VendorAiDataPort.VendorPerformanceMetrics(BigDecimal.ZERO, BigDecimal.ZERO, 0, 0, 0, 0, 0,
                         0, BigDecimal.ZERO, 0, "NONE", List.of()));
-        int year = currentYear ? LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")).getYear() : 2026;
+        var today = LocalDate.of(2027, 1, 1);
+        int year = currentYear ? today.getYear() : 2026;
         var from = LocalDate.of(year, 10, 1);
         var to = LocalDate.of(year, 10, 31);
 
-        var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
-                question, null, null, SupportedLanguage.VI);
+        CopilotChatResponse response;
+        try (var time = mockStatic(LocalDate.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(() -> LocalDate.now(VIETNAM_ZONE)).thenReturn(today);
+            response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
+                    question, null, null, SupportedLanguage.VI);
+        }
 
         verify(vendorAiData).getPerformanceMetrics(vendorId, from, to);
         assertThat(response.message()).contains("GMV 0 ₫", "thực thu dự kiến 0 ₫");

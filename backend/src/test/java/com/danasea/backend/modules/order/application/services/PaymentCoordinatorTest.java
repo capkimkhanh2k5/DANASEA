@@ -29,6 +29,7 @@ import com.danasea.backend.modules.order.presentation.dtos.PaymentWindowResponse
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockMakers;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -286,13 +287,17 @@ class PaymentCoordinatorTest {
     @Test
     @DisplayName("switchProvider is rejected if remaining time is less than 5 seconds")
     void testSwitchProviderRejectedWhenTimeInsufficient() {
-        masterOrder.setPaymentDeadline(OffsetDateTime.now().plusSeconds(3)); // only 3s remaining
-
+        OffsetDateTime now = OffsetDateTime.parse("2026-11-14T23:59:58+07:00");
+        masterOrder.setPaymentDeadline(now.plusSeconds(3));
         when(masterOrderRepository.findByIdForUpdate(orderId)).thenReturn(Optional.of(masterOrder));
 
-        assertThatThrownBy(() -> coordinator.switchProvider(customerId, orderId, PaymentProvider.PAYOS, "switch-key-late"))
-                .isInstanceOf(InvalidOrderStateException.class)
-                .hasMessageContaining("Insufficient time remaining");
+        try (var time = mockStatic(OffsetDateTime.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(OffsetDateTime::now).thenReturn(now);
+            assertThatThrownBy(() -> coordinator.switchProvider(customerId, orderId, PaymentProvider.PAYOS, "switch-key-late"))
+                    .isInstanceOf(InvalidOrderStateException.class)
+                    .hasMessageContaining("Insufficient time remaining (3s)");
+        }
     }
 
     @Test
