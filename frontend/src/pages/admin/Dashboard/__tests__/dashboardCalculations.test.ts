@@ -143,7 +143,7 @@ describe('Admin Dashboard Operations — Settlements & Payout Requests Aggregati
       return { data: { content: [], totalElements: 0 } };
     };
 
-    const data = await loadAdminDashboard(mockGet as any, { from: '2026-11-08', to: '2026-11-14' }, new AbortController().signal);
+    const data = await loadAdminDashboard(mockGet as Parameters<typeof loadAdminDashboard>[0], { from: '2026-11-08', to: '2026-11-14' }, new AbortController().signal);
     assert.equal(data.operations.settlements, 1);
     assert.equal(data.errors.length, 0);
   });
@@ -169,7 +169,7 @@ describe('Admin Dashboard Operations — Settlements & Payout Requests Aggregati
       return { data: { content: [], totalElements: 0 } };
     };
 
-    const data = await loadAdminDashboard(mockGet as any, { from: '2026-11-08', to: '2026-11-14' }, new AbortController().signal);
+    const data = await loadAdminDashboard(mockGet as Parameters<typeof loadAdminDashboard>[0], { from: '2026-11-08', to: '2026-11-14' }, new AbortController().signal);
     // When payout API is 404/incomplete, settlements must be null (unknown), NEVER falsely concluded as 0
     assert.equal(data.operations.settlements, null);
     // Disputes OPEN must be accurately counted as 1 (or 2 if both OPEN and UNDER_REVIEW return 1)
@@ -180,7 +180,7 @@ describe('Admin Dashboard Operations — Settlements & Payout Requests Aggregati
 
   test('correctly counts OPEN dispute as 1 when UNDER_REVIEW is 0', async () => {
     const { loadAdminDashboard } = await import('../dashboardData.ts');
-    const mockGet = async (path: string, config?: any) => {
+    const mockGet = async (path: string, config?: { params?: Record<string, string | number> }) => {
       if (path === '/admin/disputes') {
         if (config?.params?.status === 'OPEN') {
           return { data: { content: [{ id: '99999999-9999-9999-9999-999999999993' }], totalElements: 1 } };
@@ -199,7 +199,7 @@ describe('Admin Dashboard Operations — Settlements & Payout Requests Aggregati
       return { data: { content: [], totalElements: 0 } };
     };
 
-    const data = await loadAdminDashboard(mockGet as any, { from: '2026-11-08', to: '2026-11-14' }, new AbortController().signal);
+    const data = await loadAdminDashboard(mockGet as Parameters<typeof loadAdminDashboard>[0], { from: '2026-11-08', to: '2026-11-14' }, new AbortController().signal);
     assert.equal(data.operations.disputes, 1);
     assert.equal(data.operations.settlements, 0);
   });
