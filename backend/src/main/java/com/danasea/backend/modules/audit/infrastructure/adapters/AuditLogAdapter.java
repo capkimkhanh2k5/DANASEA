@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.audit.infrastructure.adapters;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,8 +29,40 @@ public class AuditLogAdapter implements AuditLogPort {
 
     @Override
     public Page<AuditLog> getAuditLogs(Pageable pageable) {
-        return jpaAuditLogRepository.findAll(pageable)
+        return getAuditLogs(null, null, null, pageable);
+    }
+
+    @Override
+    public Page<AuditLog> getAuditLogs(String action, String entityType, String search, Pageable pageable) {
+        String cleanAction = normalize(action);
+        String cleanEntityType = normalize(entityType);
+        String pattern = toContainsPattern(search);
+
+        if (cleanAction == null && cleanEntityType == null && pattern == null) {
+            return jpaAuditLogRepository.findAll(pageable)
+                    .map(auditLogMapper::toDomain);
+        }
+
+        return jpaAuditLogRepository.findByFilters(cleanAction, cleanEntityType, pattern, pageable)
                 .map(auditLogMapper::toDomain);
+    }
+
+    private static String normalize(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.strip();
+    }
+
+    private static String toContainsPattern(String search) {
+        if (search == null || search.isBlank()) {
+            return null;
+        }
+        String clean = search.strip().toLowerCase(Locale.ROOT)
+                .replace("!", "!!")
+                .replace("%", "!%")
+                .replace("_", "!_");
+        return "%" + clean + "%";
     }
 
     @Override

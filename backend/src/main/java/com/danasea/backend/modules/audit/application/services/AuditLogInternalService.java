@@ -46,6 +46,11 @@ public class AuditLogInternalService implements AuditLogInternalApi {
     }
 
     @Override
+    public Page<AuditLog> getAuditLogs(String action, String entityType, String search, Pageable pageable) {
+        return auditLogPort.getAuditLogs(action, entityType, search, pageable);
+    }
+
+    @Override
     public Optional<AuditLog> getAuditLogById(UUID id) {
         return auditLogPort.getAuditLogById(id);
     }

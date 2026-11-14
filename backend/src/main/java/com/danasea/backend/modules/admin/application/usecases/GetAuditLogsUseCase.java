@@ -17,7 +17,11 @@ public class GetAuditLogsUseCase {
     private final AuditLogInternalApi auditLogInternalApi;
 
     public Page<AuditLogResponse> execute(Pageable pageable) {
-        Page<AuditLog> auditLogs = auditLogInternalApi.getAuditLogs(pageable);
+        return execute(null, null, null, pageable);
+    }
+
+    public Page<AuditLogResponse> execute(String action, String entityType, String search, Pageable pageable) {
+        Page<AuditLog> auditLogs = auditLogInternalApi.getAuditLogs(action, entityType, search, pageable);
         return auditLogs.map(this::mapToResponse);
     }
 

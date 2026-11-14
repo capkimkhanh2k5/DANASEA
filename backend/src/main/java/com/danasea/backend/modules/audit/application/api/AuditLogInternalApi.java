@@ -17,5 +17,9 @@ public interface AuditLogInternalApi {
 
     Page<AuditLog> getAuditLogs(Pageable pageable);
 
+    default Page<AuditLog> getAuditLogs(String action, String entityType, String search, Pageable pageable) {
+        return getAuditLogs(pageable);
+    }
+
     Optional<AuditLog> getAuditLogById(UUID id);
 }
