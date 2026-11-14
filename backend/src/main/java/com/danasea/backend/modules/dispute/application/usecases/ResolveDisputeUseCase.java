@@ -4,14 +4,17 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.communication.application.email.EmailRequest;
 import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
 import com.danasea.backend.modules.communication.domain.models.TransactionalEmailType;
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -48,6 +51,8 @@ public class ResolveDisputeUseCase {
     private final JpaSubOrderRepository subOrderRepository;
     private final JpaRefundRepository refundRepository;
     private final RefundProcessingService refundProcessingService;
+    private final AuditLogInternalApi auditLogInternalApi;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired(required = false)
     private TransactionalEmailPort transactionalEmailPort;
@@ -68,18 +73,36 @@ public class ResolveDisputeUseCase {
             JpaDisputeRepository disputeRepository,
             JpaSubOrderRepository subOrderRepository,
             JpaRefundRepository refundRepository,
-            @Autowired(required = false) RefundProcessingService refundProcessingService) {
+            @Autowired(required = false) RefundProcessingService refundProcessingService,
+            @Autowired(required = false) AuditLogInternalApi auditLogInternalApi) {
         this.disputeRepository = disputeRepository;
         this.subOrderRepository = subOrderRepository;
         this.refundRepository = refundRepository;
         this.refundProcessingService = refundProcessingService;
+        this.auditLogInternalApi = auditLogInternalApi;
+    }
+
+    public ResolveDisputeUseCase(
+            JpaDisputeRepository disputeRepository,
+            JpaSubOrderRepository subOrderRepository,
+            JpaRefundRepository refundRepository,
+            RefundProcessingService refundProcessingService) {
+        this(disputeRepository, subOrderRepository, refundRepository, refundProcessingService, null);
     }
 
     public ResolveDisputeUseCase(
             JpaDisputeRepository disputeRepository,
             JpaSubOrderRepository subOrderRepository,
             JpaRefundRepository refundRepository) {
-        this(disputeRepository, subOrderRepository, refundRepository, null);
+        this(disputeRepository, subOrderRepository, refundRepository, null, null);
+    }
+
+    public ResolveDisputeUseCase(
+            JpaDisputeRepository disputeRepository,
+            JpaSubOrderRepository subOrderRepository,
+            JpaRefundRepository refundRepository,
+            AuditLogInternalApi auditLogInternalApi) {
+        this(disputeRepository, subOrderRepository, refundRepository, null, auditLogInternalApi);
     }
 
     @Transactional
@@ -182,12 +205,30 @@ public class ResolveDisputeUseCase {
         }
 
         // 5. Cập nhật bản ghi Dispute
+        DisputeStatus previousStatus = dispute.getStatus();
         dispute.setStatus(resolution);
         dispute.setRefundPercentage(appliedRefundPercentage);
         dispute.setAdminNote(request.adminNote());
         dispute.setResolvedBy(adminUserId);
         dispute.setResolvedAt(now);
         DisputeJpaEntity savedDispute = disputeRepository.save(dispute);
+
+        if (auditLogInternalApi != null) {
+            String metadata = buildAuditMetadata(
+                    previousStatus != null ? previousStatus.name() : "OPEN",
+                    savedDispute.getStatus().name(),
+                    savedDispute,
+                    refund != null && refund.getAmount() != null ? refund.getAmount().doubleValue() : null,
+                    refund != null && refund.getId() != null ? refund.getId().toString() : null
+            );
+            auditLogInternalApi.recordTransactionalAuditLog(
+                    adminUserId,
+                    "DISPUTE_RESOLVED",
+                    "DISPUTE",
+                    savedDispute.getId(),
+                    metadata
+            );
+        }
 
         if (transactionalEmailPort != null) {
             // 1. Email cho Khách hàng
@@ -247,6 +288,44 @@ public class ResolveDisputeUseCase {
         }
 
         return DisputeResponse.fromEntity(savedDispute);
+    }
+
+    private String buildAuditMetadata(
+            String previousStatus,
+            String newStatus,
+            DisputeJpaEntity dispute,
+            Double refundAmount,
+            String refundId) {
+        try {
+            Map<String, Object> meta = new LinkedHashMap<>();
+            meta.put("disputeId", dispute.getId().toString());
+            meta.put("previousStatus", previousStatus);
+            meta.put("newStatus", newStatus);
+            meta.put("resolution", newStatus);
+            if (dispute.getRefundPercentage() != null) {
+                meta.put("refundPercentage", dispute.getRefundPercentage().doubleValue());
+            }
+            if (refundAmount != null) {
+                meta.put("amount", refundAmount);
+            }
+            if (refundId != null) {
+                meta.put("refundId", refundId);
+            }
+            if (dispute.getReason() != null) {
+                meta.put("reason", dispute.getReason().name());
+            }
+            if (dispute.getSubOrderId() != null) {
+                meta.put("subOrderId", dispute.getSubOrderId().toString());
+            }
+            if (dispute.getAdminNote() != null && !dispute.getAdminNote().isBlank()) {
+                meta.put("note", dispute.getAdminNote().trim());
+            }
+            return objectMapper.writeValueAsString(meta);
+        } catch (Exception ex) {
+            log.warn("Could not serialize dispute audit metadata as JSON: {}", ex.getMessage());
+            return String.format("previousStatus=%s,newStatus=%s,disputeId=%s,resolution=%s",
+                    previousStatus, newStatus, dispute.getId(), newStatus);
+        }
     }
 
 }

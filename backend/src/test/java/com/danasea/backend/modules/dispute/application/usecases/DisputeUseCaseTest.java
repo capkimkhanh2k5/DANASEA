@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.dispute.application.usecases;
 
+import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.dispute.application.services.DisputeWindowService;
 import com.danasea.backend.modules.dispute.domain.exceptions.*;
 import com.danasea.backend.modules.dispute.domain.models.DisputeReason;
@@ -67,6 +68,9 @@ class DisputeUseCaseTest {
     @Mock
     private JpaRefundRepository refundRepository;
 
+    @Mock
+    private AuditLogInternalApi auditLogInternalApi;
+
     private CreateDisputeUseCase createDisputeUseCase;
     private ResolveDisputeUseCase resolveDisputeUseCase;
     private GetDisputesUseCase getDisputesUseCase;
@@ -84,7 +88,7 @@ class DisputeUseCaseTest {
                 disputeRepository, masterOrderRepository, subOrderRepository,
                 new DisputeWindowService(slotRepository, Clock.systemDefaultZone()));
         resolveDisputeUseCase = new ResolveDisputeUseCase(
-                disputeRepository, subOrderRepository, refundRepository);
+                disputeRepository, subOrderRepository, refundRepository, auditLogInternalApi);
         getDisputesUseCase = new GetDisputesUseCase(disputeRepository);
 
         customerId = UUID.randomUUID();
@@ -525,6 +529,14 @@ class DisputeUseCaseTest {
             // Provider confirmation, not the admin decision, performs the financial terminal transition.
             verify(subOrderRepository, never()).save(any());
             assertThat(subOrder.getStatus()).isEqualTo(SubOrderStatus.COMPLETED);
+
+            verify(auditLogInternalApi).recordTransactionalAuditLog(
+                    eq(adminId),
+                    eq("DISPUTE_RESOLVED"),
+                    eq("DISPUTE"),
+                    eq(disputeId),
+                    any()
+            );
         }
 
         @Test
@@ -613,6 +625,14 @@ class DisputeUseCaseTest {
 
             verify(refundRepository, never()).save(any());
             verify(subOrderRepository, never()).save(any());
+
+            verify(auditLogInternalApi).recordTransactionalAuditLog(
+                    eq(adminId),
+                    eq("DISPUTE_RESOLVED"),
+                    eq("DISPUTE"),
+                    eq(disputeId),
+                    any()
+            );
         }
 
         @Test
@@ -634,6 +654,7 @@ class DisputeUseCaseTest {
             verify(refundRepository, never()).save(any());
             verify(subOrderRepository, never()).save(any());
             verify(disputeRepository, never()).save(any());
+            verify(auditLogInternalApi, never()).recordTransactionalAuditLog(any(), any(), any(), any(), any());
         }
 
         @Test
