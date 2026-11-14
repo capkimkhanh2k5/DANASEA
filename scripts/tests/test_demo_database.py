@@ -348,6 +348,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         self.sql("INSERT INTO users(id,created_at,updated_at,email,role) VALUES ('ffffffff-0000-0000-0000-000000000011',now(),now(),'original-recovery@local.test','CUSTOMER')")
         runtime.baseline = runtime.fingerprints()
         runtime.config_fingerprint = runtime.baseline['configuration_sha256']
+        runtime.audit_package_schema()
         runtime.gate(runtime.journal)
         self.addCleanup(lambda: runtime.ungate(runtime.journal))
         point = runtime.snapshot(state)

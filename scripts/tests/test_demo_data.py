@@ -227,6 +227,33 @@ class RuntimeGuardsTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Committed package manifest mismatch'):
                 runtime.preflight({'sha': 'a' * 40, 'package_sha256': 'b' * 64})
 
+    def test_importer_requires_a_committed_receipt_matching_the_package_count(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app = Path(directory)
+            runtime = self.module.Runtime({'app_dir': directory}, app)
+            runtime.container = 'postgres'
+            runtime.admin = 'postgres'
+            point = {'backup_id': 'verified.dump'}
+            runtime.command = lambda *args, **kwargs: self.fail('Import must wait for the package audit')
+            with self.assertRaisesRegex(ValueError, 'Missing canonical record count'):
+                runtime.importer('demo', point, 'fixture-password', app / 'receipt.json')
+            runtime.expected_canonical_records = 688
+            for transaction, count, accepted in (
+                ('COMMITTED', 688, True),
+                ('COMMITTED', 687, False),
+                ('COMMITTED', 688.0, False),
+                ('COMMITTED', None, False),
+                ('ROLLED_BACK', 688, False),
+            ):
+                with self.subTest(transaction=transaction, count=count):
+                    receipt = {'transaction': transaction, 'totalVerifiedInDb': count}
+                    runtime.command = lambda *args, **kwargs: json.dumps(receipt).encode()
+                    if accepted:
+                        self.assertEqual(receipt, runtime.importer('demo', point, 'fixture-password', app / 'receipt.json'))
+                    else:
+                        with self.assertRaisesRegex(ValueError, 'verified committed receipt'):
+                            runtime.importer('demo', point, 'fixture-password', app / 'receipt.json')
+
     def test_unknown_redis_keys_block_the_entire_invalidation(self):
         self.assertTrue(self.module.known_redis_key('usersById::123'))
         self.assertTrue(self.module.known_redis_key('inventory:slot:123:holds'))
