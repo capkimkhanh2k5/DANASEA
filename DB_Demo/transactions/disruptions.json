@@ -3,65 +3,65 @@
   "sub_order_disruptions": [
     {
       "id": "da010000-0000-0000-0000-000000000001",
-      "sub_order_id": "00020000-0000-0000-0000-000000000011",
-      "original_slot_id": "a593f000-eaf6-5927-aee7-d4746e892837",
-      "original_departure_at": "2026-11-06T20:00:00.000000+00:00",
-      "decision_deadline": "2026-11-06T08:00:00.000000+00:00",
+      "sub_order_id": "00020000-0000-0000-0000-000000000010",
+      "original_slot_id": "ed7319d7-6309-5277-bb88-43a2c5c87620",
+      "original_departure_at": "2026-11-20T07:00:00.000000+07:00",
+      "decision_deadline": "2026-11-19T19:00:00.000000+07:00",
       "reason": "WEATHER",
       "details": "Cảng vụ Hàng hải Đà Nẵng phát lệnh cấm tàu xuất bến do dông lốc cục bộ ngoài khơi bán đảo Sơn Trà",
-      "source_key": "DANANG-PORT-NOTICE-20261106-01",
+      "source_key": "DANANG-PORT-NOTICE-20261120-01",
       "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
       "status": "AWAITING_DECISION",
       "refund_id": null,
-      "notification_sent_at": "2026-11-06T07:45:00.000000+00:00",
-      "created_at": "2026-11-06T07:45:00.000000+00:00",
-      "updated_at": "2026-11-06T07:45:00.000000+00:00"
+      "notification_sent_at": "2026-11-15T08:00:00.000000+00:00",
+      "created_at": "2026-11-15T08:00:00.000000+00:00",
+      "updated_at": "2026-11-15T08:00:00.000000+00:00"
     },
     {
       "id": "da010000-0000-0000-0000-000000000002",
       "sub_order_id": "00020000-0000-0000-0000-000000000012",
       "original_slot_id": "a593f000-eaf6-5927-aee7-d4746e892837",
-      "original_departure_at": "2026-11-06T21:00:00.000000+00:00",
-      "decision_deadline": "2026-11-06T09:00:00.000000+00:00",
-      "reason": "WEATHER",
-      "details": "Lệnh cấm xuất bến đối với cano chở khách lặn ngắm san hô Bãi Nam do tầm nhìn dưới 500m",
-      "source_key": "DANANG-PORT-NOTICE-20261106-02",
+      "original_departure_at": "2026-10-25T18:00:00.000000+07:00",
+      "decision_deadline": "2026-10-25T06:00:00.000000+07:00",
+      "reason": "VENDOR_FAULT",
+      "details": "Động cơ cano gặp sự cố kỹ thuật trước giờ xuất bến, đối tác không kịp bố trí phương tiện thay thế",
+      "source_key": "VENDOR-FAULT-INCIDENT-20261120-02",
       "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-      "status": "AWAITING_DECISION",
+      "status": "CLOSED",
       "refund_id": null,
-      "notification_sent_at": "2026-11-06T08:00:00.000000+00:00",
-      "created_at": "2026-11-06T08:00:00.000000+00:00",
-      "updated_at": "2026-11-06T08:00:00.000000+00:00"
+      "notification_sent_at": "2026-11-15T08:30:00.000000+00:00",
+      "created_at": "2026-11-15T08:30:00.000000+00:00",
+      "updated_at": "2026-11-15T08:30:00.000000+00:00"
     }
   ],
   "sub_order_reschedule_proposals": [
     {
       "id": "fa010000-0000-0000-0000-000000000001",
-      "sub_order_id": "00020000-0000-0000-0000-000000000011",
-      "vendor_id": "2680f19f-8b5a-5aa8-8474-cb13e2ff1c22",
-      "proposed_slot_id": "5e068a90-a8d3-5194-b2f6-d37dca987121",
-      "reason": "Đề xuất chuyển ca sang sáng mai cùng khung giờ 08:30 khi thời tiết biển êm trở lại",
+      "sub_order_id": "00020000-0000-0000-0000-000000000010",
+      "vendor_id": "128672c5-94e7-5560-896c-158794913b8c",
+      "proposed_slot_id": "86bd99b8-2040-56db-aa9b-ab3da84d94e0",
+      "reason": "Đề xuất chuyển ca sang sáng mai 07:00 khi thời tiết biển êm trở lại",
       "reason_type": "WEATHER",
       "status": "PENDING",
       "proposal_version": 1,
-      "notification_sent_at": "2026-11-06T07:50:00.000000+00:00",
-      "expires_at": "2026-11-06T20:00:00.000000+00:00",
-      "created_at": "2026-11-06T07:50:00.000000+00:00",
-      "updated_at": "2026-11-06T07:50:00.000000+00:00"
+      "notification_sent_at": "2026-11-15T08:15:00.000000+00:00",
+      "expires_at": "2026-11-19T19:00:00.000000+07:00",
+      "created_at": "2026-11-15T08:15:00.000000+00:00",
+      "updated_at": "2026-11-15T08:15:00.000000+00:00"
     }
   ],
   "vendor_fault_compensations": [
     {
-      "disruption_id": "da010000-0000-0000-0000-000000000001",
-      "sub_order_id": "00020000-0000-0000-0000-000000000013",
-      "original_slot_id": "1ae4ed72-991c-54c4-a040-1fc1f2dcf06a",
-      "vendor_id": "5fb18fee-16fd-5b9f-bcbd-759b47768d9b",
-      "voucher_id": "11111111-1111-1111-1111-111111111102",
-      "paid_basis": 1500000.0,
-      "rate_bps": 1000,
+      "disruption_id": "da010000-0000-0000-0000-000000000002",
+      "sub_order_id": "00020000-0000-0000-0000-000000000012",
+      "original_slot_id": "a593f000-eaf6-5927-aee7-d4746e892837",
+      "vendor_id": "2680f19f-8b5a-5aa8-8474-cb13e2ff1c22",
+      "voucher_id": "11111111-1111-1111-1111-111111111107",
+      "paid_basis": 650000.0,
+      "rate_bps": 2307,
       "amount": 150000.0,
       "remaining_amount": 150000.0,
-      "created_at": "2026-11-06T08:00:00.000000+00:00"
+      "created_at": "2026-11-15T08:35:00.000000+00:00"
     }
   ]
 }

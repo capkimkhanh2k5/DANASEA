@@ -73,7 +73,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         before = self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM system_configs t")
         rules = self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM category_safety_rules t")
         result = self.replace()
-        self.assertEqual(646, result['totalVerifiedInDb'])
+        self.assertEqual(683, result['totalVerifiedInDb'])
         self.assertEqual('REPLACE_SUCCESS', result['status'])
         self.assertEqual(0, self.sql("SELECT to_json(count(*)) FROM users WHERE email='old@local.test'"))
         self.assertEqual(1, self.sql("SELECT to_json(count(*)) FROM users WHERE email='config@local.test'"))
@@ -81,7 +81,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         self.assertEqual(rules, self.sql("SELECT json_agg(to_jsonb(t) ORDER BY id) FROM category_safety_rules t"))
         self.assertEqual(24, self.sql("SELECT to_json(count(*)) FROM service_safety_documents WHERE status='APPROVED' AND reviewed_by IS NOT NULL"))
         self.replace()
-        self.assertEqual(13, self.sql("SELECT to_json(count(*)) FROM users"))
+        self.assertEqual(36, self.sql("SELECT to_json(count(*)) FROM users"))
 
     def test_01b_replacement_materializes_bookable_demo_horizon(self):
         result = self.replace()
@@ -365,7 +365,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
             runtime.restore(point)
         self.assertIn(b'22012', failure.exception.stderr)
         self.assertEqual(0, self.sql("SELECT to_json(count(*)) FROM users WHERE email='original-recovery@local.test'"))
-        self.assertEqual(12, self.sql("SELECT to_json(count(*)) FROM users WHERE email LIKE '%@danasea.test'"))
+        self.assertEqual(35, self.sql("SELECT to_json(count(*)) FROM users WHERE email LIKE '%@danasea.test'"))
         try:
             runtime.restore(point)
         except subprocess.CalledProcessError as error:
@@ -380,6 +380,90 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         forbidden = subprocess.run(command, input='DELETE FROM flyway_schema_history WHERE false;', text=True, capture_output=True, check=False)
         self.assertNotEqual(0, forbidden.returncode)
         self.assertIn('permission denied', forbidden.stderr)
+
+    def test_11_extended_business_integrity_zero_violations(self):
+        """Buoc toan bo cac vi pham quan he nghiep vu mo rong ve 0 tren PostgreSQL 17."""
+        self.replace()
+
+        # 1. Zero mismatched discount or payment amounts
+        mismatched_discounts = self.sql("""
+            SELECT to_json(count(*))
+            FROM master_orders m
+            JOIN (
+                SELECT master_order_id, SUM(discount_amount) AS total_sub_disc
+                FROM sub_orders
+                GROUP BY master_order_id
+            ) s ON s.master_order_id = m.id
+            JOIN payments p ON p.master_order_id = m.id
+            WHERE m.discount_amount <> s.total_sub_disc
+               OR p.amount <> (m.total_amount - m.discount_amount)
+        """)
+        self.assertEqual(0, mismatched_discounts, "Discount or payment amounts mismatched")
+
+        # 2. Zero vendor vouchers applied to orders of another vendor
+        invalid_vendor_vouchers = self.sql("""
+            SELECT to_json(count(*))
+            FROM master_orders m
+            JOIN discount_codes d ON d.id = m.discount_code_id
+            JOIN sub_orders s ON s.master_order_id = m.id
+            WHERE d.scope = 'VENDOR' AND d.vendor_id <> s.vendor_id
+        """)
+        self.assertEqual(0, invalid_vendor_vouchers, "Vendor voucher applied to different vendor")
+
+        # 3. Zero resolved refund disputes missing matching processed refunds
+        missing_refunds = self.sql("""
+            SELECT to_json(count(*))
+            FROM disputes d
+            JOIN sub_orders s ON s.id = d.sub_order_id
+            WHERE d.status IN ('RESOLVED_REFUND', 'RESOLVED_PARTIAL')
+              AND NOT EXISTS (
+                  SELECT 1 FROM refunds r
+                  WHERE r.sub_order_id = d.sub_order_id
+                    AND r.refund_percentage = d.refund_percentage
+                    AND r.amount = ROUND(s.final_amount * d.refund_percentage / 100.0, 2)
+              )
+        """)
+        self.assertEqual(0, missing_refunds, "Resolved dispute missing matching refund record")
+
+        # 4. Zero reschedule proposals targeting foreign service or completed orders
+        invalid_proposals = self.sql("""
+            SELECT to_json(count(*))
+            FROM sub_order_reschedule_proposals p
+            JOIN sub_orders s ON s.id = p.sub_order_id
+            JOIN service_slots sl ON sl.id = p.proposed_slot_id
+            WHERE sl.service_id <> s.service_id
+               OR s.status = 'COMPLETED'
+        """)
+        self.assertEqual(0, invalid_proposals, "Reschedule proposal foreign service or completed order")
+
+        # 5. Zero disruptions with departure time mismatched from original slot
+        invalid_disruptions = self.sql("""
+            SELECT to_json(count(*))
+            FROM sub_order_disruptions d
+            JOIN service_slots s ON s.id = d.original_slot_id
+            WHERE d.original_departure_at <> (s.date + s.start_time) AT TIME ZONE 'Asia/Ho_Chi_Minh'
+        """)
+        self.assertEqual(0, invalid_disruptions, "Disruption original_departure_at mismatched from slot")
+
+        # 6. Zero reviews on incomplete orders or mismatched users/services
+        invalid_reviews = self.sql("""
+            SELECT to_json(count(*))
+            FROM reviews r
+            JOIN sub_orders s ON s.id = r.sub_order_id
+            JOIN master_orders m ON m.id = s.master_order_id
+            WHERE s.status <> 'COMPLETED'
+               OR r.customer_id <> m.customer_id
+               OR r.service_id <> s.service_id
+               OR r.vendor_id <> s.vendor_id
+        """)
+        self.assertEqual(0, invalid_reviews, "Reviews attached to incomplete orders or wrong entity")
+
+        # 7. Diversity of payout statuses: must include PAID and REJECTED
+        payout_statuses = self.sql("""
+            SELECT json_agg(DISTINCT status) FROM payout_requests
+        """)
+        self.assertIn('PAID', payout_statuses)
+        self.assertIn('REJECTED', payout_statuses)
 
 
 if __name__ == '__main__':

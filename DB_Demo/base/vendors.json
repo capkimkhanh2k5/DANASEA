@@ -10,15 +10,16 @@
         "bank_name": "BIDV",
         "badge_tier": "VERIFIED",
         "created_at": "2026-10-15T09:06:26.816505+00:00",
-        "rating_avg": "0.00",
+        "rating_avg": "3.33",
         "updated_at": "2026-10-20T10:00:00+00:00",
         "verified_at": "2026-10-20T10:00:00+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-        "rating_count": 0,
+        "rating_count": 3,
         "business_name": "Loca Travel Đà Nẵng",
         "bank_account_holder": "DANASEA DEMO VENDOR 04",
         "bank_account_number": "621140119996",
-        "verification_status": "APPROVED"
+        "verification_status": "APPROVED",
+        "rejection_reason": null
       }
     },
     {
@@ -30,15 +31,16 @@
         "bank_name": "BIDV",
         "badge_tier": "VERIFIED",
         "created_at": "2026-10-15T09:06:26.816505+00:00",
-        "rating_avg": "0.00",
+        "rating_avg": "4.00",
         "updated_at": "2026-10-20T10:00:00+00:00",
         "verified_at": "2026-10-20T10:00:00+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-        "rating_count": 0,
+        "rating_count": 1,
         "business_name": "Công ty Cổ phần D BLUE",
         "bank_account_holder": "DANASEA DEMO VENDOR 05",
         "bank_account_number": "622440868686",
-        "verification_status": "APPROVED"
+        "verification_status": "APPROVED",
+        "rejection_reason": null
       }
     },
     {
@@ -50,15 +52,16 @@
         "bank_name": "ACB",
         "badge_tier": "VERIFIED",
         "created_at": "2026-10-15T09:06:26.816505+00:00",
-        "rating_avg": "0.00",
+        "rating_avg": "4.50",
         "updated_at": "2026-10-20T10:00:00+00:00",
         "verified_at": "2026-10-20T10:00:00+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-        "rating_count": 0,
+        "rating_count": 2,
         "business_name": "Khuê Nguyễn – Dịch Vụ Câu Mực Đà Nẵng",
         "bank_account_holder": "DANASEA DEMO VENDOR 06",
         "bank_account_number": "1974197426",
-        "verification_status": "APPROVED"
+        "verification_status": "APPROVED",
+        "rejection_reason": null
       }
     },
     {
@@ -68,17 +71,18 @@
         "user_id": "865a115c-d7f9-5ebd-a36b-1834a590177a",
         "tax_code": "3702958143",
         "bank_name": "VPBank",
-        "badge_tier": "VERIFIED",
+        "badge_tier": "TOP_RATED",
         "created_at": "2026-10-15T09:06:26.816505+00:00",
-        "rating_avg": "0.00",
+        "rating_avg": "4.60",
         "updated_at": "2026-10-20T10:00:00+00:00",
         "verified_at": "2026-10-20T10:00:00+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-        "rating_count": 0,
+        "rating_count": 5,
         "business_name": "Danabeach Club (Điểm dịch vụ thể thao biển)",
         "bank_account_holder": "DANASEA DEMO VENDOR 01",
         "bank_account_number": "6969696163",
-        "verification_status": "APPROVED"
+        "verification_status": "APPROVED",
+        "rejection_reason": null
       }
     },
     {
@@ -88,17 +92,18 @@
         "user_id": "32797f00-04d0-53fc-b55d-6672984aba55",
         "tax_code": "0402195837",
         "bank_name": "VPBank",
-        "badge_tier": "VERIFIED",
+        "badge_tier": "TOP_RATED",
         "created_at": "2026-10-15T09:06:26.816505+00:00",
-        "rating_avg": "0.00",
+        "rating_avg": "4.00",
         "updated_at": "2026-10-20T10:00:00+00:00",
         "verified_at": "2026-10-20T10:00:00+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-        "rating_count": 0,
+        "rating_count": 5,
         "business_name": "Surf Shack Da Nang",
         "bank_account_holder": "DANASEA DEMO VENDOR 09",
         "bank_account_number": "797979683863",
-        "verification_status": "APPROVED"
+        "verification_status": "APPROVED",
+        "rejection_reason": null
       }
     },
     {
@@ -110,15 +115,16 @@
         "bank_name": "Vietcombank",
         "badge_tier": "VERIFIED",
         "created_at": "2026-10-15T09:06:26.816505+00:00",
-        "rating_avg": "0.00",
+        "rating_avg": "4.25",
         "updated_at": "2026-10-20T10:00:00+00:00",
         "verified_at": "2026-10-20T10:00:00+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-        "rating_count": 0,
+        "rating_count": 4,
         "business_name": "DaNaFi – Tour Câu Cá Đà Nẵng",
         "bank_account_holder": "DANASEA DEMO VENDOR 07",
         "bank_account_number": "00700797976",
-        "verification_status": "APPROVED"
+        "verification_status": "APPROVED",
+        "rejection_reason": null
       }
     },
     {
@@ -128,17 +134,18 @@
         "user_id": "3ad7d9af-4d4c-59b7-9897-288fcce5be79",
         "tax_code": "0316482915",
         "bank_name": "ACB",
-        "badge_tier": "VERIFIED",
+        "badge_tier": "TOP_RATED",
         "created_at": "2026-10-15T09:06:26.816505+00:00",
-        "rating_avg": "0.00",
+        "rating_avg": "4.43",
         "updated_at": "2026-10-20T10:00:00+00:00",
         "verified_at": "2026-10-20T10:00:00+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-        "rating_count": 0,
+        "rating_count": 7,
         "business_name": "Da Nang Outdoor Adventures (DNOA)",
         "bank_account_holder": "DANASEA DEMO VENDOR 03",
         "bank_account_number": "127273899",
-        "verification_status": "APPROVED"
+        "verification_status": "APPROVED",
+        "rejection_reason": null
       }
     },
     {
@@ -150,15 +157,16 @@
         "bank_name": "Techcombank",
         "badge_tier": "VERIFIED",
         "created_at": "2026-10-15T09:06:26.816505+00:00",
-        "rating_avg": "0.00",
+        "rating_avg": "4.67",
         "updated_at": "2026-10-20T10:00:00+00:00",
         "verified_at": "2026-10-20T10:00:00+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-        "rating_count": 0,
+        "rating_count": 3,
         "business_name": "Công ty TNHH Kajin Vina",
         "bank_account_holder": "DANASEA DEMO VENDOR 02",
         "bank_account_number": "69986999999999",
-        "verification_status": "APPROVED"
+        "verification_status": "APPROVED",
+        "rejection_reason": null
       }
     },
     {
@@ -170,15 +178,16 @@
         "bank_name": "Vietcombank",
         "badge_tier": "VERIFIED",
         "created_at": "2026-10-15T09:06:26.816505+00:00",
-        "rating_avg": "0.00",
+        "rating_avg": "4.67",
         "updated_at": "2026-10-20T10:00:00+00:00",
         "verified_at": "2026-10-20T10:00:00+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
-        "rating_count": 0,
+        "rating_count": 3,
         "business_name": "Go N Chill SUP Club",
         "bank_account_holder": "DANASEA DEMO VENDOR 08",
         "bank_account_number": "00700648686",
-        "verification_status": "APPROVED"
+        "verification_status": "APPROVED",
+        "rejection_reason": null
       }
     },
     {
@@ -198,7 +207,8 @@
         "verified_at": null,
         "verified_by": null,
         "created_at": "2026-11-01T08:00:00.000000+00:00",
-        "updated_at": "2026-11-01T08:00:00.000000+00:00"
+        "updated_at": "2026-11-01T08:00:00.000000+00:00",
+        "rejection_reason": null
       }
     },
     {
@@ -218,7 +228,8 @@
         "verified_at": null,
         "verified_by": null,
         "created_at": "2026-11-02T08:00:00.000000+00:00",
-        "updated_at": "2026-11-02T08:00:00.000000+00:00"
+        "updated_at": "2026-11-02T08:00:00.000000+00:00",
+        "rejection_reason": null
       }
     },
     {
@@ -238,7 +249,8 @@
         "verified_at": "2026-11-03T10:00:00.000000+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
         "created_at": "2026-10-28T08:00:00.000000+00:00",
-        "updated_at": "2026-11-03T10:00:00.000000+00:00"
+        "updated_at": "2026-11-03T10:00:00.000000+00:00",
+        "rejection_reason": "Hồ sơ giấy phép kinh doanh phương tiện thể thao dưới nước chưa hợp lệ hoặc thiếu chứng nhận an toàn kỹ thuật phương tiện"
       }
     },
     {
@@ -258,7 +270,8 @@
         "verified_at": "2026-11-04T14:30:00.000000+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
         "created_at": "2026-10-29T08:00:00.000000+00:00",
-        "updated_at": "2026-11-04T14:30:00.000000+00:00"
+        "updated_at": "2026-11-04T14:30:00.000000+00:00",
+        "rejection_reason": "Địa bàn hoạt động ngoài phạm vi quy hoạch được cấp phép của ban quản lý bán đảo Sơn Trà và các bãi biển du lịch Đà Nẵng"
       }
     },
     {
@@ -271,14 +284,15 @@
         "bank_name": "BIDV",
         "bank_account_holder": "SONG HAN NIGHT CRUISE JSC",
         "bank_account_number": "621140119014",
-        "badge_tier": "VERIFIED",
-        "rating_avg": "3.20",
-        "rating_count": 15,
+        "badge_tier": "NONE",
+        "rating_avg": "0.00",
+        "rating_count": 0,
         "verification_status": "APPROVED",
         "verified_at": "2026-10-18T10:00:00.000000+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
         "created_at": "2026-10-15T09:00:00.000000+00:00",
-        "updated_at": "2026-11-05T09:00:00.000000+00:00"
+        "updated_at": "2026-11-05T09:00:00.000000+00:00",
+        "rejection_reason": null
       }
     },
     {
@@ -292,13 +306,14 @@
         "bank_account_holder": "NON NUOC SPEEDBOAT CLUB",
         "bank_account_number": "155999015",
         "badge_tier": "NONE",
-        "rating_avg": "2.80",
-        "rating_count": 8,
+        "rating_avg": "0.00",
+        "rating_count": 0,
         "verification_status": "APPROVED",
         "verified_at": "2026-10-19T10:00:00.000000+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
         "created_at": "2026-10-15T09:00:00.000000+00:00",
-        "updated_at": "2026-11-05T11:00:00.000000+00:00"
+        "updated_at": "2026-11-05T11:00:00.000000+00:00",
+        "rejection_reason": null
       }
     },
     {
@@ -311,14 +326,15 @@
         "bank_name": "ACB",
         "bank_account_holder": "AN THUONG BEACH RENTAL",
         "bank_account_number": "234999016",
-        "badge_tier": "VERIFIED",
-        "rating_avg": "4.85",
-        "rating_count": 22,
+        "badge_tier": "NONE",
+        "rating_avg": "0.00",
+        "rating_count": 0,
         "verification_status": "APPROVED",
         "verified_at": "2026-10-20T10:00:00.000000+00:00",
         "verified_by": "3e3005a7-001a-5d9f-b4ee-993b52a01d61",
         "created_at": "2026-10-15T09:00:00.000000+00:00",
-        "updated_at": "2026-10-20T10:00:00.000000+00:00"
+        "updated_at": "2026-10-20T10:00:00.000000+00:00",
+        "rejection_reason": null
       }
     }
   ]

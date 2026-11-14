@@ -16,8 +16,8 @@
       "moderation_note": null,
       "vendor_reply": null,
       "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-25T14:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000002",
@@ -33,9 +33,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000003",
@@ -51,9 +51,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000004",
@@ -69,9 +69,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000005",
@@ -88,8 +88,8 @@
       "moderation_note": null,
       "vendor_reply": null,
       "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-25T14:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000006",
@@ -105,9 +105,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000007",
@@ -119,13 +119,13 @@
       "comment": "Nhân viên bến bãi tiếp đón chưa chu đáo, áo phao còn ẩm ướt chưa được phơi khô sạch sẽ.",
       "images": null,
       "is_visible": true,
-      "is_flagged": true,
-      "flag_reason": "Khách phản ánh về thời gian xuất bến",
-      "moderation_note": "Đã kiểm tra đối soát nhật ký hành trình GPS",
+      "is_flagged": false,
+      "flag_reason": null,
+      "moderation_note": null,
       "vendor_reply": "Dạ bến xin chân thành cáo lỗi cùng quý khách vì sự cố kỹ thuật đột xuất, bến đã tiến hành đối soát và hoàn trả phí hỗ trợ.",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000008",
@@ -141,9 +141,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000009",
@@ -159,27 +159,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000010",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
-      "vendor_id": "128672c5-94e7-5560-896c-158794913b8c",
-      "service_id": "88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08",
-      "sub_order_id": "00020000-0000-0000-0000-000000000010",
-      "rating": 5,
-      "comment": "Chèo SUP bình minh Mân Thái cảnh đẹp mê ly, anh hướng dẫn chụp ảnh có tâm.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000011",
@@ -196,8 +178,8 @@
       "moderation_note": null,
       "vendor_reply": null,
       "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-25T14:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000012",
@@ -213,9 +195,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000013",
@@ -232,8 +214,8 @@
       "moderation_note": null,
       "vendor_reply": null,
       "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-25T14:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000014",
@@ -249,9 +231,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn bạn đã phản hồi, bến sẽ bổ sung thêm các trang bị bảo hộ chu đáo hơn.",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000015",
@@ -267,9 +249,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000016",
@@ -285,9 +267,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000017",
@@ -304,8 +286,8 @@
       "moderation_note": null,
       "vendor_reply": null,
       "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-25T14:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000018",
@@ -321,9 +303,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000019",
@@ -340,8 +322,8 @@
       "moderation_note": null,
       "vendor_reply": null,
       "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-25T14:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000020",
@@ -357,9 +339,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000021",
@@ -375,9 +357,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000022",
@@ -393,9 +375,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000023",
@@ -407,13 +389,13 @@
       "comment": "Nhân viên bến bãi tiếp đón chưa chu đáo, áo phao còn ẩm ướt chưa được phơi khô sạch sẽ.",
       "images": null,
       "is_visible": true,
-      "is_flagged": true,
-      "flag_reason": "Khách phản ánh về thời gian xuất bến",
-      "moderation_note": "Đã kiểm tra đối soát nhật ký hành trình GPS",
+      "is_flagged": false,
+      "flag_reason": null,
+      "moderation_note": null,
       "vendor_reply": "Dạ bến xin chân thành cáo lỗi cùng quý khách vì sự cố kỹ thuật đột xuất, bến đã tiến hành đối soát và hoàn trả phí hỗ trợ.",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000024",
@@ -429,9 +411,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000025",
@@ -448,8 +430,8 @@
       "moderation_note": null,
       "vendor_reply": null,
       "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-25T14:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000026",
@@ -465,9 +447,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000027",
@@ -483,9 +465,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000028",
@@ -501,9 +483,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000029",
@@ -520,8 +502,8 @@
       "moderation_note": null,
       "vendor_reply": null,
       "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-25T14:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000030",
@@ -537,9 +519,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000031",
@@ -556,8 +538,8 @@
       "moderation_note": null,
       "vendor_reply": null,
       "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-25T14:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000032",
@@ -573,9 +555,9 @@
       "flag_reason": null,
       "moderation_note": null,
       "vendor_reply": "Cảm ơn bạn đã phản hồi, bến sẽ bổ sung thêm các trang bị bảo hộ chu đáo hơn.",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_replied_at": "2026-10-26T09:00:00.000000+00:00",
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-26T09:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000033",
@@ -590,10 +572,10 @@
       "is_flagged": false,
       "flag_reason": null,
       "moderation_note": null,
-      "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "vendor_reply": null,
+      "vendor_replied_at": null,
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-25T14:00:00.000000+00:00"
     },
     {
       "id": "66666666-6666-6666-6666-000000000034",
@@ -605,301 +587,13 @@
       "comment": "Chèo SUP bình minh Mân Thái cảnh đẹp mê ly, anh hướng dẫn chụp ảnh có tâm.",
       "images": null,
       "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000035",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
-      "vendor_id": "baea9605-392b-5003-93f1-60f2c0582f65",
-      "service_id": "fd6fced2-812e-56ce-817f-80bb3d0841e9",
-      "sub_order_id": "00020000-0000-0000-0000-000000000035",
-      "rating": 5,
-      "comment": "Mô tô nước lướt sóng cực đã, cảm giác mạnh nhưng rất an toàn vì có cứu hộ bọc lót.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": null,
-      "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000036",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
-      "vendor_id": "27afde91-58fd-5daa-b9fa-7f93f00135f0",
-      "service_id": "3758c297-54ff-5887-89bd-62220227570b",
-      "sub_order_id": "00020000-0000-0000-0000-000000000036",
-      "rating": 4,
-      "comment": "Dịch vụ rất tốt, điểm trừ nhỏ là bến hơi đông vào khung giờ cao điểm sáng.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000037",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
-      "vendor_id": "baea9605-392b-5003-93f1-60f2c0582f65",
-      "service_id": "4190046d-112a-5b93-beb2-bcc8b1cd16d4",
-      "sub_order_id": "00020000-0000-0000-0000-000000000037",
-      "rating": 5,
-      "comment": "Nước biển Đà Nẵng mùa này trong vắt, lặn ngắm san hô thấy rất nhiều đàn cá bơi lội.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": null,
-      "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000038",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
-      "vendor_id": "5a53c8e5-3a76-5383-b104-17b22d4af50f",
-      "service_id": "4b79c4cd-a138-59ca-83c3-d396c1208ac4",
-      "sub_order_id": "00020000-0000-0000-0000-000000000038",
-      "rating": 5,
-      "comment": "Dịch vụ cực kỳ chuyên nghiệp, hướng dẫn viên 1 kèm 1 an toàn và chu đáo.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000039",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
-      "vendor_id": "5a53c8e5-3a76-5383-b104-17b22d4af50f",
-      "service_id": "5943ecd7-6480-5b4a-b42b-43abc0988776",
-      "sub_order_id": "00020000-0000-0000-0000-000000000039",
-      "rating": 4,
-      "comment": "Câu cá được nhiều cá mú tươi ngon, đồ nghề chuẩn bị đầy đủ chu đáo.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000040",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
-      "vendor_id": "27afde91-58fd-5daa-b9fa-7f93f00135f0",
-      "service_id": "83ee83c5-c08b-5f6e-924e-db3ceaacd364",
-      "sub_order_id": "00020000-0000-0000-0000-000000000040",
-      "rating": 5,
-      "comment": "Chèo SUP bình minh Mân Thái cảnh đẹp mê ly, anh hướng dẫn chụp ảnh có tâm.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000041",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
-      "vendor_id": "5a53c8e5-3a76-5383-b104-17b22d4af50f",
-      "service_id": "160e67fc-f236-5871-9971-5555cf855d02",
-      "sub_order_id": "00020000-0000-0000-0000-000000000041",
-      "rating": 1,
-      "comment": "Nhân viên bến bãi tiếp đón chưa chu đáo, áo phao còn ẩm ướt chưa được phơi khô sạch sẽ.",
-      "images": null,
-      "is_visible": true,
       "is_flagged": true,
-      "flag_reason": "Khách phản ánh về thời gian xuất bến",
-      "moderation_note": "Đã kiểm tra đối soát nhật ký hành trình GPS",
-      "vendor_reply": "Dạ bến xin chân thành cáo lỗi cùng quý khách vì sự cố kỹ thuật đột xuất, bến đã tiến hành đối soát và hoàn trả phí hỗ trợ.",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000042",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
-      "vendor_id": "c7dcff25-f5dc-5fee-a719-5c23b6a899cb",
-      "service_id": "cd0c7a8d-b0b8-579a-968c-a1783174a0fc",
-      "sub_order_id": "00020000-0000-0000-0000-000000000042",
-      "rating": 4,
-      "comment": "Huấn luyện viên nhiệt tình chỉ dẫn từng kỹ thuật lướt sóng, đáng để trải nghiệm.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000043",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
-      "vendor_id": "5fb18fee-16fd-5b9f-bcbd-759b47768d9b",
-      "service_id": "5536f743-3b6d-518e-af2b-05634a218195",
-      "sub_order_id": "00020000-0000-0000-0000-000000000043",
-      "rating": 5,
-      "comment": "Nước biển Đà Nẵng mùa này trong vắt, lặn ngắm san hô thấy rất nhiều đàn cá bơi lội.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
+      "flag_reason": "Nghi vấn đánh giá không khách quan hoặc sai lệch thời gian bến bãi",
+      "moderation_note": "Chờ admin đối chiếu dữ liệu GPS trạm kiểm soát",
       "vendor_reply": null,
       "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000044",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
-      "vendor_id": "baea9605-392b-5003-93f1-60f2c0582f65",
-      "service_id": "2cdfabcf-13a2-550a-8f9e-283aad7053c9",
-      "sub_order_id": "00020000-0000-0000-0000-000000000044",
-      "rating": 5,
-      "comment": "Dịch vụ cực kỳ chuyên nghiệp, hướng dẫn viên 1 kèm 1 an toàn và chu đáo.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000045",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
-      "vendor_id": "10f8ffc5-e987-592f-9d38-426ad7f97066",
-      "service_id": "d51355fc-bf7e-5366-b199-6272efe7f52b",
-      "sub_order_id": "00020000-0000-0000-0000-000000000045",
-      "rating": 4,
-      "comment": "Thiết bị mới đẹp, cano xuất bến đúng lịch trình, nếu có thêm khăn tắm thì tuyệt vời hơn.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000046",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
-      "vendor_id": "5fb18fee-16fd-5b9f-bcbd-759b47768d9b",
-      "service_id": "dab42f5f-e61d-5ebf-811d-34ab8d293143",
-      "sub_order_id": "00020000-0000-0000-0000-000000000046",
-      "rating": 5,
-      "comment": "Chèo SUP bình minh Mân Thái cảnh đẹp mê ly, anh hướng dẫn chụp ảnh có tâm.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000047",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
-      "vendor_id": "27afde91-58fd-5daa-b9fa-7f93f00135f0",
-      "service_id": "3758c297-54ff-5887-89bd-62220227570b",
-      "sub_order_id": "00020000-0000-0000-0000-000000000047",
-      "rating": 5,
-      "comment": "Mô tô nước lướt sóng cực đã, cảm giác mạnh nhưng rất an toàn vì có cứu hộ bọc lót.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": null,
-      "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000048",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
-      "vendor_id": "baea9605-392b-5003-93f1-60f2c0582f65",
-      "service_id": "fd6fced2-812e-56ce-817f-80bb3d0841e9",
-      "sub_order_id": "00020000-0000-0000-0000-000000000048",
-      "rating": 4,
-      "comment": "Dịch vụ rất tốt, điểm trừ nhỏ là bến hơi đông vào khung giờ cao điểm sáng.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Cảm ơn quý khách đã tin chọn dịch vụ của bến!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000049",
-      "customer_id": "46c8f2ea-2be5-5365-be80-31fd57d9e260",
-      "vendor_id": "631db4cf-1ec4-5b06-8f98-56abcf3406d0",
-      "service_id": "bf8626cd-2271-59ab-9273-4fdd10eb451e",
-      "sub_order_id": "00020000-0000-0000-0000-000000000049",
-      "rating": 5,
-      "comment": "Nước biển Đà Nẵng mùa này trong vắt, lặn ngắm san hô thấy rất nhiều đàn cá bơi lội.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": null,
-      "vendor_replied_at": null,
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-04T08:00:00.000000+00:00"
-    },
-    {
-      "id": "66666666-6666-6666-6666-000000000050",
-      "customer_id": "1a5e9f3e-cbae-5840-8c20-1f7d8abeb2b0",
-      "vendor_id": "5a53c8e5-3a76-5383-b104-17b22d4af50f",
-      "service_id": "5943ecd7-6480-5b4a-b42b-43abc0988776",
-      "sub_order_id": "00020000-0000-0000-0000-000000000050",
-      "rating": 5,
-      "comment": "Dịch vụ cực kỳ chuyên nghiệp, hướng dẫn viên 1 kèm 1 an toàn và chu đáo.",
-      "images": null,
-      "is_visible": true,
-      "is_flagged": false,
-      "flag_reason": null,
-      "moderation_note": null,
-      "vendor_reply": "Kajin Vina / Danabeach rất hân hạnh được đồng hành cùng bạn!",
-      "vendor_replied_at": "2026-11-05T10:00:00.000000+00:00",
-      "created_at": "2026-11-04T08:00:00.000000+00:00",
-      "updated_at": "2026-11-05T10:00:00.000000+00:00"
+      "created_at": "2026-10-25T14:00:00.000000+00:00",
+      "updated_at": "2026-10-25T14:00:00.000000+00:00"
     }
   ]
 }
