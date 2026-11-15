@@ -23,7 +23,7 @@ import {
   AtlasPagination
 } from "../../../components/vendor/atlas/AtlasDesignSystem";
 import { vendorService } from "../../../services/vendorService";
-import { vendorEquipmentService, type BackendEquipment } from "../../../services/vendorEquipmentService";
+import { vendorEquipmentService } from "../../../services/vendorEquipmentService";
 import { DEMO_EQUIPMENT_DATA, VENDOR_USER_MAP } from "../../../data/demoEquipmentMap";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { toast } from "../../../store/useToastStore";
@@ -64,16 +64,7 @@ export function Equipment() {
 
   // Real vendor services from backend for assigning equipment
   const [vendorServices, setVendorServices] = useState<string[]>([]);
-
-  useEffect(() => {
-    vendorService.getMyServices()
-      .then((res) => {
-        if (res && res.length > 0) {
-          setVendorServices(res.map((s) => s.name));
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const [, setVendorServiceList] = useState<{ id: string; name: string }[]>([]);
 
   // Fetch real equipment from backend API or authoritative demo fixtures
   useEffect(() => {
@@ -82,8 +73,46 @@ export function Equipment() {
 
     const loadEquipment = async () => {
       try {
-        const backendList: BackendEquipment[] = await vendorEquipmentService.getEquipment();
+        const [servicesRes, backendList] = await Promise.all([
+          vendorService.getMyServices().catch(() => []),
+          vendorEquipmentService.getEquipment().catch(() => [])
+        ]);
         if (!isMounted) return;
+
+        const svcList = (servicesRes || []).map((s) => ({ id: s.id, name: s.name }));
+        setVendorServiceList(svcList);
+        setVendorServices(svcList.map((s) => s.name));
+
+        const resolveAssignedService = (compGroup?: string, eqName?: string) => {
+          if (!compGroup && !eqName) return "Toàn bộ ca vận hành";
+          const group = (compGroup || "").toUpperCase();
+          const nameLower = (eqName || "").toLowerCase();
+
+          if (compGroup?.startsWith("demo:")) {
+            const sid = compGroup.replace("demo:", "");
+            const match = svcList.find((s) => s.id === sid);
+            if (match) return match.name.split("–")[0]?.trim() || match.name;
+          }
+
+          const matched = svcList.find((s) => {
+            const sLow = s.name.toLowerCase();
+            if (group.includes("JET_SKI") || nameLower.includes("mô tô")) return sLow.includes("mô tô");
+            if (nameLower.includes("dù bay")) return sLow.includes("dù bay");
+            if (nameLower.includes("phao chuối")) return sLow.includes("phao chuối");
+            if (nameLower.includes("câu cá")) return sLow.includes("câu cá");
+            if (nameLower.includes("lặn")) return sLow.includes("lặn");
+            if (group.includes("SUP") || nameLower.includes("sup")) return sLow.includes("sup");
+            if (group.includes("KAYAK") || nameLower.includes("kayak")) return sLow.includes("kayak");
+            if (group.includes("SURF") || nameLower.includes("lướt sóng")) return sLow.includes("lướt sóng");
+            if (group.includes("FISHING") || nameLower.includes("câu mực")) return sLow.includes("câu mực");
+            if (group.includes("SPEEDBOAT") || nameLower.includes("cano")) return sLow.includes("cano") || sLow.includes("dù bay") || sLow.includes("phao chuối");
+            return false;
+          });
+
+          if (matched) return matched.name.split("–")[0]?.trim() || matched.name;
+          if (eqName && eqName.includes("–")) return eqName.split("–")[1]?.trim();
+          return "Toàn bộ ca vận hành";
+        };
 
         if (backendList && backendList.length > 0) {
           const mapped: EquipmentItem[] = backendList.map((eq) => {
@@ -119,7 +148,7 @@ export function Equipment() {
               serialNumber: `SN-${eq.id.slice(0, 8).toUpperCase()}`,
               totalQuantity: eq.capacity || 1,
               inUseQuantity: status === "OPERATIONAL" ? Math.max(1, Math.floor((eq.capacity || 1) * 0.5)) : 0,
-              assignedService: eq.name.includes("–") ? eq.name.split("–")[1]?.trim() : "Toàn bộ ca vận hành",
+              assignedService: resolveAssignedService(eq.compatibilityGroup, eq.name),
               status,
               lastMaintenance: demoMatch?.lastMaintenance || "2026-10-15",
               nextInspection: demoMatch?.nextInspection || (status === "INSPECTION_DUE" ? "2026-11-20" : "2027-04-15"),
@@ -161,7 +190,7 @@ export function Equipment() {
               serialNumber: `SN-${d.id.slice(0, 8).toUpperCase()}`,
               totalQuantity: d.capacity,
               inUseQuantity: d.status === "OPERATIONAL" ? Math.max(1, Math.floor(d.capacity * 0.5)) : 0,
-              assignedService: d.name.includes("–") ? d.name.split("–")[1]?.trim() : "Toàn bộ ca vận hành",
+              assignedService: resolveAssignedService(d.compatibilityGroup, d.name),
               status: d.status,
               lastMaintenance: d.lastMaintenance,
               nextInspection: d.nextInspection,

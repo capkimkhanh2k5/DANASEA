@@ -49,7 +49,7 @@ export const DEMO_EQUIPMENT_DATA: DemoEquipmentRecord[] = [
   {
     id: "351d823e-deb5-5174-9ed5-99c6f867330b",
     vendorId: "baea9605-392b-5003-93f1-60f2c0582f65",
-    name: "Demo 1 – Mô tô nước – Kajin Vina",
+    name: "Mô tô nước Sea-Doo GTI 130 #01",
     compatibilityGroup: "demo:2cdfabcf-13a2-550a-8f9e-283aad7053c9",
     capacity: 2,
     status: "OPERATIONAL",
@@ -59,7 +59,7 @@ export const DEMO_EQUIPMENT_DATA: DemoEquipmentRecord[] = [
   {
     id: "7c35ea0c-f84f-581c-afd6-bbd26f950096",
     vendorId: "baea9605-392b-5003-93f1-60f2c0582f65",
-    name: "Demo 2 – Mô tô nước – Kajin Vina",
+    name: "Mô tô nước Sea-Doo GTI 130 #02",
     compatibilityGroup: "demo:2cdfabcf-13a2-550a-8f9e-283aad7053c9",
     capacity: 2,
     status: "OPERATIONAL",
@@ -69,7 +69,7 @@ export const DEMO_EQUIPMENT_DATA: DemoEquipmentRecord[] = [
   {
     id: "d524c36c-02b4-569b-8c1f-71f278890623",
     vendorId: "baea9605-392b-5003-93f1-60f2c0582f65",
-    name: "Demo 3 – Mô tô nước – Kajin Vina",
+    name: "Mô tô nước Sea-Doo GTI 130 #03",
     compatibilityGroup: "demo:2cdfabcf-13a2-550a-8f9e-283aad7053c9",
     capacity: 2,
     status: "OPERATIONAL",
@@ -79,7 +79,7 @@ export const DEMO_EQUIPMENT_DATA: DemoEquipmentRecord[] = [
   {
     id: "b82c0789-efce-5b02-b6b3-a561f0d9d0fe",
     vendorId: "baea9605-392b-5003-93f1-60f2c0582f65",
-    name: "Demo 1 – Dù bay trên biển – Kajin Vina",
+    name: "Dù bay đôi Apex Chute 34ft #01",
     compatibilityGroup: "demo:4190046d-112a-5b93-beb2-bcc8b1cd16d4",
     capacity: 2,
     status: "OPERATIONAL",
@@ -89,7 +89,7 @@ export const DEMO_EQUIPMENT_DATA: DemoEquipmentRecord[] = [
   {
     id: "ef9d5861-f320-51ac-a7e4-28f388dff486",
     vendorId: "baea9605-392b-5003-93f1-60f2c0582f65",
-    name: "Demo 2 – Dù bay trên biển – Kajin Vina",
+    name: "Dù bay đôi Apex Chute 34ft #02",
     compatibilityGroup: "demo:4190046d-112a-5b93-beb2-bcc8b1cd16d4",
     capacity: 2,
     status: "OPERATIONAL",
@@ -99,7 +99,7 @@ export const DEMO_EQUIPMENT_DATA: DemoEquipmentRecord[] = [
   {
     id: "6a3fc0a1-b39a-5d52-8af9-98e9a49d0a98",
     vendorId: "baea9605-392b-5003-93f1-60f2c0582f65",
-    name: "Demo 3 – Dù bay trên biển – Kajin Vina",
+    name: "Dù bay đôi Apex Chute 34ft #03",
     compatibilityGroup: "demo:4190046d-112a-5b93-beb2-bcc8b1cd16d4",
     capacity: 2,
     status: "OPERATIONAL",
@@ -109,7 +109,7 @@ export const DEMO_EQUIPMENT_DATA: DemoEquipmentRecord[] = [
   {
     id: "ddcac471-c89f-563a-bbc0-b9416b0b970e",
     vendorId: "baea9605-392b-5003-93f1-60f2c0582f65",
-    name: "Demo 4 – Dù bay trên biển – Kajin Vina",
+    name: "Dù bay đôi Apex Chute 34ft #04",
     compatibilityGroup: "demo:4190046d-112a-5b93-beb2-bcc8b1cd16d4",
     capacity: 2,
     status: "OPERATIONAL",
@@ -119,7 +119,7 @@ export const DEMO_EQUIPMENT_DATA: DemoEquipmentRecord[] = [
   {
     id: "41b8c90c-eb34-56bf-b1cf-a0eb07773d61",
     vendorId: "baea9605-392b-5003-93f1-60f2c0582f65",
-    name: "Demo 1 – Phao chuối – Kajin Vina",
+    name: "Phao chuối nước ProMarine 5 chỗ #01",
     compatibilityGroup: "demo:fd6fced2-812e-56ce-817f-80bb3d0841e9",
     capacity: 5,
     status: "OPERATIONAL",
@@ -129,7 +129,7 @@ export const DEMO_EQUIPMENT_DATA: DemoEquipmentRecord[] = [
   {
     id: "ebc3f0e4-5db9-5e8f-9dce-95d7522f7d31",
     vendorId: "baea9605-392b-5003-93f1-60f2c0582f65",
-    name: "Demo 2 – Phao chuối – Kajin Vina",
+    name: "Phao chuối nước ProMarine 5 chỗ #02",
     compatibilityGroup: "demo:fd6fced2-812e-56ce-817f-80bb3d0841e9",
     capacity: 5,
     status: "OPERATIONAL",

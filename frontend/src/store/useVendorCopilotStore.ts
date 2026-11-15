@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { vendorAiService } from '../services/vendorAiService';
+import { detectLanguage } from '../utils/languageDetector';
 import type { 
   CopilotConversation, 
   CopilotArtifact 
@@ -155,12 +156,13 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
     }));
 
     try {
+      const detectedLang = detectLanguage(trimmed);
       const res = await vendorAiService.chatCopilot({
         conversationId: activeConversationId,
         message: trimmed,
         contextType: attachedContext?.type,
         contextId: attachedContext?.id,
-      });
+      }, detectedLang);
 
       const assistantMsg: ChatUiMessage = {
         id: 'assistant-' + Date.now(),

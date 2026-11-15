@@ -70,9 +70,17 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    const currentLang = useLanguageStore.getState().language || 'vi';
-    if (config.headers) {
-      config.headers['Accept-Language'] = currentLang;
+    // Vendor and Admin backoffice portals default to Vietnamese ('vi') for local operators.
+    // They must never blindly inherit the international tourist language toggle from the customer store.
+    const isBackoffice =
+      config.url?.includes('/vendor') ||
+      config.url?.includes('/admin') ||
+      (typeof window !== 'undefined' &&
+        (window.location.pathname.startsWith('/vendor') || window.location.pathname.startsWith('/admin')));
+
+    const defaultLang = isBackoffice ? 'vi' : (useLanguageStore.getState().language || 'vi');
+    if (config.headers && !config.headers['Accept-Language']) {
+      config.headers['Accept-Language'] = defaultLang;
     }
 
     const method = (config.method || 'GET').toUpperCase();

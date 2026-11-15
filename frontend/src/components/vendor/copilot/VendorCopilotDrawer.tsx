@@ -10,6 +10,7 @@ import {
   Check, 
   Pin, 
   Trash2, 
+  MoreVertical,
   Plus 
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
@@ -46,9 +47,25 @@ export const VendorCopilotDrawer: React.FC = () => {
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [attachType, setAttachType] = useState<'ORDER' | 'SERVICE'>('ORDER');
   const [attachIdInput, setAttachIdInput] = useState('');
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActiveMenuId(null);
+      }
+    };
+    if (activeMenuId) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activeMenuId]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -176,7 +193,7 @@ export const VendorCopilotDrawer: React.FC = () => {
                     selectConversation(c.id);
                     setShowSessions(false);
                   }}
-                  className={`group flex items-center justify-between p-1.5 px-2 rounded-lg cursor-pointer text-xs transition-colors ${
+                  className={`group flex items-center justify-between p-1.5 px-2 rounded-lg cursor-pointer text-xs transition-colors relative ${
                     isActive 
                       ? 'bg-white border border-slate-200 text-slate-900 font-semibold shadow-2xs' 
                       : 'hover:bg-slate-200/60 text-slate-700'
@@ -187,26 +204,52 @@ export const VendorCopilotDrawer: React.FC = () => {
                     <span className="truncate text-[11px]">{c.title || 'Đoạn chat không tên'}</span>
                   </div>
 
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1 shrink-0">
+                  <div className="flex items-center gap-1 ml-1 shrink-0">
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        togglePinConversation(c.id, c.pinned);
+                        setActiveMenuId(activeMenuId === c.id ? null : c.id);
                       }}
-                      className="p-0.5 text-slate-400 hover:text-amber-600 rounded"
+                      className={`p-0.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded transition-colors cursor-pointer ${
+                        activeMenuId === c.id ? 'opacity-100 bg-slate-200/60 text-slate-700' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                      title="Tùy chọn"
                     >
-                      <Pin className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteConversation(c.id);
-                      }}
-                      className="p-0.5 text-slate-400 hover:text-rose-600 rounded"
-                    >
-                      <Trash2 className="w-3 h-3" />
+                      <MoreVertical className="w-3 h-3" />
                     </button>
                   </div>
+
+                  {activeMenuId === c.id && (
+                    <div
+                      ref={menuRef}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute right-2 top-7 z-30 w-32 bg-white rounded-lg shadow-lg border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          togglePinConversation(c.id, c.pinned);
+                          setActiveMenuId(null);
+                        }}
+                        className="w-full px-2.5 py-1.5 text-left flex items-center gap-1.5 text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer text-[11px] font-normal"
+                      >
+                        <Pin className="w-3 h-3 text-slate-400" />
+                        <span>{c.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          deleteConversation(c.id);
+                          setActiveMenuId(null);
+                        }}
+                        className="w-full px-2.5 py-1.5 text-left flex items-center gap-1.5 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer text-[11px] font-normal"
+                      >
+                        <Trash2 className="w-3 h-3 text-rose-500" />
+                        <span>Xóa hội thoại</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })

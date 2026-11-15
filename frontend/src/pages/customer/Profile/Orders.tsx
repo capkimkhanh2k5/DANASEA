@@ -1420,7 +1420,7 @@ export function Orders() {
                                 </div>
 
                                 {/* Comprehensive Review Section for COMPLETED sub-orders */}
-                                {(isCompleted || Boolean(reviewsMap[subOrder.id])) && (
+                                {isCompleted && (
                                   <div className="mt-3.5 pt-3.5 border-t border-slate-200/70">
                                     {reviewsMap[subOrder.id] ? (
                                       <div data-ui="suborder-review-card" className="p-3.5 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-2.5">
@@ -2186,7 +2186,7 @@ export function Orders() {
                 />
               </div>
 
-              {/* Attached Image URLs */}
+              {/* Attached Image URLs with live preview */}
               <div>
                 <label className="text-xs font-bold text-slate-800 block mb-1">
                   Hình ảnh thực tế (đường dẫn URL, mỗi dòng 1 link, tối đa 5 ảnh)
@@ -2198,6 +2198,27 @@ export function Orders() {
                   placeholder="https://images.unsplash.com/..."
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none font-mono"
                 />
+                {reviewImagesInput.split('\n').filter((s) => s.trim().startsWith('http')).length > 0 && (
+                  <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    {reviewImagesInput
+                      .split('\n')
+                      .map((s) => s.trim())
+                      .filter((s) => s.startsWith('http'))
+                      .slice(0, 5)
+                      .map((url, idx) => (
+                        <div key={idx} className="relative w-12 h-12 rounded-lg border border-slate-200 overflow-hidden bg-slate-100 shrink-0 shadow-2xs">
+                          <img
+                            src={url}
+                            alt={`Ảnh ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">

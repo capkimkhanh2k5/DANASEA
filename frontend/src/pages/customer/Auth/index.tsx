@@ -716,7 +716,7 @@ export function Auth() {
                 fetchPriority="high"
                 decoding="async"
                 className="h-8 w-8 object-contain shrink-0"
-                src="/images/danasea-logo.png"
+                src="/images/danasea-logo-sm.png"
               />
               <span className="text-lg font-black tracking-tight text-slate-900">
                 DANASEA

@@ -152,6 +152,14 @@ export function Profile() {
     return <Navigate to="/auth" replace />;
   }
 
+  // Redirect vendor / admin to their respective dedicated portals
+  if (user.role === 'VENDOR') {
+    return <Navigate to="/vendor/profile" replace />;
+  }
+  if (user.role === 'ADMIN') {
+    return <Navigate to="/admin" replace />;
+  }
+
   const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault();
     try {

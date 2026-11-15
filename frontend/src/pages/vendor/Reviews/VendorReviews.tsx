@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { reviewService } from '../../../services/reviewService';
+import { vendorService } from '../../../services/vendorService';
 import { vendorAiService } from '../../../services/vendorAiService';
 import { toast } from '../../../store/useToastStore';
 import { 
@@ -86,12 +87,15 @@ export function VendorReviews() {
       setIsLoading(true);
       const res = await reviewService.getVendorReviews(0, 50);
       if (res && res.content && Array.isArray(res.content)) {
+        const needsServiceNames = res.content.some((review) => review.serviceId && !review.serviceName?.trim());
+        const services = needsServiceNames ? await vendorService.getMyServices().catch(() => []) : [];
+        const serviceMap = new Map((services || []).map((service) => [service.id, service.name]));
         const mapped: ReviewItem[] = res.content.map((r) => ({
           id: r.id,
           customerName: r.customerName || 'Du khách DANASEA',
           avatarText: (r.customerName || 'DK').slice(0, 2).toUpperCase(),
           orderCode: r.subOrderId ? `#VE-${r.subOrderId.slice(0, 8).toUpperCase()}` : '#DON-HANG',
-          serviceName: r.serviceName || 'Trải nghiệm du lịch biển',
+          serviceName: r.serviceName?.trim() || (r.serviceId && serviceMap.get(r.serviceId)) || 'Trải nghiệm du lịch biển',
           slotTime: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '',
           rating: r.rating || 5,
           date: r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN') : '',
@@ -255,7 +259,7 @@ export function VendorReviews() {
       {/* 3. REVIEWS VIEW */}
       <div className="space-y-4">
           {/* Star Filter Tabs */}
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/70 inline-flex">
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/70 inline-flex flex-wrap">
             <button 
               onClick={() => { setStarFilter('ALL'); setPage(0); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
@@ -266,20 +270,24 @@ export function VendorReviews() {
             >
               Tất cả ({reviews.length})
             </button>
-            {[5, 4, 3].map((stars) => (
-              <button 
-                key={stars}
-                onClick={() => { setStarFilter(stars); setPage(0); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
-                  starFilter === stars 
-                    ? 'bg-white text-slate-900 shadow-xs font-bold' 
-                    : 'text-slate-600 hover:text-slate-900 font-medium'
-                }`}
-              >
-                <span>{stars} sao</span>
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-              </button>
-            ))}
+            {[5, 4, 3, 2, 1].map((stars) => {
+              const count = reviews.filter((r) => r.rating === stars).length;
+              return (
+                <button 
+                  key={stars}
+                  onClick={() => { setStarFilter(stars); setPage(0); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer ${
+                    starFilter === stars 
+                      ? 'bg-white text-slate-900 shadow-xs font-bold' 
+                      : 'text-slate-600 hover:text-slate-900 font-medium'
+                  }`}
+                >
+                  <span>{stars} sao</span>
+                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                  <span className="font-mono text-[11px] text-slate-500">({count})</span>
+                </button>
+              );
+            })}
           </div>
 
           {/* Reviews Feed */}
