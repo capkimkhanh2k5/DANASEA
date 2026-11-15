@@ -709,10 +709,10 @@ export function BatchCreateSlotsModal({
                   />
                   <div>
                     <span className="font-bold text-xs text-slate-900 block">
-                      Tạo trong khoảng ngày (Batch)
+                      Tạo trong khoảng ngày
                     </span>
                     <span className="text-xs text-slate-500 mt-0.5 block leading-relaxed">
-                      Chỉ mở ca cho một tuần hoặc khoảng ngày cụ thể (tối đa 31 ngày). Không kích hoạt lịch 90 ngày.
+                      Tạo các ca trong khoảng ngày bạn chọn, không tự động lặp về sau.
                     </span>
                   </div>
                 </div>
@@ -737,10 +737,10 @@ export function BatchCreateSlotsModal({
                   />
                   <div>
                     <span className="font-bold text-xs text-slate-900 block">
-                      Tự động lặp 90 ngày (Operating Schedule)
+                      Tự động lặp 90 ngày
                     </span>
                     <span className="text-xs text-slate-500 mt-0.5 block leading-relaxed">
-                      Thiết lập lịch tuần hoàn. Hệ thống tự động sinh và duy trì ca suốt 3 tháng tới.
+                      Thiết lập lịch theo tuần để hệ thống tự tạo ca cho 90 ngày tới.
                     </span>
                   </div>
                 </div>
@@ -789,37 +789,33 @@ export function BatchCreateSlotsModal({
                 </div>
               </div>
             ) : (
-              <div className="p-4 bg-amber-50/70 border border-amber-200/90 rounded-xl space-y-3 text-xs text-amber-900">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold text-amber-950">
-                      Cấu hình lịch lặp 90 ngày (Operating Schedule)
-                    </p>
-                    <p className="mt-1 text-amber-800 leading-relaxed">
-                      Sẽ đăng ký <strong>{selectedDays.length * templates.length} quy tắc tuần</strong> vào hệ thống (giới hạn tối đa 84 quy tắc).
-                    </p>
-                  </div>
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
+                <div>
+                  <p className="font-bold text-xs text-slate-900">
+                    Thiết lập lịch lặp 90 ngày
+                  </p>
+                  <p className="mt-0.5 text-slate-600 leading-relaxed">
+                    Hệ thống sẽ tự tạo lịch khởi hành theo các thứ và khung giờ bạn đã chọn.
+                  </p>
                 </div>
 
                 {existingSchedule && existingSchedule.rules && existingSchedule.rules.length > 0 && (
-                  <div className="p-3 bg-white/80 border border-amber-300 rounded-lg space-y-2">
-                    <p className="font-semibold text-rose-800 flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      Cảnh báo: Dịch vụ này đã có {existingSchedule.rules.length} quy tắc lặp đang chạy!
+                  <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-lg space-y-2 text-amber-950">
+                    <p className="font-bold text-xs text-amber-900 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      Dịch vụ này đã có lịch lặp
                     </p>
-                    <p className="text-[11px] text-slate-600 leading-normal">
-                      Cập nhật lịch mới sẽ đóng các ca trống cũ không còn thuộc lịch mới. 
-                      Các ca đã có khách đặt trước vẫn được bảo toàn dữ liệu an toàn.
+                    <p className="text-[11px] text-amber-800 leading-normal">
+                      Khi thay thế, những ca không còn thuộc lịch mới có thể được đóng bán. Các đơn đã đặt vẫn được giữ nguyên.
                     </p>
                     <label className="flex items-center gap-2 text-xs font-semibold text-slate-900 cursor-pointer pt-1">
                       <input
                         type="checkbox"
                         checked={confirmOverwriteRecurring}
                         onChange={(e) => setConfirmOverwriteRecurring(e.target.checked)}
-                        className="rounded text-slate-900 focus:ring-slate-900"
+                        className="rounded text-slate-900 focus:ring-slate-900 cursor-pointer"
                       />
-                      <span>Tôi xác nhận muốn thay thế lịch lặp 90 ngày hiện tại</span>
+                      <span>Tôi xác nhận thay thế lịch lặp hiện tại</span>
                     </label>
                   </div>
                 )}

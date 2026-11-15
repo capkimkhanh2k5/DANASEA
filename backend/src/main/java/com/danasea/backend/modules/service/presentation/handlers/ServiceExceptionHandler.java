@@ -15,12 +15,15 @@ import com.danasea.backend.modules.service.domain.exceptions.WaiverContentRequir
 import com.danasea.backend.modules.service.domain.exceptions.WeatherRequirementsMissingException;
 import com.danasea.backend.shared.presentation.ErrorResponse;
 import com.danasea.backend.shared.presentation.LocalizedExceptionHandlerSupport;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
+@RestControllerAdvice(basePackages = "com.danasea.backend.modules.service")
 public class ServiceExceptionHandler extends LocalizedExceptionHandlerSupport {
 
     @ExceptionHandler(ServiceNotFoundException.class)
@@ -103,7 +106,10 @@ public class ServiceExceptionHandler extends LocalizedExceptionHandlerSupport {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+        String message = (ex.getMessage() != null && !ex.getMessage().isBlank())
+                ? ex.getMessage()
+                : message("error.invalid_input");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(error("BAD_REQUEST"));
+                .body(new ErrorResponse("INVALID_INPUT", message));
     }
 }
