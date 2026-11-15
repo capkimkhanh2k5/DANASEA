@@ -170,8 +170,8 @@ export function Logs() {
         const mapped: AdminAuditLogItem[] = (res.content || []).map(l => ({
           id: l.id,
           actorUserId: l.actorUserId || '',
-          actorName: l.actorUserId ? `User ${l.actorUserId.substring(0, 8)}` : 'Hệ thống',
-          actorEmail: '',
+          actorName: l.actorName || (l.actorUserId ? 'Không xác định' : 'Hệ thống'),
+          actorEmail: l.actorEmail || '',
           action: l.action,
           entityType: l.entityType,
           entityId: l.entityId || '',
@@ -706,9 +706,9 @@ export function Logs() {
                 <div>
                   <dt>Người thực hiện</dt>
                   <dd>
-                    <strong>{selectedLog.actorName || (selectedLog.actorUserId ? `User ${selectedLog.actorUserId.substring(0, 8)}` : 'Hệ thống tự động')}</strong>
+                    <strong>{selectedLog.actorName || (selectedLog.actorUserId ? 'Không xác định' : 'Hệ thống')}</strong>
                     <div style={{ fontSize: 12, color: 'var(--admin-muted)' }}>
-                      {selectedLog.actorEmail || (selectedLog.actorUserId ? selectedLog.actorUserId : 'Tác vụ ngầm hệ thống')}
+                      {selectedLog.actorEmail || (selectedLog.actorUserId ? '' : 'Tác vụ ngầm hệ thống')}
                     </div>
                   </dd>
                 </div>

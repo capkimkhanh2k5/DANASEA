@@ -6,6 +6,7 @@ export type DisputeExtended = (typeof MOCK_ADMIN_DISPUTES)[0] & {
   vendorResponse?: string | null;
   vendorRespondedAt?: string | null;
   vendorEvidenceUrls?: string[] | null;
+  resolvedByName?: string | null;
 };
 export type DisputeStatusFilter = 'all' | 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
 export type DisputeCategoryFilter = 'all' | 'SERVICE_QUALITY' | 'WEATHER_CANCELLATION' | 'OVERCHARGING' | 'SAFETY_ISSUE';

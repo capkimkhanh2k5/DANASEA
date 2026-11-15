@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { AlertCircle, Eye, RotateCcw, Search, SlidersHorizontal } from 'lucide-react';
+import { Eye, Search, SlidersHorizontal } from 'lucide-react';
 import { MOCK_ADMIN_VENDORS } from '../../../data/adminMockData';
 import { adminVendorService, getAdminVendorError } from '../../../services/adminVendorService';
 import type { AdminVendorResponse } from '../../../types/adminVendor';
@@ -8,6 +8,7 @@ import type { BadgeTier } from '../../../types';
 import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
 import { AdminButton, AdminFilterTabs, AdminNotice, AdminPagination } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
+import { AdminDocumentPreviewModal } from '../../../components/admin/AdminDocumentPreviewModal';
 import { applyVendorDecision, filterVendors, formatTaxCode, type VendorRecord, type VendorReviewState } from './vendorApprovalModel';
 import { VendorProfile, VendorStatus } from './VendorProfile';
 import './VendorApproval.css';
@@ -32,6 +33,7 @@ function mapVendorResponseToRecord(v: AdminVendorResponse): VendorRecord {
     bankAccountNumber: v.bankAccountNumber || '',
     bankAccountHolder: v.bankAccountHolder || '',
     verifiedBy: v.verifiedBy || '',
+    verifiedByName: v.verifiedByName || null,
     verifiedAt: v.verifiedAt || '',
     createdAt: v.createdAt,
     updatedAt: v.updatedAt,
@@ -57,10 +59,7 @@ export function VendorApproval() {
   const [documentName, setDocumentName] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
   const [documentOpen, setDocumentOpen] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
-  const [retryKey, setRetryKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -220,16 +219,12 @@ export function VendorApproval() {
 
   const handleCloseDocument = () => {
     setDocumentOpen(false);
-    setImageError(false);
-    setImageLoading(false);
     setIsRetrying(false);
   };
 
   const handleRetryPreview = async () => {
     if (isRetrying) return;
     setIsRetrying(true);
-    setImageError(false);
-    setImageLoading(true);
 
     try {
       if (!demo && selected) {
@@ -247,16 +242,12 @@ export function VendorApproval() {
 
           if (matched?.fileUrl) {
             setPreviewUrl(matched.fileUrl);
-            setRetryKey(k => k + 1);
             return;
           }
         }
       }
-      setRetryKey(k => k + 1);
     } catch (err) {
       console.error('Lỗi khi làm mới liên kết chứng từ:', err);
-      setImageError(true);
-      setImageLoading(false);
     } finally {
       setIsRetrying(false);
     }
@@ -378,17 +369,13 @@ export function VendorApproval() {
           <AdminButton disabled={isSubmitting} variant="primary" onClick={() => { setNote(''); setDecision('approve'); setDecisionOpen(true); }}>{selected.verificationStatus === 'VERIFIED' ? 'Cập nhật phê duyệt' : 'Phê duyệt đối tác'}</AdminButton></div></div>}>
       {selected && <><VendorProfile key={selected.id} vendor={selected} timeline={demo ? review.timeline.filter(event => event.vendorId === selected.id) : []} tier={tier} onTierChange={setTier} demo={demo}
         onPreview={(urlOrName, name) => {
-          setImageError(false);
           setIsRetrying(false);
-          setRetryKey(0);
           if (urlOrName.startsWith('http')) {
             setPreviewUrl(urlOrName);
             setDocumentName(name || 'Bản scan chứng từ');
-            setImageLoading(true);
           } else {
             setPreviewUrl('');
             setDocumentName(urlOrName);
-            setImageLoading(false);
           }
           setDocumentOpen(true);
         }}
@@ -409,77 +396,15 @@ export function VendorApproval() {
         <p className="admin-detail-note">Xác minh đầy đủ giấy phép kinh doanh và chứng nhận an toàn trước khi duyệt.</p></div>
     </AdminDialog>
 
-    <AdminDialog open={documentOpen} onClose={handleCloseDocument} title={documentName} description="Hồ sơ chứng từ pháp lý đối tác"
-      footer={<AdminButton onClick={handleCloseDocument}>Đóng bản xem trước</AdminButton>}>
-      <div className="admin-vendors-document-preview">
-        {previewUrl ? (
-          imageError ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '12px', padding: '16px', maxWidth: '440px', width: '100%' }}>
-              <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444' }}>
-                <AlertCircle size={24} aria-hidden="true" />
-              </div>
-              <h3 style={{ margin: 0, fontSize: '15px', color: '#1e293b', fontWeight: 600 }}>Không thể hiển thị chứng từ</h3>
-              <p style={{ margin: 0, color: '#64748b', fontSize: '13px', lineHeight: 1.5 }}>
-                Tệp tài liệu không thể tải từ máy chủ lưu trữ hoặc liên kết truy cập đã hết hạn. Bạn có thể làm mới liên kết hoặc thử tải lại.
-              </p>
-              <div style={{ marginTop: '4px' }}>
-                <AdminButton variant="primary" onClick={handleRetryPreview} loading={isRetrying}>
-                  {!isRetrying && <RotateCcw size={14} style={{ marginRight: '6px' }} />}
-                  {isRetrying ? 'Đang thử lại...' : 'Thử lại'}
-                </AdminButton>
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px', width: '100%' }}>
-              {imageLoading && (
-                <div style={{ padding: '24px 0', color: '#64748b', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <RotateCcw size={15} style={{ animation: 'spin 1s linear infinite' }} />
-                  <span>Đang tải chứng từ...</span>
-                </div>
-              )}
-              <img
-                key={`${previewUrl}-${retryKey}`}
-                src={previewUrl}
-                alt={documentName}
-                onLoad={() => {
-                  setImageLoading(false);
-                  setImageError(false);
-                }}
-                onError={() => {
-                  setImageLoading(false);
-                  setImageError(true);
-                }}
-                style={{
-                  display: imageLoading ? 'none' : 'block',
-                  maxHeight: '65vh',
-                  maxWidth: '100%',
-                  objectFit: 'contain',
-                  borderRadius: '8px',
-                  border: '1px solid #cbd5e1',
-                }}
-              />
-              {!imageLoading && (
-                <a
-                  href={previewUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: '#0284c7', fontSize: '13px', textDecoration: 'underline', fontWeight: 600 }}
-                >
-                  Mở ảnh gốc trong tab mới ↗
-                </a>
-              )}
-            </div>
-          )
-        ) : (
-          <>
-            <span className="material-symbols-outlined" aria-hidden="true">description</span>
-            <h3>Khung xem trước minh họa</h3>
-            <p>{documentName}</p>
-            <p>Đây là tên tệp cố định trong giao diện mẫu. Không có nội dung PDF được tải từ hồ sơ đối tác và chưa có xác minh tính xác thực, chữ ký số hay hiệu lực chứng nhận.</p>
-          </>
-        )}
-      </div>
-    </AdminDialog>
+    <AdminDocumentPreviewModal
+      open={documentOpen}
+      onClose={handleCloseDocument}
+      imageUrl={previewUrl}
+      title={documentName}
+      description="Hồ sơ chứng từ pháp lý đối tác"
+      onRetry={handleRetryPreview}
+      isRetrying={isRetrying}
+    />
   </div>;
 }
 

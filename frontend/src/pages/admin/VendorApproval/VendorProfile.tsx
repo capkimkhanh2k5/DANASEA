@@ -64,7 +64,10 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
                   <small>Mã số hồ sơ: #{doc.id.slice(0, 8)} · Loại: {doc.docType}</small>
                   {doc.reviewedBy && (
                     <span className="admin-vendors-doc-meta">
-                      Người duyệt: {doc.reviewedBy} {doc.reviewedAt ? `(${date(doc.reviewedAt)})` : ''}
+                      Người duyệt: <strong>{doc.reviewedByName || 'Không xác định'}</strong> {doc.reviewedAt ? `(${date(doc.reviewedAt)})` : ''}
+                      <span style={{ marginLeft: 6, opacity: 0.75, fontFamily: 'monospace', fontSize: '11px' }}>
+                        [{doc.reviewedBy.slice(0, 8)}...]
+                      </span>
                     </span>
                   )}
                   <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -128,7 +131,7 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
         <div><dt>Ngày đăng ký</dt><dd>{date(vendor.registrationDate)}</dd></div><div><dt>Cập nhật gần nhất</dt><dd>{date(vendor.updatedAt)}</dd></div>
         <div><dt>Dịch vụ đang hoạt động (mẫu)</dt><dd>{vendor.activeServicesCount ?? 'Chưa có dữ liệu'}</dd></div>
         <div><dt>Doanh thu (mẫu)</dt><dd>{vendor.totalRevenue === undefined ? 'Chưa có dữ liệu' : `${vendor.totalRevenue.toLocaleString('vi-VN')} ₫`}</dd></div>
-        <div><dt>Người duyệt trong dữ liệu</dt><dd>{vendor.verifiedBy || 'Chưa có dữ liệu'}</dd></div><div><dt>Thời điểm duyệt trong dữ liệu</dt><dd>{date(vendor.verifiedAt)}</dd></div>
+        <div><dt>Người duyệt trong dữ liệu</dt><dd>{vendor.verifiedByName ? `${vendor.verifiedByName} (${vendor.verifiedBy})` : (vendor.verifiedBy || 'Chưa có dữ liệu')}</dd></div><div><dt>Thời điểm duyệt trong dữ liệu</dt><dd>{date(vendor.verifiedAt)}</dd></div>
         <div><dt>Mô tả chứng nhận trong dữ liệu mẫu</dt><dd>{vendor.safetyCertificateStatus || 'Chưa có dữ liệu'}</dd></div></dl>
       <p className="admin-detail-note">Các mô tả và trạng thái gốc chỉ là dữ liệu mẫu, không chứng minh tài liệu còn hiệu lực.</p>
     </AdminDisclosure>
