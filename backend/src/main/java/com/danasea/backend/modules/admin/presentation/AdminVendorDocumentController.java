@@ -24,6 +24,7 @@ public class AdminVendorDocumentController {
     private final DocumentStoragePort documentStoragePort;
     private final AccountInternalApi accountInternalApi;
 
+    @Autowired
     public AdminVendorDocumentController(ReviewVendorDocumentUseCase review,
                                         DocumentStoragePort documentStoragePort,
                                         @Autowired(required = false) AccountInternalApi accountInternalApi) {

@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.admin.application.usecases;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -23,6 +24,7 @@ public class GetAuditLogsUseCase {
     private final AuditLogInternalApi auditLogInternalApi;
     private final AccountInternalApi accountInternalApi;
 
+    @Autowired
     public GetAuditLogsUseCase(AuditLogInternalApi auditLogInternalApi,
                              @Autowired(required = false) AccountInternalApi accountInternalApi) {
         this.auditLogInternalApi = auditLogInternalApi;
@@ -40,7 +42,7 @@ public class GetAuditLogsUseCase {
     public Page<AuditLogResponse> execute(String action, String entityType, String search, Pageable pageable) {
         Page<AuditLog> auditLogs = auditLogInternalApi.getAuditLogs(action, entityType, search, pageable);
         
-        Map<UUID, User> usersMap = Map.of();
+        Map<UUID, User> usersMap = new HashMap<>();
         if (accountInternalApi != null) {
             Set<UUID> actorIds = auditLogs.getContent().stream()
                     .map(AuditLog::getActorUserId)
@@ -52,7 +54,12 @@ public class GetAuditLogsUseCase {
         }
         final Map<UUID, User> finalUsersMap = usersMap;
 
-        return auditLogs.map(log -> mapToResponse(log, finalUsersMap.get(log.getActorUserId())));
+        return auditLogs.map(log -> {
+            User user = (log.getActorUserId() != null && finalUsersMap.containsKey(log.getActorUserId()))
+                    ? finalUsersMap.get(log.getActorUserId())
+                    : null;
+            return mapToResponse(log, user);
+        });
     }
 
     private AuditLogResponse mapToResponse(AuditLog log, User user) {

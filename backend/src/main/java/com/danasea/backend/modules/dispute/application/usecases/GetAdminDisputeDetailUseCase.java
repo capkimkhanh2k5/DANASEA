@@ -20,6 +20,7 @@ public class GetAdminDisputeDetailUseCase {
     private final JpaDisputeRepository disputeRepository;
     private final AccountInternalApi accountInternalApi;
 
+    @Autowired
     public GetAdminDisputeDetailUseCase(JpaDisputeRepository disputeRepository,
                                         @Autowired(required = false) AccountInternalApi accountInternalApi) {
         this.disputeRepository = disputeRepository;

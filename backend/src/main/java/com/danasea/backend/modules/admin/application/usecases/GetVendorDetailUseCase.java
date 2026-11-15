@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.admin.application.usecases;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,7 @@ public class GetVendorDetailUseCase {
     private final GetVendorDocumentsUseCase getVendorDocumentsUseCase;
     private final AccountInternalApi accountInternalApi;
 
+    @Autowired
     public GetVendorDetailUseCase(VendorInternalApi vendorInternalApi,
                                   GetVendorDocumentsUseCase getVendorDocumentsUseCase,
                                   @Autowired(required = false) AccountInternalApi accountInternalApi) {
@@ -45,7 +47,7 @@ public class GetVendorDetailUseCase {
         
         List<VendorDocument> documents = getVendorDocumentsUseCase.execute(vendor.getUserId());
 
-        Map<UUID, User> usersMap = Map.of();
+        Map<UUID, User> usersMap = new HashMap<>();
         if (accountInternalApi != null) {
             Set<UUID> userIdsToFetch = new HashSet<>();
             if (vendor.getVerifiedBy() != null) {

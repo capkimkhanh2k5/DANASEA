@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.admin.application.usecases;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -24,6 +25,7 @@ public class GetVendorsUseCase {
     private final VendorInternalApi vendorInternalApi;
     private final AccountInternalApi accountInternalApi;
 
+    @Autowired
     public GetVendorsUseCase(VendorInternalApi vendorInternalApi,
                              @Autowired(required = false) AccountInternalApi accountInternalApi) {
         this.vendorInternalApi = vendorInternalApi;
@@ -37,7 +39,7 @@ public class GetVendorsUseCase {
     public Page<AdminVendorResponse> execute(VerificationStatus status, Pageable pageable) {
         Page<Vendor> vendors = vendorInternalApi.getVendors(status, pageable);
 
-        Map<UUID, User> usersMap = Map.of();
+        Map<UUID, User> usersMap = new HashMap<>();
         if (accountInternalApi != null) {
             Set<UUID> verifierIds = vendors.getContent().stream()
                     .map(Vendor::getVerifiedBy)

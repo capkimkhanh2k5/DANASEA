@@ -105,17 +105,21 @@ public class AccountInternalService implements AccountInternalApi {
     @Override
     public Map<UUID, User> findUsersByIds(Collection<UUID> ids) {
         if (ids == null || ids.isEmpty()) {
-            return Map.of();
+            return new java.util.HashMap<>();
         }
         Set<UUID> nonNullIds = ids.stream().filter(Objects::nonNull).collect(Collectors.toSet());
         if (nonNullIds.isEmpty()) {
-            return Map.of();
+            return new java.util.HashMap<>();
         }
         List<UserJpaEntity> entities = userRepository.findAllById(nonNullIds);
-        return entities.stream()
-                .map(userMapper::toDomain)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toMap(User::getId, u -> u, (u1, u2) -> u1));
+        Map<UUID, User> map = new java.util.HashMap<>();
+        for (UserJpaEntity entity : entities) {
+            User user = userMapper.toDomain(entity);
+            if (user != null && user.getId() != null) {
+                map.put(user.getId(), user);
+            }
+        }
+        return map;
     }
 
     @Override

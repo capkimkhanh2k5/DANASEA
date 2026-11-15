@@ -18,6 +18,7 @@ public class GetAuditLogDetailUseCase {
     private final AuditLogInternalApi auditLogInternalApi;
     private final AccountInternalApi accountInternalApi;
 
+    @Autowired
     public GetAuditLogDetailUseCase(AuditLogInternalApi auditLogInternalApi,
                                     @Autowired(required = false) AccountInternalApi accountInternalApi) {
         this.auditLogInternalApi = auditLogInternalApi;

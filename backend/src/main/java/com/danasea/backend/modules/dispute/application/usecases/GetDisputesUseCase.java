@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -26,6 +27,7 @@ public class GetDisputesUseCase {
     private final JpaDisputeRepository disputeRepository;
     private final AccountInternalApi accountInternalApi;
 
+    @Autowired
     public GetDisputesUseCase(JpaDisputeRepository disputeRepository,
                              @Autowired(required = false) AccountInternalApi accountInternalApi) {
         this.disputeRepository = disputeRepository;
@@ -59,7 +61,7 @@ public class GetDisputesUseCase {
             pageResult = disputeRepository.findAll(pageable);
         }
 
-        Map<UUID, User> usersMap = Map.of();
+        Map<UUID, User> usersMap = new HashMap<>();
         if (accountInternalApi != null) {
             Set<UUID> resolverIds = pageResult.getContent().stream()
                     .map(DisputeJpaEntity::getResolvedBy)
