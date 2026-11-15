@@ -494,6 +494,59 @@ class _OrderListScreenState extends State<OrderListScreen> {
     );
   }
 
+  Widget _buildOrderCardTopBadge(SubOrderModel order, bool hasCheckedIn) {
+    if (order.status == SubOrderStatus.confirmed) {
+      if (hasCheckedIn) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F5E9),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF2E7D32)),
+              SizedBox(width: 4),
+              Text(
+                'Đã check-in',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2E7D32),
+                ),
+              ),
+            ],
+          ),
+        );
+      } else {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF8E1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.pending_rounded, size: 12, color: Color(0xFFE65100)),
+              SizedBox(width: 4),
+              Text(
+                'Chờ check-in',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFE65100),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+    return StatusBadge(status: order.status);
+  }
+
   Widget _buildSubOrderCard(SubOrderModel order) {
     final bool hasCheckedIn = order.checkedInAt != null;
     final formattedPrice = order.totalPrice.toStringAsFixed(0).replaceAllMapped(
@@ -563,7 +616,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    StatusBadge(status: order.status),
+                    _buildOrderCardTopBadge(order, hasCheckedIn),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -592,113 +645,28 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                // 3. Check-in Status & Total Price Row (Shopee style)
+                // 3. Total Price Row (Shopee style, thoáng mắt, không nhãn thừa)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Check-in badge
-                    Builder(
-                      builder: (context) {
-                        if (order.status == SubOrderStatus.cancelled || order.status == SubOrderStatus.refunded) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(6),
+                    if (hasCheckedIn && order.checkedInAt != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF2E7D32)),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Check-in: ${order.checkedInAt!.hour.toString().padLeft(2, '0')}:${order.checkedInAt!.minute.toString().padLeft(2, '0')}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2E7D32),
                             ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.block_rounded, size: 12, color: Color(0xFF94A3B8)),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Vé đã hủy',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF64748B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                        if (order.status == SubOrderStatus.completed) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE8F5E9),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF2E7D32)),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Đã hoàn thành',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF2E7D32),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                        if (order.status == SubOrderStatus.pending) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE0F2FE),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF0284C7)),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Chờ duyệt đơn',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF0284C7),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: hasCheckedIn ? const Color(0xFFE8F5E9) : const Color(0xFFFFF8E1),
-                            borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                hasCheckedIn ? Icons.check_circle_rounded : Icons.pending_rounded,
-                                size: 12,
-                                color: hasCheckedIn ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                hasCheckedIn ? 'Đã check-in bãi' : 'Chờ khách check-in',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: hasCheckedIn ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                        ],
+                      )
+                    else
+                      const SizedBox.shrink(),
 
                     // Total price
                     Row(
