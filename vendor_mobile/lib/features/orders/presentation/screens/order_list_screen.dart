@@ -11,11 +11,13 @@ import 'sub_order_detail_screen.dart';
 class OrderListScreen extends StatefulWidget {
   final VoidCallback? onOpenNotifications;
   final VoidCallback? onOpenProfile;
+  final String? initialFilter;
 
   const OrderListScreen({
     super.key,
     this.onOpenNotifications,
     this.onOpenProfile,
+    this.initialFilter,
   });
 
   @override
@@ -26,7 +28,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   final _db = VendorStore.instance;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  String _selectedFilter = 'all'; // all, PENDING, CONFIRMED, COMPLETED, REJECTED, CANCELLED, REFUNDED
+  late String _selectedFilter; // all, PENDING, CONFIRMED, COMPLETED, REJECTED, CANCELLED
   String _selectedShift = 'all'; // all, today, morning, afternoon
 
   String _normalize(String s) {
@@ -44,33 +46,58 @@ class _OrderListScreenState extends State<OrderListScreen> {
   bool _matchesShift(SubOrderModel o, String shift) {
     if (shift == 'all') return true;
     final now = DateTime.now();
-    final todayStr1 = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final todayStr2 = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
-    final isToday = o.slotDate.contains(todayStr1) ||
-        o.slotDate.contains(todayStr2) ||
-        (o.createdAt.year == now.year && o.createdAt.month == now.month && o.createdAt.day == now.day);
+    final today = DateTime(now.year, now.month, now.day);
 
-    if (shift == 'today') return isToday;
-
-    int startHour = 8;
-    final timeStr = o.slotTime.trim();
-    final match = RegExp(r'^(\d{1,2})').firstMatch(timeStr);
-    if (match != null) {
-      startHour = int.tryParse(match.group(1)!) ?? 8;
+    DateTime? orderDate;
+    if (o.slotDate.isNotEmpty) {
+      orderDate = DateTime.tryParse(o.slotDate);
+      if (orderDate == null && o.slotDate.contains('/')) {
+        final parts = o.slotDate.split('/');
+        if (parts.length == 3) {
+          final d = int.tryParse(parts[0]);
+          final m = int.tryParse(parts[1]);
+          final y = int.tryParse(parts[2]);
+          if (d != null && m != null && y != null) {
+            orderDate = DateTime(y, m, d);
+          }
+        }
+      }
     }
+    orderDate ??= DateTime(o.createdAt.year, o.createdAt.month, o.createdAt.day);
+    final orderDay = DateTime(orderDate.year, orderDate.month, orderDate.day);
 
-    if (shift == 'morning') {
-      return startHour < 12;
+    if (shift == 'today') {
+      return orderDay == today;
     }
-    if (shift == 'afternoon') {
-      return startHour >= 12;
+    if (shift == 'tomorrow') {
+      final tomorrow = today.add(const Duration(days: 1));
+      return orderDay == tomorrow;
+    }
+    if (shift == 'week') {
+      final in7Days = today.add(const Duration(days: 7));
+      return !orderDay.isBefore(today) && !orderDay.isAfter(in7Days);
     }
     return true;
+  }
+
+  String _formatShortCode(String code) {
+    final c = code.trim();
+    if (c.contains('-')) {
+      final lastPart = c.split('-').last;
+      if (lastPart.length <= 6) return '#...$lastPart';
+    }
+    if (c.length > 6) {
+      return '#...${c.substring(c.length - 4)}';
+    }
+    return '#$c';
   }
 
   @override
   void initState() {
     super.initState();
+    _selectedFilter = (widget.initialFilter != null && widget.initialFilter!.isNotEmpty)
+        ? widget.initialFilter!.toUpperCase()
+        : 'all';
     _db.addListener(_onDbChanged);
     VendorOrderRepository().getSubOrders();
   }
@@ -89,7 +116,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
   @override
   Widget build(BuildContext context) {
     final subOrders = _db.subOrders.where((o) {
-      if (_selectedFilter != 'all' && o.status.name.toUpperCase() != _selectedFilter) return false;
+      if (_selectedFilter != 'all') {
+        if (_selectedFilter == 'CANCELLED') {
+          if (o.status != SubOrderStatus.cancelled && o.status != SubOrderStatus.refunded) return false;
+        } else if (o.status.name.toUpperCase() != _selectedFilter) {
+          return false;
+        }
+      }
       if (!_matchesShift(o, _selectedShift)) return false;
       if (_searchQuery.isNotEmpty) {
         final rawQ = _searchQuery.trim().toLowerCase();
@@ -111,15 +144,14 @@ class _OrderListScreenState extends State<OrderListScreen> {
 
     final allCount = _db.subOrders.length;
     final todayCount = _db.subOrders.where((o) => _matchesShift(o, 'today')).length;
-    final morningCount = _db.subOrders.where((o) => _matchesShift(o, 'morning')).length;
-    final afternoonCount = _db.subOrders.where((o) => _matchesShift(o, 'afternoon')).length;
+    final tomorrowCount = _db.subOrders.where((o) => _matchesShift(o, 'tomorrow')).length;
+    final weekCount = _db.subOrders.where((o) => _matchesShift(o, 'week')).length;
 
     final pendingCount = _db.subOrders.where((o) => o.status == SubOrderStatus.pending).length;
     final confirmedCount = _db.subOrders.where((o) => o.status == SubOrderStatus.confirmed).length;
     final completedCount = _db.subOrders.where((o) => o.status == SubOrderStatus.completed).length;
     final rejectedCount = _db.subOrders.where((o) => o.status == SubOrderStatus.rejected).length;
-    final cancelledCount = _db.subOrders.where((o) => o.status == SubOrderStatus.cancelled).length;
-    final refundedCount = _db.subOrders.where((o) => o.status == SubOrderStatus.refunded).length;
+    final cancelledCount = _db.subOrders.where((o) => o.status == SubOrderStatus.cancelled || o.status == SubOrderStatus.refunded).length;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -127,7 +159,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
         backgroundColor: AppColors.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        titleSpacing: 16,
+        leading: Navigator.canPop(context)
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.navyAnchor, size: 20),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
+        titleSpacing: Navigator.canPop(context) ? 0 : 16,
         title: const LocalizedText(
           'Quản lý đơn hàng',
           style: TextStyle(
@@ -201,74 +239,74 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     elevation: 4,
                     color: Colors.white,
                     itemBuilder: (ctx) => [
-                      PopupMenuItem(
-                        value: 'all',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.access_time_rounded, size: 16, color: AppColors.tertiary),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Tất cả ca ($allCount)',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: _selectedShift == 'all' ? FontWeight.bold : FontWeight.normal,
-                                color: _selectedShift == 'all' ? AppColors.secondary : AppColors.onSurface,
-                              ),
+                          PopupMenuItem(
+                            value: 'all',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.schedule_rounded, size: 16, color: AppColors.secondary),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Tất cả ($allCount)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: _selectedShift == 'all' ? FontWeight.bold : FontWeight.normal,
+                                    color: _selectedShift == 'all' ? AppColors.secondary : AppColors.onSurface,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'today',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.today_rounded, size: 16, color: Color(0xFF0F766E)),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Hôm nay ($todayCount)',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: _selectedShift == 'today' ? FontWeight.bold : FontWeight.normal,
-                                color: _selectedShift == 'today' ? AppColors.secondary : AppColors.onSurface,
-                              ),
+                          ),
+                          PopupMenuItem(
+                            value: 'today',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.today_rounded, size: 16, color: Color(0xFF0F766E)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Hôm nay ($todayCount)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: _selectedShift == 'today' ? FontWeight.bold : FontWeight.normal,
+                                    color: _selectedShift == 'today' ? AppColors.secondary : AppColors.onSurface,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'morning',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.wb_twilight_rounded, size: 16, color: Color(0xFFD97706)),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Ca sáng <12h ($morningCount)',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: _selectedShift == 'morning' ? FontWeight.bold : FontWeight.normal,
-                                color: _selectedShift == 'morning' ? AppColors.secondary : AppColors.onSurface,
-                              ),
+                          ),
+                          PopupMenuItem(
+                            value: 'tomorrow',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.wb_sunny_rounded, size: 16, color: Color(0xFFD97706)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Ngày mai ($tomorrowCount)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: _selectedShift == 'tomorrow' ? FontWeight.bold : FontWeight.normal,
+                                    color: _selectedShift == 'tomorrow' ? AppColors.secondary : AppColors.onSurface,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
-                      PopupMenuItem(
-                        value: 'afternoon',
-                        child: Row(
-                          children: [
-                            const Icon(Icons.wb_sunny_rounded, size: 16, color: Color(0xFFEA580C)),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Ca chiều ≥12h ($afternoonCount)',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: _selectedShift == 'afternoon' ? FontWeight.bold : FontWeight.normal,
-                                color: _selectedShift == 'afternoon' ? AppColors.secondary : AppColors.onSurface,
-                              ),
+                          ),
+                          PopupMenuItem(
+                            value: 'week',
+                            child: Row(
+                              children: [
+                                const Icon(Icons.date_range_rounded, size: 16, color: Color(0xFF0284C7)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Tuần này ($weekCount)',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: _selectedShift == 'week' ? FontWeight.bold : FontWeight.normal,
+                                    color: _selectedShift == 'week' ? AppColors.secondary : AppColors.onSurface,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ),
+                          ),
                     ],
                     child: Container(
                       height: 42,
@@ -332,9 +370,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   const SizedBox(width: 8),
                   _buildFilterTab('REJECTED', 'Đã từ chối', rejectedCount),
                   const SizedBox(width: 8),
-                  _buildFilterTab('CANCELLED', 'Đã hủy', cancelledCount),
-                  const SizedBox(width: 8),
-                  _buildFilterTab('REFUNDED', 'Đã hoàn tiền', refundedCount),
+                  _buildFilterTab('CANCELLED', 'Hủy / Hoàn', cancelledCount),
                 ],
               ),
             ),
@@ -384,13 +420,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
     switch (key) {
       case 'today':
         return 'Hôm nay';
-      case 'morning':
-        return 'Ca sáng';
-      case 'afternoon':
-        return 'Ca chiều';
+      case 'tomorrow':
+        return 'Ngày mai';
+      case 'week':
+        return 'Tuần này';
       case 'all':
       default:
-        return 'Tất cả ca';
+        return 'Tất cả';
     }
   }
 
@@ -398,13 +434,13 @@ class _OrderListScreenState extends State<OrderListScreen> {
     switch (key) {
       case 'today':
         return Icons.today_rounded;
-      case 'morning':
-        return Icons.wb_twilight_rounded;
-      case 'afternoon':
+      case 'tomorrow':
         return Icons.wb_sunny_rounded;
+      case 'week':
+        return Icons.date_range_rounded;
       case 'all':
       default:
-        return Icons.access_time_rounded;
+        return Icons.schedule_rounded;
     }
   }
 
@@ -561,31 +597,107 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // Check-in badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: hasCheckedIn ? const Color(0xFFE8F5E9) : const Color(0xFFFFF8E1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            hasCheckedIn ? Icons.check_circle_rounded : Icons.pending_rounded,
-                            size: 12,
-                            color: hasCheckedIn ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            hasCheckedIn ? 'Đã check-in bãi' : 'Chờ khách check-in',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: hasCheckedIn ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
+                    Builder(
+                      builder: (context) {
+                        if (order.status == SubOrderStatus.cancelled || order.status == SubOrderStatus.refunded) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
                             ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.block_rounded, size: 12, color: Color(0xFF94A3B8)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Vé đã hủy',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        if (order.status == SubOrderStatus.completed) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5E9),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF2E7D32)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Đã hoàn thành',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF2E7D32),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        if (order.status == SubOrderStatus.pending) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE0F2FE),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.schedule_rounded, size: 12, color: Color(0xFF0284C7)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Chờ duyệt đơn',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0284C7),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: hasCheckedIn ? const Color(0xFFE8F5E9) : const Color(0xFFFFF8E1),
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                        ],
-                      ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                hasCheckedIn ? Icons.check_circle_rounded : Icons.pending_rounded,
+                                size: 12,
+                                color: hasCheckedIn ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                hasCheckedIn ? 'Đã check-in bãi' : 'Chờ khách check-in',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: hasCheckedIn ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
 
                     // Total price
@@ -656,7 +768,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        '#${order.subOrderCode}',
+                        _formatShortCode(order.subOrderCode),
                         textAlign: TextAlign.right,
                         style: const TextStyle(
                           fontSize: 12,

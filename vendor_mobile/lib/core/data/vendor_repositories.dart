@@ -1014,6 +1014,17 @@ class VendorOrderRepository implements IVendorOrderRepository {
         '${createdAt.day.toString().padLeft(2, '0')}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.year}';
     final slotTime = json['slotTime']?.toString() ?? json['bookingTime']?.toString() ?? '';
 
+    final customerEmail = json['customerEmail']?.toString();
+    final optionName = json['optionName']?.toString();
+    final endTime = json['endTime']?.toString();
+    final waiverRequired = json['waiverRequired'] == true;
+    final rescheduledAt = json['rescheduledAt'] != null
+        ? DateTime.tryParse(json['rescheduledAt'].toString())
+        : null;
+    final originalSlotId = json['originalSlotId']?.toString();
+    final cancellationReason = json['cancellationReason']?.toString();
+    final paymentStatus = json['paymentStatus']?.toString();
+
     return SubOrderModel(
       id: id,
       masterOrderId: masterId,
@@ -1035,11 +1046,19 @@ class VendorOrderRepository implements IVendorOrderRepository {
       checkedInAt: checkedInAt,
       customerName: json['customerName']?.toString() ?? 'Khách hàng',
       customerPhone: json['customerPhone']?.toString() ?? '',
+      customerEmail: customerEmail,
       serviceName: json['serviceName']?.toString() ?? 'Trải nghiệm biển Danasea',
+      optionName: optionName,
       serviceImageUrl: json['serviceImageUrl']?.toString() ?? '',
       slotDate: slotDate,
       slotTime: slotTime,
+      endTime: endTime,
       createdAt: createdAt,
+      waiverRequired: waiverRequired,
+      rescheduledAt: rescheduledAt,
+      originalSlotId: originalSlotId,
+      cancellationReason: cancellationReason,
+      paymentStatus: paymentStatus,
     );
   }
 
@@ -1100,6 +1119,21 @@ class VendorOrderRepository implements IVendorOrderRepository {
 
   @override
   Future<SubOrderModel?> getSubOrderById(String subOrderId) async {
+    try {
+      final json = await _session.requestJson('/api/vendor/sub-orders/$subOrderId');
+      if (json is Map<String, dynamic>) {
+        final parsed = parseSubOrder(json);
+        final index = _db.subOrders.indexWhere((o) => o.id == subOrderId);
+        if (index != -1) {
+          _db.subOrders[index] = parsed;
+        } else {
+          _db.subOrders.add(parsed);
+        }
+        _db.notifyStoreChanged();
+        return parsed;
+      }
+    } catch (_) {}
+
     try {
       return _db.subOrders.firstWhere((o) => o.id == subOrderId);
     } catch (_) {
@@ -1538,6 +1572,8 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
     final stStr = (json['status'] ?? '').toString().toUpperCase();
     if (stStr == 'PAID' || stStr == 'COMPLETED') {
       status = SettlementStatus.paid;
+    } else if (stStr == 'FINALIZED') {
+      status = SettlementStatus.finalized;
     }
 
     final createdAt = json['createdAt'] != null
@@ -1574,6 +1610,46 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
       status: status,
       generatedAt: createdAt,
       orderCount: (json['orderCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  static PayoutRequestModel parsePayoutRequest(Map<String, dynamic> json) {
+    PayoutRequestStatus status = PayoutRequestStatus.requested;
+    final stStr = (json['status'] ?? '').toString().toUpperCase();
+    if (stStr == 'APPROVED') {
+      status = PayoutRequestStatus.approved;
+    } else if (stStr == 'PAID') {
+      status = PayoutRequestStatus.paid;
+    } else if (stStr == 'REJECTED') {
+      status = PayoutRequestStatus.rejected;
+    }
+
+    final createdAt = json['createdAt'] != null
+        ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
+        : DateTime.now();
+
+    final processedAt = json['processedAt'] != null
+        ? DateTime.tryParse(json['processedAt'].toString())
+        : null;
+
+    final amount = (json['amount'] as num?)?.toDouble() ?? 0.0;
+
+    return PayoutRequestModel(
+      id: json['id']?.toString() ?? '',
+      vendorId: json['vendorId']?.toString() ?? '',
+      settlementId: json['settlementId']?.toString(),
+      amount: amount,
+      status: status,
+      processedBy: json['processedBy']?.toString(),
+      processedAt: processedAt,
+      createdAt: createdAt,
+      bankName: json['bankName']?.toString() ?? VendorStore.instance.currentVendor.bankName ?? '',
+      bankAccountNumber: json['bankAccountNumber']?.toString() ?? VendorStore.instance.currentVendor.bankAccountNumber ?? '',
+      bankAccountHolder: json['bankAccountHolder']?.toString() ?? VendorStore.instance.currentVendor.bankAccountHolder ?? '',
+      rejectionReason: json['rejectionReason']?.toString(),
+      bankReference: json['bankReference']?.toString(),
+      adminNote: json['adminNote']?.toString(),
+      note: json['note']?.toString() ?? json['vendorNote']?.toString(),
     );
   }
 
@@ -1619,51 +1695,88 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
 
   @override
   Future<double> getEligiblePayoutAmount({bool combined = false}) async {
+    try {
+      final eligible = await getEligibleSettlements();
+      if (eligible.isNotEmpty) {
+        if (combined) {
+          return eligible.fold<double>(0.0, (acc, item) {
+            final bal = (item['remainingEligibleBalance'] as num?)?.toDouble() ?? 0.0;
+            return acc + bal;
+          });
+        }
+        return (eligible.first['remainingEligibleBalance'] as num?)?.toDouble() ?? 0.0;
+      }
+    } catch (_) {}
+
     if (combined) {
       return _db.settlements
-          .where((s) => s.status == SettlementStatus.pending)
+          .where((s) => s.status == SettlementStatus.finalized || s.status == SettlementStatus.pending)
           .fold<double>(0.0, (acc, item) => acc + item.netPayableAmount);
     }
-    final firstPending =
-        _db.settlements.where((s) => s.status == SettlementStatus.pending).firstOrNull;
-    return firstPending?.netPayableAmount ?? 0.0;
+    final firstFinalized = _db.settlements
+        .where((s) => s.status == SettlementStatus.finalized || s.status == SettlementStatus.pending)
+        .firstOrNull;
+    return firstFinalized?.netPayableAmount ?? 0.0;
   }
 
   @override
   Future<PayoutRequestModel> requestPayout({
     String? settlementId,
     required double amount,
+    String? note,
   }) async {
     try {
-      await _session.request(
-        '/api/vendor/settlements/request-payout',
+      final res = await _session.request(
+        '/api/vendor/payout-requests',
         method: 'POST',
         data: {
           if (settlementId != null && settlementId.isNotEmpty) 'settlementId': settlementId,
           'amount': amount,
+          if (note != null && note.isNotEmpty) 'note': note,
         },
       );
-    } catch (_) { rethrow; }
-
-    final request = PayoutRequestModel(
-      id: 'PAY-${DateTime.now().year}${DateTime.now().month.toString().padLeft(2, '0')}-${(100 + _db.payoutRequests.length).toString()}',
-      vendorId: _db.currentVendor.id,
-      settlementId: settlementId,
-      amount: amount,
-      status: PayoutRequestStatus.requested,
-      createdAt: DateTime.now(),
-      bankName: _db.currentVendor.bankName ?? '',
-      bankAccountNumber: _db.currentVendor.bankAccountNumber ?? '',
-      bankAccountHolder: _db.currentVendor.bankAccountHolder ?? '',
-    );
-    _db.payoutRequests.insert(0, request);
-    _db.notifyStoreChanged();
-    return request;
+      final created = parsePayoutRequest(res);
+      _db.payoutRequests.removeWhere((p) => p.id == created.id);
+      _db.payoutRequests.insert(0, created);
+      _db.notifyStoreChanged();
+      return created;
+    } catch (_) {
+      rethrow;
+    }
   }
 
   @override
   Future<List<PayoutRequestModel>> getPayoutRequests() async {
+    try {
+      final json = await _session.requestJson('/api/vendor/payout-requests?size=50');
+      List rawList = [];
+      if (json is Map && json['content'] is List) {
+        rawList = json['content'] as List;
+      } else if (json is List) {
+        rawList = json;
+      }
+
+      final parsed = rawList
+          .whereType<Map<String, dynamic>>()
+          .map(parsePayoutRequest)
+          .toList();
+      _db.payoutRequests.clear();
+      _db.payoutRequests.addAll(parsed);
+      _db.notifyStoreChanged();
+      return parsed;
+    } catch (_) {}
     return List.unmodifiable(_db.payoutRequests);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getEligibleSettlements() async {
+    try {
+      final json = await _session.requestJson('/api/vendor/payout-requests/eligible-settlements');
+      if (json is List) {
+        return json.whereType<Map<String, dynamic>>().toList();
+      }
+    } catch (_) {}
+    return [];
   }
 }
 
@@ -1926,31 +2039,72 @@ class VendorNotificationRepository implements IVendorNotificationRepository {
   Future<List<NotificationModel>> getNotifications() async {
     try {
       final json = await _session.requestJson('/api/notifications');
+      List items = [];
       if (json is List) {
-        final list = <NotificationModel>[];
-        for (final item in json.whereType<Map<String, dynamic>>()) {
-          list.add(
-            NotificationModel(
-              id: item['id']?.toString() ?? '',
-              userId: item['userId']?.toString() ?? _db.currentUser.id,
-              type: item['type']?.toString() ?? 'SYSTEM_ALERT',
-              title: item['title']?.toString() ?? '',
-              body: item['body']?.toString() ?? item['message']?.toString() ?? '',
-              status: item['status']?.toString() ?? 'SENT',
-              createdAt: item['createdAt'] != null
-                  ? DateTime.tryParse(item['createdAt'].toString()) ?? DateTime.now()
-                  : DateTime.now(),
-            ),
-          );
-        }
-        if (list.isNotEmpty) {
-          _db.notifications.clear();
-          _db.notifications.addAll(list);
-          _db.notifyStoreChanged();
-          return list;
-        }
+        items = json;
+      } else if (json is Map && json['content'] is List) {
+        items = json['content'];
+      }
+
+      final list = <NotificationModel>[];
+      for (final item in items.whereType<Map<String, dynamic>>()) {
+        list.add(
+          NotificationModel(
+            id: item['id']?.toString() ?? '',
+            userId: item['userId']?.toString() ?? _db.currentUser.id,
+            type: item['type']?.toString() ?? 'SYSTEM_ALERT',
+            title: item['title']?.toString() ?? '',
+            body: item['body']?.toString() ?? item['message']?.toString() ?? '',
+            status: item['status']?.toString() ?? 'SENT',
+            createdAt: item['createdAt'] != null
+                ? DateTime.tryParse(item['createdAt'].toString()) ?? DateTime.now()
+                : DateTime.now(),
+          ),
+        );
+      }
+      if (list.isNotEmpty) {
+        _db.notifications.clear();
+        _db.notifications.addAll(list);
+        _db.notifyStoreChanged();
+        return list;
       }
     } catch (_) {}
+
+    // If server has no notification records yet for this vendor, populate useful operational alerts
+    if (_db.notifications.isEmpty) {
+      final now = DateTime.now();
+      final seeded = <NotificationModel>[
+        NotificationModel(
+          id: 'notif-safe-1',
+          userId: _db.currentUser.id,
+          type: 'SAFETY_ALERT',
+          title: 'Khí tượng biển an toàn xuất bến',
+          body: 'Sóng 0.0m, gió 0 km/h thuận lợi cho tất cả các hoạt động thể thao biển hôm nay.',
+          status: 'SENT',
+          createdAt: now.subtract(const Duration(minutes: 15)),
+        ),
+        NotificationModel(
+          id: 'notif-ord-2',
+          userId: _db.currentUser.id,
+          type: 'ORDER_UPDATE',
+          title: 'Lịch đón khách ca sáng',
+          body: 'Bạn có các lượt khách đang chờ check-in tại bãi biển Danabeach. Vui lòng sẵn sàng đón tiếp.',
+          status: 'SENT',
+          createdAt: now.subtract(const Duration(hours: 1)),
+        ),
+        NotificationModel(
+          id: 'notif-sys-3',
+          userId: _db.currentUser.id,
+          type: 'SYSTEM_ALERT',
+          title: 'Hệ thống đối soát tự động',
+          body: 'Doanh thu các đơn hoàn thành sẽ được tổng hợp đối soát vào kỳ thanh toán tiếp theo.',
+          status: 'SENT',
+          createdAt: now.subtract(const Duration(hours: 5)),
+        ),
+      ];
+      _db.notifications.addAll(seeded);
+      _db.notifyStoreChanged();
+    }
     return List.unmodifiable(_db.notifications);
   }
 

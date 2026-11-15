@@ -75,6 +75,7 @@ class StatusBadge extends StatelessWidget {
         status == SubOrderStatus.completed ||
         status == DocumentReviewStatus.approved ||
         status == SettlementStatus.paid ||
+        status == SettlementStatus.finalized ||
         status == PayoutRequestStatus.approved ||
         status == PayoutRequestStatus.paid ||
         status == DisputeStatus.resolved) {

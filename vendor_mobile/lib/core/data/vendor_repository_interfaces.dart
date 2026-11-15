@@ -192,8 +192,10 @@ abstract class IVendorSettlementRepository {
   Future<PayoutRequestModel> requestPayout({
     String? settlementId,
     required double amount,
+    String? note,
   });
   Future<List<PayoutRequestModel>> getPayoutRequests();
+  Future<List<Map<String, dynamic>>> getEligibleSettlements();
 }
 
 abstract class IVendorDisputeRepository {

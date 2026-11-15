@@ -520,7 +520,7 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               LocalizedText(
-                '${slot.startTime.substring(0, 5)} - ${slot.endTime.substring(0, 5)}',
+                '${slot.startTime.length >= 5 ? slot.startTime.substring(0, 5) : slot.startTime} - ${slot.endTime.length >= 5 ? slot.endTime.substring(0, 5) : slot.endTime}',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
@@ -1157,7 +1157,7 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                               Navigator.pop(ctx);
                               ToastNotification.showSuccess(
                                 context,
-                                'Đã gán thiết bị vào đơn vị #$unitNum của ca ${slot.startTime.substring(0, 5)}',
+                                'Đã gán thiết bị vào đơn vị #$unitNum của ca ${slot.startTime.length >= 5 ? slot.startTime.substring(0, 5) : slot.startTime}',
                               );
                             }
                           } catch (e) {

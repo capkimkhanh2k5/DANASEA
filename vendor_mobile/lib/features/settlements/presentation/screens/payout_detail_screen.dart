@@ -33,6 +33,8 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
     _currentSettlementId = widget.initialSettlementId ??
         (_db.settlements.isNotEmpty ? _db.settlements.first.id : '');
     _db.addListener(_onDbChanged);
+    _settlementRepo.getSettlements();
+    _settlementRepo.getPayoutRequests();
   }
 
   @override
@@ -61,6 +63,7 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
   }
 
   void _openPayoutRequestSheet(SettlementModel settlement) {
+    final noteController = TextEditingController();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -252,6 +255,28 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                   ),
                   const SizedBox(height: 14),
 
+                  // Optional Note Field
+                  TextField(
+                    controller: noteController,
+                    decoration: InputDecoration(
+                      hintText: 'Ghi chú gửi kế toán DANASEA (tùy chọn)',
+                      hintStyle: const TextStyle(fontSize: 12, color: AppColors.tertiary),
+                      filled: true,
+                      fillColor: AppColors.surfaceContainerLow,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.outlineVariant),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.outlineVariant),
+                      ),
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+
                   // Notice
                   const Text(
                     'Ban tài chính DANASEA sẽ rà soát tính hợp lệ của tour và chuyển khoản theo số tài khoản thụ hưởng trong vòng 24–48h làm việc.',
@@ -273,6 +298,7 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                                 await _settlementRepo.requestPayout(
                                   settlementId: settlement.id,
                                   amount: settlement.netPayableAmount,
+                                  note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
                                 );
                                 if (mounted) {
                                   Navigator.pop(sheetCtx);
@@ -428,6 +454,41 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                               'Tài khoản: ${p.bankName} ${p.bankAccountNumber}',
                               style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
                             ),
+                            if (p.note != null && p.note!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Ghi chú: ${p.note}',
+                                style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: AppColors.tertiary),
+                              ),
+                            ],
+                            if (p.bankReference != null && p.bankReference!.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFECFDF5),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Mã GD ngân hàng: ${p.bankReference}',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF059669)),
+                                ),
+                              ),
+                            ],
+                            if (p.rejectionReason != null && p.rejectionReason!.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEF2F2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'Lý do từ chối: ${p.rejectionReason}',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFDC2626)),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       );
