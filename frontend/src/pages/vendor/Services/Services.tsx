@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { vendorService } from '../../../services/vendorService';
@@ -23,7 +23,8 @@ import {
   Users, 
   Star, 
   Package,
-  AlertCircle
+  AlertCircle,
+  MoreVertical
 } from 'lucide-react';
 import { 
   AtlasPageHeader, 
@@ -50,6 +51,24 @@ export function Services() {
   // Edit price modal state
   const [editingService, setEditingService] = useState<VendorServiceDto | null>(null);
   const [editPriceInput, setEditPriceInput] = useState('');
+
+  // Three-dots action menu state
+  const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
+  const actionMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(e.target as Node)) {
+        setActiveActionMenuId(null);
+      }
+    };
+    if (activeActionMenuId) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [activeActionMenuId]);
 
   const showToast = (msg: string) => {
     toast.success(msg);
@@ -382,17 +401,18 @@ export function Services() {
 
       {/* Main Table Card (Atlas Flat Table) */}
       <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col">
-        <div className="overflow-x-auto scrollbar-thin">
+        <div className="overflow-x-auto scrollbar-thin min-h-[360px]">
           <table className="w-full text-left text-sm border-collapse table-auto">
             <thead>
               <tr className="bg-[#f8f9fa] text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200/80">
                 <th className="py-3.5 px-4">TÊN DỊCH VỤ &amp; TRẢI NGHIỆM</th>
-                <th className="py-3.5 px-4 w-[140px]">DANH MỤC</th>
-                <th className="py-3.5 px-4 text-right w-[140px]">ĐƠN GIÁ</th>
-                <th className="py-3.5 px-4 w-[150px]">THỜI LƯỢNG &amp; CA</th>
+                <th className="py-3.5 px-4 w-[130px]">DANH MỤC</th>
+                <th className="py-3.5 px-4 text-right w-[130px]">ĐƠN GIÁ</th>
+                <th className="py-3.5 px-4 w-[120px]">THỜI LƯỢNG</th>
+                <th className="py-3.5 px-4 w-[130px]">SỨC CHỨA / CA</th>
                 <th className="py-3.5 px-4 text-center w-[110px]">ĐÁNH GIÁ</th>
                 <th className="py-3.5 px-4 text-center w-[130px]">TRẠNG THÁI</th>
-                <th className="py-3.5 px-4 text-center w-[160px]">THAO TÁC</th>
+                <th className="py-3.5 px-4 text-center w-[90px]">THAO TÁC</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -410,14 +430,15 @@ export function Services() {
                     </td>
                     <td className="py-4 px-4"><div className="h-6 w-20 bg-slate-200 rounded" /></td>
                     <td className="py-4 px-4 text-right"><div className="h-4 w-24 bg-slate-200 rounded ml-auto" /></td>
+                    <td className="py-4 px-4"><div className="h-4 w-16 bg-slate-200 rounded" /></td>
                     <td className="py-4 px-4"><div className="h-4 w-20 bg-slate-200 rounded" /></td>
                     <td className="py-4 px-4 text-center"><div className="h-4 w-12 bg-slate-200 rounded mx-auto" /></td>
                     <td className="py-4 px-4 text-center"><div className="h-6 w-20 bg-slate-200 rounded-full mx-auto" /></td>
-                    <td className="py-4 px-4 text-center"><div className="h-8 w-24 bg-slate-200 rounded-lg mx-auto" /></td>
+                    <td className="py-4 px-4 text-center"><div className="h-8 w-8 bg-slate-200 rounded-lg mx-auto" /></td>
                   </tr>
                 ))
               ) : paginatedServices.length > 0 ? (
-                paginatedServices.map((service) => {
+                paginatedServices.map((service, index) => {
                   const primaryImageUrl = (service.images && service.images.length > 0 && service.images[0]?.url)
                     ? service.images[0].url
                     : 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=300&q=80';
@@ -425,6 +446,7 @@ export function Services() {
                   const displayLocation = service.locationName || service.address || 'Đà Nẵng';
                   const categoryName = categoryMap.get(service.categoryId) || 'Thể thao biển';
                   const isActionBusy = actionInProgressId === service.id;
+                  const isNearBottom = paginatedServices.length >= 3 && index >= paginatedServices.length - 2;
 
                   return (
                     <tr key={service.id} className="hover:bg-slate-50/70 transition-colors">
@@ -483,13 +505,17 @@ export function Services() {
                         </div>
                       </td>
 
-                      {/* Duration & Capacity */}
-                      <td className="py-3.5 px-4 text-xs text-slate-600 space-y-1">
-                        <div className="flex items-center gap-1.5 font-medium text-slate-800">
+                      {/* Duration */}
+                      <td className="py-3.5 px-4 text-xs text-slate-700 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 font-medium">
                           <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span>{service.durationMinutes ? `${service.durationMinutes} phút` : 'Chưa đặt'}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-slate-500">
+                      </td>
+
+                      {/* Capacity */}
+                      <td className="py-3.5 px-4 text-xs text-slate-700 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span>{service.capacityPerSlot ? `${service.capacityPerSlot} người/ca` : 'Tùy chỉnh'}</span>
                         </div>
@@ -515,67 +541,116 @@ export function Services() {
 
                       {/* Actions */}
                       <td className="py-3.5 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
+                        <div className="relative inline-block text-left">
                           <button
-                            onClick={() => navigate(`/vendor/services/${service.id}/edit`)}
-                            className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
-                            title="Chỉnh sửa dịch vụ"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveActionMenuId(activeActionMenuId === service.id ? null : service.id);
+                            }}
                             disabled={isActionBusy}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              activeActionMenuId === service.id
+                                ? "bg-slate-200 text-slate-900"
+                                : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
+                            }`}
+                            title="Thao tác"
                           >
-                            <Edit2 className="w-4 h-4" />
+                            <MoreVertical className="w-4 h-4" />
                           </button>
 
-                          {(service.status === 'DRAFT' || service.status === 'REJECTED') && (
-                            <button
-                              onClick={() => handleSubmitForReview(service)}
-                              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
-                              title="Gửi duyệt dịch vụ"
-                              disabled={isActionBusy}
+                          {activeActionMenuId === service.id && (
+                            <div
+                              ref={actionMenuRef}
+                              onClick={(e) => e.stopPropagation()}
+                              className={`absolute right-0 ${isNearBottom ? 'bottom-full mb-1.5' : 'top-full mt-1.5'} z-50 w-52 bg-white rounded-xl shadow-xl border border-slate-200/90 py-1 text-xs text-slate-700 animate-in fade-in zoom-in-95 duration-100 font-normal divide-y divide-slate-100 text-left`}
                             >
-                              <Send className="w-4 h-4" />
-                            </button>
-                          )}
+                              <div className="py-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveActionMenuId(null);
+                                    navigate(`/vendor/services/${service.id}/edit`);
+                                  }}
+                                  className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-50 transition-colors text-slate-700 hover:text-slate-900 cursor-pointer"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                  <span>Chỉnh sửa dịch vụ</span>
+                                </button>
 
-                          {service.status === 'PUBLISHED' && (
-                            <button
-                              onClick={() => handlePauseService(service)}
-                              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors cursor-pointer"
-                              title="Tạm ngưng nhận khách"
-                              disabled={isActionBusy}
-                            >
-                              <PauseCircle className="w-4 h-4" />
-                            </button>
-                          )}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveActionMenuId(null);
+                                    navigate(`/vendor/schedule?serviceId=${service.id}`);
+                                  }}
+                                  className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-50 transition-colors text-slate-700 hover:text-slate-900 cursor-pointer"
+                                >
+                                  <Calendar className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                  <span>Lịch ca &amp; Sức chứa</span>
+                                </button>
+                              </div>
 
-                          {service.status === 'PAUSED' && (
-                            <button
-                              onClick={() => handleResumeService(service)}
-                              className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors cursor-pointer"
-                              title="Mở bán lại"
-                              disabled={isActionBusy}
-                            >
-                              <PlayCircle className="w-4 h-4" />
-                            </button>
-                          )}
+                              {(service.status === 'PUBLISHED' || service.status === 'PAUSED') && (
+                                <div className="py-1">
+                                  {service.status === 'PUBLISHED' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveActionMenuId(null);
+                                        handlePauseService(service);
+                                      }}
+                                      className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-amber-50/60 transition-colors text-amber-700 cursor-pointer"
+                                    >
+                                      <PauseCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                      <span>Tạm ngưng nhận khách</span>
+                                    </button>
+                                  )}
 
-                          <button
-                            onClick={() => navigate(`/vendor/schedule?serviceId=${service.id}`)}
-                            className="p-1.5 rounded-lg text-sky-600 hover:bg-sky-50 transition-colors cursor-pointer"
-                            title="Lịch ca & Sức chứa"
-                            disabled={isActionBusy}
-                          >
-                            <Calendar className="w-4 h-4" />
-                          </button>
+                                  {service.status === 'PAUSED' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setActiveActionMenuId(null);
+                                        handleResumeService(service);
+                                      }}
+                                      className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-emerald-50/60 transition-colors text-emerald-700 cursor-pointer"
+                                    >
+                                      <PlayCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                      <span>Mở bán lại</span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
 
-                          {(service.status === 'DRAFT' || service.status === 'REJECTED') && (
-                            <button
-                              onClick={() => handleDeleteService(service.id, displayName)}
-                              className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              title="Xóa dịch vụ"
-                              disabled={isActionBusy}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                              {(service.status === 'DRAFT' || service.status === 'REJECTED') && (
+                                <div className="py-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuId(null);
+                                      handleSubmitForReview(service);
+                                    }}
+                                    className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-emerald-50/60 transition-colors text-emerald-700 cursor-pointer"
+                                  >
+                                    <Send className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                    <span>Gửi duyệt dịch vụ</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveActionMenuId(null);
+                                      handleDeleteService(service.id, displayName);
+                                    }}
+                                    className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-rose-50/60 transition-colors text-rose-600 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                                    <span>Xóa dịch vụ</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>
@@ -584,7 +659,7 @@ export function Services() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center">
+                  <td colSpan={8} className="py-16 text-center">
                     <div className="flex flex-col items-center justify-center space-y-3 text-slate-500 max-w-sm mx-auto">
                       <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
                         <Package className="w-6 h-6" />
