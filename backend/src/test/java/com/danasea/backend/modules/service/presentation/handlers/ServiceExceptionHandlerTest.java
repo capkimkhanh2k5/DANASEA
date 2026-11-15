@@ -16,6 +16,16 @@ class ServiceExceptionHandlerTest {
     private final ServiceExceptionHandler handler = new ServiceExceptionHandler();
 
     @Test
+    void illegalArgumentResponseHidesInternalExceptionMessage() {
+        var response = handler.handleIllegalArgument(new IllegalArgumentException("internal detail"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("BAD_REQUEST", response.getBody().code());
+        assertEquals("Invalid request.", response.getBody().message());
+    }
+
+    @Test
     void testSafetyDocumentRequiredException() {
         ResponseEntity<ErrorResponse> response = handler.handleSafetyDocumentRequired(new SafetyDocumentRequiredException("Test"));
         assertEquals(HttpStatus.UNPROCESSABLE_ENTITY, response.getStatusCode());

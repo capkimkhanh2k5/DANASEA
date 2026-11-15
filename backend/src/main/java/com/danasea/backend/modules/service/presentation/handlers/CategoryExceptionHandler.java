@@ -4,6 +4,7 @@ import com.danasea.backend.modules.service.domain.exceptions.CategoryHasActiveSe
 import com.danasea.backend.modules.service.domain.exceptions.CategoryHasChildrenException;
 import com.danasea.backend.modules.service.domain.exceptions.CategoryHasDependentRulesException;
 import com.danasea.backend.modules.service.domain.exceptions.CategoryHasLinkedServicesException;
+import com.danasea.backend.modules.service.domain.exceptions.CategoryHasPublishedServicesWithoutSafetyDocumentsException;
 import com.danasea.backend.modules.service.domain.exceptions.CategoryHierarchyLoopException;
 import com.danasea.backend.modules.service.domain.exceptions.CategoryNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.SlugAlreadyExistsException;
@@ -36,6 +37,12 @@ public class CategoryExceptionHandler extends LocalizedExceptionHandlerSupport {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(error("CATEGORY_HAS_ACTIVE_SERVICES"));
+    }
+
+    @ExceptionHandler(CategoryHasPublishedServicesWithoutSafetyDocumentsException.class)
+    public ResponseEntity<ErrorResponse> handlePublishedServicesWithoutSafetyDocuments() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(error("CATEGORY_HAS_PUBLISHED_SERVICES_WITHOUT_SAFETY_DOCUMENTS"));
     }
 
     @ExceptionHandler(CategoryHasLinkedServicesException.class)

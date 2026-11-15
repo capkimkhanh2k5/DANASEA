@@ -3,20 +3,26 @@ package com.danasea.backend.modules.operation.infrastructure.persistence.mappers
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.danasea.backend.modules.account.infrastructure.persistence.entities.UserJpaEntity;
 import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository;
 import com.danasea.backend.modules.operation.domain.models.Review;
 import com.danasea.backend.modules.operation.infrastructure.persistence.entities.ReviewJpaEntity;
 import com.danasea.backend.modules.operation.presentation.dtos.ReviewResponse;
+import com.danasea.backend.modules.operation.presentation.dtos.ReviewResponse.ReviewResponseBuilder;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -83,6 +89,49 @@ public class ReviewMapper {
             return null;
         }
 
+        String serviceName = null;
+        if (entity.getServiceId() != null && serviceRepository != null) {
+            serviceName = serviceRepository.findById(entity.getServiceId())
+                    .map(ServiceJpaEntity::getName)
+                    .orElse(null);
+        }
+        return toResponse(entity, serviceName);
+    }
+
+    public ReviewResponse toResponse(ReviewJpaEntity entity, String serviceName) {
+        return responseBuilder(entity, serviceName)
+                .customerId(entity.getCustomerId())
+                .subOrderId(entity.getSubOrderId())
+                .isFlagged(entity.getIsFlagged())
+                .flagReason(entity.getFlagReason())
+                .moderationNote(entity.getModerationNote())
+                .build();
+    }
+
+    public Page<ReviewResponse> toResponsePage(Page<ReviewJpaEntity> page) {
+        Map<UUID, String> serviceNames = serviceNamesForPage(page);
+        return page.map(review -> toResponse(review, serviceNames.get(review.getServiceId())));
+    }
+
+    public Page<ReviewResponse> toPublicResponsePage(Page<ReviewJpaEntity> page) {
+        Map<UUID, String> serviceNames = serviceNamesForPage(page);
+        return page.map(review -> responseBuilder(review, serviceNames.get(review.getServiceId())).build());
+    }
+
+    private Map<UUID, String> serviceNamesForPage(Page<ReviewJpaEntity> page) {
+        Set<UUID> serviceIds = page.stream()
+                .map(ReviewJpaEntity::getServiceId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (serviceIds.isEmpty() || serviceRepository == null) {
+            return Collections.emptyMap();
+        }
+        return serviceRepository.findAllById(serviceIds).stream()
+                .filter(service -> service.getName() != null)
+                .collect(Collectors.toMap(ServiceJpaEntity::getId, ServiceJpaEntity::getName));
+    }
+
+    private ReviewResponseBuilder responseBuilder(ReviewJpaEntity entity, String serviceName) {
         String customerName = "Khách hàng";
         String customerAvatar = null;
         if (entity.getCustomerId() != null) {
@@ -96,17 +145,8 @@ public class ReviewMapper {
             }
         }
 
-        String serviceName = null;
-        if (entity.getServiceId() != null && serviceRepository != null) {
-            serviceName = serviceRepository.findById(entity.getServiceId())
-                    .map(ServiceJpaEntity::getName)
-                    .orElse(null);
-        }
-
         return ReviewResponse.builder()
                 .id(entity.getId())
-                .subOrderId(entity.getSubOrderId())
-                .customerId(entity.getCustomerId())
                 .customerName(customerName)
                 .customerAvatar(customerAvatar)
                 .vendorId(entity.getVendorId())
@@ -117,23 +157,9 @@ public class ReviewMapper {
                 .images(parseImages(entity.getImages()))
                 .vendorReply(entity.getVendorReply())
                 .vendorRepliedAt(entity.getVendorRepliedAt())
-                .isFlagged(entity.getIsFlagged())
                 .isVisible(entity.getIsVisible())
-                .flagReason(entity.getFlagReason())
-                .moderationNote(entity.getModerationNote())
                 .createdAt(entity.getCreatedAt())
-                .updatedAt(entity.getUpdatedAt())
-                .build();
-    }
-
-    public ReviewResponse toPublicResponse(ReviewJpaEntity entity) {
-        ReviewResponse response = toResponse(entity);
-        return ReviewResponse.builder()
-                .id(response.id()).customerName(response.customerName()).customerAvatar(response.customerAvatar())
-                .vendorId(response.vendorId()).serviceId(response.serviceId()).serviceName(response.serviceName()).rating(response.rating())
-                .comment(response.comment()).images(response.images()).vendorReply(response.vendorReply())
-                .vendorRepliedAt(response.vendorRepliedAt()).isVisible(response.isVisible())
-                .createdAt(response.createdAt()).updatedAt(response.updatedAt()).build();
+                .updatedAt(entity.getUpdatedAt());
     }
 
     public String serializeImages(List<String> images) {

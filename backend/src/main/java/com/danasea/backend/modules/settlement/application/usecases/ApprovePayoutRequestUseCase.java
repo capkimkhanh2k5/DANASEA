@@ -104,7 +104,7 @@ public class ApprovePayoutRequestUseCase {
         }
 
         PayoutRequestJpaEntity saved = payoutRequestRepository.save(payout);
-        log.info("Admin {} đã duyệt PayoutRequest #{} ({} đ) cho Vendor {}",
+        log.info("Admin {} approved payout request #{} ({} VND) for vendor {}",
                 adminUserId, saved.getId(), saved.getAmount(), saved.getVendorId());
 
         if (auditLogInternalApi != null) {

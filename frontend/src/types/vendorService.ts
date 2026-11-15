@@ -188,12 +188,12 @@ export interface SlotTemplateRequest {
   units?: CreateSlotUnitRequest[] | null;
 }
 
-export interface BatchCreateServiceSlotsRequest {
-  startDate: string; // "YYYY-MM-DD"
-  endDate: string;   // "YYYY-MM-DD"
-  daysOfWeek: string[]; // ["MONDAY", "TUESDAY", ...]
+export type BatchCreateServiceSlotsRequest = (
+  | { dates: string[]; startDate?: never; endDate?: never; daysOfWeek?: never }
+  | { dates?: never; startDate: string; endDate: string; daysOfWeek: string[] }
+) & {
   slotTemplates: SlotTemplateRequest[];
-}
+};
 
 export interface BatchCreateServiceSlotsResponse {
   totalCreated: number;

@@ -9,11 +9,13 @@ import com.danasea.backend.modules.service.domain.exceptions.MaxImagesExceededEx
 import com.danasea.backend.modules.service.domain.exceptions.SafetyDocumentRequiredException;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceImagesRequiredException;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
+import com.danasea.backend.modules.service.domain.exceptions.ServiceSlotCreationException;
 import com.danasea.backend.modules.service.domain.exceptions.UnauthorizedServiceAccessException;
 import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedException;
 import com.danasea.backend.modules.service.domain.exceptions.WaiverContentRequiredException;
 import com.danasea.backend.modules.service.domain.exceptions.WeatherRequirementsMissingException;
 import com.danasea.backend.shared.presentation.ErrorResponse;
+import com.danasea.backend.shared.presentation.ErrorResponseLocalizationAdvice.AlreadyLocalized;
 import com.danasea.backend.shared.presentation.LocalizedExceptionHandlerSupport;
 import org.springframework.beans.TypeMismatchException;
 import org.springframework.core.Ordered;
@@ -113,10 +115,15 @@ public class ServiceExceptionHandler extends LocalizedExceptionHandlerSupport {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
-        String msg = (ex.getMessage() != null && !ex.getMessage().isBlank())
-                ? ex.getMessage()
-                : message("error.bad_request");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse("BAD_REQUEST", msg));
+                .body(error("BAD_REQUEST"));
+    }
+
+    @AlreadyLocalized
+    @ExceptionHandler(ServiceSlotCreationException.class)
+    public ResponseEntity<ErrorResponse> handleSlotCreationError(ServiceSlotCreationException ex) {
+        var details = ex.getMessageRef();
+        return ResponseEntity.status(ex.isConflict() ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(ex.getErrorCode(), message(details.key(), details.args())));
     }
 }

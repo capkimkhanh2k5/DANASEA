@@ -61,7 +61,7 @@ public class CreatePayoutRequestUseCase {
 
         // 2. Kiểm tra tenant isolation: Kỳ đối soát phải thuộc đúng vendor yêu cầu
         if (!vendorId.equals(settlement.getVendorId())) {
-            log.warn("Vendor {} cố tình yêu cầu rút tiền từ kỳ đối soát {} của Vendor {}",
+            log.warn("Vendor {} requested a payout from settlement {} owned by vendor {}",
                     vendorId, settlement.getId(), settlement.getVendorId());
             throw new UnauthorizedSettlementAccessException("Vendor does not own this settlement period");
         }
@@ -108,7 +108,7 @@ public class CreatePayoutRequestUseCase {
         entity.setUpdatedAt(now);
 
         PayoutRequestJpaEntity saved = payoutRequestRepository.save(entity);
-        log.info("Vendor {} tạo PayoutRequest #{} thành công: {} đ cho Settlement #{}",
+        log.info("Vendor {} created payout request #{} for {} VND from settlement #{}",
                 vendorId, saved.getId(), saved.getAmount(), settlement.getId());
 
         return mapper.toResponse(saved);

@@ -108,8 +108,58 @@ class AdminSystemConfigControllerTest {
                 eq(entity.getId()),
                 argThat(meta -> meta.contains("\"key\":\"PLATFORM_COMMISSION_RATE\"")
                         && meta.contains("\"previousValue\":\"10.0\"")
-                        && meta.contains("\"newValue\":\"12.5\""))
+                        && meta.contains("\"newValue\":\"12.5\"")
+                        && !meta.contains("description")
+                        && !meta.contains("Updated rate"))
         );
+    }
+
+    @Test
+    void nonAllowlistedConfigKeepsValuesAndDescriptionOutOfAudit() {
+        String key = "UPSTREAM_CREDENTIAL";
+        SystemConfigJpaEntity entity = new SystemConfigJpaEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setKey(key);
+        entity.setValue("old credential fixture");
+        when(repository.findByKey(key)).thenReturn(Optional.of(entity));
+        when(repository.save(any(SystemConfigJpaEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ResponseEntity<ConfigDto> response = controller.updateConfig(
+                key, new UpdateConfigRequest("new credential fixture", "private notes fixture"));
+
+        assertThat(response.getBody().value()).isEqualTo("new credential fixture");
+        verify(auditLogInternalApi).recordTransactionalAuditLog(
+                eq(adminId), eq("SYSTEM_CONFIG_UPDATED"), eq("SYSTEM_CONFIG"), eq(entity.getId()),
+                argThat(meta -> meta.contains("\"key\":\"UPSTREAM_CREDENTIAL\"")
+                        && !meta.contains("old credential fixture")
+                        && !meta.contains("new credential fixture")
+                        && !meta.contains("private notes fixture")));
+    }
+
+    @Test
+    void allowlistedConfigOmitsLegacyValueThatIsNotItsDeclaredType() {
+        String key = "SAFETY_REBATE_ENABLED";
+        SystemConfigJpaEntity entity = new SystemConfigJpaEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setKey(key);
+        entity.setValue("legacy free text fixture");
+        when(repository.findByKey(key)).thenReturn(Optional.of(entity));
+        when(repository.save(any(SystemConfigJpaEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        controller.updateConfig(key, new UpdateConfigRequest("false", null));
+
+        verify(auditLogInternalApi).recordTransactionalAuditLog(
+                eq(adminId), eq("SYSTEM_CONFIG_UPDATED"), eq("SYSTEM_CONFIG"), eq(entity.getId()),
+                argThat(meta -> meta.contains("\"newValue\":\"false\"") && !meta.contains("legacy free text fixture")));
+    }
+
+    @Test
+    void booleanConfigRejectsInvalidTextBeforeRecordingAudit() {
+        assertThatThrownBy(() -> controller.updateConfig(
+                "SAFETY_REBATE_ENABLED", new UpdateConfigRequest("arbitrary text fixture", null)))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(auditLogInternalApi, never()).recordTransactionalAuditLog(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -172,7 +222,7 @@ class AdminSystemConfigControllerTest {
         rule.setPriority(50);
         rule.setIsActive(true);
 
-        when(commissionRuleRepository.findById(ruleId)).thenReturn(Optional.of(rule));
+        when(commissionRuleRepository.findByIdForUpdate(ruleId)).thenReturn(Optional.of(rule));
         when(commissionRuleRepository.save(any(CommissionRuleJpaEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ResponseEntity<CommissionRuleDto> response = controller.updateCommissionRule(
@@ -194,7 +244,9 @@ class AdminSystemConfigControllerTest {
                 argThat(meta -> meta.contains("\"ruleCode\":\"CATEGORY_THUE_SUP\"")
                         && meta.contains("\"previousRate\":7")
                         && meta.contains("\"newRate\":8.5")
-                        && meta.contains("\"isActive\":false"))
+                        && meta.contains("\"isActive\":false")
+                        && !meta.contains("description")
+                        && !meta.contains("Điều chỉnh phí mùa cao điểm"))
         );
     }
 
@@ -206,7 +258,7 @@ class AdminSystemConfigControllerTest {
         rule.setId(ruleId);
         rule.setCommissionRate(new BigDecimal("0.0500"));
 
-        when(commissionRuleRepository.findById(ruleId)).thenReturn(Optional.of(rule));
+        when(commissionRuleRepository.findByIdForUpdate(ruleId)).thenReturn(Optional.of(rule));
 
         assertThatThrownBy(() -> controller.updateCommissionRule(
                 ruleId,

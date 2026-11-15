@@ -6,12 +6,14 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -157,14 +159,9 @@ public class AdminSystemConfigController {
         UUID actorId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new AccessDeniedException("Admin identity required"));
 
-        if ("PLATFORM_COMMISSION_RATE".equalsIgnoreCase(key) || "SAFETY_REBATE_RATE".equalsIgnoreCase(key)) {
-            validateCommissionRate(request.value());
-        } else if ("FLASH_SALE_MAX_SUBSIDY_RATIO".equalsIgnoreCase(key)) {
-            validateRatio(request.value());
-        } else if ("FLASH_SALE_ESTIMATED_UNIT_COST".equalsIgnoreCase(key) || "FLASH_SALE_MINIMUM_UNIT_MARGIN".equalsIgnoreCase(key)) {
-            validateMoney(request.value());
-        }
+        boolean auditValues = validateKnownConfig(key, request.value());
 
+        repository.lockWrites();
         Optional<SystemConfigJpaEntity> existingOpt = repository.findByKey(key);
         String previousValue = existingOpt.map(SystemConfigJpaEntity::getValue).orElse(null);
 
@@ -184,7 +181,7 @@ public class AdminSystemConfigController {
         SystemConfigJpaEntity saved = repository.save(entity);
 
         if (auditLogInternalApi != null) {
-            String metadata = buildSystemConfigAuditMetadata(key, previousValue, saved.getValue(), saved.getDescription(), actorId);
+            String metadata = buildSystemConfigAuditMetadata(key, previousValue, saved.getValue(), auditValues, actorId);
             auditLogInternalApi.recordTransactionalAuditLog(
                     actorId,
                     "SYSTEM_CONFIG_UPDATED",
@@ -222,7 +219,7 @@ public class AdminSystemConfigController {
         UUID actorId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new AccessDeniedException("Admin identity required"));
 
-        CommissionRuleJpaEntity entity = commissionRuleRepository.findById(id)
+        CommissionRuleJpaEntity entity = commissionRuleRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new NoSuchElementException("Commission rule not found with ID: " + id));
 
         BigDecimal previousRate = entity.getCommissionRate();
@@ -295,26 +292,20 @@ public class AdminSystemConfigController {
             String key,
             String previousValue,
             String newValue,
-            String description,
+            boolean auditValues,
             UUID actorId) {
         try {
-            boolean isSensitive = key != null && (
-                    key.toUpperCase().contains("SECRET") ||
-                    key.toUpperCase().contains("PASSWORD") ||
-                    key.toUpperCase().contains("TOKEN") ||
-                    key.toUpperCase().contains("KEY") ||
-                    key.toUpperCase().contains("PRIVATE")
-            );
             Map<String, Object> meta = new LinkedHashMap<>();
             meta.put("key", key);
-            meta.put("previousValue", isSensitive && previousValue != null ? "***" : previousValue);
-            meta.put("newValue", isSensitive && newValue != null ? "***" : newValue);
-            if (description != null && !description.isBlank()) {
-                meta.put("description", description.trim());
+            if (auditValues) {
+                if (previousValue == null || isValidKnownConfigValue(key, previousValue)) {
+                    meta.put("previousValue", previousValue);
+                }
+                meta.put("newValue", newValue);
             }
             meta.put("updatedBy", actorId.toString());
             return objectMapper.writeValueAsString(meta);
-        } catch (Exception ex) {
+        } catch (JsonProcessingException ex) {
             log.warn("Could not serialize system config audit metadata as JSON: {}", ex.getMessage());
             return String.format("key=%s,updatedBy=%s", key, actorId);
         }
@@ -351,14 +342,39 @@ public class AdminSystemConfigController {
             if (rule.getDurationDays() != null) {
                 meta.put("durationDays", rule.getDurationDays());
             }
-            if (rule.getDescription() != null && !rule.getDescription().isBlank()) {
-                meta.put("description", rule.getDescription().trim());
-            }
             meta.put("updatedBy", actorId.toString());
             return objectMapper.writeValueAsString(meta);
-        } catch (Exception ex) {
+        } catch (JsonProcessingException ex) {
             log.warn("Could not serialize commission rule audit metadata as JSON: {}", ex.getMessage());
             return String.format("ruleId=%s,ruleCode=%s,updatedBy=%s", rule.getId(), rule.getRuleCode(), actorId);
+        }
+    }
+
+    private boolean isValidKnownConfigValue(String key, String value) {
+        try {
+            return validateKnownConfig(key, value);
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
+    private boolean validateKnownConfig(String key, String value) {
+        switch (key.toUpperCase(Locale.ROOT)) {
+            case "PLATFORM_COMMISSION_RATE", "SAFETY_REBATE_RATE" -> validateCommissionRate(value);
+            case "FLASH_SALE_MAX_SUBSIDY_RATIO" -> validateRatio(value);
+            case "FLASH_SALE_ESTIMATED_UNIT_COST", "FLASH_SALE_MINIMUM_UNIT_MARGIN" -> validateMoney(value);
+            case "SAFETY_REBATE_ENABLED" -> validateBoolean(value);
+            default -> {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void validateBoolean(String value) {
+        String trimmed = value == null ? "" : value.trim();
+        if (!"true".equalsIgnoreCase(trimmed) && !"false".equalsIgnoreCase(trimmed)) {
+            throw new IllegalArgumentException("SAFETY_REBATE_ENABLED must be true or false");
         }
     }
 
@@ -372,7 +388,7 @@ public class AdminSystemConfigController {
                 throw new IllegalArgumentException("PLATFORM_COMMISSION_RATE must be between 0% and 100%");
             }
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid commission rate format: " + val);
+            throw new IllegalArgumentException("Invalid commission rate format");
         }
     }
 
@@ -386,7 +402,7 @@ public class AdminSystemConfigController {
                 throw new IllegalArgumentException("FLASH_SALE_MAX_SUBSIDY_RATIO must be between 0 and 1 (or 0% and 100%)");
             }
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid subsidy ratio format: " + val);
+            throw new IllegalArgumentException("Invalid subsidy ratio format");
         }
     }
 
@@ -400,7 +416,7 @@ public class AdminSystemConfigController {
                 throw new IllegalArgumentException("Amount must be non-negative");
             }
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Invalid money amount format: " + val);
+            throw new IllegalArgumentException("Invalid money amount format");
         }
     }
 }

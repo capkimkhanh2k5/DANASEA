@@ -10,10 +10,18 @@ import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.Locale;
 
 @RestControllerAdvice
 public class ErrorResponseLocalizationAdvice implements ResponseBodyAdvice<Object> {
+    @Target(ElementType.METHOD)
+    @Retention(RetentionPolicy.RUNTIME)
+    public @interface AlreadyLocalized {}
+
     private LocalizedMessageService messages = LocalizedMessageService.standalone();
 
     @Autowired(required = false)
@@ -23,7 +31,7 @@ public class ErrorResponseLocalizationAdvice implements ResponseBodyAdvice<Objec
 
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
-        return true;
+        return !returnType.hasMethodAnnotation(AlreadyLocalized.class);
     }
 
     @Override

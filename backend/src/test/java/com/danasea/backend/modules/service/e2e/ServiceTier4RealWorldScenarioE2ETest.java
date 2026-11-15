@@ -17,6 +17,41 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 public class ServiceTier4RealWorldScenarioE2ETest extends BaseServiceE2ETest {
 
     @Test
+    void categoryCannotRequireSafetyDocumentsWhileAnUndocumentedServiceIsPublished() throws Exception {
+        UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+
+        error(body(authenticateAsAdmin(patch("/api/admin/categories/" + ACTIVE_CATEGORY_ID)),
+                Map.of("requiresSafetyCert", true)), 409, "CATEGORY_HAS_PUBLISHED_SERVICES_WITHOUT_SAFETY_DOCUMENTS");
+
+        assertThat(categoryRepository.findById(ACTIVE_CATEGORY_ID).orElseThrow().getRequiresSafetyCert()).isFalse();
+        assertState(serviceId, ServiceStatus.PUBLISHED);
+    }
+
+    @Test
+    void categoryCanRequireSafetyDocumentsWhenPublishedServiceHasAnApprovedDocument() throws Exception {
+        UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        addApprovedSafetyDocument(serviceId);
+
+        JsonNode updated = response(body(authenticateAsAdmin(patch("/api/admin/categories/" + ACTIVE_CATEGORY_ID)),
+                Map.of("requiresSafetyCert", true)), 200);
+
+        assertThat(updated.path("requiresSafetyCert").asBoolean()).isTrue();
+        assertState(serviceId, ServiceStatus.PUBLISHED);
+    }
+
+    @Test
+    void pausedServiceCannotResumeAfterItsCategoryStartsRequiringSafetyDocuments() throws Exception {
+        UUID serviceId = seed(ServiceStatus.PAUSED).getId();
+        response(body(authenticateAsAdmin(patch("/api/admin/categories/" + ACTIVE_CATEGORY_ID)),
+                Map.of("requiresSafetyCert", true)), 200);
+
+        error(authenticateAsVendorA(patch(VENDOR_API_BASE + "/" + serviceId + "/resume")), 422,
+                "SAFETY_DOCUMENT_REQUIRED");
+
+        assertState(serviceId, ServiceStatus.PAUSED);
+    }
+
+    @Test
     @DisplayName("Scenario 1: Complete Vendor Onboarding and Service Operational Lifecycle")
     void scenario1_CompleteVendorOnboardingAndServiceLifecycle() throws Exception {
         // This legacy scenario starts after vendor approval; onboarding itself is outside its HTTP sequence.

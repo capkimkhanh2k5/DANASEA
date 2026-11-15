@@ -110,7 +110,7 @@ class CategorySafetyCertUseCaseTest {
                 .requiresSafetyCert(false)
                 .build();
 
-        when(categoryRepositoryPort.findById(id)).thenReturn(Optional.of(existing));
+        when(categoryRepositoryPort.findByIdForUpdate(id)).thenReturn(Optional.of(existing));
         when(categoryRepositoryPort.save(any(Category.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateCategoryCommand command = new UpdateCategoryCommand(
@@ -134,7 +134,7 @@ class CategorySafetyCertUseCaseTest {
                 .requiresSafetyCert(true)
                 .build();
 
-        when(categoryRepositoryPort.findById(id)).thenReturn(Optional.of(existing));
+        when(categoryRepositoryPort.findByIdForUpdate(id)).thenReturn(Optional.of(existing));
         when(categoryRepositoryPort.save(any(Category.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateCategoryCommand command = new UpdateCategoryCommand(
@@ -158,7 +158,7 @@ class CategorySafetyCertUseCaseTest {
                 .requiresSafetyCert(true)
                 .build();
 
-        when(categoryRepositoryPort.findById(idTrue)).thenReturn(Optional.of(existingTrue));
+        when(categoryRepositoryPort.findByIdForUpdate(idTrue)).thenReturn(Optional.of(existingTrue));
         when(categoryRepositoryPort.save(any(Category.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateCategoryCommand cmd1 = new UpdateCategoryCommand(
@@ -176,7 +176,7 @@ class CategorySafetyCertUseCaseTest {
                 .requiresSafetyCert(false)
                 .build();
 
-        when(categoryRepositoryPort.findById(idFalse)).thenReturn(Optional.of(existingFalse));
+        when(categoryRepositoryPort.findByIdForUpdate(idFalse)).thenReturn(Optional.of(existingFalse));
         when(categoryRepositoryPort.save(any(Category.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateCategoryCommand cmd2 = new UpdateCategoryCommand(
@@ -210,7 +210,7 @@ class CategorySafetyCertUseCaseTest {
                 .isActive(true)
                 .requiresSafetyCert(true)
                 .build();
-        when(categoryRepositoryPort.findById(id)).thenReturn(Optional.of(existing));
+        when(categoryRepositoryPort.findByIdForUpdate(id)).thenReturn(Optional.of(existing));
 
         UpdateCategoryRequest patchReq = new UpdateCategoryRequest(
                 null, null, null, null, null, null, false

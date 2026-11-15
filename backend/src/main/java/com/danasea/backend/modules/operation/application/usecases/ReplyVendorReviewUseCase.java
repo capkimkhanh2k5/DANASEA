@@ -13,21 +13,26 @@ import com.danasea.backend.modules.operation.infrastructure.persistence.mappers.
 import com.danasea.backend.modules.operation.infrastructure.persistence.repositories.JpaReviewRepository;
 import com.danasea.backend.modules.operation.presentation.dtos.ReviewResponse;
 import com.danasea.backend.modules.operation.presentation.dtos.VendorReplyRequest;
+import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.danasea.backend.modules.vendor.domain.exceptions.VendorNotFoundException;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
 import com.danasea.backend.security.infrastructure.SecurityUtils;
+import com.danasea.backend.shared.i18n.LocalizedContentValue;
 import com.danasea.backend.shared.i18n.LocalizedMessageRef;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReplyVendorReviewUseCase {
+
+    private static final String BODY_KEY = "notification.review.vendor_reply.body";
 
     private final JpaReviewRepository reviewRepository;
     private final JpaVendorRepository vendorRepository;
@@ -60,24 +65,18 @@ public class ReplyVendorReviewUseCase {
         review.setVendorRepliedAt(OffsetDateTime.now());
 
         ReviewJpaEntity saved = reviewRepository.save(review);
+        ServiceJpaEntity service = saved.getServiceId() == null ? null
+                : serviceRepository.findById(saved.getServiceId()).orElse(null);
 
         // Send in-app notification to the customer who submitted the review
         if (review.getCustomerId() != null && sendNotificationUseCase != null) {
-            String vendorName = vendor.getBusinessName() != null ? vendor.getBusinessName() : "Nhà cung cấp";
-            String serviceName = "dịch vụ";
-            if (serviceRepository != null && review.getServiceId() != null) {
-                serviceName = serviceRepository.findById(review.getServiceId())
-                        .map(s -> s.getName() != null ? s.getName() : "dịch vụ")
-                        .orElse("dịch vụ");
-            }
-
             String idempotencyKey = "vendor_review_reply:" + review.getId();
             NotificationCommand command = new NotificationCommand(
                     review.getCustomerId(),
                     "REVIEW_REPLY",
                     NotificationChannel.IN_APP,
                     LocalizedMessageRef.of("notification.review.vendor_reply.title"),
-                    LocalizedMessageRef.of("notification.review.vendor_reply.body", vendorName, serviceName),
+                    localizedReplyBody(vendor.getBusinessName(), service),
                     "SUB_ORDER",
                     review.getSubOrderId(),
                     null
@@ -86,6 +85,21 @@ public class ReplyVendorReviewUseCase {
             sendNotificationUseCase.executeOnce(command, idempotencyKey);
         }
 
-        return reviewMapper.toResponse(saved);
+        return reviewMapper.toResponse(saved, service == null ? null : service.getName());
+    }
+
+    private LocalizedMessageRef localizedReplyBody(String vendorName, ServiceJpaEntity service) {
+        boolean hasVendorName = StringUtils.hasText(vendorName);
+        String name = service == null ? null : service.getName();
+        String nameEn = service == null ? null : service.getNameEn();
+        if (!StringUtils.hasText(name) && !StringUtils.hasText(nameEn)) {
+            return hasVendorName ? LocalizedMessageRef.of(BODY_KEY + ".vendor_only", vendorName)
+                    : LocalizedMessageRef.of(BODY_KEY + ".generic");
+        }
+
+        LocalizedContentValue serviceName = new LocalizedContentValue(
+                StringUtils.hasText(name) ? name : nameEn, nameEn);
+        return hasVendorName ? LocalizedMessageRef.of(BODY_KEY, vendorName, serviceName)
+                : LocalizedMessageRef.of(BODY_KEY + ".service_only", serviceName);
     }
 }

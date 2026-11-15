@@ -38,6 +38,6 @@ public class GetVendorReviewsUseCase {
                 .orElseThrow(() -> new VendorNotFoundException("Vendor profile not found for user: " + userId));
 
         Page<ReviewJpaEntity> page = reviewRepository.findByVendorId(vendor.getId(), pageable);
-        return page.map(reviewMapper::toResponse);
+        return reviewMapper.toResponsePage(page);
     }
 }

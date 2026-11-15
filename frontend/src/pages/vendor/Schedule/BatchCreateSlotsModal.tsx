@@ -39,6 +39,13 @@ interface TemplateItem {
   units: CreateSlotUnitRequest[];
 }
 
+const MAX_BATCH_DATES = 31;
+const MAX_BATCH_SLOTS = 124;
+const MAX_BATCH_ROWS = 620;
+const DAY_MS = 86_400_000;
+const dateInVietnam = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
+const selectedDateLabel = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeZone: 'UTC' });
+
 const DAYS_OF_WEEK = [
   { key: 'MONDAY', label: 'T2', fullLabel: 'Thứ 2', jsDay: 1 },
   { key: 'TUESDAY', label: 'T3', fullLabel: 'Thứ 3', jsDay: 2 },
@@ -57,7 +64,12 @@ export function BatchCreateSlotsModal({
   capacityPerSlot,
   onSuccess,
 }: BatchCreateSlotsModalProps) {
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = dateInVietnam.format(new Date());
+  const [applyMode, setApplyMode] = useState<'ONE_TIME' | 'RECURRING_90_DAYS'>('ONE_TIME');
+  const [dateMode, setDateMode] = useState<'DATE_RANGE' | 'DATES'>('DATE_RANGE');
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [dateToAdd, setDateToAdd] = useState('');
+  const usesExplicitDates = applyMode === 'ONE_TIME' && dateMode === 'DATES';
 
   // 1. Templates State
   const [templates, setTemplates] = useState<TemplateItem[]>([
@@ -96,22 +108,11 @@ export function BatchCreateSlotsModal({
     'SUNDAY',
   ]);
 
-  // 3. Application mode: DATE_RANGE vs RECURRING_90_DAYS
-  const [applyMode, setApplyMode] = useState<'DATE_RANGE' | 'RECURRING_90_DAYS'>('DATE_RANGE');
-
-  // Date range state
-  const defaultEndDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 6);
-    return d.toISOString().split('T')[0];
-  }, []);
-
-  const [startDate, setStartDate] = useState<string>(todayStr);
-  const [endDate, setEndDate] = useState<string>(defaultEndDate);
+  const [startDate, setStartDate] = useState(todayStr);
+  const [endDate, setEndDate] = useState(() => new Date(Date.parse(todayStr) + 6 * DAY_MS).toISOString().slice(0, 10));
 
   // Existing schedule check for 90 days mode
   const [existingSchedule, setExistingSchedule] = useState<OperatingScheduleDto | null>(null);
-  const [_isLoadingSchedule, setIsLoadingSchedule] = useState<boolean>(false);
   const [confirmOverwriteRecurring, setConfirmOverwriteRecurring] = useState<boolean>(false);
 
   // Submission state
@@ -121,18 +122,16 @@ export function BatchCreateSlotsModal({
   // Fetch current operating schedule when opening modal or switching to RECURRING_90_DAYS
   useEffect(() => {
     if (!isOpen || !serviceId) return;
-    setIsLoadingSchedule(true);
     vendorService
       .getOperatingSchedule(serviceId)
       .then((data) => setExistingSchedule(data))
-      .catch(() => setExistingSchedule(null))
-      .finally(() => setIsLoadingSchedule(false));
+      .catch(() => setExistingSchedule(null));
   }, [isOpen, serviceId]);
 
   // Reset error when user changes inputs
   useEffect(() => {
     setErrorMessage(null);
-  }, [startDate, endDate, selectedDays, templates, applyMode]);
+  }, [startDate, endDate, selectedDays, selectedDates, templates, applyMode, dateMode]);
 
   // Day toggle handlers
   const handleToggleDay = (dayKey: string) => {
@@ -237,25 +236,36 @@ export function BatchCreateSlotsModal({
     );
   };
 
-  // Calculate projected slots for date range
-  const projectedSlotsCount = useMemo(() => {
-    if (applyMode !== 'DATE_RANGE') return 0;
-    if (!startDate || !endDate || startDate > endDate) return 0;
-    if (selectedDays.length === 0 || templates.length === 0) return 0;
+  const daysInRange = Math.floor((Date.parse(endDate) - Date.parse(startDate)) / DAY_MS) + 1;
+  const batchDateCount = useMemo(() => {
+    if (applyMode !== 'ONE_TIME') return 0;
+    if (usesExplicitDates) return selectedDates.length;
+    if (!(daysInRange >= 1 && daysInRange <= MAX_BATCH_DATES)) return 0;
 
+    const start = Date.parse(startDate);
     let count = 0;
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const jsDay = d.getDay();
-      const match = DAYS_OF_WEEK.find((day) => day.jsDay === jsDay);
-      if (match && selectedDays.includes(match.key)) {
-        count += templates.length;
-      }
+    for (let dayIndex = 0; dayIndex < daysInRange; dayIndex += 1) {
+      const weekday = new Date(start + dayIndex * DAY_MS).getUTCDay();
+      const match = DAYS_OF_WEEK.find((day) => day.jsDay === weekday);
+      if (match && selectedDays.includes(match.key)) count += 1;
     }
     return count;
-  }, [applyMode, startDate, endDate, selectedDays, templates.length]);
+  }, [applyMode, usesExplicitDates, selectedDates.length, daysInRange, startDate, selectedDays]);
+
+  const projectedSlotsCount = batchDateCount * templates.length;
+  const projectedRows = projectedSlotsCount + batchDateCount * templates.reduce(
+    (total, template) => total + (template.inventoryType === 'SHARED_CAPACITY_UNITS' ? template.units.length : 0),
+    0,
+  );
+  const canAddDate = dateToAdd >= todayStr
+    && selectedDates.length < MAX_BATCH_DATES
+    && !selectedDates.includes(dateToAdd);
+
+  const handleAddDate = () => {
+    if (!canAddDate) return;
+    setSelectedDates((dates) => [...dates, dateToAdd].sort());
+    setDateToAdd('');
+  };
 
   // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -303,35 +313,43 @@ export function BatchCreateSlotsModal({
     }
 
     // Validation 2: Days
-    if (selectedDays.length === 0) {
+    if (!usesExplicitDates && selectedDays.length === 0) {
       setErrorMessage('Vui lòng chọn ít nhất một thứ trong tuần áp dụng.');
       return;
     }
 
-    setIsSubmitting(true);
-
-    try {
-      if (applyMode === 'DATE_RANGE') {
-        // --- LỰA CHỌN 1: BATCH TRONG KHOẢNG NGÀY ---
+    if (applyMode === 'ONE_TIME') {
+      if (usesExplicitDates && selectedDates.some((date) => date < todayStr)) {
+        setErrorMessage('Hãy chọn các ngày từ hôm nay trở đi.');
+        return;
+      }
+      if (!usesExplicitDates) {
         if (!startDate || !endDate) {
           setErrorMessage('Vui lòng chọn ngày bắt đầu và kết thúc.');
-          setIsSubmitting(false);
           return;
         }
-        if (startDate > endDate) {
+        if (daysInRange < 1) {
           setErrorMessage('Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.');
-          setIsSubmitting(false);
           return;
         }
-        const startD = new Date(startDate);
-        const endD = new Date(endDate);
-        const diffDays = Math.round((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24));
-        if (diffDays > 31) {
-          setErrorMessage('Khoảng ngày tạo ca không được vượt quá 31 ngày.');
-          setIsSubmitting(false);
+        if (daysInRange > MAX_BATCH_DATES) {
+          setErrorMessage(`Khoảng ngày tạo ca chỉ được gồm tối đa ${MAX_BATCH_DATES} ngày.`);
           return;
         }
+      }
+      if (batchDateCount === 0) {
+        setErrorMessage(usesExplicitDates ? 'Vui lòng thêm ít nhất một ngày.' : 'Không có ngày nào khớp với các thứ đã chọn.');
+        return;
+      }
+      if (projectedSlotsCount > MAX_BATCH_SLOTS || projectedRows > MAX_BATCH_ROWS) {
+        setErrorMessage(`Mỗi lần tạo tối đa ${MAX_BATCH_SLOTS} ca và tổng cộng ${MAX_BATCH_ROWS} ca cùng phương tiện.`);
+        return;
+      }
+    }
 
+    setIsSubmitting(true);
+    try {
+      if (applyMode === 'ONE_TIME') {
         const slotTemplatesPayload: SlotTemplateRequest[] = templates.map((t) => ({
           startTime: `${t.startTime}:00`,
           endTime: `${t.endTime}:00`,
@@ -343,14 +361,11 @@ export function BatchCreateSlotsModal({
               : null,
         }));
 
-        const res = await vendorService.batchCreateSlots(serviceId, {
-          startDate,
-          endDate,
-          daysOfWeek: selectedDays,
-          slotTemplates: slotTemplatesPayload,
-        });
+        const res = await vendorService.batchCreateSlots(serviceId, usesExplicitDates
+          ? { dates: selectedDates, slotTemplates: slotTemplatesPayload }
+          : { startDate, endDate, daysOfWeek: selectedDays, slotTemplates: slotTemplatesPayload });
 
-        toast.success(`Đã tạo thành công ${res.totalCreated} ca khởi hành trong khoảng ngày đã chọn!`);
+        toast.success(`Đã tạo thành công ${res.totalCreated} ca khởi hành!`);
         onSuccess(res.totalCreated);
         onClose();
       } else {
@@ -409,6 +424,63 @@ export function BatchCreateSlotsModal({
   };
 
   if (!isOpen) return null;
+
+  const weekdaySelector = (
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+            Chọn các thứ trong tuần áp dụng
+          </h4>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleSelectAllDays}
+            className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer"
+          >
+            Cả tuần
+          </button>
+          <button
+            type="button"
+            onClick={handleSelectWeekdays}
+            className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer"
+          >
+            T2-T6
+          </button>
+          <button
+            type="button"
+            onClick={handleSelectWeekends}
+            className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer"
+          >
+            T7-CN
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1.5">
+        {DAYS_OF_WEEK.map((d) => {
+          const isSelected = selectedDays.includes(d.key);
+          return (
+            <button
+              key={d.key}
+              type="button"
+              onClick={() => handleToggleDay(d.key)}
+              aria-pressed={isSelected}
+              aria-label={d.fullLabel}
+              className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
+                isSelected
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {d.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
@@ -617,74 +689,11 @@ export function BatchCreateSlotsModal({
             </div>
           </div>
 
-          {/* BƯỚC 2: CHỌN THỨ ÁP DỤNG */}
-          <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-xs flex items-center justify-center font-bold">
-                    2
-                  </span>
-                  Chọn các thứ trong tuần áp dụng
-                </h4>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Phải chọn ít nhất 1 thứ. Các ca mẫu sẽ được tạo vào các thứ này.
-                </p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleSelectAllDays}
-                  className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer"
-                >
-                  Cả tuần
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSelectWeekdays}
-                  className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer"
-                >
-                  T2-T6
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSelectWeekends}
-                  className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium cursor-pointer"
-                >
-                  T7-CN
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1.5">
-              {DAYS_OF_WEEK.map((d) => {
-                const isSelected = selectedDays.includes(d.key);
-                return (
-                  <button
-                    key={d.key}
-                    type="button"
-                    onClick={() => handleToggleDay(d.key)}
-                    className={`py-2 px-1 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
-                      isSelected
-                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div>{d.label}</div>
-                    <div className={`text-[10px] font-normal ${isSelected ? 'text-slate-300' : 'text-slate-400'}`}>
-                      {d.key === 'SUNDAY' ? 'CN' : d.label}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* BƯỚC 3: CHỌN CÁCH ÁP DỤNG */}
+          {/* BƯỚC 2: CHỌN CÁCH ÁP DỤNG */}
           <div className="space-y-3">
             <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-xs flex items-center justify-center font-bold">
-                3
+                2
               </span>
               Chọn cách áp dụng
             </h4>
@@ -693,7 +702,7 @@ export function BatchCreateSlotsModal({
               {/* Lựa chọn 1 */}
               <label
                 className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
-                  applyMode === 'DATE_RANGE'
+                  applyMode === 'ONE_TIME'
                     ? 'border-slate-900 bg-slate-50/70 shadow-xs'
                     : 'border-slate-200 bg-white hover:border-slate-300'
                 }`}
@@ -702,17 +711,17 @@ export function BatchCreateSlotsModal({
                   <input
                     type="radio"
                     name="applyMode"
-                    value="DATE_RANGE"
-                    checked={applyMode === 'DATE_RANGE'}
-                    onChange={() => setApplyMode('DATE_RANGE')}
+                    value="ONE_TIME"
+                    checked={applyMode === 'ONE_TIME'}
+                    onChange={() => setApplyMode('ONE_TIME')}
                     className="mt-0.5 text-slate-900 focus:ring-slate-900 cursor-pointer"
                   />
                   <div>
                     <span className="font-bold text-xs text-slate-900 block">
-                      Tạo trong khoảng ngày
+                      Tạo một lần
                     </span>
                     <span className="text-xs text-slate-500 mt-0.5 block leading-relaxed">
-                      Tạo các ca trong khoảng ngày bạn chọn, không tự động lặp về sau.
+                      Chọn từng ngày hoặc chọn khoảng ngày theo thứ trong tuần.
                     </span>
                   </div>
                 </div>
@@ -748,40 +757,120 @@ export function BatchCreateSlotsModal({
             </div>
 
             {/* Form chi tiết tương ứng với Lựa chọn */}
-            {applyMode === 'DATE_RANGE' ? (
+            {applyMode === 'ONE_TIME' ? (
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Từ ngày:
-                    </label>
+                <fieldset className="flex flex-wrap gap-x-5 gap-y-2 text-xs font-semibold text-slate-800">
+                  <legend className="mb-2 text-xs font-semibold">Chọn ngày khởi hành</legend>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
-                      type="date"
-                      required
-                      min={todayStr}
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-slate-900"
+                      type="radio"
+                      name="batchDateMode"
+                      checked={dateMode === 'DATE_RANGE'}
+                      onChange={() => setDateMode('DATE_RANGE')}
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Đến ngày:
-                    </label>
+                    Khoảng ngày
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
-                      type="date"
-                      required
-                      min={startDate || todayStr}
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-slate-900"
+                      type="radio"
+                      name="batchDateMode"
+                      checked={dateMode === 'DATES'}
+                      onChange={() => setDateMode('DATES')}
                     />
-                  </div>
-                </div>
+                    Từng ngày
+                  </label>
+                </fieldset>
 
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200/60">
+                {usesExplicitDates ? (
+                  <div className="space-y-2">
+                    <label htmlFor="batch-explicit-date" className="block text-xs font-semibold text-slate-700">
+                      Thêm ngày khởi hành
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="batch-explicit-date"
+                        type="date"
+                        min={todayStr}
+                        value={dateToAdd}
+                        onChange={(e) => setDateToAdd(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddDate();
+                          }
+                        }}
+                        className="min-w-0 flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-slate-900"
+                      />
+                      <button
+                        type="button"
+                        disabled={!canAddDate || isSubmitting}
+                        onClick={handleAddDate}
+                        className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold cursor-pointer disabled:cursor-default disabled:opacity-40"
+                      >
+                        Thêm ngày
+                      </button>
+                    </div>
+                    {selectedDates.length > 0 && (
+                      <ul className="flex flex-wrap gap-2">
+                        {selectedDates.map((date) => {
+                          const label = selectedDateLabel.format(new Date(date));
+                          return (
+                            <li key={date} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white pl-2.5 pr-1 py-0.5 text-xs font-medium text-slate-700">
+                              <time dateTime={date}>{label}</time>
+                              <button
+                                type="button"
+                                aria-label={`Bỏ ngày ${label}`}
+                                disabled={isSubmitting}
+                                onClick={() => setSelectedDates((dates) => dates.filter((entry) => entry !== date))}
+                                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 cursor-pointer"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {weekdaySelector}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label htmlFor="batch-start-date" className="block text-xs font-semibold text-slate-700 mb-1">
+                            Từ ngày
+                          </label>
+                          <input
+                            type="date"
+                            id="batch-start-date"
+                            required
+                            min={todayStr}
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-slate-900"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="batch-end-date" className="block text-xs font-semibold text-slate-700 mb-1">
+                            Đến ngày
+                          </label>
+                          <input
+                            type="date"
+                            id="batch-end-date"
+                            required
+                            min={startDate || todayStr}
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-slate-900 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-slate-900"
+                          />
+                        </div>
+                      </div>
+                  </>
+                )}
+
+                <div aria-live="polite" className="flex items-center justify-between text-xs pt-1 border-t border-slate-200/60">
                   <span className="text-slate-600">
-                    Số ca dự kiến tạo:
+                    {batchDateCount} ngày được áp dụng
                   </span>
                   <span className="font-bold text-sm font-mono text-teal-800 bg-teal-50 px-2.5 py-0.5 rounded-lg border border-teal-200">
                     {projectedSlotsCount} ca
@@ -790,6 +879,7 @@ export function BatchCreateSlotsModal({
               </div>
             ) : (
               <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 text-xs">
+                {weekdaySelector}
                 <div>
                   <p className="font-bold text-xs text-slate-900">
                     Thiết lập lịch lặp 90 ngày
@@ -851,7 +941,7 @@ export function BatchCreateSlotsModal({
                   <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   <span>Đang xử lý...</span>
                 </>
-              ) : applyMode === 'DATE_RANGE' ? (
+              ) : applyMode === 'ONE_TIME' ? (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Tạo {projectedSlotsCount} ca ngay</span>

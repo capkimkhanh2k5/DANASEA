@@ -89,7 +89,7 @@ public class MarkPayoutPaidUseCase {
         }
 
         PayoutRequestJpaEntity saved = payoutRequestRepository.saveAndFlush(payout);
-        log.info("Admin {} đã xác nhận chi trả PAID cho PayoutRequest #{} (Số tiền: {} đ, Mã tham chiếu ngân hàng: {})",
+        log.info("Admin {} marked payout request #{} as PAID (amount: {} VND, bank reference: {})",
                 adminUserId, saved.getId(), saved.getAmount(), saved.getBankReference());
 
         // 3. Kiểm tra Settlement: Khi toàn bộ số tiền của kỳ đối soát đã được giải ngân, chuyển Settlement sang PAID
@@ -105,7 +105,7 @@ public class MarkPayoutPaidUseCase {
             settlement.setStatus(SettlementStatus.PAID);
             settlement.setUpdatedAt(now);
             settlementRepository.save(settlement);
-            log.info("Kỳ đối soát #{} đã hoàn tất toàn bộ nghĩa vụ chi trả (Tổng đã chi: {} / Cần chi: {}) -> Đã chuyển sang PAID.",
+            log.info("Settlement #{} was marked as PAID (total paid: {}, net payable: {})",
                     settlement.getId(), totalPaid, settlement.getNetPayableAmount());
         }
 

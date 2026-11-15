@@ -79,7 +79,7 @@ public class RejectPayoutRequestUseCase {
         }
 
         PayoutRequestJpaEntity saved = payoutRequestRepository.save(payout);
-        log.info("Admin {} đã từ chối PayoutRequest #{} (Lý do: {})",
+        log.info("Admin {} rejected payout request #{} (reason: {})",
                 adminUserId, saved.getId(), saved.getRejectionReason());
 
         if (auditLogInternalApi != null) {

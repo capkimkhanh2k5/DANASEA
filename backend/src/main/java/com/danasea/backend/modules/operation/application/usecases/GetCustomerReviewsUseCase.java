@@ -20,8 +20,7 @@ public class GetCustomerReviewsUseCase {
 
     @Transactional(readOnly = true)
     public Page<ReviewResponse> execute(UUID customerId, Pageable pageable) {
-        return reviewRepository.findByCustomerId(customerId, pageable)
-                .map(reviewMapper::toResponse);
+        return reviewMapper.toResponsePage(reviewRepository.findByCustomerId(customerId, pageable));
     }
 
     @Transactional(readOnly = true)

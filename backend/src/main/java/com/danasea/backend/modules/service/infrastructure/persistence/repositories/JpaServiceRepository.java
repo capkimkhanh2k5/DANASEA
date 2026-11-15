@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import com.danasea.backend.modules.service.domain.models.DocStatus;
 import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import jakarta.persistence.LockModeType;
@@ -26,6 +27,19 @@ public interface JpaServiceRepository extends JpaRepository<ServiceJpaEntity, UU
     Optional<ServiceJpaEntity> findByIdForUpdate(@Param("id") UUID id);
 
     boolean existsByCategoryIdAndStatus(UUID categoryId, ServiceStatus status);
+
+    @Query("""
+            SELECT COUNT(s) > 0 FROM ServiceJpaEntity s
+            WHERE s.categoryId = :categoryId AND s.status = :serviceStatus
+              AND NOT EXISTS (
+                  SELECT d.id FROM ServiceSafetyDocumentJpaEntity d
+                  WHERE d.serviceId = s.id AND d.status = :documentStatus
+              )
+            """)
+    boolean existsByCategoryAndStatusWithoutSafetyDocument(
+            @Param("categoryId") UUID categoryId,
+            @Param("serviceStatus") ServiceStatus serviceStatus,
+            @Param("documentStatus") DocStatus documentStatus);
 
     boolean existsByCategoryId(UUID categoryId);
 

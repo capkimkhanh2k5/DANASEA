@@ -10,7 +10,12 @@ import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -79,7 +84,84 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
     }
 
     @Test
-    void rejectsBatchWhenSlotAlreadyExistsAndRollsBack() throws Exception {
+    void createsOnlyTheFourSelectedDates() throws Exception {
+        UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        LocalDate first = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(2);
+        String batchUrl = VENDOR_API_BASE + "/" + serviceId + "/slots/batch";
+
+        mockMvc.perform(authenticateAsVendorA(post(batchUrl)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "dates": ["%s", "%s", "%s", "%s"],
+                                    "slotTemplates": [
+                                        {
+                                            "startTime": "08:00",
+                                            "endTime": "10:00",
+                                            "inventoryType": "PERSON_LIMIT",
+                                            "capacity": 10
+                                        }
+                                    ]
+                                }
+                                """.formatted(first, first.plusDays(1), first.plusDays(4), first.plusDays(5)))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalCreated").value(4));
+
+        entityManager.flush();
+        assertThat(jdbc.queryForList("SELECT date FROM service_slots WHERE service_id = ? ORDER BY date",
+                LocalDate.class, serviceId)).containsExactly(first, first.plusDays(1), first.plusDays(4), first.plusDays(5));
+    }
+
+    @Test
+    void persistsTheFullThirtyOneDayWorkloadAtTheLimit() throws Exception {
+        UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        LocalDate first = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(2);
+        String batchUrl = VENDOR_API_BASE + "/" + serviceId + "/slots/batch";
+        String slotTemplates = IntStream.range(8, 12)
+                .mapToObj(hour -> """
+                        {
+                            "startTime": "%02d:00",
+                            "endTime": "%02d:00",
+                            "inventoryType": "SHARED_CAPACITY_UNITS",
+                            "units": [
+                                {"unitNumber": 1, "capacity": 4},
+                                {"unitNumber": 2, "capacity": 4},
+                                {"unitNumber": 3, "capacity": 4},
+                                {"unitNumber": 4, "capacity": 4}
+                            ]
+                        }
+                        """.formatted(hour, hour + 1))
+                .collect(Collectors.joining(","));
+
+        mockMvc.perform(authenticateAsVendorA(post(batchUrl)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "startDate": "%s",
+                                    "endDate": "%s",
+                                    "daysOfWeek": ["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY","SUNDAY"],
+                                    "slotTemplates": [%s]
+                                }
+                                """.formatted(first, first.plusDays(30), slotTemplates))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalCreated").value(124));
+
+        entityManager.flush();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM service_slots WHERE service_id = ?",
+                Integer.class, serviceId)).isEqualTo(124);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM service_slot_units units
+                JOIN service_slots slots ON slots.id = units.slot_id
+                WHERE slots.service_id = ?
+                """, Integer.class, serviceId)).isEqualTo(496);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "en, A departure already exists at 08:00 on %s.",
+        "vi, Đã có ca khởi hành lúc 08:00 ngày %s."
+    })
+    void rejectsBatchWhenSlotAlreadyExistsAndRollsBack(String language, String message) throws Exception {
         UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
         LocalDate start = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(3);
         LocalDate end = start.plusDays(1);
@@ -120,11 +202,12 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
 
         // Batch attempt should fail because day 2 has duplicate slot
         mockMvc.perform(authenticateAsVendorA(post(batchUrl)
+                        .header(HttpHeaders.ACCEPT_LANGUAGE, language)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
-                .andExpect(jsonPath("$.message").isNotEmpty());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SLOT_ALREADY_EXISTS"))
+                .andExpect(jsonPath("$.message").value(message.formatted(end)));
 
         // Verify transaction was marked rollback-only due to exception in batch use case
         assertThat(TestTransaction.isFlaggedForRollback()).isTrue();
@@ -133,7 +216,7 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
     @Test
     void rejectsBatchWithPastDate() throws Exception {
         UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
-        LocalDate today = LocalDate.now(Booking.VIETNAM_ZONE);
+        LocalDate yesterday = LocalDate.now(Booking.VIETNAM_ZONE).minusDays(1);
         String batchUrl = VENDOR_API_BASE + "/" + serviceId + "/slots/batch";
 
         String jsonPayload = """
@@ -150,7 +233,7 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
                         }
                     ]
                 }
-                """.formatted(today, today, today.getDayOfWeek());
+                """.formatted(yesterday, yesterday, yesterday.getDayOfWeek());
 
         mockMvc.perform(authenticateAsVendorA(post(batchUrl)
                         .contentType(MediaType.APPLICATION_JSON)

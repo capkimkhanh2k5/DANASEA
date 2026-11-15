@@ -221,7 +221,7 @@ class CategoryDeactivationAndBusinessConstraintUseCaseTest {
             String currentSlug = "scuba-diving";
             Category existing = Category.builder().id(catId).name("Scuba").slug(currentSlug).isActive(true).build();
 
-            when(categoryRepositoryPort.findById(catId)).thenReturn(Optional.of(existing));
+            when(categoryRepositoryPort.findByIdForUpdate(catId)).thenReturn(Optional.of(existing));
             when(categoryRepositoryPort.save(any(Category.class))).thenAnswer(inv -> inv.getArgument(0));
 
             Category result = updateUseCase.execute(catId, "Scuba Diving 2026", "Scuba En", currentSlug, null, null);
@@ -242,7 +242,7 @@ class CategoryDeactivationAndBusinessConstraintUseCaseTest {
             String targetSlug = "surfing-tours";
             Category existing = Category.builder().id(catId).name("Scuba").slug(currentSlug).isActive(true).build();
 
-            when(categoryRepositoryPort.findById(catId)).thenReturn(Optional.of(existing));
+            when(categoryRepositoryPort.findByIdForUpdate(catId)).thenReturn(Optional.of(existing));
             when(categoryRepositoryPort.existsBySlug(targetSlug)).thenReturn(true);
 
             SlugAlreadyExistsException ex = assertThrows(
@@ -261,7 +261,7 @@ class CategoryDeactivationAndBusinessConstraintUseCaseTest {
             String newSlug = "deep-scuba-diving";
             Category existing = Category.builder().id(catId).name("Scuba").slug(currentSlug).isActive(true).build();
 
-            when(categoryRepositoryPort.findById(catId)).thenReturn(Optional.of(existing));
+            when(categoryRepositoryPort.findByIdForUpdate(catId)).thenReturn(Optional.of(existing));
             when(categoryRepositoryPort.existsBySlug(newSlug)).thenReturn(false);
             when(categoryRepositoryPort.save(any(Category.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -280,7 +280,7 @@ class CategoryDeactivationAndBusinessConstraintUseCaseTest {
             String currentSlug = "original-slug";
             Category existing = Category.builder().id(catId).name("Cat").slug(currentSlug).isActive(true).build();
 
-            when(categoryRepositoryPort.findById(catId)).thenReturn(Optional.of(existing));
+            when(categoryRepositoryPort.findByIdForUpdate(catId)).thenReturn(Optional.of(existing));
             when(categoryRepositoryPort.save(any(Category.class))).thenAnswer(inv -> inv.getArgument(0));
 
             Category nullResult = updateUseCase.execute(catId, "Updated 1", null, null, null, null);

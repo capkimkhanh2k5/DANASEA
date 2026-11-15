@@ -55,7 +55,7 @@ public class AdminSettlementController {
     public ResponseEntity<SettlementResponse> generateSettlement(
             @Valid @RequestBody GenerateSettlementRequest request
     ) {
-        log.info("Admin khởi tạo kỳ đối soát cho vendor: {} từ {} đến {}",
+        log.info("Admin requested a settlement for vendor {} from {} to {}",
                 request.vendorId(), request.periodStart(), request.periodEnd());
         SettlementResponse response = generateSettlementUseCase.execute(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -81,7 +81,7 @@ public class AdminSettlementController {
 
     @PatchMapping("/{id}/finalize")
     public ResponseEntity<SettlementResponse> finalizeSettlement(@PathVariable UUID id) {
-        log.info("Admin chốt sổ kỳ đối soát: {}", id);
+        log.info("Admin requested finalization of settlement {}", id);
         SettlementResponse response = finalizeSettlementUseCase.execute(id);
         return ResponseEntity.ok(response);
     }

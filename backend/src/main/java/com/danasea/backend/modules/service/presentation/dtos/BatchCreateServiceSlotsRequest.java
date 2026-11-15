@@ -6,23 +6,23 @@ import java.util.List;
 import java.util.Set;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 
 public record BatchCreateServiceSlotsRequest(
-        @NotNull(message = "{validation.service.slot.date.required}")
-        @FutureOrPresent(message = "{validation.service.slot.date.future}")
         LocalDate startDate,
 
-        @NotNull(message = "{validation.service.slot.date.required}")
-        @FutureOrPresent(message = "{validation.service.slot.date.future}")
         LocalDate endDate,
 
-        @NotEmpty(message = "{validation.service.slot.batch.days.required}")
         Set<DayOfWeek> daysOfWeek,
 
         @NotEmpty(message = "{validation.service.slot.batch.templates.required}")
         @Valid
-        List<SlotTemplateRequest> slotTemplates
-) {}
+        List<SlotTemplateRequest> slotTemplates,
+
+        List<LocalDate> dates
+) {
+    public BatchCreateServiceSlotsRequest(LocalDate startDate, LocalDate endDate, Set<DayOfWeek> daysOfWeek,
+                                          List<SlotTemplateRequest> slotTemplates) {
+        this(startDate, endDate, daysOfWeek, slotTemplates, null);
+    }
+}

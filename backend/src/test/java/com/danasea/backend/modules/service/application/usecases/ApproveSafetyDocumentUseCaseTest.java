@@ -134,7 +134,7 @@ class ApproveSafetyDocumentUseCaseTest {
         categoryEntity.setRequiresSafetyCert(true);
 
         when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(serviceEntity));
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(categoryEntity));
+        when(categoryRepository.findByIdForUpdate(categoryId)).thenReturn(Optional.of(categoryEntity));
         when(safetyDocumentRepository.existsByServiceIdAndStatus(serviceId, DocStatus.APPROVED)).thenReturn(true);
 
         boolean canPublish = useCase.canPublish(serviceId);
@@ -149,7 +149,7 @@ class ApproveSafetyDocumentUseCaseTest {
         categoryEntity.setRequiresSafetyCert(true);
 
         when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(serviceEntity));
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(categoryEntity));
+        when(categoryRepository.findByIdForUpdate(categoryId)).thenReturn(Optional.of(categoryEntity));
         when(safetyDocumentRepository.existsByServiceIdAndStatus(serviceId, DocStatus.APPROVED)).thenReturn(false);
 
         assertThrows(SafetyDocumentRequiredException.class, () ->
@@ -164,7 +164,7 @@ class ApproveSafetyDocumentUseCaseTest {
         categoryEntity.setRequiresSafetyCert(false);
 
         when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(serviceEntity));
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(categoryEntity));
+        when(categoryRepository.findByIdForUpdate(categoryId)).thenReturn(Optional.of(categoryEntity));
         when(safetyDocumentRepository.existsByServiceIdAndStatus(serviceId, DocStatus.APPROVED)).thenReturn(false);
 
         assertThrows(SafetyDocumentRequiredException.class, () ->
@@ -178,7 +178,7 @@ class ApproveSafetyDocumentUseCaseTest {
         serviceEntity.setWeatherSensitive(true);
 
         when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(serviceEntity));
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(categoryEntity));
+        when(categoryRepository.findByIdForUpdate(categoryId)).thenReturn(Optional.of(categoryEntity));
         when(safetyDocumentRepository.existsByServiceIdAndStatus(serviceId, DocStatus.APPROVED)).thenReturn(true);
 
         boolean canPublish = useCase.canPublish(serviceId);
@@ -193,7 +193,7 @@ class ApproveSafetyDocumentUseCaseTest {
         categoryEntity.setRequiresSafetyCert(false);
 
         when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(serviceEntity));
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(categoryEntity));
+        when(categoryRepository.findByIdForUpdate(categoryId)).thenReturn(Optional.of(categoryEntity));
 
         boolean canPublish = useCase.canPublish(serviceId);
 
