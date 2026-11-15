@@ -75,7 +75,7 @@ const SpotlightVideo: React.FC<{ src: string; poster: string; title: string }> =
     const container = containerRef.current;
     if (!container) return;
 
-    // 1. Preload observer: start buffering video 700px before it enters viewport
+    // 1. Preload observer: start buffering video 250px before it enters viewport
     const preloadObserver = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -83,7 +83,7 @@ const SpotlightVideo: React.FC<{ src: string; poster: string; title: string }> =
           preloadObserver.disconnect();
         }
       },
-      { rootMargin: '700px 0px' }
+      { rootMargin: '250px 0px' }
     );
 
     // 2. Playback observer: play/pause when actually visible
@@ -130,11 +130,12 @@ const SpotlightVideo: React.FC<{ src: string; poster: string; title: string }> =
         ref={videoRef}
         src={shouldLoad ? src : undefined}
         poster={poster}
-        preload={shouldLoad ? 'auto' : 'none'}
+        preload={isInView ? 'auto' : (shouldLoad ? 'metadata' : 'none')}
         autoPlay={isInView}
         loop
         muted
         playsInline
+        disablePictureInPicture
         onLoadedData={() => setIsVideoReady(true)}
         aria-label={title}
         className={`relative z-10 w-full h-full object-cover group-hover:scale-105 transition-all duration-700 ease-out ${
