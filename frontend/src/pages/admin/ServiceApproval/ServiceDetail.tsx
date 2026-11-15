@@ -3,6 +3,7 @@ import { Anchor, Compass, FileCheck, FileText, History, ShieldCheck, Waves, Wind
 import type { ServiceStatus } from '../../../types';
 import { AdminBadge } from '../../../components/admin/AdminUI';
 import { AdminDisclosure } from '../../../components/admin/AdminWorkspace';
+import { AdminDocumentPreviewModal } from '../../../components/admin/AdminDocumentPreviewModal';
 import type { ServiceRecord, ServiceReviewEvent } from './serviceApprovalModel';
 import { adminServiceApprovalService } from '../../../services/adminServiceApprovalService';
 import type { SafetyDocumentResponse } from '../../../types/adminServiceApproval';
@@ -62,6 +63,7 @@ export function ServiceDetail({
   const [safetyDocs, setSafetyDocs] = useState<SafetyDocumentResponse[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [docActionId, setDocActionId] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
 
   useEffect(() => {
     if (demo || !service?.id) return;
@@ -246,14 +248,27 @@ export function ServiceDetail({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <FileText size={16} color="#0284c7" />
                     <div>
-                      <a
-                        href={doc.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ color: '#0284c7', fontWeight: 600, textDecoration: 'underline' }}
+                      <button
+                        type="button"
+                        onClick={() => setPreviewDoc({ url: doc.fileUrl, title: `Chứng chỉ an toàn biển #${idx + 1}` })}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          color: '#0284c7',
+                          fontWeight: 600,
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          textAlign: 'left',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                        }}
                       >
-                        Chứng từ an toàn #{idx + 1}
-                      </a>
+                        <span>Chứng từ an toàn #{idx + 1}</span>
+                        <span style={{ fontSize: '11px', textDecoration: 'none', color: '#64748b' }}>🔍 Xem trước</span>
+                      </button>
                       {doc.rejectionReason && (
                         <div style={{ color: '#e11d48', fontSize: '12px' }}>
                           Lý do từ chối: {doc.rejectionReason}
@@ -456,6 +471,14 @@ export function ServiceDetail({
           </ol>
         )}
       </section>
+
+      <AdminDocumentPreviewModal
+        open={Boolean(previewDoc)}
+        onClose={() => setPreviewDoc(null)}
+        imageUrl={previewDoc?.url}
+        title={previewDoc?.title || 'Chứng chỉ an toàn biển'}
+        description="Hồ sơ chứng chỉ an toàn hàng hải khai báo cho dịch vụ"
+      />
     </div>
   );
 }

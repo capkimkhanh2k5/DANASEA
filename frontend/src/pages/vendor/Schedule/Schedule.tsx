@@ -20,7 +20,10 @@ import {
   Unlock,
   Edit2,
   CalendarDays,
-  AlertCircle
+  AlertCircle,
+  Layers,
+  ChevronDown,
+  Trash2,
 } from "lucide-react";
 import {
   AtlasPageHeader,
@@ -28,6 +31,7 @@ import {
   AtlasButton
 } from "../../../components/vendor/atlas/AtlasDesignSystem";
 import { SlotAdvisorBanner } from "./SlotAdvisorBanner";
+import { BatchCreateSlotsModal } from "./BatchCreateSlotsModal";
 
 export function Schedule() {
   const [searchParams] = useSearchParams();
@@ -52,7 +56,9 @@ export function Schedule() {
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
   // Modal State: Create Slot
+  const [createMenuAnchor, setCreateMenuAnchor] = useState<'header' | 'empty' | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [newDate, setNewDate] = useState<string>(todayStr);
   const [newStartTime, setNewStartTime] = useState<string>("06:00");
   const [newEndTime, setNewEndTime] = useState<string>("08:00");
@@ -71,6 +77,28 @@ export function Schedule() {
   const [inputStatus, setInputStatus] = useState<SlotStatus>("OPEN");
   const [capacityError, setCapacityError] = useState<string | null>(null);
   const [isUpdatingSlot, setIsUpdatingSlot] = useState(false);
+
+  // Close create menu when clicking outside
+  useEffect(() => {
+    if (!createMenuAnchor) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('[data-create-menu-container]')) {
+        setCreateMenuAnchor(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setCreateMenuAnchor(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [createMenuAnchor]);
 
   const [previousQueryService, setPreviousQueryService] = useState(queryServiceId);
   if (previousQueryService !== queryServiceId) {
@@ -283,15 +311,73 @@ export function Schedule() {
       <AtlasPageHeader
         title="Lịch Khởi hành & Điều phối Ca"
         actions={
-          <AtlasButton
-            variant="primary"
-            size="md"
-            onClick={() => setIsCreateModalOpen(true)}
-            disabled={!selectedServiceId}
-            icon={<Plus className="w-4 h-4" />}
-          >
-            Tạo ca khởi hành
-          </AtlasButton>
+          <div className="relative" data-create-menu-container>
+            <button
+              type="button"
+              disabled={!selectedServiceId}
+              onClick={() => setCreateMenuAnchor((prev) => (prev === 'header' ? null : 'header'))}
+              aria-haspopup="true"
+              aria-expanded={createMenuAnchor === 'header'}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-medium shadow-sm transition-all duration-200 hover:bg-slate-800 hover:ring-2 hover:ring-teal-500/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+            >
+              <Plus className="w-4 h-4 shrink-0 text-white" />
+              <span>Tạo ca khởi hành</span>
+              <ChevronDown
+                className={`w-4 h-4 shrink-0 text-slate-300 transition-transform duration-200 ${
+                  createMenuAnchor === 'header' ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {createMenuAnchor === 'header' && (
+              <div
+                role="menu"
+                className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-2 z-50 transition-all duration-200 transform opacity-100 translate-y-0 animate-in fade-in slide-in-from-top-2"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setCreateMenuAnchor(null);
+                    setIsCreateModalOpen(true);
+                  }}
+                  className="w-full px-4 py-2.5 text-left flex items-start gap-3 hover:bg-slate-50 transition-colors cursor-pointer group"
+                >
+                  <div className="p-2 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200/70 transition-colors shrink-0 mt-0.5">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-xs text-slate-900">A. Tạo ca đơn</div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                      Tạo một ca riêng lẻ hoặc lặp lại 1 - 30 ngày liên tiếp
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setCreateMenuAnchor(null);
+                    setIsBatchModalOpen(true);
+                  }}
+                  className="w-full px-4 py-2.5 text-left flex items-start gap-3 hover:bg-slate-50 transition-colors cursor-pointer border-t border-slate-100 group"
+                >
+                  <div className="p-2 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-100/80 transition-colors shrink-0 mt-0.5">
+                    <Layers className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
+                      <span>B. Tạo ca hàng loạt</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                      Cấu hình ca theo thứ, áp dụng khoảng ngày hoặc lặp 90 ngày
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         }
       />
 
@@ -521,14 +607,73 @@ export function Schedule() {
                     : "Vui lòng chọn một dịch vụ từ danh sách phía trên."}
                 </p>
                 {selectedServiceId && (
-                  <AtlasButton
-                    variant="primary"
-                    size="sm"
-                    onClick={() => setIsCreateModalOpen(true)}
-                    icon={<Plus className="w-4 h-4" />}
-                  >
-                    Tạo ca khởi hành mới
-                  </AtlasButton>
+                  <div className="relative inline-block" data-create-menu-container>
+                    <button
+                      type="button"
+                      disabled={!selectedServiceId}
+                      onClick={() => setCreateMenuAnchor((prev) => (prev === 'empty' ? null : 'empty'))}
+                      aria-haspopup="true"
+                      aria-expanded={createMenuAnchor === 'empty'}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-medium shadow-sm transition-all duration-200 hover:bg-slate-800 hover:ring-2 hover:ring-teal-500/20 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    >
+                      <Plus className="w-4 h-4 shrink-0 text-white" />
+                      <span>Tạo ca khởi hành mới</span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 shrink-0 text-slate-300 transition-transform duration-200 ${
+                          createMenuAnchor === 'empty' ? 'rotate-180' : ''
+                        }`}
+                      />
+                    </button>
+
+                    {createMenuAnchor === 'empty' && (
+                      <div
+                        role="menu"
+                        className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-200/90 py-2 z-50 text-left transition-all duration-200 transform opacity-100 translate-y-0 animate-in fade-in slide-in-from-top-2"
+                      >
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setCreateMenuAnchor(null);
+                            setIsCreateModalOpen(true);
+                          }}
+                          className="w-full px-4 py-2.5 text-left flex items-start gap-3 hover:bg-slate-50 transition-colors cursor-pointer group"
+                        >
+                          <div className="p-2 rounded-xl bg-slate-100 text-slate-700 group-hover:bg-slate-200/70 transition-colors shrink-0 mt-0.5">
+                            <Clock className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-xs text-slate-900">A. Tạo ca đơn</div>
+                            <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                              Tạo một ca riêng lẻ hoặc lặp lại 1 - 30 ngày liên tiếp
+                            </div>
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            setCreateMenuAnchor(null);
+                            setIsBatchModalOpen(true);
+                          }}
+                          className="w-full px-4 py-2.5 text-left flex items-start gap-3 hover:bg-slate-50 transition-colors cursor-pointer border-t border-slate-100 group"
+                        >
+                          <div className="p-2 rounded-xl bg-teal-50 text-teal-700 group-hover:bg-teal-100/80 transition-colors shrink-0 mt-0.5">
+                            <Layers className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
+                              <span>B. Tạo ca hàng loạt</span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                              Cấu hình ca theo thứ, áp dụng khoảng ngày hoặc lặp 90 ngày
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -659,25 +804,58 @@ export function Schedule() {
                       + Thêm cano
                     </button>
                   </div>
-                  {newUnits.map((u, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span className="text-slate-600 font-medium text-xs">#{u.unitNumber}</span>
-                      <input
-                        type="number"
-                        min={1}
-                        value={u.capacity}
-                        onChange={(e) => {
-                          const val = Number(e.target.value);
-                          setNewUnits((prev) =>
-                            prev.map((item, i) => (i === idx ? { ...item, capacity: val } : item))
-                          );
-                        }}
-                        className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg bg-white text-xs"
-                        placeholder="Sức chứa"
-                      />
-                      <span className="text-slate-500 text-xs">khách</span>
-                    </div>
-                  ))}
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                    {newUnits.map((u, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="text-slate-600 font-medium text-xs w-10 shrink-0">#{u.unitNumber}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={u.capacity}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setNewUnits((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, capacity: Math.max(1, val) } : item))
+                            );
+                          }}
+                          className="w-24 px-2 py-1.5 border border-slate-300 rounded-lg bg-white text-xs"
+                          placeholder="Sức chứa"
+                        />
+                        <span className="text-slate-500 text-xs">khách</span>
+
+                        {/* Nút xóa cano */}
+                        <button
+                          type="button"
+                          disabled={newUnits.length <= 1}
+                          onClick={() => {
+                            if (newUnits.length <= 1) return;
+                            setNewUnits((prev) => {
+                              const remaining = prev.filter((_, i) => i !== idx);
+                              return remaining.map((unit, i) => ({
+                                ...unit,
+                                unitNumber: i + 1,
+                              }));
+                            });
+                          }}
+                          className={`p-1 rounded transition-colors ml-auto ${
+                            newUnits.length <= 1
+                              ? 'text-slate-300 cursor-not-allowed'
+                              : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer'
+                          }`}
+                          title={newUnits.length <= 1 ? "Cần tối thiểu 1 phương tiện" : "Xóa phương tiện này"}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="text-[11px] text-slate-500 pt-1.5 border-t border-slate-200/60 flex items-center justify-between">
+                    <span>
+                      Tổng sức chứa: <strong className="text-slate-900">{newUnits.reduce((acc, u) => acc + (u.capacity || 0), 0)}</strong> khách
+                    </span>
+                    <span>({newUnits.length} phương tiện)</span>
+                  </div>
                 </div>
               )}
 
@@ -783,6 +961,21 @@ export function Schedule() {
         </div>,
         document.body
       )}
+
+      {/* Modal: Batch Create Slots */}
+      <BatchCreateSlotsModal
+        isOpen={isBatchModalOpen}
+        onClose={() => setIsBatchModalOpen(false)}
+        serviceId={selectedServiceId}
+        serviceName={selectedServiceObj?.name || ""}
+        capacityPerSlot={selectedServiceObj?.capacityPerSlot}
+        onSuccess={() => {
+          if (selectedServiceId) {
+            setIsLoadingSlots(true);
+            loadSlots(selectedServiceId);
+          }
+        }}
+      />
     </div>
   );
 }

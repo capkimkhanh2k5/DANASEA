@@ -285,7 +285,7 @@ export function VendorLayout() {
                   isPinned ? "text-slate-900 bg-slate-100 shadow-xs" : ""
                 }`}
                 title={isPinned ? "Thu gọn thanh bên (Tự động co giãn)" : "Ghim cố định thanh bên"}
-                aria-label="Toggle pin sidebar"
+                aria-label={isPinned ? "Thu gọn thanh bên" : "Ghim cố định thanh bên"}
               >
                 {isPinned ? (
                   <PanelLeftClose className="w-4 h-4 text-slate-700" />

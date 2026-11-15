@@ -26,9 +26,11 @@ import com.danasea.backend.modules.service.infrastructure.persistence.adapters.O
 import com.danasea.backend.modules.service.presentation.dtos.CreateServiceSlotRequest;
 import com.danasea.backend.modules.service.presentation.dtos.CreateSlotUnitRequest;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
+import com.danasea.backend.shared.i18n.LocalizedException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -160,7 +162,8 @@ class CreateServiceSlotUseCaseTest {
     @Test
     void nullRequestIsRejectedBeforeAnyRepositoryAccess() {
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, null))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("Request cannot be null");
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.bad_request"));
         verifyNoInteractions(services, slots, vendors);
     }
 
@@ -194,12 +197,33 @@ class CreateServiceSlotUseCaseTest {
     @Test
     void pastDepartureUsesVietnamBusinessTimeAndDoesNotWrite() {
         authorize();
-        LocalDateTime past = LocalDateTime.now(Booking.VIETNAM_ZONE).minusMinutes(1);
+        LocalDateTime past = LocalDate.now(Booking.VIETNAM_ZONE).minusDays(1).atTime(8, 0);
         var request = new CreateServiceSlotRequest(past.toLocalDate(), past.toLocalTime(),
                 past.toLocalTime().plusMinutes(30), InventoryType.PERSON_LIMIT, 2, null);
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, request))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("Cannot create a slot in the past");
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_past"));
         verifyNoInteractions(slots);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            ",                08:00, 10:00,              PERSON_LIMIT, error.slot_date_time_required",
+            "2099-01-01,      ,      10:00,              PERSON_LIMIT, error.slot_date_time_required",
+            "2099-01-01,      08:00, ,                   PERSON_LIMIT, error.slot_date_time_required",
+            "2099-01-01,      08:00, 10:00,              ,             validation.service.slot.inventory.required",
+            "2099-01-01,      08:00, 10:00:00.000000001, PERSON_LIMIT, error.slot_time_precision"
+    })
+    void invalidDepartureFieldsDoNotReachAvailabilityChecks(LocalDate date, LocalTime start, LocalTime end,
+                                                             InventoryType inventoryType, String messageKey) {
+        authorize();
+        var request = new CreateServiceSlotRequest(date, start, end, inventoryType, 2, null);
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, request))
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo(messageKey));
+
+        verifyNoInteractions(slots, scheduleStore);
     }
 
     @ParameterizedTest
@@ -209,7 +233,8 @@ class CreateServiceSlotUseCaseTest {
         var request = new CreateServiceSlotRequest(tomorrow, LocalTime.parse(start), LocalTime.parse(end),
                 InventoryType.PERSON_LIMIT, 2, null);
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, request))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("Start time must be before end time");
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_time_order"));
         verifyNoInteractions(slots);
     }
 
@@ -219,7 +244,8 @@ class CreateServiceSlotUseCaseTest {
         var request = request(InventoryType.PERSON_LIMIT, 2, null);
         when(slots.existsByServiceIdAndDateAndStartTime(serviceId, request.date(), request.startTime())).thenReturn(true);
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, request))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("departure already exists");
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_already_exists"));
         noWrites();
     }
 
@@ -228,7 +254,8 @@ class CreateServiceSlotUseCaseTest {
     void personCapacityMustBePresentAndPositive(Integer capacity) {
         authorize();
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, request(InventoryType.PERSON_LIMIT, capacity, null)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("Capacity must be greater than 0");
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_capacity"));
         noWrites();
     }
 
@@ -241,7 +268,8 @@ class CreateServiceSlotUseCaseTest {
     void sharedInventoryRequiresAtLeastOneUnit(List<CreateSlotUnitRequest> units) {
         authorize();
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, request(InventoryType.SHARED_CAPACITY_UNITS, null, units)))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("requires a list of units");
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_units_required"));
         noWrites();
     }
 
@@ -251,22 +279,23 @@ class CreateServiceSlotUseCaseTest {
 
     @ParameterizedTest
     @MethodSource("invalidUnits")
-    void invalidUnitNumbersAndCapacitiesCannotReachPersistence(CreateSlotUnitRequest unit, String message) {
+    void invalidUnitNumbersAndCapacitiesCannotReachPersistence(CreateSlotUnitRequest unit, String messageKey) {
         authorize();
         assertThatThrownBy(() -> useCase.execute(userId, serviceId,
                 request(InventoryType.SHARED_CAPACITY_UNITS, null, List.of(unit))))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage(message);
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo(messageKey));
         noWrites();
     }
 
     private static Stream<Arguments> invalidUnits() {
         return Stream.of(
-                Arguments.of(new CreateSlotUnitRequest(null, 1), "Unit number must be greater than 0"),
-                Arguments.of(new CreateSlotUnitRequest(0, 1), "Unit number must be greater than 0"),
-                Arguments.of(new CreateSlotUnitRequest(-1, 1), "Unit number must be greater than 0"),
-                Arguments.of(new CreateSlotUnitRequest(1, null), "Each unit capacity must be greater than 0"),
-                Arguments.of(new CreateSlotUnitRequest(1, 0), "Each unit capacity must be greater than 0"),
-                Arguments.of(new CreateSlotUnitRequest(1, -1), "Each unit capacity must be greater than 0"));
+                Arguments.of(new CreateSlotUnitRequest(null, 1), "error.slot_unit_number"),
+                Arguments.of(new CreateSlotUnitRequest(0, 1), "error.slot_unit_number"),
+                Arguments.of(new CreateSlotUnitRequest(-1, 1), "error.slot_unit_number"),
+                Arguments.of(new CreateSlotUnitRequest(1, null), "error.slot_unit_capacity"),
+                Arguments.of(new CreateSlotUnitRequest(1, 0), "error.slot_unit_capacity"),
+                Arguments.of(new CreateSlotUnitRequest(1, -1), "error.slot_unit_capacity"));
     }
 
     @Test
@@ -274,7 +303,8 @@ class CreateServiceSlotUseCaseTest {
         authorize();
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, request(InventoryType.SHARED_CAPACITY_UNITS, null,
                 List.of(new CreateSlotUnitRequest(1, 2), new CreateSlotUnitRequest(1, 3)))))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("Duplicate unit number: 1");
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_duplicate_unit"));
         noWrites();
     }
 
@@ -283,8 +313,8 @@ class CreateServiceSlotUseCaseTest {
         authorize();
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, request(InventoryType.SHARED_CAPACITY_UNITS, null,
                 List.of(new CreateSlotUnitRequest(1, Integer.MAX_VALUE), new CreateSlotUnitRequest(2, 1)))))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("Total unit capacity exceeds the supported integer capacity")
-                .hasCauseInstanceOf(ArithmeticException.class);
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_unit_capacity_overflow"));
         noWrites();
     }
 
@@ -292,8 +322,9 @@ class CreateServiceSlotUseCaseTest {
     void nullUnitIsRejectedAsInvalidInputBeforeAnyWrite() {
         authorize();
         assertThatThrownBy(() -> useCase.execute(userId, serviceId,
-                request(InventoryType.SHARED_CAPACITY_UNITS, null, java.util.Collections.singletonList(null))))
-                .isInstanceOf(IllegalArgumentException.class).hasMessage("Unit cannot be null");
+                request(InventoryType.SHARED_CAPACITY_UNITS, null, Collections.singletonList(null))))
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_unit_number"));
         noWrites();
     }
 

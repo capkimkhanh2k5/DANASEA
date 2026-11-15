@@ -1,5 +1,5 @@
 {
-  "reviewedMigrations": "V1-V58",
+  "reviewedMigrations": "V1-V59",
   "classification": {
     "ai_assessment_cases": "replace",
     "ai_chat_requests": "replace",
@@ -6573,6 +6573,19 @@
         "validated": true
       },
       {
+        "name": "fk_categories_parent_id",
+        "child": "public.categories",
+        "parent": "public.categories",
+        "childcolumns": [
+          "parent_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE RESTRICT",
+        "validated": true
+      },
+      {
         "name": "category_safety_rules_category_id_fkey",
         "child": "public.category_safety_rules",
         "parent": "public.categories",
@@ -6582,7 +6595,7 @@
         "parentcolumns": [
           "id"
         ],
-        "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE",
+        "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT",
         "validated": true
       },
       {
@@ -6621,7 +6634,7 @@
         "parentcolumns": [
           "id"
         ],
-        "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE",
+        "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT",
         "validated": true
       },
       {
@@ -7038,6 +7051,19 @@
           "id"
         ],
         "definition": "FOREIGN KEY (slot_id) REFERENCES service_slots(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "fk_services_category_id",
+        "child": "public.services",
+        "parent": "public.categories",
+        "childcolumns": [
+          "category_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE RESTRICT",
         "validated": true
       },
       {

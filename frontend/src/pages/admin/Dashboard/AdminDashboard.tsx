@@ -79,7 +79,12 @@ export function AdminDashboard() {
           )}
 
           {/* 4 Box Tóm lược kinh doanh độc lập (Dynamic theo 7/30 ngày) */}
-          <ExecutiveDigestBanner days={days} metrics={metrics} loading={loading} />
+          <ExecutiveDigestBanner
+            days={days}
+            metrics={metrics}
+            loading={loading}
+            unavailable={revenueUnavailable}
+          />
 
           {/* =========================================================================
               HÀNG 1: Block 1 (KPI Overview ~38%) + Block 2 (Revenue Trend ~62%)

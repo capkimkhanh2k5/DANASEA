@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Outlet, useLocation, Navigate, Link } from 'react-router-dom';
-import { FlaskConical, Menu, PanelLeftClose, ShieldAlert, X } from 'lucide-react';
+import { Outlet, useLocation, Navigate, Link, useNavigate } from 'react-router-dom';
+import { FlaskConical, Menu, PanelLeftClose, PanelLeft, ShieldAlert, X } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { adminPages } from '../components/admin/adminRoutes';
 import { AdminNavigation } from '../components/admin/AdminNavigation';
@@ -12,6 +12,7 @@ import '../components/admin/adminInteractions.css';
 
 export function AdminLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const user = useAuthStore(state => state.user);
   const token = useAuthStore(state => state.accessToken);
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
@@ -22,8 +23,21 @@ export function AdminLayout() {
     return useAuthStore.persist?.hasHydrated?.() ?? true;
   });
 
-  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isPinned, setIsPinned] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('danasea_admin_sidebar_pinned') === 'true';
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('danasea_admin_sidebar_pinned', String(isPinned));
+    }
+  }, [isPinned]);
+
   const [days, setDays] = useState<7 | 30>(7);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -123,84 +137,133 @@ export function AdminLayout() {
 
   const demo = accessResult.allowed && accessResult.reason === 'demo';
   const page = adminPages.find(item => item.to === location.pathname) ?? adminPages[0];
+  const isExpanded = mobileOpen || isPinned || isHovered;
 
   return (
-    <div className={`admin-shell ${collapsed ? 'admin-shell--collapsed' : ''} ${mobileOpen ? 'admin-shell--mobile-open' : ''}`}>
+    <div className={`admin-shell flex min-h-screen bg-[#f5f8fa] text-slate-800 ${isPinned ? 'admin-shell--pinned' : ''}`}>
       <a href="#admin-content" className="admin-skip-link">Đến nội dung chính</a>
-      {mobileOpen && <button className="admin-backdrop" aria-label="Đóng menu" onClick={() => setMobileOpen(false)} tabIndex={-1} />}
+      {mobileOpen && (
+        <button
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 lg:hidden cursor-pointer"
+          aria-label="Đóng menu"
+          onClick={() => setMobileOpen(false)}
+          tabIndex={-1}
+        />
+      )}
 
-      {/* GEMINI-STYLE SIDEBAR */}
+      {/* Anti-jitter spacer so main content does not jump on hover */}
+      <div
+        className="hidden lg:block shrink-0 transition-all duration-200 ease-in-out print:hidden"
+        style={{ width: isPinned ? 260 : 68 }}
+      />
+
+      {/* Modern Collapsible Sidebar (Compact Rail -> Hover Expand / Pin) */}
       <aside
         id="admin-navigation"
         ref={sidebarRef}
-        className="admin-sidebar"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`fixed top-0 bottom-0 left-0 z-40 bg-white border-r border-slate-200/80 flex flex-col justify-between select-none print:hidden transition-[width,box-shadow] duration-200 ease-out ${
+          mobileOpen
+            ? 'shadow-2xl shadow-slate-900/20 translate-x-0'
+            : isExpanded
+            ? 'shadow-2xl shadow-slate-900/10'
+            : 'shadow-none'
+        } ${
+          !mobileOpen ? 'max-lg:-translate-x-full lg:translate-x-0' : ''
+        }`}
+        style={{
+          width: mobileOpen || isExpanded ? 260 : 68,
+        }}
         aria-label="Điều hướng quản trị"
         role={mobileOpen ? 'dialog' : undefined}
         aria-modal={mobileOpen || undefined}
       >
-        <div className="admin-brand-row">
-          {collapsed && !mobileOpen ? (
-            /* Khi thu gọn: hiển thị logo ở đầu thanh bên, bấm vào logo thì mở rộng ra lại */
-            <button
-              type="button"
-              className="admin-brand-collapsed-btn admin-desktop-only"
-              onClick={() => setCollapsed(false)}
-              aria-label="Mở rộng thanh bên"
-              title="Mở rộng thanh bên"
+        <div className="flex flex-col min-h-0 flex-1">
+          {/* Brand Header */}
+          <div className="h-16 px-3.5 border-b border-slate-200/80 flex items-center justify-between shrink-0 overflow-hidden">
+            <div
+              className="flex items-center gap-3 cursor-pointer shrink-0"
+              onClick={() => {
+                navigate('/admin');
+                closeOverlays();
+              }}
+              title="DANASEA Hệ thống quản trị"
             >
-              <span className="admin-brand-mark">
-                <img src="/images/danasea-logo-sm.png" width={32} height={32} decoding="async" alt="DANASEA Logo" className="admin-brand-logo" />
-              </span>
-            </button>
-          ) : (
-            /* Khi mở rộng: logo và tên thương hiệu là tĩnh (không bấm chuyển trang), nút đóng ở bên phải */
-            <>
-              <div className="admin-brand-container">
-                <div className="admin-brand admin-brand--static" aria-label="DANASEA Admin — Hệ thống quản trị">
-                  <span className="admin-brand-mark">
-                    <img src="/images/danasea-logo-sm.png" width={32} height={32} decoding="async" alt="DANASEA Logo" className="admin-brand-logo" />
-                  </span>
-                  <span className="admin-brand-copy">
-                    <strong>DANASEA</strong>
-                  </span>
-                </div>
+              <img
+                src="/images/danasea-logo-sm.png"
+                alt="DANASEA Logo"
+                className="w-9 h-9 object-contain rounded-xl shrink-0 shadow-xs"
+              />
+              <div
+                className={`flex flex-col transition-all duration-200 ${
+                  isExpanded ? 'opacity-100 max-w-[150px]' : 'opacity-0 max-w-0 overflow-hidden'
+                }`}
+              >
+                <span className="font-extrabold text-base tracking-tight text-slate-900 leading-none">
+                  DANASEA
+                </span>
+                <span className="text-[10px] text-[#0B5D6F] font-bold tracking-wider uppercase mt-1 whitespace-nowrap">
+                  QUẢN TRỊ VIÊN
+                </span>
               </div>
+            </div>
+
+            {/* Desktop Sidebar Toggle Button (Gemini Style) */}
+            {isExpanded && (
               <button
                 type="button"
-                className="admin-sidebar-toggle-btn admin-desktop-only"
-                onClick={() => setCollapsed(true)}
-                aria-label="Đóng thanh bên"
-                title="Đóng thanh bên"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsPinned((prev) => !prev);
+                }}
+                className="hidden lg:flex p-1.5 rounded-lg text-slate-500 hover:text-slate-800 bg-transparent hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+                title={isPinned ? 'Thu gọn thanh bên (Tự động ẩn)' : 'Ghim cố định thanh bên'}
+                aria-label={isPinned ? 'Thu gọn thanh bên' : 'Ghim cố định thanh bên'}
               >
-                <PanelLeftClose size={20} />
+                {isPinned ? (
+                  <PanelLeftClose className="w-4 h-4 transition-transform duration-200" />
+                ) : (
+                  <PanelLeft className="w-4 h-4 transition-transform duration-200" />
+                )}
               </button>
-            </>
-          )}
-          <button
-            type="button"
-            className="admin-icon-button admin-mobile-only"
-            onClick={() => setMobileOpen(false)}
-            aria-label="Đóng menu điều hướng"
-          >
-            <X size={20} />
-          </button>
+            )}
+
+            {/* Mobile Close Button */}
+            {mobileOpen && (
+              <button
+                type="button"
+                className="lg:hidden p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+                onClick={() => setMobileOpen(false)}
+                aria-label="Đóng menu điều hướng"
+              >
+                <X size={20} />
+              </button>
+            )}
+          </div>
+
+          {/* Navigation Links Grouped */}
+          <AdminNavigation isExpanded={isExpanded} onNavigate={closeOverlays} />
         </div>
 
-        <AdminNavigation collapsed={collapsed && !mobileOpen} onNavigate={closeOverlays} />
-
-        <div className="admin-sidebar-bottom">
+        {/* Footer Account Section */}
+        <div className="p-3 border-t border-slate-200/80 flex flex-col gap-2 shrink-0">
           <AdminAccount
             user={user}
             token={token}
             demo={demo}
-            collapsed={collapsed && !mobileOpen}
+            isExpanded={isExpanded}
             onNavigate={closeOverlays}
           />
         </div>
       </aside>
 
       {/* WORKSPACE AREA - NO TOPBAR */}
-      <div className="admin-workspace" inert={mobileOpen || undefined}>
+      <div
+        className="admin-workspace flex-1 flex flex-col min-w-0"
+        style={{ marginLeft: 0 }}
+        inert={mobileOpen || undefined}
+      >
         {!demo && user && user.role !== 'ADMIN' && (
           <div className="admin-role-context" role="status">
             <ShieldAlert size={17} />

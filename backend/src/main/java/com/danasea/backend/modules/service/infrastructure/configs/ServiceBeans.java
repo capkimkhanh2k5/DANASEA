@@ -78,8 +78,9 @@ public class ServiceBeans {
     public ResumeServiceUseCase resumeServiceUseCase(
             ServiceRepositoryPort serviceRepository,
             ServiceImageRepositoryPort serviceImageRepository,
-            VendorPort vendorPort) {
-        return new ResumeServiceUseCase(serviceRepository, serviceImageRepository, vendorPort);
+            VendorPort vendorPort,
+            ApproveSafetyDocumentUseCase approveSafetyDocumentUseCase) {
+        return new ResumeServiceUseCase(serviceRepository, serviceImageRepository, vendorPort, approveSafetyDocumentUseCase);
     }
 
     @Bean

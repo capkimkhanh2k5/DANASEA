@@ -4,4 +4,5 @@ import java.util.UUID;
 
 public interface ActiveServiceCheckPort {
     boolean hasActiveServices(UUID categoryId);
+    boolean hasPublishedServicesWithoutApprovedSafetyDocuments(UUID categoryId);
 }

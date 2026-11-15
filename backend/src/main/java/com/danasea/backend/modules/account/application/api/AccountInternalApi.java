@@ -1,6 +1,8 @@
 package com.danasea.backend.modules.account.application.api;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,6 +18,8 @@ public interface AccountInternalApi {
     Optional<User> findUserByEmail(String email);
 
     Optional<User> findUserById(UUID id);
+
+    Map<UUID, User> findUsersByIds(Collection<UUID> ids);
 
     boolean existsByEmail(String email);
 

@@ -655,10 +655,24 @@ export function Inbox() {
 
                         <div className="shrink-0 flex items-center self-start sm:self-center">
                           <Link
-                            to="/profile/orders"
+                            to={
+                              isProposal && notif.relatedEntityId
+                                ? `/profile/orders?rescheduleSubOrderId=${notif.relatedEntityId}`
+                                : isReviewReply && notif.relatedEntityId
+                                ? `/profile/orders?subOrderId=${notif.relatedEntityId}`
+                                : notif.relatedEntityType === "ORDER" && notif.relatedEntityId
+                                ? `/profile/orders?orderId=${notif.relatedEntityId}`
+                                : "/profile/orders"
+                            }
                             className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors flex items-center gap-1.5"
                           >
-                            <span>{isEn ? "View Order & Reply" : "Xem đơn & Phản hồi"}</span>
+                            <span>
+                              {isProposal
+                                ? (isEn ? "Review Proposal" : "Xem đề xuất")
+                                : isReviewReply
+                                ? (isEn ? "View Review & Reply" : "Xem phản hồi đánh giá")
+                                : (isEn ? "View Order & Reply" : "Xem đơn & Phản hồi")}
+                            </span>
                             <ArrowRight className="w-3.5 h-3.5" />
                           </Link>
                         </div>

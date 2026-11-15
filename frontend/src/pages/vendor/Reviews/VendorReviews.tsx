@@ -85,18 +85,17 @@ export function VendorReviews() {
   const fetchReviews = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [res, services] = await Promise.all([
-        reviewService.getVendorReviews(0, 50),
-        vendorService.getMyServices().catch(() => []),
-      ]);
-      const serviceMap = new Map((services || []).map((s) => [s.id, s.name]));
+      const res = await reviewService.getVendorReviews(0, 50);
       if (res && res.content && Array.isArray(res.content)) {
+        const needsServiceNames = res.content.some((review) => review.serviceId && !review.serviceName?.trim());
+        const services = needsServiceNames ? await vendorService.getMyServices().catch(() => []) : [];
+        const serviceMap = new Map((services || []).map((service) => [service.id, service.name]));
         const mapped: ReviewItem[] = res.content.map((r) => ({
           id: r.id,
           customerName: r.customerName || 'Du khách DANASEA',
           avatarText: (r.customerName || 'DK').slice(0, 2).toUpperCase(),
           orderCode: r.subOrderId ? `#VE-${r.subOrderId.slice(0, 8).toUpperCase()}` : '#DON-HANG',
-          serviceName: (r.serviceId && serviceMap.get(r.serviceId)) || 'Trải nghiệm du lịch biển',
+          serviceName: r.serviceName?.trim() || (r.serviceId && serviceMap.get(r.serviceId)) || 'Trải nghiệm du lịch biển',
           slotTime: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '',
           rating: r.rating || 5,
           date: r.createdAt ? new Date(r.createdAt).toLocaleString('vi-VN') : '',
@@ -133,7 +132,7 @@ export function VendorReviews() {
 
     try {
       setIsSubmittingReply(true);
-      await reviewService.replyVendorReview(replyingReviewId, replyText.trim());
+      const updated = await reviewService.replyVendorReview(replyingReviewId, replyText.trim());
 
       setReviews(prev => prev.map(r => {
         if (r.id === replyingReviewId) {
@@ -141,17 +140,18 @@ export function VendorReviews() {
             ...r,
             reply: {
               author: 'Đại diện cơ sở tổ chức',
-              time: 'Vừa xong',
-              text: replyText.trim(),
+              time: updated.vendorRepliedAt ? new Date(updated.vendorRepliedAt).toLocaleString('vi-VN') : 'Vừa xong',
+              text: updated.vendorReply || replyText.trim(),
             }
           };
         }
         return r;
       }));
 
-      toast.success('Đã đăng phản hồi đánh giá công khai thành công!');
+      toast.success('Đã lưu phản hồi đánh giá công khai thành công!');
       setReplyingReviewId(null);
       setReplyText('');
+      void fetchReviews();
     } catch (err: unknown) {
       console.error('[VendorReviews] Lỗi gửi phản hồi:', err);
       let msg = 'Không thể gửi phản hồi.';
@@ -366,7 +366,20 @@ export function VendorReviews() {
                           <span className="font-bold text-sm text-slate-900">{rev.reply.author}</span>
                           <span className="text-slate-400 text-xs font-mono">• {rev.reply.time}</span>
                         </div>
-                        <AtlasBadge label="Đã phản hồi" variant="success" />
+                        <div className="flex items-center gap-2">
+                          <AtlasBadge label="Đã phản hồi" variant="success" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyingReviewId(rev.id);
+                              setReplyText(rev.reply?.text || '');
+                            }}
+                            className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-200/60 rounded-md transition-colors cursor-pointer"
+                            title="Chỉnh sửa phản hồi"
+                          >
+                            <PenLine className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                       <p className="text-slate-600 pl-5 text-xs leading-relaxed">“{rev.reply.text}”</p>
                     </div>
@@ -411,7 +424,7 @@ export function VendorReviews() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 font-display">
                 <Reply className="w-4 h-4 text-slate-700" />
-                Phản hồi công khai cho du khách
+                {reviews.find(r => r.id === replyingReviewId)?.reply ? 'Chỉnh sửa phản hồi cho du khách' : 'Phản hồi công khai cho du khách'}
               </h3>
               <button onClick={() => setReplyingReviewId(null)} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer">
                 <X className="w-4 h-4" />
@@ -456,7 +469,11 @@ export function VendorReviews() {
                 disabled={isSubmittingReply || !replyText.trim()}
                 icon={isSubmittingReply ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : undefined}
               >
-                {isSubmittingReply ? 'Đang gửi...' : 'Đăng phản hồi'}
+                {isSubmittingReply
+                  ? 'Đang gửi...'
+                  : reviews.find(r => r.id === replyingReviewId)?.reply
+                  ? 'Cập nhật phản hồi'
+                  : 'Đăng phản hồi'}
               </AtlasButton>
             </div>
           </div>

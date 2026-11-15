@@ -68,7 +68,7 @@ public class VendorPayoutRequestController {
             @Valid @RequestBody CreatePayoutRequestRequest request
     ) {
         UUID currentVendorId = resolveCurrentVendorId();
-        log.info("Vendor {} tạo yêu cầu rút tiền: {} đ cho kỳ đối soát {}",
+        log.info("Vendor {} requested a payout of {} VND from settlement {}",
                 currentVendorId, request.amount(), request.settlementId());
         PayoutRequestResponse response = createPayoutRequestUseCase.execute(currentVendorId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

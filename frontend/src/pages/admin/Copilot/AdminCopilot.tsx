@@ -287,7 +287,7 @@ export const AdminCopilot: React.FC = () => {
       const errorBubble: LocalMessage = {
         id: generateLocalId('err'),
         role: 'assistant',
-        content: `Lỗi kết nối Copilot: ${errorMsg}`,
+        content: `Lỗi kết nối DaNaBot: ${errorMsg}`,
         createdAt: new Date().toISOString(),
         isError: true,
         canRetry: true,
@@ -323,7 +323,7 @@ export const AdminCopilot: React.FC = () => {
   return (
     <div className="admin-copilot">
       {/* ==================== LEFT SIDEBAR: SESSIONS ==================== */}
-      <aside className="admin-copilot__sidebar" aria-label="Danh sách hội thoại Copilot">
+      <aside className="admin-copilot__sidebar" aria-label="Danh sách hội thoại DaNaBot">
         <div className="admin-copilot__sidebar-header">
           <button
             type="button"
@@ -469,7 +469,7 @@ export const AdminCopilot: React.FC = () => {
               <Bot size={15} />
             </div>
             <span>
-              {conversations.find((c) => c.id === currentConversationId)?.title || 'Admin Copilot'}
+              {conversations.find((c) => c.id === currentConversationId)?.title || 'Admin DaNaBot'}
             </span>
           </div>
 
@@ -609,7 +609,7 @@ export const AdminCopilot: React.FC = () => {
               <div className="admin-copilot__msg-body">
                 <div className="admin-copilot__msg-content admin-copilot__loading-content">
                   <div className="admin-copilot__loading-spinner" />
-                  <span>AI Copilot đang phân tích và tra cứu dữ liệu...</span>
+                  <span>DaNaBot đang phân tích và tra cứu dữ liệu...</span>
                 </div>
               </div>
             </div>
@@ -662,7 +662,7 @@ export const AdminCopilot: React.FC = () => {
                   handleSendMessage();
                 }
               }}
-              placeholder="Hỏi Copilot về doanh thu, khiếu nại, đối tác hoặc số liệu sàn... (Enter để gửi, Shift+Enter xuống dòng)"
+              placeholder="Hỏi DaNaBot về doanh thu, khiếu nại, đối tác hoặc số liệu sàn... (Enter để gửi, Shift+Enter xuống dòng)"
               className="admin-copilot__textarea"
               disabled={sending}
             />
@@ -710,7 +710,7 @@ export const AdminCopilot: React.FC = () => {
         onClose={() => setShowAttachModal(false)}
         variant="modal"
         title="Đính kèm đối tượng phân tích"
-        description="Gắn ngữ cảnh hồ sơ khiếu nại hoặc đơn hàng để Copilot hỗ trợ tra cứu chính xác."
+        description="Gắn ngữ cảnh hồ sơ khiếu nại hoặc đơn hàng để DaNaBot hỗ trợ tra cứu chính xác."
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, width: '100%' }}>
             <AdminButton onClick={() => setShowAttachModal(false)}>Hủy</AdminButton>

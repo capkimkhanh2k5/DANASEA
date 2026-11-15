@@ -43,6 +43,6 @@ public class GetAdminReviewsUseCase {
         };
 
         Page<ReviewJpaEntity> page = reviewRepository.findAll(spec, pageable);
-        return page.map(reviewMapper::toResponse);
+        return reviewMapper.toResponsePage(page);
     }
 }

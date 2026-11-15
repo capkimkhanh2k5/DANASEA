@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Anchor,
@@ -72,7 +72,7 @@ export function Categories() {
   const [formParentId, setFormParentId] = useState('');
   const [formIcon, setFormIcon] = useState('surfing');
   const [formIsActive, setFormIsActive] = useState(true);
-  const [formRequiresCert, setFormRequiresCert] = useState(true);
+  const [formRequiresCert, setFormRequiresCert] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [_isSubmitting, setIsSubmitting] = useState(false);
 
@@ -83,40 +83,38 @@ export function Categories() {
   // Notice
   const [notice, setNotice] = useState<string | null>(null);
 
-  useEffect(() => {
+  const refreshCategories = useCallback(async (signal?: AbortSignal) => {
     if (demo) return;
+    try {
+      setLoading(true);
+      const dtos = await adminCategoryService.getCategories(signal);
+      const mapped: Category[] = dtos.map(c => ({
+        id: c.id,
+        name: c.name,
+        nameEn: c.nameEn || '',
+        slug: c.slug,
+        parentId: c.parentId || '',
+        iconUrl: c.iconUrl || 'surfing',
+        isActive: c.isActive,
+        requiresSafetyCert: c.requiresSafetyCert ?? null,
+      }));
+      setCategories(mapped);
+    } catch (err) {
+      if (signal?.aborted) return;
+      const info = getAdminCategoryError(err);
+      setErrorMessage(info.message);
+    } finally {
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, [demo]);
 
-    let isMounted = true;
+  useEffect(() => {
     const controller = new AbortController();
-
-    adminCategoryService.getCategories(controller.signal)
-      .then(dtos => {
-        if (!isMounted) return;
-        const mapped: Category[] = dtos.map(c => ({
-          id: c.id,
-          name: c.name,
-          nameEn: c.nameEn || '',
-          slug: c.slug,
-          parentId: c.parentId || '',
-          iconUrl: c.iconUrl || 'surfing',
-          isActive: c.isActive,
-          requiresSafetyCert: true,
-        }));
-        setCategories(mapped);
-        setLoading(false);
-      })
-      .catch(err => {
-        if (!isMounted) return;
-        const info = getAdminCategoryError(err);
-        setErrorMessage(info.message);
-        setLoading(false);
-      });
-
+    refreshCategories(controller.signal);
     return () => {
-      isMounted = false;
       controller.abort();
     };
-  }, [demo]);
+  }, [refreshCategories]);
 
   const visibleCategories = categories;
 
@@ -127,7 +125,8 @@ export function Categories() {
 
   const activeCount = visibleCategories.filter(c => c.isActive).length;
   const inactiveCount = visibleCategories.filter(c => !c.isActive).length;
-  const certRequiredCount = visibleCategories.filter(c => c.requiresSafetyCert).length;
+  const certRequiredCount = visibleCategories.filter(c => c.requiresSafetyCert === true).length;
+  const certUnknownCount = visibleCategories.filter(c => c.requiresSafetyCert === null || c.requiresSafetyCert === undefined).length;
 
   const PAGE_SIZE = 8;
   const [currentPage, setCurrentPage] = useState(1);
@@ -154,7 +153,7 @@ export function Categories() {
     setFormParentId('');
     setFormIcon('surfing');
     setFormIsActive(true);
-    setFormRequiresCert(true);
+    setFormRequiresCert(false);
     setFormError(null);
     setIsDrawerOpen(true);
   };
@@ -167,7 +166,7 @@ export function Categories() {
     setFormParentId(category.parentId || '');
     setFormIcon(category.iconUrl || 'surfing');
     setFormIsActive(category.isActive);
-    setFormRequiresCert(category.requiresSafetyCert);
+    setFormRequiresCert(category.requiresSafetyCert === true);
     setFormError(null);
     setIsDrawerOpen(true);
   };
@@ -222,6 +221,7 @@ export function Categories() {
           slug: formSlug.trim(),
           iconUrl: formIcon,
           isActive: formIsActive,
+          requiresSafetyCert: formRequiresCert,
         });
         setCategories(prev => prev.map(c => c.id === updated.id ? {
           ...c,
@@ -230,6 +230,7 @@ export function Categories() {
           slug: updated.slug,
           iconUrl: updated.iconUrl || 'surfing',
           isActive: updated.isActive,
+          requiresSafetyCert: updated.requiresSafetyCert ?? c.requiresSafetyCert ?? null,
         } : c));
         setNotice(`Đã cập nhật danh mục "${updated.name}".`);
       } else {
@@ -239,6 +240,7 @@ export function Categories() {
           slug: formSlug.trim(),
           parentId: formParentId || undefined,
           iconUrl: formIcon,
+          requiresSafetyCert: formRequiresCert,
         });
         const newCat: Category = {
           id: created.id,
@@ -248,7 +250,7 @@ export function Categories() {
           parentId: created.parentId || '',
           iconUrl: created.iconUrl || 'surfing',
           isActive: created.isActive,
-          requiresSafetyCert: true,
+          requiresSafetyCert: created.requiresSafetyCert ?? null,
         };
         setCategories(prev => [newCat, ...prev]);
         setNotice(`Đã tạo mới danh mục "${created.name}".`);
@@ -294,13 +296,29 @@ export function Categories() {
     setIsDeleteModalOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (!demo || !deleteTarget) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
 
-    setCategories(prev => deleteCategory(prev, deleteTarget.id, demo));
-    setIsDeleteModalOpen(false);
-    setNotice(`Đã xóa danh mục "${deleteTarget.name}" khỏi danh sách demo.`);
-    setDeleteTarget(null);
+    if (demo) {
+      setCategories(prev => deleteCategory(prev, deleteTarget.id, demo));
+      setIsDeleteModalOpen(false);
+      setNotice(`Đã xóa danh mục "${deleteTarget.name}" khỏi danh sách demo.`);
+      setDeleteTarget(null);
+      return;
+    }
+
+    try {
+      await adminCategoryService.deleteCategory(deleteTarget.id);
+      setIsDeleteModalOpen(false);
+      setNotice(`Đã xóa vĩnh viễn danh mục "${deleteTarget.name}".`);
+      setDeleteTarget(null);
+      await refreshCategories();
+    } catch (err) {
+      const info = getAdminCategoryError(err, true);
+      setIsDeleteModalOpen(false);
+      setDeleteTarget(null);
+      setNotice(`Không thể xóa: ${info.message}`);
+    }
   };
 
   return (
@@ -322,11 +340,20 @@ export function Categories() {
         {/* Filter Tabs */}
         <AdminFilterTabs
           label="Lọc trạng thái danh mục"
-          value={certFilter === 'required' ? 'cert_required' : statusFilter}
+          value={
+            certFilter === 'required'
+              ? 'cert_required'
+              : certFilter === 'unknown'
+              ? 'cert_unknown'
+              : statusFilter
+          }
           onChange={val => {
             setCurrentPage(1);
             if (val === 'cert_required') {
               setCertFilter('required');
+              setStatusFilter('all');
+            } else if (val === 'cert_unknown') {
+              setCertFilter('unknown');
               setStatusFilter('all');
             } else {
               setCertFilter('all');
@@ -338,6 +365,7 @@ export function Categories() {
             { value: 'active', label: 'Đang hiển thị', count: activeCount },
             { value: 'inactive', label: 'Tạm ẩn', count: inactiveCount },
             { value: 'cert_required', label: 'Yêu cầu chứng chỉ', count: certRequiredCount },
+            ...(certUnknownCount > 0 ? [{ value: 'cert_unknown', label: 'Chưa rõ chứng chỉ', count: certUnknownCount }] : []),
           ]}
         />
 
@@ -415,12 +443,14 @@ export function Categories() {
                       <span className="admin-categories-slug-chip">/{cat.slug}</span>
                     </td>
                     <td>
-                      {cat.requiresSafetyCert ? (
+                      {cat.requiresSafetyCert === true ? (
                         <AdminBadge tone="amber">
                           <ShieldCheck size={12} aria-hidden="true" /> Bắt buộc khai báo
                         </AdminBadge>
-                      ) : (
+                      ) : cat.requiresSafetyCert === false ? (
                         <AdminBadge tone="neutral">Tùy chọn</AdminBadge>
+                      ) : (
+                        <AdminBadge tone="neutral">Chưa có dữ liệu</AdminBadge>
                       )}
                     </td>
                     <td>
@@ -501,7 +531,11 @@ export function Categories() {
         onClose={() => setIsDrawerOpen(false)}
         variant="drawer"
         title={editingCategory ? `Chỉnh sửa: ${editingCategory.name}` : 'Thêm mới danh mục trải nghiệm'}
-        description="Cấu hình thông tin danh mục dịch vụ biển · Dữ liệu dùng thử trong phiên"
+        description={
+          demo
+            ? 'Cấu hình thông tin danh mục dịch vụ biển · Dữ liệu dùng thử trong phiên'
+            : 'Cấu hình thông tin danh mục dịch vụ biển trên hệ thống DANASEA'
+        }
         footer={
           <div className="admin-categories-drawer-footer">
             <AdminButton onClick={() => setIsDrawerOpen(false)}>Hủy</AdminButton>
@@ -616,11 +650,11 @@ export function Categories() {
 
       {/* 6. Delete Confirmation Modal */}
       <AdminDialog
-        open={isDeleteModalOpen && demo}
+        open={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
         variant="modal"
-        title="Xác nhận xóa danh mục"
-        description="Thao tác này chỉ xóa dữ liệu trong phiên xem thử demo"
+        title="Xóa danh mục trải nghiệm"
+        description="Thao tác này sẽ xóa vĩnh viễn danh mục khỏi hệ thống"
         footer={
           <>
             <AdminButton onClick={() => setIsDeleteModalOpen(false)}>Quay lại</AdminButton>
@@ -635,7 +669,7 @@ export function Categories() {
             Bạn có chắc chắn muốn xóa danh mục <strong>"{deleteTarget?.name}"</strong> không?
           </p>
           <p className="admin-detail-note">
-            Các dịch vụ thuộc danh mục này trong bản demo sẽ bị mất liên kết phân loại. Thao tác không ảnh hưởng cơ sở dữ liệu thật.
+            Lưu ý: Chỉ có thể xóa danh mục không có bất kỳ dịch vụ nào liên kết, không có danh mục con và không có quy tắc hoa hồng / an toàn. Thao tác này không thể hoàn tác.
           </p>
         </div>
       </AdminDialog>

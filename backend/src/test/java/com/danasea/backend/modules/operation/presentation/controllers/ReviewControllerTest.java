@@ -114,6 +114,9 @@ class ReviewControllerTest {
     private FlagReviewUseCase flagReviewUseCase;
 
     @MockitoBean
+    private GetCustomerReviewsUseCase getCustomerReviewsUseCase;
+
+    @MockitoBean
     private GetServiceReviewsUseCase getServiceReviewsUseCase;
 
     @MockitoBean
@@ -250,6 +253,52 @@ class ReviewControllerTest {
                     .andExpect(jsonPath("$.isFlagged").value(true))
                     .andExpect(jsonPath("$.comment").doesNotExist())
                     .andExpect(jsonPath("$.flagReason").doesNotExist());
+        }
+
+        @Test
+        @WithMockUser(username = "11111111-1111-1111-1111-111111111111", roles = "CUSTOMER")
+        @DisplayName("GET /api/customer/reviews returns 200 OK with page of customer reviews")
+        void getCustomerReviewsSuccess() throws Exception {
+            ReviewResponse response = ReviewResponse.builder()
+                    .id(reviewId)
+                    .subOrderId(subOrderId)
+                    .customerId(customerId)
+                    .rating((short) 5)
+                    .comment("Trải nghiệm đáng nhớ")
+                    .vendorReply("Cảm ơn bạn!")
+                    .vendorRepliedAt(OffsetDateTime.now())
+                    .build();
+
+            when(getCustomerReviewsUseCase.execute(eq(customerId), any(Pageable.class)))
+                    .thenReturn(new PageImpl<>(List.of(response)));
+
+            mockMvc.perform(get("/api/customer/reviews"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].id").value(reviewId.toString()))
+                    .andExpect(jsonPath("$.content[0].vendorReply").value("Cảm ơn bạn!"));
+        }
+
+        @Test
+        @WithMockUser(username = "11111111-1111-1111-1111-111111111111", roles = "CUSTOMER")
+        @DisplayName("GET /api/sub-orders/{id}/reviews returns 200 OK when review exists")
+        void getReviewBySubOrderSuccess() throws Exception {
+            ReviewResponse response = ReviewResponse.builder()
+                    .id(reviewId)
+                    .subOrderId(subOrderId)
+                    .customerId(customerId)
+                    .rating((short) 5)
+                    .comment("Trải nghiệm tuyệt vời")
+                    .vendorReply("Cảm ơn quý khách")
+                    .vendorRepliedAt(OffsetDateTime.now())
+                    .build();
+
+            when(getCustomerReviewsUseCase.executeBySubOrder(eq(subOrderId), eq(customerId)))
+                    .thenReturn(response);
+
+            mockMvc.perform(get("/api/sub-orders/" + subOrderId + "/reviews"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(reviewId.toString()))
+                    .andExpect(jsonPath("$.vendorReply").value("Cảm ơn quý khách"));
         }
     }
 

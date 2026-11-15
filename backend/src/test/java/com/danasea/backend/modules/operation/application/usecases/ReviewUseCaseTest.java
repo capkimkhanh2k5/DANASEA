@@ -4,9 +4,19 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 
+import com.danasea.backend.modules.account.application.api.AccountInternalApi;
+import com.danasea.backend.modules.account.domain.models.User;
+import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository;
+import com.danasea.backend.modules.communication.application.dtos.NotificationCommand;
+import com.danasea.backend.modules.communication.application.usecases.SendNotificationUseCase;
+import com.danasea.backend.modules.communication.domain.models.NotificationChannel;
+import com.danasea.backend.modules.communication.infrastructure.persistence.repositories.JpaNotificationRepository;
 import com.danasea.backend.modules.operation.domain.exceptions.DuplicateReviewException;
 import com.danasea.backend.modules.operation.domain.exceptions.InvalidReviewSubOrderStateException;
 import com.danasea.backend.modules.operation.domain.exceptions.ReviewNotFoundException;
@@ -28,15 +38,20 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.entities.VendorJpaEntity;
 import com.danasea.backend.modules.vendor.infrastructure.persistence.repositories.JpaVendorRepository;
+import com.danasea.backend.shared.i18n.LocalizedMessageService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -66,6 +81,9 @@ class ReviewUseCaseTest {
 
     @Mock
     private JpaVendorRepository vendorRepository;
+
+    @Mock
+    private SendNotificationUseCase sendNotificationUseCase;
 
     private ReviewMapper reviewMapper;
     private ReviewRatingService reviewRatingService;
@@ -97,7 +115,7 @@ class ReviewUseCaseTest {
 
         lenient().when(vendorRepository.findByIdForUpdate(any(UUID.class))).thenReturn(Optional.of(new VendorJpaEntity()));
         ObjectMapper objectMapper = new ObjectMapper();
-        reviewMapper = new ReviewMapper(objectMapper, mock(com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository.class));
+        reviewMapper = new ReviewMapper(objectMapper, mock(JpaUserRepository.class), serviceRepository);
         reviewRatingService = new ReviewRatingService(reviewRepository, serviceRepository, vendorRepository);
 
         createReviewUseCase = new CreateReviewUseCase(reviewRepository, subOrderRepository, masterOrderRepository, reviewMapper, reviewRatingService);
@@ -105,9 +123,44 @@ class ReviewUseCaseTest {
         flagReviewUseCase = new FlagReviewUseCase(reviewRepository);
         getServiceReviewsUseCase = new GetServiceReviewsUseCase(reviewRepository, reviewMapper);
         getVendorReviewsUseCase = new GetVendorReviewsUseCase(reviewRepository, vendorRepository, reviewMapper);
-        replyVendorReviewUseCase = new ReplyVendorReviewUseCase(reviewRepository, vendorRepository, reviewMapper);
+        replyVendorReviewUseCase = new ReplyVendorReviewUseCase(reviewRepository, vendorRepository, reviewMapper, sendNotificationUseCase, serviceRepository);
         getAdminReviewsUseCase = new GetAdminReviewsUseCase(reviewRepository, reviewMapper);
         updateReviewVisibilityUseCase = new UpdateReviewVisibilityUseCase(reviewRepository, reviewMapper, reviewRatingService);
+    }
+
+    @Test
+    void publicPageLoadsServiceNameOnceAndRedactsPrivateReviewFields() {
+        Pageable pageable = PageRequest.of(0, 10);
+        ReviewJpaEntity review = ReviewJpaEntity.builder()
+                .customerId(customerId)
+                .subOrderId(subOrderId)
+                .vendorId(vendorId)
+                .serviceId(serviceId)
+                .rating((short) 4)
+                .isFlagged(true)
+                .flagReason("Internal reason")
+                .moderationNote("Internal note")
+                .isVisible(true)
+                .build();
+        ReviewJpaEntity anotherReview = ReviewJpaEntity.builder().serviceId(serviceId).rating((short) 5).build();
+        ServiceJpaEntity service = new ServiceJpaEntity();
+        service.setId(serviceId);
+        service.setName("Tour cano");
+        when(reviewRepository.findByServiceIdAndIsVisibleTrue(serviceId, pageable))
+                .thenReturn(new PageImpl<>(List.of(review, anotherReview), pageable, 2));
+        when(serviceRepository.findAllById(Set.of(serviceId))).thenReturn(List.of(service));
+
+        Page<ReviewResponse> result = getServiceReviewsUseCase.execute(serviceId, pageable);
+
+        verify(serviceRepository, never()).findById(any(UUID.class));
+        verify(serviceRepository).findAllById(Set.of(serviceId));
+        assertThat(result).extracting(ReviewResponse::serviceName).containsExactly("Tour cano", "Tour cano");
+        ReviewResponse publicReview = result.getContent().get(0);
+        assertThat(publicReview.customerId()).isNull();
+        assertThat(publicReview.subOrderId()).isNull();
+        assertThat(publicReview.isFlagged()).isNull();
+        assertThat(publicReview.flagReason()).isNull();
+        assertThat(publicReview.moderationNote()).isNull();
     }
 
     @Nested
@@ -551,6 +604,76 @@ class ReviewUseCaseTest {
 
             assertThat(response.vendorReply()).isEqualTo("Cảm ơn quý khách đã trải nghiệm dịch vụ!");
             assertThat(response.vendorRepliedAt()).isNotNull();
+
+            ArgumentCaptor<NotificationCommand> commandCaptor = ArgumentCaptor.forClass(NotificationCommand.class);
+            ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+            verify(sendNotificationUseCase, times(1)).executeOnce(commandCaptor.capture(), keyCaptor.capture());
+
+            NotificationCommand command = commandCaptor.getValue();
+            assertThat(command.recipientId()).isEqualTo(customerId);
+            assertThat(command.type()).isEqualTo("REVIEW_REPLY");
+            assertThat(command.channel()).isEqualTo(NotificationChannel.IN_APP);
+            assertThat(keyCaptor.getValue()).isEqualTo("vendor_review_reply:" + reviewId);
+        }
+
+        @ParameterizedTest
+        @MethodSource("localizedReplyCases")
+        void rendersNotificationForCustomerSavedLanguage(String locale, String vendorName, String name,
+                String nameEn, String title, String body) {
+            UUID vendorUserId = UUID.randomUUID();
+            VendorJpaEntity vendor = new VendorJpaEntity();
+            vendor.setId(vendorId);
+            vendor.setBusinessName(vendorName);
+            ReviewJpaEntity review = ReviewJpaEntity.builder()
+                    .vendorId(vendorId).serviceId(serviceId).customerId(customerId).subOrderId(subOrderId)
+                    .rating((short) 5).build();
+            review.setId(reviewId);
+            ServiceJpaEntity service = new ServiceJpaEntity();
+            service.setName(name);
+            service.setNameEn(nameEn);
+            User customer = new User();
+            customer.setLocale(locale);
+            AccountInternalApi accounts = mock(AccountInternalApi.class);
+            JpaNotificationRepository notifications = mock(JpaNotificationRepository.class);
+            SendNotificationUseCase sender = new SendNotificationUseCase(notifications, null, accounts,
+                    LocalizedMessageService.standalone());
+            ReplyVendorReviewUseCase useCase = new ReplyVendorReviewUseCase(
+                    reviewRepository, vendorRepository, reviewMapper, sender, serviceRepository);
+            when(vendorRepository.findByUserId(vendorUserId)).thenReturn(Optional.of(vendor));
+            when(reviewRepository.findByIdForUpdate(reviewId)).thenReturn(Optional.of(review));
+            when(reviewRepository.save(review)).thenReturn(review);
+            when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(service));
+            when(accounts.findUserById(customerId)).thenReturn(Optional.of(customer));
+
+            LocaleContextHolder.setLocale(Locale.forLanguageTag("en".equals(locale) ? "vi" : "en"));
+            try {
+                useCase.execute(reviewId, new VendorReplyRequest("Hẹn gặp lại!"), vendorUserId);
+            } finally {
+                LocaleContextHolder.resetLocaleContext();
+            }
+
+            verify(notifications).insertInAppOnce(any(UUID.class), eq(customerId), eq("REVIEW_REPLY"),
+                    eq(title), eq(body), eq(locale), eq("SUB_ORDER"), eq(subOrderId), any(OffsetDateTime.class),
+                    eq("vendor_review_reply:" + reviewId));
+        }
+
+        static Stream<Arguments> localizedReplyCases() {
+            String enTitle = "Review response from operator";
+            String viTitle = "Phản hồi đánh giá từ nhà cung cấp";
+            return Stream.of(
+                    Arguments.of("en", "Cano Sông Hàn", "Tour cano", "Speedboat tour", enTitle,
+                            "Operator Cano Sông Hàn responded to your review for service \"Speedboat tour\"."),
+                    Arguments.of("vi", "Cano Sông Hàn", "Tour cano", "Speedboat tour", viTitle,
+                            "Nhà cung cấp Cano Sông Hàn đã phản hồi đánh giá của bạn cho dịch vụ \"Tour cano\"."),
+                    Arguments.of("en", " ", "Tour cano", "", enTitle,
+                            "The operator responded to your review for service \"Tour cano\"."),
+                    Arguments.of("en", "Cano Sông Hàn", " ", null, enTitle,
+                            "Operator Cano Sông Hàn responded to your review."),
+                    Arguments.of("vi", null, " ", " ", viTitle,
+                            "Nhà cung cấp đã phản hồi đánh giá của bạn."),
+                    Arguments.of("en", null, " ", " ", enTitle,
+                            "The operator responded to your review.")
+            );
         }
 
         @Test
@@ -574,6 +697,8 @@ class ReviewUseCaseTest {
             assertThatThrownBy(() -> replyVendorReviewUseCase.execute(reviewId, request, vendorUserId))
                     .isInstanceOf(UnauthorizedReviewAccessException.class)
                     .hasMessageContaining("Vendor does not own the service");
+
+            verifyNoInteractions(sendNotificationUseCase);
         }
     }
 

@@ -26,8 +26,31 @@ public record DisputeResponse(
         OffsetDateTime updatedAt,
         String vendorResponse,
         List<String> vendorEvidenceUrls,
-        OffsetDateTime vendorRespondedAt
+        OffsetDateTime vendorRespondedAt,
+        String resolvedByName
 ) {
+    public DisputeResponse(
+            UUID id,
+            UUID orderId,
+            UUID subOrderId,
+            UUID customerId,
+            DisputeReason reason,
+            String description,
+            List<String> evidenceUrls,
+            DisputeStatus status,
+            BigDecimal refundPercentage,
+            String adminNote,
+            UUID resolvedBy,
+            OffsetDateTime resolvedAt,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            String vendorResponse,
+            List<String> vendorEvidenceUrls,
+            OffsetDateTime vendorRespondedAt
+    ) {
+        this(id, orderId, subOrderId, customerId, reason, description, evidenceUrls, status, refundPercentage, adminNote, resolvedBy, resolvedAt, createdAt, updatedAt, vendorResponse, vendorEvidenceUrls, vendorRespondedAt, null);
+    }
+
     public DisputeResponse(
             UUID id,
             UUID orderId,
@@ -66,6 +89,10 @@ public record DisputeResponse(
     }
 
     public static DisputeResponse fromEntity(DisputeJpaEntity entity) {
+        return fromEntity(entity, null);
+    }
+
+    public static DisputeResponse fromEntity(DisputeJpaEntity entity, String resolvedByName) {
         if (entity == null) {
             return null;
         }
@@ -86,7 +113,8 @@ public record DisputeResponse(
                 entity.getUpdatedAt(),
                 entity.getVendorResponse(),
                 entity.getVendorEvidenceUrls(),
-                entity.getVendorRespondedAt()
+                entity.getVendorRespondedAt(),
+                resolvedByName
         );
     }
 

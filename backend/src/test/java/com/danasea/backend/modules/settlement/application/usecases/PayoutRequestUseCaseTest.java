@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.settlement.application.usecases;
 
+import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.operation.domain.models.PayoutRequest;
 import com.danasea.backend.modules.operation.domain.models.PayoutRequestStatus;
 import com.danasea.backend.modules.operation.infrastructure.persistence.entities.PayoutRequestJpaEntity;
@@ -48,6 +49,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -63,6 +65,9 @@ class PayoutRequestUseCaseTest {
 
     @Mock
     private VendorInternalApi vendorInternalApi;
+
+    @Mock
+    private AuditLogInternalApi auditLogInternalApi;
 
     private PayoutRequestMapper mapper;
 
@@ -94,18 +99,21 @@ class PayoutRequestUseCaseTest {
         approvePayoutRequestUseCase = new ApprovePayoutRequestUseCase(
                 payoutRequestRepository,
                 settlementRepository,
-                mapper
+                mapper,
+                auditLogInternalApi
         );
 
         rejectPayoutRequestUseCase = new RejectPayoutRequestUseCase(
                 payoutRequestRepository,
-                mapper
+                mapper,
+                auditLogInternalApi
         );
 
         markPayoutPaidUseCase = new MarkPayoutPaidUseCase(
                 payoutRequestRepository,
                 settlementRepository,
-                mapper
+                mapper,
+                auditLogInternalApi
         );
 
         getVendorEligibleSettlementsUseCase = new GetVendorEligibleSettlementsUseCase(
@@ -305,6 +313,14 @@ class PayoutRequestUseCaseTest {
             assertThat(response.vendorNote()).isEqualTo("Yêu cầu rút tiền đợt 1");
             assertThat(entity.getProcessedBy()).isEqualTo(adminUserId);
             assertThat(entity.getProcessedAt()).isNotNull();
+
+            verify(auditLogInternalApi).recordTransactionalAuditLog(
+                    eq(adminUserId),
+                    eq("PAYOUT_REQUEST_APPROVED"),
+                    eq("PAYOUT_REQUEST"),
+                    eq(payoutRequestId),
+                    any()
+            );
         }
 
         @Test
@@ -318,6 +334,8 @@ class PayoutRequestUseCaseTest {
             assertThatThrownBy(() -> approvePayoutRequestUseCase.execute(payoutRequestId, adminUserId, request))
                     .isInstanceOf(InvalidPayoutRequestStateException.class)
                     .hasMessageContaining("Chỉ có thể duyệt");
+
+            verify(auditLogInternalApi, never()).recordTransactionalAuditLog(any(), any(), any(), any(), any());
         }
 
         @Test
@@ -329,6 +347,8 @@ class PayoutRequestUseCaseTest {
 
             assertThatThrownBy(() -> approvePayoutRequestUseCase.execute(payoutRequestId, adminUserId, request))
                     .isInstanceOf(PayoutRequestNotFoundException.class);
+
+            verify(auditLogInternalApi, never()).recordTransactionalAuditLog(any(), any(), any(), any(), any());
         }
     }
 
@@ -360,6 +380,14 @@ class PayoutRequestUseCaseTest {
             assertThat(response.vendorNote()).isEqualTo("Yêu cầu rút tiền đợt 1");
             assertThat(entity.getProcessedBy()).isEqualTo(adminUserId);
             assertThat(entity.getProcessedAt()).isNotNull();
+
+            verify(auditLogInternalApi).recordTransactionalAuditLog(
+                    eq(adminUserId),
+                    eq("PAYOUT_REQUEST_REJECTED"),
+                    eq("PAYOUT_REQUEST"),
+                    eq(payoutRequestId),
+                    any()
+            );
         }
 
         @Test
@@ -373,6 +401,8 @@ class PayoutRequestUseCaseTest {
             assertThatThrownBy(() -> rejectPayoutRequestUseCase.execute(payoutRequestId, adminUserId, request))
                     .isInstanceOf(InvalidPayoutRequestStateException.class)
                     .hasMessageContaining("Không thể từ chối");
+
+            verify(auditLogInternalApi, never()).recordTransactionalAuditLog(any(), any(), any(), any(), any());
         }
     }
 
@@ -405,6 +435,14 @@ class PayoutRequestUseCaseTest {
             assertThat(response.bankReference()).isEqualTo("FT2611129999");
             assertThat(response.vendorNote()).isEqualTo("Yêu cầu rút tiền đợt 1");
             assertThat(settlement.getStatus()).isEqualTo(SettlementStatus.FINALIZED); // Vẫn FINALIZED
+
+            verify(auditLogInternalApi).recordTransactionalAuditLog(
+                    eq(adminUserId),
+                    eq("PAYOUT_REQUEST_PAID"),
+                    eq("PAYOUT_REQUEST"),
+                    eq(payoutRequestId),
+                    any()
+            );
         }
 
         @Test

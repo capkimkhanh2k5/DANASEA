@@ -30,6 +30,8 @@ public interface JpaReviewRepository extends JpaRepository<ReviewJpaEntity, UUID
 
     Page<ReviewJpaEntity> findByServiceIdAndIsVisibleTrue(UUID serviceId, Pageable pageable);
 
+    Page<ReviewJpaEntity> findByCustomerId(UUID customerId, Pageable pageable);
+
     Page<ReviewJpaEntity> findByVendorId(UUID vendorId, Pageable pageable);
 
     Page<ReviewJpaEntity> findByVendorIdAndIsVisibleTrue(UUID vendorId, Pageable pageable);

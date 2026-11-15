@@ -25,6 +25,7 @@ public class AdminVendorResponse {
     private String bankAccountHolder;
     private VerificationStatus verificationStatus;
     private UUID verifiedBy;
+    private String verifiedByName;
     private OffsetDateTime verifiedAt;
     private BigDecimal ratingAvg;
     private Integer ratingCount;

@@ -277,7 +277,7 @@ export interface Category {
   parentId: string;
   iconUrl: string;
   isActive: boolean;
-  requiresSafetyCert: boolean;
+  requiresSafetyCert?: boolean | null;
 }
 
 export interface RecentlyViewed {

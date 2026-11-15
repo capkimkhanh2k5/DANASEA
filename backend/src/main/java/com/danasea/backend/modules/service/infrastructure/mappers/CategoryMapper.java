@@ -69,6 +69,7 @@ public class CategoryMapper {
                 domain.getParentId(),
                 domain.getIconUrl(),
                 domain.getIsActive(),
+                domain.getRequiresSafetyCert() != null ? domain.getRequiresSafetyCert() : false,
                 domain.getCreatedAt(),
                 domain.getUpdatedAt()
         );
@@ -86,6 +87,7 @@ public class CategoryMapper {
                 domain.getParentId(),
                 domain.getIconUrl(),
                 domain.getIsActive(),
+                domain.getRequiresSafetyCert() != null ? domain.getRequiresSafetyCert() : false,
                 children != null ? children : new ArrayList<>()
         );
     }

@@ -10,6 +10,8 @@ import lombok.Builder;
 public class AuditLogResponse {
     private UUID id;
     private UUID actorUserId;
+    private String actorName;
+    private String actorEmail;
     private String action;
     private String entityType;
     private UUID entityId;
