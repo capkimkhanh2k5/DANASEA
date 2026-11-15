@@ -65,9 +65,6 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
                   {doc.reviewedBy && (
                     <span className="admin-vendors-doc-meta">
                       Người duyệt: <strong>{doc.reviewedByName || 'Không xác định'}</strong> {doc.reviewedAt ? `(${date(doc.reviewedAt)})` : ''}
-                      <span style={{ marginLeft: 6, opacity: 0.75, fontFamily: 'monospace', fontSize: '11px' }}>
-                        [{doc.reviewedBy.slice(0, 8)}...]
-                      </span>
                     </span>
                   )}
                   <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
