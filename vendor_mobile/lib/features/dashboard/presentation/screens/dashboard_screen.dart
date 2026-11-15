@@ -525,7 +525,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: _buildToDoItem(
                               count: '$confirmedCount',
                               label: 'Chờ check-in',
-                              countColor: const Color(0xFFD97706),
+                              countColor: const Color(0xFF004D56),
                               onTap: () => _openOrders(filter: 'CONFIRMED'),
                             ),
                           ),
@@ -534,7 +534,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: _buildToDoItem(
                               count: '${_metrics.newOrders > 0 ? _metrics.newOrders : pendingCount}',
                               label: 'Đơn mới',
-                              countColor: const Color(0xFF0284C7),
+                              countColor: const Color(0xFF004D56),
                               onTap: () => _openOrders(filter: 'PENDING'),
                             ),
                           ),
@@ -543,7 +543,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: _buildToDoItem(
                               count: '$cancelledCount',
                               label: 'Hủy / Hoàn',
-                              countColor: const Color(0xFFDC2626),
+                              countColor: const Color(0xFF004D56),
                               onTap: () => _openOrders(filter: 'CANCELLED'),
                             ),
                           ),
@@ -552,7 +552,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: _buildToDoItem(
                               count: '$reviewCount',
                               label: 'Đánh giá mới',
-                              countColor: const Color(0xFF7C3AED),
+                              countColor: const Color(0xFF004D56),
                               onTap: _openReviews,
                             ),
                           ),
@@ -563,7 +563,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // 3. THAO TÁC VẬN HÀNH (2x2 Grid cân đối, bỏ nút Ví trùng lặp với thẻ Hero)
+                // 3. THAO TÁC VẬN HÀNH (Đồng bộ chuẩn tone xanh Danasea #004D56 trên nền #E6F4F1)
                 const Text(
                   'Thao tác vận hành',
                   style: TextStyle(
@@ -578,8 +578,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _buildActionTile(
                         icon: Icons.qr_code_scanner,
-                        iconBg: const Color(0xFFFEE2E2),
-                        iconColor: const Color(0xFFDC2626),
+                        iconBg: const Color(0xFFE6F4F1),
+                        iconColor: const Color(0xFF004D56),
                         title: 'Quét vé QR',
                         onTap: _openQrScan,
                       ),
@@ -588,8 +588,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _buildActionTile(
                         icon: Icons.calendar_month_outlined,
-                        iconBg: const Color(0xFFCCFBF1),
-                        iconColor: const Color(0xFF0F766E),
+                        iconBg: const Color(0xFFE6F4F1),
+                        iconColor: const Color(0xFF004D56),
                         title: 'Lịch ca chạy',
                         onTap: _openSlots,
                       ),
@@ -602,8 +602,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _buildActionTile(
                         icon: Icons.star_outline_rounded,
-                        iconBg: const Color(0xFFEDE9FE),
-                        iconColor: const Color(0xFF7C3AED),
+                        iconBg: const Color(0xFFE6F4F1),
+                        iconColor: const Color(0xFF004D56),
                         title: 'Đánh giá',
                         onTap: _openReviews,
                       ),
@@ -612,8 +612,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _buildActionTile(
                         icon: Icons.bar_chart_rounded,
-                        iconBg: const Color(0xFFE0F2FE),
-                        iconColor: const Color(0xFF0284C7),
+                        iconBg: const Color(0xFFE6F4F1),
+                        iconColor: const Color(0xFF004D56),
                         title: 'Báo cáo',
                         onTap: () {
                           Navigator.of(context).push(
@@ -740,9 +740,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ? (booked / capacity).clamp(0.0, 1.0)
                               : 0.0;
                           final int fillPercent = (fillRatio * 100).round();
-                          final Color progressColor = fillRatio >= 0.85
-                              ? const Color(0xFFD97706)
-                              : const Color(0xFF004D56);
+                          final Color progressColor = const Color(0xFF004D56);
 
                           return Container(
                             padding: const EdgeInsets.all(10),

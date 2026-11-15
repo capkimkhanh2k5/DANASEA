@@ -154,64 +154,6 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Dynamic Notification Banner: Pending Action
-            if (pendingCount > 0) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(AppShapes.rLg),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x0A000000), blurRadius: 6, offset: Offset(0, 2)),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withAlpha(35),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.reply_all, color: AppColors.primary, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          LocalizedText(
-                            '$pendingCount phản hồi đang chờ',
-                            style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
-                          ),
-                          LocalizedText(
-                            'Phản hồi đánh giá của khách hàng kịp thời để nâng cao uy tín',
-                            style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer,
-                        borderRadius: BorderRadius.circular(AppShapes.rFull),
-                      ),
-                      child: LocalizedText(
-                        'Ưu tiên cao',
-                        style: AppTypography.labelSm.copyWith(
-                          color: AppColors.onPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
             // Performance Metrics Hub
             Container(
               padding: const EdgeInsets.all(20),
@@ -229,26 +171,15 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            LocalizedText(
-                              'TỔNG QUAN ĐÁNH GIÁ',
-                              style: AppTypography.labelSm.copyWith(
-                                color: AppColors.secondary,
-                                letterSpacing: 0.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            LocalizedText(
-                              'Mức độ hài lòng của khách',
-                              style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                      const Expanded(
+                        child: Text(
+                          'Tổng quan',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.navyAnchor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -283,8 +214,8 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                     children: [
                       // Score Column
                       Container(
-                        width: 96,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                        width: 104,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(AppShapes.rMd),
@@ -308,7 +239,7 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                                 5,
                                 (index) => Icon(
                                   index < avgRating.round() ? Icons.star_rounded : Icons.star_border_rounded,
-                                  size: 15,
+                                  size: 14,
                                   color: const Color(0xFFF59E0B),
                                 ),
                               ),

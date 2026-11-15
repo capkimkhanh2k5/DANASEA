@@ -263,8 +263,8 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // Show Sea Safety monitoring cards if "all" or "sea_safety"
-                if (_selectedFilter == 'all' || _selectedFilter == 'sea_safety') ...[
+                // Only show detailed slot cards when filtering "An toàn biển" or when there is active marine risk
+                if (_selectedFilter == 'sea_safety' || isSeaWeatherRisky) ...[
                   // Slot Safety Monitor Card
                   Container(
                     padding: const EdgeInsets.all(16),
