@@ -10,19 +10,33 @@ import com.danasea.backend.modules.account.infrastructure.persistence.repositori
 import com.danasea.backend.modules.operation.domain.models.Review;
 import com.danasea.backend.modules.operation.infrastructure.persistence.entities.ReviewJpaEntity;
 import com.danasea.backend.modules.operation.presentation.dtos.ReviewResponse;
+import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
+import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class ReviewMapper {
 
     private final ObjectMapper objectMapper;
     private final JpaUserRepository userRepository;
+    private final JpaServiceRepository serviceRepository;
+
+    @Autowired
+    public ReviewMapper(ObjectMapper objectMapper, JpaUserRepository userRepository, JpaServiceRepository serviceRepository) {
+        this.objectMapper = objectMapper;
+        this.userRepository = userRepository;
+        this.serviceRepository = serviceRepository;
+    }
+
+    public ReviewMapper(ObjectMapper objectMapper, JpaUserRepository userRepository) {
+        this(objectMapper, userRepository, null);
+    }
 
     public Review toDomain(ReviewJpaEntity entity) {
         if (entity == null) {
@@ -82,6 +96,13 @@ public class ReviewMapper {
             }
         }
 
+        String serviceName = null;
+        if (entity.getServiceId() != null && serviceRepository != null) {
+            serviceName = serviceRepository.findById(entity.getServiceId())
+                    .map(ServiceJpaEntity::getName)
+                    .orElse(null);
+        }
+
         return ReviewResponse.builder()
                 .id(entity.getId())
                 .subOrderId(entity.getSubOrderId())
@@ -90,6 +111,7 @@ public class ReviewMapper {
                 .customerAvatar(customerAvatar)
                 .vendorId(entity.getVendorId())
                 .serviceId(entity.getServiceId())
+                .serviceName(serviceName)
                 .rating(entity.getRating())
                 .comment(entity.getComment())
                 .images(parseImages(entity.getImages()))
@@ -108,7 +130,7 @@ public class ReviewMapper {
         ReviewResponse response = toResponse(entity);
         return ReviewResponse.builder()
                 .id(response.id()).customerName(response.customerName()).customerAvatar(response.customerAvatar())
-                .vendorId(response.vendorId()).serviceId(response.serviceId()).rating(response.rating())
+                .vendorId(response.vendorId()).serviceId(response.serviceId()).serviceName(response.serviceName()).rating(response.rating())
                 .comment(response.comment()).images(response.images()).vendorReply(response.vendorReply())
                 .vendorRepliedAt(response.vendorRepliedAt()).isVisible(response.isVisible())
                 .createdAt(response.createdAt()).updatedAt(response.updatedAt()).build();

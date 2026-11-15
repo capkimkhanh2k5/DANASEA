@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import com.danasea.backend.modules.operation.application.usecases.CreateReviewUseCase;
 import com.danasea.backend.modules.operation.application.usecases.FlagReviewUseCase;
+import com.danasea.backend.modules.operation.application.usecases.GetCustomerReviewsUseCase;
 import com.danasea.backend.modules.operation.application.usecases.UpdateReviewUseCase;
 import com.danasea.backend.modules.operation.presentation.dtos.CreateReviewRequest;
 import com.danasea.backend.modules.operation.presentation.dtos.FlagReviewRequest;
@@ -14,6 +15,10 @@ import com.danasea.backend.security.infrastructure.SecurityUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -29,6 +34,32 @@ public class CustomerReviewController {
     private final CreateReviewUseCase createReviewUseCase;
     private final UpdateReviewUseCase updateReviewUseCase;
     private final FlagReviewUseCase flagReviewUseCase;
+    private final GetCustomerReviewsUseCase getCustomerReviewsUseCase;
+
+    @GetMapping("/customer/reviews")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Page<ReviewResponse>> getCustomerReviews(
+            @PageableDefault(size = 50, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        UUID customerId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new AccessDeniedException("User is not authenticated"));
+        Page<ReviewResponse> response = getCustomerReviewsUseCase.execute(customerId, pageable);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/sub-orders/{id}/reviews")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ReviewResponse> getReviewBySubOrder(
+            @PathVariable("id") UUID subOrderId
+    ) {
+        UUID customerId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new AccessDeniedException("User is not authenticated"));
+        ReviewResponse response = getCustomerReviewsUseCase.executeBySubOrder(subOrderId, customerId);
+        if (response == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(response);
+    }
 
     @PostMapping("/sub-orders/{id}/reviews")
     @PreAuthorize("isAuthenticated()")

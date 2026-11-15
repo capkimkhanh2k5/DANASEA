@@ -774,7 +774,11 @@ export function Header() {
                         }}
                         className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
                       >
-                        <span>{language === 'en' ? 'View My Orders & Tickets' : 'Xem vé & Đơn hàng liên quan'}</span>
+                        <span>
+                          {selectedNotif.type?.includes('REVIEW')
+                            ? (language === 'en' ? 'View Review & Partner Reply' : 'Xem đánh giá & Phản hồi đối tác')
+                            : (language === 'en' ? 'View My Orders & Tickets' : 'Xem vé & Đơn hàng liên quan')}
+                        </span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                     )}

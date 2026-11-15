@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.danasea.backend.modules.communication.application.dtos.NotificationCommand;
+import com.danasea.backend.modules.communication.application.usecases.SendNotificationUseCase;
 import com.danasea.backend.modules.operation.domain.exceptions.DuplicateReviewException;
 import com.danasea.backend.modules.operation.domain.exceptions.InvalidReviewSubOrderStateException;
 import com.danasea.backend.modules.operation.domain.exceptions.ReviewNotFoundException;
@@ -67,6 +69,9 @@ class ReviewUseCaseTest {
     @Mock
     private JpaVendorRepository vendorRepository;
 
+    @Mock
+    private SendNotificationUseCase sendNotificationUseCase;
+
     private ReviewMapper reviewMapper;
     private ReviewRatingService reviewRatingService;
 
@@ -97,7 +102,7 @@ class ReviewUseCaseTest {
 
         lenient().when(vendorRepository.findByIdForUpdate(any(UUID.class))).thenReturn(Optional.of(new VendorJpaEntity()));
         ObjectMapper objectMapper = new ObjectMapper();
-        reviewMapper = new ReviewMapper(objectMapper, mock(com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository.class));
+        reviewMapper = new ReviewMapper(objectMapper, mock(com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository.class), serviceRepository);
         reviewRatingService = new ReviewRatingService(reviewRepository, serviceRepository, vendorRepository);
 
         createReviewUseCase = new CreateReviewUseCase(reviewRepository, subOrderRepository, masterOrderRepository, reviewMapper, reviewRatingService);
@@ -105,7 +110,7 @@ class ReviewUseCaseTest {
         flagReviewUseCase = new FlagReviewUseCase(reviewRepository);
         getServiceReviewsUseCase = new GetServiceReviewsUseCase(reviewRepository, reviewMapper);
         getVendorReviewsUseCase = new GetVendorReviewsUseCase(reviewRepository, vendorRepository, reviewMapper);
-        replyVendorReviewUseCase = new ReplyVendorReviewUseCase(reviewRepository, vendorRepository, reviewMapper);
+        replyVendorReviewUseCase = new ReplyVendorReviewUseCase(reviewRepository, vendorRepository, reviewMapper, sendNotificationUseCase, serviceRepository);
         getAdminReviewsUseCase = new GetAdminReviewsUseCase(reviewRepository, reviewMapper);
         updateReviewVisibilityUseCase = new UpdateReviewVisibilityUseCase(reviewRepository, reviewMapper, reviewRatingService);
     }
@@ -551,6 +556,16 @@ class ReviewUseCaseTest {
 
             assertThat(response.vendorReply()).isEqualTo("Cảm ơn quý khách đã trải nghiệm dịch vụ!");
             assertThat(response.vendorRepliedAt()).isNotNull();
+
+            ArgumentCaptor<NotificationCommand> commandCaptor = ArgumentCaptor.forClass(NotificationCommand.class);
+            ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+            verify(sendNotificationUseCase, times(1)).executeOnce(commandCaptor.capture(), keyCaptor.capture());
+
+            NotificationCommand command = commandCaptor.getValue();
+            assertThat(command.recipientId()).isEqualTo(customerId);
+            assertThat(command.type()).isEqualTo("REVIEW_REPLY");
+            assertThat(command.channel()).isEqualTo(com.danasea.backend.modules.communication.domain.models.NotificationChannel.IN_APP);
+            assertThat(keyCaptor.getValue()).isEqualTo("vendor_review_reply:" + reviewId);
         }
 
         @Test
@@ -574,6 +589,8 @@ class ReviewUseCaseTest {
             assertThatThrownBy(() -> replyVendorReviewUseCase.execute(reviewId, request, vendorUserId))
                     .isInstanceOf(UnauthorizedReviewAccessException.class)
                     .hasMessageContaining("Vendor does not own the service");
+
+            verifyNoInteractions(sendNotificationUseCase);
         }
     }
 

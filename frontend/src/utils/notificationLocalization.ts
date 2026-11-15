@@ -120,5 +120,12 @@ export function localizeNotificationBody(body?: string | null, language: string 
       .replace('đã bị hủy do thời tiết nguy hiểm. Yêu cầu hoàn tiền toàn bộ đang chờ cổng thanh toán xác nhận.', 'was cancelled due to severe weather. A full refund has been requested and is awaiting payment gateway confirmation.');
   }
 
+  // Pattern 10: Phản hồi đánh giá
+  const vendorReplyMatch = trimmed.match(/^Nhà cung cấp (.+?) đã phản hồi đánh giá của bạn cho dịch vụ "(.+?)"\./);
+  if (vendorReplyMatch) {
+    const [, vendorName, serviceName] = vendorReplyMatch;
+    return `Operator ${vendorName} responded to your review for service "${serviceName}".`;
+  }
+
   return trimmed;
 }
