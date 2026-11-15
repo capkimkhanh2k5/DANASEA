@@ -86,7 +86,7 @@ public class AdminPayoutRequestController {
             @RequestBody(required = false) ApprovePayoutRequest request
     ) {
         UUID adminUserId = SecurityUtils.getCurrentUserId().orElse(null);
-        log.info("Admin {} duyệt PayoutRequest #{}", adminUserId, id);
+        log.info("Admin {} requested approval for payout request #{}", adminUserId, id);
         PayoutRequestResponse response = approvePayoutRequestUseCase.execute(id, adminUserId, request);
         return ResponseEntity.ok(response);
     }
@@ -97,7 +97,7 @@ public class AdminPayoutRequestController {
             @Valid @RequestBody RejectPayoutRequest request
     ) {
         UUID adminUserId = SecurityUtils.getCurrentUserId().orElse(null);
-        log.info("Admin {} từ chối PayoutRequest #{} với lý do: {}", adminUserId, id, request.rejectionReason());
+        log.info("Admin {} requested rejection of payout request #{} (reason: {})", adminUserId, id, request.rejectionReason());
         PayoutRequestResponse response = rejectPayoutRequestUseCase.execute(id, adminUserId, request);
         return ResponseEntity.ok(response);
     }
@@ -108,7 +108,7 @@ public class AdminPayoutRequestController {
             @RequestBody(required = false) MarkPaidPayoutRequest request
     ) {
         UUID adminUserId = SecurityUtils.getCurrentUserId().orElse(null);
-        log.info("Admin {} ghi nhận giải ngân PAID cho PayoutRequest #{}", adminUserId, id);
+        log.info("Admin {} requested to mark payout request #{} as PAID", adminUserId, id);
         PayoutRequestResponse response = markPayoutPaidUseCase.execute(id, adminUserId, request);
         return ResponseEntity.ok(response);
     }

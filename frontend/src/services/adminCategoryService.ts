@@ -20,8 +20,8 @@ function requireCategory(value: AdminCategoryDto): void {
 }
 
 export const adminCategoryService = {
-  async getCategories(signal: AbortSignal): Promise<AdminCategoryDto[]> {
-    const { data } = await apiClient.get<AdminCategoryTreeDto[]>('/admin/categories', { signal });
+  async getCategories(signal?: AbortSignal): Promise<AdminCategoryDto[]> {
+    const { data } = await apiClient.get<AdminCategoryTreeDto[]>('/admin/categories', signal ? { signal } : undefined);
     const categories: AdminCategoryDto[] = [];
     const seen = new Set<string>();
     const visit = (nodes: AdminCategoryTreeDto[]) => {
@@ -63,6 +63,10 @@ export const adminCategoryService = {
     if (data.id !== id || data.isActive) throw new Error('Backend chưa xác nhận tạm ẩn danh mục.');
     return data;
   },
+
+  async deleteCategory(id: string): Promise<void> {
+    await apiClient.delete(`/admin/categories/${encodeURIComponent(id)}`);
+  },
 };
 
 export function getAdminCategoryError(error: unknown, mutation = false) {
@@ -88,6 +92,9 @@ export function getAdminCategoryError(error: unknown, mutation = false) {
     const messages: Record<string, string> = {
       SLUG_ALREADY_EXISTS: 'Slug đã được sử dụng. Vui lòng chọn slug khác.',
       CATEGORY_HAS_ACTIVE_SERVICES: 'Không thể tạm ẩn danh mục đang có dịch vụ PUBLISHED.',
+      CATEGORY_HAS_LINKED_SERVICES: 'Không thể xóa danh mục đang có dịch vụ liên kết. Vui lòng chuyển hoặc xóa dịch vụ trước, hoặc sử dụng tính năng Tạm ẩn.',
+      CATEGORY_HAS_CHILDREN: 'Không thể xóa danh mục đang chứa danh mục con. Vui lòng di dời hoặc xóa danh mục con trước.',
+      CATEGORY_HAS_DEPENDENT_RULES: 'Không thể xóa danh mục đang liên kết với biểu phí hoa hồng hoặc quy tắc an toàn.',
       CATEGORY_HIERARCHY_LOOP: 'Danh mục cha không được là chính nó hoặc danh mục con của nó.',
       CATEGORY_NOT_FOUND: 'Danh mục hoặc danh mục cha không còn tồn tại. Hãy tải lại danh sách.',
     };

@@ -1,6 +1,8 @@
 package com.danasea.backend.modules.service.application.usecases;
 
-import com.danasea.backend.shared.presentation.ApiConflictException;
+import static com.danasea.backend.modules.service.domain.exceptions.ServiceSlotCreationException.conflict;
+import static com.danasea.backend.modules.service.domain.exceptions.ServiceSlotCreationException.invalid;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -43,31 +45,67 @@ public class CreateServiceSlotUseCase {
     @Transactional
     public ServiceSlotResponse execute(UUID userId, UUID serviceId, CreateServiceSlotRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("Request cannot be null");
+            throw invalid("error.bad_request");
         }
 
+        lockOwnedService(userId, serviceId);
+        ServiceSlot slot = prepareSlot(serviceId, request);
+        checkAvailability(slot, LocalDateTime.now(Booking.VIETNAM_ZONE), false);
+        return persistSlot(slot);
+    }
+
+    List<ServiceSlotResponse> createBatch(UUID userId, UUID serviceId, List<CreateServiceSlotRequest> requests) {
+        List<ServiceSlot> slots = requests.stream()
+                .map(request -> prepareSlot(serviceId, request))
+                .toList();
+
+        lockOwnedService(userId, serviceId);
+        LocalDateTime now = LocalDateTime.now(Booking.VIETNAM_ZONE);
+        slots.forEach(slot -> checkAvailability(slot, now, true));
+        return slots.stream().map(this::persistSlot).toList();
+    }
+
+    private void lockOwnedService(UUID userId, UUID serviceId) {
         Vendor vendor = vendorPort.findByUserId(userId)
                 .orElseThrow(() -> new VendorNotApprovedException("Vendor not found for user: " + userId));
-
         Service service = serviceRepository.findByIdForUpdate(serviceId)
                 .orElseThrow(() -> new ServiceNotFoundException(serviceId));
-
         service.validateOwnership(vendor.getId());
+    }
 
-        if (!LocalDateTime.of(request.date(), request.startTime()).isAfter(LocalDateTime.now(Booking.VIETNAM_ZONE))) {
-            throw new IllegalArgumentException("Cannot create a slot in the past");
+    private void checkAvailability(ServiceSlot slot, LocalDateTime now, boolean batch) {
+        if (!LocalDateTime.of(slot.getDate(), slot.getStartTime()).isAfter(now)) {
+            throw invalid("error.slot_past",
+                    slot.getDate().toString(), slot.getStartTime().toString());
         }
+        if (scheduleStore.blocks(slot.getServiceId(), slot.getDate(), slot.getStartTime())) {
+            throw conflict("OPERATING_SCHEDULE_CONFLICT", "error.slot_schedule_conflict",
+                    slot.getDate(), slot.getStartTime());
+        }
+        if (serviceSlotRepository.existsByServiceIdAndDateAndStartTime(
+                slot.getServiceId(), slot.getDate(), slot.getStartTime())) {
+            if (batch) {
+                throw conflict("SLOT_ALREADY_EXISTS", "error.slot_already_exists",
+                        slot.getDate(), slot.getStartTime());
+            }
+            throw invalid("error.slot_already_exists",
+                    slot.getDate().toString(), slot.getStartTime().toString());
+        }
+    }
 
+    private ServiceSlot prepareSlot(UUID serviceId, CreateServiceSlotRequest request) {
+        if (request.date() == null || request.startTime() == null || request.endTime() == null) {
+            throw invalid("error.slot_date_time_required");
+        }
+        if (request.startTime().getNano() != 0 || request.endTime().getNano() != 0) {
+            throw invalid("error.slot_time_precision");
+        }
         if (!request.startTime().isBefore(request.endTime())) {
-            throw new IllegalArgumentException("Start time must be before end time");
+            throw invalid("error.slot_time_order",
+                    request.startTime().toString(), request.endTime().toString());
         }
-
-        if (scheduleStore.blocks(serviceId, request.date(), request.startTime())) {
-            throw new ApiConflictException("OPERATING_SCHEDULE_CONFLICT", "An operating schedule exception blocks this slot");
-        }
-
-        if (serviceSlotRepository.existsByServiceIdAndDateAndStartTime(serviceId, request.date(), request.startTime())) {
-            throw new IllegalArgumentException("A departure already exists at this date and start time");
+        if (request.inventoryType() == null) {
+            throw invalid("validation.service.slot.inventory.required");
         }
 
         int totalCapacity;
@@ -76,42 +114,37 @@ public class CreateServiceSlotUseCase {
 
         if (InventoryType.SHARED_CAPACITY_UNITS.equals(request.inventoryType())) {
             if (request.units() == null || request.units().isEmpty()) {
-                throw new IllegalArgumentException("SHARED_CAPACITY_UNITS inventory model requires a list of units");
+                throw invalid("error.slot_units_required");
             }
 
             Set<Integer> unitNumbers = new HashSet<>();
-            int sum = 0;
-            for (CreateSlotUnitRequest uReq : request.units()) {
-                if (uReq == null) {
-                    throw new IllegalArgumentException("Unit cannot be null");
+            long sum = 0;
+            for (CreateSlotUnitRequest unit : request.units()) {
+                if (unit == null || unit.unitNumber() == null || unit.unitNumber() <= 0) {
+                    throw invalid("error.slot_unit_number");
                 }
-                if (uReq.unitNumber() == null || uReq.unitNumber() <= 0) {
-                    throw new IllegalArgumentException("Unit number must be greater than 0");
+                if (!unitNumbers.add(unit.unitNumber())) {
+                    throw invalid("error.slot_duplicate_unit", unit.unitNumber());
                 }
-                if (!unitNumbers.add(uReq.unitNumber())) {
-                    throw new IllegalArgumentException("Duplicate unit number: " + uReq.unitNumber());
+                if (unit.capacity() == null || unit.capacity() <= 0) {
+                    throw invalid("error.slot_unit_capacity", unit.unitNumber());
                 }
-                if (uReq.capacity() == null || uReq.capacity() <= 0) {
-                    throw new IllegalArgumentException("Each unit capacity must be greater than 0");
-                }
-                try {
-                    sum = Math.addExact(sum, uReq.capacity());
-                } catch (ArithmeticException exception) {
-                    throw new IllegalArgumentException("Total unit capacity exceeds the supported integer capacity", exception);
+                sum += unit.capacity();
+                if (sum > Integer.MAX_VALUE) {
+                    throw invalid("error.slot_unit_capacity_overflow");
                 }
                 units.add(ServiceSlotUnit.builder()
                         .id(UUID.randomUUID())
                         .slotId(slotId)
-                        .unitNumber(uReq.unitNumber())
-                        .capacity(uReq.capacity())
+                        .unitNumber(unit.unitNumber())
+                        .capacity(unit.capacity())
                         .bookedCount(0)
                         .build());
             }
-            totalCapacity = sum;
+            totalCapacity = (int) sum;
         } else {
-            // PERSON_LIMIT
             if (request.capacity() == null || request.capacity() <= 0) {
-                throw new IllegalArgumentException("Capacity must be greater than 0");
+                throw invalid("error.slot_capacity");
             }
             totalCapacity = request.capacity();
         }
@@ -128,12 +161,15 @@ public class CreateServiceSlotUseCase {
                 .units(units)
                 .build();
         slot.setId(slotId);
+        return slot;
+    }
 
+    private ServiceSlotResponse persistSlot(ServiceSlot slot) {
         ServiceSlot saved = serviceSlotRepository.save(slot);
+        List<ServiceSlotUnit> units = slot.getUnits();
         if (!units.isEmpty()) {
-            serviceSlotRepository.saveUnits(slotId, units);
+            serviceSlotRepository.saveUnits(slot.getId(), units);
         }
-
         return toResponse(saved, units);
     }
 

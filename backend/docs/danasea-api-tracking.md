@@ -160,6 +160,7 @@
 - [x] POST /api/admin/categories
 - [x] PATCH /api/admin/categories/{id} — optional `isActive`: bật/tắt/kích hoạt lại; absent/null giữ nguyên. Tắt vẫn bị chặn nếu có Service PUBLISHED, giống route deactivate.
 - [x] PATCH /api/admin/categories/{id}/deactivate
+- [x] DELETE /api/admin/categories/{id}
 
 ### Categories — Test
 - [x] CreateCategoryUseCaseTest (root, child, parent không tồn tại, slug trùng, vòng lặp phân cấp)
@@ -186,6 +187,7 @@
 - [x] PATCH /api/vendor/services/{id}/options/{optionId} (Sửa hoặc ngừng bán lựa chọn)
 - [x] GET /api/vendor/services/{id}/slots (Xem ca và cấu hình tồn chỗ)
 - [x] POST /api/vendor/services/{id}/slots (Tạo ca: PERSON_LIMIT hoặc SHARED_CAPACITY_UNITS)
+- [x] POST /api/vendor/services/{id}/slots/batch (Tạo ca hàng loạt theo ngày cụ thể hoặc khoảng ngày)
 - [x] PATCH /api/vendor/services/{id}/slots/{slotId} (Sửa ca, hạn mức, bảo vệ cam kết hoặc đóng/mở)
 - [x] POST /api/vendor/services/{serviceId}/slots/{slotId}/cancel (Hủy vận hành chuyến)
 - [x] GET /api/vendor/services/{serviceId}/slots/{slotId}/cancel (Đọc trạng thái hủy và các hoàn tiền có trước cần đối soát)
@@ -602,6 +604,8 @@ Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi 
 ## EPIC-07 · Operations / Settlement / Review
 
 ### Review & Rating — API
+- [x] GET /api/customer/reviews
+- [x] GET /api/sub-orders/{id}/reviews
 - [x] POST /api/sub-orders/{id}/reviews (chủ đơn COMPLETED; một review mỗi sub-order)
 - [x] PUT /api/sub-orders/{id}/reviews (sửa qua sub-order, trong 7 ngày)
 - [x] PUT /api/reviews/{id} (chỉ tác giả, trong 7 ngày)

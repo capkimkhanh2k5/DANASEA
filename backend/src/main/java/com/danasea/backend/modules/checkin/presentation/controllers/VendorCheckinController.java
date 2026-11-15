@@ -28,7 +28,7 @@ public class VendorCheckinController {
     @PostMapping("/verify")
     @PreAuthorize("hasRole('VENDOR') or hasRole('ADMIN')")
     public ResponseEntity<VerifyCheckinResponse> verifyCheckin(@Valid @RequestBody VerifyCheckinRequest request) {
-        log.info("Vendor quét mã QR xác thực check-in");
+        log.info("Vendor scanned a QR code to verify check-in");
         VerifyCheckinResponse response = verifyCheckinUseCase.execute(request);
         return ResponseEntity.ok(response);
     }
@@ -36,7 +36,7 @@ public class VendorCheckinController {
     @PostMapping("/early-dispatch")
     @PreAuthorize("hasRole('VENDOR') or hasRole('ADMIN')")
     public ResponseEntity<EarlyDispatchResponse> earlyDispatch(@Valid @RequestBody EarlyDispatchRequest request) {
-        log.info("Vendor xác nhận điều phối khách chơi ca sớm (FIFO)");
+        log.info("Vendor confirmed an earlier departure for a customer (FIFO)");
         EarlyDispatchResponse response = earlyDispatchSlotUseCase.execute(request);
         return ResponseEntity.ok(response);
     }

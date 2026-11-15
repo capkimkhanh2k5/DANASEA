@@ -16,13 +16,32 @@ public record VendorDocumentResponse(
         UUID reviewedBy,
         OffsetDateTime reviewedAt,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        String reviewedByName
 ) {
+    public VendorDocumentResponse(
+            UUID id,
+            UUID vendorId,
+            DocType docType,
+            String fileUrl,
+            DocStatus status,
+            UUID reviewedBy,
+            OffsetDateTime reviewedAt,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt
+    ) {
+        this(id, vendorId, docType, fileUrl, status, reviewedBy, reviewedAt, createdAt, updatedAt, null);
+    }
+
     public static VendorDocumentResponse fromDomain(VendorDocument doc) {
-        return fromDomain(doc, doc != null ? doc.getFileUrl() : null);
+        return fromDomain(doc, doc != null ? doc.getFileUrl() : null, null);
     }
 
     public static VendorDocumentResponse fromDomain(VendorDocument doc, String deliveryUrl) {
+        return fromDomain(doc, deliveryUrl, null);
+    }
+
+    public static VendorDocumentResponse fromDomain(VendorDocument doc, String deliveryUrl, String reviewedByName) {
         if (doc == null) {
             return null;
         }
@@ -35,7 +54,8 @@ public record VendorDocumentResponse(
                 doc.getReviewedBy(),
                 doc.getReviewedAt(),
                 doc.getCreatedAt(),
-                doc.getUpdatedAt()
+                doc.getUpdatedAt(),
+                reviewedByName
         );
     }
 
@@ -73,5 +93,9 @@ public record VendorDocumentResponse(
 
     public OffsetDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public String getReviewedByName() {
+        return reviewedByName;
     }
 }

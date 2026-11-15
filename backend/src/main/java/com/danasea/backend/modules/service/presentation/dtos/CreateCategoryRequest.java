@@ -10,5 +10,10 @@ public record CreateCategoryRequest(
     @NotBlank(message = "{validation.category.slug.required}")
     String slug,
     UUID parentId,
-    String iconUrl
-) {}
+    String iconUrl,
+    Boolean requiresSafetyCert
+) {
+    public CreateCategoryRequest(String name, String nameEn, String slug, UUID parentId, String iconUrl) {
+        this(name, nameEn, slug, parentId, iconUrl, null);
+    }
+}

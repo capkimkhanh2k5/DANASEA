@@ -26,8 +26,10 @@ export const vendorAiService = {
    * POST /api/vendor/ai/copilot/chat
    * Chat hỏi đáp KPIs, doanh thu, phân tích đơn hàng và hỗ trợ đính kèm ngữ cảnh
    */
-  async chatCopilot(req: CopilotChatRequest): Promise<CopilotChatResponse> {
-    const res = await apiClient.post<CopilotChatResponse>('/vendor/ai/copilot/chat', req);
+  async chatCopilot(req: CopilotChatRequest, language: 'vi' | 'en' = 'vi'): Promise<CopilotChatResponse> {
+    const res = await apiClient.post<CopilotChatResponse>('/vendor/ai/copilot/chat', req, {
+      headers: { 'Accept-Language': language },
+    });
     return res.data;
   },
 

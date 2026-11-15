@@ -25,6 +25,7 @@ export interface DisputeResponse {
   refundPercentage?: number | null;
   adminNote?: string | null;
   resolvedBy?: string | null;
+  resolvedByName?: string | null;
   resolvedAt?: string | null;
   createdAt: string;
   updatedAt: string;

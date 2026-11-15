@@ -14,6 +14,7 @@ public record ReviewResponse(
         String customerAvatar,
         UUID vendorId,
         UUID serviceId,
+        String serviceName,
         Short rating,
         String comment,
         List<String> images,

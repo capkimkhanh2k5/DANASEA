@@ -63,7 +63,7 @@ class RejectVendorUseCaseTest {
         AdminVendorResponse response = useCase.execute(vendor.getId(), adminId, reason);
 
         assertThat(vendor.getVerifiedAt()).isBeforeOrEqualTo(OffsetDateTime.now());
-        assertThat(response).usingRecursiveComparison().ignoringFields("documents").isEqualTo(persisted);
+        assertThat(response).usingRecursiveComparison().ignoringFields("documents", "verifiedByName").isEqualTo(persisted);
         InOrder order = inOrder(vendorInternalApi, auditLogInternalApi);
         order.verify(vendorInternalApi).findById(vendor.getId());
         order.verify(vendorInternalApi).saveVendor(vendor);

@@ -3,9 +3,12 @@ package com.danasea.backend.modules.service.presentation.controllers;
 import java.util.List;
 import java.util.UUID;
 
+import com.danasea.backend.modules.service.application.usecases.BatchCreateServiceSlotsUseCase;
 import com.danasea.backend.modules.service.application.usecases.CreateServiceSlotUseCase;
 import com.danasea.backend.modules.service.application.usecases.GetVendorServiceSlotsUseCase;
 import com.danasea.backend.modules.service.application.usecases.UpdateServiceSlotUseCase;
+import com.danasea.backend.modules.service.presentation.dtos.BatchCreateServiceSlotsRequest;
+import com.danasea.backend.modules.service.presentation.dtos.BatchCreateServiceSlotsResponse;
 import com.danasea.backend.modules.service.presentation.dtos.CreateServiceSlotRequest;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotResponse;
 import com.danasea.backend.modules.service.presentation.dtos.UpdateServiceSlotRequest;
@@ -31,6 +34,7 @@ public class VendorServiceSlotController {
 
     private final GetVendorServiceSlotsUseCase getVendorServiceSlotsUseCase;
     private final CreateServiceSlotUseCase createServiceSlotUseCase;
+    private final BatchCreateServiceSlotsUseCase batchCreateServiceSlotsUseCase;
     private final UpdateServiceSlotUseCase updateServiceSlotUseCase;
 
     @GetMapping
@@ -51,6 +55,18 @@ public class VendorServiceSlotController {
         UUID userId = SecurityUtils.getCurrentUserId()
                 .orElseThrow(() -> new AccessDeniedException("User is not authenticated"));
         ServiceSlotResponse response = createServiceSlotUseCase.execute(userId, serviceId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/batch")
+    @PreAuthorize("hasRole('VENDOR')")
+    public ResponseEntity<BatchCreateServiceSlotsResponse> batchCreateSlots(
+            @PathVariable("id") UUID serviceId,
+            @Valid @RequestBody BatchCreateServiceSlotsRequest request
+    ) {
+        UUID userId = SecurityUtils.getCurrentUserId()
+                .orElseThrow(() -> new AccessDeniedException("User is not authenticated"));
+        BatchCreateServiceSlotsResponse response = batchCreateServiceSlotsUseCase.execute(userId, serviceId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

@@ -17,7 +17,8 @@ import {
   Scale, 
   LogOut, 
   Bell, 
-  Pin,
+  PanelLeftClose,
+  PanelLeftOpen,
   CheckCheck,
   LifeBuoy,
   Star,
@@ -252,11 +253,11 @@ export function VendorLayout() {
           <div className="h-16 px-3.5 border-b border-slate-200/80 flex items-center justify-between shrink-0 overflow-hidden">
             <div 
               className="flex items-center gap-3 cursor-pointer shrink-0" 
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/vendor")}
               title="DANASEA Kênh đối tác"
             >
               <img
-                src="/images/danasea-logo.png"
+                src="/images/danasea-logo-sm.png"
                 alt="DANASEA Logo"
                 className="w-9 h-9 object-contain rounded-xl shrink-0 shadow-xs"
               />
@@ -281,12 +282,16 @@ export function VendorLayout() {
                   setIsPinned((prev) => !prev);
                 }}
                 className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer shrink-0 ${
-                  isPinned ? "text-slate-900 bg-slate-100" : ""
+                  isPinned ? "text-slate-900 bg-slate-100 shadow-xs" : ""
                 }`}
-                title={isPinned ? "Bỏ ghim (Tự động thu gọn)" : "Ghim cố định thanh bên"}
-                aria-label="Toggle pin sidebar"
+                title={isPinned ? "Thu gọn thanh bên (Tự động co giãn)" : "Ghim cố định thanh bên"}
+                aria-label={isPinned ? "Thu gọn thanh bên" : "Ghim cố định thanh bên"}
               >
-                <Pin className={`w-4 h-4 ${isPinned ? "rotate-45 fill-current text-slate-900" : ""}`} />
+                {isPinned ? (
+                  <PanelLeftClose className="w-4 h-4 text-slate-700" />
+                ) : (
+                  <PanelLeftOpen className="w-4 h-4 text-slate-400 hover:text-slate-700" />
+                )}
               </button>
             )}
           </div>
@@ -514,12 +519,22 @@ export function VendorLayout() {
       </aside>
 
       {/* Main dynamic outlet */}
-      <div className="flex-1 flex flex-col min-w-0 print:block print:w-full print:m-0 print:p-0">
-        <main className="flex-1 overflow-y-auto overflow-x-hidden print:overflow-visible print:h-auto print:w-full print:m-0 print:p-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full print:block print:w-full print:m-0 print:p-0">
+        <main
+          className={`flex-1 print:overflow-visible print:h-auto print:w-full print:m-0 print:p-0 ${
+            location.pathname === "/vendor/copilot" || location.pathname === "/vendor/messages"
+              ? "flex flex-col overflow-hidden h-full min-h-0"
+              : "overflow-y-auto overflow-x-hidden"
+          }`}
+        >
           <div
             key={location.pathname}
             onAnimationEnd={() => setAnimationClass("")}
-            className={`min-h-full flex flex-col ${animationClass}`}
+            className={`min-h-full flex flex-col ${
+              location.pathname === "/vendor/copilot" || location.pathname === "/vendor/messages"
+                ? "flex-1 h-full min-h-0 overflow-hidden"
+                : animationClass
+            }`}
           >
             <Outlet />
           </div>

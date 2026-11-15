@@ -392,6 +392,34 @@ export function Header() {
           >
             {t.nav.experiences}
           </Link>
+
+          {isAuthenticated && user?.role === 'VENDOR' && (
+            <Link
+              to="/vendor"
+              className={`ml-2 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 ${
+                isTransparent
+                  ? "bg-white/20 text-white backdrop-blur-xs border border-white/30 hover:bg-white/30"
+                  : "bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-200/80"
+              }`}
+            >
+              <Store className="w-3.5 h-3.5 text-sky-600" />
+              <span>{language === 'en' ? 'Vendor Portal' : 'Kênh đối tác'}</span>
+            </Link>
+          )}
+
+          {isAuthenticated && user?.role === 'ADMIN' && (
+            <Link
+              to="/admin"
+              className={`ml-2 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 ${
+                isTransparent
+                  ? "bg-white/20 text-white backdrop-blur-xs border border-white/30 hover:bg-white/30"
+                  : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/80"
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{language === 'en' ? 'Admin Portal' : 'Quản trị viên'}</span>
+            </Link>
+          )}
         </nav>
         
         {/* Right Controls Deck - Consolidated Account Dropdown */}
@@ -447,7 +475,7 @@ export function Header() {
                   {/* User Profile Header or Guest Greeting */}
                   {isAuthenticated && user ? (
                     <Link
-                      to="/profile"
+                      to={user.role === 'VENDOR' ? '/vendor/profile' : user.role === 'ADMIN' ? '/admin' : '/profile'}
                       onClick={() => setShowAccountMenu(false)}
                       className="px-3 py-2.5 flex items-center justify-between hover:bg-slate-50 transition-colors group cursor-pointer"
                     >
@@ -463,10 +491,10 @@ export function Header() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-bold text-slate-900 truncate group-hover:text-sky-700 transition-colors">
-                            {user.fullName || "Khách hàng"}
+                            {user.fullName || (user.role === 'VENDOR' ? (language === 'en' ? 'Vendor' : 'Đối tác') : (language === 'en' ? 'Customer' : 'Khách hàng'))}
                           </p>
                           <p className="text-[11px] text-slate-400 truncate">
-                            {user.email || user.phone || "Thành viên"}
+                            {user.role === 'VENDOR' ? (language === 'en' ? 'Vendor Partner' : 'Đối tác vận hành') : (user.email || user.phone || "Thành viên")}
                           </p>
                         </div>
                       </div>
@@ -486,6 +514,42 @@ export function Header() {
                           {language === 'en' ? 'Sign In / Register' : 'Đăng nhập / Đăng ký'}
                         </Link>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Portal Quick Switch for VENDOR or ADMIN */}
+                  {isAuthenticated && user?.role === 'VENDOR' && (
+                    <div className="p-1 bg-sky-50/50">
+                      <Link
+                        to="/vendor"
+                        onClick={() => setShowAccountMenu(false)}
+                        className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white transition-colors shadow-xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Store className="w-3.5 h-3.5 text-white" />
+                          <span className="text-xs font-bold">
+                            {language === 'en' ? 'Vendor Portal' : 'Vào Kênh Đối Tác'}
+                          </span>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-white/90" />
+                      </Link>
+                    </div>
+                  )}
+                  {isAuthenticated && user?.role === 'ADMIN' && (
+                    <div className="p-1 bg-indigo-50/50">
+                      <Link
+                        to="/admin"
+                        onClick={() => setShowAccountMenu(false)}
+                        className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="w-3.5 h-3.5 text-white" />
+                          <span className="text-xs font-bold">
+                            {language === 'en' ? 'Admin Portal' : 'Vào Trang Quản Trị'}
+                          </span>
+                        </div>
+                        <ChevronRight className="w-3.5 h-3.5 text-white/90" />
+                      </Link>
                     </div>
                   )}
 
@@ -774,7 +838,11 @@ export function Header() {
                         }}
                         className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
                       >
-                        <span>{language === 'en' ? 'View My Orders & Tickets' : 'Xem vé & Đơn hàng liên quan'}</span>
+                        <span>
+                          {selectedNotif.type?.includes('REVIEW')
+                            ? (language === 'en' ? 'View Review & Partner Reply' : 'Xem đánh giá & Phản hồi đối tác')
+                            : (language === 'en' ? 'View My Orders & Tickets' : 'Xem vé & Đơn hàng liên quan')}
+                        </span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                     )}

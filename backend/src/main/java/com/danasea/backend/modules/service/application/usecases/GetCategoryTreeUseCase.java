@@ -83,6 +83,7 @@ public class GetCategoryTreeUseCase {
                         cat.getParentId(),
                         cat.getIconUrl(),
                         cat.getIsActive(),
+                        cat.getRequiresSafetyCert() != null ? cat.getRequiresSafetyCert() : false,
                         new ArrayList<>()
                 ));
                 parentMap.put(cat.getId(), cat.getParentId());

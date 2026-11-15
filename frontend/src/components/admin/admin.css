@@ -457,11 +457,21 @@
   padding: 0 6px;
 }
 
+.admin-pagination__btn--nav {
+  min-width: 32px;
+  padding: 0 6px;
+}
+
 .admin-pagination__btn--active {
   background: var(--admin-primary, #0B5D6F) !important;
   border-color: var(--admin-primary, #0B5D6F) !important;
   color: #ffffff !important;
   font-weight: 600 !important;
+}
+
+.admin-pagination__btn--active:disabled {
+  opacity: 1 !important;
+  cursor: default !important;
 }
 
 .admin-pagination__ellipsis {

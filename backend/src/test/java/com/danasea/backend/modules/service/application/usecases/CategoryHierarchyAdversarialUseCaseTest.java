@@ -73,7 +73,7 @@ class CategoryHierarchyAdversarialUseCaseTest {
                     .isActive(true)
                     .build();
 
-            when(categoryRepositoryPort.findById(catId)).thenReturn(Optional.of(existingCat));
+            when(categoryRepositoryPort.findByIdForUpdate(catId)).thenReturn(Optional.of(existingCat));
 
             UpdateCategoryCommand command = new UpdateCategoryCommand("Existing", "Existing En", "existing", catId, null);
 
@@ -100,7 +100,7 @@ class CategoryHierarchyAdversarialUseCaseTest {
             Category catA = Category.builder().id(idA).name("A").slug("a").parentId(null).isActive(true).build();
             Category catB = Category.builder().id(idB).name("B").slug("b").parentId(idA).isActive(true).build();
 
-            when(categoryRepositoryPort.findById(idA)).thenReturn(Optional.of(catA));
+            when(categoryRepositoryPort.findByIdForUpdate(idA)).thenReturn(Optional.of(catA));
             when(categoryRepositoryPort.findById(idB)).thenReturn(Optional.of(catB));
 
             UpdateCategoryCommand command = new UpdateCategoryCommand("A", "A En", "a", idB, null);
@@ -129,7 +129,7 @@ class CategoryHierarchyAdversarialUseCaseTest {
             Category catD = Category.builder().id(idD).name("D").slug("d").parentId(idC).isActive(true).build();
             Category catE = Category.builder().id(idE).name("E").slug("e").parentId(idD).isActive(true).build();
 
-            when(categoryRepositoryPort.findById(idA)).thenReturn(Optional.of(catA));
+            when(categoryRepositoryPort.findByIdForUpdate(idA)).thenReturn(Optional.of(catA));
             when(categoryRepositoryPort.findById(idB)).thenReturn(Optional.of(catB));
             when(categoryRepositoryPort.findById(idC)).thenReturn(Optional.of(catC));
             when(categoryRepositoryPort.findById(idD)).thenReturn(Optional.of(catD));
@@ -160,7 +160,7 @@ class CategoryHierarchyAdversarialUseCaseTest {
             Category catD = Category.builder().id(idD).name("D").slug("d").parentId(idC).isActive(true).build();
 
             when(categoryRepositoryPort.findById(idA)).thenReturn(Optional.of(catA));
-            when(categoryRepositoryPort.findById(idB)).thenReturn(Optional.of(catB));
+            when(categoryRepositoryPort.findByIdForUpdate(idB)).thenReturn(Optional.of(catB));
             when(categoryRepositoryPort.findById(idC)).thenReturn(Optional.of(catC));
             when(categoryRepositoryPort.findById(idD)).thenReturn(Optional.of(catD));
 
@@ -192,7 +192,7 @@ class CategoryHierarchyAdversarialUseCaseTest {
             when(categoryRepositoryPort.findById(idRoot)).thenReturn(Optional.of(root));
             when(categoryRepositoryPort.findById(idBranch1)).thenReturn(Optional.of(b1));
             when(categoryRepositoryPort.findById(idBranch2)).thenReturn(Optional.of(b2));
-            when(categoryRepositoryPort.findById(idSub2)).thenReturn(Optional.of(sub2));
+            when(categoryRepositoryPort.findByIdForUpdate(idSub2)).thenReturn(Optional.of(sub2));
             when(categoryRepositoryPort.save(any(Category.class))).thenAnswer(inv -> inv.getArgument(0));
 
             UpdateCategoryCommand command = new UpdateCategoryCommand("Sub2", "Sub2 En", "sub2", idBranch1, null);
@@ -238,7 +238,7 @@ class CategoryHierarchyAdversarialUseCaseTest {
             Category catB = Category.builder().id(idB).name("B").slug("b").parentId(idA).isActive(true).build();
             Category catC = Category.builder().id(idC).name("C").slug("c").parentId(idB).isActive(true).build();
 
-            when(categoryRepositoryPort.findById(idA)).thenReturn(Optional.of(catA));
+            when(categoryRepositoryPort.findByIdForUpdate(idA)).thenReturn(Optional.of(catA));
             when(categoryRepositoryPort.findById(idC)).thenReturn(Optional.of(catC));
             when(categoryRepositoryPort.findById(idB)).thenReturn(Optional.of(catB));
 
@@ -263,7 +263,7 @@ class CategoryHierarchyAdversarialUseCaseTest {
             Category catX = Category.builder().id(idX).name("X").slug("x").parentId(idY).isActive(true).build();
             Category catY = Category.builder().id(idY).name("Y").slug("y").parentId(idX).isActive(true).build();
 
-            when(categoryRepositoryPort.findById(idZ)).thenReturn(Optional.of(catZ));
+            when(categoryRepositoryPort.findByIdForUpdate(idZ)).thenReturn(Optional.of(catZ));
             when(categoryRepositoryPort.findById(idX)).thenReturn(Optional.of(catX));
             when(categoryRepositoryPort.findById(idY)).thenReturn(Optional.of(catY));
 

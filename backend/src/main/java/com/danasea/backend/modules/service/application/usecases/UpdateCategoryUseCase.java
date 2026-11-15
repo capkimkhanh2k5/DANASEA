@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.danasea.backend.modules.service.application.ports.output.CategoryRepositoryPort;
 import com.danasea.backend.modules.service.application.ports.output.ActiveServiceCheckPort;
 import com.danasea.backend.modules.service.domain.exceptions.CategoryHasActiveServicesException;
+import com.danasea.backend.modules.service.domain.exceptions.CategoryHasPublishedServicesWithoutSafetyDocumentsException;
 import com.danasea.backend.modules.service.domain.exceptions.CategoryHierarchyLoopException;
 import com.danasea.backend.modules.service.domain.exceptions.CategoryNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.SlugAlreadyExistsException;
@@ -24,11 +25,17 @@ public class UpdateCategoryUseCase {
 
     @Transactional
     public Category execute(UUID id, UpdateCategoryCommand command) {
-        Category category = categoryRepositoryPort.findById(id)
+        Category category = categoryRepositoryPort.findByIdForUpdate(id)
                 .orElseThrow(() -> new CategoryNotFoundException("Category not found with id: " + id));
 
         if (Boolean.FALSE.equals(command.isActive()) && activeServiceCheckPort.hasActiveServices(id)) {
             throw new CategoryHasActiveServicesException(id);
+        }
+
+        if (Boolean.TRUE.equals(command.requiresSafetyCert())
+                && !Boolean.TRUE.equals(category.getRequiresSafetyCert())
+                && activeServiceCheckPort.hasPublishedServicesWithoutApprovedSafetyDocuments(id)) {
+            throw new CategoryHasPublishedServicesWithoutSafetyDocumentsException(id);
         }
 
         if (command.slug() != null && !command.slug().isBlank() && !command.slug().equals(category.getSlug())) {
@@ -65,12 +72,21 @@ public class UpdateCategoryUseCase {
         if (command.isActive() != null) {
             category.setIsActive(command.isActive());
         }
+
+        if (command.requiresSafetyCert() != null) {
+            category.setRequiresSafetyCert(command.requiresSafetyCert());
+        }
         return categoryRepositoryPort.save(category);
     }
 
     @Transactional
     public Category execute(UUID id, String name, String nameEn, String slug, UUID parentId, String iconUrl) {
         return execute(id, new UpdateCategoryCommand(name, nameEn, slug, parentId, iconUrl));
+    }
+
+    @Transactional
+    public Category execute(UUID id, String name, String nameEn, String slug, UUID parentId, String iconUrl, Boolean isActive, Boolean requiresSafetyCert) {
+        return execute(id, new UpdateCategoryCommand(name, nameEn, slug, parentId, iconUrl, isActive, requiresSafetyCert));
     }
 
     private void validateNoHierarchyLoop(UUID categoryId, UUID targetParentId) {

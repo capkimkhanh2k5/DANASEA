@@ -162,6 +162,7 @@ export function Disputes() {
             status: (d.status === 'RESOLVED_REFUND' || d.status === 'RESOLVED_REJECTED' || d.status === 'RESOLVED_PARTIAL' ? 'RESOLVED' : d.status === 'UNDER_REVIEW' ? 'IN_PROGRESS' : 'OPEN') as unknown as DisputeExtended['status'],
             resolutionNote: d.adminNote || '',
             resolvedBy: d.resolvedBy || '',
+            resolvedByName: d.resolvedByName || '',
             resolvedAt: d.resolvedAt || '',
             customerName,
             customerPhone,
@@ -740,9 +741,16 @@ export function Disputes() {
                       </AdminButton>
                     </>
                   ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#166534', fontWeight: 600 }}>
-                      <CheckCircle2 size={16} />
-                      <span>Hồ sơ đã được giải quyết bởi {selectedDispute.resolvedBy || 'Ban Quản trị DANASEA'}.</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#166534' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600 }}>
+                        <CheckCircle2 size={16} />
+                        <span>Hồ sơ đã được giải quyết bởi <strong>{selectedDispute.resolvedByName || (selectedDispute.resolvedBy ? 'Không xác định' : 'Ban Quản trị DANASEA')}</strong>.</span>
+                      </div>
+                      {selectedDispute.resolvedBy && (
+                        <div style={{ paddingLeft: 22, fontSize: 11, color: '#475569', fontFamily: 'monospace' }}>
+                          Mã người duyệt: {selectedDispute.resolvedBy}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

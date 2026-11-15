@@ -3,8 +3,9 @@ package com.danasea.backend.modules.service.application.usecases;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.transaction.annotation.Transactional;
+
 import com.danasea.backend.modules.service.application.dtos.ServiceResult;
-import com.danasea.backend.modules.service.application.usecases.ApproveSafetyDocumentUseCase;
 import com.danasea.backend.modules.service.application.usecases.helpers.ServiceResultMapper;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.models.Service;
@@ -22,8 +23,9 @@ public class ApproveServiceUseCase {
     private final AuditLogPort auditLogPort;
     private final ApproveSafetyDocumentUseCase approveSafetyDocumentUseCase;
 
+    @Transactional
     public ServiceResult execute(UUID adminUserId, UUID serviceId) {
-        Service service = serviceRepository.findById(serviceId)
+        Service service = serviceRepository.findByIdForUpdate(serviceId)
                 .orElseThrow(() -> new ServiceNotFoundException(serviceId));
 
         // Business logic guard: ensure safety documents are approved if required

@@ -113,6 +113,12 @@ class DemoDatabaseAcceptance(unittest.TestCase):
             )
         """))
         base, transactions, _ = IMPORTER.load_fixtures()
+        session = IMPORTER.Session(self.args, readonly=True)
+        try:
+            IMPORTER.rebase_reschedule_fixtures(base, transactions, IMPORTER.db_now_vn(session))
+        finally:
+            session.finish(commit=False)
+            session.close()
         historical = {item['slot_id'] for item in transactions['booking_items']}
         original_dates = {row['id']: row['date'] for row in base['service_slots'] if row['id'] in historical}
         actual_dates = self.sql("""
@@ -761,7 +767,7 @@ class DemoDatabaseAcceptance(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='danasea-cli-receipt-') as tmp:
             receipt_path = Path(tmp) / 'cli_receipt.json'
             base_cmd = [
-                'python3', str(ROOT / 'DB_Demo/install_demo_data.py'),
+                os.sys.executable, str(ROOT / 'DB_Demo/install_demo_data.py'),
                 '--docker-container', self.container,
                 '--database', 'demo_acceptance',
                 '--ownership-file', str(receipt_path),

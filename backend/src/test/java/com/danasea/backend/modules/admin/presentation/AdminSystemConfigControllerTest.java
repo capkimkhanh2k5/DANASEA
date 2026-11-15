@@ -3,7 +3,10 @@ package com.danasea.backend.modules.admin.presentation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -13,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,10 +42,12 @@ class AdminSystemConfigControllerTest {
     private final JpaSystemConfigRepository repository = mock(JpaSystemConfigRepository.class);
     private final JpaCommissionRuleRepository commissionRuleRepository = mock(JpaCommissionRuleRepository.class);
     private final JpaCategoryRepository categoryRepository = mock(JpaCategoryRepository.class);
+    private final AuditLogInternalApi auditLogInternalApi = mock(AuditLogInternalApi.class);
     private final AdminSystemConfigController controller = new AdminSystemConfigController(
             repository,
             commissionRuleRepository,
-            categoryRepository
+            categoryRepository,
+            auditLogInternalApi
     );
     private final UUID adminId = UUID.randomUUID();
 
@@ -94,6 +100,66 @@ class AdminSystemConfigControllerTest {
         assertThat(response.getBody().value()).isEqualTo("12.5");
         assertThat(response.getBody().description()).isEqualTo("Updated rate");
         verify(repository).save(entity);
+
+        verify(auditLogInternalApi).recordTransactionalAuditLog(
+                eq(adminId),
+                eq("SYSTEM_CONFIG_UPDATED"),
+                eq("SYSTEM_CONFIG"),
+                eq(entity.getId()),
+                argThat(meta -> meta.contains("\"key\":\"PLATFORM_COMMISSION_RATE\"")
+                        && meta.contains("\"previousValue\":\"10.0\"")
+                        && meta.contains("\"newValue\":\"12.5\"")
+                        && !meta.contains("description")
+                        && !meta.contains("Updated rate"))
+        );
+    }
+
+    @Test
+    void nonAllowlistedConfigKeepsValuesAndDescriptionOutOfAudit() {
+        String key = "UPSTREAM_CREDENTIAL";
+        SystemConfigJpaEntity entity = new SystemConfigJpaEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setKey(key);
+        entity.setValue("old credential fixture");
+        when(repository.findByKey(key)).thenReturn(Optional.of(entity));
+        when(repository.save(any(SystemConfigJpaEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ResponseEntity<ConfigDto> response = controller.updateConfig(
+                key, new UpdateConfigRequest("new credential fixture", "private notes fixture"));
+
+        assertThat(response.getBody().value()).isEqualTo("new credential fixture");
+        verify(auditLogInternalApi).recordTransactionalAuditLog(
+                eq(adminId), eq("SYSTEM_CONFIG_UPDATED"), eq("SYSTEM_CONFIG"), eq(entity.getId()),
+                argThat(meta -> meta.contains("\"key\":\"UPSTREAM_CREDENTIAL\"")
+                        && !meta.contains("old credential fixture")
+                        && !meta.contains("new credential fixture")
+                        && !meta.contains("private notes fixture")));
+    }
+
+    @Test
+    void allowlistedConfigOmitsLegacyValueThatIsNotItsDeclaredType() {
+        String key = "SAFETY_REBATE_ENABLED";
+        SystemConfigJpaEntity entity = new SystemConfigJpaEntity();
+        entity.setId(UUID.randomUUID());
+        entity.setKey(key);
+        entity.setValue("legacy free text fixture");
+        when(repository.findByKey(key)).thenReturn(Optional.of(entity));
+        when(repository.save(any(SystemConfigJpaEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        controller.updateConfig(key, new UpdateConfigRequest("false", null));
+
+        verify(auditLogInternalApi).recordTransactionalAuditLog(
+                eq(adminId), eq("SYSTEM_CONFIG_UPDATED"), eq("SYSTEM_CONFIG"), eq(entity.getId()),
+                argThat(meta -> meta.contains("\"newValue\":\"false\"") && !meta.contains("legacy free text fixture")));
+    }
+
+    @Test
+    void booleanConfigRejectsInvalidTextBeforeRecordingAudit() {
+        assertThatThrownBy(() -> controller.updateConfig(
+                "SAFETY_REBATE_ENABLED", new UpdateConfigRequest("arbitrary text fixture", null)))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(auditLogInternalApi, never()).recordTransactionalAuditLog(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -104,6 +170,8 @@ class AdminSystemConfigControllerTest {
                 new UpdateConfigRequest("-5", "Invalid")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("between 0% and 100%");
+
+        verify(auditLogInternalApi, never()).recordTransactionalAuditLog(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -114,6 +182,8 @@ class AdminSystemConfigControllerTest {
                 new UpdateConfigRequest("105", "Invalid")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("between 0% and 100%");
+
+        verify(auditLogInternalApi, never()).recordTransactionalAuditLog(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -152,7 +222,7 @@ class AdminSystemConfigControllerTest {
         rule.setPriority(50);
         rule.setIsActive(true);
 
-        when(commissionRuleRepository.findById(ruleId)).thenReturn(Optional.of(rule));
+        when(commissionRuleRepository.findByIdForUpdate(ruleId)).thenReturn(Optional.of(rule));
         when(commissionRuleRepository.save(any(CommissionRuleJpaEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         ResponseEntity<CommissionRuleDto> response = controller.updateCommissionRule(
@@ -165,5 +235,36 @@ class AdminSystemConfigControllerTest {
         assertThat(response.getBody().commissionRatePercent()).isEqualByComparingTo("8.5");
         assertThat(response.getBody().isActive()).isFalse();
         assertThat(response.getBody().description()).isEqualTo("Điều chỉnh phí mùa cao điểm");
+
+        verify(auditLogInternalApi).recordTransactionalAuditLog(
+                eq(adminId),
+                eq("COMMISSION_RULE_UPDATED"),
+                eq("COMMISSION_RULE"),
+                eq(ruleId),
+                argThat(meta -> meta.contains("\"ruleCode\":\"CATEGORY_THUE_SUP\"")
+                        && meta.contains("\"previousRate\":7")
+                        && meta.contains("\"newRate\":8.5")
+                        && meta.contains("\"isActive\":false")
+                        && !meta.contains("description")
+                        && !meta.contains("Điều chỉnh phí mùa cao điểm"))
+        );
+    }
+
+    @Test
+    @DisplayName("Admin updating commission rule with invalid percentage throws and does not record audit log")
+    void updateCommissionRuleInvalidRateThrows() {
+        UUID ruleId = UUID.randomUUID();
+        CommissionRuleJpaEntity rule = new CommissionRuleJpaEntity();
+        rule.setId(ruleId);
+        rule.setCommissionRate(new BigDecimal("0.0500"));
+
+        when(commissionRuleRepository.findByIdForUpdate(ruleId)).thenReturn(Optional.of(rule));
+
+        assertThatThrownBy(() -> controller.updateCommissionRule(
+                ruleId,
+                new UpdateCommissionRuleRequest(new BigDecimal("150"), null, true, "Invalid")
+        )).isInstanceOf(IllegalArgumentException.class);
+
+        verify(auditLogInternalApi, never()).recordTransactionalAuditLog(any(), any(), any(), any(), any());
     }
 }

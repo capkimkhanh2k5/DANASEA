@@ -22,6 +22,6 @@ public class GetServiceReviewsUseCase {
     @Transactional(readOnly = true)
     public Page<ReviewResponse> execute(UUID serviceId, Pageable pageable) {
         Page<ReviewJpaEntity> page = reviewRepository.findByServiceIdAndIsVisibleTrue(serviceId, pageable);
-        return page.map(reviewMapper::toPublicResponse);
+        return reviewMapper.toPublicResponsePage(page);
     }
 }

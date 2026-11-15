@@ -14,6 +14,7 @@ import {
   Star,
   Minus,
   Plus,
+  ShoppingCart,
   MessageSquare,
   MessageCircle,
   User,
@@ -352,17 +353,21 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
   const unitPrice = selectedOption ? selectedOption.price : (service?.price || 0);
   const totalPrice = qty * unitPrice;
 
-  // Capacity validation
-  const maxCapacity = activeSlot ? activeSlot.availableCapacity : 10;
-  const isSoldOut = activeSlot ? activeSlot.availableCapacity <= 0 : false;
-
-  const isItemInCart = useMemo(() => {
-    if (editingCartItem) return false;
-    if (!service || !activeSlot) return false;
-    return cartItems.some(
+  // Capacity validation & In-Cart Tracking
+  const existingCartItem = useMemo(() => {
+    if (editingCartItem) return null;
+    if (!service || !activeSlot) return null;
+    return cartItems.find(
       (item) => item.serviceId === service.id && item.slotId === activeSlot.slotId
-    );
+    ) || null;
   }, [cartItems, service, activeSlot, editingCartItem]);
+
+  const inCartQuantity = existingCartItem ? existingCartItem.quantity : 0;
+  const slotCapacity = activeSlot ? activeSlot.availableCapacity : 10;
+  const isSoldOut = activeSlot ? activeSlot.availableCapacity <= 0 : false;
+  const remainingAddableCapacity = Math.max(0, slotCapacity - inCartQuantity);
+  const isSlotFullInCart = inCartQuantity > 0 && remainingAddableCapacity <= 0;
+  const maxSelectableQty = Math.max(1, remainingAddableCapacity);
 
   // Pure Vietnamese normalizers for demo/seed data
   const localizedSafetyRules = useMemo(() => {
@@ -476,6 +481,14 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
       alert('Vui lòng chọn khung giờ khởi hành.');
       return;
     }
+    if (isSlotFullInCart) {
+      alert('Bạn đã thêm tối đa số chỗ còn lại của ca này vào giỏ hàng.');
+      return;
+    }
+    if (qty > remainingAddableCapacity) {
+      alert(`Ca này chỉ còn có thể thêm tối đa ${remainingAddableCapacity} vé.`);
+      return;
+    }
     if (service.waiverRequired && !isWaiverChecked) {
       alert('Vui lòng đồng ý với Điều khoản an toàn & miễn trừ trách nhiệm trước khi đặt vé.');
       return;
@@ -517,7 +530,8 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
       });
       setIsAdding(false);
       setShowAddSuccess(true);
-      setTimeout(() => setShowAddSuccess(false), 3000);
+      setQty(1);
+      setTimeout(() => setShowAddSuccess(false), 3500);
     }, 400);
   };
 
@@ -1005,14 +1019,20 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                     <div className="flex flex-col">
                       <span className="text-sm font-bold text-slate-900">Số lượng người</span>
                       {activeSlot && (
-                        <span className="text-[13px] text-slate-500 tabular-nums">Tối đa {maxCapacity} người</span>
+                        <span className="text-[13px] text-slate-500 tabular-nums">
+                          {isSlotFullInCart
+                            ? `Đã thêm đủ tối đa ${inCartQuantity} chỗ vào giỏ`
+                            : inCartQuantity > 0
+                            ? `Có thể thêm tối đa ${remainingAddableCapacity} vé nữa`
+                            : `Tối đa ${remainingAddableCapacity} người`}
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
                         onClick={() => setQty(Math.max(1, qty - 1))}
-                        disabled={qty <= 1}
+                        disabled={qty <= 1 || isSlotFullInCart}
                         className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-700 flex items-center justify-center font-bold hover:bg-slate-100 transition-colors active:scale-95 disabled:opacity-40 cursor-pointer"
                       >
                         <Minus className="w-3.5 h-3.5" />
@@ -1020,8 +1040,8 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                       <span className="font-bold text-base text-slate-900 min-w-[20px] text-center tabular-nums">{qty}</span>
                       <button
                         type="button"
-                        onClick={() => setQty(Math.min(maxCapacity > 0 ? maxCapacity : 1, qty + 1))}
-                        disabled={!activeSlot || isSoldOut || qty >= maxCapacity}
+                        onClick={() => setQty(Math.min(maxSelectableQty, qty + 1))}
+                        disabled={!activeSlot || isSoldOut || isSlotFullInCart || qty >= maxSelectableQty}
                         className="w-8 h-8 rounded-lg bg-white border border-slate-300 text-slate-700 flex items-center justify-center font-bold hover:bg-slate-100 transition-colors active:scale-95 disabled:opacity-40 cursor-pointer"
                       >
                         <Plus className="w-3.5 h-3.5" />
@@ -1063,6 +1083,24 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                     </div>
                   )}
 
+                  {inCartQuantity > 0 && !editingCartItem && (
+                    <div className="p-2.5 rounded-xl bg-sky-50 border border-sky-200/80 text-sky-950 text-xs flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <ShoppingCart className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                        <span className="truncate">
+                          Đã có <strong className="font-bold text-sky-700">{inCartQuantity} vé</strong> trong giỏ cho ca này
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/cart')}
+                        className="text-sky-700 font-bold hover:text-sky-900 underline shrink-0 cursor-pointer"
+                      >
+                        Xem giỏ
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex items-baseline justify-between">
                     <span className="text-sm font-semibold text-slate-600">Tổng tạm tính:</span>
                     <span className="text-2xl font-black text-[#991b1b] tabular-nums">
@@ -1070,46 +1108,81 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                     </span>
                   </div>
 
-                  {isItemInCart ? (
-                    <button
-                      type="button"
-                      onClick={() => navigate('/cart')}
-                      className="w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center transition-all cursor-pointer bg-[#0284c7] hover:bg-[#0369a1] text-white shadow-xs active:scale-98"
-                    >
-                      Xem giỏ hàng
-                    </button>
+                  {isSlotFullInCart ? (
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                      >
+                        Đã thêm tối đa chỗ còn lại của ca này
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/cart')}
+                        className="w-full h-11 rounded-xl font-bold text-sm flex items-center justify-center transition-all cursor-pointer bg-[#0284c7] hover:bg-[#0369a1] text-white shadow-xs active:scale-98"
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-2" />
+                        Đến giỏ hàng thanh toán
+                      </button>
+                    </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!activeSlot || isSoldOut) {
-                          alert('Khung giờ này đã hết chỗ, vui lòng chọn ca khác.');
-                          return;
-                        }
-                        if (service.waiverRequired && !isWaiverChecked) {
-                          alert('Vui lòng tích chọn đồng ý Điều khoản an toàn & miễn trừ trách nhiệm trước khi đặt vé.');
-                          return;
-                        }
-                        handleAddToCart();
-                      }}
-                      className={`w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center transition-all cursor-pointer shadow-xs ${
-                        isAdding
-                          ? 'bg-[#0284c7] text-white scale-98'
-                          : (!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked))
-                          ? 'bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold border border-slate-300'
-                          : 'bg-[#0284c7] hover:bg-[#0369a1] text-white active:scale-98'
-                      }`}
-                    >
-                      {isAdding
-                        ? (editingCartItem ? 'Đang cập nhật...' : 'Đang thêm...')
-                        : (editingCartItem ? 'Cập nhật giỏ hàng' : 'Thêm vào giỏ hàng')}
-                    </button>
+                    <div className="flex flex-col sm:flex-row items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!activeSlot || isSoldOut) {
+                            alert('Khung giờ này đã hết chỗ, vui lòng chọn ca khác.');
+                            return;
+                          }
+                          if (service.waiverRequired && !isWaiverChecked) {
+                            alert('Vui lòng tích chọn đồng ý Điều khoản an toàn & miễn trừ trách nhiệm trước khi đặt vé.');
+                            return;
+                          }
+                          handleAddToCart();
+                        }}
+                        className={`flex-1 w-full h-12 rounded-xl font-bold text-sm flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+                          isAdding
+                            ? 'bg-[#0284c7] text-white scale-98'
+                            : (!activeSlot || isSoldOut || (service.waiverRequired && !isWaiverChecked))
+                            ? 'bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold border border-slate-300'
+                            : 'bg-[#0284c7] hover:bg-[#0369a1] text-white active:scale-98'
+                        }`}
+                      >
+                        {isAdding
+                          ? (editingCartItem ? 'Đang cập nhật...' : 'Đang thêm...')
+                          : (editingCartItem 
+                              ? 'Cập nhật giỏ hàng' 
+                              : (inCartQuantity > 0 ? 'Thêm tiếp vào giỏ' : 'Thêm vào giỏ hàng'))}
+                      </button>
+
+                      {inCartQuantity > 0 && !editingCartItem && (
+                        <button
+                          type="button"
+                          onClick={() => navigate('/cart')}
+                          className="w-full sm:w-auto h-12 px-4 rounded-xl font-bold text-sm flex items-center justify-center transition-all cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80 active:scale-98 shrink-0"
+                          title="Đi tới giỏ hàng"
+                        >
+                          <ShoppingCart className="w-4 h-4 mr-1.5 text-slate-600" />
+                          <span>Xem giỏ</span>
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   {showAddSuccess && (
-                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[13px] font-semibold flex items-center gap-1.5 animate-fade-in">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span>Đã thêm vào giỏ!</span>
+                    <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[13px] font-semibold flex items-center justify-between gap-1.5 animate-fade-in">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span className="truncate">Đã thêm vào giỏ thành công!</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate('/cart')}
+                        className="text-emerald-800 underline hover:text-emerald-950 font-bold text-xs cursor-pointer ml-auto shrink-0"
+                      >
+                        Xem giỏ hàng
+                      </button>
                     </div>
                   )}
                 </div>

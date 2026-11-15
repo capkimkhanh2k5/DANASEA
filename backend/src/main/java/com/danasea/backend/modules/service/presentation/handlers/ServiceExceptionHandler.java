@@ -9,18 +9,24 @@ import com.danasea.backend.modules.service.domain.exceptions.MaxImagesExceededEx
 import com.danasea.backend.modules.service.domain.exceptions.SafetyDocumentRequiredException;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceImagesRequiredException;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
+import com.danasea.backend.modules.service.domain.exceptions.ServiceSlotCreationException;
 import com.danasea.backend.modules.service.domain.exceptions.UnauthorizedServiceAccessException;
 import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedException;
 import com.danasea.backend.modules.service.domain.exceptions.WaiverContentRequiredException;
 import com.danasea.backend.modules.service.domain.exceptions.WeatherRequirementsMissingException;
 import com.danasea.backend.shared.presentation.ErrorResponse;
+import com.danasea.backend.shared.presentation.ErrorResponseLocalizationAdvice.AlreadyLocalized;
 import com.danasea.backend.shared.presentation.LocalizedExceptionHandlerSupport;
+import org.springframework.beans.TypeMismatchException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-@RestControllerAdvice
+@Order(Ordered.HIGHEST_PRECEDENCE)
+@RestControllerAdvice(basePackages = "com.danasea.backend.modules.service")
 public class ServiceExceptionHandler extends LocalizedExceptionHandlerSupport {
 
     @ExceptionHandler(ServiceNotFoundException.class)
@@ -101,9 +107,23 @@ public class ServiceExceptionHandler extends LocalizedExceptionHandlerSupport {
                 .body(error("SAFETY_DOCUMENT_REQUIRED"));
     }
 
+    @ExceptionHandler(TypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(TypeMismatchException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(error("BAD_REQUEST"));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(error("BAD_REQUEST"));
+    }
+
+    @AlreadyLocalized
+    @ExceptionHandler(ServiceSlotCreationException.class)
+    public ResponseEntity<ErrorResponse> handleSlotCreationError(ServiceSlotCreationException ex) {
+        var details = ex.getMessageRef();
+        return ResponseEntity.status(ex.isConflict() ? HttpStatus.CONFLICT : HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(ex.getErrorCode(), message(details.key(), details.args())));
     }
 }
