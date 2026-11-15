@@ -773,7 +773,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
 
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            Sức chứa định danh mỗi ca (khách) <span className="text-rose-500">*</span>
+                            Sức chứa tham khảo mỗi ca (khách) <span className="text-rose-500">*</span>
                           </label>
                           <input 
                             type="number"
@@ -781,7 +781,11 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                             value={capacityPerSlot}
                             onChange={(e) => setCapacityPerSlot(Number(e.target.value))}
                             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs text-black focus:ring-1 focus:ring-primary focus:outline-none"
+                            placeholder="Số khách dự kiến"
                           />
+                          <p className="mt-1 text-[11px] text-slate-500 leading-tight">
+                            Số khách dự kiến mỗi ca do đối tác khai báo, chỉ mang tính tham khảo và không giới hạn số lượng đặt chỗ thực tế.
+                          </p>
                         </div>
 
                         <div className="md:col-span-2">
@@ -1365,7 +1369,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                 <div className="grid grid-cols-2 gap-2 p-2 bg-slate-50 rounded-lg">
                   <div>Đơn vị niêm yết: <span className="font-mono font-bold text-black">{price.toLocaleString('vi-VN')} đ</span></div>
                   <div>Thời lượng: <span className="font-semibold text-black">{durationMinutes} phút</span></div>
-                  <div>Sức chứa: <span className="font-semibold text-black">{capacityPerSlot} người/ca</span></div>
+                  <div>Sức chứa tham khảo: <span className="font-semibold text-black">{capacityPerSlot} khách/ca</span></div>
                   <div>Địa điểm: <span className="font-semibold text-black">{locationName}</span></div>
                 </div>
               </div>

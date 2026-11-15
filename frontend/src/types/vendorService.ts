@@ -179,3 +179,52 @@ export interface UpdateServiceSlotRequest {
   capacity?: number;
   units?: CreateSlotUnitRequest[];
 }
+
+export interface SlotTemplateRequest {
+  startTime: string; // "HH:mm:ss"
+  endTime: string;   // "HH:mm:ss"
+  inventoryType: InventoryType;
+  capacity?: number | null;
+  units?: CreateSlotUnitRequest[] | null;
+}
+
+export interface BatchCreateServiceSlotsRequest {
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string;   // "YYYY-MM-DD"
+  daysOfWeek: string[]; // ["MONDAY", "TUESDAY", ...]
+  slotTemplates: SlotTemplateRequest[];
+}
+
+export interface BatchCreateServiceSlotsResponse {
+  totalCreated: number;
+  slots: VendorServiceSlotDto[];
+}
+
+export interface OperatingScheduleWeeklyRuleDto {
+  dayOfWeek: string; // "MONDAY".."SUNDAY"
+  startTime: string; // "HH:mm:ss"
+  endTime: string;   // "HH:mm:ss"
+  inventoryType: InventoryType;
+  capacity?: number | null;
+  units?: { unitNumber: number; capacity: number; equipmentId?: string | null }[] | null;
+}
+
+export interface OperatingScheduleDto {
+  startsOn: string;
+  endsOn?: string | null;
+  active: boolean;
+  rules: OperatingScheduleWeeklyRuleDto[];
+}
+
+export interface PutOperatingScheduleRequest {
+  startsOn: string;
+  endsOn?: string | null;
+  active: boolean;
+  rules: OperatingScheduleWeeklyRuleDto[];
+}
+
+export interface OperatingScheduleUpdateResponse {
+  schedule: OperatingScheduleDto;
+  createdSlots: number;
+  closedSlots: number;
+}
