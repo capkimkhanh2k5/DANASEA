@@ -11,6 +11,8 @@ import {
   isZoomInDisabled,
   isZoomOutDisabled,
   isResetDisabled,
+  calculateZoomWithCursor,
+  clampPan,
 } from '../documentViewerModel.ts';
 
 describe('documentViewerModel — Zoom & Pan business rules', () => {
@@ -55,21 +57,54 @@ describe('documentViewerModel — Zoom & Pan business rules', () => {
   });
 
   it('isResetDisabled is true only when at default 100% and (0,0), or when loading/error/no URL', () => {
-    // At default 100% and 0,0
     assert.equal(isResetDisabled(100, { x: 0, y: 0 }, false, false, true), true);
-
-    // Zoomed in
     assert.equal(isResetDisabled(125, { x: 0, y: 0 }, false, false, true), false);
-
-    // Zoomed out
     assert.equal(isResetDisabled(75, { x: 0, y: 0 }, false, false, true), false);
-
-    // Panned
     assert.equal(isResetDisabled(100, { x: 10, y: -20 }, false, false, true), false);
-
-    // Loading / error / no URL should disable reset
     assert.equal(isResetDisabled(125, { x: 0, y: 0 }, true, false, true), true);
     assert.equal(isResetDisabled(125, { x: 0, y: 0 }, false, true, true), true);
     assert.equal(isResetDisabled(125, { x: 0, y: 0 }, false, false, false), true);
+  });
+
+  it('calculateZoomWithCursor keeps point under cursor stationary when zooming in', () => {
+    const currentZoom = 100;
+    const newZoom = 125;
+    const currentPos = { x: 0, y: 0 };
+    const cursor = { x: 100, y: 50 };
+
+    const newPos = calculateZoomWithCursor(currentZoom, newZoom, currentPos, cursor);
+    // x = 100 - (100 - 0) * 1.25 = 100 - 125 = -25
+    assert.equal(newPos.x, -25);
+    // y = 50 - (50 - 0) * 1.25 = 50 - 62.5 = -12.5
+    assert.equal(newPos.y, -12.5);
+  });
+
+  it('calculateZoomWithCursor resets position to (0, 0) when zooming back to <= 100% (Fit)', () => {
+    const newPos = calculateZoomWithCursor(125, 100, { x: -25, y: -12.5 }, { x: 100, y: 50 });
+    assert.deepEqual(newPos, { x: 0, y: 0 });
+
+    const newPos50 = calculateZoomWithCursor(75, 50, { x: -10, y: -5 }, { x: 100, y: 50 });
+    assert.deepEqual(newPos50, { x: 0, y: 0 });
+  });
+
+  it('clampPan strictly prevents the document from wandering off-screen', () => {
+    const viewport = { width: 800, height: 600 };
+
+    // At scale <= 100% (Fit), pan is always clamped to 0,0
+    assert.deepEqual(clampPan({ x: 100, y: 100 }, 100, viewport), { x: 0, y: 0 });
+    assert.deepEqual(clampPan({ x: 100, y: 100 }, 75, viewport), { x: 0, y: 0 });
+
+    // At scale 150%, scale = 1.5. maxPanX = (800/2) * 0.5 + 48 = 248. maxPanY = (600/2) * 0.5 + 48 = 198.
+    const withinBounds = clampPan({ x: 150, y: -100 }, 150, viewport);
+    assert.deepEqual(withinBounds, { x: 150, y: -100 });
+
+    const excessiveDrag = clampPan({ x: 9999, y: -9999 }, 150, viewport);
+    assert.equal(excessiveDrag.x, 248);
+    assert.equal(excessiveDrag.y, -198);
+
+    // Negative bounds
+    const excessiveNegativeDrag = clampPan({ x: -9999, y: 9999 }, 150, viewport);
+    assert.equal(excessiveNegativeDrag.x, -248);
+    assert.equal(excessiveNegativeDrag.y, 198);
   });
 });

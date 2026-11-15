@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { AlertCircle, FileText, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
+import { AlertCircle, FileText, Maximize2, Minimize2, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { AdminDialog } from './AdminDialog';
-import { AdminButton } from './AdminWorkspace';
 import {
   DEFAULT_ZOOM,
   zoomIn,
@@ -10,6 +9,8 @@ import {
   isZoomInDisabled,
   isZoomOutDisabled,
   isResetDisabled,
+  calculateZoomWithCursor,
+  clampPan,
 } from './documentViewerModel';
 import './AdminDocumentPreviewModal.css';
 
@@ -35,11 +36,17 @@ export function AdminDocumentPreviewModal({
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [imageLoading, setImageLoading] = useState<boolean>(true);
   const [imageError, setImageError] = useState<boolean>(false);
   const [retryKey, setRetryKey] = useState<number>(0);
 
+  const viewportRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const lastWheelTimeRef = useRef<number>(0);
+  const accumulatedDeltaRef = useRef<number>(0);
+
+  const isHttpUrl = Boolean(imageUrl && imageUrl.startsWith('http'));
 
   // Reset zoom, position, loading & error states when modal opens or document changes
   useEffect(() => {
@@ -52,13 +59,31 @@ export function AdminDocumentPreviewModal({
     }
   }, [open, imageUrl, retryKey]);
 
-  // Zoom handlers
+  // Zoom handlers for toolbar buttons
   const handleZoomIn = useCallback(() => {
-    setZoom(prev => zoomIn(prev));
+    setZoom(prev => {
+      const next = zoomIn(prev);
+      if (next !== prev) {
+        const rect = viewportRef.current?.getBoundingClientRect() || { width: 800, height: 600 };
+        setPosition(pos => clampPan(pos, next, { width: rect.width, height: rect.height }));
+      }
+      return next;
+    });
   }, []);
 
   const handleZoomOut = useCallback(() => {
-    setZoom(prev => zoomOut(prev));
+    setZoom(prev => {
+      const next = zoomOut(prev);
+      if (next !== prev) {
+        if (next <= DEFAULT_ZOOM) {
+          setPosition({ x: 0, y: 0 });
+        } else {
+          const rect = viewportRef.current?.getBoundingClientRect() || { width: 800, height: 600 };
+          setPosition(pos => clampPan(pos, next, { width: rect.width, height: rect.height }));
+        }
+      }
+      return next;
+    });
   }, []);
 
   const handleReset = useCallback(() => {
@@ -67,9 +92,62 @@ export function AdminDocumentPreviewModal({
     setPosition(r.position);
   }, []);
 
-  // Pan / Drag handlers
+  const handleToggleExpand = useCallback(() => {
+    setIsExpanded(prev => !prev);
+  }, []);
+
+  // Mouse Wheel Zoom directly on the viewport (throttled & zooms towards cursor)
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !open) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault(); // Do not scroll modal or background page
+      if (imageLoading || imageError || !isHttpUrl) return;
+
+      const now = performance.now();
+      if (now - lastWheelTimeRef.current > 150) {
+        accumulatedDeltaRef.current = 0;
+      }
+      accumulatedDeltaRef.current += e.deltaY;
+
+      // Throttle: minimum 70ms between zoom steps and 25px delta threshold
+      if (now - lastWheelTimeRef.current < 70 || Math.abs(accumulatedDeltaRef.current) < 25) {
+        return;
+      }
+
+      const direction = accumulatedDeltaRef.current < 0 ? 1 : -1; // up = zoom in, down = zoom out
+      accumulatedDeltaRef.current = 0;
+      lastWheelTimeRef.current = now;
+
+      const rect = viewport.getBoundingClientRect();
+      const cursorInViewport = {
+        x: e.clientX - rect.left - rect.width / 2,
+        y: e.clientY - rect.top - rect.height / 2,
+      };
+
+      setZoom(currentZoom => {
+        const nextZoom = direction > 0 ? zoomIn(currentZoom) : zoomOut(currentZoom);
+        if (nextZoom === currentZoom) return currentZoom;
+
+        setPosition(currentPos => {
+          const targetPos = calculateZoomWithCursor(currentZoom, nextZoom, currentPos, cursorInViewport);
+          return clampPan(targetPos, nextZoom, { width: rect.width, height: rect.height });
+        });
+
+        return nextZoom;
+      });
+    };
+
+    viewport.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      viewport.removeEventListener('wheel', handleWheel);
+    };
+  }, [open, imageLoading, imageError, isHttpUrl]);
+
+  // Mouse pan handlers
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.button !== 0 || imageLoading || imageError || !imageUrl) return;
+    if (e.button !== 0 || imageLoading || imageError || !isHttpUrl) return;
     e.preventDefault();
     setIsDragging(true);
     dragStartRef.current = {
@@ -78,8 +156,9 @@ export function AdminDocumentPreviewModal({
     };
   };
 
+  // Touch pan handlers
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (e.touches.length === 1 && !imageLoading && !imageError && imageUrl) {
+    if (e.touches.length === 1 && !imageLoading && !imageError && isHttpUrl) {
       setIsDragging(true);
       dragStartRef.current = {
         x: e.touches[0].clientX - position.x,
@@ -90,25 +169,29 @@ export function AdminDocumentPreviewModal({
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!isDragging || e.touches.length !== 1) return;
-    setPosition({
+    const rect = viewportRef.current?.getBoundingClientRect() || { width: 800, height: 600 };
+    const rawPos = {
       x: e.touches[0].clientX - dragStartRef.current.x,
       y: e.touches[0].clientY - dragStartRef.current.y,
-    });
+    };
+    setPosition(clampPan(rawPos, zoom, { width: rect.width, height: rect.height }));
   };
 
   const handleTouchEnd = () => {
     setIsDragging(false);
   };
 
-  // Window-level mouse listeners for smooth dragging outside viewport bounds
+  // Window-level mouse listeners for smooth dragging even when cursor leaves viewport
   useEffect(() => {
     if (!isDragging) return;
 
     const onWindowMouseMove = (e: MouseEvent) => {
-      setPosition({
+      const rect = viewportRef.current?.getBoundingClientRect() || { width: 800, height: 600 };
+      const rawPos = {
         x: e.clientX - dragStartRef.current.x,
         y: e.clientY - dragStartRef.current.y,
-      });
+      };
+      setPosition(clampPan(rawPos, zoom, { width: rect.width, height: rect.height }));
     };
 
     const onWindowMouseUp = () => {
@@ -122,7 +205,7 @@ export function AdminDocumentPreviewModal({
       window.removeEventListener('mousemove', onWindowMouseMove);
       window.removeEventListener('mouseup', onWindowMouseUp);
     };
-  }, [isDragging]);
+  }, [isDragging, zoom]);
 
   // Retry handler
   const handleInternalRetry = () => {
@@ -135,17 +218,15 @@ export function AdminDocumentPreviewModal({
     }
   };
 
-  const isHttpUrl = Boolean(imageUrl && imageUrl.startsWith('http'));
   const resetDisabled = isResetDisabled(zoom, position, imageLoading, imageError, isHttpUrl);
 
   return (
     <AdminDialog
       open={open}
       onClose={onClose}
-      title={title || 'Bản xem trước tài liệu'}
+      title={title}
       description={description}
-      className="admin-dialog--preview"
-      footer={<AdminButton onClick={onClose}>Đóng bản xem trước</AdminButton>}
+      className={`admin-dialog--preview ${isExpanded ? 'is-expanded' : ''}`}
     >
       <div className="admin-doc-viewer">
         {/* Controls Toolbar */}
@@ -159,7 +240,7 @@ export function AdminDocumentPreviewModal({
               title="Thu nhỏ (-25%)"
               aria-label="Thu nhỏ 25%"
             >
-              <ZoomOut size={16} aria-hidden="true" />
+              <ZoomOut size={15} aria-hidden="true" />
             </button>
 
             <span className="admin-doc-viewer-zoom-badge" aria-live="polite">
@@ -174,7 +255,7 @@ export function AdminDocumentPreviewModal({
               title="Phóng to (+25%)"
               aria-label="Phóng to 25%"
             >
-              <ZoomIn size={16} aria-hidden="true" />
+              <ZoomIn size={15} aria-hidden="true" />
             </button>
           </div>
 
@@ -182,24 +263,44 @@ export function AdminDocumentPreviewModal({
 
           <button
             type="button"
-            className="admin-doc-viewer-reset-btn"
+            className="admin-doc-viewer-action-btn"
             onClick={handleReset}
             disabled={resetDisabled}
             title="Đặt lại về trạng thái vừa khung ban đầu"
           >
-            <RotateCcw size={14} aria-hidden="true" />
+            <RotateCcw size={13} aria-hidden="true" />
             <span>Đặt lại</span>
           </button>
 
-          {zoom > 100 && !imageLoading && !imageError && isHttpUrl && (
-            <span className="admin-doc-viewer-hint">
-              Kéo ảnh để xem các góc
-            </span>
-          )}
+          <button
+            type="button"
+            className="admin-doc-viewer-action-btn"
+            onClick={handleToggleExpand}
+            title={isExpanded ? 'Thu nhỏ khung xem' : 'Mở rộng khung xem'}
+          >
+            {isExpanded ? (
+              <>
+                <Minimize2 size={13} aria-hidden="true" />
+                <span>Thu nhỏ</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 size={13} aria-hidden="true" />
+                <span>Mở rộng</span>
+              </>
+            )}
+          </button>
+
+          <span className="admin-doc-viewer-hint">
+            {zoom > 100
+              ? 'Lăn chuột hoặc kéo ảnh để xem các góc'
+              : 'Lăn con lăn chuột để zoom trực tiếp'}
+          </span>
         </div>
 
         {/* Viewport Area */}
         <div
+          ref={viewportRef}
           className={`admin-doc-viewer-viewport ${isHttpUrl && !imageLoading && !imageError ? 'is-draggable' : ''} ${isDragging ? 'is-dragging' : ''}`}
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
@@ -213,7 +314,7 @@ export function AdminDocumentPreviewModal({
             <>
               {imageLoading && (
                 <div className="admin-doc-viewer-loading">
-                  <RotateCcw size={22} className="admin-spin" aria-hidden="true" />
+                  <RotateCcw size={20} className="admin-spin" aria-hidden="true" />
                   <span>Đang tải chứng từ...</span>
                 </div>
               )}
@@ -221,7 +322,7 @@ export function AdminDocumentPreviewModal({
               {imageError ? (
                 <div className="admin-doc-viewer-error">
                   <div className="admin-doc-viewer-error-icon">
-                    <AlertCircle size={26} aria-hidden="true" />
+                    <AlertCircle size={24} aria-hidden="true" />
                   </div>
                   <h3 className="admin-doc-viewer-error-title">Không thể hiển thị chứng từ</h3>
                   <p className="admin-doc-viewer-error-desc">
@@ -234,7 +335,7 @@ export function AdminDocumentPreviewModal({
                       onClick={handleInternalRetry}
                       disabled={isRetrying}
                     >
-                      <RotateCcw size={14} className={isRetrying ? 'admin-spin' : ''} aria-hidden="true" />
+                      <RotateCcw size={13} className={isRetrying ? 'admin-spin' : ''} aria-hidden="true" />
                       <span>{isRetrying ? 'Đang thử lại...' : 'Thử lại'}</span>
                     </button>
                   </div>
@@ -265,7 +366,7 @@ export function AdminDocumentPreviewModal({
             </>
           ) : (
             <div className="admin-doc-viewer-empty">
-              <FileText size={38} className="text-slate-400" aria-hidden="true" />
+              <FileText size={36} className="text-slate-400" aria-hidden="true" />
               <h3>Khung xem trước minh họa</h3>
               <p className="admin-doc-viewer-empty-name">{title}</p>
               <p className="admin-doc-viewer-empty-desc">
