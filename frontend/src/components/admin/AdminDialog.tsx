@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { animateAdminDialog } from './dialogMotion';
 
-export function AdminDialog({ open, onClose, title, description, children, footer, variant = 'modal' }: {
-  open: boolean; onClose: () => void; title: string; description?: string; children: ReactNode; footer?: ReactNode; variant?: 'modal' | 'drawer';
+export function AdminDialog({ open, onClose, title, description, children, footer, variant = 'modal', className }: {
+  open: boolean; onClose: () => void; title: string; description?: string; children: ReactNode; footer?: ReactNode; variant?: 'modal' | 'drawer'; className?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const id = useId();
@@ -23,7 +23,7 @@ export function AdminDialog({ open, onClose, title, description, children, foote
   }, []);
 
   if (typeof document === 'undefined') return null;
-  return createPortal(<div className="admin-shell admin-overlay-root"><dialog ref={dialogRef} className={`admin-dialog admin-dialog--${variant}`} aria-labelledby={`${id}-title`} aria-describedby={description ? `${id}-description` : undefined}
+  return createPortal(<div className="admin-shell admin-overlay-root"><dialog ref={dialogRef} className={`admin-dialog admin-dialog--${variant}${className ? ` ${className}` : ''}`} aria-labelledby={`${id}-title`} aria-describedby={description ? `${id}-description` : undefined}
     onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => {
       if (event.target !== event.currentTarget) return;
       const bounds = event.currentTarget.getBoundingClientRect();
