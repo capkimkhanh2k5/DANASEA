@@ -80,11 +80,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgumentException(IllegalArgumentException ex) {
-        String message = (ex.getMessage() != null && !ex.getMessage().isBlank())
-                ? ex.getMessage()
-                : messages.get("error.invalid_input");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse("INVALID_INPUT", message));
+                .body(new ErrorResponse("INVALID_INPUT", messages.get("error.invalid_input")));
     }
 
     @ExceptionHandler({TypeMismatchException.class, HttpMessageNotReadableException.class,

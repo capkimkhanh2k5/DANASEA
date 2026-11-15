@@ -123,7 +123,7 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").isNotEmpty());
 
         // Verify transaction was marked rollback-only due to exception in batch use case
@@ -156,7 +156,7 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_INPUT"))
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
                 .andExpect(jsonPath("$.message").isNotEmpty());
     }
 

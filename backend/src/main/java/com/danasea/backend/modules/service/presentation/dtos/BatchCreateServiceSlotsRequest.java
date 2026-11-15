@@ -19,10 +19,10 @@ public record BatchCreateServiceSlotsRequest(
         @FutureOrPresent(message = "{validation.service.slot.date.future}")
         LocalDate endDate,
 
-        @NotEmpty(message = "At least one day of week must be selected")
+        @NotEmpty(message = "{validation.service.slot.batch.days.required}")
         Set<DayOfWeek> daysOfWeek,
 
-        @NotEmpty(message = "At least one slot template is required")
+        @NotEmpty(message = "{validation.service.slot.batch.templates.required}")
         @Valid
         List<SlotTemplateRequest> slotTemplates
 ) {}

@@ -38,13 +38,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.danasea.backend.configs.AbstractExternalInfrastructureIntegrationTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
+import com.danasea.backend.configs.AbstractPostgresIntegrationTest;
 
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
 @DisplayName("Review & Rating End-to-End Lifecycle Integration Test")
-public class ReviewRatingIntegrationTest extends AbstractExternalInfrastructureIntegrationTest {
+public class ReviewRatingIntegrationTest extends AbstractPostgresIntegrationTest {
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        configurePostgresProperties(registry, SHARED_DATABASE);
+    }
 
     @MockitoBean
     private io.github.bucket4j.redis.lettuce.cas.LettuceBasedProxyManager proxyManager;

@@ -1569,7 +1569,7 @@ def execute_sync(session, base_rows, trans_rows, audit, demo_password=None):
 
 
 # Replacement accepts only the exact reviewed V1-V58 table/column/FK/trigger inventory.
-REPLACEMENT_FLYWAY_VERSION = 58
+REPLACEMENT_FLYWAY_VERSION = 59
 RESET_INVENTORY_SQL = """
 SELECT json_build_object(
  'schemas',(SELECT json_agg(nspname ORDER BY nspname) FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'),
@@ -1671,6 +1671,7 @@ def seed_demo_operating_schedule(session, base_rows):
             private_capacity[service_id] = max(private_capacity.get(service_id, 0), capacity)
 
     schedules, slots, equipment, units = [], [], [], []
+    existing_slot_ids = {s['id'] for s in base_rows['service_slots']}
     existing_departures = {(s['service_id'], s['date'], time.fromisoformat(s['start_time']))
                            for s in base_rows['service_slots']}
     existing_departures.add((RESCHEDULE_SERVICE_ID, sched_info['target_day'], time(7, 0)))
@@ -1711,6 +1712,11 @@ def seed_demo_operating_schedule(session, base_rows):
                 if datetime.combine(day, clock) <= now or (service_id, day.isoformat(), clock) in existing_departures:
                     continue
                 slot_id = str(uuid.uuid5(SLOT_NAMESPACE, f'{service_id}|{day}|{start}'))
+                if slot_id in existing_slot_ids:
+                    if (service_id, day.isoformat(), clock) in existing_departures:
+                        continue
+                    slot_id = str(uuid.uuid5(SLOT_NAMESPACE, f'{service_id}|{day}|{start}|schedule'))
+                existing_slot_ids.add(slot_id)
                 slots.append({'id': slot_id, 'service_id': service_id, 'date': day.isoformat(),
                               'start_time': start, 'end_time': end, 'capacity': capacity,
                               'booked_count': 0, 'status': 'OPEN', 'inventory_type': inventory_type})

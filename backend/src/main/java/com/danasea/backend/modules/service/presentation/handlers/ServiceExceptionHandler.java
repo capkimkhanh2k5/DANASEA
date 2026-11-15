@@ -15,6 +15,7 @@ import com.danasea.backend.modules.service.domain.exceptions.WaiverContentRequir
 import com.danasea.backend.modules.service.domain.exceptions.WeatherRequirementsMissingException;
 import com.danasea.backend.shared.presentation.ErrorResponse;
 import com.danasea.backend.shared.presentation.LocalizedExceptionHandlerSupport;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -104,12 +105,18 @@ public class ServiceExceptionHandler extends LocalizedExceptionHandlerSupport {
                 .body(error("SAFETY_DOCUMENT_REQUIRED"));
     }
 
+    @ExceptionHandler(TypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(TypeMismatchException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(error("BAD_REQUEST"));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
-        String message = (ex.getMessage() != null && !ex.getMessage().isBlank())
+        String msg = (ex.getMessage() != null && !ex.getMessage().isBlank())
                 ? ex.getMessage()
-                : message("error.invalid_input");
+                : message("error.bad_request");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ErrorResponse("INVALID_INPUT", message));
+                .body(new ErrorResponse("BAD_REQUEST", msg));
     }
 }

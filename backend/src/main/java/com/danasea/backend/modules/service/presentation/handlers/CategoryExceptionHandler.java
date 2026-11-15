@@ -42,23 +42,21 @@ public class CategoryExceptionHandler extends LocalizedExceptionHandlerSupport {
     public ResponseEntity<ErrorResponse> handleCategoryHasLinkedServices(CategoryHasLinkedServicesException exception) {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(new ErrorResponse("CATEGORY_HAS_LINKED_SERVICES",
-                        "Không thể xóa danh mục đang có dịch vụ liên kết. Vui lòng chuyển hoặc xóa dịch vụ trước, hoặc sử dụng tính năng Tạm ẩn."));
+                .body(error("CATEGORY_HAS_LINKED_SERVICES"));
     }
 
     @ExceptionHandler(CategoryHasChildrenException.class)
     public ResponseEntity<ErrorResponse> handleCategoryHasChildren(CategoryHasChildrenException exception) {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(new ErrorResponse("CATEGORY_HAS_CHILDREN",
-                        "Không thể xóa danh mục đang chứa danh mục con. Vui lòng di dời hoặc xóa danh mục con trước."));
+                .body(error("CATEGORY_HAS_CHILDREN"));
     }
 
     @ExceptionHandler(CategoryHasDependentRulesException.class)
     public ResponseEntity<ErrorResponse> handleCategoryHasDependentRules(CategoryHasDependentRulesException exception) {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(new ErrorResponse("CATEGORY_HAS_DEPENDENT_RULES", exception.getMessage()));
+                .body(error("CATEGORY_HAS_DEPENDENT_RULES"));
     }
 
     @ExceptionHandler(CategoryHierarchyLoopException.class)
