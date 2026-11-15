@@ -5,39 +5,13 @@ import {
   Send, 
   Pin, 
   Trash2, 
+  MoreVertical,
   Paperclip, 
   X, 
-  Check, 
-  TrendingUp, 
-  Star, 
-  CalendarClock, 
-  Wand2 
+  Check 
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from '../../../components/vendor/copilot/CopilotArtifactCard';
-
-const STARTER_PROMPTS = [
-  {
-    icon: TrendingUp,
-    title: 'Doanh thu hôm nay',
-    prompt: 'Doanh thu và tổng số đơn của gian hàng hôm nay thế nào?',
-  },
-  {
-    icon: Star,
-    title: 'Phân tích review',
-    prompt: 'Phân tích đánh giá review của khách hàng trong 90 ngày qua',
-  },
-  {
-    icon: CalendarClock,
-    title: 'Tư vấn ca vận hành',
-    prompt: 'Kiểm tra ca vận hành vắng khách và cảnh báo thời tiết 7 ngày tới',
-  },
-  {
-    icon: Wand2,
-    title: 'Tối ưu bài đăng',
-    prompt: 'Đánh giá chất lượng và gợi ý tối ưu các bài đăng dịch vụ biển',
-  },
-];
 
 export function VendorCopilotPage() {
   const {
@@ -61,9 +35,25 @@ export function VendorCopilotPage() {
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [attachType, setAttachType] = useState<'ORDER' | 'SERVICE'>('ORDER');
   const [attachIdInput, setAttachIdInput] = useState('');
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActiveMenuId(null);
+      }
+    };
+    if (activeMenuId) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activeMenuId]);
 
   useEffect(() => {
     loadConversations();
@@ -94,10 +84,10 @@ export function VendorCopilotPage() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-68px)] bg-slate-50 overflow-hidden">
+    <div className="flex h-full w-full bg-slate-50 overflow-hidden min-h-0 flex-1">
       {/* Left Sidebar: Session Threads */}
-      <div className="w-72 bg-white border-r border-slate-200/80 flex flex-col shrink-0">
-        <div className="p-4 border-b border-slate-200/80 flex items-center justify-between">
+      <div className="w-72 bg-white border-r border-slate-200/80 flex flex-col shrink-0 h-full min-h-0">
+        <div className="p-4 border-b border-slate-200/80 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <Bot className="w-4 h-4 text-sky-600" strokeWidth={1.75} />
             <span className="font-bold text-slate-900 text-sm">Hội thoại</span>
@@ -129,7 +119,7 @@ export function VendorCopilotPage() {
                 <div
                   key={c.id}
                   onClick={() => selectConversation(c.id)}
-                  className={`group flex items-center justify-between p-2.5 rounded-xl cursor-pointer text-xs transition-colors ${
+                  className={`group flex items-center justify-between p-2.5 rounded-xl cursor-pointer text-xs transition-colors relative ${
                     isActive
                       ? 'bg-sky-50 border border-sky-200/80 text-sky-950 font-semibold shadow-2xs'
                       : 'hover:bg-slate-100 text-slate-700 border border-transparent'
@@ -140,28 +130,52 @@ export function VendorCopilotPage() {
                     <span className="truncate">{c.title || 'Đoạn chat không tên'}</span>
                   </div>
 
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 shrink-0">
+                  <div className="flex items-center gap-1 ml-2 shrink-0">
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        togglePinConversation(c.id, c.pinned);
+                        setActiveMenuId(activeMenuId === c.id ? null : c.id);
                       }}
-                      className="p-1 text-slate-400 hover:text-amber-600 rounded"
-                      title={c.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}
+                      className={`p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-md transition-colors cursor-pointer ${
+                        activeMenuId === c.id ? 'opacity-100 bg-slate-200/60 text-slate-700' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                      title="Tùy chọn"
                     >
-                      <Pin className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteConversation(c.id);
-                      }}
-                      className="p-1 text-slate-400 hover:text-rose-600 rounded"
-                      title="Xóa đoạn chat"
-                    >
-                      <Trash2 className="w-3 h-3" />
+                      <MoreVertical className="w-3.5 h-3.5" />
                     </button>
                   </div>
+
+                  {activeMenuId === c.id && (
+                    <div
+                      ref={menuRef}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute right-2 top-9 z-30 w-36 bg-white rounded-xl shadow-lg border border-slate-200/90 py-1 text-xs animate-in fade-in zoom-in-95 duration-100"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          togglePinConversation(c.id, c.pinned);
+                          setActiveMenuId(null);
+                        }}
+                        className="w-full px-3 py-2 text-left flex items-center gap-2 text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer font-normal"
+                      >
+                        <Pin className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{c.pinned ? 'Bỏ ghim' : 'Ghim lên đầu'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          deleteConversation(c.id);
+                          setActiveMenuId(null);
+                        }}
+                        className="w-full px-3 py-2 text-left flex items-center gap-2 text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer font-normal"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                        <span>Xóa hội thoại</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -170,9 +184,9 @@ export function VendorCopilotPage() {
       </div>
 
       {/* Main Chat Workspace */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col bg-white h-full min-h-0 min-w-0 overflow-hidden">
         {/* Header */}
-        <div className="h-14 px-6 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-white">
+        <div className="h-14 px-6 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-white sticky top-0 z-10">
           <div className="flex items-center gap-2.5">
             <span className="font-bold text-sm text-slate-900">DANASEA Copilot</span>
           </div>
@@ -187,30 +201,18 @@ export function VendorCopilotPage() {
           )}
         </div>
 
-        {/* Message Thread */}
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5 max-w-4xl w-full mx-auto">
+        {/* Message Thread - Full Width Scroll Container with Flush Scrollbar */}
+        <div className="flex-1 overflow-y-auto min-h-0 w-full overscroll-contain">
+          <div className="w-full p-6 flex flex-col gap-5 min-h-full">
           {messages.length === 0 ? (
-            <div className="my-auto flex flex-col items-center py-6 w-full max-w-2xl mx-auto">
-              <div className="w-full grid grid-cols-2 gap-2.5 text-left">
-                {STARTER_PROMPTS.map((sp, idx) => {
-                  const Icon = sp.icon;
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => sendMessage(sp.prompt)}
-                      className="p-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-slate-300 transition-all text-left flex flex-col gap-1.5 group cursor-pointer shadow-2xs hover:shadow-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Icon className="w-4 h-4 text-sky-600 group-hover:text-sky-700 shrink-0" strokeWidth={1.75} />
-                        <span className="text-xs font-bold text-slate-900">{sp.title}</span>
-                      </div>
-                      <span className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
-                        {sp.prompt}
-                      </span>
-                    </button>
-                  );
-                })}
+            <div className="my-auto flex flex-col items-center justify-center py-12 text-center select-none">
+              <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-600 mb-3 shadow-2xs">
+                <Bot className="w-6 h-6" strokeWidth={1.75} />
               </div>
+              <h3 className="font-bold text-base text-slate-800 tracking-tight">DANASEA Copilot</h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-sm leading-relaxed">
+                Trợ lý vận hành và đối soát dữ liệu gian hàng. Nhập câu hỏi bên dưới để bắt đầu hội thoại.
+              </p>
             </div>
           ) : (
             messages.map((m) => {
@@ -265,44 +267,43 @@ export function VendorCopilotPage() {
             </div>
           )}
 
-          <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
-        {/* Bottom Input Area */}
-        <div className="p-4 border-t border-slate-200/80 bg-white">
-          <div className="max-w-4xl mx-auto">
-            <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAttachModal(true)}
-                  className="p-2.5 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200/80 transition-colors cursor-pointer shrink-0"
-                  title="Đính kèm mã đơn hàng hoặc tour để hỏi AI"
-                >
-                  <Paperclip className="w-4 h-4" />
-                </button>
+        {/* Bottom Input Area - Fixed & Full Horizontal Width */}
+        <div className="py-3 px-6 border-t border-slate-200/80 bg-white shrink-0 w-full sticky bottom-0 z-10">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-2 w-full">
+            <div className="flex items-center gap-2.5 w-full">
+              <button
+                type="button"
+                onClick={() => setShowAttachModal(true)}
+                className="p-2.5 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200/80 transition-colors cursor-pointer shrink-0"
+                title="Đính kèm mã đơn hàng hoặc tour để hỏi AI"
+              >
+                <Paperclip className="w-4 h-4" />
+              </button>
 
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder={attachedContext ? `Hỏi về ${attachedContext.label}...` : "Hỏi doanh thu, đơn hàng hôm nay, ca tour vắng..."}
-                  disabled={isLoading}
-                  className="flex-1 text-xs bg-slate-50 border border-slate-200/90 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 placeholder-slate-400 transition-all"
-                />
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={attachedContext ? `Hỏi về ${attachedContext.label}...` : "Hỏi doanh thu, đơn hàng hôm nay, ca tour vắng..."}
+                disabled={isLoading}
+                className="flex-1 text-xs bg-slate-50 border border-slate-200/90 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 placeholder-slate-400 transition-all shadow-2xs"
+              />
 
-                <button
-                  type="submit"
-                  disabled={!input.trim() || isLoading}
-                  className="p-3 rounded-xl bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
-                  title="Gửi câu hỏi"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </div>
-            </form>
-          </div>
+              <button
+                type="submit"
+                disabled={!input.trim() || isLoading}
+                className="p-3 rounded-xl bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0 shadow-xs"
+                title="Gửi câu hỏi"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
+          </form>
         </div>
       </div>
 
