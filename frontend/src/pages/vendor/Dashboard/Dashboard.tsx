@@ -911,9 +911,9 @@ export function Dashboard() {
               Chưa có dịch vụ nào đang mở ca.
             </div>
           ) : (
-            <div className="my-auto py-2 flex flex-col sm:flex-row items-center justify-between gap-5 flex-1">
+            <div className="my-auto py-2 flex flex-col sm:flex-row items-center justify-between gap-6 flex-1">
               {/* Native SVG Donut Gauge */}
-              <div className="relative w-42 h-42 shrink-0 flex items-center justify-center">
+              <div className="relative w-48 h-48 sm:w-52 sm:h-52 shrink-0 flex items-center justify-center">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 160 160">
                   {/* Background Track Ring */}
                   <circle
@@ -930,7 +930,7 @@ export function Dashboard() {
                     cy="80"
                     r="58"
                     fill="none"
-                    stroke={customerMetrics.occupancyRate >= 100 ? "#f59e0b" : "#0284c7"}
+                    stroke={customerMetrics.occupancyRate >= 100 ? "#10b981" : "#0284c7"}
                     strokeWidth="15"
                     strokeDasharray={364.42}
                     strokeDashoffset={364.42 - (364.42 * Math.min(100, Math.max(0, customerMetrics.occupancyRate))) / 100}
@@ -941,31 +941,31 @@ export function Dashboard() {
 
                 {/* Centered KPI Metrics */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
-                  <span className="text-3xl font-bold font-mono text-slate-900 tabular-nums tracking-tight">
+                  <span className="text-3xl sm:text-4xl font-bold font-mono text-slate-900 tabular-nums tracking-tight">
                     {customerMetrics.occupancyRate}%
                   </span>
-                  <span className="text-[10px] font-semibold text-slate-600 tracking-wider uppercase mt-0.5">
+                  <span className="text-[11px] font-semibold text-slate-500 tracking-wider uppercase mt-1">
                     {customerMetrics.totalBooked}/{customerMetrics.totalCapacity} VÉ
                   </span>
                 </div>
               </div>
 
               {/* Service Breakdown Legend */}
-              <div className="flex-1 w-full space-y-2.5">
-                {serviceOccupancies.slice(0, 3).map((srv, idx) => {
-                  const colors = ["bg-[#0284c7]", "bg-[#06b6d4]", "bg-[#10b981]"];
+              <div className="flex-1 w-full self-stretch flex flex-col justify-around py-2 gap-5 sm:gap-6">
+                {serviceOccupancies.slice(0, 4).map((srv, idx) => {
+                  const colors = ["bg-[#0284c7]", "bg-[#06b6d4]", "bg-[#10b981]", "bg-[#6366f1]"];
                   const color = colors[idx % colors.length];
                   return (
-                    <div key={srv.id} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className={`w-2 h-2 rounded-full ${color} shrink-0`} />
-                          <span className="font-semibold text-slate-800 truncate max-w-[140px]">
+                    <div key={srv.id} className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between text-xs sm:text-[13px] gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <span className={`w-2.5 h-2.5 rounded-full ${color} shrink-0`} />
+                          <span className="font-semibold text-slate-800 truncate" title={srv.name}>
                             {cleanServiceName(srv.name)}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0 font-mono">
-                          <span className="text-slate-700 font-medium tabular-nums">
+                        <div className="flex items-center gap-2 shrink-0 font-mono text-xs sm:text-[13px]">
+                          <span className="text-slate-600 font-medium tabular-nums">
                             {srv.booked}/{srv.capacity}
                           </span>
                           <span className="text-slate-900 font-bold tabular-nums">
@@ -975,10 +975,10 @@ export function Dashboard() {
                       </div>
 
                       {/* Mini Bar */}
-                      <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
                         <div
-                          className={`h-full rounded-full ${idx === 0 ? "bg-[#0284c7]" : idx === 1 ? "bg-[#06b6d4]" : "bg-[#10b981]"}`}
-                          style={{ width: `${srv.percentage}%` }}
+                          className={`h-full rounded-full transition-all duration-500 ${color}`}
+                          style={{ width: `${Math.min(100, Math.max(0, srv.percentage))}%` }}
                         />
                       </div>
                     </div>
