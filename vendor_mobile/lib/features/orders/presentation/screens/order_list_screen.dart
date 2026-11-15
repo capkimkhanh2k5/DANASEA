@@ -7,7 +7,6 @@ import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../core/widgets/partner_account_app_bar_button.dart';
 import 'sub_order_detail_screen.dart';
-import '../../../chat/presentation/screens/chat_conversation_screen.dart';
 
 class OrderListScreen extends StatefulWidget {
   final VoidCallback? onOpenNotifications;
@@ -28,6 +27,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedFilter = 'all'; // all, PENDING, CONFIRMED, COMPLETED, REJECTED, CANCELLED, REFUNDED
+  String _selectedShift = 'all'; // all, today, morning, afternoon
 
   String _normalize(String s) {
     var str = s.toLowerCase();
@@ -39,6 +39,33 @@ class _OrderListScreenState extends State<OrderListScreen> {
     str = str.replaceAll(RegExp(r'[ỳýỵỷỹ]'), 'y');
     str = str.replaceAll(RegExp(r'[đ]'), 'd');
     return str;
+  }
+
+  bool _matchesShift(SubOrderModel o, String shift) {
+    if (shift == 'all') return true;
+    final now = DateTime.now();
+    final todayStr1 = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final todayStr2 = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+    final isToday = o.slotDate.contains(todayStr1) ||
+        o.slotDate.contains(todayStr2) ||
+        (o.createdAt.year == now.year && o.createdAt.month == now.month && o.createdAt.day == now.day);
+
+    if (shift == 'today') return isToday;
+
+    int startHour = 8;
+    final timeStr = o.slotTime.trim();
+    final match = RegExp(r'^(\d{1,2})').firstMatch(timeStr);
+    if (match != null) {
+      startHour = int.tryParse(match.group(1)!) ?? 8;
+    }
+
+    if (shift == 'morning') {
+      return startHour < 12;
+    }
+    if (shift == 'afternoon') {
+      return startHour >= 12;
+    }
+    return true;
   }
 
   @override
@@ -63,6 +90,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   Widget build(BuildContext context) {
     final subOrders = _db.subOrders.where((o) {
       if (_selectedFilter != 'all' && o.status.name.toUpperCase() != _selectedFilter) return false;
+      if (!_matchesShift(o, _selectedShift)) return false;
       if (_searchQuery.isNotEmpty) {
         final rawQ = _searchQuery.trim().toLowerCase();
         final cleanQ = rawQ.replaceAll('#', '').trim();
@@ -82,6 +110,10 @@ class _OrderListScreenState extends State<OrderListScreen> {
     }).toList();
 
     final allCount = _db.subOrders.length;
+    final todayCount = _db.subOrders.where((o) => _matchesShift(o, 'today')).length;
+    final morningCount = _db.subOrders.where((o) => _matchesShift(o, 'morning')).length;
+    final afternoonCount = _db.subOrders.where((o) => _matchesShift(o, 'afternoon')).length;
+
     final pendingCount = _db.subOrders.where((o) => o.status == SubOrderStatus.pending).length;
     final confirmedCount = _db.subOrders.where((o) => o.status == SubOrderStatus.confirmed).length;
     final completedCount = _db.subOrders.where((o) => o.status == SubOrderStatus.completed).length;
@@ -111,52 +143,180 @@ class _OrderListScreenState extends State<OrderListScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Search Bar
+            // Search Bar + Shift Filter Dropdown (Shopee / GrabMerchant Style)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: SizedBox(
-                height: 44,
-                child: TextField(
-                  controller: _searchController,
-                  textAlignVertical: TextAlignVertical.center,
-                  onChanged: (val) => setState(() => _searchQuery = val.trim()),
-                  style: const TextStyle(fontSize: 13.5, color: AppColors.onSurface),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white,
-                    hintText: tr(context, 'Tìm theo mã đơn (#DNS...), tên khách hoặc dịch vụ...'),
-                    hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.outline),
-                    prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.tertiary),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.cancel, size: 18, color: AppColors.tertiary),
-                            splashRadius: 16,
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _searchQuery = '');
-                            },
-                          )
-                        : null,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(22),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(22),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(22),
-                      borderSide: const BorderSide(color: AppColors.secondary, width: 1.5),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 42,
+                      child: TextField(
+                        controller: _searchController,
+                        textAlignVertical: TextAlignVertical.center,
+                        onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                        style: const TextStyle(fontSize: 13, color: AppColors.onSurface),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          filled: true,
+                          fillColor: Colors.white,
+                          hintText: tr(context, 'Tìm theo mã đơn, khách, tour...'),
+                          hintStyle: const TextStyle(fontSize: 12, color: AppColors.outline),
+                          prefixIcon: const Icon(Icons.search, size: 19, color: AppColors.tertiary),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.cancel, size: 17, color: AppColors.tertiary),
+                                  splashRadius: 16,
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : null,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: const BorderSide(color: AppColors.secondary, width: 1.5),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+
+                  // Shift Filter Popup Menu (Gọn gàng, không bị 2 hàng pill đè nhau)
+                  PopupMenuButton<String>(
+                    initialValue: _selectedShift,
+                    tooltip: 'Lọc ca chạy',
+                    onSelected: (val) => setState(() => _selectedShift = val),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 4,
+                    color: Colors.white,
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: 'all',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.access_time_rounded, size: 16, color: AppColors.tertiary),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Tất cả ca ($allCount)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: _selectedShift == 'all' ? FontWeight.bold : FontWeight.normal,
+                                color: _selectedShift == 'all' ? AppColors.secondary : AppColors.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'today',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.today_rounded, size: 16, color: Color(0xFF0F766E)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Hôm nay ($todayCount)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: _selectedShift == 'today' ? FontWeight.bold : FontWeight.normal,
+                                color: _selectedShift == 'today' ? AppColors.secondary : AppColors.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'morning',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.wb_twilight_rounded, size: 16, color: Color(0xFFD97706)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Ca sáng <12h ($morningCount)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: _selectedShift == 'morning' ? FontWeight.bold : FontWeight.normal,
+                                color: _selectedShift == 'morning' ? AppColors.secondary : AppColors.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'afternoon',
+                        child: Row(
+                          children: [
+                            const Icon(Icons.wb_sunny_rounded, size: 16, color: Color(0xFFEA580C)),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Ca chiều ≥12h ($afternoonCount)',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: _selectedShift == 'afternoon' ? FontWeight.bold : FontWeight.normal,
+                                color: _selectedShift == 'afternoon' ? AppColors.secondary : AppColors.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    child: Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 11),
+                      decoration: BoxDecoration(
+                        color: _selectedShift != 'all'
+                            ? AppColors.secondary.withValues(alpha: 0.1)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: _selectedShift != 'all'
+                              ? AppColors.secondary
+                              : const Color(0xFFE2E8F0),
+                          width: _selectedShift != 'all' ? 1.5 : 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _getShiftIcon(_selectedShift),
+                            size: 15,
+                            color: _selectedShift != 'all' ? AppColors.secondary : AppColors.tertiary,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            _getShiftLabel(_selectedShift),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: _selectedShift != 'all' ? FontWeight.bold : FontWeight.w600,
+                              color: _selectedShift != 'all' ? AppColors.secondary : AppColors.onSurface,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 16,
+                            color: _selectedShift != 'all' ? AppColors.secondary : AppColors.tertiary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
-            // Horizontal Filter Chips
+            // Horizontal Status Filter Chips (Duy nhất 1 hàng tab trạng thái)
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
@@ -205,7 +365,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                       )
                     : ListView.builder(
                         physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+                        padding: const EdgeInsets.fromLTRB(16.0, 6.0, 16.0, 110.0),
                         itemCount: subOrders.length,
                         itemBuilder: (context, index) {
                           final order = subOrders[index];
@@ -218,6 +378,34 @@ class _OrderListScreenState extends State<OrderListScreen> {
         ),
       ),
     );
+  }
+
+  String _getShiftLabel(String key) {
+    switch (key) {
+      case 'today':
+        return 'Hôm nay';
+      case 'morning':
+        return 'Ca sáng';
+      case 'afternoon':
+        return 'Ca chiều';
+      case 'all':
+      default:
+        return 'Tất cả ca';
+    }
+  }
+
+  IconData _getShiftIcon(String key) {
+    switch (key) {
+      case 'today':
+        return Icons.today_rounded;
+      case 'morning':
+        return Icons.wb_twilight_rounded;
+      case 'afternoon':
+        return Icons.wb_sunny_rounded;
+      case 'all':
+      default:
+        return Icons.access_time_rounded;
+    }
   }
 
   Widget _buildFilterTab(String key, String label, int count) {
@@ -234,7 +422,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             color: active ? AppColors.secondary : AppColors.borderSubtle,
           ),
           boxShadow: active
-              ? [BoxShadow(color: AppColors.secondary.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))]
+              ? [BoxShadow(color: AppColors.secondary.withValues(alpha: 0.2), blurRadius: 4, offset: const Offset(0, 2))]
               : null,
         ),
         child: Row(
@@ -252,7 +440,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
               decoration: BoxDecoration(
-                color: active ? AppColors.onSecondary.withOpacity(0.22) : AppColors.surfaceContainerLow,
+                color: active ? AppColors.onSecondary.withValues(alpha: 0.22) : AppColors.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: LocalizedText(
@@ -306,36 +494,47 @@ class _OrderListScreenState extends State<OrderListScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Order Code & Status Badge Header
+                // 1. Top row: Customer avatar + Customer name (left) & StatusBadge (right)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '#${order.subOrderCode}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.navyAnchor,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: const BoxDecoration(
+                              color: AppColors.surfaceContainerHigh,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.person, size: 15, color: AppColors.tertiary),
                           ),
-                        ),
-                        if (order.masterOrderCode.isNotEmpty && order.masterOrderCode != order.subOrderCode) ...[
-                          const SizedBox(width: 6),
-                          Text(
-                            '(${order.masterOrderCode})',
-                            style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              order.customerName.isNotEmpty ? order.customerName : 'Khách hàng',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.navyAnchor,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
-                      ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     StatusBadge(status: order.status),
                   ],
                 ),
                 const SizedBox(height: 8),
+                const Divider(height: 1, color: AppColors.surfaceContainerHigh),
+                const SizedBox(height: 8),
 
-                // 2. Service & Customer Information (Clean, high-density typography)
+                // 2. Service & Tour Information
                 Text(
                   order.serviceName,
                   style: const TextStyle(
@@ -343,22 +542,21 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     fontWeight: FontWeight.bold,
                     color: AppColors.navyAnchor,
                   ),
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${order.customerName} • ${order.quantity} khách • ${order.slotDate} (${order.slotTime})',
+                  '${order.quantity} khách • ${order.slotDate} (${order.slotTime})',
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.tertiary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(height: 10),
-                const Divider(height: 1, color: AppColors.surfaceContainerHigh),
                 const SizedBox(height: 8),
-                // 3. Check-in Status & Price Row
+
+                // 3. Check-in Status & Total Price Row (Shopee style)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -396,86 +594,76 @@ class _OrderListScreenState extends State<OrderListScreen> {
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
+                        const Text(
+                          'Tổng thanh toán: ',
+                          style: TextStyle(fontSize: 12, color: AppColors.tertiary),
+                        ),
                         Text(
-                          formattedPrice,
+                          '₫$formattedPrice',
                           style: const TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: AppColors.navyAnchor,
                           ),
-                        ),
-                        const SizedBox(width: 2),
-                        const Text(
-                          'đ',
-                          style: TextStyle(fontSize: 11, color: AppColors.tertiary, fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
 
-                // 4. Action Buttons
+                // 4. Action button (Right aligned, Chi tiết đơn only)
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ChatConversationScreen(
-                                conversationId: 'conv-001',
-                                customerName: order.customerName,
-                                subOrderCode: order.subOrderCode,
-                              ),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceContainerLowest,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.borderSubtle),
+                    Container(
+                      height: 32,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.receipt_long_rounded, size: 14, color: AppColors.onSecondary),
+                          SizedBox(width: 4),
+                          Text(
+                            'Chi tiết đơn',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSecondary),
                           ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.chat_bubble_outline_rounded, size: 14, color: AppColors.navyAnchor),
-                              SizedBox(width: 4),
-                              Text('Nhắn tin', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.navyAnchor)),
-                            ],
-                          ),
-                        ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Divider(height: 1, color: AppColors.surfaceContainerHigh),
+                const SizedBox(height: 8),
+
+                // 5. Bottom: "Mã đơn hàng" on left, "#<subOrderCode>" on right (Shopee style)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Mã đơn hàng',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.tertiary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => SubOrderDetailScreen(subOrder: order),
-                            ),
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: AppColors.secondary,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.receipt_long_rounded, size: 14, color: AppColors.onSecondary),
-                              SizedBox(width: 4),
-                              Text('Chi tiết đơn', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSecondary)),
-                            ],
-                          ),
+                      child: Text(
+                        '#${order.subOrderCode}',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.navyAnchor,
                         ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],

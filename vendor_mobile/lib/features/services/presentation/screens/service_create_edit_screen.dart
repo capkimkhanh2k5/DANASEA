@@ -87,6 +87,26 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
   bool _isSavingDraft = false;
   String? _serverServiceId;
 
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _section1Key = GlobalKey();
+  final GlobalKey _section2Key = GlobalKey();
+  final GlobalKey _section3Key = GlobalKey();
+  final GlobalKey _section4Key = GlobalKey();
+  int _activeSectionIndex = 0;
+
+  void _scrollToSection(GlobalKey key, int index) {
+    setState(() => _activeSectionIndex = index);
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+        alignment: 0.05,
+      );
+    }
+  }
+
   bool _isValidUuid(String? value) {
     if (value == null || value.isEmpty) return false;
     return RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(value);
@@ -959,6 +979,8 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
 
     _lngController.dispose();
 
+    _scrollController.dispose();
+
     super.dispose();
 
   }
@@ -1159,16 +1181,16 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
       ),
 
       body: SafeArea(
-
-        child: SingleChildScrollView(
-
-          padding: const EdgeInsets.all(16.0),
-
-          child: Column(
-
-            crossAxisAlignment: CrossAxisAlignment.start,
-
-            children: [
+        child: Column(
+          children: [
+            _buildStickySectionBar(),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 60.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
 
               // Vendor Mini Banner
 
@@ -1339,9 +1361,8 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
 
 
               // SECTION 1: Thông tin cơ bản
-
               _buildSectionCard(
-
+                key: _section1Key,
                 title: 'Thông tin cơ bản',
 
                 icon: Icons.edit_note,
@@ -1660,9 +1681,8 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
 
 
               // SECTION 2: Vận hành & Đơn giá duy nhất
-
               _buildSectionCard(
-
+                key: _section2Key,
                 title: 'Vận hành & Đơn giá',
 
                 icon: Icons.monetization_on,
@@ -1970,9 +1990,8 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
 
 
               // SECTION 3: Điểm đón khách
-
               _buildSectionCard(
-
+                key: _section3Key,
                 title: 'Điểm đón khách',
 
                 icon: Icons.location_on,
@@ -2058,9 +2077,8 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
 
 
               // SECTION 4: Quản lý hình ảnh
-
               _buildSectionCard(
-
+                key: _section4Key,
                 title: 'Hình ảnh dịch vụ',
 
                 icon: Icons.photo_library,
@@ -2286,22 +2304,92 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
               ),
 
               const SizedBox(height: 20),
-
             ],
-
           ),
-
         ),
-
       ),
+    ],
+  ),
+),
+);
+}
 
+  Widget _buildStickySectionBar() {
+    final sections = [
+      (title: '1. Cơ bản', key: _section1Key, icon: Icons.edit_note),
+      (title: '2. Giá & Gói', key: _section2Key, icon: Icons.sell_outlined),
+      (title: '3. Điểm đón', key: _section3Key, icon: Icons.location_on_outlined),
+      (title: '4. Hình ảnh', key: _section4Key, icon: Icons.photo_library_outlined),
+    ];
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: List.generate(sections.length, (idx) {
+            final s = sections[idx];
+            final active = _activeSectionIndex == idx;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: () => _scrollToSection(s.key, idx),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: active ? AppColors.secondary : AppColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: active ? AppColors.secondary : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        s.icon,
+                        size: 14,
+                        color: active ? Colors.white : AppColors.secondary,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        s.title,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: active ? FontWeight.bold : FontWeight.w500,
+                          color: active ? Colors.white : AppColors.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
     );
-
   }
 
 
 
   Widget _buildSectionCard({
+
+    Key? key,
 
     required String title,
 
@@ -2314,6 +2402,8 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
   }) {
 
     return Container(
+
+      key: key,
 
       padding: const EdgeInsets.all(16),
 

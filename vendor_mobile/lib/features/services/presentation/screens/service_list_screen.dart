@@ -29,6 +29,7 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   String _selectedFilter = 'all'; // all, PUBLISHED, PENDING, DRAFT, PAUSED, REJECTED
+  final Map<String, int> _optionCounts = {};
 
   String _normalize(String s) {
     var str = s.toLowerCase();
@@ -46,7 +47,25 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
   void initState() {
     super.initState();
     _db.addListener(_onDbChanged);
-    VendorServiceRepository().getServices();
+    _loadServicesWithCounts();
+  }
+
+  Future<void> _loadServicesWithCounts() async {
+    final list = await VendorServiceRepository().getServices();
+    for (final s in list) {
+      if (RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(s.serviceId)) {
+        VendorServiceRepository()
+            .getServiceOptions(s.serviceId)
+            .then((opts) {
+              if (mounted) {
+                setState(() {
+                  _optionCounts[s.serviceId] = opts.length;
+                });
+              }
+            })
+            .catchError((_) {});
+      }
+    }
   }
 
   @override
@@ -108,15 +127,46 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
           ),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Quản lý thiết bị & Bảo trì (Cano / Kayak / Áo phao)',
-            icon: const Icon(Icons.handyman_outlined, color: AppColors.secondary),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const VendorEquipmentScreen()),
-              );
-            },
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Tooltip(
+              message: 'Quản lý thiết bị & Phương tiện (Cano / Kayak / Áo phao)',
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const VendorEquipmentScreen()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondaryContainer.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.secondary.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.handyman_outlined, size: 15, color: AppColors.secondary),
+                      SizedBox(width: 5),
+                      LocalizedText(
+                        'Thiết bị',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.secondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
+          const SizedBox(width: 4),
           PartnerAccountAppBarButton(onPressed: widget.onOpenProfile),
         ],
       ),
@@ -228,7 +278,7 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
                       ),
                     )
                   : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+                      padding: const EdgeInsets.fromLTRB(16.0, 6.0, 16.0, 110.0),
                       itemCount: services.length,
                       itemBuilder: (context, index) {
                         final s = services[index];
@@ -400,6 +450,61 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
                     ),
 
 
+                    // Bottom row on cover: Options count & Total Photos badges
+                    Positioned(
+                      bottom: 8,
+                      right: 10,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.sell_outlined, size: 12, color: Colors.white),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${_optionCounts[service.serviceId] ?? 1} gói lựa chọn',
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.65),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.photo_library_outlined, size: 12, color: Colors.white),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${service.imageUrls.length} ảnh',
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -443,6 +548,8 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
                       children: [
                         _buildSpecBadge(Icons.access_time_rounded, '${service.durationMinutes} phút'),
                         _buildSpecBadge(Icons.people_alt_outlined, 'Tối đa ${service.maxCapacity} khách'),
+                        _buildSpecBadge(Icons.sell_outlined, '${_optionCounts[service.serviceId] ?? 1} gói bán'),
+                        _buildSpecBadge(Icons.collections_outlined, '${service.imageUrls.length} hình ảnh'),
                         if (service.meetingPointName.isNotEmpty)
                           _buildSpecBadge(Icons.place_outlined, service.meetingPointName),
                       ],

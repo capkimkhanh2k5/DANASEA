@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/status_badge.dart';
-import '../../../../core/widgets/toast_notification.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/data/vendor_store.dart';
 import '../../../../core/data/vendor_repositories.dart';
 import '../../../profile/presentation/screens/edit_profile_bank_screen.dart';
+import '../../../orders/presentation/screens/sub_order_detail_screen.dart';
 import 'payout_detail_screen.dart';
 
 class SettlementRevenueScreen extends StatefulWidget {
@@ -21,110 +20,15 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
   String _filterStatus = 'all'; // all, pending, paid
   String _selectedMonth = 'all'; // all, 2024-10, 2024-09
   bool _isBalanceVisible = true;
-  bool _isExportingCsv = false;
-
-  Future<void> _exportCsvReport() async {
-    if (_isExportingCsv) return;
-    setState(() => _isExportingCsv = true);
-    try {
-      final now = DateTime.now();
-      final from = now.subtract(const Duration(days: 30));
-      final csvText = await VendorReportRepository().exportReportCsv(
-        type: 'revenue',
-        from: from,
-        to: now,
-        groupBy: 'day',
-      );
-      if (!mounted) return;
-      setState(() => _isExportingCsv = false);
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (ctx) => Container(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.75),
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 16,
-            bottom: MediaQuery.of(ctx).padding.bottom + 20,
-          ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.file_download_done, color: AppColors.secondary, size: 22),
-                      SizedBox(width: 8),
-                      Text(
-                        'Báo cáo Doanh thu CSV',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                      ),
-                    ],
-                  ),
-                  TextButton.icon(
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: csvText));
-                      Navigator.pop(ctx);
-                      ToastNotification.showSuccess(context, 'Đã sao chép dữ liệu CSV vào bộ nhớ tạm');
-                    },
-                    icon: const Icon(Icons.copy, size: 16),
-                    label: const Text('Sao chép CSV'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Flexible(
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: SingleChildScrollView(
-                    child: SelectableText(
-                      csvText.isNotEmpty ? csvText : 'Không có dữ liệu trong khoảng thời gian này.',
-                      style: const TextStyle(fontSize: 11.5, fontFamily: 'monospace', color: AppColors.onSurface),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isExportingCsv = false);
-      ToastNotification.showError(context, 'Lỗi xuất báo cáo CSV: $e');
-    }
-  }
+  int _viewModeIndex = 0; // 0: Kỳ đối soát, 1: Dòng tiền theo đơn (Web Revenue.tsx)
+  String _orderCashflowFilter = 'all'; // all, available, escrow, refunded
 
   @override
   void initState() {
     super.initState();
     _db.addListener(_onDbChanged);
     VendorSettlementRepository().getSettlements();
+    VendorOrderRepository().getSubOrders();
   }
 
   @override
@@ -214,9 +118,9 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
             const SizedBox(height: 12),
             _buildPolicyItem(
               icon: Icons.pie_chart_outline_rounded,
-              title: 'Phí nền tảng cố định 10%',
+              title: 'Phí nền tảng DANASEA',
               desc:
-                  'Chỉ thu 10% trên các tour và ca hoạt động hoàn tất thành công. Không thu phí duy trì, không phí ẩn.',
+                  'Khấu trừ phí hoa hồng sàn theo chính sách hiện hành trên các tour và ca hoạt động hoàn tất thành công. Không thu phí duy trì, không phí ẩn.',
             ),
             const SizedBox(height: 20),
             SizedBox(
@@ -326,7 +230,7 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
       backgroundColor: const Color(0xFFF6F7F9),
       appBar: AppBar(
         title: const Text(
-          'Doanh thu của tôi',
+          'Doanh thu & Đối soát',
           style: TextStyle(
             color: AppColors.onSurface,
             fontWeight: FontWeight.bold,
@@ -344,20 +248,6 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
           },
         ),
         actions: [
-          TextButton.icon(
-            onPressed: _isExportingCsv ? null : _exportCsvReport,
-            icon: _isExportingCsv
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.secondary),
-                  )
-                : const Icon(Icons.download_outlined, size: 18, color: AppColors.secondary),
-            label: const Text(
-              'Xuất CSV',
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.secondary),
-            ),
-          ),
           IconButton(
             icon: const Icon(Icons.help_outline_rounded, color: AppColors.onSurfaceVariant),
             tooltip: 'Chính sách thanh toán',
@@ -586,7 +476,7 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                '${vendor.bankName ?? 'Ngân hàng'} ••••$bankLast4 (${vendor.bankAccountHolder ?? ''})',
+                                '${vendor.bankName ?? 'Ngân hàng'} ••••$bankLast4',
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w600,
@@ -671,170 +561,261 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 18),
-
-              // 2. SHOPEE SELLER STATUS TABS
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFECEFF1)),
-                ),
-                child: Row(
-                  children: [
-                    _buildStatusTab('all', 'Tất cả (${settlements.length})'),
-                    _buildStatusTab('pending', 'Chưa thanh toán (${pendingSettlements.length})'),
-                    _buildStatusTab('paid', 'Đã thanh toán (${paidSettlements.length})'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // 3. MONTH FILTER CHIPS
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildMonthChip('all', 'Tất cả các kỳ'),
-                    ...settlements
-                        .map((s) => '${s.periodStart.year}-${s.periodStart.month.toString().padLeft(2, '0')}')
-                        .toSet()
-                        .map((m) {
-                      final parts = m.split('-');
-                      final label = 'Tháng ${parts.length > 1 ? parts[1] : ""}/${parts.first}';
-                      return Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: _buildMonthChip(m, label),
-                      );
-                    }),
-                  ],
-                ),
-              ),
               const SizedBox(height: 14),
 
-              // 4. TRANSPARENT FINANCIAL FORMULA BREAKDOWN
+              // VIEW MODE SWITCHER: Kỳ đối soát vs Dòng tiền theo đơn (Web Revenue.tsx style)
               Container(
-                padding: const EdgeInsets.all(14),
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color(0xFFE2E8F0),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFECEFF1)),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Tổng hợp dòng tiền mục đang chọn',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.onSurface,
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _viewModeIndex = 0),
+                        borderRadius: BorderRadius.circular(11),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            color: _viewModeIndex == 0 ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(11),
+                            boxShadow: _viewModeIndex == 0
+                                ? const [BoxShadow(color: Color(0x12000000), blurRadius: 4, offset: Offset(0, 2))]
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.calendar_month_rounded,
+                                size: 16,
+                                color: _viewModeIndex == 0 ? AppColors.secondary : AppColors.tertiary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Kỳ đối soát',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: _viewModeIndex == 0 ? AppColors.secondary : AppColors.tertiary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        Text(
-                          '${filtered.length} kỳ đối soát',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.tertiary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                    const Divider(height: 16, color: Color(0xFFF1F5F9)),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Tổng doanh số dịch vụ (Gross):',
-                          style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
-                        ),
-                        Text(
-                          _formatVnd(filteredGross),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.onSurface,
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _viewModeIndex = 1),
+                        borderRadius: BorderRadius.circular(11),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            color: _viewModeIndex == 1 ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(11),
+                            boxShadow: _viewModeIndex == 1
+                                ? const [BoxShadow(color: Color(0x12000000), blurRadius: 4, offset: Offset(0, 2))]
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.receipt_long_rounded,
+                                size: 16,
+                                color: _viewModeIndex == 1 ? AppColors.secondary : AppColors.tertiary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Dòng tiền theo đơn',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: _viewModeIndex == 1 ? AppColors.secondary : AppColors.tertiary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Phí nền tảng DANASEA (~10%):',
-                          style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
-                        ),
-                        Text(
-                          '-${_formatVnd(filteredCommission)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 16, color: Color(0xFFF1F5F9)),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Thực nhận về tài khoản (Net):',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.onSurface,
-                          ),
-                        ),
-                        Text(
-                          _formatVnd(filteredNet),
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF059669),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
 
-              // 5. SETTLEMENT STATEMENTS LIST
-              if (filtered.isEmpty)
+              if (_viewModeIndex == 0) ...[
+                // 2. SHOPEE SELLER STATUS TABS
                 Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFECEFF1)),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildStatusTab('all', 'Tất cả (${settlements.length})'),
+                      _buildStatusTab('pending', 'Chưa thanh toán (${pendingSettlements.length})'),
+                      _buildStatusTab('paid', 'Đã thanh toán (${paidSettlements.length})'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // 3. MONTH FILTER CHIPS
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildMonthChip('all', 'Tất cả các kỳ'),
+                      ...settlements
+                          .map((s) => '${s.periodStart.year}-${s.periodStart.month.toString().padLeft(2, '0')}')
+                          .toSet()
+                          .map((m) {
+                        final parts = m.split('-');
+                        final label = 'Tháng ${parts.length > 1 ? parts[1] : ""}/${parts.first}';
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: _buildMonthChip(m, label),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // 4. TRANSPARENT FINANCIAL FORMULA BREAKDOWN
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFECEFF1)),
+                  ),
                   child: Column(
-                    children: const [
-                      Icon(Icons.inbox_outlined, size: 48, color: AppColors.tertiaryFixedDim),
-                      SizedBox(height: 10),
-                      Text(
-                        'Không có kỳ đối soát nào trong mục này',
-                        style: TextStyle(fontSize: 13, color: AppColors.tertiary),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Tổng hợp dòng tiền mục đang chọn',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                          Text(
+                            '${filtered.length} kỳ đối soát',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.tertiary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 16, color: Color(0xFFF1F5F9)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Tổng doanh số dịch vụ (Gross):',
+                            style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                          ),
+                          Text(
+                            _formatVnd(filteredGross),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Phí nền tảng DANASEA:',
+                            style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                          ),
+                          Text(
+                            '-${_formatVnd(filteredCommission)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 16, color: Color(0xFFF1F5F9)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Thực nhận về tài khoản (Net):',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                          Text(
+                            _formatVnd(filteredNet),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF059669),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                )
-              else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filtered.length,
-                  separatorBuilder: (ctx, idx) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final item = filtered[index];
-                    return _buildShopeeSettlementCard(item, vendor);
-                  },
                 ),
+                const SizedBox(height: 16),
+
+                // 5. SETTLEMENT STATEMENTS LIST
+                if (filtered.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    alignment: Alignment.center,
+                    child: Column(
+                      children: const [
+                        Icon(Icons.inbox_outlined, size: 48, color: AppColors.tertiaryFixedDim),
+                        SizedBox(height: 10),
+                        Text(
+                          'Không có kỳ đối soát nào trong mục này',
+                          style: TextStyle(fontSize: 13, color: AppColors.tertiary),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: filtered.length,
+                    separatorBuilder: (ctx, idx) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final item = filtered[index];
+                      return _buildShopeeSettlementCard(item, vendor);
+                    },
+                  ),
+              ] else ...[
+                // Dòng tiền theo đơn (Web Revenue.tsx style)
+                _buildOrderCashflowSection(),
+              ],
               const SizedBox(height: 32),
             ],
           ),
@@ -933,43 +914,52 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.receipt_rounded,
-                          size: 16,
-                          color: AppColors.secondary,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.id,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.onSurface,
-                            ),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          Text(
-                            'Kỳ: ${item.periodStart.day}/${item.periodStart.month} - ${item.periodEnd.day}/${item.periodEnd.month}/${item.periodEnd.year} • ${item.orderCount} đơn',
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.tertiary,
-                            ),
+                          child: const Icon(
+                            Icons.receipt_rounded,
+                            size: 16,
+                            color: AppColors.secondary,
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.id,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.onSurface,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'Kỳ: ${item.periodStart.day}/${item.periodStart.month} - ${item.periodEnd.day}/${item.periodEnd.month}/${item.periodEnd.year} • ${item.orderCount} đơn',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.tertiary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   StatusBadge(status: item.status.toBadgeStatus()),
                 ],
               ),
@@ -993,7 +983,7 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
                       ),
                     ),
                     Text(
-                      'Phí sàn (10%): -${_formatVnd(item.commissionAmount)}',
+                      'Phí sàn: -${_formatVnd(item.commissionAmount)}',
                       style: const TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
@@ -1062,5 +1052,341 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildOrderCashflowSection() {
+    final subOrders = _db.subOrders;
+    final availableOrders = subOrders.where((o) => o.status == SubOrderStatus.completed).toList();
+    final escrowOrders = subOrders.where((o) => o.status == SubOrderStatus.confirmed || o.status == SubOrderStatus.pending).toList();
+    final refundedOrders = subOrders.where((o) => o.status == SubOrderStatus.refunded).toList();
+
+    final double availableTotal = availableOrders.fold(0.0, (acc, o) => acc + (o.vendorPayoutAmount > 0 ? o.vendorPayoutAmount : o.totalPrice * 0.9));
+    final double escrowTotal = escrowOrders.fold(0.0, (acc, o) => acc + (o.vendorPayoutAmount > 0 ? o.vendorPayoutAmount : o.totalPrice * 0.9));
+    final double refundedTotal = refundedOrders.fold(0.0, (acc, o) => acc + o.totalPrice);
+
+    List<SubOrderModel> displayOrders = subOrders;
+    if (_orderCashflowFilter == 'available') {
+      displayOrders = availableOrders;
+    } else if (_orderCashflowFilter == 'escrow') {
+      displayOrders = escrowOrders;
+    } else if (_orderCashflowFilter == 'refunded') {
+      displayOrders = refundedOrders;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. Metric Breakdown Bar
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFECEFF1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.show_chart_rounded, size: 16, color: AppColors.secondary),
+                  SizedBox(width: 6),
+                  Text(
+                    'Phân bổ dòng tiền theo trạng thái tour',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildCashflowMetricItem(
+                      label: 'Khả dụng',
+                      amount: availableTotal,
+                      color: const Color(0xFF059669),
+                      icon: Icons.check_circle_outline_rounded,
+                    ),
+                  ),
+                  Container(width: 1, height: 36, color: const Color(0xFFE2E8F0)),
+                  Expanded(
+                    child: _buildCashflowMetricItem(
+                      label: 'Đang ký quỹ',
+                      amount: escrowTotal,
+                      color: const Color(0xFFD97706),
+                      icon: Icons.hourglass_top_rounded,
+                    ),
+                  ),
+                  Container(width: 1, height: 36, color: const Color(0xFFE2E8F0)),
+                  Expanded(
+                    child: _buildCashflowMetricItem(
+                      label: 'Đã hoàn tiền',
+                      amount: refundedTotal,
+                      color: const Color(0xFFDC2626),
+                      icon: Icons.replay_rounded,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // 2. Sub-filter Horizontal Chips
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildCashflowFilterChip('all', 'Tất cả (${subOrders.length})'),
+              const SizedBox(width: 8),
+              _buildCashflowFilterChip('available', 'Khả dụng (${availableOrders.length})'),
+              const SizedBox(width: 8),
+              _buildCashflowFilterChip('escrow', 'Đang ký quỹ (${escrowOrders.length})'),
+              const SizedBox(width: 8),
+              _buildCashflowFilterChip('refunded', 'Đã hoàn (${refundedOrders.length})'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 3. Orders List
+        if (displayOrders.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 40),
+            alignment: Alignment.center,
+            child: const Column(
+              children: [
+                Icon(Icons.inbox_outlined, size: 48, color: AppColors.tertiaryFixedDim),
+                SizedBox(height: 10),
+                Text(
+                  'Không có đơn hàng nào trong phân loại này',
+                  style: TextStyle(fontSize: 13, color: AppColors.tertiary),
+                ),
+              ],
+            ),
+          )
+        else
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: displayOrders.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            itemBuilder: (context, index) {
+              final order = displayOrders[index];
+              final isRefunded = order.status == SubOrderStatus.refunded;
+              final double netPayout = order.vendorPayoutAmount > 0
+                  ? order.vendorPayoutAmount
+                  : (isRefunded ? 0.0 : order.totalPrice * 0.9);
+              final double fee = order.commissionAmount > 0
+                  ? order.commissionAmount
+                  : (isRefunded ? 0.0 : order.totalPrice * 0.1);
+
+              return InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SubOrderDetailScreen(subOrder: order),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFECEFF1)),
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x06000000), blurRadius: 4, offset: Offset(0, 2)),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    '#${order.subOrderCode}',
+                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    order.slotTime.isNotEmpty ? order.slotTime : 'Slot chung',
+                                    style: const TextStyle(fontSize: 10, color: AppColors.tertiary, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildCashflowStatusBadge(order.status),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        order.serviceName,
+                        style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${order.customerName} • Ngày đi: ${order.slotDate.isNotEmpty ? order.slotDate : "${order.createdAt.day}/${order.createdAt.month}/${order.createdAt.year}"}',
+                        style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
+                      ),
+                      const Divider(height: 16, color: Color(0xFFF1F5F9)),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Giá tour: ${_formatVnd(order.totalPrice)}',
+                                style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
+                              ),
+                              Text(
+                                'Phí sàn: -${_formatVnd(fee)}',
+                                style: const TextStyle(fontSize: 10.5, color: Color(0xFFEF4444)),
+                              ),
+                            ],
+                          ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              const Text(
+                                'Doanh thu ròng nhận được',
+                                style: TextStyle(fontSize: 10, color: AppColors.tertiary),
+                              ),
+                              Text(
+                                isRefunded ? '0 đ (Đã hoàn)' : '+ ${_formatVnd(netPayout)}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: isRefunded ? const Color(0xFFEF4444) : const Color(0xFF059669),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildCashflowMetricItem({
+    required String label,
+    required double amount,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Column(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10.5, color: AppColors.tertiary, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          _formatVnd(amount),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCashflowFilterChip(String key, String label) {
+    final isSelected = _orderCashflowFilter == key;
+    return InkWell(
+      onTap: () => setState(() => _orderCashflowFilter = key),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.secondary : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.secondary : const Color(0xFFCBD5E1),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+            color: isSelected ? Colors.white : AppColors.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCashflowStatusBadge(SubOrderStatus status) {
+    if (status == SubOrderStatus.completed) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFECFDF5),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFA7F3D0)),
+        ),
+        child: const Text(
+          'Khả dụng',
+          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+        ),
+      );
+    } else if (status == SubOrderStatus.refunded) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFECACA)),
+        ),
+        child: const Text(
+          'Đã hoàn tiền',
+          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+        ),
+      );
+    } else {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFFDE68A)),
+        ),
+        child: const Text(
+          'Đang ký quỹ',
+          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFFD97706)),
+        ),
+      );
+    }
   }
 }

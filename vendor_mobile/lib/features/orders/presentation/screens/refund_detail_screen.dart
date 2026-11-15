@@ -63,6 +63,12 @@ class RefundDetailScreen extends StatelessWidget {
             slotTime: '',
             createdAt: refund.processedAt ?? DateTime.now(),
           ));
+
+    final double originalTotal = subOrder.totalPrice > 0 ? subOrder.totalPrice : refund.originalSubtotal;
+    final double refundAmount = refund.amount;
+    final double vendorRetained = (originalTotal - refundAmount).clamp(0.0, double.infinity);
+    final String refundPercent = (refund.percentage * 100).toStringAsFixed(0);
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
@@ -439,6 +445,61 @@ class RefundDetailScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 14),
+
+              // Financial Reconciliation Breakdown Card (Bảng đối chiếu hoàn tiền & doanh thu giữ lại)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLowest,
+                  borderRadius: AppShapes.radiusMd,
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: AppShapes.shadowSm,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.account_balance_wallet_outlined, size: 18, color: AppColors.secondary),
+                        SizedBox(width: 8),
+                        Text(
+                          'Đối chiếu Hoàn tiền & Doanh thu',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.navyAnchor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _buildReconciliationRow(
+                      label: 'Tổng giá trị đơn ban đầu',
+                      value: '+ ${_formatVnd(originalTotal)}',
+                      valueColor: AppColors.onSurface,
+                      isBold: false,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildReconciliationRow(
+                      label: 'Số tiền hoàn trả khách ($refundPercent%)',
+                      value: '- ${_formatVnd(refundAmount)}',
+                      valueColor: const Color(0xFFDC2626),
+                      isBold: false,
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
+                      child: Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+                    ),
+                    _buildReconciliationRow(
+                      label: 'Phần doanh thu đối tác giữ lại',
+                      value: '= ${_formatVnd(vendorRetained)}',
+                      valueColor: const Color(0xFF059669),
+                      isBold: true,
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 16),
 
               // Read-only advisory notice
@@ -464,6 +525,39 @@ class RefundDetailScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  String _formatVnd(double val) {
+    return '${val.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')} đ';
+  }
+
+  Widget _buildReconciliationRow({
+    required String label,
+    required String value,
+    required Color valueColor,
+    required bool isBold,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: isBold ? 13 : 12,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+            color: isBold ? AppColors.navyAnchor : AppColors.tertiary,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: isBold ? 14 : 12.5,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+            color: valueColor,
+          ),
+        ),
+      ],
     );
   }
 }
