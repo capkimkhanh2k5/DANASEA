@@ -97,13 +97,7 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
         weather.waveHeightM > 1.2 ||
         !(_advanceSafety?.canBook ?? true);
 
-    final firstSlot = _db.slots.isNotEmpty ? _db.slots.first : null;
     final targetSlot = _db.slots.isNotEmpty ? _db.slots.last : null;
-    final firstService = _db.services.isNotEmpty ? _db.services.first : null;
-    final serviceName = firstService?.name ?? 'Trải nghiệm thể thao biển';
-    final locationName = (firstService?.locationName != null && firstService!.locationName.isNotEmpty)
-        ? firstService.locationName
-        : (weather.locationName.isNotEmpty ? weather.locationName : '51 Võ Nguyên Giáp, Đà Nẵng');
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -263,190 +257,8 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // Only show detailed slot cards when filtering "An toàn biển" or when there is active marine risk
-                if (_selectedFilter == 'sea_safety' || isSeaWeatherRisky) ...[
-                  // Slot Safety Monitor Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                      boxShadow: const [
-                        BoxShadow(color: Color(0x06000000), blurRadius: 8, offset: Offset(0, 2)),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Row 1: Service Name + Status Badge
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    serviceName,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.navyAnchor,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                                  decoration: BoxDecoration(
-                                    color: (_advanceSafety?.canBook ?? true)
-                                        ? const Color(0xFFECFDF5)
-                                        : const Color(0xFFFEF2F2),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: (_advanceSafety?.canBook ?? true)
-                                          ? const Color(0xFFA7F3D0)
-                                          : const Color(0xFFFECACA),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        (_advanceSafety?.canBook ?? true)
-                                            ? Icons.check_circle_rounded
-                                            : Icons.warning_rounded,
-                                        size: 13,
-                                        color: (_advanceSafety?.canBook ?? true)
-                                            ? const Color(0xFF059669)
-                                            : const Color(0xFFDC2626),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        (_advanceSafety?.canBook ?? true)
-                                            ? 'Đủ điều kiện xuất bến'
-                                            : 'Cần theo dõi',
-                                        style: TextStyle(
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: (_advanceSafety?.canBook ?? true)
-                                              ? const Color(0xFF059669)
-                                              : const Color(0xFFDC2626),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.schedule_rounded, size: 13, color: AppColors.secondary),
-                                const SizedBox(width: 4),
-                                Text(
-                                  firstSlot != null
-                                      ? 'Ca ${_formatTime(firstSlot.startTime)} - ${_formatTime(firstSlot.endTime)}'
-                                      : 'Các ca chạy hôm nay',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.onSurface),
-                                ),
-                                if (locationName.isNotEmpty) ...[
-                                  const SizedBox(width: 8),
-                                  const Text('•', style: TextStyle(color: AppColors.tertiary)),
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.location_on_outlined, size: 13, color: AppColors.tertiary),
-                                  const SizedBox(width: 3),
-                                  Expanded(
-                                    child: Text(
-                                      locationName,
-                                      style: const TextStyle(fontSize: 11.5, color: AppColors.tertiary),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-
-                        // Metric Boxes
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildMetricBox(
-                                icon: Icons.air,
-                                label: 'Sức gió',
-                                value: '${weather.windSpeedKmh.toStringAsFixed(0)} km/h',
-                                sub: firstService != null && firstService.minWindKmh > 0
-                                    ? '< ${firstService.minWindKmh.toStringAsFixed(0)} km/h'
-                                    : '< 25 km/h',
-                                color: weather.windSpeedKmh <= 25 ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _buildMetricBox(
-                                icon: Icons.tsunami,
-                                label: 'Độ cao sóng',
-                                value: '${weather.waveHeightM.toStringAsFixed(1)} m',
-                                sub: firstService != null && firstService.maxWaveM > 0
-                                    ? '< ${firstService.maxWaveM.toStringAsFixed(1)} m'
-                                    : '< 1.2 m',
-                                color: weather.waveHeightM <= 1.2 ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: _buildMetricBox(
-                                icon: Icons.wb_sunny_outlined,
-                                label: 'Lượng mưa',
-                                value: '${weather.precipitationMm.toStringAsFixed(1)} mm',
-                                sub: weather.precipitationMm <= 0.5 ? 'Trời quang' : 'Có mưa',
-                                color: const Color(0xFF0284C7),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Safety advisory summary note
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFF1F5F9)),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(Icons.info_outline_rounded, size: 15, color: AppColors.secondary),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  (_advanceSafety != null && _advanceSafety!.summaryMessage.isNotEmpty)
-                                      ? _advanceSafety!.summaryMessage
-                                      : ((weather.windSpeedKmh <= 25 && weather.waveHeightM <= 1.2)
-                                          ? 'Mặt nước êm ái, hướng gió thuận lợi cho các hoạt động thể thao biển.'
-                                          : 'Sóng gió đang tăng cao, vui lòng kiểm tra trang thiết bị bảo hộ trước khi xuất bến.'),
-                                  style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant, height: 1.35),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Slot Status or Disruption Card
-                  if (isSeaWeatherRisky && targetSlot != null) ...[
+                // Chỉ khi nào biển có rủi ro/bão thật sự mới hiện banner đỏ cảnh báo ca chạy
+                if (isSeaWeatherRisky && targetSlot != null) ...[
                     // High-Risk Alert Card
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -539,55 +351,7 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                  ] else ...[
-                    // Calm & Normal Weather Reassuring Card
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFECFDF5),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.check_circle_outline_rounded, size: 20, color: Color(0xFF059669)),
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Tất cả ca chạy an toàn xuất bến',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                                ),
-                                SizedBox(height: 2),
-                                Text(
-                                  'Không có cảnh báo rủi ro thời tiết tại bãi biển.',
-                                  style: TextStyle(fontSize: 11, color: AppColors.tertiary),
-                                ),
-                              ],
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () => widget.onNavigateTab?.call(2),
-                            child: const Text(
-                              'Lịch ca',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondary),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                   ],
-                ],
 
                 // Notification List Section
                 Row(
@@ -672,44 +436,6 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
             color: active ? AppColors.onSecondary : AppColors.onSurfaceVariant,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildMetricBox({
-    required IconData icon,
-    required String label,
-    required String value,
-    required String sub,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 14, color: color),
-              const SizedBox(width: 4),
-              Flexible(
-                child: LocalizedText(
-                  label,
-                  style: const TextStyle(fontSize: 10, color: AppColors.tertiary),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          LocalizedText(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 2),
-          LocalizedText(sub, style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-        ],
       ),
     );
   }
