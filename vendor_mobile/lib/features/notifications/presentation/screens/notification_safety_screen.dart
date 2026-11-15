@@ -177,6 +177,56 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
               ),
               const SizedBox(height: 14),
 
+              // 3 Marine Safety Quick Metrics (Chiều cao sóng, Tốc độ gió, Khuyến nghị an toàn)
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildTopMarineKpiCard(
+                      icon: Icons.waves_rounded,
+                      iconColor: const Color(0xFF0284C7),
+                      iconBg: const Color(0xFFE0F2FE),
+                      label: 'Chiều cao sóng',
+                      value: '${weather.waveHeightM.toStringAsFixed(1)} m',
+                      status: weather.waveHeightM <= 1.2 ? 'Sóng êm' : (weather.waveHeightM <= 2.0 ? 'Sóng vừa' : 'Sóng lớn'),
+                      statusColor: weather.waveHeightM <= 1.2 ? const Color(0xFF059669) : const Color(0xFFD97706),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildTopMarineKpiCard(
+                      icon: Icons.air_rounded,
+                      iconColor: const Color(0xFF0D9488),
+                      iconBg: const Color(0xFFCCFBF1),
+                      label: 'Tốc độ gió',
+                      value: '${weather.windSpeedKmh.toStringAsFixed(0)} km/h',
+                      status: weather.windSpeedKmh <= 25 ? 'Gió nhẹ' : 'Gió giật',
+                      statusColor: weather.windSpeedKmh <= 25 ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildTopMarineKpiCard(
+                      icon: (_advanceSafety?.canBook ?? true)
+                          ? Icons.verified_user_rounded
+                          : Icons.warning_amber_rounded,
+                      iconColor: (_advanceSafety?.canBook ?? true)
+                          ? const Color(0xFF059669)
+                          : const Color(0xFFD97706),
+                      iconBg: (_advanceSafety?.canBook ?? true)
+                          ? const Color(0xFFD1FAE5)
+                          : const Color(0xFFFEF3C7),
+                      label: 'Khuyến nghị',
+                      value: (_advanceSafety?.canBook ?? true) ? 'An toàn' : 'Cảnh giác',
+                      status: (_advanceSafety?.canBook ?? true) ? 'Cho chạy' : 'Hạn chế',
+                      statusColor: (_advanceSafety?.canBook ?? true)
+                          ? const Color(0xFF059669)
+                          : const Color(0xFFD97706),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
               // Filter Tabs
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
@@ -764,6 +814,65 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTopMarineKpiCard({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String label,
+    required String value,
+    required String status,
+    required Color statusColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(8)),
+                child: Icon(icon, color: iconColor, size: 16),
+              ),
+              Text(
+                status,
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w800,
+              color: AppColors.navyAnchor,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10.5, color: AppColors.tertiary),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

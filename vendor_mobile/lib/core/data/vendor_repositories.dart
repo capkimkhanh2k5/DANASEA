@@ -990,11 +990,23 @@ class VendorOrderRepository implements IVendorOrderRepository {
     final subtotal = (json['subtotalAmount'] as num?)?.toDouble() ??
         (json['subtotal'] as num?)?.toDouble() ??
         (unitPrice * quantity);
-    final commissionRate = (json['commissionRate'] as num?)?.toDouble() ?? 0.0;
-    final commissionAmount = (json['commissionAmount'] as num?)?.toDouble() ?? (subtotal * commissionRate / 100);
-    final vendorPayout = (json['finalAmount'] as num?)?.toDouble() ??
-        (json['vendorPayoutAmount'] as num?)?.toDouble() ??
-        (subtotal - commissionAmount);
+    double rawRate = (json['commissionRate'] as num?)?.toDouble() ?? 10.0;
+    if (rawRate <= 0) {
+      rawRate = 10.0; // Mặc định 10% theo chính sách phí sàn DANASEA
+    }
+    final commissionRate = rawRate <= 1.0 ? rawRate * 100 : rawRate;
+    final rawCommAmount = (json['commissionAmount'] as num?)?.toDouble();
+    final commissionAmount = (rawCommAmount != null && rawCommAmount > 0)
+        ? rawCommAmount
+        : (subtotal * commissionRate / 100);
+
+    final rawFinalAmount = (json['finalAmount'] as num?)?.toDouble();
+    final rawVendorPayout = (json['vendorPayoutAmount'] as num?)?.toDouble();
+    final vendorPayout = (rawFinalAmount != null && rawFinalAmount > 0)
+        ? rawFinalAmount
+        : (rawVendorPayout != null && rawVendorPayout > 0)
+            ? rawVendorPayout
+            : (subtotal - commissionAmount);
 
     final id = json['id']?.toString() ?? json['itemId']?.toString() ?? '';
     final masterId = json['masterOrderId']?.toString() ?? json['bookingId']?.toString() ?? id;

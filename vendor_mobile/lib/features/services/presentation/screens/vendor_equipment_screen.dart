@@ -36,6 +36,106 @@ class _VendorEquipmentScreenState extends State<VendorEquipmentScreen> {
     }
   }
 
+  Widget _buildTopMetricsSummary(int total, int ready, int maintenance) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildMetricTile(
+              label: 'Tổng thiết bị',
+              value: '$total',
+              color: AppColors.secondary,
+              icon: Icons.directions_boat_outlined,
+              bg: const Color(0xFFE0F2FE),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildMetricTile(
+              label: 'Sẵn sàng chạy',
+              value: '$ready',
+              color: const Color(0xFF059669),
+              icon: Icons.check_circle_outline,
+              bg: const Color(0xFFDCFCE7),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _buildMetricTile(
+              label: 'Đang bảo trì',
+              value: '$maintenance',
+              color: const Color(0xFFD97706),
+              icon: Icons.build_circle_outlined,
+              bg: const Color(0xFFFEF3C7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricTile({
+    required String label,
+    required String value,
+    required Color color,
+    required IconData icon,
+    required Color bg,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 4,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 14, color: color),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF64748B),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _openCreateEquipmentSheet() async {
     final nameCtrl = TextEditingController();
     final capCtrl = TextEditingController(text: '2');
@@ -383,124 +483,167 @@ class _VendorEquipmentScreenState extends State<VendorEquipmentScreen> {
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
-            : _equipmentList.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.directions_boat_filled_outlined, size: 52, color: AppColors.tertiary),
-                          const SizedBox(height: 12),
-                          const LocalizedText(
-                            'Chưa có thiết bị nào được đăng ký (Cano, Kayak, SUP, Áo phao).',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 14, color: AppColors.tertiary),
-                          ),
-                          const SizedBox(height: 14),
-                          ElevatedButton.icon(
-                            onPressed: _openCreateEquipmentSheet,
-                            icon: const Icon(Icons.add),
-                            label: const LocalizedText('Đăng ký thiết bị đầu tiên'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.secondary,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-                    itemCount: _equipmentList.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final eq = _equipmentList[index];
-                      final maint = _latestMaintenance[eq.id];
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLowest,
-                          borderRadius: AppShapes.radiusMd,
-                          border: Border.all(color: AppColors.borderSubtle),
-                          boxShadow: AppShapes.shadowSm,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.secondaryContainer.withValues(alpha: 0.5),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.kayaking, color: AppColors.secondary, size: 20),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        eq.name,
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.onSurface,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Nhóm: ${eq.compatibilityGroup} • Sức chứa: ${eq.capacity} khách',
-                                        style: const TextStyle(fontSize: 12, color: AppColors.tertiary),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: () => _openMaintenanceSheet(eq),
-                                  icon: const Icon(Icons.build_outlined, size: 14),
-                                  label: const LocalizedText('Bảo trì', style: TextStyle(fontSize: 11.5)),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: AppColors.primary,
-                                    side: const BorderSide(color: AppColors.primary),
-                                    visualDensity: VisualDensity.compact,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (maint != null) ...[
-                              const SizedBox(height: 10),
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryFixed.withValues(alpha: 0.35),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.handyman_outlined, size: 16, color: AppColors.primary),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Lịch bảo trì: ${maint.start} → ${maint.end} • ${maint.reason}',
-                                        style: const TextStyle(fontSize: 11.5, color: AppColors.onSurface),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+            : Column(
+                children: [
+                  Builder(
+                    builder: (context) {
+                      final totalEquipment = _equipmentList.length;
+                      final inMaintenance = _equipmentList
+                          .where((eq) => _latestMaintenance[eq.id] != null)
+                          .length;
+                      final readyToRun = (totalEquipment - inMaintenance) > 0
+                          ? (totalEquipment - inMaintenance)
+                          : 0;
+                      return _buildTopMetricsSummary(
+                        totalEquipment,
+                        readyToRun,
+                        inMaintenance,
                       );
                     },
                   ),
+                  const SizedBox(height: 4),
+                  Expanded(
+                    child: _equipmentList.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.directions_boat_filled_outlined,
+                                      size: 52, color: AppColors.tertiary),
+                                  const SizedBox(height: 12),
+                                  const LocalizedText(
+                                    'Chưa có thiết bị nào được đăng ký (Cano, Kayak, SUP, Áo phao).',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        fontSize: 14, color: AppColors.tertiary),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  ElevatedButton.icon(
+                                    onPressed: _openCreateEquipmentSheet,
+                                    icon: const Icon(Icons.add),
+                                    label: const LocalizedText(
+                                        'Đăng ký thiết bị đầu tiên'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.secondary,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                            itemCount: _equipmentList.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final eq = _equipmentList[index];
+                              final maint = _latestMaintenance[eq.id];
+                              return Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceContainerLowest,
+                                  borderRadius: AppShapes.radiusMd,
+                                  border: Border.all(color: AppColors.borderSubtle),
+                                  boxShadow: AppShapes.shadowSm,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.secondaryContainer
+                                                .withValues(alpha: 0.5),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(Icons.kayaking,
+                                              color: AppColors.secondary, size: 20),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                eq.name,
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.onSurface,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'Nhóm: ${eq.compatibilityGroup} • Sức chứa: ${eq.capacity} khách',
+                                                style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: AppColors.tertiary),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        OutlinedButton.icon(
+                                          onPressed: () =>
+                                              _openMaintenanceSheet(eq),
+                                          icon: const Icon(Icons.build_outlined,
+                                              size: 14),
+                                          label: const LocalizedText('Bảo trì',
+                                              style: TextStyle(fontSize: 11.5)),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: AppColors.primary,
+                                            side: const BorderSide(
+                                                color: AppColors.primary),
+                                            visualDensity: VisualDensity.compact,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(16)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (maint != null) ...[
+                                      const SizedBox(height: 10),
+                                      Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryFixed
+                                              .withValues(alpha: 0.35),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.handyman_outlined,
+                                                size: 16,
+                                                color: AppColors.primary),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                'Lịch bảo trì: ${maint.start} → ${maint.end} • ${maint.reason}',
+                                                style: const TextStyle(
+                                                    fontSize: 11.5,
+                                                    color: AppColors.onSurface),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
       ),
     );
   }

@@ -16,6 +16,7 @@ import '../../../reviews/presentation/screens/review_feedback_screen.dart';
 import '../../../vouchers/presentation/screens/voucher_management_screen.dart';
 import '../../../settlements/presentation/screens/settlement_revenue_screen.dart';
 import '../../../settlements/presentation/screens/payout_detail_screen.dart';
+import '../../../analytics/presentation/screens/analytics_dashboard_screen.dart';
 import '../../../disputes/presentation/screens/dispute_management_screen.dart';
 import '../../../../core/widgets/symbolic_vendor_avatar.dart';
 
@@ -153,7 +154,7 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
 
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 60),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -492,6 +493,17 @@ class _PartnerAccountScreenState extends State<PartnerAccountScreen> {
               ),
               child: Column(
                 children: [
+                  _buildMenuItem(
+                    icon: Icons.bar_chart_rounded,
+                    iconBgColor: AppColors.secondaryContainer.withAlpha(80),
+                    iconColor: AppColors.secondary,
+                    title: 'Báo cáo phân tích kinh doanh',
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (ctx) => const AnalyticsDashboardScreen()),
+                    ),
+                  ),
+                  const Divider(height: 1, color: AppColors.surfaceContainerHigh),
                   _buildMenuItem(
                     icon: Icons.query_stats_outlined,
                     iconBgColor: AppColors.secondaryContainer.withAlpha(80),

@@ -118,7 +118,7 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 6.0, 16.0, 110.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -566,46 +566,140 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
           ),
           const SizedBox(height: 8),
 
-          // Capacity & Booked row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const LocalizedText('Khách đã đặt: ', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
-                  LocalizedText(
-                    '${slot.bookedCount}',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
-                  ),
-                  LocalizedText(' / ${slot.capacity} khách', style: const TextStyle(fontSize: 11, color: AppColors.tertiary)),
-                ],
-              ),
-              if (slot.heldCount > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.surfaceContainerHigh, borderRadius: BorderRadius.circular(6)),
-                  child: LocalizedText('Tạm giữ: ${slot.heldCount}', style: const TextStyle(fontSize: 10, color: AppColors.tertiary)),
+          // Occupancy Bar (Thanh tiến độ lấp đầy chỗ)
+          Builder(
+            builder: (context) {
+              final double fillRatio = slot.capacity > 0
+                  ? (slot.bookedCount / slot.capacity).clamp(0.0, 1.0)
+                  : 0.0;
+              final int fillPercent = (fillRatio * 100).round();
+              final Color occupancyColor = slot.isBlocked
+                  ? const Color(0xFF94A3B8)
+                  : (fillRatio >= 1.0
+                      ? const Color(0xFFDC2626)
+                      : (fillRatio >= 0.8
+                          ? const Color(0xFFD97706)
+                          : (fillRatio >= 0.4
+                              ? const Color(0xFF0D9488)
+                              : const Color(0xFF004D56))));
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
-            ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'Tiến độ lấp đầy chỗ: ',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                            Text(
+                              '$fillPercent%',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.bold,
+                                color: occupancyColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '${slot.bookedCount}/${slot.capacity} khách${slot.heldCount > 0 ? ' (tạm giữ ${slot.heldCount})' : ''}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: occupancyColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: fillRatio,
+                        minHeight: 6,
+                        backgroundColor: const Color(0xFFE2E8F0),
+                        valueColor: AlwaysStoppedAnimation<Color>(occupancyColor),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: LinearProgressIndicator(
-              value: slot.capacity > 0 ? (slot.bookedCount / slot.capacity).clamp(0.0, 1.0) : 0,
-              minHeight: 4,
-              backgroundColor: AppColors.surfaceContainerHigh,
-              valueColor: AlwaysStoppedAnimation<Color>(slot.isBlocked ? AppColors.tertiary : AppColors.secondary),
-            ),
-          ),
-          if (slot.units.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Đơn vị thuyền/cano: ${slot.units.map((u) => 'Đơn vị #${u['unitNumber']} (${u['capacity']} chỗ)').join(' • ')}',
-              style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.secondary),
-            ),
-          ],
           const SizedBox(height: 8),
+
+          // Chip thuyền nhỏ cho ca chia theo thuyền (SHARED_CAPACITY_UNITS)
+          if (slot.inventoryType == 'SHARED_CAPACITY_UNITS' || slot.units.isNotEmpty) ...[
+            const Text(
+              'Đơn vị thuyền / cano (Bấm để gán thiết bị nhanh):',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: (slot.units.isNotEmpty
+                      ? slot.units
+                      : [
+                          {'unitNumber': 1, 'capacity': (slot.capacity / 2).ceil()},
+                          {'unitNumber': 2, 'capacity': (slot.capacity / 2).floor()},
+                        ])
+                  .map((u) {
+                final uNum = u['unitNumber'] ?? 1;
+                final uCap = u['capacity'] ?? 0;
+                return InkWell(
+                  onTap: () => _showAssignEquipmentDialog(slot, initialUnitNumber: uNum),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0F2FE),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFBAE6FD)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.directions_boat_filled_outlined,
+                            size: 13, color: Color(0xFF0369A1)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Thuyền #$uNum ($uCap chỗ)',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0369A1),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.add_link, size: 12, color: Color(0xFF0284C7)),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 8),
+          ],
 
           // Actions
           if (slot.status != SlotStatus.cancelled)
@@ -885,7 +979,7 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
     );
   }
 
-  Future<void> _showAssignEquipmentDialog(ServiceSlotModel slot) async {
+  Future<void> _showAssignEquipmentDialog(ServiceSlotModel slot, {int? initialUnitNumber}) async {
     final equipmentRepo = VendorEquipmentRepository();
     List<VendorEquipmentModel> equipmentList = [];
     bool isLoadingEq = true;
@@ -894,7 +988,7 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
     final availableUnits = slot.units.isNotEmpty
         ? slot.units.map((u) => u['unitNumber'] ?? 1).toList()
         : <int>[1];
-    int selectedUnitNumber = availableUnits.first;
+    int selectedUnitNumber = initialUnitNumber ?? availableUnits.first;
     final customUnitController = TextEditingController(text: selectedUnitNumber.toString());
 
     equipmentRepo.listEquipment().then((list) {
@@ -1309,7 +1403,7 @@ class _OperatingScheduleModalState extends State<_OperatingScheduleModal> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Thời gian áp dụng: $_startsOn  đến  $_endsOn',
+                    'Thời gian áp dụng: ${_startsOn.isNotEmpty ? _startsOn : "Từ hôm nay"} ${_endsOn.isNotEmpty ? "đến $_endsOn" : "(Không thời hạn)"}',
                     style: const TextStyle(fontSize: 13, color: AppColors.tertiary),
                   ),
                   const SizedBox(height: 16),
@@ -1338,12 +1432,20 @@ class _OperatingScheduleModalState extends State<_OperatingScheduleModal> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Ngày nghỉ / Bảo trì (Ngoại lệ)',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                      const Expanded(
+                        child: Text(
+                          'Ngày nghỉ / Bảo trì (Ngoại lệ)',
+                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
+                      const SizedBox(width: 4),
                       TextButton.icon(
                         onPressed: _promptAddException,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                          visualDensity: VisualDensity.compact,
+                        ),
                         icon: const Icon(Icons.add_circle_outline, size: 16, color: AppColors.secondary),
                         label: const Text(
                           'Thêm ngày nghỉ',

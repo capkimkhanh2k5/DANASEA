@@ -354,7 +354,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppShapes.gutterMobile),
+        padding: const EdgeInsets.fromLTRB(
+          AppShapes.gutterMobile,
+          AppShapes.gutterMobile,
+          AppShapes.gutterMobile,
+          110.0,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

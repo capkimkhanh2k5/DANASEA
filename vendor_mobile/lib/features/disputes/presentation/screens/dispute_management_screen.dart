@@ -182,7 +182,7 @@ class _DisputeManagementScreenState extends State<DisputeManagementScreen> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -268,19 +268,62 @@ class _DisputeManagementScreenState extends State<DisputeManagementScreen> {
 
   Widget _buildDisputeCard(DisputeModel dispute) {
     final isResolved = dispute.status == DisputeStatus.resolved;
+    final isOpen = dispute.status == DisputeStatus.open;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(AppShapes.rLg),
-        boxShadow: const [
-          BoxShadow(color: Color(0x08000000), blurRadius: 6, offset: Offset(0, 2)),
+        border: Border(
+          left: BorderSide(
+            color: isOpen ? const Color(0xFFEA580C) : const Color(0xFFE2E8F0),
+            width: isOpen ? 4.5 : 1,
+          ),
+          top: BorderSide(color: isOpen ? const Color(0xFFFED7AA) : const Color(0xFFE2E8F0)),
+          right: BorderSide(color: isOpen ? const Color(0xFFFED7AA) : const Color(0xFFE2E8F0)),
+          bottom: BorderSide(color: isOpen ? const Color(0xFFFED7AA) : const Color(0xFFE2E8F0)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isOpen ? const Color(0x1AEA580C) : const Color(0x08000000),
+            blurRadius: isOpen ? 8 : 4,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Urgency Reminder Badge for OPEN Disputes
+          if (isOpen) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFDBA74)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFEA580C)),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'CẦN GIẢI TRÌNH: Vui lòng gửi bằng chứng sớm để bảo vệ quyền lợi đối tác!',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFC2410C),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           // Header Bar
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,11 +552,14 @@ class _DisputeManagementScreenState extends State<DisputeManagementScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _showAddEvidenceDialog(dispute),
-                    icon: const Icon(Icons.upload_file, size: 15),
-                    label: const LocalizedText('Gửi minh chứng', style: TextStyle(fontSize: 12)),
+                    icon: Icon(isOpen ? Icons.priority_high_rounded : Icons.upload_file, size: 15),
+                    label: LocalizedText(
+                      isOpen ? 'Nộp giải trình ngay' : 'Gửi minh chứng',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondaryFixed,
-                      foregroundColor: AppColors.onSecondaryFixed,
+                      backgroundColor: isOpen ? const Color(0xFFEA580C) : AppColors.secondaryFixed,
+                      foregroundColor: isOpen ? Colors.white : AppColors.onSecondaryFixed,
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppShapes.rFull)),
                       padding: const EdgeInsets.symmetric(vertical: 8),
