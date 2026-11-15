@@ -17,7 +17,8 @@ import {
   Scale, 
   LogOut, 
   Bell, 
-  Pin,
+  PanelLeftClose,
+  PanelLeft,
   CheckCheck,
   LifeBuoy,
   Star,
@@ -283,10 +284,14 @@ export function VendorLayout() {
                 className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer shrink-0 ${
                   isPinned ? "text-slate-900 bg-slate-100" : ""
                 }`}
-                title={isPinned ? "Bỏ ghim (Tự động thu gọn)" : "Ghim cố định thanh bên"}
-                aria-label="Toggle pin sidebar"
+                title={isPinned ? "Thu gọn thanh bên (Tự động ẩn)" : "Ghim cố định thanh bên"}
+                aria-label={isPinned ? "Thu gọn thanh bên" : "Ghim cố định thanh bên"}
               >
-                <Pin className={`w-4 h-4 ${isPinned ? "rotate-45 fill-current text-slate-900" : ""}`} />
+                {isPinned ? (
+                  <PanelLeftClose className="w-4 h-4 transition-transform duration-200" />
+                ) : (
+                  <PanelLeft className="w-4 h-4 transition-transform duration-200" />
+                )}
               </button>
             )}
           </div>

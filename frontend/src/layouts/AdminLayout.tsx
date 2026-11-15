@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, Navigate, Link, useNavigate } from 'react-router-dom';
-import { FlaskConical, Menu, Pin, ShieldAlert, X } from 'lucide-react';
+import { FlaskConical, Menu, PanelLeftClose, PanelLeft, ShieldAlert, X } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { adminPages } from '../components/admin/adminRoutes';
 import { AdminNavigation } from '../components/admin/AdminNavigation';
@@ -209,7 +209,7 @@ export function AdminLayout() {
               </div>
             </div>
 
-            {/* Desktop Pin Button */}
+            {/* Desktop Sidebar Toggle Button (Gemini Style) */}
             {isExpanded && (
               <button
                 type="button"
@@ -217,13 +217,17 @@ export function AdminLayout() {
                   e.stopPropagation();
                   setIsPinned((prev) => !prev);
                 }}
-                className={`hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-[#0B5D6F] hover:bg-teal-50 transition-colors cursor-pointer shrink-0 ${
-                  isPinned ? 'text-[#0B5D6F] bg-teal-50' : ''
+                className={`hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer shrink-0 ${
+                  isPinned ? 'text-slate-700 bg-slate-100' : ''
                 }`}
-                title={isPinned ? 'Bỏ ghim (Tự động thu gọn)' : 'Ghim cố định thanh bên'}
-                aria-label="Toggle pin sidebar"
+                title={isPinned ? 'Thu gọn thanh bên (Tự động ẩn)' : 'Ghim cố định thanh bên'}
+                aria-label={isPinned ? 'Thu gọn thanh bên' : 'Ghim cố định thanh bên'}
               >
-                <Pin className={`w-4 h-4 transition-transform duration-200 ${isPinned ? 'rotate-45 fill-current text-[#0B5D6F]' : ''}`} />
+                {isPinned ? (
+                  <PanelLeftClose className="w-4 h-4 transition-transform duration-200" />
+                ) : (
+                  <PanelLeft className="w-4 h-4 transition-transform duration-200" />
+                )}
               </button>
             )}
 
