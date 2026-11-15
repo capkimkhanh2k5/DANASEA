@@ -537,5 +537,53 @@
     "sha256": "16003b2e2cd9bdfe3763d12a583f8ced9856f00bac3358d7f1e89c6733acca46",
     "readback": "HTTP_200_SHA256_PASS",
     "classification": "DEVELOPMENT_SYNTHETIC"
+  },
+  "7b492a259ba5e5aff29649337fe2bcd9edd8764c1ac2697a6cd7bf06db3bcd4a": {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/3/31/Sport_Fishing_Boats.jpg",
+    "sha256": "7b492a259ba5e5aff29649337fe2bcd9edd8764c1ac2697a6cd7bf06db3bcd4a",
+    "readback": "HTTP_200_SHA256_PASS",
+    "classification": "DEMO_ILLUSTRATION",
+    "disputeId": "77777777-7777-7777-7777-777777777701",
+    "subject": "Tàu câu cá thể thao",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Sport_Fishing_Boats.jpg",
+    "creator": "Dimitris Vetsikas",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "5c2140a0f2aba1a37961f2ef488ec5df4d28b4b895ceefa0e94db630b545c6bd": {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/9/95/Jetski_renting_Agadir_beach_2020.jpg",
+    "sha256": "5c2140a0f2aba1a37961f2ef488ec5df4d28b4b895ceefa0e94db630b545c6bd",
+    "readback": "HTTP_200_SHA256_PASS",
+    "classification": "DEMO_ILLUSTRATION",
+    "disputeId": "77777777-7777-7777-7777-777777777702",
+    "subject": "Mô tô nước",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Jetski_renting_Agadir_beach_2020.jpg",
+    "creator": "Abdeaitali",
+    "license": "CC-BY-SA-4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/"
+  },
+  "0fe5565c418fb4f5aa7f9db6f812204812da1b7a7bdac793c06eed310ea474d8": {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/1/16/Surf_Boards_on_Kuta_beach.JPG",
+    "sha256": "0fe5565c418fb4f5aa7f9db6f812204812da1b7a7bdac793c06eed310ea474d8",
+    "readback": "HTTP_200_SHA256_PASS",
+    "classification": "DEMO_ILLUSTRATION",
+    "disputeId": "77777777-7777-7777-7777-777777777703",
+    "subject": "Ván lướt sóng",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Surf_Boards_on_Kuta_beach.JPG",
+    "creator": "Rudolph.A.furtado",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+  },
+  "a169708e51167cd23969f290ec2c9640f6d20f36131460015cf32ae4ebf68f50": {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/Snorkeling_gear.jpg",
+    "sha256": "a169708e51167cd23969f290ec2c9640f6d20f36131460015cf32ae4ebf68f50",
+    "readback": "HTTP_200_SHA256_PASS",
+    "classification": "DEMO_ILLUSTRATION",
+    "disputeId": "77777777-7777-7777-7777-777777777704",
+    "subject": "Thiết bị lặn ống thở",
+    "sourceUrl": "https://commons.wikimedia.org/wiki/File:Snorkeling_gear.jpg",
+    "creator": "Petey21",
+    "license": "CC0-1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
   }
 }

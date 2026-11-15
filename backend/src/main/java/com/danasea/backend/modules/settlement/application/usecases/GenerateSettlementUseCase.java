@@ -28,8 +28,10 @@ import com.danasea.backend.modules.dispute.infrastructure.persistence.repositori
 import com.danasea.backend.modules.order.domain.models.RefundStatus;
 import com.danasea.backend.modules.order.domain.models.SubOrderStatus;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.RefundJpaEntity;
+import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderDisruptionJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaRefundRepository;
+import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderDisruptionRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceSlotJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
@@ -59,6 +61,7 @@ public class GenerateSettlementUseCase {
     private final JpaRefundRepository refundRepository;
     private final JpaDisputeRepository disputeRepository;
     private final JpaServiceSlotRepository serviceSlotRepository;
+    private final JpaSubOrderDisruptionRepository disruptionRepository;
     private final SettlementCalculationEngine calculationEngine;
     private final SettlementMapper mapper;
     private final VendorInternalApi vendorInternalApi;
@@ -77,7 +80,6 @@ public class GenerateSettlementUseCase {
         this.systemConfigRepository = systemConfigRepository;
     }
 
-    @Autowired
     public GenerateSettlementUseCase(
             JpaSettlementRepository settlementRepository,
             JpaSettlementLineItemRepository lineItemRepository,
@@ -87,14 +89,30 @@ public class GenerateSettlementUseCase {
             JpaServiceSlotRepository serviceSlotRepository,
             SettlementCalculationEngine calculationEngine,
             SettlementMapper mapper,
-            VendorInternalApi vendorInternalApi
-    ) {
+            VendorInternalApi vendorInternalApi) {
+        this(settlementRepository, lineItemRepository, subOrderRepository, refundRepository,
+                disputeRepository, serviceSlotRepository, null, calculationEngine, mapper, vendorInternalApi);
+    }
+
+    @Autowired
+    public GenerateSettlementUseCase(
+            JpaSettlementRepository settlementRepository,
+            JpaSettlementLineItemRepository lineItemRepository,
+            JpaSubOrderRepository subOrderRepository,
+            JpaRefundRepository refundRepository,
+            JpaDisputeRepository disputeRepository,
+            JpaServiceSlotRepository serviceSlotRepository,
+            @Autowired(required = false) JpaSubOrderDisruptionRepository disruptionRepository,
+            SettlementCalculationEngine calculationEngine,
+            SettlementMapper mapper,
+            VendorInternalApi vendorInternalApi) {
         this.settlementRepository = settlementRepository;
         this.lineItemRepository = lineItemRepository;
         this.subOrderRepository = subOrderRepository;
         this.refundRepository = refundRepository;
         this.disputeRepository = disputeRepository;
         this.serviceSlotRepository = Objects.requireNonNull(serviceSlotRepository, "serviceSlotRepository");
+        this.disruptionRepository = disruptionRepository;
         this.calculationEngine = calculationEngine;
         this.mapper = mapper;
         this.vendorInternalApi = Objects.requireNonNull(vendorInternalApi, "vendorInternalApi");
@@ -105,11 +123,16 @@ public class GenerateSettlementUseCase {
         if (request == null) {
             throw new IllegalArgumentException("Settlement request is required.");
         }
-        return execute(request.vendorId(), request.periodStart(), request.periodEnd());
+        return execute(request.vendorId(), request.periodStart(), request.periodEnd(), LocalDate.now());
     }
 
     @Transactional
     public SettlementResponse execute(UUID vendorId, LocalDate periodStart, LocalDate periodEnd) {
+        return execute(vendorId, periodStart, periodEnd, LocalDate.now());
+    }
+
+    @Transactional
+    public SettlementResponse execute(UUID vendorId, LocalDate periodStart, LocalDate periodEnd, LocalDate evaluationDate) {
         if (vendorId == null) {
             throw new IllegalArgumentException("Vendor ID is required.");
         }
@@ -119,6 +142,7 @@ public class GenerateSettlementUseCase {
         if (periodStart.isAfter(periodEnd)) {
             throw new InvalidSettlementPeriodException("Settlement start date must not be after its end date.");
         }
+        LocalDate evalDate = evaluationDate != null ? evaluationDate : LocalDate.now();
 
         // 1. Kiểm tra tính bất biến / Idempotency
         Optional<SettlementJpaEntity> existingOpt = settlementRepository
@@ -129,50 +153,69 @@ public class GenerateSettlementUseCase {
             SettlementJpaEntity existing = existingOpt.get();
             if (existing.getStatus() != null && existing.getStatus().isImmutable()) {
                 throw new SettlementAlreadyFinalizedException(
-                        String.format("The settlement for this period has already been finalized or paid and cannot be re-generated (vendor: %s, status: %s)",
-                                vendorId, existing.getStatus())
-                );
+                        String.format(
+                                "The settlement for this period has already been finalized or paid and cannot be re-generated (vendor: %s, status: %s)",
+                                vendorId, existing.getStatus()));
             }
         }
 
         UUID settlementId = existingOpt.map(SettlementJpaEntity::getId).orElseGet(UUID::randomUUID);
 
-        // 2. Lấy danh sách sub_orders của vendor
+        // 2. Chống quyết toán trùng / chi trả trùng:
+        // Lấy danh sách subOrderId đã được quyết toán và chi trả (hoặc hoàn tiền 100%) trong các kỳ đối soát đã FINALIZED / PAID của vendor
+        Set<UUID> alreadySettledIds = lineItemRepository.findSettledSubOrderIdsByVendorId(vendorId);
+        if (alreadySettledIds == null) {
+            alreadySettledIds = Collections.emptySet();
+        }
+
+        // 3. Lấy danh sách sub_orders của vendor (Bao gồm COMPLETED, CHECKED_IN, PARTIALLY_REFUNDED, REFUNDED, NO_SHOW)
         List<SubOrderJpaEntity> subOrders = Objects.requireNonNull(
                 subOrderRepository.findByVendorIdAndStatusIn(vendorId, Set.of(
                         SubOrderStatus.COMPLETED,
                         SubOrderStatus.CHECKED_IN,
                         SubOrderStatus.PARTIALLY_REFUNDED,
-                        SubOrderStatus.REFUNDED
-                )),
+                        SubOrderStatus.REFUNDED,
+                        SubOrderStatus.NO_SHOW)),
                 "Sub-order repository returned null.");
 
-        // 3. Lọc theo khung thời gian kỳ đối soát [periodStart, periodEnd] (bao hàm 2 đầu mốc)
-        List<SubOrderJpaEntity> filteredOrders = new ArrayList<>();
+        // 4. Lọc đơn hợp lệ:
+        // - Không bỏ sót đơn gối kỳ: Các đơn trước periodStart bị giữ lại ở kỳ trước (do vướng D+7, dispute, refund)
+        //   sẽ tự động được đưa vào xét duyệt ở kỳ này!
+        // - Đơn không vượt quá periodEnd (orderDate <= periodEnd).
+        // - Đơn chưa từng được thanh toán trong kỳ đã chốt (alreadySettledIds).
+        List<SubOrderJpaEntity> candidateOrders = new ArrayList<>();
+        Map<UUID, LocalDate> orderDateMap = new HashMap<>();
+
         for (SubOrderJpaEntity so : subOrders) {
-            LocalDate orderDate = null;
-            if (so.getSlotId() != null) {
-                ServiceSlotJpaEntity slot = serviceSlotRepository.findById(so.getSlotId())
-                        .orElseThrow(() -> new IllegalStateException(
-                                "Settlement data is incomplete: slot not found for sub-order " + so.getId()));
-                orderDate = slot.getDate();
+            if (alreadySettledIds.contains(so.getId())) {
+                continue; // Đã chốt chi trả ở kỳ trước
             }
 
+            LocalDate orderDate = null;
+            if (so.getSlotId() != null) {
+                var slotOpt = serviceSlotRepository.findById(so.getSlotId());
+                if (slotOpt.isPresent()) {
+                    orderDate = slotOpt.get().getDate();
+                }
+            }
             if (orderDate == null && so.getCreatedAt() != null) {
                 orderDate = so.getCreatedAt().toLocalDate();
             }
 
             if (orderDate != null) {
-                if (orderDate.isBefore(periodStart) || orderDate.isAfter(periodEnd)) {
-                    continue;
+                if (orderDate.isAfter(periodEnd)) {
+                    continue; // Đơn thuộc các ca trong tương lai sau kỳ đối soát
                 }
+                orderDateMap.put(so.getId(), orderDate);
+                candidateOrders.add(so);
             }
-            filteredOrders.add(so);
         }
 
-        // 4. Batch query cho disputes và refunds
-        List<UUID> subOrderIds = filteredOrders.stream().map(SubOrderJpaEntity::getId).toList();
+        // 5. Batch queries cho disputes, refunds, disruptions
+        List<UUID> subOrderIds = candidateOrders.stream().map(SubOrderJpaEntity::getId).toList();
+
         Map<UUID, List<RefundJpaEntity>> refundMap = new HashMap<>();
+        Set<UUID> pendingRefundSubOrderIds = new HashSet<>();
         if (!subOrderIds.isEmpty()) {
             List<RefundJpaEntity> batchRefunds = Objects.requireNonNull(
                     refundRepository.findBySubOrderIdIn(subOrderIds),
@@ -180,6 +223,8 @@ public class GenerateSettlementUseCase {
             for (RefundJpaEntity refund : batchRefunds) {
                 if (refund.getStatus() == RefundStatus.PROCESSED) {
                     refundMap.computeIfAbsent(refund.getSubOrderId(), key -> new ArrayList<>()).add(refund);
+                } else if (refund.getStatus() == RefundStatus.PENDING) {
+                    pendingRefundSubOrderIds.add(refund.getSubOrderId());
                 }
             }
         }
@@ -196,13 +241,27 @@ public class GenerateSettlementUseCase {
             }
         }
 
-        // 5. Tính toán từng dòng đơn hàng
-        List<SettlementLineItem> lineItems = new ArrayList<>();
-        BigDecimal totalGross = BigDecimal.ZERO.setScale(SettlementCalculationEngine.SCALE, SettlementCalculationEngine.ROUNDING);
-        BigDecimal totalCommission = BigDecimal.ZERO.setScale(SettlementCalculationEngine.SCALE, SettlementCalculationEngine.ROUNDING);
-        BigDecimal totalNetPayout = BigDecimal.ZERO.setScale(SettlementCalculationEngine.SCALE, SettlementCalculationEngine.ROUNDING);
+        Set<UUID> activeDisruptionSubOrderIds = new HashSet<>();
+        if (disruptionRepository != null && !subOrderIds.isEmpty()) {
+            List<SubOrderDisruptionJpaEntity> activeDisruptions = disruptionRepository
+                    .findBySubOrderIdInAndStatus(subOrderIds, "AWAITING_DECISION");
+            if (activeDisruptions != null) {
+                for (SubOrderDisruptionJpaEntity disruption : activeDisruptions) {
+                    activeDisruptionSubOrderIds.add(disruption.getSubOrderId());
+                }
+            }
+        }
 
-        for (SubOrderJpaEntity so : filteredOrders) {
+        // 6. Tính toán từng dòng đơn hàng
+        List<SettlementLineItem> lineItems = new ArrayList<>();
+        BigDecimal totalGross = BigDecimal.ZERO.setScale(SettlementCalculationEngine.SCALE,
+                SettlementCalculationEngine.ROUNDING);
+        BigDecimal totalCommission = BigDecimal.ZERO.setScale(SettlementCalculationEngine.SCALE,
+                SettlementCalculationEngine.ROUNDING);
+        BigDecimal totalNetPayout = BigDecimal.ZERO.setScale(SettlementCalculationEngine.SCALE,
+                SettlementCalculationEngine.ROUNDING);
+
+        for (SubOrderJpaEntity so : candidateOrders) {
             List<RefundJpaEntity> refunds = refundMap.getOrDefault(so.getId(), Collections.emptyList());
             BigDecimal totalRefund = refunds.stream()
                     .map(RefundJpaEntity::getAmount)
@@ -210,11 +269,18 @@ public class GenerateSettlementUseCase {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             boolean hasActiveDispute = activeDisputeSubOrderIds.contains(so.getId());
+            boolean hasPendingRefund = pendingRefundSubOrderIds.contains(so.getId());
+            boolean hasActiveDisruption = activeDisruptionSubOrderIds.contains(so.getId());
+
+            // Quy tắc D+7: Cửa sổ khiếu nại mở trong 7 ngày kể từ experienceDate (theo CreateDisputeUseCase)
+            LocalDate experienceDate = orderDateMap.get(so.getId());
+            boolean isDisputeWindowOpen = experienceDate != null && !evalDate.isAfter(experienceDate.plusDays(7));
 
             BigDecimal subtotal = so.getSubtotalAmount() != null ? so.getSubtotalAmount() : BigDecimal.ZERO;
             BigDecimal rate = so.getCommissionRate();
-            if(rate==null) throw new InvalidCommissionRateException(
-                    "Commission snapshot missing for sub-order " + so.getId());
+            if (rate == null)
+                throw new InvalidCommissionRateException(
+                        "Commission snapshot missing for sub-order " + so.getId());
 
             SubOrderCalculationContext context = SubOrderCalculationContext.builder()
                     .subOrderId(so.getId())
@@ -222,6 +288,9 @@ public class GenerateSettlementUseCase {
                     .subtotalAmount(subtotal)
                     .refundAmount(totalRefund)
                     .hasActiveDispute(hasActiveDispute)
+                    .hasPendingRefund(hasPendingRefund)
+                    .hasActiveDisruption(hasActiveDisruption)
+                    .disputeWindowOpen(isDisputeWindowOpen)
                     .commissionRate(rate)
                     .vendorDiscountAmount(so.getVendorDiscountAmount())
                     .platformDiscountAmount(so.getPlatformDiscountAmount())
@@ -240,7 +309,7 @@ public class GenerateSettlementUseCase {
             }
         }
 
-        // 5.1. Đánh giá Quỹ thưởng An toàn Biển (Safety Rebate 2.0% tiền mặt)
+        // 6.1. Đánh giá Quỹ thưởng An toàn Biển (Safety Rebate 2.0% tiền mặt)
         BigDecimal rebateRate = BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
         BigDecimal rebateAmount = BigDecimal.ZERO.setScale(SettlementCalculationEngine.SCALE, SettlementCalculationEngine.ROUNDING);
         boolean rebateQualified = false;
@@ -312,7 +381,7 @@ public class GenerateSettlementUseCase {
             }
         }
 
-        // 6. Lưu hoặc cập nhật Settlement
+        // 7. Lưu hoặc cập nhật Settlement
         SettlementJpaEntity settlementEntity;
         if (existingOpt.isPresent()) {
             settlementEntity = existingOpt.get();
@@ -345,7 +414,7 @@ public class GenerateSettlementUseCase {
             settlementEntity = settlementRepository.save(settlementEntity);
         }
 
-        // 7. Lưu các LineItems
+        // 8. Lưu các LineItems
         for (SettlementLineItem item : lineItems) {
             SettlementLineItemJpaEntity lie = mapper.toLineItemEntity(item);
             lie.setSettlementId(settlementId);

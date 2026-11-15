@@ -27,6 +27,7 @@ import {
   AtlasBadge,
   AtlasButton
 } from "../../../components/vendor/atlas/AtlasDesignSystem";
+import { SlotAdvisorBanner } from "./SlotAdvisorBanner";
 
 export function Schedule() {
   const [searchParams] = useSearchParams();
@@ -294,7 +295,10 @@ export function Schedule() {
         }
       />
 
-      {/* 2. Filter & Service Selection Panel (Atlas Toolbar) */}
+      {/* 2. AI Slot Advisor Banner */}
+      <SlotAdvisorBanner serviceId={selectedServiceId} />
+
+      {/* 3. Filter & Service Selection Panel (Atlas Toolbar) */}
       <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
         <div className="flex flex-wrap items-center gap-3">
           {/* Service Dropdown */}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { VendorProfileData } from '../../../services/vendorMockService';
-import { vendorProfileService } from '../../../services/vendorProfileService';
+import { vendorProfileService, getVendorProfileError } from '../../../services/vendorProfileService';
 import { authService, type UserProfileResponse } from '../../../services/authService';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { toast } from '../../../store/useToastStore';
@@ -15,7 +15,9 @@ import {
   Info,
   User as UserIcon,
   Mail,
-  ShieldCheck
+  ShieldCheck,
+  AlertCircle,
+  RotateCcw
 } from 'lucide-react';
 import { 
   AtlasPageHeader, 
@@ -26,7 +28,8 @@ import {
 
 export function Profile() {
   const { user: authUser, accessToken } = useAuthStore();
-  const [profile, setProfile] = useState<VendorProfileData | null>(null);
+  const [profile, setProfile] = useState<(VendorProfileData & { rejection_reason?: string }) | null>(null);
+  const [isResubmitting, setIsResubmitting] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfileResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'account' | 'bank' | 'docs'>('info');
 
@@ -66,7 +69,7 @@ export function Profile() {
       const vStatus = realProfile.verificationStatus || realProfile.status || 'PENDING';
       const bTier = realProfile.badgeTier || 'NONE';
 
-      const mapped: VendorProfileData = {
+      const mapped: VendorProfileData & { rejection_reason?: string } = {
         id: realProfile.id,
         name: realProfile.businessName || realProfile.brandName || 'Doanh nghiệp đối tác',
         phone: realProfile.contactPhone || '0905123458',
@@ -77,6 +80,7 @@ export function Profile() {
         bank_name: realProfile.bankName || '',
         bank_account_number: realProfile.bankAccountNumber || '',
         bank_account_holder: realProfile.bankAccountHolder || '',
+        rejection_reason: realProfile.rejectionReason,
         documents: realDocs.map((d) => ({
           type: d.docType === 'SAFETY_CERT' ? 'SAFETY_CERT' : 'BUSINESS_LICENSE',
           name: d.docType === 'SAFETY_CERT' ? 'Giay_chung_nhan_ATGT_duong_thuy.png' : 'Giay_phep_dang_ky_kinh_doanh.png',
@@ -129,6 +133,21 @@ export function Profile() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+// Action: Resubmit Profile
+  const handleResubmitProfile = async () => {
+    try {
+      setIsResubmitting(true);
+      await vendorProfileService.resubmitProfile();
+      toast.success('Đã gửi lại yêu cầu phê duyệt hồ sơ đối tác thành công! Vui lòng chờ Ban quản trị thẩm định.');
+      loadData();
+    } catch (err: unknown) {
+      console.error('[Profile] Lỗi gửi lại hồ sơ:', err);
+      toast.error(getVendorProfileError(err, 'Không thể gửi lại hồ sơ đối tác. Vui lòng kiểm tra đầy đủ giấy tờ hợp lệ.'));
+    } finally {
+      setIsResubmitting(false);
+    }
+  };
 
   // Action: Save bank info
   const handleSaveBank = async (e: React.FormEvent) => {
@@ -256,6 +275,38 @@ export function Profile() {
       <AtlasPageHeader
         title="Hồ sơ & Pháp lý Doanh nghiệp"
       />
+
+      {/* Rejection Alert & Resubmit CTA */}
+      {profile.verification_status === 'REJECTED' && (
+        <div className="p-5 rounded-xl bg-rose-50 border border-rose-200 text-rose-950 space-y-3" role="alert">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" aria-hidden="true" />
+            <div className="space-y-1">
+              <strong className="text-sm font-bold text-rose-950">
+                Hồ sơ hoạt động đối tác chưa đạt yêu cầu kiểm duyệt
+              </strong>
+              <p className="text-xs text-rose-800 leading-relaxed">
+                Lý do từ Ban quản trị: <span className="font-bold underline">{profile.rejection_reason || 'Vui lòng bổ sung hoặc thay thế các giấy tờ pháp lý chưa đạt chuẩn.'}</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-rose-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <p className="text-rose-700">
+              Sau khi cập nhật đầy đủ thông tin hoặc tải lại giấy phép, hãy nhấn nút bên cạnh để gửi yêu cầu thẩm định lại.
+            </p>
+            <AtlasButton
+              variant="danger"
+              size="sm"
+              disabled={isResubmitting || profile.documents.length < 2}
+              onClick={handleResubmitProfile}
+              icon={<RotateCcw className={`w-3.5 h-3.5 ${isResubmitting ? 'animate-spin' : ''}`} />}
+            >
+              {isResubmitting ? 'Đang gửi...' : 'Gửi duyệt lại hồ sơ'}
+            </AtlasButton>
+          </div>
+        </div>
+      )}
 
       {/* 2. Navigation Tabs (Atlas Segmented Tabs) */}
       <AtlasSegmentedTabs<'info' | 'account' | 'bank' | 'docs'>
@@ -586,6 +637,9 @@ export function Profile() {
                       {doc?.status === 'PENDING' && (
                         <AtlasBadge label="Chờ duyệt" variant="warning" />
                       )}
+                      {doc?.status === 'REJECTED' && (
+                        <AtlasBadge label="Chưa đạt" variant="danger" />
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2.5 pt-3 border-t border-slate-200/70">
@@ -637,6 +691,9 @@ export function Profile() {
                       )}
                       {doc?.status === 'PENDING' && (
                         <AtlasBadge label="Chờ duyệt" variant="warning" />
+                      )}
+                      {doc?.status === 'REJECTED' && (
+                        <AtlasBadge label="Chưa đạt" variant="danger" />
                       )}
                     </div>
 

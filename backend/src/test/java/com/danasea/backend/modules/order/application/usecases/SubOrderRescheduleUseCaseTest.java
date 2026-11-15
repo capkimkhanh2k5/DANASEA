@@ -45,6 +45,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -487,8 +488,9 @@ class SubOrderRescheduleUseCaseTest {
     @Test
     void proposalExpiryForNearDepartureRemainsFuture() {
         vendor();
-        target.setDate(LocalDate.now(Booking.VIETNAM_ZONE));
-        target.setStartTime(LocalTime.now(Booking.VIETNAM_ZONE).plusMinutes(30));
+        var nearFuture = LocalDateTime.now(Booking.VIETNAM_ZONE).plusMinutes(30);
+        target.setDate(nearFuture.toLocalDate());
+        target.setStartTime(nearFuture.toLocalTime());
         var result =
                 create.execute(
                         subId,

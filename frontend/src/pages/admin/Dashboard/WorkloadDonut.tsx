@@ -66,7 +66,7 @@ export function WorkloadDonut({ counts, loading, demo = false }: WorkloadDonutPr
     <section className="admin-card admin-dashboard-workload-block" aria-label="Công việc chờ xử lý">
       <div className="admin-dashboard-block-header">
         <h2 className="admin-dashboard-block-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Clock3 size={17} strokeWidth={2.2} style={{ color: '#0B5D6F' }} />
+          <Clock3 size={17} strokeWidth={2.2} style={{ color: '#0284C7' }} />
           Công việc chờ xử lý
         </h2>
       </div>
@@ -174,7 +174,7 @@ export function WorkloadDonut({ counts, loading, demo = false }: WorkloadDonutPr
           </div>
 
           {/* Interactive Legend List - Single Vertical Column (Right) */}
-          <div className="admin-donut-legend-column" role="list" aria-label="Chi tiết 4 nhóm công việc chờ xử lý">
+          <div className="admin-donut-legend-column" role="list" aria-label="Chi tiết các nhóm công việc chờ xử lý">
             {segments.map(seg => {
               const isHovered = hoveredKey === seg.key;
 

@@ -9,6 +9,7 @@ import com.danasea.backend.modules.order.domain.exceptions.PaymentAttemptConflic
 import com.danasea.backend.modules.order.domain.exceptions.PaymentGatewayException;
 import com.danasea.backend.modules.order.domain.exceptions.PaymentVerificationException;
 import com.danasea.backend.modules.order.domain.exceptions.RefundNotFoundException;
+import com.danasea.backend.modules.order.domain.exceptions.SubOrderNotFoundException;
 import com.danasea.backend.modules.order.domain.exceptions.UnauthorizedOrderAccessException;
 import com.danasea.backend.modules.order.domain.exceptions.UnpaidOrderReceiptException;
 import com.danasea.backend.modules.order.domain.exceptions.WaiverAcceptanceRequiredException;
@@ -42,6 +43,12 @@ public class OrderExceptionHandler extends LocalizedExceptionHandlerSupport {
     public ResponseEntity<ErrorResponse> handleRefundNotFound(RefundNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(error("REFUND_NOT_FOUND"));
+    }
+
+    @ExceptionHandler(SubOrderNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleSubOrderNotFound(SubOrderNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(error("SUB_ORDER_NOT_FOUND"));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

@@ -32,4 +32,5 @@ public class AdminVendorResponse {
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private List<VendorDocumentResponse> documents;
+    private String rejectionReason;
 }

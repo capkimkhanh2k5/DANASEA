@@ -4,6 +4,7 @@ import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -22,6 +23,7 @@ import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.vendor.application.usecases.GetVendorDocumentsUseCase;
 import com.danasea.backend.modules.vendor.application.usecases.GetVendorProfileUseCase;
 import com.danasea.backend.modules.vendor.application.usecases.RegisterVendorProfileUseCase;
+import com.danasea.backend.modules.vendor.application.usecases.ResubmitVendorProfileUseCase;
 import com.danasea.backend.modules.vendor.application.usecases.UpdateVendorProfileUseCase;
 import com.danasea.backend.modules.vendor.application.usecases.UploadVendorDocumentUseCase;
 import com.danasea.backend.modules.vendor.domain.exceptions.VendorNotFoundException;
@@ -33,28 +35,55 @@ import com.danasea.backend.modules.vendor.presentation.dtos.VendorDocumentRespon
 import com.danasea.backend.modules.vendor.presentation.dtos.VendorProfileResponse;
 
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/vendor")
-@RequiredArgsConstructor
 public class VendorProfileController {
 
     private final RegisterVendorProfileUseCase registerVendorProfileUseCase;
     private final GetVendorProfileUseCase getVendorProfileUseCase;
     private final UpdateVendorProfileUseCase updateVendorProfileUseCase;
+    private final ResubmitVendorProfileUseCase resubmitVendorProfileUseCase;
     private final UploadVendorDocumentUseCase uploadVendorDocumentUseCase;
     private final GetVendorDocumentsUseCase getVendorDocumentsUseCase;
     private final AccountInternalApi accountInternalApi;
 
+    @Autowired
+    public VendorProfileController(
+            RegisterVendorProfileUseCase registerVendorProfileUseCase,
+            GetVendorProfileUseCase getVendorProfileUseCase,
+            UpdateVendorProfileUseCase updateVendorProfileUseCase,
+            ResubmitVendorProfileUseCase resubmitVendorProfileUseCase,
+            UploadVendorDocumentUseCase uploadVendorDocumentUseCase,
+            GetVendorDocumentsUseCase getVendorDocumentsUseCase,
+            AccountInternalApi accountInternalApi) {
+        this.registerVendorProfileUseCase = registerVendorProfileUseCase;
+        this.getVendorProfileUseCase = getVendorProfileUseCase;
+        this.updateVendorProfileUseCase = updateVendorProfileUseCase;
+        this.resubmitVendorProfileUseCase = resubmitVendorProfileUseCase;
+        this.uploadVendorDocumentUseCase = uploadVendorDocumentUseCase;
+        this.getVendorDocumentsUseCase = getVendorDocumentsUseCase;
+        this.accountInternalApi = accountInternalApi;
+    }
+
+    public VendorProfileController(
+            RegisterVendorProfileUseCase registerVendorProfileUseCase,
+            GetVendorProfileUseCase getVendorProfileUseCase,
+            UpdateVendorProfileUseCase updateVendorProfileUseCase,
+            UploadVendorDocumentUseCase uploadVendorDocumentUseCase,
+            GetVendorDocumentsUseCase getVendorDocumentsUseCase,
+            AccountInternalApi accountInternalApi) {
+        this(registerVendorProfileUseCase, getVendorProfileUseCase, updateVendorProfileUseCase, null,
+                uploadVendorDocumentUseCase, getVendorDocumentsUseCase, accountInternalApi);
+    }
+
+    @Deprecated(since = "2.0", forRemoval = true)
     @PostMapping("/profile")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'VENDOR')")
+    @PreAuthorize("denyAll()")
     public ResponseEntity<VendorProfileResponse> registerProfile(
             @Valid @RequestBody RegisterVendorProfileRequest request,
             Principal principal) {
-        UUID userId = resolveUserId(principal);
-        Vendor vendor = registerVendorProfileUseCase.execute(userId, request.toCommand());
-        return ResponseEntity.status(HttpStatus.CREATED).body(VendorProfileResponse.fromDomain(vendor));
+        throw new UnsupportedOperationException("Direct vendor registration is deprecated. Please apply via /api/partner-applications.");
     }
 
     @GetMapping("/profile")
@@ -72,6 +101,14 @@ public class VendorProfileController {
             Principal principal) {
         UUID userId = resolveUserId(principal);
         Vendor vendor = updateVendorProfileUseCase.execute(userId, request.toCommand());
+        return ResponseEntity.ok(VendorProfileResponse.fromDomain(vendor));
+    }
+
+    @PostMapping("/profile/resubmit")
+    @PreAuthorize("hasRole('VENDOR')")
+    public ResponseEntity<VendorProfileResponse> resubmitProfile(Principal principal) {
+        UUID userId = resolveUserId(principal);
+        Vendor vendor = resubmitVendorProfileUseCase.execute(userId);
         return ResponseEntity.ok(VendorProfileResponse.fromDomain(vendor));
     }
 

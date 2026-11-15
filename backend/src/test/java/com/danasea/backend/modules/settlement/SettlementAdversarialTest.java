@@ -48,6 +48,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import java.util.Set;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -407,7 +408,7 @@ public class SettlementAdversarialTest {
             onEnd.setCommissionRate(new BigDecimal("0.100000"));
             onEnd.setCreatedAt(end.atStartOfDay().atOffset(OffsetDateTime.now().getOffset()));
 
-            // SubOrder 1 day before start (excluded)
+            // SubOrder 1 day before start (đã quyết toán ở kỳ trước -> excluded)
             SubOrderJpaEntity beforeStart = new SubOrderJpaEntity();
             beforeStart.setId(UUID.randomUUID());
             beforeStart.setVendorId(vendorAId);
@@ -425,6 +426,8 @@ public class SettlementAdversarialTest {
             afterEnd.setCommissionRate(new BigDecimal("0.100000"));
             afterEnd.setCreatedAt(end.plusDays(1).atStartOfDay().atOffset(OffsetDateTime.now().getOffset()));
 
+            when(settlementLineItemRepository.findSettledSubOrderIdsByVendorId(vendorAId))
+                    .thenReturn(Set.of(beforeStart.getId()));
             when(settlementRepository.findByVendorIdAndPeriodStartAndPeriodEnd(vendorAId, start, end))
                     .thenReturn(Optional.empty());
             when(subOrderRepository.findByVendorIdAndStatusIn(eq(vendorAId), anyCollection()))

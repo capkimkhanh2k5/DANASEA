@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -68,6 +69,7 @@ public interface VendorAiDataPort {
     Optional<VendorProfile> findProfileByUserId(UUID userId);
     Optional<VendorProfile> findProfileByVendorId(UUID vendorId);
     List<VendorServiceItem> listServices(UUID vendorId);
+    Map<String, Long> countServicesByStatus(UUID vendorId);
     Optional<VendorServiceItem> getService(UUID vendorId, UUID serviceId);
     List<VendorSlotItem> listUpcomingSlots(UUID vendorId, UUID serviceId, int horizonDays);
     List<VendorReviewItem> listReviews(UUID vendorId, UUID serviceId, int limit);

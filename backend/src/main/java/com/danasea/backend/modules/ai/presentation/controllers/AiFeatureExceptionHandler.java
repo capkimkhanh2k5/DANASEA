@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.danasea.backend.modules.ai.domain.exceptions.AiResourceNotFoundException;
+import com.danasea.backend.modules.ai.domain.exceptions.AiModerationUnavailableException;
 import com.danasea.backend.modules.ai.domain.exceptions.AiStateConflictException;
 import com.danasea.backend.modules.ai.infrastructure.cliproxy.CliProxyException;
 import com.danasea.backend.modules.order.domain.exceptions.OrderNotFoundException;
@@ -23,8 +24,8 @@ import com.danasea.backend.shared.presentation.LocalizedExceptionHandlerSupport;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(basePackageClasses = CustomerAiController.class)
 public class AiFeatureExceptionHandler extends LocalizedExceptionHandlerSupport {
-    @ExceptionHandler(CliProxyException.class)
-    public ResponseEntity<ErrorResponse> unavailable(CliProxyException exception) {
+    @ExceptionHandler({CliProxyException.class, AiModerationUnavailableException.class})
+    public ResponseEntity<ErrorResponse> unavailable() {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(new ErrorResponse("AI_SERVICE_UNAVAILABLE", message("ai.unavailable")));
     }

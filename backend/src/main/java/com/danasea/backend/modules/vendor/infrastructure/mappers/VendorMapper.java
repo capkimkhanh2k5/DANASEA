@@ -33,6 +33,7 @@ public class VendorMapper {
         domain.setRatingAvg(entity.getRatingAvg());
         domain.setRatingCount(entity.getRatingCount());
         domain.setBadgeTier(entity.getBadgeTier());
+        domain.setRejectionReason(entity.getRejectionReason());
         return domain;
     }
 
@@ -57,6 +58,7 @@ public class VendorMapper {
         entity.setRatingAvg(domain.getRatingAvg());
         entity.setRatingCount(domain.getRatingCount());
         entity.setBadgeTier(domain.getBadgeTier());
+        entity.setRejectionReason(domain.getRejectionReason());
         return entity;
     }
 

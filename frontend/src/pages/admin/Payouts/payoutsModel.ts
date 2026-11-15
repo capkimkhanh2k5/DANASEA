@@ -1,8 +1,28 @@
 import type { MOCK_ADMIN_PAYOUTS } from '../../../data/adminMockData';
 import type { PayoutRequestStatus } from '../../../types';
 
-export type PayoutExtended = (typeof MOCK_ADMIN_PAYOUTS)[0];
-export type PayoutStatusFilter = 'all' | 'REQUESTED' | 'PAID' | 'REJECTED';
+export type PayoutExtended = (typeof MOCK_ADMIN_PAYOUTS)[0] & {
+  bankReference?: string | null;
+  rejectionReason?: string | null;
+  adminNote?: string | null;
+  note?: string | null;
+};
+export type PayoutStatusFilter = 'all' | 'REQUESTED' | 'APPROVED' | 'PAID' | 'REJECTED';
+
+export function formatDisplayCode(id: string, prefix = 'PAY'): string {
+  if (!id) return '';
+  if (id.startsWith('PAY-') || id.startsWith('SETTLE-') || id.startsWith('ORD-') || id.startsWith('STL-') || id.startsWith('SUB-') || id.startsWith('DISP-')) return id;
+  const clean = id.replace(/-/g, '');
+  const isSeed =
+    clean.startsWith('00010000') ||
+    clean.startsWith('00060000') ||
+    clean.startsWith('00000000') ||
+    new Set(clean.slice(0, 8).split('')).size <= 2;
+  const code = isSeed
+    ? (clean.slice(0, 4) + clean.slice(-4))
+    : clean.substring(0, 8);
+  return `${prefix}-${code.toUpperCase()}`;
+}
 
 export function filterPayouts(
   payouts: PayoutExtended[],
@@ -15,6 +35,7 @@ export function filterPayouts(
     const matchesQuery =
       !q ||
       p.id.toLowerCase().includes(q) ||
+      formatDisplayCode(p.id, 'PAY').toLowerCase().includes(q) ||
       (p.vendorName?.toLowerCase().includes(q) ?? false) ||
       (p.bankAccountNumber?.toLowerCase().includes(q) ?? false) ||
       (p.bankAccountHolder?.toLowerCase().includes(q) ?? false) ||
@@ -27,15 +48,20 @@ export function filterPayouts(
 export function calculatePayoutMetrics(payouts: PayoutExtended[]) {
   const totalCount = payouts.length;
   let pendingCount = 0;
+  let approvedCount = 0;
   let paidCount = 0;
   let rejectedCount = 0;
   let totalPendingAmount = 0;
+  let totalApprovedAmount = 0;
   let totalPaidAmount = 0;
 
   for (const p of payouts) {
     if (p.status === 'REQUESTED') {
       pendingCount++;
       totalPendingAmount += p.amount;
+    } else if (p.status === 'APPROVED') {
+      approvedCount++;
+      totalApprovedAmount += p.amount;
     } else if (p.status === 'PAID') {
       paidCount++;
       totalPaidAmount += p.amount;
@@ -47,9 +73,11 @@ export function calculatePayoutMetrics(payouts: PayoutExtended[]) {
   return {
     totalCount,
     pendingCount,
+    approvedCount,
     paidCount,
     rejectedCount,
     totalPendingAmount,
+    totalApprovedAmount,
     totalPaidAmount,
   };
 }

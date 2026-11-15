@@ -24,4 +24,5 @@ public class Vendor extends BaseDomainModel {
     private BigDecimal ratingAvg;
     private Integer ratingCount;
     private BadgeTier badgeTier;
+    private String rejectionReason;
 }

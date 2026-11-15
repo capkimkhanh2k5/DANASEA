@@ -23,6 +23,7 @@ import org.springframework.web.client.RestClientResponseException;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -71,6 +72,46 @@ public class CliProxyLlmClientTest {
                 defaultModel,
                 fallbackModel
         );
+    }
+
+    @Test
+    void scopedTextRetainsItsSystemPromptAndNoToolsOnFailover() {
+        when(responseSpec.body(eq(CliProxyDto.ChatResponse.class)))
+                .thenThrow(new ResourceAccessException("primary unavailable"))
+                .thenReturn(new CliProxyDto.ChatResponse(List.of(new CliProxyDto.ChatResponse.Choice(
+                        new CliProxyDto.Message("assistant", "Vendor guidance")))));
+        var user = new AiMessage();
+        user.setRole(AiMessageRole.USER);
+        user.setContent("Tôi cần hướng dẫn");
+
+        var result = cliProxyLlmClient.generateText(List.of(user), SupportedLanguage.VI, "Vendor system prompt");
+
+        assertEquals("Vendor guidance", result.getContent());
+        var bodies = ArgumentCaptor.forClass(CliProxyDto.ChatRequest.class);
+        verify(requestBodySpec, times(2)).body(bodies.capture());
+        for (var request : bodies.getAllValues()) {
+            assertEquals(new CliProxyDto.Message("system", "Vendor system prompt"), request.messages().getFirst());
+            assertEquals(new CliProxyDto.Message("user", "Tôi cần hướng dẫn"), request.messages().getLast());
+            assertNull(request.tools());
+        }
+        verifyNoInteractions(aiToolRegistry);
+    }
+
+    @Test
+    void customerChatRetainsCustomerSystemPromptAndTools() {
+        when(aiToolRegistry.getToolDefinitions()).thenReturn(List.of(Map.of("name", "ai_smart_search")));
+        when(responseSpec.body(eq(CliProxyDto.ChatResponse.class))).thenReturn(
+                new CliProxyDto.ChatResponse(List.of(new CliProxyDto.ChatResponse.Choice(
+                        new CliProxyDto.Message("assistant", "Customer guidance")))));
+
+        cliProxyLlmClient.generateResponse(List.of(), SupportedLanguage.VI);
+
+        var body = ArgumentCaptor.forClass(CliProxyDto.ChatRequest.class);
+        verify(requestBodySpec).body(body.capture());
+        assertEquals("system", body.getValue().messages().getFirst().role());
+        assertTrue(body.getValue().messages().getFirst().content().contains("help customers"));
+        assertEquals(List.of(Map.of("type", "function", "function", Map.of("name", "ai_smart_search"))),
+                body.getValue().tools());
     }
 
     @Test

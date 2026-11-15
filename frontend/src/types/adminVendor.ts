@@ -34,6 +34,7 @@ export interface AdminVendorResponse {
   createdAt: string;
   updatedAt: string;
   documents?: VendorDocumentResponse[];
+  rejectionReason?: string;
 }
 
 export interface RejectVendorRequest {

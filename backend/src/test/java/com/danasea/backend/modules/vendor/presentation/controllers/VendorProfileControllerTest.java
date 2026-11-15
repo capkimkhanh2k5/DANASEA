@@ -39,7 +39,10 @@ import com.danasea.backend.modules.vendor.application.usecases.GetVendorDocument
 import com.danasea.backend.modules.vendor.application.usecases.GetVendorProfileUseCase;
 import com.danasea.backend.modules.vendor.application.usecases.RegisterVendorProfileUseCase;
 import com.danasea.backend.modules.vendor.application.usecases.UpdateVendorProfileUseCase;
+import com.danasea.backend.modules.vendor.application.usecases.ResubmitVendorProfileUseCase;
 import com.danasea.backend.modules.vendor.application.usecases.UploadVendorDocumentUseCase;
+import com.danasea.backend.modules.vendor.domain.exceptions.VendorDocumentsIncompleteException;
+import com.danasea.backend.modules.vendor.domain.exceptions.VendorStatusConflictException;
 import com.danasea.backend.modules.vendor.domain.exceptions.VendorNotFoundException;
 import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import com.danasea.backend.modules.vendor.domain.models.DocStatus;
@@ -139,6 +142,9 @@ class VendorProfileControllerTest {
 
     @MockitoBean
     private GetVendorDocumentsUseCase getVendorDocumentsUseCase;
+
+    @MockitoBean
+    private ResubmitVendorProfileUseCase resubmitVendorProfileUseCase;
 
     @MockitoBean
     private AccountInternalApi accountInternalApi;
@@ -294,13 +300,13 @@ class VendorProfileControllerTest {
     }
 
     // ==========================================
-    // 3. POST /api/vendor/profile (Registration)
+    // 3. POST /api/vendor/profile (Deactivated Endpoint)
     // ==========================================
 
     @Test
-    @DisplayName("POST /api/vendor/profile returns 201 Created on valid registration request body")
+    @DisplayName("POST /api/vendor/profile returns 403 Forbidden for CUSTOMER attempting self-elevation")
     @WithMockUser(username = "customer@example.com", roles = "CUSTOMER")
-    void shouldReturn201OnValidRegistrationRequest() throws Exception {
+    void shouldReturn403ForCustomerOnRegisterProfile() throws Exception {
         RegisterVendorProfileRequest request = new RegisterVendorProfileRequest(
                 "Danang Fresh Seafood",
                 "0123456789",
@@ -310,39 +316,19 @@ class VendorProfileControllerTest {
                 "NGUYEN VAN A"
         );
 
-        Vendor createdVendor = new Vendor();
-        createdVendor.setId(vendorId);
-        createdVendor.setUserId(customerUserId);
-        createdVendor.setBusinessName(request.businessName());
-        createdVendor.setTaxCode(request.taxCode());
-        createdVendor.setAddress(request.address());
-        createdVendor.setBankAccountNumber(request.bankAccountNumber());
-        createdVendor.setBankName(request.bankName());
-        createdVendor.setBankAccountHolder(request.bankAccountHolder());
-        createdVendor.setVerificationStatus(VerificationStatus.PENDING);
-        createdVendor.setBadgeTier(BadgeTier.NONE);
-        createdVendor.setRatingAvg(BigDecimal.ZERO);
-        createdVendor.setRatingCount(0);
-
-        when(registerVendorProfileUseCase.execute(eq(customerUserId), any())).thenReturn(createdVendor);
-
         mockMvc.perform(post("/api/vendor/profile")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(vendorId.toString()))
-                .andExpect(jsonPath("$.businessName").value("Danang Fresh Seafood"))
-                .andExpect(jsonPath("$.verificationStatus").value("PENDING"))
-                .andExpect(jsonPath("$.badgeTier").value("NONE"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     @Test
-    @DisplayName("POST /api/vendor/profile returns 400 Bad Request on invalid request body (missing businessName)")
-    @WithMockUser(username = "customer@example.com", roles = "CUSTOMER")
-    void shouldReturn400OnInvalidRegistrationRequestBody() throws Exception {
-        // Missing businessName (null)
+    @DisplayName("POST /api/vendor/profile returns 403 Forbidden for ADMIN because endpoint is deprecated and denyAll")
+    @WithMockUser(username = "admin@example.com", roles = "ADMIN")
+    void shouldReturn403ForAdminOnRegisterProfile() throws Exception {
         RegisterVendorProfileRequest request = new RegisterVendorProfileRequest(
-                null,
+                "Danang Fresh Seafood",
                 "0123456789",
                 "123 Vo Nguyen Giap, Da Nang",
                 "9876543210",
@@ -353,8 +339,28 @@ class VendorProfileControllerTest {
         mockMvc.perform(post("/api/vendor/profile")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    @DisplayName("POST /api/vendor/profile returns 403 Forbidden for VENDOR because endpoint is deprecated and denyAll")
+    @WithMockUser(username = "vendor@example.com", roles = "VENDOR")
+    void shouldReturn403ForVendorOnRegisterProfile() throws Exception {
+        RegisterVendorProfileRequest request = new RegisterVendorProfileRequest(
+                "Danang Fresh Seafood",
+                "0123456789",
+                "123 Vo Nguyen Giap, Da Nang",
+                "9876543210",
+                "Vietcombank",
+                "NGUYEN VAN A"
+        );
+
+        mockMvc.perform(post("/api/vendor/profile")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     // ==========================================
@@ -464,5 +470,66 @@ class VendorProfileControllerTest {
                 .andExpect(jsonPath("$[0].status").value("APPROVED"))
                 .andExpect(jsonPath("$[1].docType").value("SAFETY_CERT"))
                 .andExpect(jsonPath("$[1].status").value("PENDING"));
+    }
+
+    // ==========================================
+    // 7. POST /api/vendor/profile/resubmit
+    // ==========================================
+
+    @Test
+    @DisplayName("POST /api/vendor/profile/resubmit returns 200 OK with PENDING status and null rejectionReason")
+    @WithMockUser(username = "vendor@example.com", roles = "VENDOR")
+    void shouldReturn200WhenResubmitSuccess() throws Exception {
+        Vendor resubmittedVendor = new Vendor();
+        resubmittedVendor.setId(vendorId);
+        resubmittedVendor.setUserId(vendorUserId);
+        resubmittedVendor.setBusinessName("Da Nang Sea Tours");
+        resubmittedVendor.setTaxCode("0401234567");
+        resubmittedVendor.setAddress("12 Vo Nguyen Giap");
+        resubmittedVendor.setBankAccountNumber("0123456789");
+        resubmittedVendor.setBankName("Vietcombank");
+        resubmittedVendor.setBankAccountHolder("DA NANG SEA TOURS");
+        resubmittedVendor.setVerificationStatus(VerificationStatus.PENDING);
+        resubmittedVendor.setRejectionReason(null);
+
+        when(resubmitVendorProfileUseCase.execute(vendorUserId)).thenReturn(resubmittedVendor);
+
+        mockMvc.perform(post("/api/vendor/profile/resubmit"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(vendorId.toString()))
+                .andExpect(jsonPath("$.verificationStatus").value("PENDING"))
+                .andExpect(jsonPath("$.rejectionReason").isEmpty());
+    }
+
+    @Test
+    @DisplayName("POST /api/vendor/profile/resubmit returns 403 Forbidden when called by CUSTOMER")
+    @WithMockUser(username = "customer@example.com", roles = "CUSTOMER")
+    void shouldReturn403WhenCustomerCallsResubmit() throws Exception {
+        mockMvc.perform(post("/api/vendor/profile/resubmit"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("POST /api/vendor/profile/resubmit returns 409 Conflict when vendor is already PENDING")
+    @WithMockUser(username = "vendor@example.com", roles = "VENDOR")
+    void shouldReturn409WhenVendorAlreadyPending() throws Exception {
+        when(resubmitVendorProfileUseCase.execute(vendorUserId))
+                .thenThrow(new VendorStatusConflictException("VENDOR_ALREADY_PENDING", "Vendor profile is currently PENDING review"));
+
+        mockMvc.perform(post("/api/vendor/profile/resubmit"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("VENDOR_ALREADY_PENDING"));
+    }
+
+    @Test
+    @DisplayName("POST /api/vendor/profile/resubmit returns 400 Bad Request when documents are incomplete")
+    @WithMockUser(username = "vendor@example.com", roles = "VENDOR")
+    void shouldReturn400WhenDocumentsIncomplete() throws Exception {
+        when(resubmitVendorProfileUseCase.execute(vendorUserId))
+                .thenThrow(new VendorDocumentsIncompleteException("Missing required document: SAFETY_CERT"));
+
+        mockMvc.perform(post("/api/vendor/profile/resubmit"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("DOCUMENTS_INCOMPLETE"));
     }
 }

@@ -34,4 +34,10 @@ public interface JpaSubOrderRescheduleProposalRepository
 
     List<SubOrderRescheduleProposalJpaEntity> findBySubOrderIdAndStatusAndExpiresAtAfter(
             UUID subOrderId, String status, OffsetDateTime now);
+
+    @Query("SELECT COUNT(p) > 0 FROM SubOrderRescheduleProposalJpaEntity p WHERE " +
+           "p.subOrderId IN (SELECT s.id FROM SubOrderJpaEntity s WHERE s.masterOrderId IN " +
+           "(SELECT o.id FROM MasterOrderJpaEntity o WHERE o.customerId = :customerId)) " +
+           "AND p.status = 'PENDING'")
+    boolean hasPendingRescheduleProposals(@Param("customerId") UUID customerId);
 }

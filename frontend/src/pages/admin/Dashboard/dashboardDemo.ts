@@ -1,4 +1,4 @@
-import { mergeDailyReports, type DashboardData, type DateRange, type HotServiceItem, type RecentOrder, type TopVendorItem } from './dashboardModel';
+import { mergeDailyReports, type DashboardData, type DateRange, type HotServiceItem, type RecentOrder, type TopServingVendorItem, type TopVendorItem } from './dashboardModel';
 import {
   MOCK_ADMIN_MASTER_ORDERS,
   MOCK_ADMIN_REFUNDS,
@@ -61,6 +61,30 @@ function computeHotServices(range: DateRange): HotServiceItem[] {
   const items = Array.from(map.values()).sort((a, b) => b.bookingCount - a.bookingCount || a.serviceName.localeCompare(b.serviceName)).slice(0, 5);
   const max = Math.max(1, ...items.map(i => i.bookingCount));
   return items.map(i => ({ ...i, sharePercent: Math.round((i.bookingCount / max) * 100) }));
+}
+
+function computeTopServingVendors(range: DateRange): TopServingVendorItem[] {
+  const inRange = MOCK_ADMIN_SUB_ORDERS.filter(s => {
+    const d = (s.createdAt || '').slice(0, 10);
+    return d >= range.from && d <= range.to && ['CONFIRMED', 'COMPLETED', 'PAID'].includes(s.status);
+  });
+  const map = new Map<string, { vendorId: string; vendorName: string; completedOrders: number; totalOrders: number; revenue: number }>();
+  for (const s of inRange) {
+    const existing = map.get(s.vendorId) || {
+      vendorId: s.vendorId,
+      vendorName: getVendorName(s.vendorId),
+      completedOrders: 0,
+      totalOrders: 0,
+      revenue: 0,
+    };
+    existing.completedOrders += 1;
+    existing.totalOrders += 1;
+    existing.revenue += s.subtotalAmount;
+    map.set(s.vendorId, existing);
+  }
+  const items = Array.from(map.values()).sort((a, b) => b.completedOrders - a.completedOrders || b.revenue - a.revenue).slice(0, 5);
+  const max = Math.max(1, ...items.map(i => i.completedOrders));
+  return items.map(i => ({ ...i, sharePercent: Math.round((i.completedOrders / max) * 100) }));
 }
 
 function computeTopVendors(range: DateRange): TopVendorItem[] {
@@ -127,15 +151,17 @@ export function createDashboardDemo(range: DateRange): DashboardData {
   return {
     bookings,
     revenue,
-    // Đồng nhất hoàn toàn với 4 nhóm công việc chờ xử lý (tổng: 6 mục)
+    // Đồng nhất hoàn toàn với 5 nhóm công việc chờ xử lý
+    // - roleApplications: 1 (Đơn xét duyệt vai trò đang PENDING)
     // - vendors: 1 (Đối tác DaNaFi đang PENDING)
     // - services: 2 (Dịch vụ srv-03, srv-04 đang PENDING_APPROVAL)
     // - settlements: 2 (Quyết toán PAY-2026-10-002, PAY-2026-10-003 đang REQUESTED)
     // - disputes: 1 (Khiếu nại DSP-01 đang OPEN)
     // - refunds: 2
-    operations: { vendors: 1, services: 2, settlements: 2, disputes: 1, refunds: 2 },
+    operations: { roleApplications: 1, vendors: 1, services: 2, settlements: 2, disputes: 1, refunds: 2 },
     hotServices: computeHotServices(range),
     topVendors: computeTopVendors(range),
+    topServingVendors: computeTopServingVendors(range),
     recentOrders,
     errors: [],
   };

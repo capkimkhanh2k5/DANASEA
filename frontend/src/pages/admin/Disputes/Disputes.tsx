@@ -11,6 +11,7 @@ import {
   User,
   RotateCcw,
   Info,
+  Copy,
 } from 'lucide-react';
 import { MOCK_ADMIN_DISPUTES } from '../../../data/adminMockData';
 import { adminDisputeService, getAdminDisputeError } from '../../../services/adminDisputeService';
@@ -42,6 +43,8 @@ import type { OrderResponse, SubOrderResponse } from '../../../types/order';
 import type { AdminVendorResponse } from '../../../types/adminVendor';
 import type { AdminUserSummaryDto } from '../../../types/adminUser';
 import type { ServiceSummaryDto } from '../../../types/service';
+import { formatDisplayCode } from '../Orders/ordersModel';
+import { DisputeAiArbitrationCard } from './DisputeAiArbitrationCard';
 import './Disputes.css';
 
 function formatDateTime(isoStr?: string | null): string {
@@ -129,7 +132,9 @@ export function Disputes() {
 
         const mapped: DisputeExtended[] = rawDisputes.map(d => {
           const ord = orderMap.get(d.orderId);
-          const subOrd = ord?.subOrders?.find((s: SubOrderResponse) => s.id === d.subOrderId || s.subOrderId === d.subOrderId);
+          const ordWithItems = ord as (OrderResponse & { items?: SubOrderResponse[] }) | undefined;
+          const subOrdersList: SubOrderResponse[] = ordWithItems?.items || ord?.subOrders || [];
+          const subOrd = subOrdersList.find((s: SubOrderResponse) => s.id === d.subOrderId || s.subOrderId === d.subOrderId);
 
           const matchedService = services.find(s => s.id === subOrd?.serviceId);
           const matchedVendor = vendors.find(v => v.id === subOrd?.vendorId);
@@ -137,9 +142,15 @@ export function Disputes() {
 
           const customerName = matchedUser?.fullName || `Khách hàng ${d.customerId.substring(0, 8)}`;
           const customerPhone = matchedUser?.phone || '';
-          const vendorName = matchedVendor?.businessName || 'Đơn vị đối tác';
-          const serviceName = matchedService?.name || 'Dịch vụ trải nghiệm biển';
-          const orderAmount = subOrd?.finalAmount ?? subOrd?.subtotalAmount ?? (subOrd?.unitPrice && subOrd?.quantity ? subOrd.unitPrice * subOrd.quantity : 0);
+          const serviceVendorId = (matchedService as (ServiceSummaryDto & { vendorId?: string }) | undefined)?.vendorId;
+          const subOrdExt = subOrd as (SubOrderResponse & { vendorName?: string; serviceName?: string }) | undefined;
+          const vendorName = matchedVendor?.businessName || (serviceVendorId ? vendors.find(v => v.id === serviceVendorId)?.businessName : undefined) || subOrdExt?.vendorName || 'Đơn vị đối tác';
+          const serviceName = matchedService?.name || subOrdExt?.serviceName || 'Dịch vụ trải nghiệm biển';
+          const orderAmount = (subOrd?.finalAmount && subOrd.finalAmount > 0)
+            ? subOrd.finalAmount
+            : ((subOrd?.subtotalAmount && subOrd.subtotalAmount > 0)
+                ? subOrd.subtotalAmount
+                : ((subOrd?.unitPrice && subOrd?.quantity) ? subOrd.unitPrice * subOrd.quantity : (ord?.totalAmount || 0)));
 
           return {
             id: d.id,
@@ -361,86 +372,88 @@ export function Disputes() {
           {/* Master Items List */}
           <div className="admin-disputes__list" role="listbox" aria-label="Danh sách tranh chấp">
             <div key={statusFilter} className="admin-tab-pane">
-            {loading ? (
-              <div style={{ padding: '32px 16px' }}>
-                <AdminState
-                  kind="empty"
-                  title="Đang tải danh sách khiếu nại..."
-                  description="Vui lòng đợi trong giây lát khi hệ thống kết nối máy chủ."
-                />
-              </div>
-            ) : errorMessage ? (
-              <div style={{ padding: '32px 16px' }}>
-                <AdminState
-                  kind="error"
-                  title="Không thể tải khiếu nại"
-                  description={errorMessage}
-                />
-              </div>
-            ) : filteredDisputes.length === 0 ? (
-              <div style={{ padding: '32px 16px' }}>
-                <AdminState
-                  kind="empty"
-                  title="Không có hồ sơ nào"
-                  description={disputes.length === 0 ? "Hiện tại sàn DANASEA không ghi nhận tranh chấp hoặc khiếu nại nào cần phân xử." : "Không tìm thấy tranh chấp phù hợp với bộ lọc hiện tại."}
-                  action={
-                    <AdminButton
-                      onClick={() => {
-                        setSearchQuery('');
-                        setStatusFilter('all');
+              {loading ? (
+                <div style={{ padding: '32px 16px' }}>
+                  <AdminState
+                    kind="empty"
+                    title="Đang tải danh sách khiếu nại..."
+                    description="Vui lòng đợi trong giây lát khi hệ thống kết nối máy chủ."
+                  />
+                </div>
+              ) : errorMessage ? (
+                <div style={{ padding: '32px 16px' }}>
+                  <AdminState
+                    kind="error"
+                    title="Không thể tải khiếu nại"
+                    description={errorMessage}
+                  />
+                </div>
+              ) : filteredDisputes.length === 0 ? (
+                <div style={{ padding: '32px 16px' }}>
+                  <AdminState
+                    kind="empty"
+                    title="Không có hồ sơ nào"
+                    description={disputes.length === 0 ? "Hiện tại sàn DANASEA không ghi nhận tranh chấp hoặc khiếu nại nào cần phân xử." : "Không tìm thấy tranh chấp phù hợp với bộ lọc hiện tại."}
+                    action={
+                      <AdminButton
+                        onClick={() => {
+                          setSearchQuery('');
+                          setStatusFilter('all');
+                        }}
+                      >
+                        Xóa bộ lọc
+                      </AdminButton>
+                    }
+                  />
+                </div>
+              ) : (
+                paginatedDisputes.map(d => {
+                  const isSelected = d.id === selectedDispute?.id;
+                  return (
+                    <div
+                      key={d.id}
+                      role="option"
+                      aria-selected={isSelected}
+                      tabIndex={0}
+                      className={`admin-disputes__item ${isSelected ? 'admin-disputes__item--active' : ''}`}
+                      onClick={() => handleSelectDispute(d)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleSelectDispute(d);
+                        }
                       }}
                     >
-                      Xóa bộ lọc
-                    </AdminButton>
-                  }
-                />
-              </div>
-            ) : (
-              paginatedDisputes.map(d => {
-                const isSelected = d.id === selectedDispute?.id;
-                return (
-                  <div
-                    key={d.id}
-                    role="option"
-                    aria-selected={isSelected}
-                    tabIndex={0}
-                    className={`admin-disputes__item ${isSelected ? 'admin-disputes__item--active' : ''}`}
-                    onClick={() => handleSelectDispute(d)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleSelectDispute(d);
-                      }
-                    }}
-                  >
-                    <div className="admin-disputes__item-top">
-                      <span className="admin-disputes__item-id">#{d.id}</span>
-                      <AdminBadge
-                        tone={
-                          d.status === 'RESOLVED'
-                            ? 'teal'
-                            : d.status === 'IN_PROGRESS'
-                            ? 'neutral'
-                            : 'amber'
-                        }
-                      >
-                        {d.status === 'RESOLVED' ? 'ĐÃ XONG' : d.status === 'IN_PROGRESS' ? 'ĐANG XỬ LÝ' : 'CHỜ DUYỆT'}
-                      </AdminBadge>
-                    </div>
+                      <div className="admin-disputes__item-top">
+                        <span className="admin-disputes__item-id" title={d.id}>
+                          #{formatDisplayCode(d.id, 'DISP')}
+                        </span>
+                        <AdminBadge
+                          tone={
+                            d.status === 'RESOLVED'
+                              ? 'teal'
+                              : d.status === 'IN_PROGRESS'
+                                ? 'neutral'
+                                : 'amber'
+                          }
+                        >
+                          {d.status === 'RESOLVED' ? 'ĐÃ XONG' : d.status === 'IN_PROGRESS' ? 'ĐANG XỬ LÝ' : 'CHỜ DUYỆT'}
+                        </AdminBadge>
+                      </div>
 
-                    <div className="admin-disputes__item-service">{d.serviceName}</div>
-                    <div className="admin-disputes__item-desc">{d.description}</div>
+                      <div className="admin-disputes__item-service">{d.serviceName}</div>
+                      <div className="admin-disputes__item-desc">{d.description}</div>
 
-                    <div className="admin-disputes__item-footer">
-                      <span className="admin-disputes__item-customer">{d.customerName}</span>
-                      <span className="admin-disputes__item-amount">
-                        {d.orderAmount ? `${d.orderAmount.toLocaleString('vi-VN')} đ` : 'N/A'}
-                      </span>
+                      <div className="admin-disputes__item-footer">
+                        <span className="admin-disputes__item-customer">{d.customerName}</span>
+                        <span className="admin-disputes__item-amount">
+                          {d.orderAmount ? `${d.orderAmount.toLocaleString('vi-VN')} đ` : 'N/A'}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -460,160 +473,130 @@ export function Disputes() {
         {selectedDispute && (
           <aside className="admin-disputes__detail" aria-labelledby="dispute-detail-heading">
             <div key={selectedDispute.id} className="admin-master-detail-fade">
-            {/* Header: Service, Code, Category, Status */}
-            <div className="admin-disputes__detail-header">
-              <div>
-                <div className="admin-disputes__detail-tag-row">
-                  <span className="admin-disputes__tag-pill">HỒ SƠ #{selectedDispute.id}</span>
-                  <span style={{ fontSize: 12, color: 'var(--admin-muted, #595959)' }}>
-                    Đơn hàng: <strong>{selectedDispute.subOrderId}</strong>
-                  </span>
-                  <span style={{ fontSize: 12, color: 'var(--admin-primary, #0B5D6F)', fontWeight: 600 }}>
-                    · {DISPUTE_CATEGORY_LABELS[selectedDispute.category] || selectedDispute.category}
-                  </span>
+              {/* Header: Service, Code, Category, Status */}
+              <div className="admin-disputes__detail-header">
+                <div>
+                  <div className="admin-disputes__detail-tag-row">
+                    <span className="admin-disputes__tag-pill" title={selectedDispute.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      HỒ SƠ #{formatDisplayCode(selectedDispute.id, 'DISP')}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedDispute.id);
+                          setNotice(`Đã sao chép UUID hồ sơ: ${selectedDispute.id}`);
+                        }}
+                        title="Sao chép UUID khiếu nại"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 1, color: 'inherit' }}
+                      >
+                        <Copy size={11} />
+                      </button>
+                    </span>
+                    <span style={{ fontSize: 12, color: 'var(--admin-muted, #595959)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      Đơn chính:{' '}
+                      <strong title={selectedDispute.orderId || ''}>
+                        #{formatDisplayCode(selectedDispute.orderId || '', 'ORD')}
+                      </strong>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const oid = selectedDispute.orderId || '';
+                          navigator.clipboard.writeText(oid);
+                          setNotice(`Đã sao chép UUID đơn chính: ${oid}`);
+                        }}
+                        title="Sao chép UUID đơn chính"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 1, color: 'var(--admin-muted, #595959)' }}
+                      >
+                        <Copy size={11} />
+                      </button>
+                    </span>
+                    {selectedDispute.subOrderId && (
+                      <span style={{ fontSize: 12, color: 'var(--admin-muted, #595959)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        · Đơn con:{' '}
+                        <strong title={selectedDispute.subOrderId}>
+                          #{formatDisplayCode(selectedDispute.subOrderId, 'SUB')}
+                        </strong>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(selectedDispute.subOrderId);
+                            setNotice(`Đã sao chép UUID đơn con: ${selectedDispute.subOrderId}`);
+                          }}
+                          title="Sao chép UUID đơn con"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 1, color: 'var(--admin-muted, #595959)' }}
+                        >
+                          <Copy size={11} />
+                        </button>
+                      </span>
+                    )}
+                    <span style={{ fontSize: 12, color: 'var(--admin-primary, #0B5D6F)', fontWeight: 600 }}>
+                      · {DISPUTE_CATEGORY_LABELS[selectedDispute.category] || selectedDispute.category}
+                    </span>
+                  </div>
+                  <h2 id="dispute-detail-heading" className="admin-disputes__detail-service-title" style={{ textWrap: 'balance' }}>
+                    {selectedDispute.serviceName}
+                  </h2>
                 </div>
-                <h2 id="dispute-detail-heading" className="admin-disputes__detail-service-title" style={{ textWrap: 'balance' }}>
-                  {selectedDispute.serviceName}
-                </h2>
+
+                <AdminBadge
+                  tone={
+                    selectedDispute.status === 'RESOLVED'
+                      ? 'teal'
+                      : selectedDispute.status === 'IN_PROGRESS'
+                        ? 'neutral'
+                        : 'amber'
+                  }
+                >
+                  {selectedDispute.status === 'RESOLVED' ? 'ĐÃ XONG' : selectedDispute.status === 'IN_PROGRESS' ? 'ĐANG XỬ LÝ' : 'CHỜ DUYỆT'}
+                </AdminBadge>
               </div>
 
-              <AdminBadge
-                tone={
-                  selectedDispute.status === 'RESOLVED'
-                    ? 'teal'
-                    : selectedDispute.status === 'IN_PROGRESS'
-                    ? 'neutral'
-                    : 'amber'
-                }
-              >
-                {selectedDispute.status === 'RESOLVED' ? 'ĐÃ XONG' : selectedDispute.status === 'IN_PROGRESS' ? 'ĐANG XỬ LÝ' : 'CHỜ DUYỆT'}
-              </AdminBadge>
-            </div>
-
-            {/* Parties: Customer & Vendor */}
-            <div className="admin-disputes__section">
-              <span className="admin-disputes__section-title">
-                <User size={14} />
-                Các bên liên quan
-              </span>
-              <div className="admin-disputes__parties-grid">
-                <div className="admin-disputes__party-card">
-                  <span className="admin-disputes__party-role">Du khách khiếu nại</span>
-                  <span className="admin-disputes__party-name">{selectedDispute.customerName}</span>
-                  <span className="admin-disputes__party-sub">SĐT: {selectedDispute.customerPhone}</span>
-                </div>
-
-                <div className="admin-disputes__party-card">
-                  <span className="admin-disputes__party-role">Đối tác vận hành tour</span>
-                  <span className="admin-disputes__party-name">{selectedDispute.vendorName}</span>
-                  <span className="admin-disputes__party-sub" style={{ fontWeight: 600, color: 'var(--admin-primary, #0B5D6F)' }}>
-                    Giá trị đơn: {selectedDispute.orderAmount ? `${selectedDispute.orderAmount.toLocaleString('vi-VN')} VNĐ` : 'N/A'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Claim Content */}
-            <div className="admin-disputes__section">
-              <span className="admin-disputes__section-title">
-                <FileText size={14} />
-                Nội dung phản ánh từ khách hàng
-              </span>
-              <div className="admin-disputes__claim-box">
-                {selectedDispute.description}
-              </div>
-            </div>
-
-            {/* Attached Evidence */}
-            {selectedDispute.evidenceImages && selectedDispute.evidenceImages.length > 0 && (
+              {/* Parties: Customer & Vendor */}
               <div className="admin-disputes__section">
                 <span className="admin-disputes__section-title">
-                  <ImageIcon size={14} />
-                  Hình ảnh bằng chứng hiện trường ({selectedDispute.evidenceImages.length} ảnh)
+                  <User size={14} />
+                  Các bên liên quan
                 </span>
-                <div className="admin-disputes__gallery">
-                  {selectedDispute.evidenceImages.map((img, idx) => (
-                    <img
-                      key={idx}
-                      src={img}
-                      alt="Bằng chứng hiện trường"
-                      className="admin-disputes__evidence-thumb"
-                      onClick={() => setPreviewImage(img)}
-                      title="Bấm để xem ảnh phóng to"
-                    />
-                  ))}
+                <div className="admin-disputes__parties-grid">
+                  <div className="admin-disputes__party-card">
+                    <span className="admin-disputes__party-role">Du khách khiếu nại</span>
+                    <span className="admin-disputes__party-name">{selectedDispute.customerName}</span>
+                    <span className="admin-disputes__party-sub">SĐT: {selectedDispute.customerPhone}</span>
+                  </div>
+
+                  <div className="admin-disputes__party-card">
+                    <span className="admin-disputes__party-role">Đối tác vận hành tour</span>
+                    <span className="admin-disputes__party-name">{selectedDispute.vendorName}</span>
+                    <span className="admin-disputes__party-sub" style={{ fontWeight: 600, color: 'var(--admin-primary, #0B5D6F)' }}>
+                      Giá trị đơn: {selectedDispute.orderAmount ? `${selectedDispute.orderAmount.toLocaleString('vi-VN')} VNĐ` : 'N/A'}
+                    </span>
+                  </div>
                 </div>
               </div>
-            )}
 
-            {/* Vendor Defense / Explanation Section */}
-            <div className="admin-disputes__section">
-              <span className="admin-disputes__section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <ShieldAlert size={14} />
-                  Văn bản giải trình từ Đối tác / Nhà cung cấp
+              {/* Claim Content */}
+              <div className="admin-disputes__section">
+                <span className="admin-disputes__section-title">
+                  <FileText size={14} />
+                  Nội dung phản ánh từ khách hàng
                 </span>
-                {selectedDispute.vendorRespondedAt && (
-                  <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--admin-muted, #64748b)' }}>
-                    Gửi lúc: {formatDateTime(selectedDispute.vendorRespondedAt)}
-                  </span>
-                )}
-              </span>
-
-              {selectedDispute.vendorResponse ? (
-                <div
-                  style={{
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    backgroundColor: '#F8FAFC',
-                    border: '1px solid #E2E8F0',
-                    borderLeft: '4px solid #0284C7',
-                    fontSize: 13,
-                    lineHeight: 1.6,
-                    color: '#1E293B',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontWeight: 600, color: '#0369A1', fontSize: 12 }}>
-                    <CheckCircle2 size={14} />
-                    <span>Ý kiến phản hồi từ đối tác ({selectedDispute.vendorName}):</span>
-                  </div>
-                  <div style={{ whiteSpace: 'pre-wrap' }}>
-                    {selectedDispute.vendorResponse}
-                  </div>
+                <div className="admin-disputes__claim-box">
+                  {selectedDispute.description}
                 </div>
-              ) : (
-                <div
-                  style={{
-                    padding: '12px 14px',
-                    borderRadius: '8px',
-                    backgroundColor: '#FFFBEB',
-                    border: '1px solid #FEF3C7',
-                    borderLeft: '4px solid #F59E0B',
-                    fontSize: 13,
-                    color: '#92400E',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                  }}
-                >
-                  <Clock size={16} style={{ flexShrink: 0 }} />
-                  <span>Đối tác chưa gửi văn bản giải trình. Hệ thống đang chờ phản hồi từ nhà cung cấp trong thời hạn quy định (24h).</span>
-                </div>
-              )}
+              </div>
 
-              {/* Vendor Attached Evidence */}
-              {selectedDispute.vendorEvidenceUrls && selectedDispute.vendorEvidenceUrls.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
-                    <ImageIcon size={13} />
-                    Bằng chứng đối soát từ đối tác ({selectedDispute.vendorEvidenceUrls.length} tệp)
+              {/* Attached Evidence */}
+              {selectedDispute.evidenceImages && selectedDispute.evidenceImages.length > 0 && (
+                <div className="admin-disputes__section">
+                  <span className="admin-disputes__section-title">
+                    <ImageIcon size={14} />
+                    Hình ảnh bằng chứng hiện trường ({selectedDispute.evidenceImages.length} ảnh)
                   </span>
                   <div className="admin-disputes__gallery">
-                    {selectedDispute.vendorEvidenceUrls.map((img, idx) => (
+                    {selectedDispute.evidenceImages.map((img, idx) => (
                       <img
                         key={idx}
                         src={img}
-                        alt="Bằng chứng từ đối tác"
+                        alt="Bằng chứng hiện trường"
                         className="admin-disputes__evidence-thumb"
                         onClick={() => setPreviewImage(img)}
                         title="Bấm để xem ảnh phóng to"
@@ -622,55 +605,148 @@ export function Disputes() {
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Field Review Log (Neutral phrasing) */}
-            <div className="admin-disputes__review-card">
-              <Info size={18} style={{ flexShrink: 0, marginTop: 2 }} />
-              <div>
-                <strong>Đối soát nhật trình vận hành (Dữ liệu mẫu):</strong> Ghi nhận dữ liệu thời gian xuất bến và nhật trình mặt nước theo hồ sơ mẫu. Đối tác có nghĩa vụ bồi hoàn thỏa đáng nếu điều kiện an toàn và trang bị mặt nước không đảm bảo cam kết.
-              </div>
-            </div>
+              {/* Vendor Defense / Explanation Section */}
+              <div className="admin-disputes__section">
+                <span className="admin-disputes__section-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <ShieldAlert size={14} />
+                    Văn bản giải trình từ Đối tác / Nhà cung cấp
+                  </span>
+                  {selectedDispute.vendorRespondedAt && (
+                    <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--admin-muted, #64748b)' }}>
+                      Gửi lúc: {formatDateTime(selectedDispute.vendorRespondedAt)}
+                    </span>
+                  )}
+                </span>
 
-            {/* Deliberation Note & Resolution Actions */}
-            <div className="admin-disputes__resolution-box">
-              <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--admin-ink, #171717)' }}>
-                KẾT LUẬN THẨM ĐỊNH &amp; PHƯƠNG ÁN GIẢI QUYẾT:
-              </label>
-              <textarea
-                className="admin-disputes__textarea"
-                value={resolutionNote}
-                onChange={(e) => setResolutionNote(e.target.value)}
-                placeholder="Nhập biên bản thẩm định hoặc ghi chú lý do hoàn tiền/bác bỏ..."
-              />
-
-              <div className="admin-disputes__actions-row">
-                {selectedDispute.status !== 'RESOLVED' ? (
-                  <>
-                    <AdminButton
-                      variant="secondary"
-                      onClick={() => setIsDismissModalOpen(true)}
-                    >
-                      <Ban size={15} aria-hidden="true" />
-                      Bác bỏ khiếu nại
-                    </AdminButton>
-
-                    <AdminButton
-                      variant="primary"
-                      onClick={() => setIsRefundModalOpen(true)}
-                    >
-                      <RotateCcw size={15} aria-hidden="true" />
-                      Chấp thuận &amp; Hoàn tiền (Mô phỏng SEPAY)
-                    </AdminButton>
-                  </>
+                {selectedDispute.vendorResponse ? (
+                  <div
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
+                      borderLeft: '4px solid #0284C7',
+                      fontSize: 13,
+                      lineHeight: 1.6,
+                      color: '#1E293B',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontWeight: 600, color: '#0369A1', fontSize: 12 }}>
+                      <CheckCircle2 size={14} />
+                      <span>Ý kiến phản hồi từ đối tác ({selectedDispute.vendorName}):</span>
+                    </div>
+                    <div style={{ whiteSpace: 'pre-wrap' }}>
+                      {selectedDispute.vendorResponse}
+                    </div>
+                  </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#166534', fontWeight: 600 }}>
-                    <CheckCircle2 size={16} />
-                    <span>Hồ sơ đã được giải quyết bởi {selectedDispute.resolvedBy || 'Ban Quản trị DANASEA'}.</span>
+                  <div
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: '#FFFBEB',
+                      border: '1px solid #FEF3C7',
+                      borderLeft: '4px solid #F59E0B',
+                      fontSize: 13,
+                      color: '#92400E',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <Clock size={16} style={{ flexShrink: 0 }} />
+                    <span>Đối tác chưa gửi văn bản giải trình. Hệ thống đang chờ phản hồi từ nhà cung cấp trong thời hạn quy định (24h).</span>
+                  </div>
+                )}
+
+                {/* Vendor Attached Evidence */}
+                {selectedDispute.vendorEvidenceUrls && selectedDispute.vendorEvidenceUrls.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#475569', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                      <ImageIcon size={13} />
+                      Bằng chứng đối soát từ đối tác ({selectedDispute.vendorEvidenceUrls.length} tệp)
+                    </span>
+                    <div className="admin-disputes__gallery">
+                      {selectedDispute.vendorEvidenceUrls.map((img, idx) => (
+                        <img
+                          key={idx}
+                          src={img}
+                          alt="Bằng chứng từ đối tác"
+                          className="admin-disputes__evidence-thumb"
+                          onClick={() => setPreviewImage(img)}
+                          title="Bấm để xem ảnh phóng to"
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
+
+              {/* Field Review Log (Neutral phrasing) */}
+              <div className="admin-disputes__review-card">
+                <Info size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <strong>Đối soát nhật trình vận hành (Dữ liệu mẫu):</strong> Ghi nhận dữ liệu thời gian xuất bến và nhật trình mặt nước theo hồ sơ mẫu. Đối tác có nghĩa vụ bồi hoàn thỏa đáng nếu điều kiện an toàn và trang bị mặt nước không đảm bảo cam kết.
+                </div>
+              </div>
+
+              {/* AI Dispute Arbitration Assistant */}
+              <DisputeAiArbitrationCard
+                disputeId={selectedDispute.id}
+                onApplyDraftNote={(draftNote, suggestedRefundPercent) => {
+                  setResolutionNote(draftNote);
+                  if (
+                    typeof suggestedRefundPercent === 'number' &&
+                    suggestedRefundPercent >= 0 &&
+                    suggestedRefundPercent <= 100
+                  ) {
+                    setRefundPercentage(suggestedRefundPercent);
+                  }
+                  setNotice('Đã áp dụng biên bản đề xuất từ AI vào kết luận thẩm định.');
+                }}
+              />
+
+              {/* Deliberation Note & Resolution Actions */}
+              <div className="admin-disputes__resolution-box">
+                <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--admin-ink, #171717)' }}>
+                  KẾT LUẬN THẨM ĐỊNH &amp; PHƯƠNG ÁN GIẢI QUYẾT:
+                </label>
+                <textarea
+                  className="admin-disputes__textarea"
+                  value={resolutionNote}
+                  onChange={(e) => setResolutionNote(e.target.value)}
+                  placeholder="Nhập biên bản thẩm định hoặc ghi chú lý do hoàn tiền/bác bỏ..."
+                />
+
+                <div className="admin-disputes__actions-row">
+                  {selectedDispute.status !== 'RESOLVED' ? (
+                    <>
+                      <AdminButton
+                        variant="secondary"
+                        onClick={() => setIsDismissModalOpen(true)}
+                      >
+                        <Ban size={15} aria-hidden="true" />
+                        Bác bỏ khiếu nại
+                      </AdminButton>
+
+                      <AdminButton
+                        variant="primary"
+                        onClick={() => setIsRefundModalOpen(true)}
+                      >
+                        <RotateCcw size={15} aria-hidden="true" />
+                        Chấp thuận &amp; Hoàn tiền (Mô phỏng SEPAY)
+                      </AdminButton>
+                    </>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#166534', fontWeight: 600 }}>
+                      <CheckCircle2 size={16} />
+                      <span>Hồ sơ đã được giải quyết bởi {selectedDispute.resolvedBy || 'Ban Quản trị DANASEA'}.</span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </aside>
         )}

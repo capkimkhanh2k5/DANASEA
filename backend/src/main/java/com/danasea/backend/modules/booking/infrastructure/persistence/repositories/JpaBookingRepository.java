@@ -54,5 +54,10 @@ public interface JpaBookingRepository extends JpaRepository<BookingJpaEntity, UU
     default List<BookingJpaEntity> findExpiredHolds(OffsetDateTime threshold) {
         return findExpiredHolds(List.of(BookingStatus.HOLD, BookingStatus.PENDING_PAYMENT), threshold);
     }
-}
 
+    @Query("SELECT COUNT(b) > 0 FROM BookingJpaEntity b WHERE b.customerId = :customerId " +
+           "AND b.status IN (com.danasea.backend.modules.booking.domain.models.BookingStatus.HOLD, " +
+           "com.danasea.backend.modules.booking.domain.models.BookingStatus.PENDING_PAYMENT) " +
+           "AND (b.holdExpiresAt IS NULL OR b.holdExpiresAt > CURRENT_TIMESTAMP)")
+    boolean hasActiveBookings(@Param("customerId") UUID customerId);
+}

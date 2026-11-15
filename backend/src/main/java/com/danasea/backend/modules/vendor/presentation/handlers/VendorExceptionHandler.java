@@ -9,7 +9,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import com.danasea.backend.modules.vendor.domain.exceptions.InvalidDocTypeException;
 import com.danasea.backend.modules.vendor.domain.exceptions.UserLockedException;
 import com.danasea.backend.modules.vendor.domain.exceptions.VendorAlreadyExistsException;
+import com.danasea.backend.modules.vendor.domain.exceptions.VendorDocumentsIncompleteException;
 import com.danasea.backend.modules.vendor.domain.exceptions.VendorNotFoundException;
+import com.danasea.backend.modules.vendor.domain.exceptions.VendorProfileIncompleteException;
+import com.danasea.backend.modules.vendor.domain.exceptions.VendorStatusConflictException;
 import com.danasea.backend.modules.service.domain.exceptions.InvalidFileTypeException;
 import com.danasea.backend.shared.presentation.ErrorResponse;
 import com.danasea.backend.shared.presentation.LocalizedExceptionHandlerSupport;
@@ -24,11 +27,32 @@ public class VendorExceptionHandler extends LocalizedExceptionHandlerSupport {
                 .body(error("VENDOR_ALREADY_EXISTS"));
     }
 
+    @ExceptionHandler(VendorStatusConflictException.class)
+    public ResponseEntity<ErrorResponse> handleVendorStatusConflict(VendorStatusConflictException ex) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(error(ex.getErrorCode() != null ? ex.getErrorCode() : "VENDOR_STATUS_CONFLICT"));
+    }
+
     @ExceptionHandler(VendorNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleVendorNotFound(VendorNotFoundException ex) {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(error("VENDOR_NOT_FOUND"));
+    }
+
+    @ExceptionHandler(VendorProfileIncompleteException.class)
+    public ResponseEntity<ErrorResponse> handleVendorProfileIncomplete(VendorProfileIncompleteException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(error("PROFILE_INCOMPLETE"));
+    }
+
+    @ExceptionHandler(VendorDocumentsIncompleteException.class)
+    public ResponseEntity<ErrorResponse> handleVendorDocumentsIncomplete(VendorDocumentsIncompleteException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(error("DOCUMENTS_INCOMPLETE"));
     }
 
     @ExceptionHandler(UserLockedException.class)

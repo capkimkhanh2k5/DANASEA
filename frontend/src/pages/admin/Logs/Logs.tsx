@@ -32,6 +32,7 @@ import {
   type LogActionFilter,
   type LogEntityFilter,
 } from './logsModel';
+import { formatDisplayCode } from '../Orders/ordersModel';
 import './Logs.css';
 
 export function Logs() {
@@ -135,6 +136,12 @@ export function Logs() {
     setCopied(true);
     setNotice('Đã sao chép siêu dữ liệu (JSON) đã xử lý an toàn vào clipboard.');
     setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handleCopyText = (text: string, label: string) => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text);
+    setNotice(`Đã sao chép ${label}: ${text}`);
   };
 
   // Open drawer and ensure technical section starts collapsed
@@ -397,8 +404,8 @@ export function Logs() {
                           }}
                           aria-label={`Xem chi tiết bản ghi ${log.id}, hành động ${meta.label}`}
                         >
-                          <td className="admin-log-id-cell">
-                            {log.id}
+                          <td className="admin-log-id-cell" title={log.id}>
+                            #{formatDisplayCode(log.id, 'LOG')}
                           </td>
                           <td className="admin-log-time-cell">
                             <strong>{formatDateTimeVN(log.createdAt)}</strong>
@@ -423,7 +430,9 @@ export function Logs() {
                           <td>
                             <div className="admin-log-entity-badge">
                               <span>{ENTITY_LABELS[log.entityType] || log.entityType}:</span>
-                              <span className="admin-log-entity-id">#{log.entityId}</span>
+                              <span className="admin-log-entity-id" title={log.entityId}>
+                                #{formatDisplayCode(log.entityId, log.entityType === 'ORDER' || log.entityType === 'MASTER_ORDER' ? 'ORD' : log.entityType === 'SETTLEMENT' ? 'STL' : 'ENT')}
+                              </span>
                             </div>
                           </td>
                           <td style={{ textAlign: 'center' }}>
@@ -465,8 +474,8 @@ export function Logs() {
       <AdminDialog
         open={Boolean(selectedLog)}
         variant="drawer"
-        title={selectedLog ? `Chi tiết kiểm toán: ${selectedLog.id}` : ''}
-        description="Bản ghi lưu vết hoạt động quản trị trên hệ thống DANASEA."
+        title={selectedLog ? `Chi tiết kiểm toán: #${formatDisplayCode(selectedLog.id, 'LOG')}` : ''}
+        description={selectedLog ? `Mã bản ghi hệ thống: ${selectedLog.id}` : "Bản ghi lưu vết hoạt động quản trị trên hệ thống DANASEA."}
         onClose={() => setSelectedLog(null)}
         footer={
           <AdminButton variant="secondary" onClick={() => setSelectedLog(null)}>
@@ -481,7 +490,19 @@ export function Logs() {
               <AdminBadge tone={getActionMeta(selectedLog.action).tone}>
                 {getActionMeta(selectedLog.action).label}
               </AdminBadge>
-              <span className="admin-config-key">{selectedLog.id}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span className="admin-config-key" title={selectedLog.id}>
+                  #{formatDisplayCode(selectedLog.id, 'LOG')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopyText(selectedLog.id, 'UUID bản ghi')}
+                  title="Sao chép UUID bản ghi"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--admin-muted)' }}
+                >
+                  <Copy size={12} />
+                </button>
+              </div>
             </div>
 
             {/* 1. Core Audit Context */}
@@ -518,7 +539,19 @@ export function Logs() {
                     <span style={{ fontWeight: 600 }}>
                       {ENTITY_LABELS[selectedLog.entityType] || selectedLog.entityType}
                     </span>
-                    <div className="admin-log-entity-id">#{selectedLog.entityId}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                      <span className="admin-log-entity-id" title={selectedLog.entityId}>
+                        #{formatDisplayCode(selectedLog.entityId, selectedLog.entityType === 'ORDER' || selectedLog.entityType === 'MASTER_ORDER' ? 'ORD' : selectedLog.entityType === 'SETTLEMENT' ? 'STL' : 'ENT')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyText(selectedLog.entityId, 'UUID đối tượng tác động')}
+                        title="Sao chép UUID đối tượng tác động"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--admin-muted)' }}
+                      >
+                        <Copy size={12} />
+                      </button>
+                    </div>
                   </dd>
                 </div>
               </dl>

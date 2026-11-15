@@ -62,6 +62,7 @@ public class VendorServiceController {
                 request.price(),
                 request.durationMinutes(),
                 request.capacityPerSlot(),
+                request.operationType(),
                 request.locationName(),
                 request.address(),
                 request.latitude(),
@@ -101,6 +102,7 @@ public class VendorServiceController {
                 request.categoryId(), request.name(), request.nameEn(),
                 request.description(), request.descriptionEn(),
                 request.price(), request.durationMinutes(), request.capacityPerSlot(),
+                request.operationType(),
                 request.locationName(), request.address(), request.latitude(), request.longitude(),
                 request.waiverContent(), request.waiverContentEn(), request.waiverRequired(),
                 request.weatherSensitive(), request.minWindKmh(), request.maxWaveM());

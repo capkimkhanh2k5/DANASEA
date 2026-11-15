@@ -67,6 +67,7 @@ public class CreateServiceUseCase {
                 .price(cmd.price())
                 .durationMinutes(cmd.durationMinutes())
                 .capacityPerSlot(cmd.capacityPerSlot())
+                .operationType(cmd.operationType() != null ? cmd.operationType() : com.danasea.backend.modules.service.domain.models.OperationType.FIXED_DEPARTURE)
                 .locationName(cmd.locationName())
                 .address(cmd.address())
                 .latitude(cmd.latitude())

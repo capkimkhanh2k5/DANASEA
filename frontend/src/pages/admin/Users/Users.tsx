@@ -162,8 +162,12 @@ export function Users() {
 
   const handleRoleChange = (newRole: Role) => {
     if (!selectedUser) return;
+    if (newRole === 'VENDOR' && selectedUser.role === 'CUSTOMER') {
+      setNotice('Không thể gán quyền VENDOR trực tiếp: Khách hàng bắt buộc phải gửi đơn Hợp tác doanh nghiệp và được thẩm định qua mục "Duyệt vai trò".');
+      return;
+    }
     if (!demo) {
-      setNotice('Bật thao tác demo (?demo=1) để thử nghiệm thay đổi vai trò tài khoản.');
+      setNotice('Hệ thống không hỗ trợ đổi vai trò tài khoản tùy ý. Quy trình chuyển vai trò sang VENDOR phải thông qua "Duyệt vai trò".');
       return;
     }
 
@@ -655,7 +659,7 @@ export function Users() {
                   {
                     role: 'VENDOR' as const,
                     title: 'VENDOR',
-                    desc: 'Nhà cung cấp tour biển, mở ca và soát vé check-in.',
+                    desc: 'Nhà cung cấp tour biển (yêu cầu nộp đơn và thẩm định tại "Duyệt vai trò").',
                   },
                   {
                     role: 'ADMIN' as const,

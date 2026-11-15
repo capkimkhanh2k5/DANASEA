@@ -69,8 +69,8 @@ export function AdminAccount({
           to={demo ? '/admin/settings?demo=1' : '/admin/settings'}
           onClick={onNavigate}
           className="admin-account-action"
-          aria-label="Cấu hình hệ thống"
-          title="Cấu hình hệ thống"
+          aria-label="Cấu hình hoa hồng"
+          title="Cấu hình hoa hồng"
         >
           <Settings2 size={16} />
         </Link>

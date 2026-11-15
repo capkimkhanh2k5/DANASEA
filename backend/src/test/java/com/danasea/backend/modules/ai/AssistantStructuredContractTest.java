@@ -81,6 +81,23 @@ class AssistantStructuredContractTest {
         assertThat(result.getCards().getFirst().sources()).isEmpty();
     }
 
+    @Test void tourSearchWithResultsKeepsUsefulTextWhenModelAddsUnverifiedPolicy() {
+        var chat = chat("ai_smart_search");
+        when(llm.generateResponse(any(), eq(SupportedLanguage.VI))).thenReturn(
+                toolResponse("ai_smart_search", "{}"),
+                answer("Đã tìm thấy tour. Bạn có thể hủy miễn phí."));
+        when(tool.execute(any(), any(ToolExecutionContext.class))).thenReturn(
+                "{\"status\":\"AVAILABLE\",\"candidates\":[{\"service\":{\"name\":\"Tour lặn biển\"}}]}");
+
+        var result = chat.processMessage(conversation,
+                "Tôi muốn đặt tour lặn biển ở Đà Nẵng, bạn có thể tìm dịch vụ giúp tôi không?",
+                SupportedLanguage.VI, actor);
+
+        assertThat(result.getContent()).contains("Tôi tìm thấy").doesNotContain("hủy miễn phí", "hoàn hủy");
+        assertThat(result.getCards()).singleElement().satisfies(card ->
+                assertThat(card.type()).isEqualTo("SERVICE_LIST"));
+    }
+
     @Test void ownedCancellationPreviewProducesDeterministicPolicyTextAndSourcedCard() {
         var chat = chat("ai_customer_support");
         when(llm.generateResponse(any(), eq(SupportedLanguage.EN))).thenReturn(

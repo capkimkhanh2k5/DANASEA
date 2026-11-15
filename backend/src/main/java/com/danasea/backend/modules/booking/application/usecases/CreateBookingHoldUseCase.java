@@ -11,6 +11,7 @@ import com.danasea.backend.modules.booking.domain.models.BookingItemAllocation;
 import com.danasea.backend.modules.booking.domain.models.InventoryLockItem;
 import com.danasea.backend.modules.booking.domain.models.SlotValidationDetails;
 import com.danasea.backend.modules.booking.domain.ports.BookingRepositoryPort;
+import com.danasea.backend.modules.booking.domain.ports.CustomerAccountPort;
 import com.danasea.backend.modules.booking.domain.ports.InventoryLockPort;
 import com.danasea.backend.modules.booking.domain.ports.ServiceSlotPort;
 import com.danasea.backend.modules.booking.domain.ports.FlashSaleBookingPort;
@@ -73,6 +74,13 @@ public class CreateBookingHoldUseCase {
     @Autowired
     public void setFlashSale(FlashSaleBookingPort flashSale) { this.flashSale=flashSale; }
 
+    private CustomerAccountPort customerAccountPort;
+
+    @Autowired(required = false)
+    public void setCustomerAccountPort(CustomerAccountPort customerAccountPort) {
+        this.customerAccountPort = customerAccountPort;
+    }
+
     private record AggregationKey(UUID slotId, UUID optionId, Integer participantsCount, boolean allowSplit, UUID flashSaleId, int groupIndex) {}
 
     @Transactional
@@ -83,6 +91,9 @@ public class CreateBookingHoldUseCase {
         }
         if (command.customerId() == null) {
             throw new IllegalArgumentException("Customer ID cannot be null");
+        }
+        if (customerAccountPort != null) {
+            customerAccountPort.validateCustomerForBookingWithLock(command.customerId());
         }
         if (command.items() == null || command.items().isEmpty()) {
             throw new IllegalArgumentException("Booking must contain at least one item");

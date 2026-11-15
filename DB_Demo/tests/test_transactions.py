@@ -42,16 +42,16 @@ class TransactionDatasetContract(unittest.TestCase):
         self.assertEqual('0.1000', meta['platformCommissionRate'])
         self.assertEqual(228, meta['baseRecordsReferenced'])
         self.assertEqual(50, len(self.data['bookings']))
-        self.assertEqual(50, len(self.data['booking_items']))
+        self.assertEqual(51, len(self.data['booking_items']))
         self.assertEqual(50, len(self.data['master_orders']))
-        self.assertEqual(50, len(self.data['sub_orders']))
-        self.assertEqual(50, len(self.data['payments']))
+        self.assertEqual(51, len(self.data['sub_orders']))
+        self.assertEqual(51, len(self.data['payments']))
         self.assertEqual(6, len(self.data['refunds']))
         self.assertEqual(20, len(self.data['invoices']))
         self.assertEqual(11, len(self.data['settlements']))
         self.assertEqual(19, len(self.data['settlement_line_items']))
         self.assertEqual(11, len(self.data['payout_requests']))
-        self.assertEqual(27, len(self.data.get('booking_item_allocations', [])))
+        self.assertEqual(28, len(self.data.get('booking_item_allocations', [])))
 
     def test_referential_integrity_to_base_package(self):
         # Customer checks
@@ -76,8 +76,12 @@ class TransactionDatasetContract(unittest.TestCase):
 
         # Admin user check in payout requests
         for pr in self.data['payout_requests']:
-            self.assertIn(pr['processed_by'], self.users)
-            self.assertEqual('ADMIN', self.users[pr['processed_by']]['role'])
+            if pr['status'] == 'REQUESTED':
+                self.assertIsNone(pr['processed_by'])
+                self.assertIsNone(pr['processed_at'])
+            else:
+                self.assertIn(pr['processed_by'], self.users)
+                self.assertEqual('ADMIN', self.users[pr['processed_by']]['role'])
 
     def test_internal_transaction_linkages(self):
         booking_ids = {b['id'] for b in self.data['bookings']}
@@ -123,13 +127,20 @@ class TransactionDatasetContract(unittest.TestCase):
             final = Decimal(so['final_amount'])
             self.assertEqual(subtotal - discount, final, 'Final amount must equal subtotal - discount')
 
+            vendor_discount = Decimal(so.get('vendor_discount_amount', '0.00'))
+            platform_discount = Decimal(so.get('platform_discount_amount', '0.00'))
+            self.assertEqual(vendor_discount + platform_discount, discount, 'Vendor + platform discount must equal discount_amount')
+
+            basis = Decimal(so['commission_basis_amount'])
+            self.assertEqual(subtotal - vendor_discount, basis, 'Commission basis must equal subtotal - vendor_discount')
+
             rate = Decimal(so['commission_rate'])
             comm = Decimal(so['commission_amount'])
-            expected_comm = (final * rate).quantize(Decimal('0.01'))
-            self.assertEqual(expected_comm, comm, 'Commission must equal final * commission_rate')
+            expected_comm = (basis * rate).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            self.assertEqual(expected_comm, comm, 'Commission must equal commission_basis_amount * commission_rate')
 
             payout = Decimal(so['vendor_payout_amount'])
-            self.assertEqual(final - comm, payout, 'Vendor payout must equal final - commission')
+            self.assertEqual(basis - comm, payout, 'Vendor payout must equal commission_basis_amount - commission')
 
         # Settlement line item and aggregate checks
         line_items_by_settlement = {}
@@ -170,7 +181,7 @@ class TransactionDatasetContract(unittest.TestCase):
         for order in self.data['master_orders']:
             booking = next(b for b in self.data['bookings'] if b['id'] == order['booking_id'])
             self.assertEqual(booking['customer_id'], order['customer_id'])
-            self.assertEqual(Decimal(booking['total_amount']), Decimal(order['total_amount']))
+            self.assertEqual(Decimal(booking['total_amount']) - Decimal(order['discount_amount']), Decimal(order['total_amount']))
 
     def test_refund_payment_links_and_payout_balance(self):
         for refund in self.data['refunds']:
@@ -233,7 +244,7 @@ class TransactionDatasetContract(unittest.TestCase):
 
     def test_private_allocations_integrity(self):
         allocs = self.data.get('booking_item_allocations', [])
-        self.assertEqual(27, len(allocs))
+        self.assertEqual(28, len(allocs))
         items_by_id = {i['id']: i for i in self.data['booking_items']}
         sub_by_item = {s['booking_item_id']: s for s in self.data['sub_orders']}
         active_units = {}
@@ -245,11 +256,11 @@ class TransactionDatasetContract(unittest.TestCase):
             self.assertGreater(a['unit_number'], 0)
             self.assertGreater(a['allocated_seats'], 0)
             so = sub_by_item[a['booking_item_id']]
-            if so['status'] != 'CANCELLED':
+            if so['status'] not in ('CANCELLED', 'REFUNDED', 'REJECTED') and not item.get('capacity_released', False):
                 key = (a['slot_id'], a['unit_number'])
                 self.assertNotIn(key, active_units, f"Conflicting unit allocation on slot {a['slot_id']} unit {a['unit_number']}")
                 active_units[key] = a['id']
-        self.assertEqual(22, len(active_units))
+        self.assertEqual(23, len(active_units))
 
 
 if __name__ == '__main__':

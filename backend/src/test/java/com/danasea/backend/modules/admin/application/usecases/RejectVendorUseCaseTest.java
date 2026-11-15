@@ -85,6 +85,32 @@ class RejectVendorUseCaseTest {
     }
 
     @Test
+    void rejectsNullReasonWithoutModifyingVendorOrAuditing() {
+        UUID vendorId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> useCase.execute(vendorId, adminId, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Rejection reason cannot be blank");
+
+        verifyNoInteractions(vendorInternalApi);
+        verifyNoInteractions(auditLogInternalApi);
+    }
+
+    @Test
+    void rejectsBlankReasonWithoutModifyingVendorOrAuditing() {
+        UUID vendorId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> useCase.execute(vendorId, adminId, "   \t\n  "))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Rejection reason cannot be blank");
+
+        verifyNoInteractions(vendorInternalApi);
+        verifyNoInteractions(auditLogInternalApi);
+    }
+
+    @Test
     void refusesAlreadyRejectedVendorWithoutChangingItsDecision() {
         assertFinalDecisionCannotBeRejected(VerificationStatus.REJECTED, "Vendor is already rejected");
     }

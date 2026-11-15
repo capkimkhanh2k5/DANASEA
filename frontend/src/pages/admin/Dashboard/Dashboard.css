@@ -158,7 +158,102 @@
 }
 
 /* -------------------------------------------------------------------------
-   3 Rows Layout Grid
+   Standalone 4-Box Executive Digest Grid (No Outer Box, Pure Vietnamese)
+   ------------------------------------------------------------------------- */
+.admin-digest-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 1280px) {
+  .admin-digest-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-digest-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-digest-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: all 0.15s ease;
+}
+
+.admin-digest-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.admin-digest-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-digest-card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.3px;
+}
+
+.admin-digest-period-pill {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #0284c7;
+  background-color: #f0f9ff;
+  border: 1px solid #e0f2fe;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.admin-digest-card-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.admin-digest-card-sub {
+  font-size: 11.5px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.admin-digest-unit {
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.admin-digest-separator {
+  margin: 0 6px;
+  color: #cbd5e1;
+}
+
+/* -------------------------------------------------------------------------
+   2 Rows Layout Grid
    ------------------------------------------------------------------------- */
 .admin-dashboard-row-1 {
   display: grid;
@@ -169,14 +264,7 @@
 
 .admin-dashboard-row-2 {
   display: grid;
-  grid-template-columns: minmax(0, 60%) minmax(340px, 40%);
-  gap: 16px;
-  align-items: stretch;
-}
-
-.admin-dashboard-row-3 {
-  display: grid;
-  grid-template-columns: minmax(340px, 40%) minmax(0, 60%);
+  grid-template-columns: minmax(0, 58%) minmax(360px, 42%);
   gap: 16px;
   align-items: stretch;
 }
@@ -310,7 +398,7 @@
 .admin-chart-total-value {
   font-size: 18px;
   font-weight: 700;
-  color: var(--admin-primary, #0B5D6F);
+  color: #0284C7;
   letter-spacing: -0.4px;
 }
 
@@ -555,7 +643,7 @@
 .admin-donut-legend-column {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   flex: 1;
   min-width: 0;
 }
@@ -564,8 +652,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: 10px;
+  padding: 6px 11px;
   background-color: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -578,8 +666,8 @@
 .admin-donut-legend-row:hover,
 .admin-donut-legend-row--active {
   background-color: #ffffff;
-  border-color: #94a3b8;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  border-color: #0284c7;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.08);
   transform: translateX(2px);
 }
 

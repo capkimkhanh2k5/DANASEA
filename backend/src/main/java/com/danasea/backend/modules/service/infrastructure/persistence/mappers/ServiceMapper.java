@@ -46,6 +46,7 @@ public class ServiceMapper {
         domain.setAvgRating(entity.getAvgRating());
         domain.setRatingCount(entity.getRatingCount());
         domain.setViewCount(entity.getViewCount());
+        domain.setOperationType(entity.getOperationType() != null ? entity.getOperationType() : com.danasea.backend.modules.service.domain.models.OperationType.FIXED_DEPARTURE);
         return domain;
     }
 
@@ -83,6 +84,7 @@ public class ServiceMapper {
         entity.setAvgRating(domain.getAvgRating() != null ? domain.getAvgRating() : BigDecimal.ZERO);
         entity.setRatingCount(domain.getRatingCount() != null ? domain.getRatingCount() : 0);
         entity.setViewCount(domain.getViewCount() != null ? domain.getViewCount() : 0);
+        entity.setOperationType(domain.getOperationType() != null ? domain.getOperationType() : com.danasea.backend.modules.service.domain.models.OperationType.FIXED_DEPARTURE);
         return entity;
     }
 

@@ -59,6 +59,7 @@ public class UpdateServiceUseCase {
         if (cmd.price() != null) service.setPrice(cmd.price());
         if (cmd.durationMinutes() != null) service.setDurationMinutes(cmd.durationMinutes());
         if (cmd.capacityPerSlot() != null) service.setCapacityPerSlot(cmd.capacityPerSlot());
+        if (cmd.operationType() != null) service.setOperationType(cmd.operationType());
         if (cmd.locationName() != null) service.setLocationName(cmd.locationName());
         if (cmd.address() != null) service.setAddress(cmd.address());
         if (cmd.latitude() != null) service.setLatitude(cmd.latitude());

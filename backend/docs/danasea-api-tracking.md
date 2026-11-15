@@ -119,6 +119,7 @@
 
 ### Vendor Profile — API
 - [x] POST /api/vendor/profile
+- [x] POST /api/vendor/profile/resubmit
 - [x] GET /api/vendor/profile
 - [x] PATCH /api/vendor/profile
 - [x] POST /api/vendor/documents
@@ -129,6 +130,15 @@
 - [x] PATCH /api/admin/vendors/{vendorId}/documents/{documentId}/reject — body `reason` bắt buộc, tối đa 2000 ký tự; lý do lưu trong audit log. Duyệt lặp hoặc đổi quyết định sau review trả 409.
 - [x] PATCH /api/admin/vendors/{id}/approve — Chỉ duyệt Vendor PENDING khi có BUSINESS_LICENSE và SAFETY_CERT đã APPROVED; review document không tự duyệt Vendor. Contract từng document được hoàn thiện theo phạm vi phê duyệt ngày 24/10/2026.
 - [x] PATCH /api/admin/vendors/{id}/reject
+
+### Partner Role Applications — API
+- [x] POST /api/partner-applications
+- [x] POST /api/partner-applications/resubmit
+- [x] GET /api/partner-applications/my
+- [x] GET /api/admin/partner-applications
+- [x] GET /api/admin/partner-applications/{id}
+- [x] PATCH /api/admin/partner-applications/{id}/approve
+- [x] PATCH /api/admin/partner-applications/{id}/reject
 
 ### Vendor Public Profile — API
 - [x] GET /api/vendors/{id} (hồ sơ công khai, không trả thông tin tài khoản ngân hàng/thuế)
@@ -326,6 +336,7 @@ Hai item phải nhận hai đơn vị khác nhau và tính giá hai gói. Nhóm 
 - [x] GET /api/payments/{orderId}/payment-status (truy vấn tiến trình countdown 5+5 và trạng thái thanh toán)
 - [x] POST /api/payments/webhook/payos (webhook xử lý thanh toán từ payOS có xác thực HMAC)
 - [x] POST /api/payments/webhook/zalopay (callback xử lý thanh toán từ ZaloPay có xác thực HMAC Key2)
+- [x] GET /api/vendor/sub-orders/{id}
 - [x] POST /api/payments/paypal/capture (capture đơn PayPal sau khi khách duyệt thanh toán)
 - [x] GET /api/payments/webhook/vnpay (IPN callback dạng GET từ VNPay)
 - [x] POST /api/payments/webhook/vnpay (IPN callback dạng POST từ VNPay)
@@ -651,6 +662,7 @@ Chính sách hiện tại: khách sửa review trong 7 ngày; chưa cung cấp A
 ### QR Check-in
 - [x] POST /api/bookings/{id}/qr-code
 - [x] POST /api/vendor/checkin/verify
+- [x] POST /api/vendor/checkin/early-dispatch (điều phối khách chơi ca sớm theo thỏa thuận FIFO)
 - [x] CheckinUseCaseTest và CheckinAdversarialEmpiricalTest (44 ca: QR hết hạn/không hợp lệ, đã sử dụng, quyền và trạng thái; báo cáo ngày 10/10/2026 không có failure/error/skip).
 
 ### Settlement
@@ -661,6 +673,19 @@ Chính sách hiện tại: khách sửa review trong 7 ngày; chưa cung cấp A
 - [x] GET /api/vendor/settlements
 - [x] GET /api/vendor/settlements/{id}
 - [x] SettlementCalculationTest, SettlementUseCaseTest, SettlementAdversarialTest và AdversarialSettlementStressTest (71 ca: tính tiền/hoa hồng, refund, cam kết kỳ và chống tạo/chốt trùng; báo cáo ngày 10/10/2026 không có failure/error/skip). Không nghiệm thu payout hoặc cấu hình hoa hồng chưa triển khai.
+
+### Vendor Payout Requests — API
+- [x] POST /api/vendor/payout-requests (vendor tạo yêu cầu rút tiền từ kỳ đối soát FINALIZED)
+- [x] GET /api/vendor/payout-requests (vendor xem danh sách yêu cầu rút tiền)
+- [x] GET /api/vendor/payout-requests/{id} (vendor xem chi tiết yêu cầu rút tiền)
+- [x] GET /api/vendor/payout-requests/eligible-settlements (vendor lấy danh sách kỳ đối soát còn số dư khả dụng)
+
+### Admin Payout Requests — API
+- [x] GET /api/admin/payout-requests (admin xem toàn bộ danh sách yêu cầu rút tiền)
+- [x] GET /api/admin/payout-requests/{id} (admin xem chi tiết yêu cầu rút tiền và tài khoản ngân hàng)
+- [x] PATCH /api/admin/payout-requests/{id}/approve (admin phê duyệt yêu cầu rút tiền)
+- [x] PATCH /api/admin/payout-requests/{id}/reject (admin từ chối yêu cầu rút tiền kèm lý do)
+- [x] PATCH /api/admin/payout-requests/{id}/mark-paid (admin ghi nhận giải ngân kế toán nội bộ kèm mã tham chiếu)
 
 ### Flash Sale & Platform Promotions — API
 - [x] GET /api/flash-sales/active
@@ -741,7 +766,7 @@ Nếu DB dev đã áp dụng migration notification V25 cũ, cần kiểm tra ch
 ---
 
 
-# TODO 
+# TODO
 
 ### P1 Chi trả vendor và cấu hình hoa hồng -> ĐÃ HOÀN THÀNH CẤU HÌNH HOA HỒNG ĐỘNG & SAFETY REBATE (V54); CÒN LUỒNG RÚT TIỀN.
 

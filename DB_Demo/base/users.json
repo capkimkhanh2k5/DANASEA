@@ -204,6 +204,397 @@
         "is_email_verified": true,
         "password_hash": null
       }
+    },
+    {
+      "sqlRow": {
+        "id": "3e3005a7-001a-5d9f-b4ee-993b52a01d62",
+        "role": "ADMIN",
+        "email": "finance_admin@danasea.test",
+        "phone": "0905111002",
+        "locale": "vi",
+        "full_name": "Finance & Payout Administrator",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "3e3005a7-001a-5d9f-b4ee-993b52a01d63",
+        "role": "ADMIN",
+        "email": "dispute_admin@danasea.test",
+        "phone": "0905111003",
+        "locale": "vi",
+        "full_name": "Dispute & Arbitration Administrator",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "3e3005a7-001a-5d9f-b4ee-993b52a01d64",
+        "role": "ADMIN",
+        "email": "safety_admin@danasea.test",
+        "phone": "0905111004",
+        "locale": "vi",
+        "full_name": "Port Safety & Compliance Administrator",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "b1010000-0000-0000-0000-000000000010",
+        "role": "VENDOR",
+        "email": "vender_10@danasea.test",
+        "phone": "0866776810",
+        "locale": "vi",
+        "full_name": "Mỹ Khê Jet Sports",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "b1010000-0000-0000-0000-000000000011",
+        "role": "VENDOR",
+        "email": "vender_11@danasea.test",
+        "phone": "0866776811",
+        "locale": "vi",
+        "full_name": "Bán Đảo Xanh SUP Club",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "b1010000-0000-0000-0000-000000000012",
+        "role": "VENDOR",
+        "email": "vender_12@danasea.test",
+        "phone": "0866776812",
+        "locale": "vi",
+        "full_name": "Biển Đông Water Sports",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "b1010000-0000-0000-0000-000000000013",
+        "role": "VENDOR",
+        "email": "vender_13@danasea.test",
+        "phone": "0866776813",
+        "locale": "vi",
+        "full_name": "Nam Ô Eco Marine Tours",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "b1010000-0000-0000-0000-000000000014",
+        "role": "VENDOR",
+        "email": "vender_14@danasea.test",
+        "phone": "0866776814",
+        "locale": "vi",
+        "full_name": "Sông Hàn Night Cruise",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "b1010000-0000-0000-0000-000000000015",
+        "role": "VENDOR",
+        "email": "vender_15@danasea.test",
+        "phone": "0866776815",
+        "locale": "vi",
+        "full_name": "Non Nước Speedboat Club",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "b1010000-0000-0000-0000-000000000016",
+        "role": "VENDOR",
+        "email": "vender_16@danasea.test",
+        "phone": "0866776816",
+        "locale": "vi",
+        "full_name": "An Thượng Beach Rental",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:06:26.816505+00:00",
+        "updated_at": "2026-10-15T09:23:11.283307+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000003",
+        "role": "CUSTOMER",
+        "email": "customer_3@danasea.test",
+        "phone": "0912345603",
+        "locale": "vi",
+        "full_name": "Lê Văn Nam",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000004",
+        "role": "CUSTOMER",
+        "email": "customer_4@danasea.test",
+        "phone": "0912345604",
+        "locale": "en",
+        "full_name": "John Smith",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000005",
+        "role": "CUSTOMER",
+        "email": "customer_5@danasea.test",
+        "phone": "0912345605",
+        "locale": "vi",
+        "full_name": "Đặng Thị Mai",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000006",
+        "role": "CUSTOMER",
+        "email": "customer_6@danasea.test",
+        "phone": "0912345606",
+        "locale": "vi",
+        "full_name": "Phạm Hùng Dũng",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000007",
+        "role": "CUSTOMER",
+        "email": "customer_7@danasea.test",
+        "phone": "0912345607",
+        "locale": "vi",
+        "full_name": "Hoàng Minh Tuấn",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000008",
+        "role": "CUSTOMER",
+        "email": "customer_8@danasea.test",
+        "phone": "0912345608",
+        "locale": "vi",
+        "full_name": "Nguyễn Thị Bích",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000009",
+        "role": "CUSTOMER",
+        "email": "customer_9@danasea.test",
+        "phone": "0912345609",
+        "locale": "vi",
+        "full_name": "Vũ Thành Long",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000010",
+        "role": "CUSTOMER",
+        "email": "customer_10@danasea.test",
+        "phone": "0912345610",
+        "locale": "vi",
+        "full_name": "Trần Bảo Ngọc",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000011",
+        "role": "CUSTOMER",
+        "email": "customer_11@danasea.test",
+        "phone": "0912345611",
+        "locale": "en",
+        "full_name": "David Wilson",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000012",
+        "role": "CUSTOMER",
+        "email": "customer_12@danasea.test",
+        "phone": "0912345612",
+        "locale": "vi",
+        "full_name": "Đỗ Quang Huy",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000013",
+        "role": "CUSTOMER",
+        "email": "customer_13@danasea.test",
+        "phone": "0912345613",
+        "locale": "vi",
+        "full_name": "Bùi Khánh Linh",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000014",
+        "role": "CUSTOMER",
+        "email": "customer_14@danasea.test",
+        "phone": "0912345614",
+        "locale": "vi",
+        "full_name": "Võ Minh Trí",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
+    },
+    {
+      "sqlRow": {
+        "id": "c1010000-0000-0000-0000-000000000015",
+        "role": "CUSTOMER",
+        "email": "customer_15@danasea.test",
+        "phone": "0912345615",
+        "locale": "vi",
+        "full_name": "Ngô Phương Thảo",
+        "is_locked": false,
+        "avatar_url": null,
+        "created_at": "2026-10-15T09:00:00.000000+00:00",
+        "updated_at": "2026-10-15T09:00:00.000000+00:00",
+        "session_version": 0,
+        "is_email_verified": true,
+        "password_hash": null
+      }
     }
   ]
 }

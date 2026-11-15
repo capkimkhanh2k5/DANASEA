@@ -162,7 +162,6 @@ export function AdminLayout() {
                   </span>
                   <span className="admin-brand-copy">
                     <strong>DANASEA</strong>
-                    <small>Marine Experience Platform</small>
                   </span>
                 </div>
               </div>
@@ -228,9 +227,6 @@ export function AdminLayout() {
                       ? 'Dashboard'
                       : (page as { pageTitle?: string; label: string }).pageTitle || page.label}
                   </h1>
-                  {(location.pathname === '/admin' || location.pathname === '/admin/') && (
-                    <p className="admin-main-page-sub">Tổng quan vận hành</p>
-                  )}
                 </div>
               </div>
 

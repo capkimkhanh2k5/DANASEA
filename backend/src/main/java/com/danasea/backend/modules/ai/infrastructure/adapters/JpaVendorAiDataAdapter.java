@@ -67,6 +67,13 @@ public class JpaVendorAiDataAdapter implements VendorAiDataPort {
 
     @Override
     @Transactional(readOnly = true)
+    public Map<String, Long> countServicesByStatus(UUID vendorId) {
+        return serviceRepo.countServicesByStatusForVendor(vendorId).stream()
+                .collect(Collectors.toMap(row -> row.getStatus().name(), JpaServiceRepository.StatusCount::getTotal));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Optional<VendorServiceItem> getService(UUID vendorId, UUID serviceId) {
         return findOwnedService(vendorId, serviceId).map(this::toServiceItem);
     }

@@ -1,6 +1,7 @@
 package com.danasea.backend.modules.communication;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
@@ -352,11 +353,11 @@ public class TripReviewEmailIntegrationTest extends BaseEmailIntegrationTest {
     }
 
     // =========================================================================
-    // 5. CHO PHÉP ĐÁNH GIÁ KHI ĐÃ CHECKED_IN
+    // 5. TỪ CHỐI ĐÁNH GIÁ KHI ĐANG CHECKED_IN; CHỈ CHO PHÉP KHI COMPLETED
     // =========================================================================
     @Test
-    @DisplayName("PR 7 - Khách hàng đã check-in (CHECKED_IN) được phép gửi đánh giá thành công")
-    void whenCheckedIn_customerCanCreateReviewSuccessfully() {
+    @DisplayName("SubOrder CHECKED_IN bị từ chối đánh giá; chỉ COMPLETED mới được phép gửi đánh giá")
+    void whenCheckedIn_customerCannotCreateReview_mustBeCompleted() {
         UUID customerId = UUID.randomUUID();
         UUID vendorOwnerId = UUID.randomUUID();
         mockUser(customerId, "customer-review@danasea.vn", "Nguyễn Khách", Role.CUSTOMER);
@@ -371,11 +372,23 @@ public class TripReviewEmailIntegrationTest extends BaseEmailIntegrationTest {
             subOrderRepository.save(subOrder);
         });
 
-        // Gửi đánh giá
+        // 1. Khi đang CHECKED_IN: Gửi đánh giá phải bị từ chối với InvalidReviewSubOrderStateException
         CreateReviewRequest req = new CreateReviewRequest((short) 5, "Tour rất đẹp và an toàn!", List.of());
-        var res = tx.execute(status -> createReviewUseCase.execute(fixture.subOrderId(), req, customerId));
+        assertThrows(
+                InvalidReviewSubOrderStateException.class,
+                () -> tx.execute(status -> createReviewUseCase.execute(fixture.subOrderId(), req, customerId)),
+                "SubOrder ở trạng thái CHECKED_IN không được phép đánh giá"
+        );
 
-        assertTrue(res != null && res.id() != null, "Đánh giá phải được tạo thành công khi subOrder là CHECKED_IN");
+        // 2. Chuyển sang COMPLETED: Đánh giá thành công
+        tx.executeWithoutResult(status -> {
+            var subOrder = subOrderRepository.findById(fixture.subOrderId()).orElseThrow();
+            subOrder.setStatus(SubOrderStatus.COMPLETED);
+            subOrderRepository.save(subOrder);
+        });
+
+        var res = tx.execute(status -> createReviewUseCase.execute(fixture.subOrderId(), req, customerId));
+        assertTrue(res != null && res.id() != null, "Đánh giá phải được tạo thành công khi subOrder là COMPLETED");
         assertTrue(reviewRepository.existsBySubOrderId(fixture.subOrderId()));
     }
 
@@ -448,7 +461,7 @@ public class TripReviewEmailIntegrationTest extends BaseEmailIntegrationTest {
             serviceRepository.saveAndFlush(svc);
 
             ZonedDateTime now = ZonedDateTime.now(Booking.VIETNAM_ZONE);
-            ZonedDateTime departure = now.minusHours(1);
+            ZonedDateTime departure = now.plusHours(1);
             ServiceSlotJpaEntity slot = new ServiceSlotJpaEntity();
             slot.setId(UUID.randomUUID());
             slot.setServiceId(svc.getId());

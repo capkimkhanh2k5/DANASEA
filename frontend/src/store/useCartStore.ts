@@ -10,6 +10,7 @@ export interface CartItem {
   unitPrice: number;
   // Denormalized data for UI display
   serviceName: string;
+  serviceNameEn?: string;
   thumbnailUrl: string;
   date: string;
   timeSlot: string;

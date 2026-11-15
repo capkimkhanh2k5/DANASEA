@@ -1,16 +1,27 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Minus, Send, RotateCcw } from 'lucide-react';
-import { useAiModalStore } from '../../store/useAiModalStore';
+import { Minus, X, Send, RotateCcw } from 'lucide-react';
+import { useAiModalStore, type AiChatMessage } from '../../store/useAiModalStore';
+import { useLanguageStore } from '../../store/useLanguageStore';
 
-const QUICK_SUGGESTIONS = [
+const QUICK_SUGGESTIONS_VI = [
   'Thời tiết & sóng biển hôm nay?',
   'Lặn san hô Hòn Sụp lúc mấy giờ đẹp?',
   'Gợi ý tour SUP đón bình minh Mỹ Khê',
   'Tiêu chuẩn an toàn & bảo hiểm',
 ];
 
+const QUICK_SUGGESTIONS_EN = [
+  "Today's ocean weather & waves?",
+  'Best time for Hon Sup snorkeling?',
+  'Sunrise SUP at My Khe beach',
+  'Safety standards & insurance',
+];
+
 export const AiChatPopup: React.FC = () => {
   const { isOpen, messages, isGenerating, closeAiModal, sendMessage, clearHistory } = useAiModalStore();
+  const { language } = useLanguageStore();
+  const isEn = language === 'en';
+
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,6 +45,8 @@ export const AiChatPopup: React.FC = () => {
 
   if (!isOpen) return null;
 
+  const quickSuggestions = isEn ? QUICK_SUGGESTIONS_EN : QUICK_SUGGESTIONS_VI;
+
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!inputValue.trim() || isGenerating) return;
@@ -48,41 +61,56 @@ export const AiChatPopup: React.FC = () => {
     await sendMessage(suggestion);
   };
 
+  const renderMessageContent = (msg: AiChatMessage) => {
+    if (msg.id === 'welcome-msg') {
+      return isEn
+        ? 'I can help you check ocean weather, marine conditions, and guide tour bookings in Da Nang. What information do you need?'
+        : 'Hệ thống hỗ trợ tra cứu điều kiện hải văn, cập nhật thời tiết và tư vấn đặt dịch vụ biển tại Đà Nẵng. Bạn cần tìm kiếm thông tin nào?';
+    }
+    return msg.content;
+  };
+
   return (
     <div
       role="dialog"
-      aria-label="Cửa sổ Trợ lý tư vấn dịch vụ"
+      aria-label={isEn ? 'AI Tour Assistant Window' : 'Cửa sổ Trợ lý tư vấn dịch vụ'}
       className="fixed bottom-20 right-3 left-3 sm:left-auto sm:bottom-6 sm:right-[88px] z-50 w-auto sm:w-[360px] h-[480px] max-h-[calc(100vh-80px)] bg-white rounded-2xl border border-slate-200/90 shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-left"
     >
-      {/* Top Header - Synced with Footer Brand Navy (#031d44) */}
-      <div className="p-3.5 bg-[#031d44] text-white flex items-center justify-between border-b border-sky-950 shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white shrink-0">
-            <Bot className="w-4 h-4 text-white" />
-          </div>
-          <div>
-            <span className="font-semibold text-xs tracking-tight text-white block">Trợ lý tư vấn dịch vụ</span>
-          </div>
+      {/* Top Header - Streamlined and styled identically to MessagesPopup */}
+      <div className="px-3.5 py-2.5 bg-white text-slate-900 flex items-center justify-between border-b border-slate-100 shadow-2xs shrink-0">
+        <div className="min-w-0">
+          <h3 className="font-semibold text-xs sm:text-[13px] text-slate-900 truncate leading-snug">
+            {isEn ? 'AI Assistant' : 'Trợ lý tư vấn dịch vụ'}
+          </h3>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0 ml-2">
           <button
             type="button"
             onClick={clearHistory}
-            title="Làm mới hội thoại"
-            aria-label="Làm mới hội thoại"
-            className="w-7 h-7 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+            title={isEn ? 'Reset conversation' : 'Làm mới hội thoại'}
+            aria-label={isEn ? 'Reset conversation' : 'Làm mới hội thoại'}
+            className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
             onClick={closeAiModal}
-            title="Đóng cửa sổ"
-            aria-label="Đóng cửa sổ"
-            className="w-7 h-7 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+            title={isEn ? 'Minimize' : 'Thu nhỏ'}
+            aria-label={isEn ? 'Minimize' : 'Thu nhỏ'}
+            className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
           >
             <Minus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={closeAiModal}
+            title={isEn ? 'Close' : 'Đóng'}
+            aria-label={isEn ? 'Close' : 'Đóng'}
+            className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -95,12 +123,12 @@ export const AiChatPopup: React.FC = () => {
             className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} animate-in fade-in duration-100`}
           >
             {msg.role === 'user' ? (
-              <div className="bg-[#031d44] text-white rounded-xl rounded-tr-xs px-3.5 py-2.5 max-w-[85%] text-xs font-normal leading-relaxed shadow-xs">
+              <div className="bg-sky-700 text-white rounded-xl rounded-tr-xs px-3.5 py-2.5 max-w-[85%] text-xs font-normal leading-relaxed shadow-xs">
                 {msg.content}
               </div>
             ) : (
               <div className="bg-white border border-slate-200/90 text-slate-800 rounded-xl rounded-tl-xs px-3.5 py-2.5 max-w-[92%] text-xs leading-relaxed shadow-xs">
-                <div className="whitespace-pre-line text-slate-700">{msg.content}</div>
+                <div className="whitespace-pre-line text-slate-700">{renderMessageContent(msg)}</div>
               </div>
             )}
           </div>
@@ -110,7 +138,7 @@ export const AiChatPopup: React.FC = () => {
           <div className="flex items-start animate-in fade-in duration-100">
             <div className="bg-white border border-slate-200/90 rounded-xl px-3 py-2 text-xs text-slate-500 shadow-xs flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse"></span>
-              <span>Đang tra cứu dữ liệu...</span>
+              <span>{isEn ? 'Searching marine data...' : 'Đang tra cứu dữ liệu...'}</span>
             </div>
           </div>
         )}
@@ -120,7 +148,7 @@ export const AiChatPopup: React.FC = () => {
 
       {/* Quick Suggestion Chips */}
       <div className="px-3 py-2 bg-white border-t border-slate-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-        {QUICK_SUGGESTIONS.map((suggestion, idx) => (
+        {quickSuggestions.map((suggestion, idx) => (
           <button
             key={idx}
             type="button"
@@ -140,16 +168,16 @@ export const AiChatPopup: React.FC = () => {
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder="Nhập câu hỏi cần hỗ trợ..."
+          placeholder={isEn ? 'Ask a question or request advice...' : 'Nhập câu hỏi cần hỗ trợ...'}
           disabled={isGenerating}
-          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#031d44] focus:bg-white transition-all shadow-xs"
+          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white transition-all shadow-xs"
         />
         <button
           type="submit"
           disabled={isGenerating || !inputValue.trim()}
-          title="Gửi câu hỏi"
-          aria-label="Gửi câu hỏi"
-          className="w-9 h-9 rounded-xl bg-[#031d44] hover:bg-[#021838] text-white flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-xs"
+          title={isEn ? 'Send question' : 'Gửi câu hỏi'}
+          aria-label={isEn ? 'Send question' : 'Gửi câu hỏi'}
+          className="w-9 h-9 rounded-xl bg-sky-700 hover:bg-sky-800 text-white flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-xs"
         >
           <Send className="w-3.5 h-3.5" />
         </button>

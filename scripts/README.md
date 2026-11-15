@@ -32,7 +32,6 @@ scripts/
 │   ├── demo_request.py               # Ký và xác thực yêu cầu nạp demo data an toàn
 │   ├── demo_report.py                # Tạo báo cáo kết quả nạp demo
 │   ├── demo_runtime.py               # Môi trường runtime thực thi nạp demo
-│   ├── seed_database_demo_builder.py # Sinh dữ liệu mẫu (tour biển, vendor, slot)
 │   └── install-demo-data-controls.sh # Cài đặt chính sách kiểm soát demo
 │
 ├── governance/ & ci/                  # 🛡️ NHÓM 5: CI/CD & QUẢN TRỊ BẢO MẬT GITHUB

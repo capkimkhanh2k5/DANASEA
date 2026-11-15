@@ -20,6 +20,10 @@ public interface JpaVendorRepository extends JpaRepository<VendorJpaEntity, UUID
     @Query("select v from VendorJpaEntity v where v.id = :id")
     Optional<VendorJpaEntity> findByIdForUpdate(UUID id);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select v from VendorJpaEntity v where v.userId = :userId")
+    Optional<VendorJpaEntity> findByUserIdForUpdate(UUID userId);
+
     Optional<VendorJpaEntity> findByUserId(UUID userId);
 
     boolean existsByUserId(UUID userId);

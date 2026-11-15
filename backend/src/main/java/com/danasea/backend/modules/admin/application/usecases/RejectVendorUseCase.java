@@ -23,13 +23,18 @@ public class RejectVendorUseCase {
 
     @Transactional
     public AdminVendorResponse execute(UUID vendorId, UUID adminId, String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("Rejection reason cannot be blank");
+        }
+        String cleanReason = reason.trim();
+
         Vendor vendor = vendorInternalApi.findById(vendorId)
                 .orElseThrow(() -> new VendorNotFoundException("Vendor not found with id: " + vendorId));
 
         if (vendor.getVerificationStatus() == VerificationStatus.REJECTED) {
             throw new IllegalArgumentException("Vendor is already rejected");
         }
-        
+
         if (vendor.getVerificationStatus() == VerificationStatus.APPROVED) {
             throw new IllegalArgumentException("Cannot reject an already approved vendor");
         }
@@ -37,6 +42,7 @@ public class RejectVendorUseCase {
         vendor.setVerificationStatus(VerificationStatus.REJECTED);
         vendor.setVerifiedBy(adminId);
         vendor.setVerifiedAt(OffsetDateTime.now());
+        vendor.setRejectionReason(cleanReason);
 
         Vendor savedVendor = vendorInternalApi.saveVendor(vendor);
 
@@ -46,7 +52,7 @@ public class RejectVendorUseCase {
                 "VENDOR_REJECTION",
                 "VENDOR",
                 vendorId,
-                "Vendor rejected by admin. Reason: " + reason
+                "Vendor rejected by admin. Reason: " + cleanReason
         );
 
         return mapToResponse(savedVendor);
@@ -70,6 +76,7 @@ public class RejectVendorUseCase {
                 .badgeTier(vendor.getBadgeTier())
                 .createdAt(vendor.getCreatedAt())
                 .updatedAt(vendor.getUpdatedAt())
+                .rejectionReason(vendor.getRejectionReason())
                 .build();
     }
 }

@@ -155,6 +155,7 @@ app:
     pool-size: ${APP_SCHEDULER_POOL_SIZE:4}
     booking-cleanup-delay: ${APP_BOOKING_CLEANUP_DELAY:1m}
     weather-fetch-rate: ${APP_WEATHER_FETCH_RATE:30m}
+    sub-order-completion-delay: ${APP_SUB_ORDER_COMPLETION_DELAY:60s}
   weather:
     monitoring-cron: ${APP_WEATHER_MONITORING_CRON:0 */30 * * * *}
   transactional-email:

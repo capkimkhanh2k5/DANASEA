@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.service.presentation.dtos;
 
+import com.danasea.backend.modules.service.domain.models.OperationType;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Pattern;
@@ -24,6 +25,7 @@ public record UpdateServiceRequest(
         Integer durationMinutes,
         @Positive
         Integer capacityPerSlot,
+        OperationType operationType,
         @Size(max = 255)
         String locationName,
         @Size(max = 500)
@@ -47,10 +49,23 @@ public record UpdateServiceRequest(
             String descriptionEn, BigDecimal price, Integer durationMinutes,
             Integer capacityPerSlot, String locationName, String address,
             BigDecimal latitude, BigDecimal longitude, String waiverContent,
+            String waiverContentEn, Boolean waiverRequired, Boolean weatherSensitive,
+            BigDecimal minWindKmh, BigDecimal maxWaveM) {
+        this(categoryId, name, nameEn, description, descriptionEn, price,
+                durationMinutes, capacityPerSlot, null, locationName, address,
+                latitude, longitude, waiverContent, waiverContentEn, waiverRequired,
+                weatherSensitive, minWindKmh, maxWaveM);
+    }
+
+    public UpdateServiceRequest(
+            UUID categoryId, String name, String nameEn, String description,
+            String descriptionEn, BigDecimal price, Integer durationMinutes,
+            Integer capacityPerSlot, String locationName, String address,
+            BigDecimal latitude, BigDecimal longitude, String waiverContent,
             String waiverContentEn, Boolean weatherSensitive,
             BigDecimal minWindKmh, BigDecimal maxWaveM) {
         this(categoryId, name, nameEn, description, descriptionEn, price,
-                durationMinutes, capacityPerSlot, locationName, address,
+                durationMinutes, capacityPerSlot, null, locationName, address,
                 latitude, longitude, waiverContent, waiverContentEn, null,
                 weatherSensitive, minWindKmh, maxWaveM);
     }

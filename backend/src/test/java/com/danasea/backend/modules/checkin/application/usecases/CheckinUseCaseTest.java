@@ -736,4 +736,126 @@ class CheckinUseCaseTest {
             executor.shutdown();
         }
     }
+
+    @Nested
+    @DisplayName("7. FIFO Early Dispatch Candidate Calculation")
+    class FifoEarlyDispatchCandidates {
+
+        @Test
+        @DisplayName("Multiple candidates: Picks earliest available slot and lists all options")
+        void testMultipleEarlySlots_PicksEarliest() {
+            LocalDate date = LocalDate.now().plusDays(1);
+            String rawToken = qrTokenSigner.generateToken(subOrderId, OffsetDateTime.now(ZoneOffset.UTC).plusDays(2));
+            String tokenHash = QrTokenSigner.hashToken(rawToken);
+
+            CheckinTokenJpaEntity tokenEntity = new CheckinTokenJpaEntity();
+            tokenEntity.setId(tokenId);
+            tokenEntity.setSubOrderId(subOrderId);
+            tokenEntity.setQrTokenHash(tokenHash);
+
+            UUID serviceId = UUID.randomUUID();
+            SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
+            subOrder.setId(subOrderId);
+            subOrder.setVendorId(vendorId);
+            subOrder.setServiceId(serviceId);
+            subOrder.setSlotId(slotId);
+            subOrder.setStatus(SubOrderStatus.CONFIRMED);
+            subOrder.setQuantity(2);
+
+            // Current slot: 16:00 -> 17:30
+            ServiceSlotJpaEntity currentSlot = new ServiceSlotJpaEntity();
+            currentSlot.setId(slotId);
+            currentSlot.setServiceId(serviceId);
+            currentSlot.setDate(date);
+            currentSlot.setStartTime(LocalTime.of(16, 0));
+            currentSlot.setEndTime(LocalTime.of(17, 30));
+            currentSlot.setStatus(com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN);
+
+            // Candidate 1: 14:00 (cap: 10, booked: 2 -> avail: 8)
+            ServiceSlotJpaEntity slot14 = new ServiceSlotJpaEntity();
+            slot14.setId(UUID.randomUUID());
+            slot14.setServiceId(serviceId);
+            slot14.setDate(date);
+            slot14.setStartTime(LocalTime.of(14, 0));
+            slot14.setEndTime(LocalTime.of(15, 30));
+            slot14.setCapacity(10);
+            slot14.setBookedCount(2);
+            slot14.setStatus(com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN);
+
+            // Candidate 2: 10:00 (cap: 10, booked: 1 -> avail: 9) - EARLIEST!
+            ServiceSlotJpaEntity slot10 = new ServiceSlotJpaEntity();
+            slot10.setId(UUID.randomUUID());
+            slot10.setServiceId(serviceId);
+            slot10.setDate(date);
+            slot10.setStartTime(LocalTime.of(10, 0));
+            slot10.setEndTime(LocalTime.of(11, 30));
+            slot10.setCapacity(10);
+            slot10.setBookedCount(1);
+            slot10.setStatus(com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN);
+
+            when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
+            when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(slotRepository.findByIdForUpdate(slotId)).thenReturn(Optional.of(currentSlot));
+            when(checkinTokenRepository.markAsUsedAtomic(eq(tokenId), any(), eq(staffId))).thenReturn(1);
+            when(slotRepository.findByServiceIdAndDateAndStatus(serviceId, date, com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN))
+                    .thenReturn(List.of(slot14, slot10));
+
+            var response = verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId);
+
+            assertThat(response.getStatus()).isEqualTo(SubOrderStatus.CHECKED_IN);
+            assertThat(response.earlyDispatchSuggestion()).isNotNull();
+            assertThat(response.earlyDispatchSuggestion().startTime()).isEqualTo(LocalTime.of(10, 0));
+            assertThat(response.earlyDispatchSuggestion().availableCapacity()).isEqualTo(9);
+
+            assertThat(response.availableEarlySlots()).hasSize(2);
+            assertThat(response.availableEarlySlots().get(0).startTime()).isEqualTo(LocalTime.of(10, 0));
+            assertThat(response.availableEarlySlots().get(1).startTime()).isEqualTo(LocalTime.of(14, 0));
+        }
+
+        @Test
+        @DisplayName("Last / only slot of day with no earlier slots: returns null earlyDispatchSuggestion")
+        void testNoEarlierSlots_ReturnsNullSuggestion() {
+            LocalDate date = LocalDate.now().plusDays(1);
+            String rawToken = qrTokenSigner.generateToken(subOrderId, OffsetDateTime.now(ZoneOffset.UTC).plusDays(2));
+            String tokenHash = QrTokenSigner.hashToken(rawToken);
+
+            CheckinTokenJpaEntity tokenEntity = new CheckinTokenJpaEntity();
+            tokenEntity.setId(tokenId);
+            tokenEntity.setSubOrderId(subOrderId);
+            tokenEntity.setQrTokenHash(tokenHash);
+
+            UUID serviceId = UUID.randomUUID();
+            SubOrderJpaEntity subOrder = new SubOrderJpaEntity();
+            subOrder.setId(subOrderId);
+            subOrder.setVendorId(vendorId);
+            subOrder.setServiceId(serviceId);
+            subOrder.setSlotId(slotId);
+            subOrder.setStatus(SubOrderStatus.CONFIRMED);
+            subOrder.setQuantity(2);
+
+            // Current slot: 08:00 (first slot of day)
+            ServiceSlotJpaEntity currentSlot = new ServiceSlotJpaEntity();
+            currentSlot.setId(slotId);
+            currentSlot.setServiceId(serviceId);
+            currentSlot.setDate(date);
+            currentSlot.setStartTime(LocalTime.of(8, 0));
+            currentSlot.setEndTime(LocalTime.of(9, 30));
+            currentSlot.setStatus(com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN);
+
+            when(vendorLookupPort.findVendorIdByUserId(staffId)).thenReturn(Optional.of(vendorId));
+            when(checkinTokenRepository.findByQrTokenHash(tokenHash)).thenReturn(Optional.of(tokenEntity));
+            when(subOrderRepository.findByIdForUpdate(subOrderId)).thenReturn(Optional.of(subOrder));
+            when(slotRepository.findByIdForUpdate(slotId)).thenReturn(Optional.of(currentSlot));
+            when(checkinTokenRepository.markAsUsedAtomic(eq(tokenId), any(), eq(staffId))).thenReturn(1);
+            when(slotRepository.findByServiceIdAndDateAndStatus(serviceId, date, com.danasea.backend.modules.service.domain.models.SlotStatus.OPEN))
+                    .thenReturn(List.of(currentSlot));
+
+            var response = verifyCheckinUseCase.execute(new VerifyCheckinRequest(rawToken), staffId);
+
+            assertThat(response.getStatus()).isEqualTo(SubOrderStatus.CHECKED_IN);
+            assertThat(response.earlyDispatchSuggestion()).isNull();
+            assertThat(response.availableEarlySlots()).isNull();
+        }
+    }
 }

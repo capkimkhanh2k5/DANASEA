@@ -4,6 +4,7 @@ import com.danasea.backend.modules.booking.domain.ports.VendorLookupPort;
 import com.danasea.backend.modules.checkin.domain.services.QrTokenSigner;
 import com.danasea.backend.modules.checkin.infrastructure.persistence.entities.CheckinTokenJpaEntity;
 import com.danasea.backend.modules.checkin.infrastructure.persistence.repositories.JpaCheckinTokenRepository;
+import com.danasea.backend.modules.dispute.application.services.DisputeWindowService;
 import com.danasea.backend.modules.dispute.application.usecases.CreateDisputeUseCase;
 import com.danasea.backend.modules.dispute.application.usecases.ResolveDisputeUseCase;
 import com.danasea.backend.modules.dispute.domain.models.DisputeReason;
@@ -55,6 +56,7 @@ import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -149,7 +151,8 @@ public class FullLifecycleEmpiricalChallengerTest {
         settlementMapper = new SettlementMapper();
 
         createDisputeUseCase = new CreateDisputeUseCase(
-                disputeRepository, masterOrderRepository, subOrderRepository, slotRepository);
+                disputeRepository, masterOrderRepository, subOrderRepository,
+                new DisputeWindowService(slotRepository, Clock.systemDefaultZone()));
 
         resolveDisputeUseCase = new ResolveDisputeUseCase(
                 disputeRepository, subOrderRepository, refundRepository);
@@ -227,7 +230,7 @@ public class FullLifecycleEmpiricalChallengerTest {
         @DisplayName("1.3 Khiếu nại RESOLVED_REJECTED: Đơn hàng được mở khóa, đối soát 100% doanh thu")
         void testDisputeResolvedRejected_UnfreezesForSettlement() {
             UUID subId = UUID.randomUUID();
-            createOrderWithSlot(subId, new BigDecimal("4000000.00"), new BigDecimal("0.1000"), SubOrderStatus.COMPLETED);
+            createOrderWithSlot(subId, new BigDecimal("4000000.00"), new BigDecimal("0.1000"), SubOrderStatus.COMPLETED, LocalDate.now().minusDays(2));
 
             UUID masterOrderId = subOrderStore.get(subId).getMasterOrderId();
 
@@ -245,8 +248,8 @@ public class FullLifecycleEmpiricalChallengerTest {
             assertThat(subOrderStore.get(subId).getStatus()).isEqualTo(SubOrderStatus.COMPLETED);
             assertThat(disputeStore.get(disputeResp.id()).getStatus()).isEqualTo(DisputeStatus.RESOLVED_REJECTED);
 
-            // Chạy settlement: Đơn hàng được thanh toán bình thường
-            SettlementResponse response = generateSettlementUseCase.execute(vendorId, periodStart, periodEnd);
+            // Chạy settlement sau khi kết thúc cửa sổ khiếu nại D+7 (evalDate sau experienceDate + 7)
+            SettlementResponse response = generateSettlementUseCase.execute(vendorId, periodStart, periodEnd, LocalDate.now().plusDays(6));
 
             assertThat(response.grossAmount()).isEqualByComparingTo(new BigDecimal("4000000.00"));
             assertThat(response.commissionAmount()).isEqualByComparingTo(new BigDecimal("400000.00"));
@@ -273,7 +276,7 @@ public class FullLifecycleEmpiricalChallengerTest {
             UUID subId = UUID.randomUUID();
             BigDecimal subtotal = new BigDecimal("10000000.00"); // 10 triệu
             BigDecimal commRate = new BigDecimal("0.1500");     // 15% hoa hồng
-            createOrderWithSlot(subId, subtotal, commRate, SubOrderStatus.COMPLETED);
+            createOrderWithSlot(subId, subtotal, commRate, SubOrderStatus.COMPLETED, LocalDate.now().minusDays(2));
 
             UUID masterOrderId = subOrderStore.get(subId).getMasterOrderId();
 
@@ -297,8 +300,8 @@ public class FullLifecycleEmpiricalChallengerTest {
             pendingRefund.setStatus(RefundStatus.PROCESSED);
             subOrderStore.get(subId).setStatus(SubOrderStatus.PARTIALLY_REFUNDED);
 
-            // Chạy settlement
-            SettlementResponse response = generateSettlementUseCase.execute(vendorId, periodStart, periodEnd);
+            // Chạy settlement sau khi kết thúc cửa sổ khiếu nại D+7 (evalDate sau experienceDate + 7)
+            SettlementResponse response = generateSettlementUseCase.execute(vendorId, periodStart, periodEnd, LocalDate.now().plusDays(6));
 
             // Kỳ vọng:
             // netAfterRefund = 10.000.000 - 3.500.000 = 6.500.000
@@ -531,11 +534,16 @@ public class FullLifecycleEmpiricalChallengerTest {
     // HELPER METHODS
     // ==========================================
     private void createOrderWithSlot(UUID subId, BigDecimal subtotal, BigDecimal commissionRate, SubOrderStatus status) {
+        createOrderWithSlot(subId, subtotal, commissionRate, status, LocalDate.now().minusDays(10));
+    }
+
+    private void createOrderWithSlot(UUID subId, BigDecimal subtotal, BigDecimal commissionRate, SubOrderStatus status, LocalDate slotDate) {
         UUID slotId = UUID.randomUUID();
         ServiceSlotJpaEntity slot = new ServiceSlotJpaEntity();
         slot.setId(slotId);
         slot.setServiceId(serviceId);
-        slot.setDate(LocalDate.now().minusDays(1));
+        // Ngày trải nghiệm vượt qua cửa sổ khiếu nại D+7 để đủ điều kiện đối soát giải ngân
+        slot.setDate(slotDate);
         slot.setStartTime(LocalTime.of(9, 0));
         slot.setEndTime(LocalTime.of(12, 0));
         slot.setStatus(SlotStatus.OPEN);
