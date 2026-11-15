@@ -824,6 +824,41 @@ class VendorSlotRepository implements IVendorSlotRepository {
   }
 
   @override
+  Future<List<ServiceSlotModel>> batchCreateSlots({
+    required String serviceId,
+    DateTime? startDate,
+    DateTime? endDate,
+    List<String>? daysOfWeek,
+    List<DateTime>? dates,
+    required List<Map<String, dynamic>> slotTemplates,
+  }) async {
+    try {
+      final res = await _session.request(
+        '/api/vendor/services/$serviceId/slots/batch',
+        method: 'POST',
+        data: {
+          if (startDate != null) 'startDate': startDate.toIso8601String().split('T').first,
+          if (endDate != null) 'endDate': endDate.toIso8601String().split('T').first,
+          if (daysOfWeek != null && daysOfWeek.isNotEmpty) 'daysOfWeek': daysOfWeek,
+          if (dates != null && dates.isNotEmpty)
+            'dates': dates.map((d) => d.toIso8601String().split('T').first).toList(),
+          'slotTemplates': slotTemplates,
+        },
+      );
+      List rawList = [];
+      if (res['slots'] is List) {
+        rawList = res['slots'] as List;
+      }
+      final created = rawList.whereType<Map<String, dynamic>>().map(parseSlot).toList();
+      _db.slots.addAll(created);
+      _db.notifyStoreChanged();
+      return created;
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  @override
   Future<ServiceSlotModel> updateSlotCapacity(String slotId, int newCapacity) async {
     try {
       final slot = await getSlotById(slotId);
@@ -1418,10 +1453,14 @@ class VendorReviewRepository implements IVendorReviewRepository {
   @override
   Future<ReviewModel> replyToReview(String reviewId, String replyContent) async {
     try {
+      final text = replyContent.trim();
       final res = await _session.request(
         '/api/vendor/reviews/$reviewId/reply',
         method: 'POST',
-        data: {'replyComment': replyContent.trim()},
+        data: {
+          'reply': text,
+          'replyComment': text,
+        },
       );
       final updated = parseReview(res);
       final index = _db.reviews.indexWhere((r) => r.id == reviewId);

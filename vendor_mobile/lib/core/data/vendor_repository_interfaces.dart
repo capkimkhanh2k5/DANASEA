@@ -100,6 +100,14 @@ abstract class IVendorSlotRepository {
   Future<List<ServiceSlotModel>> getSlotsForService(String serviceId, DateTime date);
   Future<ServiceSlotModel?> getSlotById(String slotId);
   Future<ServiceSlotModel> saveSlot(ServiceSlotModel slot);
+  Future<List<ServiceSlotModel>> batchCreateSlots({
+    required String serviceId,
+    DateTime? startDate,
+    DateTime? endDate,
+    List<String>? daysOfWeek,
+    List<DateTime>? dates,
+    required List<Map<String, dynamic>> slotTemplates,
+  });
   Future<ServiceSlotModel> updateSlotCapacity(String slotId, int newCapacity);
   Future<ServiceSlotModel> toggleBlockSlot(String slotId, bool blocked);
   Future<Map<String, dynamic>> cancelSlot(String serviceId, String slotId, String reason);
