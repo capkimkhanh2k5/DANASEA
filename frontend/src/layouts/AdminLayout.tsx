@@ -217,9 +217,7 @@ export function AdminLayout() {
                   e.stopPropagation();
                   setIsPinned((prev) => !prev);
                 }}
-                className={`hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer shrink-0 ${
-                  isPinned ? 'text-slate-700 bg-slate-100' : ''
-                }`}
+                className="hidden lg:flex p-1.5 rounded-lg text-slate-500 hover:text-slate-800 bg-transparent hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
                 title={isPinned ? 'Thu gọn thanh bên (Tự động ẩn)' : 'Ghim cố định thanh bên'}
                 aria-label={isPinned ? 'Thu gọn thanh bên' : 'Ghim cố định thanh bên'}
               >
