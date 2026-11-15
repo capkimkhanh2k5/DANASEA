@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, X } from 'lucide-react';
+import React, { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LoaderCircle, X } from 'lucide-react';
 
 export function AdminButton({ loading = false, variant = 'secondary', className = '', disabled, children, type = 'button', ...props }:
   ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean; variant?: 'primary' | 'secondary' | 'danger' }) {
@@ -97,36 +97,18 @@ export function AdminPagination({
   recordLabel = 'bản ghi',
   onPageChange,
   className = '',
-  hideOnSinglePage = true,
+  hideOnSinglePage = false,
 }: AdminPaginationProps) {
   if (totalRecords === 0) return null;
   if (hideOnSinglePage && totalPages <= 1 && totalRecords <= pageSize) return null;
 
-  const fromRecord = Math.min((currentPage - 1) * pageSize + 1, totalRecords);
-  const toRecord = Math.min(currentPage * pageSize, totalRecords);
+  const safeTotalPages = Math.max(1, totalPages);
+  const validCurrentPage = Math.max(1, Math.min(currentPage, safeTotalPages));
+  const fromRecord = Math.min((validCurrentPage - 1) * pageSize + 1, totalRecords);
+  const toRecord = Math.min(validCurrentPage * pageSize, totalRecords);
 
-  const getPageNumbers = () => {
-    if (totalPages <= 5) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-    const pages: (number | 'ellipsis')[] = [];
-    pages.push(1);
-    if (currentPage > 3) {
-      pages.push('ellipsis');
-    }
-    const start = Math.max(2, currentPage - 1);
-    const end = Math.min(totalPages - 1, currentPage + 1);
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
-    }
-    if (currentPage < totalPages - 2) {
-      pages.push('ellipsis');
-    }
-    pages.push(totalPages);
-    return pages;
-  };
-
-  const pageNumbers = getPageNumbers();
+  const isFirstPage = validCurrentPage <= 1;
+  const isLastPage = validCurrentPage >= safeTotalPages;
 
   return (
     <nav
@@ -140,51 +122,60 @@ export function AdminPagination({
       <div className="admin-pagination__controls">
         <button
           type="button"
+          className="admin-pagination__btn admin-pagination__btn--nav admin-pagination__btn--first"
+          disabled={isFirstPage}
+          onClick={() => onPageChange(1)}
+          title="Về trang đầu"
+          aria-label="Về trang đầu"
+        >
+          <ChevronsLeft size={15} aria-hidden="true" />
+        </button>
+
+        <button
+          type="button"
           className="admin-pagination__btn admin-pagination__btn--prev"
-          disabled={currentPage <= 1}
-          onClick={() => onPageChange(currentPage - 1)}
+          disabled={isFirstPage}
+          onClick={() => onPageChange(validCurrentPage - 1)}
+          title="Trang trước"
           aria-label="Trang trước"
         >
           <ChevronLeft size={15} aria-hidden="true" style={{ marginRight: 2 }} />
-          Trước
+          <span>Trước</span>
         </button>
 
-        <div className="admin-pagination__pages" role="group" aria-label="Các trang">
-          {pageNumbers.map((p, idx) => {
-            if (p === 'ellipsis') {
-              return (
-                <span key={`ellipsis-${idx}`} className="admin-pagination__ellipsis" aria-hidden="true">
-                  …
-                </span>
-              );
-            }
-            const isActive = p === currentPage;
-            return (
-              <button
-                key={p}
-                type="button"
-                className={`admin-pagination__btn admin-pagination__btn--page ${
-                  isActive ? 'admin-pagination__btn--active' : ''
-                }`}
-                aria-current={isActive ? 'page' : undefined}
-                aria-label={`Trang ${p}`}
-                onClick={() => onPageChange(p)}
-              >
-                {p}
-              </button>
-            );
-          })}
+        <div className="admin-pagination__pages" role="group" aria-label="Trang hiện tại">
+          <button
+            type="button"
+            className="admin-pagination__btn admin-pagination__btn--page admin-pagination__btn--active"
+            aria-current="page"
+            aria-label={`Trang hiện tại ${validCurrentPage}`}
+            disabled
+          >
+            {validCurrentPage}
+          </button>
         </div>
 
         <button
           type="button"
           className="admin-pagination__btn admin-pagination__btn--next"
-          disabled={currentPage >= totalPages}
-          onClick={() => onPageChange(currentPage + 1)}
+          disabled={isLastPage}
+          onClick={() => onPageChange(validCurrentPage + 1)}
+          title="Trang sau"
           aria-label="Trang sau"
         >
-          Sau
+          <span>Sau</span>
           <ChevronRight size={15} aria-hidden="true" style={{ marginLeft: 2 }} />
+        </button>
+
+        <button
+          type="button"
+          className="admin-pagination__btn admin-pagination__btn--nav admin-pagination__btn--last"
+          disabled={isLastPage}
+          onClick={() => onPageChange(safeTotalPages)}
+          title="Về trang cuối"
+          aria-label="Về trang cuối"
+        >
+          <ChevronsRight size={15} aria-hidden="true" />
         </button>
       </div>
     </nav>
