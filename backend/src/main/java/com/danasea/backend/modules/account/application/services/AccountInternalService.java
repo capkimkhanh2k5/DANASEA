@@ -2,10 +2,15 @@ package com.danasea.backend.modules.account.application.services;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import jakarta.persistence.criteria.Predicate;
 
@@ -95,6 +100,22 @@ public class AccountInternalService implements AccountInternalApi {
             return Optional.empty();
         }
         return userRepository.findById(id).map(userMapper::toDomain);
+    }
+
+    @Override
+    public Map<UUID, User> findUsersByIds(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        Set<UUID> nonNullIds = ids.stream().filter(Objects::nonNull).collect(Collectors.toSet());
+        if (nonNullIds.isEmpty()) {
+            return Map.of();
+        }
+        List<UserJpaEntity> entities = userRepository.findAllById(nonNullIds);
+        return entities.stream()
+                .map(userMapper::toDomain)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(User::getId, u -> u, (u1, u2) -> u1));
     }
 
     @Override

@@ -8,6 +8,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import com.danasea.backend.modules.account.application.api.AccountInternalApi;
+import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.audit.application.api.AuditLogInternalApi;
 import com.danasea.backend.modules.communication.application.email.EmailRequest;
 import com.danasea.backend.modules.communication.application.email.TransactionalEmailPort;
@@ -60,12 +62,19 @@ public class ResolveDisputeUseCase {
     @Autowired(required = false)
     private VendorInternalApi vendorInternalApi;
 
+    @Autowired(required = false)
+    private AccountInternalApi accountInternalApi;
+
     public void setTransactionalEmailPort(TransactionalEmailPort transactionalEmailPort) {
         this.transactionalEmailPort = transactionalEmailPort;
     }
 
     public void setVendorInternalApi(VendorInternalApi vendorInternalApi) {
         this.vendorInternalApi = vendorInternalApi;
+    }
+
+    public void setAccountInternalApi(AccountInternalApi accountInternalApi) {
+        this.accountInternalApi = accountInternalApi;
     }
 
     @Autowired
@@ -287,7 +296,14 @@ public class ResolveDisputeUseCase {
             }
         }
 
-        return DisputeResponse.fromEntity(savedDispute);
+        String resolvedByName = null;
+        if (savedDispute.getResolvedBy() != null && accountInternalApi != null) {
+            resolvedByName = accountInternalApi.findUserById(savedDispute.getResolvedBy())
+                    .map(User::getFullName)
+                    .orElse(null);
+        }
+
+        return DisputeResponse.fromEntity(savedDispute, resolvedByName);
     }
 
     private String buildAuditMetadata(

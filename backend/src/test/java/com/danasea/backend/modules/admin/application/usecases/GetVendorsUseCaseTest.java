@@ -59,7 +59,7 @@ class GetVendorsUseCaseTest {
 
         assertThat(response.getContent()).hasSize(1);
         assertThat(response.getContent().getFirst()).usingRecursiveComparison()
-                .ignoringFields("documents").isEqualTo(vendor);
+                .ignoringFields("documents", "verifiedByName").isEqualTo(vendor);
         assertThat(response.getNumber()).isEqualTo(2);
         assertThat(response.getSize()).isEqualTo(3);
         assertThat(response.getTotalElements()).isEqualTo(10);
