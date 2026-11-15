@@ -649,7 +649,7 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               LocalizedText(
-                                'Phí sàn (~10%)',
+                                'Phí sàn',
                                 style: AppTypography.labelSm.copyWith(color: AppColors.tertiary),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -686,7 +686,9 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                       const SizedBox(width: 8),
                       Flexible(
                         child: LocalizedText(
-                          '90% Đối tác • 10% Phí sàn',
+                          currentSettlement.grossAmount > 0
+                              ? '${(currentSettlement.netPayableAmount / currentSettlement.grossAmount * 100).round()}% Đối tác • ${(currentSettlement.commissionAmount / currentSettlement.grossAmount * 100).round()}% Phí sàn'
+                              : 'Đối tác • Phí sàn',
                           style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -709,7 +711,10 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+
+            // Payout Lifecycle Stepper 3 Bước (Chốt số kỳ -> Kế toán duyệt -> Đã chuyển khoản)
+            _buildPayoutProgressStepper(currentSettlement),
 
             // Settlement Status info if paid
             if (!isPending) ...[
@@ -830,6 +835,153 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
             const SizedBox(height: 32),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPayoutProgressStepper(SettlementModel settlement) {
+    final isPaid = settlement.status == SettlementStatus.paid;
+    // Step 0: Chốt số kỳ (done)
+    // Step 1: Đang chờ kế toán duyệt (done if paid, current if pending)
+    // Step 2: Đã chuyển khoản ngân hàng (done if paid, next if pending)
+    final currentStep = isPaid ? 2 : 1;
+
+    final steps = [
+      {
+        'title': 'Chốt số kỳ',
+        'desc': 'Ngày ${settlement.periodEnd.day}/${settlement.periodEnd.month}',
+        'icon': Icons.rule_folder_rounded,
+      },
+      {
+        'title': 'Kế toán duyệt',
+        'desc': isPaid ? 'Đã phê duyệt' : 'Đang rà soát',
+        'icon': Icons.verified_user_outlined,
+      },
+      {
+        'title': 'Chuyển khoản NH',
+        'desc': isPaid ? 'Đã giải ngân' : '24-48h làm việc',
+        'icon': Icons.account_balance_rounded,
+      },
+    ];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.timeline_rounded, size: 16, color: AppColors.secondary),
+                  SizedBox(width: 6),
+                  Text(
+                    'Tiến trình giải ngân',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.navyAnchor,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isPaid ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: isPaid ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A)),
+                ),
+                child: Text(
+                  isPaid ? 'ĐÃ GIẢI NGÂN' : 'ĐANG XỬ LÝ',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: isPaid ? const Color(0xFF059669) : const Color(0xFFD97706),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: List.generate(steps.length * 2 - 1, (index) {
+              if (index.isOdd) {
+                final stepIndex = index ~/ 2;
+                final isDone = currentStep > stepIndex;
+                return Expanded(
+                  child: Container(
+                    height: 2.5,
+                    color: isDone ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+                  ),
+                );
+              }
+              final stepIndex = index ~/ 2;
+              final isDone = currentStep > stepIndex;
+              final isCurrent = currentStep == stepIndex;
+              final step = steps[stepIndex];
+
+              final Color circleBg = isDone
+                  ? const Color(0xFF10B981)
+                  : (isCurrent ? AppColors.secondaryContainer : const Color(0xFFF1F5F9));
+              final Color iconColor = isDone
+                  ? Colors.white
+                  : (isCurrent ? AppColors.secondary : const Color(0xFF94A3B8));
+              final Color textColor = isCurrent
+                  ? AppColors.secondary
+                  : (isDone ? AppColors.navyAnchor : const Color(0xFF94A3B8));
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: circleBg,
+                      shape: BoxShape.circle,
+                      border: isCurrent
+                          ? Border.all(color: AppColors.secondary, width: 2)
+                          : null,
+                    ),
+                    child: Icon(
+                      isDone ? Icons.check : (step['icon'] as IconData),
+                      size: 16,
+                      color: iconColor,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    step['title'] as String,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isCurrent || isDone ? FontWeight.bold : FontWeight.w500,
+                      color: textColor,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    step['desc'] as String,
+                    style: const TextStyle(
+                      fontSize: 9.5,
+                      color: AppColors.tertiary,
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
+        ],
       ),
     );
   }

@@ -251,9 +251,11 @@ class MyOrdersScreenState extends State<MyOrdersScreen> {
                             )
                           : ListView.separated(
                               physics: const AlwaysScrollableScrollPhysics(),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppShapes.gutterMobile,
-                                vertical: 10,
+                              padding: const EdgeInsets.fromLTRB(
+                                AppShapes.gutterMobile,
+                                10,
+                                AppShapes.gutterMobile,
+                                110.0,
                               ),
                               itemCount: orders.length +
                                   ((_loading || _error != null || _hasMore)

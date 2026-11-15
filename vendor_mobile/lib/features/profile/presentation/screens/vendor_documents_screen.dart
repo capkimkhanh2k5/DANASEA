@@ -155,6 +155,12 @@ class _VendorDocumentsScreenState extends State<VendorDocumentsScreen> {
       ),
     );
 
+    final bool hasBusinessLicense = docs.any((d) => d.docType == VendorDocType.businessLicense && d.fileUrl.isNotEmpty);
+    final bool hasSafetyCert = docs.any((d) => d.docType == VendorDocType.safetyCert && d.fileUrl.isNotEmpty);
+    final bool hasBank = (_db.currentVendor.bankAccountNumber ?? '').isNotEmpty;
+    final bool hasTaxOrAddress = (_db.currentVendor.taxCode ?? '').isNotEmpty || (_db.currentVendor.businessAddress ?? '').isNotEmpty;
+    final int completedDocs = (hasBusinessLicense ? 1 : 0) + (hasSafetyCert ? 1 : 0) + (hasBank ? 1 : 0) + (hasTaxOrAddress ? 1 : 0);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7F9),
       appBar: AppBar(
@@ -181,7 +187,7 @@ class _VendorDocumentsScreenState extends State<VendorDocumentsScreen> {
         onRefresh: _loadDocuments,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -255,6 +261,80 @@ class _VendorDocumentsScreenState extends State<VendorDocumentsScreen> {
                         color: Colors.white.withAlpha(220),
                         height: 1.4,
                       ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Progress Bar: Đã hoàn thiện X/4 hồ sơ pháp lý
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 4),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              completedDocs == 4 ? Icons.check_circle_rounded : Icons.pending_actions_rounded,
+                              size: 16,
+                              color: completedDocs == 4 ? const Color(0xFF059669) : const Color(0xFFD97706),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Đã hoàn thiện $completedDocs/4 hồ sơ pháp lý',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.navyAnchor,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '${((completedDocs / 4) * 100).toInt()}%',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: completedDocs == 4 ? const Color(0xFF059669) : AppColors.secondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: completedDocs / 4.0,
+                        minHeight: 6,
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          completedDocs == 4 ? const Color(0xFF059669) : AppColors.secondary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _buildDocCheckChip('GPKD', hasBusinessLicense),
+                        const SizedBox(width: 6),
+                        _buildDocCheckChip('An toàn biển', hasSafetyCert),
+                        const SizedBox(width: 6),
+                        _buildDocCheckChip('TK nhận tiền', hasBank),
+                        const SizedBox(width: 6),
+                        _buildDocCheckChip('Mã số thuế', hasTaxOrAddress),
+                      ],
                     ),
                   ],
                 ),
@@ -566,6 +646,43 @@ class _VendorDocumentsScreenState extends State<VendorDocumentsScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDocCheckChip(String label, bool isDone) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          color: isDone ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: isDone ? const Color(0xFFA7F3D0) : const Color(0xFFE2E8F0)),
+        ),
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isDone ? Icons.check : Icons.circle_outlined,
+              size: 11,
+              color: isDone ? const Color(0xFF059669) : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(width: 3),
+            Flexible(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: isDone ? FontWeight.bold : FontWeight.w500,
+                  color: isDone ? const Color(0xFF065F46) : const Color(0xFF64748B),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

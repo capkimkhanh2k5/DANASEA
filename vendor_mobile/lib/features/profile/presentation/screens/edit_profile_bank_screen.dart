@@ -236,7 +236,7 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
           ),
           body: SingleChildScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
             child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -341,19 +341,19 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Visual Payout Card
+                  // Visual Virtual Bank Card Preview (Màu xanh biển đậm, tự động cập nhật)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [AppColors.secondary, Color(0xFF004F57)],
+                        colors: [Color(0xFF0A192F), Color(0xFF1E3A8A), Color(0xFF0284C7)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(AppShapes.rLg),
+                      borderRadius: BorderRadius.circular(18),
                       boxShadow: const [
-                        BoxShadow(color: Color(0x24006874), blurRadius: 10, offset: Offset(0, 4)),
+                        BoxShadow(color: Color(0x280F172A), blurRadius: 14, offset: Offset(0, 6)),
                       ],
                     ),
                     child: Column(
@@ -362,53 +362,89 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(
-                              child: Row(
-                                children: [
-                                  ClipOval(
-                                    child: Image.asset(
-                                      'assets/danasea-logo.png',
-                                      width: 22,
-                                      height: 22,
-                                      fit: BoxFit.contain,
-                                    ),
+                            Row(
+                              children: [
+                                ClipOval(
+                                  child: Image.asset(
+                                    'assets/danasea-logo.png',
+                                    width: 24,
+                                    height: 24,
+                                    fit: BoxFit.contain,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: LocalizedText(
-                                      'DANASEA PAYOUT',
-                                      style: AppTypography.labelSm.copyWith(
-                                        color: AppColors.secondaryFixed,
-                                        letterSpacing: 1.0,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'DANASEA PAYOUT',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    letterSpacing: 1.2,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                ],
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withAlpha(45),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _selectedBank,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Icon(Icons.contactless, color: Colors.white.withAlpha(180), size: 22),
                           ],
                         ),
-                        const SizedBox(height: 18),
-                        LocalizedText(
+                        const SizedBox(height: 14),
+
+                        // Chip & Contactless
+                        Row(
+                          children: [
+                            Container(
+                              width: 32,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFFDE68A), Color(0xFFF59E0B)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Icon(Icons.contactless, color: Colors.white70, size: 20),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        const Text(
                           'SỐ TÀI KHOẢN THỤ HƯỞNG',
-                          style: AppTypography.labelSm.copyWith(color: AppColors.secondaryFixed),
+                          style: TextStyle(fontSize: 10, color: Colors.white60, letterSpacing: 0.8, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
-                        LocalizedText(
-                          _bankAccountController.text.isNotEmpty ? _bankAccountController.text : '•••• •••• ••••',
-                          style: AppTypography.headlineSm.copyWith(
+                        Text(
+                          _bankAccountController.text.isNotEmpty
+                              ? _bankAccountController.text.replaceAllMapped(RegExp(r'.{4}'), (match) => '${match.group(0)} ')
+                              : '•••• •••• •••• ••••',
+                          style: const TextStyle(
+                            fontSize: 17,
                             color: Colors.white,
                             letterSpacing: 2.0,
                             fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 18),
+                        const SizedBox(height: 14),
+
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -417,16 +453,20 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  LocalizedText(
+                                  const Text(
                                     'CHỦ TÀI KHOẢN',
-                                    style: AppTypography.labelSm.copyWith(color: AppColors.secondaryFixed),
+                                    style: TextStyle(fontSize: 9.5, color: Colors.white60, letterSpacing: 0.8, fontWeight: FontWeight.bold),
                                   ),
                                   const SizedBox(height: 2),
-                                  LocalizedText(
-                                    _bankHolderController.text.isNotEmpty ? _bankHolderController.text.toUpperCase() : 'CHƯA NHẬP',
-                                    style: AppTypography.labelLg.copyWith(
+                                  Text(
+                                    _bankHolderController.text.isNotEmpty
+                                        ? _bankHolderController.text.toUpperCase()
+                                        : 'CHƯA NHẬP TÊN CHỦ THẺ',
+                                    style: const TextStyle(
+                                      fontSize: 13,
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -434,21 +474,7 @@ class _EditProfileBankScreenState extends State<EditProfileBankScreen> {
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(40),
-                                borderRadius: BorderRadius.circular(AppShapes.rFull),
-                              ),
-                              child: LocalizedText(
-                                _selectedBank,
-                                style: AppTypography.labelSm.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                            const Icon(Icons.verified_user_rounded, color: Color(0xFF34D399), size: 18),
                           ],
                         ),
                       ],

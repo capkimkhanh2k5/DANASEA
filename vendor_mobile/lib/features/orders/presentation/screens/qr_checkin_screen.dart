@@ -26,6 +26,7 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
   late final MobileScannerController _scannerController;
   late final AnimationController _animController;
   late final Animation<double> _laserAnimation;
+  final TextEditingController _quickInputController = TextEditingController();
 
   bool _isProcessing = false;
   bool _isTorchOn = false;
@@ -58,6 +59,7 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
 
   @override
   void dispose() {
+    _quickInputController.dispose();
     _animController.dispose();
     _scannerController.dispose();
     super.dispose();
@@ -230,12 +232,26 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
     final cleaned = _extractCode(rawInput).toLowerCase();
     final currentVendorId = _db.currentVendor.id.toLowerCase();
 
-    // 1. Tìm tất cả các hoạt động liên quan đến mã quét được (bằng masterOrderId, id, subOrderCode, masterOrderCode)
+    // 1. Tìm tất cả các hoạt động liên quan đến mã quét được (bằng masterOrderId, id, subOrderCode, masterOrderCode, hoặc 4-5 số cuối)
     final allRelatedOrders = _db.subOrders.where((o) {
-      return o.id.toLowerCase() == cleaned ||
-          o.subOrderCode.toLowerCase() == cleaned ||
-          o.masterOrderCode.toLowerCase() == cleaned ||
-          o.masterOrderId.toLowerCase() == cleaned;
+      final subCode = o.subOrderCode.toLowerCase();
+      final masterCode = o.masterOrderCode.toLowerCase();
+      final id = o.id.toLowerCase();
+      final masterId = o.masterOrderId.toLowerCase();
+
+      final exactMatch = id == cleaned ||
+          subCode == cleaned ||
+          masterCode == cleaned ||
+          masterId == cleaned;
+
+      // Hỗ trợ gõ 4-5 ký tự cuối (ví dụ '8924', '8924-1') khi trời nắng chói
+      final suffixMatch = cleaned.length >= 4 && (
+        subCode.endsWith(cleaned) ||
+        masterCode.endsWith(cleaned) ||
+        id.endsWith(cleaned)
+      );
+
+      return exactMatch || suffixMatch;
     }).toList();
 
     // 2. Lọc các hoạt động thuộc cơ sở của Vendor hiện tại (Multi-tenant Isolation)
@@ -814,7 +830,7 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Nhập mã đơn con (ví dụ: DNS-8924-1) in trên vé điện tử của khách hàng.',
+                  'Nhập mã đơn con (DNS-8924-1) hoặc chỉ cần gõ 4–5 số cuối (ví dụ: 8924, 8924-1) khi trời chói nắng.',
                   style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
                 ),
                 const SizedBox(height: 14),
@@ -823,7 +839,7 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                   autofocus: true,
                   textCapitalization: TextCapitalization.characters,
                   decoration: InputDecoration(
-                    hintText: 'DNS-8924-1...',
+                    hintText: 'DNS-8924-1 hoặc 4-5 số cuối (VD: 8924)...',
                     prefixIcon: const Icon(Icons.pin, color: AppColors.secondary),
                     filled: true,
                     fillColor: AppColors.surfaceContainerLow,
@@ -1247,9 +1263,77 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                       ],
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 12),
 
-                  // Action Buttons: Manual Input + Pending Queue
+                  // Quick Manual Input Dock (nổi bật dưới đáy, trời nắng chói gõ 4-5 số cuối là check-in ngay)
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(14, 4, 6, 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.pin_rounded, color: AppColors.secondary, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _quickInputController,
+                            textCapitalization: TextCapitalization.characters,
+                            style: const TextStyle(fontSize: 13, color: AppColors.onSurface, fontWeight: FontWeight.w600),
+                            decoration: const InputDecoration(
+                              hintText: 'Gõ 4–5 số cuối mã vé (VD: 8924)...',
+                              hintStyle: TextStyle(fontSize: 12, color: AppColors.outline),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            onSubmitted: (val) {
+                              if (val.trim().isNotEmpty) {
+                                _handleCode(val);
+                                _quickInputController.clear();
+                              }
+                            },
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            final val = _quickInputController.text.trim();
+                            if (val.isNotEmpty) {
+                              _handleCode(val);
+                              _quickInputController.clear();
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(18),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.secondary,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: const Text(
+                              'Check-in',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Action Buttons: Manual Input Dialog + Pending Queue
                   Row(
                     children: [
                       Expanded(
@@ -1258,7 +1342,7 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                           icon: const Icon(Icons.keyboard_alt_outlined,
                               size: 16, color: Colors.white),
                           label: const Text(
-                            'Nhập mã thủ công',
+                            'Nhập mã đầy đủ',
                             style:
                                 TextStyle(fontSize: 12, color: Colors.white),
                           ),

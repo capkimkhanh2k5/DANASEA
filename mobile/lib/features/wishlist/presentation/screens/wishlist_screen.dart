@@ -126,7 +126,12 @@ class _WishlistScreenState extends State<WishlistScreen> {
           : RefreshIndicator(
               onRefresh: store.loadWishlist,
               child: ListView.separated(
-                padding: const EdgeInsets.all(AppShapes.gutterMobile),
+                padding: const EdgeInsets.fromLTRB(
+                  AppShapes.gutterMobile,
+                  AppShapes.gutterMobile,
+                  AppShapes.gutterMobile,
+                  110.0,
+                ),
                 itemCount: items.length,
                 separatorBuilder: (_, unused) =>
                     const SizedBox(height: AppShapes.spaceMd),

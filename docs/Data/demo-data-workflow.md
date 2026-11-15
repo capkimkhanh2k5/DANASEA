@@ -55,6 +55,9 @@ manifest hashes.
    Use the public key corresponding to the existing CI SSH private key. This
    installs a bounded `demo-data <sha>` command; normal CD alone cannot upgrade
    the root-owned SSH entrypoint. Do not replace the key with unrestricted SSH.
+   Reinstall the controls once after deploying the runtime that reads the
+   expected canonical count from the verified `DB_Demo` package. Later changes
+   to the fixture count take effect with the deployed package.
 3. Install the host Python bcrypt dependency from the server's trusted OS
    packages (Ubuntu/Debian: `sudo apt-get install python3-bcrypt`) and confirm
    `python3 -c 'import bcrypt'` succeeds for the deployment account.

@@ -427,7 +427,7 @@ class _VoucherManagementScreenState extends State<VoucherManagementScreen> with 
 
   Widget _buildVoucherListTab(List<DiscountCodeModel> vouchers, List<DiscountRedemptionModel> redemptions) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -440,159 +440,205 @@ class _VoucherManagementScreenState extends State<VoucherManagementScreen> with 
               final v = vouchers[index];
               final progress = v.maxUses > 0 ? (v.usedCount / v.maxUses).clamp(0.0, 1.0) : 0.0;
               final isExpired = v.validTo.isBefore(DateTime.now());
+              final discountLabel = v.discountType == DiscountType.percentage
+                  ? '-${v.discountValue.toInt()}%'
+                  : '-${(v.discountValue >= 1000 ? "${(v.discountValue / 1000).toStringAsFixed(0)}K" : "${v.discountValue.toInt()}đ")}';
 
               return Container(
-                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isExpired ? AppColors.surfaceContainerLow : AppColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(AppShapes.rLg),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                   boxShadow: const [
-                    BoxShadow(color: Color(0x0A000000), blurRadius: 6, offset: Offset(0, 2)),
+                    BoxShadow(color: Color(0x06000000), blurRadius: 6, offset: Offset(0, 2)),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Stack(
+                    children: [
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // 1. Left Stub: Discount Value (-20% / -50K)
+                            Container(
+                              width: 90,
+                              color: isExpired ? const Color(0xFF94A3B8) : AppColors.secondary,
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Flexible(
-                                    child: LocalizedText(
-                                      v.code,
-                                      style: AppTypography.headlineSm.copyWith(
-                                        color: isExpired ? AppColors.tertiary : AppColors.secondary,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.5,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                                  const Icon(Icons.local_offer_rounded, color: Colors.white70, size: 18),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    discountLabel,
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      letterSpacing: -0.5,
                                     ),
+                                    textAlign: TextAlign.center,
                                   ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primaryContainer.withAlpha(40),
-                                      borderRadius: BorderRadius.circular(AppShapes.rFull),
-                                    ),
-                                    child: LocalizedText(
-                                      v.discountType == DiscountType.percentage
-                                          ? 'Giảm ${v.discountValue.toInt()}%'
-                                          : '-${v.discountValue.toInt()} đ',
-                                      style: AppTypography.labelSm.copyWith(
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    v.discountType == DiscountType.percentage ? 'GIẢM GIÁ' : 'TRỰC TIẾP',
+                                    style: const TextStyle(
+                                      fontSize: 8.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white70,
+                                      letterSpacing: 0.8,
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 2),
-                              LocalizedText(
-                                v.discountType == DiscountType.percentage
-                                    ? 'Giảm theo tỷ lệ %'
-                                    : 'Giảm trừ trực tiếp',
-                                style: AppTypography.bodySm.copyWith(color: AppColors.tertiary),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Switch(
-                          value: v.isActive && !isExpired,
-                          activeColor: AppColors.secondary,
-                          onChanged: isExpired ? null : (val) => _handleToggleActive(v, val),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Progress Bar
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: LocalizedText(
-                            'Đã dùng: ${v.usedCount}/${v.maxUses} lượt',
-                            style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: LocalizedText(
-                            '${(progress * 100).toInt()}% hoàn thành',
-                            style: AppTypography.labelSm.copyWith(
-                              color: AppColors.secondary,
-                              fontWeight: FontWeight.bold,
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(AppShapes.rFull),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 6,
-                        backgroundColor: AppColors.surfaceContainerHigh,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          isExpired ? AppColors.tertiary : AppColors.secondary,
+
+                            // 2. Vertical Dashed Perforation Line
+                            CustomPaint(
+                              size: const Size(1, double.infinity),
+                              painter: _DashedLinePainter(),
+                            ),
+
+                            // 3. Right Body: Code, Validity, Progress (Đã dùng X/Y)
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(14, 10, 12, 10),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            v.code,
+                                            style: TextStyle(
+                                              fontSize: 14.5,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 0.5,
+                                              color: isExpired ? AppColors.tertiary : AppColors.navyAnchor,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        Transform.scale(
+                                          scale: 0.8,
+                                          child: Switch(
+                                            value: v.isActive && !isExpired,
+                                            activeColor: AppColors.secondary,
+                                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                            onChanged: isExpired ? null : (val) => _handleToggleActive(v, val),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.access_time_rounded, size: 11, color: AppColors.tertiary),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Hạn: ${v.validFrom.day}/${v.validFrom.month} - ${v.validTo.day}/${v.validTo.month}/${v.validTo.year}',
+                                          style: const TextStyle(fontSize: 10.5, color: AppColors.tertiary),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+
+                                    // Progress Bar
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Đã dùng: ${v.usedCount}/${v.maxUses}',
+                                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant),
+                                        ),
+                                        Text(
+                                          '${(progress * 100).toInt()}%',
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.bold,
+                                            color: isExpired ? AppColors.tertiary : AppColors.secondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: progress,
+                                        minHeight: 5,
+                                        backgroundColor: const Color(0xFFF1F5F9),
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          isExpired ? AppColors.tertiary : AppColors.secondary,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        InkWell(
+                                          onTap: () => _showEditVoucherModal(v),
+                                          borderRadius: BorderRadius.circular(6),
+                                          child: const Padding(
+                                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.edit_outlined, size: 12, color: AppColors.secondary),
+                                                SizedBox(width: 3),
+                                                Text(
+                                                  'Chỉnh sửa',
+                                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
 
-                    // Footer with validity and Edit button
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              const Icon(Icons.date_range, size: 14, color: AppColors.tertiary),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: LocalizedText(
-                                  '${v.validFrom.day}/${v.validFrom.month} - ${v.validTo.day}/${v.validTo.month}/${v.validTo.year}',
-                                  style: AppTypography.bodySm.copyWith(color: AppColors.tertiary, fontSize: 12),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
+                      // Top notch cutout
+                      Positioned(
+                        top: -7,
+                        left: 83,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: const BoxDecoration(
+                            color: AppColors.background,
+                            shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        InkWell(
-                          onTap: () => _showEditVoucherModal(v),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.edit, size: 14, color: AppColors.secondary),
-                                const SizedBox(width: 4),
-                                LocalizedText(
-                                  'Sửa',
-                                  style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
+                      ),
+                      // Bottom notch cutout
+                      Positioned(
+                        bottom: -7,
+                        left: 83,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: const BoxDecoration(
+                            color: AppColors.background,
+                            shape: BoxShape.circle,
                           ),
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
@@ -673,7 +719,7 @@ class _VoucherManagementScreenState extends State<VoucherManagementScreen> with 
 
   Widget _buildCreateVoucherTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -888,4 +934,25 @@ class _VoucherManagementScreenState extends State<VoucherManagementScreen> with 
       ),
     );
   }
+}
+
+class _DashedLinePainter extends CustomPainter {
+  const _DashedLinePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const double dashHeight = 4.0;
+    const double dashSpace = 3.0;
+    double startY = 6.0;
+    final paint = Paint()
+      ..color = const Color(0xFFCBD5E1)
+      ..strokeWidth = 1.2;
+    while (startY < size.height - 6.0) {
+      canvas.drawLine(Offset(0, startY), Offset(0, startY + dashHeight), paint);
+      startY += dashHeight + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

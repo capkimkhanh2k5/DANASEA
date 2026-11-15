@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:mobile/core/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -42,6 +43,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
   MarineBriefingOverview? _marineBriefing;
   bool _loading = true;
   bool _loadingReceipt = false;
+  bool _downloadingPdf = false;
   bool _openingPayment = false;
   String? _error;
   int _generation = 0;
@@ -188,12 +190,91 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
     }
   }
 
+  Future<void> _downloadReceiptPdf(
+    MasterOrderModel order, {
+    Uint8List? preloadedBytes,
+    String? receiptCode,
+  }) async {
+    if (_downloadingPdf) return;
+    setState(() => _downloadingPdf = true);
+    try {
+      final bytes = preloadedBytes ?? await _repository.receiptPdf(order.id);
+      final safeCode = (receiptCode ?? order.id).replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final fileName = 'DANASEA_Receipt_$safeCode.pdf';
+
+      File? targetFile;
+      final downloadDir = Directory('/storage/emulated/0/Download');
+      if (await downloadDir.exists()) {
+        try {
+          final f = File('${downloadDir.path}/$fileName');
+          await f.writeAsBytes(bytes, flush: true);
+          targetFile = f;
+        } catch (_) {}
+      }
+      if (targetFile == null) {
+        final f = File('${Directory.systemTemp.path}/$fileName');
+        await f.writeAsBytes(bytes, flush: true);
+        targetFile = f;
+      }
+
+      try {
+        await launchUrl(
+          Uri.file(targetFile.path),
+          mode: LaunchMode.externalApplication,
+        );
+      } catch (_) {}
+
+      if (!mounted) return;
+      final kb = (bytes.lengthInBytes / 1024).toStringAsFixed(1);
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.secondary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          content: Text(
+            'Đã lưu biên nhận PDF: $fileName ($kb KB)',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
+    } on AuthFailure catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: LocalizedText(e.message),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText('Không thể tải file PDF biên nhận. Vui lòng thử lại.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _downloadingPdf = false);
+    }
+  }
+
   Future<void> _openReceipt(MasterOrderModel order) async {
     if (_loadingReceipt) return;
     setState(() => _loadingReceipt = true);
     try {
       final receipt = await _repository.receipt(order.id);
-      final pdfBytes = await _repository.receiptPdf(order.id);
+      Uint8List? pdfBytes;
+      try {
+        pdfBytes = await _repository.receiptPdf(order.id);
+      } catch (_) {}
       if (!mounted) return;
       await showModalBottomSheet<void>(
         context: context,
@@ -300,12 +381,38 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
                     _formatPrice(receipt.totalAmount),
                     valueColor: AppColors.primary,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'PDF: receipt-${order.id}.pdf (${(pdfBytes.lengthInBytes / 1024).toStringAsFixed(1)} KB)',
-                    style: AppTypography.bodySm(color: AppColors.secondary),
-                  ),
+                  if (pdfBytes != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'PDF: receipt-${order.id}.pdf (${(pdfBytes.lengthInBytes / 1024).toStringAsFixed(1)} KB)',
+                      style: AppTypography.bodySm(color: AppColors.secondary),
+                    ),
+                  ],
                   const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        _downloadReceiptPdf(
+                          order,
+                          preloadedBytes: pdfBytes,
+                          receiptCode: receipt.receiptCode,
+                        );
+                      },
+                      icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+                      label: const LocalizedText('Tải xuống & Mở bản PDF'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -1077,7 +1184,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
                           label: LocalizedText(
                             _loadingReceipt
                                 ? 'Đang tải biên nhận...'
-                                : 'Tải hóa đơn điện tử VAT (PDF)',
+                                : 'Xem biên nhận điện tử VAT',
                             style: AppTypography.labelMd(
                               color: AppColors.secondary,
                             ),
@@ -1085,6 +1192,42 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> with WidgetsBindi
                           onPressed: _loadingReceipt
                               ? null
                               : () => _openReceipt(masterOrder),
+                        ),
+                        const SizedBox(height: 10),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            minimumSize: const Size(double.infinity, 44),
+                          ),
+                          icon: _downloadingPdf
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.picture_as_pdf_rounded,
+                                  color: Colors.white,
+                                  size: 19,
+                                ),
+                          label: LocalizedText(
+                            _downloadingPdf
+                                ? 'Đang tải bản PDF...'
+                                : 'Tải & Mở hóa đơn điện tử (PDF)',
+                            style: AppTypography.labelMd(
+                              color: Colors.white,
+                            ),
+                          ),
+                          onPressed: _downloadingPdf
+                              ? null
+                              : () => _downloadReceiptPdf(masterOrder),
                         ),
                         const SizedBox(height: 24),
                       ],

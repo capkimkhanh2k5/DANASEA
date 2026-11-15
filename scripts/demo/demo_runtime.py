@@ -83,6 +83,7 @@ class Runtime:
         self.environment = dict(os.environ)
         self.journal = None
         self.config_fingerprint = None
+        self.expected_canonical_records = None
 
     def command(self, args, *, input=None, timeout=300, **kwargs):
         return subprocess.run(args, input=input, check=True, capture_output=True,
@@ -182,12 +183,16 @@ class Runtime:
         import bcrypt  # Installed host dependency; do not discover it after taking service down.
         if not callable(bcrypt.hashpw):
             raise ValueError('Importer dependency unavailable')
+        self.audit_package_schema()
+
+    def audit_package_schema(self):
         # Ordinary preflight rejects business conflicts which replacement intentionally removes.
-        # Inspect only the reviewed schema inventory in a READ ONLY transaction here.
+        # Count normalized fixtures from the verified package and review the schema read-only.
         code = """import importlib.util,json,sys,types
 spec=importlib.util.spec_from_file_location('demo_importer',sys.argv[1])
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-m.manifest();m.load_fixtures()
+m.manifest()
+base, transactions, _ = m.load_fixtures()
 a=types.SimpleNamespace(docker_container=sys.argv[2],database=sys.argv[3],user=sys.argv[4])
 s=m.Session(a,readonly=True)
 try:
@@ -195,9 +200,15 @@ try:
  m.require(actual==json.loads((m.ROOT/'expected_database_schema.json').read_text())['schema'],'Unreviewed reset schema')
  s.finish(commit=False)
 finally:s.close()
+expected = sum(len(rows) for rows in base.values()) + sum(len(rows) for rows in transactions.values())
+print(json.dumps(expected))
 """
-        self.command([sys.executable, '-I', '-c', code, str(self.package / 'install_demo_data.py'),
-                      self.container, self.database, self.admin])
+        output = self.command([sys.executable, '-I', '-c', code, str(self.package / 'install_demo_data.py'),
+                               self.container, self.database, self.admin])
+        count = json.loads(output)
+        if type(count) is not int or count <= 0:
+            raise ValueError('Invalid canonical record count from verified demo package')
+        self.expected_canonical_records = count
 
     def enter_maintenance(self, journal):
         self.journal = journal
@@ -320,13 +331,17 @@ finally:s.close()
     def importer(self, database, point, password, ownership, apply=True):
         if not password or '\n' in password or '\r' in password:
             raise ValueError('Missing runtime demo password')
+        if apply and self.expected_canonical_records is None:
+            raise ValueError('Missing canonical record count from verified demo package')
         archive = self.state / 'backups' / point['backup_id']
         arguments = [sys.executable, '-I', str(self.package / 'install_demo_data.py'), '--replace',
                      '--apply' if apply else '--dry-run', '--docker-container', self.container,
                      '--database', database, '--user', self.admin, '--backup-file', str(archive),
                      '--ownership-file', str(ownership), '--demo-password-stdin']
         result = json.loads(self.command(arguments, input=(password + '\n').encode(), timeout=600))
-        if apply and (result.get('transaction') != 'COMMITTED' or result.get('totalVerifiedInDb') != 687):
+        verified = result.get('totalVerifiedInDb')
+        if apply and (result.get('transaction') != 'COMMITTED'
+                      or type(verified) is not int or verified != self.expected_canonical_records):
             raise ValueError('Replacement did not return a verified committed receipt')
         return result
 

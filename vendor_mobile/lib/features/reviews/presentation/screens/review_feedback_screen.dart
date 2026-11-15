@@ -98,6 +98,22 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
     final pendingCount = allReviews.where((r) => r.vendorReply == null).length;
     final flaggedCount = allReviews.where((r) => r.isFlagged).length;
 
+    final int count5 = allReviews.where((r) => r.rating == 5).length;
+    final int count4 = allReviews.where((r) => r.rating == 4).length;
+    final int count3 = allReviews.where((r) => r.rating == 3).length;
+    final int count2 = allReviews.where((r) => r.rating == 2).length;
+    final int count1 = allReviews.where((r) => r.rating == 1).length;
+    final int totalReviews = allReviews.length;
+    final double avgRating = totalReviews > 0
+        ? (allReviews.fold<double>(0.0, (acc, r) => acc + r.rating) / totalReviews)
+        : 5.0;
+
+    final double pct5 = totalReviews > 0 ? count5 / totalReviews : 0.0;
+    final double pct4 = totalReviews > 0 ? count4 / totalReviews : 0.0;
+    final double pct3 = totalReviews > 0 ? count3 / totalReviews : 0.0;
+    final double pct2 = totalReviews > 0 ? count2 / totalReviews : 0.0;
+    final double pct1 = totalReviews > 0 ? count1 / totalReviews : 0.0;
+
     List<ReviewModel> filteredReviews = allReviews;
     if (_currentFilter == 'pending') {
       filteredReviews = allReviews.where((r) => r.vendorReply == null).toList();
@@ -105,6 +121,12 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
       filteredReviews = allReviews.where((r) => r.rating == 5).toList();
     } else if (_currentFilter == '4star') {
       filteredReviews = allReviews.where((r) => r.rating == 4).toList();
+    } else if (_currentFilter == '3star') {
+      filteredReviews = allReviews.where((r) => r.rating == 3).toList();
+    } else if (_currentFilter == '2star') {
+      filteredReviews = allReviews.where((r) => r.rating == 2).toList();
+    } else if (_currentFilter == '1star') {
+      filteredReviews = allReviews.where((r) => r.rating == 1).toList();
     } else if (_currentFilter == 'flagged') {
       filteredReviews = allReviews.where((r) => r.isFlagged).toList();
     }
@@ -128,7 +150,7 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -196,6 +218,7 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerLowest,
                 borderRadius: BorderRadius.circular(AppShapes.rXl),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
                 boxShadow: const [
                   BoxShadow(color: Color(0x0A000000), blurRadius: 10, offset: Offset(0, 2)),
                 ],
@@ -211,7 +234,7 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             LocalizedText(
-                              'NHÀ CUNG CẤP',
+                              'TỔNG QUAN ĐÁNH GIÁ',
                               style: AppTypography.labelSm.copyWith(
                                 color: AppColors.secondary,
                                 letterSpacing: 0.5,
@@ -221,7 +244,7 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                             ),
                             const SizedBox(height: 2),
                             LocalizedText(
-                              'Đánh giá dịch vụ',
+                              'Mức độ hài lòng của khách',
                               style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -232,18 +255,19 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: AppColors.secondaryContainer,
+                          color: const Color(0xFFECFDF5),
                           borderRadius: BorderRadius.circular(AppShapes.rFull),
+                          border: Border.all(color: const Color(0xFFA7F3D0)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.verified, size: 14, color: AppColors.onSecondaryContainer),
+                            const Icon(Icons.verified, size: 14, color: Color(0xFF059669)),
                             const SizedBox(width: 4),
-                            LocalizedText(
-                              '98% Hài lòng',
+                            Text(
+                              '${totalReviews > 0 ? (((count5 + count4) / totalReviews) * 100).toInt() : 100}% Hài lòng',
                               style: AppTypography.labelSm.copyWith(
-                                color: AppColors.onSecondaryContainer,
+                                color: const Color(0xFF059669),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -254,60 +278,64 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                   ),
                   const SizedBox(height: 18),
 
-                  // Rating Breakdown
+                  // Rating Breakdown (Google Play / Klook Style)
                   Row(
                     children: [
                       // Score Column
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        width: 96,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
                         decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLow,
+                          color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(AppShapes.rMd),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: Column(
                           children: [
-                            LocalizedText(
-                              '4.9',
-                              style: AppTypography.headlineLgMobile.copyWith(
-                                color: AppColors.onSurface,
-                                fontWeight: FontWeight.bold,
+                            Text(
+                              avgRating.toStringAsFixed(1),
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navyAnchor,
+                                letterSpacing: -0.5,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: List.generate(
                                 5,
-                                (index) => const Icon(
-                                  Icons.star,
-                                  size: 16,
-                                  color: AppColors.primaryContainer,
+                                (index) => Icon(
+                                  index < avgRating.round() ? Icons.star_rounded : Icons.star_border_rounded,
+                                  size: 15,
+                                  color: const Color(0xFFF59E0B),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            LocalizedText(
-                              '${allReviews.length + 139} lượt',
-                              style: AppTypography.labelSm.copyWith(color: AppColors.tertiary),
+                            const SizedBox(height: 6),
+                            Text(
+                              '$totalReviews đánh giá',
+                              style: const TextStyle(fontSize: 11, color: AppColors.tertiary, fontWeight: FontWeight.w500),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 14),
 
-                      // Progress Bars
+                      // Google Play / Klook Horizontal Distribution Bars
                       Expanded(
                         child: Column(
                           children: [
-                            _buildRatingBar(5, 0.92, 131),
-                            const SizedBox(height: 4),
-                            _buildRatingBar(4, 0.07, 10),
-                            const SizedBox(height: 4),
-                            _buildRatingBar(3, 0.01, 1),
-                            const SizedBox(height: 4),
-                            _buildRatingBar(2, 0.0, 0),
-                            const SizedBox(height: 4),
-                            _buildRatingBar(1, 0.0, 0),
+                            _buildRatingBar(5, pct5, count5),
+                            const SizedBox(height: 5),
+                            _buildRatingBar(4, pct4, count4),
+                            const SizedBox(height: 5),
+                            _buildRatingBar(3, pct3, count3),
+                            const SizedBox(height: 5),
+                            _buildRatingBar(2, pct2, count2),
+                            const SizedBox(height: 5),
+                            _buildRatingBar(1, pct1, count1),
                           ],
                         ),
                       ),
@@ -379,37 +407,69 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
   }
 
   Widget _buildRatingBar(int star, double percentage, int count) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 14,
-          child: LocalizedText(
-            '$star',
-            style: AppTypography.labelSm.copyWith(color: AppColors.onSurface),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppShapes.rFull),
-            child: LinearProgressIndicator(
-              value: percentage,
-              minHeight: 6,
-              backgroundColor: AppColors.surfaceContainerHigh,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryContainer),
+    final filterKey = '${star}star';
+    final isSelected = _currentFilter == filterKey;
+
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _currentFilter = isSelected ? 'all' : filterKey;
+        });
+      },
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 1.5),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              child: Row(
+                children: [
+                  Text(
+                    '$star',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                      color: isSelected ? AppColors.secondary : AppColors.onSurface,
+                    ),
+                  ),
+                  const SizedBox(width: 1),
+                  const Icon(Icons.star, size: 9, color: Color(0xFFF59E0B)),
+                ],
+              ),
             ),
-          ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: percentage,
+                  minHeight: 7,
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    star >= 4
+                        ? const Color(0xFFF59E0B)
+                        : (star == 3 ? const Color(0xFFFBBF24) : const Color(0xFFEF4444)),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 24,
+              child: Text(
+                '$count',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? AppColors.secondary : AppColors.tertiary,
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 28,
-          child: LocalizedText(
-            '$count',
-            textAlign: TextAlign.right,
-            style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
-          ),
-        ),
-      ],
+      ),
     );
   }
 

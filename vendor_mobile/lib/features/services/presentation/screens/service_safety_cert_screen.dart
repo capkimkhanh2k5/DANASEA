@@ -92,6 +92,63 @@ class _ServiceSafetyCertScreenState extends State<ServiceSafetyCertScreen> {
 
 
 
+  Future<void> _uploadSafetyDoc({String? titleHint}) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppColors.surfaceContainerLowest,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  titleHint != null
+                      ? 'Tải lên: $titleHint'
+                      : 'Tải lên chứng chỉ an toàn dịch vụ (Cloud)',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined, color: AppColors.secondary),
+                title: const LocalizedText('Chọn tệp ảnh chứng chỉ từ Thư viện'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
+                title: const LocalizedText('Chụp ảnh chứng chỉ trực tiếp'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    try {
+      final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+      if (picked == null || !mounted) return;
+      final finalName = titleHint != null ? '$titleHint - ${picked.name}' : picked.name;
+      await _serviceRepo.uploadServiceSafetyDocument(
+        serviceId: widget.service.serviceId,
+        fileName: finalName,
+        filePath: picked.path,
+      );
+      if (!mounted) return;
+      setState(() {});
+      ToastNotification.showSuccess(context, 'Đã tải chứng chỉ lên Cloudinary (Đang chờ duyệt)');
+    } catch (e) {
+      if (!mounted) return;
+      ToastNotification.showError(context, 'Lỗi tải chứng chỉ lên Cloud: $e');
+    }
+  }
+
   ServiceModel _updateModel(ServiceStatus newStatus) {
 
     return widget.service.copyWith(
@@ -173,10 +230,8 @@ class _ServiceSafetyCertScreenState extends State<ServiceSafetyCertScreen> {
       ),
 
       body: SafeArea(
-
         child: SingleChildScrollView(
-
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 40.0),
 
           child: Column(
 
@@ -779,179 +834,284 @@ class _ServiceSafetyCertScreenState extends State<ServiceSafetyCertScreen> {
                         const SizedBox(width: 8),
 
                         OutlinedButton.icon(
-                          onPressed: () async {
-                            final source = await showModalBottomSheet<ImageSource>(
-                              context: context,
-                              backgroundColor: AppColors.surfaceContainerLowest,
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                              ),
-                              builder: (ctx) => SafeArea(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 8),
-                                        child: LocalizedText(
-                                          'Tải lên chứng chỉ an toàn dịch vụ (Cloud)',
-                                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                                        ),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.photo_library_outlined, color: AppColors.secondary),
-                                        title: const LocalizedText('Chọn tệp ảnh chứng chỉ từ Thư viện'),
-                                        onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-                                      ),
-                                      ListTile(
-                                        leading: const Icon(Icons.camera_alt_outlined, color: AppColors.primary),
-                                        title: const LocalizedText('Chụp ảnh chứng chỉ trực tiếp'),
-                                        onTap: () => Navigator.pop(ctx, ImageSource.camera),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                            if (source == null || !mounted) return;
-                            try {
-                              final picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
-                              if (picked == null || !mounted) return;
-                              await _serviceRepo.uploadServiceSafetyDocument(
-                                serviceId: widget.service.serviceId,
-                                fileName: picked.name,
-                                filePath: picked.path,
-                              );
-                              if (!mounted) return;
-                              setState(() {});
-                              ToastNotification.showSuccess(context, 'Đã tải chứng chỉ lên Cloudinary (Đang chờ duyệt)');
-                            } catch (e) {
-                              if (!mounted) return;
-                              ToastNotification.showError(context, 'Lỗi tải chứng chỉ lên Cloud: $e');
-                            }
-                          },
-
+                          onPressed: () => _uploadSafetyDoc(),
                           icon: const Icon(Icons.cloud_upload_outlined, size: 14),
-
                           label: const LocalizedText('Tải lên Cloud', style: TextStyle(fontSize: 11)),
-
                           style: OutlinedButton.styleFrom(
-
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-
                             side: const BorderSide(color: AppColors.secondary),
-
                             foregroundColor: AppColors.secondary,
-
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-
                           ),
-
                         ),
-
                       ],
-
                     ),
-
                     const SizedBox(height: 8),
-
-                    const LocalizedText('Các chứng chỉ an toàn, phao cứu sinh và sơ cấp cứu gắn riêng cho dịch vụ này.',
-
-                        style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
-
+                    const LocalizedText(
+                      'Các chứng chỉ an toàn, phao cứu sinh và sơ cấp cứu bắt buộc cho dịch vụ biển này.',
+                      style: TextStyle(fontSize: 11, color: AppColors.tertiary),
+                    ),
                     const SizedBox(height: 12),
 
-                    if (safetyDocs.isEmpty)
+                    // Render Standard Safety Documents List with Status Cards (Emerald for Uploaded, Orange for Missing)
+                    Builder(
+                      builder: (context) {
+                        const standardDocs = [
+                          (
+                            title: 'Đăng kiểm & An toàn kỹ thuật phương tiện',
+                            desc: 'Giấy chứng nhận an toàn phương tiện cano, thuyền, ván chèo SUP',
+                            icon: Icons.directions_boat_outlined,
+                            keyword: 'dang kiem',
+                          ),
+                          (
+                            title: 'Bảo hiểm trách nhiệm dân sự hành khách',
+                            desc: 'Hợp đồng bảo hiểm du lịch bắt buộc cho du khách tham gia',
+                            icon: Icons.health_and_safety_outlined,
+                            keyword: 'bao hiem',
+                          ),
+                          (
+                            title: 'Chứng chỉ Cứu hộ bờ biển & Sơ cấp cứu',
+                            desc: 'Bằng cấp/chứng chỉ cứu sinh bờ biển, sơ cấp cứu của HDV/thuyền trưởng',
+                            icon: Icons.medical_services_outlined,
+                            keyword: 'cuu ho',
+                          ),
+                          (
+                            title: 'Phương án ứng phó sự cố hàng hải & Áo phao',
+                            desc: 'Quy trình cứu nạn cứu hộ và biên bản kiểm tra áo phao định kỳ',
+                            icon: Icons.warning_amber_rounded,
+                            keyword: 'ao phao',
+                          ),
+                        ];
 
-                      Container(
+                        final matchedDocIds = <String>{};
 
-                        padding: const EdgeInsets.all(12),
+                        return Column(
+                          children: [
+                            ...standardDocs.map((item) {
+                              ServiceSafetyDocumentModel? foundDoc;
+                              for (final doc in safetyDocs) {
+                                final nameLower = doc.documentName.toLowerCase();
+                                if (nameLower.contains(item.keyword) ||
+                                    nameLower.contains(item.title.toLowerCase().substring(0, 8))) {
+                                  foundDoc = doc;
+                                  matchedDocIds.add(doc.docId);
+                                  break;
+                                }
+                              }
+                              // Also assign if there's any unassigned doc sequentially
+                              if (foundDoc == null && safetyDocs.isNotEmpty) {
+                                for (final doc in safetyDocs) {
+                                  if (!matchedDocIds.contains(doc.docId)) {
+                                    foundDoc = doc;
+                                    matchedDocIds.add(doc.docId);
+                                    break;
+                                  }
+                                }
+                              }
 
-                        decoration: BoxDecoration(
+                              final isUploaded = foundDoc != null;
 
-                          color: AppColors.surfaceContainerLow,
-
-                          borderRadius: BorderRadius.circular(8),
-
-                        ),
-
-                        child: const Center(
-
-                          child: LocalizedText('Chưa có chứng chỉ an toàn riêng cho dịch vụ này', style: TextStyle(fontSize: 12, color: AppColors.tertiary)),
-
-                        ),
-
-                      )
-
-                    else
-
-                      ListView.separated(
-
-                        shrinkWrap: true,
-
-                        physics: const NeverScrollableScrollPhysics(),
-
-                        itemCount: safetyDocs.length,
-
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-
-                        itemBuilder: (context, idx) {
-
-                          final doc = safetyDocs[idx];
-
-                          return Container(
-
-                            padding: const EdgeInsets.all(10),
-
-                            decoration: BoxDecoration(
-
-                              color: AppColors.surfaceContainerLow,
-
-                              borderRadius: BorderRadius.circular(10),
-
-                            ),
-
-                            child: Row(
-
-                              children: [
-
-                                const Icon(Icons.picture_as_pdf, color: AppColors.primary, size: 24),
-
-                                const SizedBox(width: 10),
-
-                                Expanded(
-
-                                  child: Column(
-
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-
-                                    children: [
-
-                                      LocalizedText(doc.documentName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
-
-                                      LocalizedText('ID: ${doc.docId} • Cập nhật: ${doc.uploadedAt.day}/${doc.uploadedAt.month}',
-
-                                          style: const TextStyle(fontSize: 10, color: AppColors.tertiary)),
-
-                                    ],
-
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isUploaded
+                                      ? const Color(0xFFF0FDF4)
+                                      : const Color(0xFFFFF7ED),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isUploaded
+                                        ? const Color(0xFF059669)
+                                        : const Color(0xFFF97316),
+                                    width: isUploaded ? 1.5 : 1.2,
                                   ),
-
                                 ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          width: 34,
+                                          height: 34,
+                                          decoration: BoxDecoration(
+                                            color: isUploaded
+                                                ? const Color(0xFFDCFCE7)
+                                                : const Color(0xFFFFEDD5),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            item.icon,
+                                            size: 18,
+                                            color: isUploaded
+                                                ? const Color(0xFF059669)
+                                                : const Color(0xFFEA580C),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                item.title,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.onSurface,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                item.desc,
+                                                style: const TextStyle(
+                                                  fontSize: 10.5,
+                                                  color: AppColors.tertiary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 3),
+                                          decoration: BoxDecoration(
+                                            color: isUploaded
+                                                ? const Color(0xFF059669)
+                                                : const Color(0xFFEA580C),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                isUploaded
+                                                    ? Icons.check_circle_rounded
+                                                    : Icons.warning_amber_rounded,
+                                                size: 12,
+                                                color: Colors.white,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                isUploaded ? 'Đã tải lên' : 'Chưa có',
+                                                style: const TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    if (isUploaded)
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              'Tệp: ${foundDoc.documentName} • ${foundDoc.uploadedAt.day}/${foundDoc.uploadedAt.month}',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w500,
+                                                color: Color(0xFF065F46),
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          StatusBadge(status: foundDoc.status),
+                                        ],
+                                      )
+                                    else
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton.icon(
+                                          onPressed: () =>
+                                              _uploadSafetyDoc(titleHint: item.title),
+                                          icon: const Icon(Icons.upload_file_outlined,
+                                              size: 15),
+                                          label: const Text(
+                                            'Tải ảnh / tài liệu chứng nhận',
+                                            style: TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: const Color(0xFFC2410C),
+                                            side: const BorderSide(
+                                                color: Color(0xFFF97316)),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 8),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }),
 
-                                StatusBadge(status: doc.status),
-
-                              ],
-
-                            ),
-
-                          );
-
-                        },
-
-                      ),
+                            // Render any remaining extra uploaded documents
+                            if (safetyDocs.length > matchedDocIds.length) ...[
+                              const SizedBox(height: 8),
+                              const Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Tài liệu an toàn bổ sung khác:',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.secondary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              ...safetyDocs
+                                  .where((d) => !matchedDocIds.contains(d.docId))
+                                  .map((doc) => Container(
+                                        margin: const EdgeInsets.only(bottom: 6),
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF0FDF4),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
+                                          border: Border.all(
+                                              color: const Color(0xFF059669)),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.picture_as_pdf,
+                                                color: Color(0xFF059669),
+                                                size: 20),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                doc.documentName,
+                                                style: const TextStyle(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                            StatusBadge(status: doc.status),
+                                          ],
+                                        ),
+                                      )),
+                            ],
+                          ],
+                        );
+                      },
+                    ),
 
                   ],
 

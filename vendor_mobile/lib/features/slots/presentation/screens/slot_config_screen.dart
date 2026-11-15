@@ -5,7 +5,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/data/vendor_store.dart';
 import '../../../../core/models/vendor_models.dart';
-import '../../../../core/widgets/vendor_button.dart';
 import '../../../../core/widgets/toast_notification.dart';
 import '../../../../core/widgets/alarm_wheel_picker.dart';
 
@@ -212,7 +211,7 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 40.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -241,8 +240,11 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainerLowest,
-                  borderRadius: AppShapes.radiusMd,
-                  boxShadow: AppShapes.shadowSm,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x06102F3A), blurRadius: 8, offset: Offset(0, 2)),
+                  ],
                 ),
                 child: Row(
                   children: [
@@ -251,7 +253,7 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                       height: 48,
                       decoration: BoxDecoration(
                         color: AppColors.secondaryContainer,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Icon(Icons.kayaking, color: AppColors.onSecondaryContainer, size: 24),
                     ),
@@ -290,8 +292,11 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainerLowest,
-                  borderRadius: AppShapes.radiusMd,
-                  boxShadow: AppShapes.shadowSm,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x06102F3A), blurRadius: 8, offset: Offset(0, 2)),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -302,7 +307,7 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                         const Expanded(
                           child: Row(
                             children: [
-                              Icon(Icons.calendar_today, size: 18, color: AppColors.primary),
+                              Icon(Icons.calendar_today, size: 18, color: AppColors.secondary),
                               SizedBox(width: 6),
                               Expanded(
                                 child: LocalizedText('Ngày áp dụng',
@@ -365,8 +370,11 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainerLowest,
-                  borderRadius: AppShapes.radiusMd,
-                  boxShadow: AppShapes.shadowSm,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x06102F3A), blurRadius: 8, offset: Offset(0, 2)),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,9 +401,18 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: AppColors.primaryFixed, borderRadius: BorderRadius.circular(10)),
-                          child: LocalizedText('Thời lượng: ${service?.durationMinutes ?? 60} phút',
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.onPrimaryFixedVariant)),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondaryContainer.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: LocalizedText(
+                            'Thời lượng: ${service?.durationMinutes ?? 60} phút',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.secondary,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -455,7 +472,7 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.wb_sunny, size: 18, color: AppColors.primaryContainer),
+                                      const Icon(Icons.wb_sunny, size: 18, color: Color(0xFF0284C7)),
                                       Expanded(
                                         child: Text(
                                           _endTimeController.text,
@@ -483,15 +500,18 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainerLowest,
-                  borderRadius: AppShapes.radiusMd,
-                  boxShadow: AppShapes.shadowSm,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x06102F3A), blurRadius: 8, offset: Offset(0, 2)),
+                  ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.groups, size: 18, color: AppColors.primary),
+                        Icon(Icons.groups, size: 18, color: AppColors.secondary),
                         SizedBox(width: 6),
                         Expanded(
                           child: LocalizedText(
@@ -548,58 +568,30 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    if (_isEdit) ...[
+                      const SizedBox(height: 16),
 
-                    // Read-only Booked & Held Info Box
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainer,
-                        borderRadius: AppShapes.radiusSm,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Expanded(
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.lock_outline, size: 14, color: AppColors.tertiary),
-                                    SizedBox(width: 4),
-                                    Expanded(
-                                      child: LocalizedText(
-                                        'Số khách đã đặt:',
-                                        style: TextStyle(fontSize: 12, color: AppColors.tertiary),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(color: AppColors.surfaceDim, borderRadius: BorderRadius.circular(10)),
-                                child: LocalizedText('$_bookedCount khách', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
-                              ),
-                            ],
-                          ),
-                          if (_heldCount > 0) ...[
-                            const SizedBox(height: 6),
+                      // Read-only Booked & Held Info Box (Chỉ hiện khi Chỉnh sửa ca đã có)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainer,
+                          borderRadius: AppShapes.radiusSm,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 const Expanded(
                                   child: Row(
                                     children: [
-                                      Icon(Icons.timer_outlined, size: 14, color: AppColors.tertiary),
+                                      Icon(Icons.lock_outline, size: 14, color: AppColors.tertiary),
                                       SizedBox(width: 4),
                                       Expanded(
                                         child: LocalizedText(
-                                          'Tạm giữ thanh toán:',
+                                          'Số khách đã đặt:',
                                           style: TextStyle(fontSize: 12, color: AppColors.tertiary),
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
@@ -609,73 +601,127 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                LocalizedText('$_heldCount khách', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                              ],
-                            ),
-                          ],
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(3),
-                            child: LinearProgressIndicator(
-                              value: _capacity > 0 ? (_bookedCount / _capacity).clamp(0.0, 1.0) : 0,
-                              minHeight: 5,
-                              backgroundColor: AppColors.surfaceContainerHighest,
-                              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          const LocalizedText(
-                            'Dữ liệu chỉ đọc từ hệ thống đơn đặt của khách. Đối tác không thể giảm sức chứa dưới tổng số khách đã đặt & tạm giữ.',
-                            style: TextStyle(fontSize: 10, color: AppColors.tertiary),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Block toggle
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerLow,
-                        borderRadius: AppShapes.radiusSm,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.block, size: 20, color: AppColors.primary),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const LocalizedText('Chặn nhận thêm khách', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
-                                LocalizedText(
-                                  'Ngừng mở bán mới trên ứng dụng mà không ảnh hưởng tới $_bookedCount khách đã đặt thành công.',
-                                  style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(color: AppColors.surfaceDim, borderRadius: BorderRadius.circular(10)),
+                                  child: LocalizedText('$_bookedCount khách', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
                                 ),
                               ],
                             ),
-                          ),
-                          Switch.adaptive(
-                            value: _isBlocked,
-                            activeThumbColor: AppColors.primary,
-                            activeTrackColor: AppColors.primaryFixed,
-                            onChanged: (val) => setState(() => _isBlocked = val),
-                          ),
-                        ],
+                            if (_heldCount > 0) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Expanded(
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.timer_outlined, size: 14, color: AppColors.tertiary),
+                                        SizedBox(width: 4),
+                                        Expanded(
+                                          child: LocalizedText(
+                                            'Tạm giữ thanh toán:',
+                                            style: TextStyle(fontSize: 12, color: AppColors.tertiary),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  LocalizedText('$_heldCount khách', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                ],
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: LinearProgressIndicator(
+                                value: _capacity > 0 ? (_bookedCount / _capacity).clamp(0.0, 1.0) : 0,
+                                minHeight: 6,
+                                backgroundColor: const Color(0xFFE2E8F0),
+                                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.secondary),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const LocalizedText(
+                              'Dữ liệu chỉ đọc từ hệ thống đơn đặt của khách. Đối tác không thể giảm sức chứa dưới tổng số khách đã đặt & tạm giữ.',
+                              style: TextStyle(fontSize: 10, color: AppColors.tertiary),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 14),
+
+                      // Block toggle (Chỉ hiện khi Chỉnh sửa ca đã có)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.block, size: 20, color: AppColors.secondary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const LocalizedText('Chặn nhận thêm khách', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
+                                  LocalizedText(
+                                    'Ngừng mở bán mới trên ứng dụng mà không ảnh hưởng tới $_bookedCount khách đã đặt thành công.',
+                                    style: const TextStyle(fontSize: 11, color: AppColors.tertiary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch.adaptive(
+                              value: _isBlocked,
+                              activeThumbColor: AppColors.secondary,
+                              activeTrackColor: AppColors.secondaryContainer,
+                              onChanged: (val) => setState(() => _isBlocked = val),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: 20),
 
-              // Action buttons
-              VendorButton(
-                text: 'Lưu cấu hình khung giờ',
-                icon: Icons.save,
-                isLoading: _isSaving,
-                onPressed: _isSaving ? null : _saveSlot,
+              // Action buttons (Đồng bộ nút bấm với slot_calendar_screen.dart)
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _isSaving ? null : _saveSlot,
+                  icon: _isSaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(_isEdit ? Icons.save_outlined : Icons.add_circle_outline, size: 18),
+                  label: Text(
+                    _isEdit ? 'Lưu thay đổi ca chạy' : 'Tạo ca chạy mới',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 10),
               if (_isEdit && _bookedCount == 0)

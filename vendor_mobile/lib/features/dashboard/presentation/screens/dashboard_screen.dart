@@ -13,6 +13,7 @@ import '../../../disputes/presentation/screens/dispute_management_screen.dart';
 import '../../../orders/presentation/screens/qr_checkin_screen.dart';
 import '../../../notifications/presentation/screens/notification_safety_screen.dart';
 import '../../../ai/presentation/screens/vendor_copilot_screen.dart';
+import '../../../analytics/presentation/screens/analytics_dashboard_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onNavigateTab;
@@ -258,7 +259,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 110.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -379,7 +380,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                _isBalanceVisible ? 'Đã quyết toán: ' + _formatVnd(_metrics.netPayout) : 'Đã quyết toán: ••••',
+                                _isBalanceVisible ? 'Đã quyết toán: ${_formatVnd(_metrics.netPayout)}' : 'Đã quyết toán: ••••',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: Color(0xFFE2E8F0),
@@ -395,7 +396,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                _isBalanceVisible ? 'Chờ đối soát: ' + _formatVnd((_metrics.totalRevenue - _metrics.netPayout) > 0 ? (_metrics.totalRevenue - _metrics.netPayout) : 0.0) : 'Chờ đối soát: ••••',
+                                _isBalanceVisible ? 'Chờ đối soát: ${_formatVnd((_metrics.totalRevenue - _metrics.netPayout) > 0 ? (_metrics.totalRevenue - _metrics.netPayout) : 0.0)}' : 'Chờ đối soát: ••••',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: Color(0xFFFDE68A),
@@ -522,7 +523,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // 3. THAO TÁC VẬN HÀNH (From Ảnh 1: 2x2 Grid, Clean & Bold)
+                // 3. THAO TÁC VẬN HÀNH (2x2 Grid cân đối, bỏ nút Ví trùng lặp với thẻ Hero)
                 const Text(
                   'Thao tác vận hành',
                   style: TextStyle(
@@ -560,21 +561,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     Expanded(
                       child: _buildActionTile(
-                        icon: Icons.account_balance_wallet_outlined,
-                        iconBg: const Color(0xFFFEF3C7),
-                        iconColor: const Color(0xFFD97706),
-                        title: 'Ví doanh thu',
-                        onTap: _openSettlements,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildActionTile(
                         icon: Icons.star_outline_rounded,
                         iconBg: const Color(0xFFEDE9FE),
                         iconColor: const Color(0xFF7C3AED),
                         title: 'Đánh giá',
                         onTap: _openReviews,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildActionTile(
+                        icon: Icons.bar_chart_rounded,
+                        iconBg: const Color(0xFFE0F2FE),
+                        iconColor: const Color(0xFF0284C7),
+                        title: 'Báo cáo phân tích',
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AnalyticsDashboardScreen(),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -685,48 +692,106 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Sức chứa khung giờ',
-                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                          ),
-                          Text(
-                            nextSlot != null ? '${nextSlot.bookedCount}/${nextSlot.capacity} khách' : '0/0 khách',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: (nextSlot?.capacity ?? 10) > 0
-                              ? ((nextSlot?.bookedCount ?? 8) / (nextSlot?.capacity ?? 10)).clamp(0.0, 1.0)
-                              : 0.8,
-                          minHeight: 5,
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF004D56)),
-                        ),
+                      Builder(
+                        builder: (context) {
+                          final int booked = nextSlot?.bookedCount ?? 0;
+                          final int capacity = nextSlot?.capacity ?? 0;
+                          final double fillRatio = capacity > 0
+                              ? (booked / capacity).clamp(0.0, 1.0)
+                              : 0.0;
+                          final int fillPercent = (fillRatio * 100).round();
+                          final Color progressColor = fillRatio >= 0.85
+                              ? const Color(0xFFD97706)
+                              : const Color(0xFF004D56);
+
+                          return Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Tiến độ lấp đầy khách (Booked / Capacity)',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF64748B),
+                                      ),
+                                    ),
+                                    Text(
+                                      '$booked/$capacity khách ($fillPercent%)',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: progressColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 7),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: LinearProgressIndicator(
+                                    value: fillRatio,
+                                    minHeight: 7,
+                                    backgroundColor: const Color(0xFFE2E8F0),
+                                    valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _openOrders,
-                          icon: const Icon(Icons.people_outline, size: 16),
-                          label: const Text(
-                            'Xem danh sách khách của ca này',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: _openQrScan,
+                              icon: const Icon(Icons.qr_code_scanner_rounded, size: 17),
+                              label: const Text(
+                                'Soát vé QR ca này',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF004D56),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 11),
+                              ),
+                            ),
                           ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF004D56),
-                            side: const BorderSide(color: Color(0xFF004D56)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: _openOrders,
+                              icon: const Icon(Icons.people_outline, size: 16),
+                              label: const Text(
+                                'Danh sách khách',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF004D56),
+                                side: const BorderSide(color: Color(0xFF004D56)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(vertical: 11),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),

@@ -67,6 +67,11 @@ flutter:
 
   assets:
     - assets/danasea-logo.png
+    - assets/ai_orb.webp
+    - assets/ai_orb_idle.webp
+    - assets/ai_orb_thinking.webp
+    - assets/qua-cau-p1-trong-suot.gif
+    - assets/qua-cau-p2-trong-suot.gif
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
