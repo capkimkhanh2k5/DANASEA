@@ -7,11 +7,11 @@ import {
   Trash2, 
   MoreVertical,
   Paperclip, 
-  X, 
-  Check 
+  X 
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from '../../../components/vendor/copilot/CopilotArtifactCard';
+import { MarkdownText } from '../../../components/common/MarkdownText';
 
 export function VendorCopilotPage() {
   const {
@@ -229,14 +229,11 @@ export function VendorCopilotPage() {
                         : 'bg-slate-50 border border-slate-200/90 text-slate-900 rounded-tl-xs shadow-2xs'
                     }`}
                   >
-                    {!isUser && m.toolsUsed && m.toolsUsed.length > 0 && (
-                      <div className="mb-2 pb-1.5 border-b border-slate-200/60 flex items-center gap-1.5 text-[10px] text-sky-700 font-semibold">
-                        <Check className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                        <span>Đối chiếu dữ liệu: {m.toolsUsed.join(', ')}</span>
-                      </div>
+                    {isUser ? (
+                      <div className="whitespace-pre-wrap">{m.content}</div>
+                    ) : (
+                      <MarkdownText content={m.content} />
                     )}
-
-                    <div className="whitespace-pre-wrap">{m.content}</div>
 
                     {!isUser && m.artifacts && m.artifacts.length > 0 && (
                       <div className="flex flex-col gap-2 mt-3">

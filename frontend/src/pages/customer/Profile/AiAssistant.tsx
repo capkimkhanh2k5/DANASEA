@@ -12,6 +12,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { aiService } from "../../../services/aiService";
+import { MarkdownText } from "../../../components/common/MarkdownText";
 
 export function AiAssistant() {
   const navigate = useNavigate();
@@ -166,7 +167,11 @@ export function AiAssistant() {
                       : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs shadow-xs'
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  {msg.role === 'user' ? (
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  ) : (
+                    <MarkdownText content={msg.content} />
+                  )}
                 </div>
 
                 {msg.role === 'user' && (
