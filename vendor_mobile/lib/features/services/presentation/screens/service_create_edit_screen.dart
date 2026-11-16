@@ -352,6 +352,8 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
   void _showListingOptimizeModal(ListingOptimizeResultModel result) {
     final viDraft = result.drafts['vi'] ?? result.drafts['VI'];
     final enDraft = result.drafts['en'] ?? result.drafts['EN'];
+    final canApply = [viDraft, enDraft].any((draft) => draft != null &&
+        (draft.optimizedTitle.trim().isNotEmpty || draft.optimizedDescription.trim().isNotEmpty));
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -531,7 +533,7 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {
+                      onPressed: !canApply ? null : () {
                         setState(() {
                           if (viDraft != null) {
                             if (viDraft.optimizedTitle.isNotEmpty) {

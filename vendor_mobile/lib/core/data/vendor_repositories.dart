@@ -2414,72 +2414,54 @@ class VendorAiRepository implements IVendorAiRepository {
         if (contextId != null) 'contextId': contextId,
       },
     );
-    return CopilotMessageModel.fromJson(res);
+    final response = CopilotMessageModel.fromJson(res);
+    if (response.content.trim().isEmpty && response.details.isEmpty) {
+      throw const FormatException('API chưa trả về nội dung phản hồi.');
+    }
+    return response;
   }
 
   @override
   Future<List<Map<String, dynamic>>> listConversations() async {
-    try {
-      final res = await _session.requestJson('/api/vendor/ai/copilot/conversations');
-      if (res is List) {
-        return res.whereType<Map<String, dynamic>>().toList();
-      }
-    } catch (_) {}
-    return [];
+    final res = await _session.requestJson('/api/vendor/ai/copilot/conversations');
+    return (res as List).cast<Map<String, dynamic>>().toList();
   }
 
   @override
   Future<List<CopilotMessageModel>> getConversationHistory(String conversationId) async {
+    final res = await _session.requestJson('/api/vendor/ai/copilot/conversations/$conversationId/history');
+    return (res as List).cast<Map<String, dynamic>>().map(CopilotMessageModel.fromJson).toList();
+  }
+
+  @override
+  Future<bool> deleteConversation(String conversationId) async {
     try {
-      final res = await _session.requestJson('/api/vendor/ai/copilot/conversations/$conversationId/history');
-      if (res is List) {
-        return res
-            .whereType<Map<String, dynamic>>()
-            .map(CopilotMessageModel.fromJson)
-            .toList();
-      }
-    } catch (_) {}
-    return [];
+      await _session.request(
+        '/api/vendor/ai/copilot/conversations/$conversationId',
+        method: 'DELETE',
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override
   Future<SlotAdvisorResultModel> getSlotAdvisor({String? serviceId, int horizonDays = 7}) async {
-    try {
-      final res = await _session.request(
-        '/api/vendor/ai/slots/advisor',
-        method: 'POST',
-        data: {
-          if (serviceId != null && serviceId.isNotEmpty) 'serviceId': serviceId,
-          'horizonDays': horizonDays,
-        },
-      );
-      return SlotAdvisorResultModel.fromJson(res);
-    } catch (e) {
-      try {
-        final query = serviceId != null ? '?serviceId=$serviceId&horizonDays=$horizonDays' : '?horizonDays=$horizonDays';
-        final res = await _session.request('/api/vendor/ai/slot-advisor$query');
-        return SlotAdvisorResultModel.fromJson(res);
-      } catch (_) {
-        return const SlotAdvisorResultModel();
-      }
-    }
+    final res = await _session.request('/api/vendor/ai/slots/advisor', method: 'POST', data: {
+      if (serviceId != null && serviceId.isNotEmpty) 'serviceId': serviceId,
+      'horizonDays': horizonDays,
+    });
+    return SlotAdvisorResultModel.fromJson(res);
   }
 
   @override
   Future<ReviewCoachingResultModel> getReviewCoaching({String? serviceId, int periodDays = 90}) async {
-    try {
-      final res = await _session.request(
-        '/api/vendor/ai/review-coaching',
-        method: 'POST',
-        data: {
-          if (serviceId != null && serviceId.isNotEmpty) 'serviceId': serviceId,
-          'periodDays': periodDays,
-        },
-      );
-      return ReviewCoachingResultModel.fromJson(res);
-    } catch (_) {
-      return const ReviewCoachingResultModel();
-    }
+    final res = await _session.request('/api/vendor/ai/review-coaching', method: 'POST', data: {
+      if (serviceId != null && serviceId.isNotEmpty) 'serviceId': serviceId,
+      'periodDays': periodDays,
+    });
+    return ReviewCoachingResultModel.fromJson(res);
   }
 
   @override

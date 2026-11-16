@@ -288,6 +288,7 @@ abstract class IVendorAiRepository {
   });
   Future<List<Map<String, dynamic>>> listConversations();
   Future<List<CopilotMessageModel>> getConversationHistory(String conversationId);
+  Future<bool> deleteConversation(String conversationId);
   Future<SlotAdvisorResultModel> getSlotAdvisor({String? serviceId, int horizonDays = 7});
   Future<ReviewCoachingResultModel> getReviewCoaching({String? serviceId, int periodDays = 90});
   Future<ReplyDraftResultModel> draftReviewReply({

@@ -849,14 +849,22 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => _SlotAdvisorModal(
         serviceId: _selectedServiceId,
-        onSelectDate: (dateStr) {
+        onSelectSlot: (rec) async {
+          final serviceId = _selectedServiceId;
           Navigator.pop(ctx);
+          final slots = await _slotRepo.getSlotsForService(serviceId, DateTime.tryParse(rec.date) ?? _selectedDate);
+          if (!mounted) return;
+          final slot = slots.where((s) => s.slotId == rec.slotId && s.serviceId == serviceId).firstOrNull;
+          if (slot == null) {
+            ToastNotification.showError(context, 'Không tìm thấy ca chạy này. Vui lòng tải lại lịch.');
+            return;
+          }
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => SlotConfigScreen(
-                serviceId: _selectedServiceId,
-                initialDate: dateStr,
+                serviceId: serviceId,
+                slot: slot,
               ),
             ),
           );
@@ -1528,11 +1536,11 @@ class _OperatingScheduleModalState extends State<_OperatingScheduleModal> {
 
 class _SlotAdvisorModal extends StatefulWidget {
   final String serviceId;
-  final ValueChanged<String> onSelectDate;
+  final ValueChanged<SlotRecommendationModel> onSelectSlot;
 
   const _SlotAdvisorModal({
     required this.serviceId,
-    required this.onSelectDate,
+    required this.onSelectSlot,
   });
 
   @override
@@ -1542,7 +1550,7 @@ class _SlotAdvisorModal extends StatefulWidget {
 class _SlotAdvisorModalState extends State<_SlotAdvisorModal> {
   final _aiRepo = VendorAiRepository();
   bool _isLoading = true;
-  SlotAdvisorResultModel _result = const SlotAdvisorResultModel();
+  SlotAdvisorResultModel? _result;
 
   @override
   void initState() {
@@ -1551,13 +1559,17 @@ class _SlotAdvisorModalState extends State<_SlotAdvisorModal> {
   }
 
   Future<void> _loadAdvisor() async {
-    setState(() => _isLoading = true);
-    final res = await _aiRepo.getSlotAdvisor(serviceId: widget.serviceId, horizonDays: 7);
-    if (mounted) {
-      setState(() {
-        _result = res;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _result = null;
+    });
+    try {
+      final result = await _aiRepo.getSlotAdvisor(serviceId: widget.serviceId, horizonDays: 7);
+      if (mounted) setState(() => _result = result);
+    } catch (_) {
+      // A missing result displays the retry state below.
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -1565,8 +1577,10 @@ class _SlotAdvisorModalState extends State<_SlotAdvisorModal> {
     switch (level.toUpperCase()) {
       case 'SAFE':
         return const Color(0xFF16A34A);
+      case 'MODERATE':
       case 'CAUTION':
         return const Color(0xFFD97706);
+      case 'HIGH_RISK':
       case 'DANGEROUS':
         return const Color(0xFFDC2626);
       default:
@@ -1578,17 +1592,22 @@ class _SlotAdvisorModalState extends State<_SlotAdvisorModal> {
     switch (level.toUpperCase()) {
       case 'SAFE':
         return 'Biển êm an toàn';
+      case 'MODERATE':
       case 'CAUTION':
-        return 'Chú ý sóng cấp 3-4';
+        return 'Cần lưu ý điều kiện biển';
+      case 'HIGH_RISK':
       case 'DANGEROUS':
         return 'Cảnh báo biển động';
+      case 'NOT_REQUIRED':
+        return 'Không yêu cầu đánh giá biển';
       default:
-        return 'Bình thường';
+        return 'Chưa xác định điều kiện biển';
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final result = _result;
     return Container(
       constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
       padding: EdgeInsets.only(
@@ -1644,20 +1663,21 @@ class _SlotAdvisorModalState extends State<_SlotAdvisorModal> {
               ),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 20, color: AppColors.tertiary),
-                onPressed: _loadAdvisor,
+                onPressed: _isLoading ? null : _loadAdvisor,
               ),
             ],
           ),
           const SizedBox(height: 14),
 
           // Overview metrics chips
+          if (result != null)
           Row(
             children: [
-              _buildStatChip('Đánh giá', '${_result.totalSlotsEvaluated} ca', const Color(0xFF0F766E), const Color(0xFFCCFBF1)),
+              _buildStatChip('Đánh giá', '${result.totalSlotsEvaluated} ca', const Color(0xFF0F766E), const Color(0xFFCCFBF1)),
               const SizedBox(width: 8),
-              _buildStatChip('Nhu cầu cao', '${_result.highDemandSlotsCount}', const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
+              _buildStatChip('Nhu cầu cao', '${result.highDemandSlotsCount}', const Color(0xFF2563EB), const Color(0xFFDBEAFE)),
               const SizedBox(width: 8),
-              _buildStatChip('Rủi ro biển', '${_result.weatherRiskSlotsCount}', const Color(0xFFDC2626), const Color(0xFFFEE2E2)),
+              _buildStatChip('Rủi ro biển', '${result.weatherRiskSlotsCount}', const Color(0xFFDC2626), const Color(0xFFFEE2E2)),
             ],
           ),
           const SizedBox(height: 12),
@@ -1668,7 +1688,9 @@ class _SlotAdvisorModalState extends State<_SlotAdvisorModal> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _result.recommendations.isEmpty
+                : result == null
+                    ? Center(child: TextButton(onPressed: _loadAdvisor, child: const Text('Không tải được khuyến nghị ca chạy. Thử lại')))
+                    : result.recommendations.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -1676,22 +1698,22 @@ class _SlotAdvisorModalState extends State<_SlotAdvisorModal> {
                             const Icon(Icons.wb_sunny_outlined, size: 40, color: AppColors.tertiary),
                             const SizedBox(height: 8),
                             const Text(
-                              'Các ca hiện tại đang tối ưu theo thời tiết.',
+                              'Chưa có khuyến nghị cho các ca trong kỳ này.',
                               style: TextStyle(fontSize: 13, color: AppColors.tertiary),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Đã phân tích ${_result.totalSlotsEvaluated} ca chạy trong 7 ngày tới.',
+                              'Đã phân tích ${result.totalSlotsEvaluated} ca chạy trong 7 ngày tới.',
                               style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                             ),
                           ],
                         ),
                       )
                     : ListView.separated(
-                        itemCount: _result.recommendations.length,
+                        itemCount: result.recommendations.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (ctx, i) {
-                          final rec = _result.recommendations[i];
+                          final rec = result.recommendations[i];
                           final safetyColor = _getSafetyColor(rec.marineSafetyLevel);
                           final safetyText = _getSafetyLabel(rec.marineSafetyLevel);
 
@@ -1748,7 +1770,7 @@ class _SlotAdvisorModalState extends State<_SlotAdvisorModal> {
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: OutlinedButton.icon(
-                                    onPressed: () => widget.onSelectDate(rec.date),
+                                    onPressed: () => widget.onSelectSlot(rec),
                                     icon: const Icon(Icons.add_circle_outline, size: 14),
                                     label: const Text('Cấu hình ca này', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                                     style: OutlinedButton.styleFrom(
