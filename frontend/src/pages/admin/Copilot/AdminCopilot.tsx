@@ -30,6 +30,7 @@ import type {
 } from '../../../types/adminAi';
 import { parseArtifactsJson } from './copilotArtifactHelpers';
 import { CopilotArtifactRenderer } from './CopilotArtifactRenderer';
+import { MarkdownText } from '../../../components/common/MarkdownText';
 import './AdminCopilot.css';
 
 let localMessageSequence = 0;
@@ -554,7 +555,11 @@ export const AdminCopilot: React.FC = () => {
                       m.isError ? 'admin-copilot__msg-content--error' : ''
                     }`}
                   >
-                    {m.content}
+                    {m.role === 'user' ? (
+                      m.content
+                    ) : (
+                      <MarkdownText content={m.content} />
+                    )}
 
                     {m.isError && m.canRetry && (
                       <div style={{ marginTop: '8px' }}>
