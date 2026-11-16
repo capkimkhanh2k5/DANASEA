@@ -3,13 +3,35 @@ import { apiClient } from './apiClient';
 import type { AdminAuditLogDto } from '../types/adminAuditLog';
 import type { SpringPage } from '../types/adminUser';
 
+export interface AdminAuditLogFilters {
+  action?: string;
+  entityType?: string;
+  search?: string;
+}
+
 export const adminAuditLogService = {
   /**
-   * Fetch paginated audit logs from Backend
+   * Fetch paginated audit logs from Backend with optional server-side filters
    */
-  async getAuditLogs(page = 0, size = 20, signal?: AbortSignal): Promise<SpringPage<AdminAuditLogDto>> {
+  async getAuditLogs(
+    page = 0,
+    size = 20,
+    filters?: AdminAuditLogFilters,
+    signal?: AbortSignal
+  ): Promise<SpringPage<AdminAuditLogDto>> {
+    const params: Record<string, string | number> = { page, size };
+    if (filters?.action && filters.action !== 'ALL' && filters.action.trim()) {
+      params.action = filters.action.trim();
+    }
+    if (filters?.entityType && filters.entityType !== 'ALL' && filters.entityType.trim()) {
+      params.entityType = filters.entityType.trim();
+    }
+    if (filters?.search && filters.search.trim()) {
+      params.search = filters.search.trim();
+    }
+
     const { data } = await apiClient.get<SpringPage<AdminAuditLogDto>>('/admin/audit-logs', {
-      params: { page, size },
+      params,
       signal,
     });
     return data;

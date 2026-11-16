@@ -79,7 +79,7 @@ class GetVendorDetailUseCaseTest {
 
         AdminVendorResponse response = useCase.execute(vendor.getId());
 
-        assertThat(response).usingRecursiveComparison().ignoringFields("documents").isEqualTo(vendor);
+        assertThat(response).usingRecursiveComparison().ignoringFields("documents", "verifiedByName").isEqualTo(vendor);
         assertThat(response.getDocuments()).containsExactly(new VendorDocumentResponse(
                 document.getId(), vendor.getId(), DocType.BUSINESS_LICENSE,
                 "https://delivery.example/signed-license.pdf", DocStatus.APPROVED,

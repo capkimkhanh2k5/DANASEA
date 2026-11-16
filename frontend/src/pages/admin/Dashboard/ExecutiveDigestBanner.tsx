@@ -21,52 +21,53 @@ interface ExecutiveDigestBannerProps {
     gmv: number;
     revenue: number;
     commission: number;
+    refunds?: number;
   };
   loading?: boolean;
+  unavailable?: boolean;
 }
 
 export const ExecutiveDigestBanner: React.FC<ExecutiveDigestBannerProps> = ({
   days,
   metrics,
+  loading = false,
+  unavailable = false,
 }) => {
   const [digestData, setDigestData] = useState<PlatformDashboardMetrics | null>(null);
+  const [digestLoading, setDigestLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let active = true;
+    setDigestLoading(true);
     adminAiService
       .getExecutiveDigest(days === 7 ? 'LAST_7_DAYS' : 'LAST_30_DAYS')
       .then(data => {
-        if (active) setDigestData(data);
+        if (active) {
+          setDigestData(data);
+          setDigestLoading(false);
+        }
       })
       .catch(() => {
-        // Fallback silently to range metrics
+        if (active) {
+          setDigestData(null);
+          setDigestLoading(false);
+        }
       });
     return () => {
       active = false;
     };
   }, [days]);
 
-  // Compute values dynamically from selected time range (7d or 30d)
-  const gmv = metrics.gmv > 0
-    ? metrics.gmv
-    : (digestData
-        ? (days === 7 ? Math.round(digestData.totalGmv * 0.25) : digestData.totalGmv)
-        : (days === 7 ? 35380000 : 141520000));
+  // Financial numbers: SSOT from metrics (API reports filtered strictly by selected time range)
+  const gmv = metrics.gmv;
+  const commission = metrics.commission;
+  const payout = metrics.revenue - metrics.commission - (metrics.refunds || 0);
 
-  const commission = metrics.commission > 0
-    ? metrics.commission
-    : (digestData
-        ? (days === 7 ? Math.round(digestData.platformCommission * 0.25) : digestData.platformCommission)
-        : (days === 7 ? 3279000 : 13116000));
+  const isFinancialUnavailable = loading || unavailable;
 
-  const payout = metrics.gmv > 0
-    ? (metrics.gmv - metrics.commission)
-    : (digestData
-        ? (days === 7 ? Math.round(digestData.netPayout * 0.25) : digestData.netPayout)
-        : (days === 7 ? 29511000 : 118044000));
-
-  const activeVendors = digestData?.activeVendors ?? 10;
-  const activeServices = digestData?.activeServices ?? 24;
+  const activeVendors = digestData?.activeVendors;
+  const activeServices = digestData?.activeServices;
+  const isEcosystemUnavailable = digestLoading || activeVendors == null || activeServices == null;
 
   return (
     <section aria-label="Tóm lược kinh doanh nền tảng" className="admin-digest-cards-grid">
@@ -82,11 +83,11 @@ export const ExecutiveDigestBanner: React.FC<ExecutiveDigestBannerProps> = ({
           <AnimatedKpiCounter
             value={gmv}
             formatter={formatVnd}
-            unavailable={false}
+            unavailable={isFinancialUnavailable}
           />
         </div>
         <div className="admin-digest-card-sub">
-          Doanh số toàn sàn trong kỳ
+          {isFinancialUnavailable ? 'Chờ dữ liệu báo cáo' : (gmv > 0 ? 'Doanh số toàn sàn trong kỳ' : 'Không có giao dịch trong kỳ')}
         </div>
       </article>
 
@@ -102,11 +103,11 @@ export const ExecutiveDigestBanner: React.FC<ExecutiveDigestBannerProps> = ({
           <AnimatedKpiCounter
             value={payout}
             formatter={formatVnd}
-            unavailable={false}
+            unavailable={isFinancialUnavailable}
           />
         </div>
         <div className="admin-digest-card-sub">
-          Doanh thu thực nhận của đối tác
+          {isFinancialUnavailable ? 'Chờ dữ liệu báo cáo' : 'Doanh thu thực nhận của đối tác'}
         </div>
       </article>
 
@@ -122,11 +123,11 @@ export const ExecutiveDigestBanner: React.FC<ExecutiveDigestBannerProps> = ({
           <AnimatedKpiCounter
             value={commission}
             formatter={formatVnd}
-            unavailable={false}
+            unavailable={isFinancialUnavailable}
           />
         </div>
         <div className="admin-digest-card-sub">
-          Thu nhập nền tảng trong kỳ
+          {isFinancialUnavailable ? 'Chờ dữ liệu báo cáo' : 'Thu nhập nền tảng trong kỳ'}
         </div>
       </article>
 
@@ -140,19 +141,19 @@ export const ExecutiveDigestBanner: React.FC<ExecutiveDigestBannerProps> = ({
         </div>
         <div className="admin-digest-card-value">
           <AnimatedKpiCounter
-            value={activeVendors}
+            value={activeVendors ?? 0}
             formatter={(n) => `${n}`}
-            unavailable={false}
+            unavailable={isEcosystemUnavailable}
           /> <span className="admin-digest-unit">đối tác</span>
           <span className="admin-digest-separator">/</span>
           <AnimatedKpiCounter
-            value={activeServices}
+            value={activeServices ?? 0}
             formatter={(n) => `${n}`}
-            unavailable={false}
+            unavailable={isEcosystemUnavailable}
           /> <span className="admin-digest-unit">dịch vụ</span>
         </div>
         <div className="admin-digest-card-sub">
-          Đang hoạt động trên hệ thống
+          {isEcosystemUnavailable ? 'Đang cập nhật danh mục' : 'Đang hoạt động trên hệ thống'}
         </div>
       </article>
     </section>

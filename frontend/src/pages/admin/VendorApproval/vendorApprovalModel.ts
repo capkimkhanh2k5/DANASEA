@@ -5,6 +5,7 @@ import type { VendorDocumentResponse } from '../../../types/adminVendor';
 export type VendorRecord = typeof MOCK_ADMIN_VENDORS[number] & {
   documents?: VendorDocumentResponse[];
   rejectionReason?: string;
+  verifiedByName?: string | null;
 };
 export type VendorDecision = {
   vendorId: string;

@@ -11,6 +11,7 @@ export interface VendorDocumentResponse {
   fileUrl: string;
   status: VendorDocStatus;
   reviewedBy: string | null;
+  reviewedByName?: string | null;
   reviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -27,6 +28,7 @@ export interface AdminVendorResponse {
   bankAccountHolder: string;
   verificationStatus: VendorVerificationStatus;
   verifiedBy: string | null;
+  verifiedByName?: string | null;
   verifiedAt: string | null;
   ratingAvg: number;
   ratingCount: number;

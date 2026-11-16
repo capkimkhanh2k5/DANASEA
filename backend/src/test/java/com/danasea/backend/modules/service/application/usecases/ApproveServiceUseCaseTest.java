@@ -65,7 +65,7 @@ class ApproveServiceUseCaseTest {
         Service pending = serviceWithStatus(ServiceStatus.PENDING_REVIEW);
         Service saved = serviceWithStatus(ServiceStatus.PUBLISHED);
 
-        when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(pending));
+        when(serviceRepository.findByIdForUpdate(serviceId)).thenReturn(Optional.of(pending));
         when(serviceRepository.save(any())).thenReturn(saved);
         when(serviceImageRepository.findByServiceId(any())).thenReturn(List.of());
 
@@ -81,7 +81,7 @@ class ApproveServiceUseCaseTest {
     void approve_alreadyPublished_throwsException() {
         Service published = serviceWithStatus(ServiceStatus.PUBLISHED);
 
-        when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(published));
+        when(serviceRepository.findByIdForUpdate(serviceId)).thenReturn(Optional.of(published));
 
         assertThatThrownBy(() -> useCase.execute(adminUserId, serviceId))
                 .isInstanceOf(InvalidServiceStateException.class);
@@ -93,7 +93,7 @@ class ApproveServiceUseCaseTest {
     @DisplayName("❌ Approve dịch vụ đang DRAFT → InvalidServiceStateException")
     void approve_draftStatus_throwsException() {
         Service draft = serviceWithStatus(ServiceStatus.DRAFT);
-        when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(draft));
+        when(serviceRepository.findByIdForUpdate(serviceId)).thenReturn(Optional.of(draft));
 
         assertThatThrownBy(() -> useCase.execute(adminUserId, serviceId))
                 .isInstanceOf(InvalidServiceStateException.class);

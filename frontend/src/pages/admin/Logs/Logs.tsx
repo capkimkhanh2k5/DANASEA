@@ -35,6 +35,74 @@ import {
 import { formatDisplayCode } from '../Orders/ordersModel';
 import './Logs.css';
 
+// Active Backend actions that currently produce audit logs
+const ACTIVE_BE_ACTIONS: { value: LogActionFilter; label: string }[] = [
+  { value: 'RECONCILE_PAYMENT_PENDING', label: 'Đối soát thanh toán (Chờ xác nhận)' },
+  { value: 'RECONCILE_PAYMENT_SUCCESS', label: 'Đối soát thanh toán thành công' },
+  { value: 'RECONCILE_PAYMENT_FAILED', label: 'Đối soát thanh toán thất bại' },
+  { value: 'RECONCILE_PAYMENT_SKIPPED', label: 'Bỏ qua đối soát thanh toán' },
+  { value: 'PARTNER_APPLICATION_APPROVAL', label: 'Duyệt đơn đăng ký đối tác' },
+  { value: 'PARTNER_APPLICATION_REJECTION', label: 'Từ chối đơn đăng ký đối tác' },
+  { value: 'VENDOR_APPROVAL', label: 'Phê duyệt hồ sơ đối tác' },
+  { value: 'VENDOR_REJECTION', label: 'Từ chối hồ sơ đối tác' },
+  { value: 'VENDOR_DOCUMENT_APPROVED', label: 'Duyệt chứng từ đối tác' },
+  { value: 'VENDOR_DOCUMENT_REJECTED', label: 'Từ chối chứng từ đối tác' },
+  { value: 'VENDOR_PROFILE_RESUBMITTED', label: 'Nộp lại hồ sơ đối tác' },
+  { value: 'SERVICE_APPROVED', label: 'Phê duyệt dịch vụ' },
+  { value: 'SERVICE_REJECTED', label: 'Từ chối dịch vụ' },
+  { value: 'FINALIZE_SETTLEMENT', label: 'Chốt kỳ quyết toán' },
+  { value: 'PAYOUT_REQUEST_APPROVED', label: 'Phê duyệt yêu cầu chi trả' },
+  { value: 'PAYOUT_REQUEST_REJECTED', label: 'Từ chối yêu cầu chi trả' },
+  { value: 'PAYOUT_REQUEST_PAID', label: 'Đánh dấu đã chi trả' },
+  { value: 'DISPUTE_RESOLVED', label: 'Giải quyết khiếu nại' },
+  { value: 'SYSTEM_CONFIG_UPDATED', label: 'Cập nhật cấu hình hệ thống' },
+  { value: 'COMMISSION_RULE_UPDATED', label: 'Cập nhật quy tắc hoa hồng' },
+  { value: 'REFUND_MANUALLY_COMPLETED', label: 'Hoàn tiền thủ công thành công' },
+  { value: 'USER_LOCKED', label: 'Khóa tài khoản' },
+  { value: 'USER_UNLOCKED', label: 'Mở khóa tài khoản' },
+  { value: 'CHANGE_PASSWORD', label: 'Thay đổi mật khẩu' },
+  { value: 'PASSWORD_RESET', label: 'Đặt lại mật khẩu' },
+  { value: 'FLASH_SALE_CREATED', label: 'Tạo chương trình Flash Sale' },
+  { value: 'FLASH_SALE_APPROVED', label: 'Phê duyệt Flash Sale' },
+  { value: 'FLASH_SALE_CANCELLED', label: 'Hủy Flash Sale' },
+  { value: 'COMPLETE_SUB_ORDER', label: 'Hoàn tất đơn dịch vụ' },
+  { value: 'COMPLETE_SUB_ORDER_NO_SHOW', label: 'Đơn dịch vụ khách vắng mặt (No-show)' },
+  { value: 'DISPATCH_OVERDUE_SLOT', label: 'Điều phối khung giờ quá hạn' },
+  { value: 'EARLY_DISPATCH_SLOT', label: 'Điều phối khung giờ sớm' },
+];
+
+// Planned actions that do not yet emit backend audit logs
+const PLANNED_ACTIONS: { value: LogActionFilter; label: string }[] = [
+  { value: 'VERIFY_VENDOR', label: 'Xác minh đối tác (Chưa có log BE)' },
+  { value: 'PROCESS_REFUND', label: 'Xử lý hoàn tiền (Chưa có log BE)' },
+  { value: 'CREATE_PROMOTION', label: 'Tạo mã khuyến mãi (Chưa có log BE)' },
+  { value: 'UPDATE_PROMOTION', label: 'Cập nhật khuyến mãi (Chưa có log BE)' },
+  { value: 'ADMIN_LOGIN', label: 'Đăng nhập quản trị (Chưa có log BE)' },
+];
+
+// Standard uppercase entity types supported by Backend
+const ACTIVE_BE_ENTITIES: { value: LogEntityFilter; label: string }[] = [
+  { value: 'PAYMENT', label: 'Giao dịch thanh toán' },
+  { value: 'PARTNER_APPLICATION', label: 'Đơn đăng ký đối tác' },
+  { value: 'VENDOR', label: 'Hồ sơ đối tác' },
+  { value: 'VENDOR_DOCUMENT', label: 'Chứng từ đối tác' },
+  { value: 'SERVICE', label: 'Dịch vụ trải nghiệm' },
+  { value: 'SETTLEMENT', label: 'Kỳ quyết toán' },
+  { value: 'PAYOUT_REQUEST', label: 'Yêu cầu chi trả' },
+  { value: 'DISPUTE', label: 'Khiếu nại khách hàng' },
+  { value: 'SYSTEM_CONFIG', label: 'Cấu hình hệ thống' },
+  { value: 'COMMISSION_RULE', label: 'Quy tắc hoa hồng' },
+  { value: 'REFUND', label: 'Yêu cầu hoàn tiền' },
+  { value: 'USER', label: 'Tài khoản người dùng' },
+  { value: 'ORDER', label: 'Đơn hàng' },
+  { value: 'FLASH_SALE', label: 'Flash Sale' },
+];
+
+// Planned entity types (not yet actively logged)
+const PLANNED_ENTITIES: { value: LogEntityFilter; label: string }[] = [
+  { value: 'PROMOTION', label: 'Mã khuyến mãi (Chưa có log BE)' },
+];
+
 export function Logs() {
   const location = useLocation();
   const demo = import.meta.env.DEV && new URLSearchParams(location.search).get('demo') === '1';
@@ -44,6 +112,7 @@ export function Logs() {
   const [loading, setLoading] = useState(() => !demo);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedAction, setSelectedAction] = useState<LogActionFilter>('ALL');
   const [selectedEntity, setSelectedEntity] = useState<LogEntityFilter>('ALL');
   const [selectedLog, setSelectedLog] = useState<AdminAuditLogItem | null>(null);
@@ -55,21 +124,54 @@ export function Logs() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(() => demo ? Math.max(1, Math.ceil(MOCK_ADMIN_AUDIT_LOGS.length / PAGE_SIZE)) : 1);
   const [totalElements, setTotalElements] = useState(() => demo ? MOCK_ADMIN_AUDIT_LOGS.length : 0);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Debounce search input (350ms) to prevent request flooding
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(prev => {
+        if (prev !== search) {
+          setCurrentPage(1);
+          return search;
+        }
+        return prev;
+      });
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  const handleActionChange = (action: LogActionFilter) => {
+    setSelectedAction(action);
+    setCurrentPage(1);
+  };
+
+  const handleEntityChange = (entity: LogEntityFilter) => {
+    setSelectedEntity(entity);
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     if (demo) {
       return;
     }
 
-    let isMounted = true;
-    adminAuditLogService.getAuditLogs(currentPage - 1, PAGE_SIZE)
+    const abortController = new AbortController();
+    setLoading(true);
+    setErrorMessage(null);
+
+    const filters = {
+      action: selectedAction !== 'ALL' ? selectedAction : undefined,
+      entityType: selectedEntity !== 'ALL' ? selectedEntity : undefined,
+      search: debouncedSearch.trim() ? debouncedSearch.trim() : undefined,
+    };
+
+    adminAuditLogService.getAuditLogs(currentPage - 1, PAGE_SIZE, filters, abortController.signal)
       .then(res => {
-        if (!isMounted) return;
         const mapped: AdminAuditLogItem[] = (res.content || []).map(l => ({
           id: l.id,
           actorUserId: l.actorUserId || '',
-          actorName: l.actorUserId ? `User ${l.actorUserId.substring(0, 8)}` : 'Hệ thống',
-          actorEmail: '',
+          actorName: l.actorName || (l.actorUserId ? 'Không xác định' : 'Hệ thống'),
+          actorEmail: l.actorEmail || '',
           action: l.action,
           entityType: l.entityType,
           entityId: l.entityId || '',
@@ -78,30 +180,85 @@ export function Logs() {
           updatedAt: l.timestamp,
         }));
         setLogs(mapped);
-        setTotalPages(res.totalPages || 1);
-        setTotalElements(res.totalElements || mapped.length);
+        setTotalPages(res.totalPages || 0);
+        setTotalElements(res.totalElements || 0);
         setLoading(false);
       })
       .catch(err => {
-        if (!isMounted) return;
+        if (abortController.signal.aborted) {
+          return;
+        }
         const info = getAdminAuditLogError(err);
         setErrorMessage(info.message);
         setLoading(false);
       });
 
     return () => {
-      isMounted = false;
+      abortController.abort();
     };
-  }, [demo, currentPage]);
+  }, [demo, currentPage, debouncedSearch, selectedAction, selectedEntity, refreshKey]);
 
-  // Filtered data
+  // Action options categorized into active Backend actions and planned actions
+  const activeActionOptions = useMemo(() => {
+    const activeMap = new Map<string, string>();
+    ACTIVE_BE_ACTIONS.forEach(a => activeMap.set(a.value, a.label));
+    const plannedSet = new Set(PLANNED_ACTIONS.map(p => p.value));
+
+    // Dynamic inclusion of any action appearing in loaded logs
+    logs.forEach(l => {
+      if (!activeMap.has(l.action) && !plannedSet.has(l.action)) {
+        activeMap.set(l.action, getActionMeta(l.action).label);
+      }
+    });
+
+    return Array.from(activeMap.entries())
+      .map(([value, label]) => ({
+        value: value as LogActionFilter,
+        label,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [logs]);
+
+  const plannedActionOptions = useMemo(() => {
+    return [...PLANNED_ACTIONS].sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, []);
+
+  // Entity options categorized into active Backend entities and planned entities
+  const activeEntityOptions = useMemo(() => {
+    const activeMap = new Map<string, string>();
+    ACTIVE_BE_ENTITIES.forEach(e => activeMap.set(e.value, e.label));
+    const plannedSet = new Set(PLANNED_ENTITIES.map(p => p.value));
+
+    logs.forEach(l => {
+      const upper = l.entityType.toUpperCase();
+      if (!activeMap.has(upper) && !plannedSet.has(upper)) {
+        activeMap.set(upper, ENTITY_LABELS[upper] || ENTITY_LABELS[l.entityType] || l.entityType);
+      }
+    });
+
+    return Array.from(activeMap.entries())
+      .map(([value, label]) => ({
+        value: value as LogEntityFilter,
+        label,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, [logs]);
+
+  const plannedEntityOptions = useMemo(() => {
+    return [...PLANNED_ENTITIES].sort((a, b) => a.label.localeCompare(b.label, 'vi'));
+  }, []);
+
+  // Filtered data (Demo mode filters in-memory; live mode uses server-side filtered logs)
   const filteredLogs = useMemo(() => {
-    return filterAuditLogs(logs, search, selectedAction, selectedEntity);
-  }, [logs, search, selectedAction, selectedEntity]);
+    if (demo) {
+      return filterAuditLogs(logs, search, selectedAction, selectedEntity);
+    }
+    return logs;
+  }, [demo, logs, search, selectedAction, selectedEntity]);
 
   const calculatedTotalPages = demo
     ? (Math.ceil(filteredLogs.length / PAGE_SIZE) || 1)
-    : totalPages;
+    : Math.max(1, totalPages);
   const activePage = Math.min(Math.max(1, currentPage), calculatedTotalPages);
 
   const paginatedLogs = useMemo(() => {
@@ -110,21 +267,44 @@ export function Logs() {
     return filteredLogs.slice(start, start + PAGE_SIZE);
   }, [demo, filteredLogs, activePage]);
 
-  // Statistics
+  // Transparent statistics: Global total vs. page-level operational indicators
   const stats = useMemo(() => {
-    const total = logs.length;
-    const approvals = logs.filter(l => l.action.includes('APPROVE') || l.action.includes('VERIFY')).length;
-    const resolutions = logs.filter(l => l.action.includes('RESOLVE') || l.action.includes('LOCK')).length;
-    return { total, approvals, resolutions };
-  }, [logs]);
+    const totalStored = demo ? filteredLogs.length : totalElements;
+    const pageApprovals = logs.filter(l =>
+      l.action.includes('APPROVE') ||
+      l.action.includes('VERIFY') ||
+      l.action.includes('SUCCESS')
+    ).length;
+    const pageResolutions = logs.filter(l =>
+      l.action.includes('RESOLVE') ||
+      l.action.includes('LOCK') ||
+      l.action.includes('REJECT') ||
+      l.action.includes('PENDING') ||
+      l.action.includes('FAILED')
+    ).length;
+    return { totalStored, pageApprovals, pageResolutions };
+  }, [demo, filteredLogs.length, totalElements, logs]);
 
   // Reset all filters
   const handleResetFilters = () => {
     setSearch('');
+    setDebouncedSearch('');
     setSelectedAction('ALL');
     setSelectedEntity('ALL');
     setCurrentPage(1);
-    setNotice('Đã đặt lại toàn bộ bộ lọc nhật ký.');
+    setNotice('Đã đặt lại toàn bộ bộ lọc và từ khóa tìm kiếm.');
+  };
+
+  // Real data refresh handler
+  const handleRefresh = () => {
+    if (demo) {
+      setNotice('Đã làm mới dữ liệu nhật ký kiểm toán (Demo).');
+      return;
+    }
+    setLoading(true);
+    setErrorMessage(null);
+    setRefreshKey(k => k + 1);
+    setNotice('Đã làm mới dữ liệu nhật ký kiểm toán từ máy chủ.');
   };
 
   // Copy sanitized JSON metadata
@@ -204,26 +384,26 @@ export function Logs() {
         />
       ) : (
         <div className="admin-logs-container">
-          {/* Summary KPI Strip: 3 real metrics, ungrounded 'Bảo mật dữ liệu' removed */}
+          {/* Summary KPI Strip: Distinguishes between global DB total and current page indicators */}
           <section
             className="admin-workspace-summary"
             aria-label="Thống kê nhanh nhật ký"
-            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}
+            style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}
           >
             <div className="admin-workspace-metric">
-              <span>Tổng số bản ghi lưu trữ</span>
-              <strong>{stats.total}</strong>
-              <small>Giao diện chỉ xem · Toàn thời gian</small>
+              <span>{hasActiveFilters ? 'Số bản ghi khớp bộ lọc' : 'Tổng số bản ghi lưu trữ'}</span>
+              <strong>{stats.totalStored.toLocaleString('vi-VN')}</strong>
+              <small>{hasActiveFilters ? 'Toàn hệ thống (Server-side)' : 'Toàn hệ thống CSDL · Toàn thời gian'}</small>
             </div>
             <div className="admin-workspace-metric">
               <span>Hồ sơ &amp; Quyết toán đã duyệt</span>
-              <strong style={{ color: 'var(--admin-primary)' }}>{stats.approvals}</strong>
-              <small>Xác minh đối tác &amp; lệnh chi giải ngân</small>
+              <strong style={{ color: 'var(--admin-primary)' }}>{stats.pageApprovals}</strong>
+              <small>Trong {logs.length} bản ghi trang {activePage}</small>
             </div>
             <div className="admin-workspace-metric">
-              <span>Xử lý kỷ luật &amp; Tranh chấp</span>
-              <strong style={{ color: '#b45309' }}>{stats.resolutions}</strong>
-              <small>Phân xử khiếu nại &amp; tài khoản tạm khóa</small>
+              <span>Xử lý kỷ luật &amp; Đối soát</span>
+              <strong style={{ color: '#b45309' }}>{stats.pageResolutions}</strong>
+              <small>Trong {logs.length} bản ghi trang {activePage}</small>
             </div>
           </section>
 
@@ -234,12 +414,9 @@ export function Logs() {
                 <Search size={15} aria-hidden="true" />
                 <input
                   type="text"
-                  placeholder="Tìm theo mã log, tên người thực hiện, đối tượng..."
+                  placeholder="Tìm theo mã log, người thực hiện, đối tượng..."
                   value={search}
-                  onChange={e => {
-                    setSearch(e.target.value);
-                    setCurrentPage(1);
-                  }}
+                  onChange={e => setSearch(e.target.value)}
                   aria-label="Tìm kiếm nhật ký kiểm toán"
                 />
                 {search && (
@@ -247,6 +424,7 @@ export function Logs() {
                     type="button"
                     onClick={() => {
                       setSearch('');
+                      setDebouncedSearch('');
                       setCurrentPage(1);
                     }}
                     aria-label="Xóa nội dung tìm kiếm"
@@ -261,50 +439,54 @@ export function Logs() {
               <select
                 aria-label="Lọc theo loại hành động"
                 value={selectedAction}
-                onChange={e => {
-                  setSelectedAction(e.target.value as LogActionFilter);
-                  setCurrentPage(1);
-                }}
+                onChange={e => handleActionChange(e.target.value as LogActionFilter)}
                 className="admin-logs-select"
               >
-                <option value="ALL">Tất cả hành động ({logs.length})</option>
-                <option value="APPROVE_PAYOUT">Duyệt quyết toán</option>
-                <option value="VERIFY_VENDOR">Xác minh đối tác</option>
-                <option value="REJECT_VENDOR">Từ chối đối tác</option>
-                <option value="RESOLVE_DISPUTE">Giải quyết khiếu nại</option>
-                <option value="PROCESS_REFUND">Xử lý hoàn tiền</option>
-                <option value="UPDATE_PROMOTION">Cập nhật khuyến mãi</option>
-                <option value="CREATE_PROMOTION">Tạo mã khuyến mãi</option>
-                <option value="GENERATE_SETTLEMENT">Tạo kỳ quyết toán</option>
-                <option value="UPDATE_SYSTEM_CONFIG">Cập nhật cấu hình</option>
-                <option value="LOCK_USER_ACCOUNT">Khóa tài khoản</option>
-                <option value="ADMIN_LOGIN">Đăng nhập quản trị</option>
+                <option value="ALL">Tất cả hành động</option>
+                <optgroup label="Hành động đã hỗ trợ ghi nhận (Backend)">
+                  {activeActionOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Hành động dự kiến (Chưa có nguồn log BE)">
+                  {plannedActionOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
 
               {/* Entity Type Filter */}
               <select
                 aria-label="Lọc theo đối tượng tác động"
                 value={selectedEntity}
-                onChange={e => {
-                  setSelectedEntity(e.target.value as LogEntityFilter);
-                  setCurrentPage(1);
-                }}
+                onChange={e => handleEntityChange(e.target.value as LogEntityFilter)}
                 className="admin-logs-select"
               >
                 <option value="ALL">Tất cả đối tượng</option>
-                <option value="PayoutRequest">Yêu cầu quyết toán</option>
-                <option value="Vendor">Hồ sơ đối tác</option>
-                <option value="Dispute">Khiếu nại khách hàng</option>
-                <option value="SystemConfig">Tham số hệ thống</option>
-                <option value="User">Tài khoản người dùng</option>
-                <option value="Promotion">Mã khuyến mãi</option>
-                <option value="Order">Đơn hàng</option>
+                <optgroup label="Đối tượng đã hỗ trợ ghi nhận (Backend)">
+                  {activeEntityOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Đối tượng dự kiến (Chưa có log BE)">
+                  {plannedEntityOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
               </select>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 13, color: 'var(--admin-muted)', fontWeight: 550, whiteSpace: 'nowrap' }}>
-                Hiển thị <strong>{filteredLogs.length}</strong> / {logs.length} bản ghi
+                Hiển thị <strong>{logs.length}</strong> bản ghi (Trang {activePage}/{calculatedTotalPages}) · Tổng cộng {totalElements.toLocaleString('vi-VN')} bản ghi
               </div>
               {hasActiveFilters && (
                 <AdminButton
@@ -318,9 +500,8 @@ export function Logs() {
               )}
               <AdminButton
                 variant="secondary"
-                onClick={() => {
-                  setNotice('Đã làm mới dữ liệu nhật ký kiểm toán.');
-                }}
+                onClick={handleRefresh}
+                loading={loading}
                 aria-label="Làm mới nhật ký kiểm toán"
               >
                 <RefreshCw size={15} aria-hidden="true" />
@@ -329,7 +510,7 @@ export function Logs() {
             </div>
           </div>
 
-          {/* Master Table: Metadata column removed, balanced widths, clickable row */}
+          {/* Master Table */}
           <div className="admin-logs-card">
             {loading ? (
               <div style={{ padding: '40px 20px' }}>
@@ -347,6 +528,11 @@ export function Logs() {
                   kind="error"
                   title="Không thể tải nhật ký"
                   description={errorMessage}
+                  action={
+                    <AdminButton variant="secondary" onClick={handleRefresh}>
+                      Thử lại
+                    </AdminButton>
+                  }
                 />
               </div>
             ) : filteredLogs.length === 0 ? (
@@ -354,12 +540,18 @@ export function Logs() {
                 <AdminState
                   compact
                   kind="empty"
-                  title="Không tìm thấy nhật ký kiểm toán phù hợp"
-                  description={logs.length === 0 ? "Hiện tại hệ thống chưa ghi nhận bản ghi nhật ký kiểm toán nào." : "Thử thay đổi từ khóa tìm kiếm hoặc đặt lại các bộ lọc."}
+                  title={hasActiveFilters ? 'Không tìm thấy nhật ký phù hợp với bộ lọc hiện tại' : 'Chưa có bản ghi nhật ký nào'}
+                  description={
+                    hasActiveFilters
+                      ? 'Không tìm thấy bản ghi nhật ký kiểm toán nào khớp với bộ lọc hoặc từ khóa tìm kiếm. Bạn có thể thay đổi tiêu chí hoặc đặt lại bộ lọc.'
+                      : 'Hiện tại hệ thống chưa ghi nhận bản ghi nhật ký kiểm toán nào trong cơ sở dữ liệu.'
+                  }
                   action={
-                    <AdminButton variant="secondary" onClick={handleResetFilters}>
-                      Đặt lại bộ lọc
-                    </AdminButton>
+                    hasActiveFilters ? (
+                      <AdminButton variant="secondary" onClick={handleResetFilters}>
+                        Đặt lại bộ lọc
+                      </AdminButton>
+                    ) : undefined
                   }
                 />
               </div>
@@ -380,7 +572,7 @@ export function Logs() {
                     {paginatedLogs.map(log => {
                       const meta = getActionMeta(log.action);
                       const isSelected = selectedLog?.id === log.id;
-                      const initials = (log.actorName || log.actorUserId || 'AD')
+                      const initials = (log.actorName || log.actorUserId || 'HT')
                         .split(' ')
                         .filter(Boolean)
                         .slice(-2)
@@ -417,8 +609,8 @@ export function Logs() {
                                 {initials}
                               </span>
                               <div className="admin-actor-info">
-                                <strong>{log.actorName || log.actorUserId}</strong>
-                                <small>{log.actorEmail || log.actorUserId}</small>
+                                <strong>{log.actorName || 'Hệ thống'}</strong>
+                                <small>{log.actorEmail || (log.actorUserId ? log.actorUserId.substring(0, 18) + '...' : 'Tự động (System)')}</small>
                               </div>
                             </div>
                           </td>
@@ -456,7 +648,7 @@ export function Logs() {
                 </table>
               </div>
             )}
-            {!loading && !errorMessage && filteredLogs.length > 0 && (
+            {!loading && !errorMessage && totalElements > 0 && (
               <AdminPagination
                 currentPage={activePage}
                 totalPages={calculatedTotalPages}
@@ -514,15 +706,15 @@ export function Logs() {
                 <div>
                   <dt>Người thực hiện</dt>
                   <dd>
-                    <strong>{selectedLog.actorName || 'Quản trị viên'}</strong>
+                    <strong>{selectedLog.actorName || (selectedLog.actorUserId ? 'Không xác định' : 'Hệ thống')}</strong>
                     <div style={{ fontSize: 12, color: 'var(--admin-muted)' }}>
-                      {selectedLog.actorEmail || selectedLog.actorUserId}
+                      {selectedLog.actorEmail || (selectedLog.actorUserId ? '' : 'Tác vụ ngầm hệ thống')}
                     </div>
                   </dd>
                 </div>
                 <div>
                   <dt>Mã định danh User</dt>
-                  <dd className="admin-log-entity-id">{selectedLog.actorUserId}</dd>
+                  <dd className="admin-log-entity-id">{selectedLog.actorUserId || 'Tự động (System)'}</dd>
                 </div>
                 <div>
                   <dt>Thời gian thực hiện</dt>
@@ -530,6 +722,15 @@ export function Logs() {
                     {formatDateTimeVN(selectedLog.createdAt)}
                     <small style={{ display: 'block', color: 'var(--admin-muted)', fontSize: 11 }}>
                       ISO: {selectedLog.createdAt}
+                    </small>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Hành động ghi nhận</dt>
+                  <dd>
+                    <strong>{getActionMeta(selectedLog.action).label}</strong>
+                    <small style={{ display: 'block', color: 'var(--admin-muted)', fontSize: 11, fontFamily: 'monospace' }}>
+                      {selectedLog.action}
                     </small>
                   </dd>
                 </div>
@@ -628,7 +829,7 @@ export function Logs() {
               )}
             </section>
 
-            {/* 4. Read-Only Scope Note (No unverified WORM claims) */}
+            {/* 4. Read-Only Scope Note */}
             <div className="admin-detail-note" style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
               <Shield size={18} style={{ color: 'var(--admin-primary)', flexShrink: 0, marginTop: 2 }} aria-hidden="true" />
               <div>

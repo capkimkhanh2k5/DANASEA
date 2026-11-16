@@ -11,6 +11,11 @@ import type {
   VendorServiceSlotDto,
   CreateServiceSlotRequest,
   UpdateServiceSlotRequest,
+  BatchCreateServiceSlotsRequest,
+  BatchCreateServiceSlotsResponse,
+  OperatingScheduleDto,
+  PutOperatingScheduleRequest,
+  OperatingScheduleUpdateResponse,
 } from '../types/vendorService';
 
 export const vendorService = {
@@ -123,6 +128,27 @@ export const vendorService = {
 
   async updateSlot(serviceId: string, slotId: string, data: UpdateServiceSlotRequest): Promise<VendorServiceSlotDto> {
     const res = await apiClient.patch<VendorServiceSlotDto>(`/vendor/services/${serviceId}/slots/${slotId}`, data);
+    return res.data;
+  },
+
+  async batchCreateSlots(serviceId: string, data: BatchCreateServiceSlotsRequest): Promise<BatchCreateServiceSlotsResponse> {
+    const res = await apiClient.post<BatchCreateServiceSlotsResponse>(`/vendor/services/${serviceId}/slots/batch`, data);
+    return res.data;
+  },
+
+  // 6. OPERATING SCHEDULE (90-day recurring)
+  async getOperatingSchedule(serviceId: string): Promise<OperatingScheduleDto | null> {
+    try {
+      const res = await apiClient.get<OperatingScheduleDto>(`/vendor/services/${serviceId}/operating-schedule`);
+      return res.data;
+    } catch {
+      // 404 means no schedule set yet
+      return null;
+    }
+  },
+
+  async putOperatingSchedule(serviceId: string, data: PutOperatingScheduleRequest): Promise<OperatingScheduleUpdateResponse> {
+    const res = await apiClient.put<OperatingScheduleUpdateResponse>(`/vendor/services/${serviceId}/operating-schedule`, data);
     return res.data;
   },
 };

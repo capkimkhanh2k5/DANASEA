@@ -1,6 +1,8 @@
 export interface AdminAuditLogDto {
   id: string;
   actorUserId: string | null;
+  actorName?: string | null;
+  actorEmail?: string | null;
   action: string;
   entityType: string;
   entityId: string | null;

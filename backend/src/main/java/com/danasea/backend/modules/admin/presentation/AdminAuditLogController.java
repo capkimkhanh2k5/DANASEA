@@ -32,12 +32,16 @@ public class AdminAuditLogController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<AuditLogResponse>> getAuditLogs(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String action,
+            @RequestParam(required = false) String entityType,
+            @RequestParam(required = false) String search) {
         if (page < 0 || size < 1 || size > 100) {
             throw new IllegalArgumentException("page must be non-negative and size must be between 1 and 100");
         }
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<AuditLogResponse> response = getAuditLogsUseCase.execute(pageable);
+        Sort sort = Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id"));
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<AuditLogResponse> response = getAuditLogsUseCase.execute(action, entityType, search, pageable);
         return ResponseEntity.ok(response);
     }
 

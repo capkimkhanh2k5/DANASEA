@@ -1,23 +1,42 @@
 package com.danasea.backend.modules.dispute.application.usecases;
 
+import com.danasea.backend.modules.account.application.api.AccountInternalApi;
+import com.danasea.backend.modules.account.domain.models.User;
 import com.danasea.backend.modules.dispute.domain.models.DisputeReason;
 import com.danasea.backend.modules.dispute.domain.models.DisputeStatus;
 import com.danasea.backend.modules.dispute.infrastructure.persistence.entities.DisputeJpaEntity;
 import com.danasea.backend.modules.dispute.infrastructure.persistence.repositories.JpaDisputeRepository;
 import com.danasea.backend.modules.dispute.presentation.dtos.DisputeResponse;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.data.domain.Sort.Order;
 
 @Service
-@RequiredArgsConstructor
 public class GetDisputesUseCase {
 
     private final JpaDisputeRepository disputeRepository;
+    private final AccountInternalApi accountInternalApi;
+
+    @Autowired
+    public GetDisputesUseCase(JpaDisputeRepository disputeRepository,
+                             @Autowired(required = false) AccountInternalApi accountInternalApi) {
+        this.disputeRepository = disputeRepository;
+        this.accountInternalApi = accountInternalApi;
+    }
+
+    public GetDisputesUseCase(JpaDisputeRepository disputeRepository) {
+        this(disputeRepository, null);
+    }
 
     @Transactional(readOnly = true)
     public Page<DisputeResponse> execute(DisputeStatus status, DisputeReason reason, Pageable pageable) {
@@ -41,7 +60,26 @@ public class GetDisputesUseCase {
         } else {
             pageResult = disputeRepository.findAll(pageable);
         }
-        return pageResult.map(DisputeResponse::fromEntity);
+
+        Map<UUID, User> usersMap = new HashMap<>();
+        if (accountInternalApi != null) {
+            Set<UUID> resolverIds = pageResult.getContent().stream()
+                    .map(DisputeJpaEntity::getResolvedBy)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            if (!resolverIds.isEmpty()) {
+                usersMap = accountInternalApi.findUsersByIds(resolverIds);
+            }
+        }
+        final Map<UUID, User> finalUsersMap = usersMap;
+
+        return pageResult.map(entity -> {
+            String resolvedByName = null;
+            if (entity.getResolvedBy() != null && finalUsersMap.containsKey(entity.getResolvedBy())) {
+                resolvedByName = finalUsersMap.get(entity.getResolvedBy()).getFullName();
+            }
+            return DisputeResponse.fromEntity(entity, resolvedByName);
+        });
     }
 
 }

@@ -24,6 +24,12 @@ export function KpiOverview({
 }: KpiOverviewProps) {
   const completionRate = metrics.bookings > 0 ? ((metrics.completed / metrics.bookings) * 100).toFixed(1) : '0';
   const cancellationRate = metrics.bookings > 0 ? ((metrics.cancelled / metrics.bookings) * 100).toFixed(1) : '0';
+  const commissionRate = metrics.revenue > 0 ? ((metrics.commission / metrics.revenue) * 100).toFixed(1) : '0';
+  const commissionFoot = revenueUnavailable
+    ? 'Chờ dữ liệu báo cáo'
+    : metrics.commission > 0 && metrics.revenue > 0
+      ? `${commissionRate}% doanh thu (${formatVND(metrics.revenue)})`
+      : 'Chưa phát sinh hoa hồng trong kỳ';
 
   const cards = [
     {
@@ -54,7 +60,7 @@ export function KpiOverview({
       value: metrics.commission,
       formatter: formatVND,
       unavailable: revenueUnavailable,
-      foot: revenueUnavailable ? 'Chờ dữ liệu báo cáo' : `10% doanh thu (${formatVND(metrics.revenue)})`,
+      foot: commissionFoot,
     },
     {
       id: 'kpi-refunds',

@@ -1,6 +1,10 @@
 package com.danasea.backend.modules.service.presentation.handlers;
 
 import com.danasea.backend.modules.service.domain.exceptions.CategoryHasActiveServicesException;
+import com.danasea.backend.modules.service.domain.exceptions.CategoryHasChildrenException;
+import com.danasea.backend.modules.service.domain.exceptions.CategoryHasDependentRulesException;
+import com.danasea.backend.modules.service.domain.exceptions.CategoryHasLinkedServicesException;
+import com.danasea.backend.modules.service.domain.exceptions.CategoryHasPublishedServicesWithoutSafetyDocumentsException;
 import com.danasea.backend.modules.service.domain.exceptions.CategoryHierarchyLoopException;
 import com.danasea.backend.modules.service.domain.exceptions.CategoryNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.SlugAlreadyExistsException;
@@ -33,6 +37,33 @@ public class CategoryExceptionHandler extends LocalizedExceptionHandlerSupport {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(error("CATEGORY_HAS_ACTIVE_SERVICES"));
+    }
+
+    @ExceptionHandler(CategoryHasPublishedServicesWithoutSafetyDocumentsException.class)
+    public ResponseEntity<ErrorResponse> handlePublishedServicesWithoutSafetyDocuments() {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(error("CATEGORY_HAS_PUBLISHED_SERVICES_WITHOUT_SAFETY_DOCUMENTS"));
+    }
+
+    @ExceptionHandler(CategoryHasLinkedServicesException.class)
+    public ResponseEntity<ErrorResponse> handleCategoryHasLinkedServices(CategoryHasLinkedServicesException exception) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(error("CATEGORY_HAS_LINKED_SERVICES"));
+    }
+
+    @ExceptionHandler(CategoryHasChildrenException.class)
+    public ResponseEntity<ErrorResponse> handleCategoryHasChildren(CategoryHasChildrenException exception) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(error("CATEGORY_HAS_CHILDREN"));
+    }
+
+    @ExceptionHandler(CategoryHasDependentRulesException.class)
+    public ResponseEntity<ErrorResponse> handleCategoryHasDependentRules(CategoryHasDependentRulesException exception) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(error("CATEGORY_HAS_DEPENDENT_RULES"));
     }
 
     @ExceptionHandler(CategoryHierarchyLoopException.class)

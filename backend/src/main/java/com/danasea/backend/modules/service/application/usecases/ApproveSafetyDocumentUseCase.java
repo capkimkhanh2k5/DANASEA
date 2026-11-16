@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
+import com.danasea.backend.modules.service.domain.exceptions.CategoryNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.SafetyDocumentRequiredException;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.models.DocStatus;
@@ -60,8 +61,9 @@ public class ApproveSafetyDocumentUseCase {
                 .orElseThrow(() -> new ServiceNotFoundException("Service not found: " + serviceId));
 
         // 2. Load category
-        var category = categoryRepository.findById(service.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("Category not found: " + service.getCategoryId()));
+        // Hold the category lock until the publishing transaction finishes.
+        var category = categoryRepository.findByIdForUpdate(service.getCategoryId())
+                .orElseThrow(() -> new CategoryNotFoundException(service.getCategoryId()));
 
         // 3. Check if safety cert is required by category flag or weather sensitivity
         boolean requiresCert = Boolean.TRUE.equals(service.getWeatherSensitive())

@@ -81,6 +81,18 @@ class AuditLogInternalServiceTest {
     }
 
     @Test
+    void getAuditLogs_WithFilters_ShouldDelegateToPort() {
+        Pageable pageable = mock(Pageable.class);
+        Page<AuditLog> page = mock(Page.class);
+        when(auditLogPort.getAuditLogs("ACTION", "ENTITY", "search", pageable)).thenReturn(page);
+
+        Page<AuditLog> result = auditLogInternalService.getAuditLogs("ACTION", "ENTITY", "search", pageable);
+
+        assertThat(result).isEqualTo(page);
+        verify(auditLogPort).getAuditLogs("ACTION", "ENTITY", "search", pageable);
+    }
+
+    @Test
     void getAuditLogById_ShouldDelegateToPort() {
         UUID id = UUID.randomUUID();
         AuditLog auditLog = new AuditLog();

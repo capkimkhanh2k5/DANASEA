@@ -20,6 +20,7 @@ export interface ReviewResponse {
   customerAvatar?: string;
   vendorId?: string;
   serviceId?: string;
+  serviceName?: string;
   rating: number;
   comment: string;
   images?: string[];
@@ -91,5 +92,29 @@ export const reviewService = {
       reply,
     });
     return response.data;
+  },
+
+  /**
+   * Get reviews submitted by the authenticated customer
+   * GET /api/customer/reviews
+   */
+  async getCustomerReviews(page = 0, size = 50): Promise<PageResponse<ReviewResponse>> {
+    const response = await apiClient.get<PageResponse<ReviewResponse>>('/customer/reviews', {
+      params: { page, size },
+    });
+    return response.data;
+  },
+
+  /**
+   * Get review for a specific sub-order
+   * GET /api/sub-orders/{id}/reviews
+   */
+  async getReviewBySubOrder(subOrderId: string): Promise<ReviewResponse | null> {
+    try {
+      const response = await apiClient.get<ReviewResponse>(`/sub-orders/${subOrderId}/reviews`);
+      return response.data;
+    } catch {
+      return null;
+    }
   },
 };

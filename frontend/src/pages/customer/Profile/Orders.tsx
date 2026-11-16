@@ -228,6 +228,27 @@ export function Orders() {
         // Non-critical, ignore
       });
 
+      // Load existing customer reviews from backend
+      reviewService.getCustomerReviews(0, 100).then((pageRes) => {
+        if (pageRes && pageRes.content) {
+          const map: Record<string, ReviewResponse> = {};
+          pageRes.content.forEach((r) => {
+            if (r.subOrderId) map[r.subOrderId] = r;
+          });
+          setReviewsMap((prev) => {
+            const next = { ...prev, ...map };
+            try {
+              localStorage.setItem("danasea_customer_reviews", JSON.stringify(next));
+            } catch {
+              // ignore
+            }
+            return next;
+          });
+        }
+      }).catch(() => {
+        // Non-critical, ignore
+      });
+
       // Load public services catalog in one batch to enrich order card titles and thumbnails
       serviceCatalogService.getServices({ size: 100 }).then((catalogRes) => {
         const list = catalogRes.content || [];

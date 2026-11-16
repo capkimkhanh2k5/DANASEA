@@ -6,6 +6,7 @@ export interface AdminCategoryDto {
   parentId: string | null;
   iconUrl: string | null;
   isActive: boolean;
+  requiresSafetyCert?: boolean | null;
 }
 
 export interface AdminCategoryTreeDto extends AdminCategoryDto {
@@ -23,6 +24,7 @@ export interface CreateAdminCategoryRequest {
   slug: string;
   parentId?: string | null;
   iconUrl?: string;
+  requiresSafetyCert?: boolean;
 }
 
 export interface UpdateAdminCategoryRequest {
@@ -33,4 +35,5 @@ export interface UpdateAdminCategoryRequest {
   parentId?: string;
   iconUrl?: string;
   isActive?: boolean;
+  requiresSafetyCert?: boolean;
 }
