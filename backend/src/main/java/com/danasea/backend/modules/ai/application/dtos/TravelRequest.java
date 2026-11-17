@@ -48,6 +48,9 @@ public record TravelRequest(String query, UUID categoryId, BigDecimal totalBudge
         if (latitude == null && normalized.matches(".*(gan toi|near me|my location).*")) questions.add("COORDINATES_REQUIRED");
         if (latitude == null && normalized.matches(".*(my khe|son tra|hoi an|ngu hanh son).*")) unsupported.add("PLACE_NAME_REQUIRES_COORDINATES");
         BigDecimal parsedBudget = TravelQueryParser.budget(query);
+        if (totalBudget == null && parsedBudget == null && TravelQueryParser.requestsBudget(query)) {
+            questions.add("BUDGET_REQUIRED");
+        }
         String basis = budgetBasis == null ? TravelQueryParser.perPersonBudget(query) ? "PER_PERSON" : "TOTAL" : budgetBasis;
         if (totalBudget == null && parsedBudget != null && !TravelQueryParser.perPersonBudget(query)
                 && !normalized.matches(".*(ca nhom|tong|total|group budget|gia dinh|family).*")) {

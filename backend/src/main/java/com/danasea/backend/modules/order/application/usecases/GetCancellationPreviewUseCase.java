@@ -61,7 +61,8 @@ public class GetCancellationPreviewUseCase {
         MasterOrder masterOrder;
         List<SubOrder> subOrders;
 
-        Optional<MasterOrder> masterOpt = masterOrderRepository.findById(query.orderOrSubOrderId());
+        Optional<MasterOrder> masterOpt = query.vendorId() == null
+                ? masterOrderRepository.findById(query.orderOrSubOrderId()) : Optional.empty();
         if (masterOpt.isPresent()) {
             masterOrder = masterOpt.get();
             subOrders = subOrderRepository.findByMasterOrderId(masterOrder.getId());
@@ -74,6 +75,9 @@ public class GetCancellationPreviewUseCase {
                                             new OrderNotFoundException(
                                                     "Order not found with id: "
                                                             + query.orderOrSubOrderId()));
+            if (query.vendorId() != null && !query.vendorId().equals(subOrder.getVendorId())) {
+                throw new AccessDeniedException("Order is not available to this vendor");
+            }
             masterOrder =
                     masterOrderRepository
                             .findById(subOrder.getMasterOrderId())
@@ -87,7 +91,7 @@ public class GetCancellationPreviewUseCase {
 
         // Chặn IDOR: Người dùng chỉ được xem trước hủy đơn của chính mình trừ khi là Quản trị viên
         // (ADMIN)
-        if (!query.isAdmin()
+        if (query.vendorId() == null && !query.isAdmin()
                 && (masterOrder.getCustomerId() == null
                         || !masterOrder.getCustomerId().equals(query.currentUserId()))) {
             throw new AccessDeniedException(

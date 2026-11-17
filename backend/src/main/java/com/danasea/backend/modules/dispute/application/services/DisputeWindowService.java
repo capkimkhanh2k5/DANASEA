@@ -21,6 +21,10 @@ public class DisputeWindowService {
     private final JpaServiceSlotRepository slotRepository;
     private final Clock clock;
 
+    public static int filingWindowDays() {
+        return DISPUTE_WINDOW_DAYS;
+    }
+
     public DisputeWindow resolve(SubOrderJpaEntity subOrder) {
         LocalDateTime now = LocalDateTime.now(clock);
         ServiceSlotJpaEntity slot = subOrder.getSlotId() == null

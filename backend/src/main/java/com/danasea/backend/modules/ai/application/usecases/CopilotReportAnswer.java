@@ -38,6 +38,39 @@ final class CopilotReportAnswer {
                         .formatted(dates, gmv, collected, refunds, commission);
     }
 
+    static String compareAdminRevenue(JsonNode current, TimeRange currentPeriod, JsonNode previous,
+                                      TimeRange previousPeriod, boolean english) {
+        if (!current.isArray() || !previous.isArray()) return unavailable(english);
+        BigDecimal currentCash = sum(current, "collectedCash");
+        BigDecimal previousCash = sum(previous, "collectedCash");
+        BigDecimal difference = currentCash.subtract(previousCash);
+        String change = money(difference, english);
+        if (difference.signum() > 0) change = "+" + change;
+        return english
+                ? "Cash collected was %s (%s) versus %s (%s). Difference: %s. The current month is in progress. The report does not establish the cause."
+                        .formatted(money(currentCash, true), dates(currentPeriod, true), money(previousCash, true), dates(previousPeriod, true), change)
+                : "Tiền đã thu là %s (%s), so với %s (%s). Chênh lệch %s. Tháng hiện tại chưa kết thúc. Báo cáo chưa đủ dữ liệu để kết luận nguyên nhân."
+                        .formatted(money(currentCash, false), dates(currentPeriod, false), money(previousCash, false), dates(previousPeriod, false), change);
+    }
+
+    static String adminCancellations(JsonNode data, TimeRange period, boolean english) {
+        if (!data.path("totalBookings").isNumber() || !data.path("totalCancelled").isNumber()) return unavailable(english);
+        long all = data.path("totalBookings").asLong();
+        long cancelled = data.path("totalCancelled").asLong();
+        var formatter = NumberFormat.getPercentInstance(english ? Locale.US : Locale.forLanguageTag("vi-VN"));
+        formatter.setMaximumFractionDigits(2);
+        String share = all == 0 ? (english ? "no bookings" : "không có đơn") : formatter.format((double) cancelled / all);
+        return english ? "%s had %d cancellations out of %d bookings (%s).".formatted(dates(period, true), cancelled, all, share)
+                : "Kỳ %s có %d/%d đơn hủy (%s).".formatted(dates(period, false), cancelled, all, share);
+    }
+
+    static String adminQueue(JsonNode data, boolean english) {
+        if (!data.path("pendingSupportRequestsCount").isIntegralNumber()) return unavailable(english);
+        long support = data.path("pendingSupportRequestsCount").asLong();
+        return english ? "%d support requests are waiting for review.".formatted(support)
+                : "Hiện có %d yêu cầu hỗ trợ đang chờ xử lý.".formatted(support);
+    }
+
     static String vendorServices(JsonNode data, boolean publishedOnly, boolean english) {
         if (!data.path("total").isIntegralNumber() || !data.path("byStatus").isObject()) return unavailable(english);
         long total = data.path("total").longValue();
@@ -74,11 +107,15 @@ final class CopilotReportAnswer {
     }
 
     private static String total(JsonNode rows, String field, boolean english) {
+        return money(sum(rows, field), english);
+    }
+
+    private static BigDecimal sum(JsonNode rows, String field) {
         BigDecimal sum = BigDecimal.ZERO;
         for (JsonNode row : rows) {
             sum = sum.add(row.path(field).decimalValue());
         }
-        return money(sum, english);
+        return sum;
     }
 
     private static String money(BigDecimal amount, boolean english) {

@@ -3,13 +3,17 @@ package com.danasea.backend.modules.ai.application.usecases;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.text.NumberFormat;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +32,7 @@ import com.danasea.backend.modules.ai.domain.models.LlmResponse;
 import com.danasea.backend.modules.ai.domain.models.ToolCall;
 import com.danasea.backend.modules.ai.domain.services.AssistantAuditLogService;
 import com.danasea.backend.modules.ai.domain.services.ChatHistoryService;
+import com.danasea.backend.modules.ai.domain.services.BookingIntent;
 import com.danasea.backend.modules.ai.domain.services.TravelQueryParser;
 import com.danasea.backend.modules.ai.infrastructure.persistence.entities.AiMessageJpaEntity;
 import com.danasea.backend.shared.i18n.LocalizedException;
@@ -45,15 +50,27 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class ChatUseCase {
 
-    private static final List<String> POLICY_KEYWORDS = List.of(
-            "hoàn tiền",
-            "chính sách hủy",
-            "chính sách hoãn",
-            "quy định hoàn",
-            "quy định hủy",
-            "cancellation policy",
-            "refund policy", "hoàn", "hủy", "refund", "cancellation", "reschedule", "đổi lịch"
-    );
+    private static final Pattern POLICY_CLAIM = CopilotRequest.words(
+            "hoan tien|hoan huy|hoan phi|hoan lai|boi hoan|huy mien phi|huy khong mat phi|"
+                    + "chinh sach huy|chinh sach hoan|chinh sach hoan lich|quy dinh huy|quy dinh hoan|"
+                    + "hoan \\d+(?:[.,]\\d+)?(?=%)|doi lich mien phi|mien phi doi lich|"
+                    + "refunds?|refundable|cancellation policy|free cancellation|cancel for free|free reschedul(?:e|ing)");
+    private static final Pattern FORECAST_UNAVAILABLE = CopilotRequest.words(
+            "du bao(?: thoi tiet)? (?:dang )?(?:loi|hong|mat|khong co|khong kha dung|het han)|"
+                    + "khong co (?:du lieu )?du bao|forecast (?:is )?(?:down|unavailable|stale|expired)|"
+                    + "no (?:usable |fresh )?forecast");
+    private static final Pattern TRIP_SAFETY = CopilotRequest.words(
+            "co nen|an toan de|co an toan|co dam bao|dam bao an toan|safe to|is it safe|should i");
+    private static final Pattern TRIP_BRIEFING = CopilotRequest.words(
+            "can mang gi|chuan bi gi|luu y an toan|cam nang|what should i bring|packing|marine briefing");
+    private static final Pattern BUDGET_SEARCH = CopilotRequest.words(
+            "tim (?:tour|dich vu|trai nghiem)|co (?:nhung )?(?:tour|goi|dich vu) nao|find|search|looking for");
+    private static final Pattern OTHER_TRAVEL_INTENT = CopilotRequest.words(
+            "lich trinh|so sanh|gan toi|thoi tiet|itinerary|compare|near me|forecast|weather");
+    private static final Pattern BOOKING_GUIDE = CopilotRequest.words("huong dan|lam the nao|how (?:do i|to)|guide");
+    private static final Pattern BOOKING_WORKFLOW = CopilotRequest.words("dat tour|dat dich vu|book (?:a|the|my) (?:tour|service)|booking");
+    private static final Pattern DISCOVERY_OR_PAYMENT = CopilotRequest.words("tim kiem|thanh toan|pay|search");
+    private record ToolRequest(String name, String arguments) {}
     private static final int MAX_USER_MESSAGE_CHARS = 1800;
     private static final int MAX_CHAT_ITERATIONS = 5;
     private static final int DEFAULT_HISTORY_LIMIT = 20;
@@ -66,7 +83,13 @@ public class ChatUseCase {
     private final Map<String, ToolExecutor> toolExecutors;
     private final ObjectMapper objectMapper;
     private final AssistantAuditLogService auditLogService;
+    private PolicyChatAnswer policyAnswers;
     private LocalizedMessageService messages = LocalizedMessageService.standalone();
+
+    @Autowired
+    void setPolicyAnswers(PolicyChatAnswer policyAnswers) {
+        this.policyAnswers = policyAnswers;
+    }
 
     @Autowired
     void setLocalizedMessageService(LocalizedMessageService messages) {
@@ -150,10 +173,109 @@ public class ChatUseCase {
                 answer.setContent(messages.get("ai.customer.finance_scope", language == null ? SupportedLanguage.EN : language));
                 return finish(conversationId, answer, List.of(), readContext(conversationId));
             }
+            if (policyAnswers != null && language != null) {
+                var policyReply = policyAnswers.resolve(effectiveContent, language, userId, null, false, null);
+                if (policyReply != null) return finishPolicyReply(conversationId, policyReply);
+            }
+            if (language != null) {
+                String query = CopilotRequest.normalize(effectiveContent);
+                if (FORECAST_UNAVAILABLE.matcher(query).find()) {
+                    return finishWeatherUnknown(conversationId, language);
+                }
+                if (BOOKING_GUIDE.matcher(query).find() && BOOKING_WORKFLOW.matcher(query).find()
+                        && DISCOVERY_OR_PAYMENT.matcher(query).find()) {
+                    var answer = new LlmResponse();
+                    answer.setContent(messages.get("ai.booking.guide", language));
+                    return finish(conversationId, answer, List.of(), readContext(conversationId));
+                }
+                if (shouldReadBudgetSearch(effectiveContent, query)
+                        && (!readContext(conversationId).has("criteria") || needsBudgetClarification(effectiveContent))) {
+                    return finishBudgetSearch(conversationId, userId, language, effectiveContent);
+                }
+                UUID orderId = PolicyChatAnswer.reference(effectiveContent);
+                if (orderId != null && TRIP_BRIEFING.matcher(query).find() && toolExecutors.containsKey("ai_marine_briefing")) {
+                    return finishMarineBriefing(conversationId, userId, language, orderId);
+                }
+            }
             return executeChatLoop(conversationId, language, userId, effectiveContent);
         } finally {
             chatHistoryService.finishProcessing(conversationId, processing);
         }
+    }
+
+    private boolean shouldReadBudgetSearch(String message, String normalized) {
+        return toolExecutors.containsKey("ai_smart_search") && !BookingIntent.permitsConfirmation(message)
+                && !OTHER_TRAVEL_INTENT.matcher(normalized).find()
+                && (TravelQueryParser.budget(message) != null || TravelQueryParser.requestsBudget(message)
+                    || BookingIntent.isSearchOnly(message))
+                && (BUDGET_SEARCH.matcher(normalized).find() || !TravelQueryParser.includedActivities(message).isEmpty()
+                    || BookingIntent.isSearchOnly(message));
+    }
+
+    private boolean needsBudgetClarification(String message) {
+        return TravelQueryParser.requestsBudget(message) && TravelQueryParser.budget(message) == null;
+    }
+
+    private LlmResponse finishBudgetSearch(UUID conversationId, UUID userId, SupportedLanguage language, String message) {
+        ObjectNode state = readContext(conversationId);
+        var request = objectMapper.createObjectNode();
+        request.putObject("criteria").put("query", message);
+        var call = new ToolCall(UUID.randomUUID().toString(), "ai_smart_search", request.toString());
+        String arguments = mergeCriteria(call, state, message);
+        String result = executeTool(toolExecutors.get(call.getName()), arguments, language, conversationId, userId, call);
+        var card = new AssistantArtifactMapper(objectMapper).map(call, result, conversationId);
+        rememberSuccessfulCriteria(state, arguments, card);
+        var response = new LlmResponse();
+        String key = switch (card.status()) {
+            case "AVAILABLE" -> "ai.search.results_available";
+            case "NO_MATCHES" -> "ai.search.no_matches";
+            case "NEEDS_INPUT" -> card.requiredInputs().contains("BUDGET_REQUIRED")
+                    ? "ai.search.budget_required" : "ai.search.needs_input";
+            case "PARTIAL" -> hasServiceResults(card) ? "ai.search.results_available" : "ai.search.partial";
+            default -> "ai.unavailable";
+        };
+        response.setContent(messages.get(key, language));
+        if (Set.of("PARTIAL", "NEEDS_INPUT", "UNAVAILABLE").contains(card.status())) {
+            response.setResponseStatus("UNAVAILABLE".equals(card.status()) ? "PARTIAL" : card.status());
+        }
+        return finish(conversationId, response, List.of(card), state);
+    }
+
+    private LlmResponse finishPolicyReply(UUID conversationId, PolicyChatAnswer.Reply reply) {
+        var response = new LlmResponse();
+        response.setContent(reply.message());
+        response.setResponseStatus(reply.status());
+        var cards = new ArrayList<AssistantArtifact>();
+        if (!reply.facts().isEmpty()) {
+            var facts = objectMapper.convertValue(reply.facts(), new TypeReference<Map<String, Object>>() { });
+            cards.add(new AssistantArtifact(UUID.randomUUID().toString(),
+                    "ai_cancellation_preview".equals(reply.tool()) ? "CUSTOMER_SUPPORT" : "POLICY",
+                    reply.tool(), "AVAILABLE", facts, List.of(new AssistantArtifact.Source(
+                    reply.tool(), "BACKEND_TOOL", reply.tool(), java.time.OffsetDateTime.now())),
+                    List.of(), List.of(), false));
+        }
+        return finish(conversationId, response, cards, readContext(conversationId));
+    }
+
+    private LlmResponse finishWeatherUnknown(UUID conversationId, SupportedLanguage language) {
+        var response = new LlmResponse();
+        response.setContent(messages.get("ai.weather.unconfirmed", language));
+        var card = new AssistantArtifact(UUID.randomUUID().toString(), "WEATHER", "ai_weather_slot", "UNKNOWN",
+                Map.of("status", "UNKNOWN", "bookingAuthorized", false, "requiresRevalidation", true),
+                List.of(), List.of(), List.of(), false);
+        return finish(conversationId, response, List.of(card), readContext(conversationId));
+    }
+
+    private LlmResponse finishMarineBriefing(UUID conversationId, UUID userId, SupportedLanguage language, UUID orderId) {
+        var call = new ToolCall(UUID.randomUUID().toString(), "ai_marine_briefing",
+                objectMapper.createObjectNode().put("orderId", orderId.toString()).toString());
+        String result = executeTool(toolExecutors.get(call.getName()), call.getArguments(), language, conversationId, userId, call);
+        var card = new AssistantArtifactMapper(objectMapper).map(call, result, conversationId);
+        var response = new LlmResponse();
+        boolean available = !"UNAVAILABLE".equals(card.status());
+        response.setContent(messages.get(available ? "ai.weather.briefing" : "ai.policy.order_unavailable", language));
+        if (!available) response.setResponseStatus("PARTIAL");
+        return finish(conversationId, response, List.of(card), readContext(conversationId));
     }
 
     private LlmResponse executeChatLoop(UUID conversationId, SupportedLanguage language, UUID userId, String message) {
@@ -165,7 +287,11 @@ public class ChatUseCase {
             state.remove("criteria");
         }
         long deadline = System.nanoTime() + AiExecutionBudget.remaining(AiExecutionBudget.LLM_REQUEST_TIMEOUT).toNanos();
+        Map<ToolRequest, String> resultsByRequest = new HashMap<>();
         int toolCount = 0;
+        boolean tripSafety = language != null && TRIP_SAFETY.matcher(CopilotRequest.normalize(message)).find();
+        boolean hasAreaWeather = false;
+        boolean permitsBooking = language == null || BookingIntent.permitsConfirmation(message);
 
         for (int i = 0; i < MAX_CHAT_ITERATIONS && System.nanoTime() < deadline; i++) {
             List<AiMessage> history = mapToDomain(chatHistoryService.getRecentMessages(conversationId, DEFAULT_HISTORY_LIMIT));
@@ -187,51 +313,131 @@ public class ChatUseCase {
                 } catch (JsonProcessingException exception) {
                     throw new IllegalStateException("Unable to serialize assistant tool calls", exception);
                 }
+                boolean executedNewTool = false;
                 for (ToolCall call : response.getToolCalls()) {
                     if (++toolCount > 12 || System.nanoTime() >= deadline) break;
                     ToolExecutor executor = toolExecutors.get(call.getName());
                     String arguments = language == null ? call.getArguments() : mergeCriteria(call, state, message);
-                    String result;
-                    if (executor == null) result = "{\"errorCode\":\"AI_TOOL_UNKNOWN\"}";
-                    else {
-                        try {
-                            result = language == null ? executor.execute(arguments)
-                                    : executor.execute(arguments, new ToolExecutionContext(language, conversationId, userId));
-                        } catch (RuntimeException exception) {
-                            log.warn("Assistant tool {} failed", call.getName());
-                            result = "{\"errorCode\":\"AI_TOOL_UNAVAILABLE\"}";
-                        }
+                    var request = new ToolRequest(call.getName(), arguments);
+                    String previous = language == null ? null : resultsByRequest.get(request);
+                    if (previous != null) {
+                        chatHistoryService.appendMessage(conversationId, AiMessageRole.TOOL,
+                                artifactMapper.modelContext(previous, call), call.getId());
+                        continue;
                     }
+                    String result;
+                    boolean needsBookingIntent = "request_booking_confirmation".equals(call.getName()) && !permitsBooking;
+                    if (needsBookingIntent) {
+                        result = "{\"errorCode\":\"EXPLICIT_BOOKING_INTENT_REQUIRED\"}";
+                    } else if (tripSafety && "get_safety_alert".equals(call.getName())) {
+                        result = "{\"errorCode\":\"SLOT_ASSESSMENT_REQUIRED\"}";
+                        hasAreaWeather = true;
+                    } else {
+                        result = executeTool(executor, arguments, language, conversationId, userId, call);
+                        hasAreaWeather |= "get_weather_forecast".equals(call.getName());
+                    }
+                    resultsByRequest.put(request, result);
+                    executedNewTool = true;
                     chatHistoryService.appendMessage(conversationId, AiMessageRole.TOOL,
                             artifactMapper.modelContext(result, call), call.getId());
+                    if (needsBookingIntent) continue;
                     AssistantArtifact card = artifactMapper.map(call, result, conversationId);
                     cards.add(card);
                     rememberSuccessfulCriteria(state, arguments, card);
                 }
+                if (!executedNewTool) break;
             } else {
-                boolean sourcedPolicy = cards.stream().anyMatch(artifactMapper::hasPolicyEvidence);
+                if (tripSafety && hasAreaWeather && cards.stream().noneMatch(card ->
+                        "ai_weather_slot".equals(card.tool()) && !"UNAVAILABLE".equals(card.status()))) {
+                    response.setContent(messages.get("ai.weather.slot_required", language));
+                    response.setResponseStatus("NEEDS_INPUT");
+                    return finish(conversationId, response, cards, state);
+                }
                 if (containsPolicyKeywords(response.getContent())) {
-                    var replyLanguage = language == null ? SupportedLanguage.EN : language;
-                    boolean foundServices = !containsPolicyKeywords(message) && cards.stream().anyMatch(card ->
-                            "SERVICE_LIST".equals(card.type()) && !card.sources().isEmpty()
-                                    && (hasResults(card.facts().get("candidates")) || hasResults(card.facts().get("results"))));
-                    if (foundServices) {
-                        response.setContent(messages.get("ai.search.results_available", replyLanguage));
-                    } else if (!sourcedPolicy) {
-                        response.setContent(messages.get("ai.policy.lookup_required", replyLanguage));
-                    } else if (language != null) {
-                        response.setContent(messages.get("ai.policy.verified_facts", language));
-                    }
+                    protectPolicyClaims(response, message, language, cards, artifactMapper);
                 }
                 return finish(conversationId, response, cards, state);
             }
             if (toolCount >= 12) break;
         }
         LlmResponse timeout = new LlmResponse();
-        timeout.setContent(messages.get("ai.timeout", language == null ? SupportedLanguage.EN : language));
+        boolean hasServiceResults = cards.stream().anyMatch(this::hasServiceResults);
+        timeout.setContent(messages.get(hasServiceResults ? "ai.search.results_available" : "ai.timeout",
+                language == null ? SupportedLanguage.EN : language));
         timeout.setKeyMasked(lastResponse == null ? null : lastResponse.getKeyMasked());
         timeout.setResponseStatus("PARTIAL");
         return finish(conversationId, timeout, cards, state);
+    }
+
+    private void protectPolicyClaims(LlmResponse response, String message, SupportedLanguage language,
+                                     List<AssistantArtifact> cards, AssistantArtifactMapper artifactMapper) {
+        var replyLanguage = language == null ? SupportedLanguage.EN : language;
+        boolean requestedPolicy = containsPolicyKeywords(message);
+        if (!requestedPolicy) {
+            if (cards.stream().anyMatch(this::hasServiceResults)) {
+                response.setContent(messages.get("ai.search.results_available", replyLanguage));
+                return;
+            }
+            boolean foundComparison = cards.stream().anyMatch(card ->
+                    "COMPARISON".equals(card.type()) && !card.sources().isEmpty() && hasResults(card.facts().get("matrix")));
+            if (foundComparison) {
+                response.setContent(messages.get("ai.search.comparison_available", replyLanguage));
+                return;
+            }
+            var quote = cards.stream().filter(card -> "SERVICE_DETAIL".equals(card.type()) && !card.sources().isEmpty())
+                    .map(card -> serviceQuote(card, replyLanguage)).filter(java.util.Objects::nonNull).findFirst();
+            if (quote.isPresent()) {
+                response.setContent(quote.get());
+                return;
+            }
+            if (language != null) {
+                String remaining = Arrays.stream(response.getContent().split("(?<=[.!?。])\\s+|\\R+"))
+                        .filter(part -> !containsPolicyKeywords(part))
+                        .filter(part -> part.codePoints().anyMatch(Character::isLetter))
+                        .collect(Collectors.joining("\n"));
+                // Keep the useful portion of a response when the model adds an unrelated policy claim.
+                if (!remaining.isBlank()) {
+                    response.setContent(remaining);
+                    return;
+                }
+            }
+        }
+        boolean sourcedPolicy = cards.stream().anyMatch(artifactMapper::hasPolicyEvidence);
+        if (!sourcedPolicy) {
+            response.setContent(messages.get("ai.policy.lookup_required", replyLanguage));
+        } else if (language != null) {
+            response.setContent(messages.get("ai.policy.verified_facts", language));
+        }
+    }
+
+    private String serviceQuote(AssistantArtifact card, SupportedLanguage language) {
+        var facts = card.facts();
+        if (!"ACTIVE_OPTION_PARTY_TOTAL".equals(facts.get("priceBasis"))
+                || !(facts.get("partySize") instanceof Number party)
+                || !(facts.get("name") instanceof String name)
+                || !(facts.get("options") instanceof List<?> options)) return null;
+        var price = options.stream().filter(Map.class::isInstance).map(Map.class::cast)
+                .filter(option -> hasResults(option.get("slots")) && option.get("partyTotal") instanceof Number)
+                .map(option -> new BigDecimal(option.get("partyTotal").toString())).min(BigDecimal::compareTo);
+        return price.map(amount -> messages.get("ai.search.service_quote", language, name, party.intValue(),
+                NumberFormat.getNumberInstance(language.locale()).format(amount))).orElse(null);
+    }
+
+    private String executeTool(ToolExecutor executor, String arguments, SupportedLanguage language,
+                               UUID conversationId, UUID userId, ToolCall call) {
+        if (executor == null) return "{\"errorCode\":\"AI_TOOL_UNKNOWN\"}";
+        try {
+            return language == null ? executor.execute(arguments)
+                    : executor.execute(arguments, new ToolExecutionContext(language, conversationId, userId));
+        } catch (RuntimeException exception) {
+            log.warn("Assistant tool {} failed", call.getName());
+            return "{\"errorCode\":\"AI_TOOL_UNAVAILABLE\"}";
+        }
+    }
+
+    private boolean hasServiceResults(AssistantArtifact card) {
+        return "SERVICE_LIST".equals(card.type()) && !card.sources().isEmpty()
+                && (hasResults(card.facts().get("candidates")) || hasResults(card.facts().get("results")));
     }
 
     private boolean hasResults(Object value) {
@@ -307,20 +513,6 @@ public class ChatUseCase {
             }
 
             if (saved != null && message != null && !message.isBlank()) {
-                if (supplied == null || !supplied.has("partySize")) {
-                    Integer parsedParty = TravelQueryParser.partySize(message);
-                    if (parsedParty != null) criteria.put("partySize", parsedParty);
-                }
-                if (supplied == null || !supplied.has("totalBudget")) {
-                    BigDecimal parsedBudget = TravelQueryParser.budget(message);
-                    if (parsedBudget != null) {
-                        if (TravelQueryParser.perPersonBudget(message)) {
-                            int party = Math.max(1, criteria.path("partySize").asInt(1));
-                            parsedBudget = parsedBudget.multiply(BigDecimal.valueOf(party));
-                        }
-                        criteria.put("totalBudget", parsedBudget);
-                    }
-                }
                 if (supplied == null || (!supplied.has("from") && !supplied.has("to"))) {
                     try {
                         LocalDate[] dates = TravelQueryParser.dates(message);
@@ -337,6 +529,29 @@ public class ChatUseCase {
                         if (times[1] != null) criteria.put("dayEnd", times[1].toString());
                     } catch (Exception ignored) { }
                 }
+            }
+
+            BigDecimal budget = TravelQueryParser.budget(message);
+            Integer partySize = TravelQueryParser.partySize(message);
+            if (partySize != null) {
+                criteria.put("partySize", partySize);
+                if ("search_services".equals(call.getName())) arguments.remove("partySize");
+            }
+            if (budget != null) {
+                boolean perPerson = TravelQueryParser.perPersonBudget(message);
+                if (perPerson) {
+                    int travelers = Math.max(1, criteria.path("partySize").asInt(1));
+                    budget = budget.multiply(BigDecimal.valueOf(travelers));
+                }
+                criteria.put("totalBudget", budget).put("budgetBasis", perPerson ? "PER_PERSON" : "TOTAL");
+                if ("search_services".equals(call.getName())) arguments.remove("max_price");
+            } else if (needsBudgetClarification(message)) {
+                criteria.remove("totalBudget");
+                criteria.put("query", message);
+                if ("search_services".equals(call.getName())) arguments.remove(List.of("query", "category", "max_price"));
+            } else if (saved != null && saved.hasNonNull("totalBudget") && !explicitReset) {
+                criteria.set("totalBudget", saved.get("totalBudget"));
+                if ("search_services".equals(call.getName())) arguments.remove("max_price");
             }
 
             if ("search_services".equals(call.getName()) && arguments.hasNonNull("query")) criteria.set("query", arguments.get("query"));
@@ -363,16 +578,7 @@ public class ChatUseCase {
     }
 
     private boolean containsPolicyKeywords(String content) {
-        if (content == null || content.isBlank()) {
-            return false;
-        }
-        String lower = content.toLowerCase();
-        for (String kw : POLICY_KEYWORDS) {
-            if (lower.contains(kw)) {
-                return true;
-            }
-        }
-        return false;
+        return POLICY_CLAIM.matcher(TravelQueryParser.normalize(content)).find();
     }
 
     private List<AiMessage> mapToDomain(List<AiMessageJpaEntity> jpaList) {

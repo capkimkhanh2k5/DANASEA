@@ -143,7 +143,12 @@ class VendorAdminAiFeaturesTest {
 
         roleCopilotUseCase = new RoleCopilotUseCase(
                 vendorAiData, reviewCoachingUseCase, slotAdvisorUseCase, listingOptimizerUseCase,
-                adminAiData, disputeSummaryUseCase, insightStore, llmClient, moderationPort, mapper);
+                adminAiData, disputeSummaryUseCase, insightStore, llmClient, moderationPort, mapper,
+                new com.danasea.backend.modules.ai.application.usecases.PolicyChatAnswer(
+                        new com.danasea.backend.modules.order.application.api.AiPolicyReader(
+                                new com.danasea.backend.modules.order.domain.services.RefundPolicyEngine())::current,
+                        mock(com.danasea.backend.modules.order.application.usecases.GetCancellationPreviewUseCase.class),
+                        com.danasea.backend.shared.i18n.LocalizedMessageService.standalone()));
 
         marineBriefingUseCase = new CustomerMarineBriefingUseCase(
                 masterOrderRepo, subOrderRepo, serviceRepo, slotRepo, marineWeather, insightStore, mapper);
@@ -474,7 +479,7 @@ class VendorAdminAiFeaturesTest {
                     "Doanh thu tháng này là bao nhiêu?", null, null, SupportedLanguage.VI);
             when(insightStore.listCopilotMessages(conversation.id())).thenReturn(List.of(earlierReply));
             followUp = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
-                    "Còn tháng trước thì sao?", null, null, SupportedLanguage.VI);
+                    "Thế còn riêng tháng trước thì sao?", null, null, SupportedLanguage.VI);
         }
 
         verify(vendorAiData).getPerformanceMetrics(vendorId, today, today);
@@ -751,5 +756,89 @@ class VendorAdminAiFeaturesTest {
         UUID attackerUserId = UUID.randomUUID();
         assertThatThrownBy(() -> marineBriefingUseCase.getMarineBriefing(attackerUserId, orderId))
                 .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+            "chính sách đổi tra đang như nào", "chính sách hoàn tiền" })
+    void vendorPolicyRepliesUseCanonicalRules(String question) {
+        stubVendorPolicyConversation();
+        var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId,
+                null, question, null, null, SupportedLanguage.VI);
+        assertThat(response.message()).contains("24 giờ", "100%", "0%");
+        assertThat(response.toolsUsed()).containsExactly("get_policy");
+    }
+
+    @Test
+    void vendorRefundDraftDoesNotPromiseUnapprovedPayment() {
+        var model = new LlmResponse();
+        model.setContent("Sẽ tiến hành hoàn tiền 100% ngay hôm nay.");
+        when(llmClient.generateText(any(), any(), anyString())).thenReturn(model);
+        stubVendorPolicyConversation();
+        var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, null,
+                "Khách phàn nàn bị mất tiền, hãy viết phản hồi hứa hoàn 100% ngay lập tức.",
+                null, null, SupportedLanguage.VI);
+        assertThat(response.message()).contains("kiểm tra").doesNotContain("100%", "hôm nay");
+    }
+
+    private void stubVendorPolicyConversation() {
+        var conversation = new CopilotConversation(UUID.randomUUID(), vendorUserId, "VENDOR", vendorId,
+                "vi", null, false, false, null, null, 0L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.createCopilotConversation(vendorUserId, "VENDOR", vendorId, "vi", null, null, null))
+                .thenReturn(conversation);
+    }
+
+    @Test
+    void adminQueueQuestionReturnsWaitingSupportCount() {
+        var conversation = adminConversation();
+        when(adminAiData.getQueueOverview()).thenReturn(new AdminAiDataPort.QueueOverview(2, 7, 1));
+
+        var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, conversation.id(),
+                "Có bao nhiêu yêu cầu hỗ trợ khách hàng đang chờ xử lý?", null, null, SupportedLanguage.VI);
+
+        assertThat(response.toolsUsed()).containsExactly("admin_risk_and_support_queue_overview");
+        assertThat(response.message()).contains("7", "yêu cầu hỗ trợ");
+    }
+
+    @Test
+    void comparingPreviousMonthReadsBothPeriodsAndComputesTheDelta() {
+        var conversation = adminConversation();
+        LocalDate now = LocalDate.of(2027, 1, 15);
+        when(adminAiData.getRevenueTimeSeries(LocalDate.of(2027, 1, 1), now, "day"))
+                .thenReturn(List.of(new RevenueTimeSeriesItem("2027-01-01", BigDecimal.TEN, new BigDecimal("1200000"),
+                        BigDecimal.ZERO, BigDecimal.ONE, BigDecimal.TEN)));
+        when(adminAiData.getRevenueTimeSeries(LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 31), "day"))
+                .thenReturn(List.of(new RevenueTimeSeriesItem("2026-12-01", BigDecimal.TEN, new BigDecimal("1000000"),
+                        BigDecimal.ZERO, BigDecimal.ONE, BigDecimal.TEN)));
+        try (var time = mockStatic(LocalDate.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(() -> LocalDate.now(VIETNAM_ZONE)).thenReturn(now);
+            var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, conversation.id(),
+                    "So sánh doanh thu tháng này với tháng trước và giải thích chênh lệch.",
+                    null, null, SupportedLanguage.VI);
+
+            assertThat(response.artifacts()).hasSize(2);
+            assertThat(response.message()).contains("200.000", "1.200.000", "1.000.000");
+        }
+    }
+
+    @Test
+    void adminDisputeGuidanceUsesAttachedDispute() {
+        var conversation = adminConversation();
+        UUID disputeId = UUID.randomUUID();
+        when(adminAiData.getDisputeFullEvidence(disputeId)).thenReturn(Optional.empty());
+
+        roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, conversation.id(),
+                "Hãy tóm tắt khiếu nại này từ thông tin khách hàng và nhà cung cấp.",
+                "DISPUTE", disputeId, SupportedLanguage.VI);
+
+        verify(adminAiData).getDisputeFullEvidence(disputeId);
+    }
+
+    private CopilotConversation adminConversation() {
+        var conversation = new CopilotConversation(UUID.randomUUID(), adminUserId, "ADMIN", null,
+                "vi", null, false, false, null, null, 0L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(conversation.id())).thenReturn(Optional.of(conversation));
+        return conversation;
     }
 }

@@ -15,7 +15,7 @@ final class CopilotRequest {
     private static final Pattern REVENUE = words("doanh thu|gmv|revenue|turnover");
     private static final Pattern METRIC_DEFINITION = Pattern.compile(
             "^(?:gmv la gi|doanh thu la gi|what is gmv|what does gmv mean)[?!.]*$");
-    private static final Pattern PLATFORM = words("toan san|ca san|toan nen tang|toan he thong|cua (?:san )?danasea|"
+    private static final Pattern PLATFORM = words("toan san|ca san|toan bo doi tac|tat ca doi tac|toan nen tang|toan he thong|cua (?:san )?danasea|"
             + "doanh thu he thong|gmv danasea|platform wide|platform revenue|platform gmv|across the platform|entire platform|all vendors");
     private static final Pattern OTHER_VENDOR = words("gian hang khac|doi tac khac|vendor khac|nha cung cap khac|"
             + "another vendor|other vendors|another shop");
@@ -38,9 +38,9 @@ final class CopilotRequest {
     private static final Pattern TODAY_PERIOD = words("hom nay|today");
     private static final Pattern YESTERDAY = words("hom qua|yesterday");
     private static final Pattern TRAILING_DAYS =
-            Pattern.compile("\\b(?:last (\\d{1,4}) days?|(?:trong )?(\\d{1,4}) ngay (?:qua|gan day))\\b");
+            Pattern.compile("\\b(?:last (\\d{1,4}) days?|(?:trong )?(\\d{1,4}) ngay (?:qua|gan day|gan nhat))\\b");
     private static final Pattern PERIOD_FOLLOW_UP = Pattern.compile(
-            "^(?:con |the con |vay con |what about |and )?(?:hom nay|hom qua|thang nay|thang truoc|"
+            "^(?:con |the con |vay con |what about |and )?(?:rieng |just )?(?:hom nay|hom qua|thang nay|thang truoc|"
                     + "today|yesterday|this month|last month)(?: thi sao)?[?!.]*$");
 
     private CopilotRequest() {}
@@ -63,7 +63,7 @@ final class CopilotRequest {
     }
 
     static boolean isPublishedCount(String text) {
-        return matches(PUBLISHED, text);
+        return matches(PUBLISHED, text) && !matches(words("cho duyet|ngung ban|tam dung|pending|paused|draft|rejected"), text);
     }
 
     static boolean isPersonalBooking(String text) {
@@ -76,6 +76,11 @@ final class CopilotRequest {
 
     static boolean isPeriodFollowUp(String text) {
         return PERIOD_FOLLOW_UP.matcher(text).matches();
+    }
+
+    static boolean comparesMonths(String text) {
+        return THIS_MONTH.matcher(text).find() && LAST_MONTH.matcher(text).find()
+                && matches(words("so sanh|chenh lech|compare|versus|vs"), text);
     }
 
     static TimeRange revenuePeriod(String original, String normalized, LocalDate today) {

@@ -6,12 +6,19 @@ export interface AssistantChatRequest {
   conversationId?: string;
 }
 
+export interface AssistantCard {
+  id: string;
+  type: string;
+  status: string;
+  facts: Record<string, unknown>;
+}
+
 export interface AssistantChatResponse {
   status: string;
   conversationId: string;
   message: string;
   responseStatus: string;
-  cards: unknown[];
+  cards: AssistantCard[];
   sources: unknown[];
   actions: unknown[];
   requiredInputs: string[];
@@ -52,7 +59,7 @@ export const aiService = {
     const res = await apiClient.post<AssistantChatResponse>('/assistant/chat', {
       message,
       conversationId: conversationId || undefined,
-    });
+    }, { timeout: 130_000 });
     return res.data;
   },
 

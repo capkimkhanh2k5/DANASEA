@@ -204,4 +204,15 @@ class CustomerAiFeaturesTest {
         verifyNoInteractions(weather);
     }
 
+
+    @Test void paymentWarningDoesNotTriggerModelOnlyFlagsButSolicitationStillDoes() {
+        var cases = mock(AssessmentCaseStorePort.class);
+        doReturn(noul(DecisionTask.MODERATION, "external_payment", 0.68))
+                .when(model).decide(eq(DecisionTask.MODERATION), any());
+        var useCase = new AssessTextUseCase(model, cases);
+        assertThat(useCase.execute(owner, "Không chuyển tiền ngoài DANASEA.", false).reasonCodes()).isEmpty();
+        assertThat(useCase.execute(owner, "Vui lòng chuyển tiền ngoài DANASEA.", false).status()).isEqualTo("NEEDS_REVIEW");
+        assertThat(useCase.execute(owner, "Không chuyển tiền ngoài DANASEA. Gọi 0901234567", false).reasonCodes())
+                .contains("EXTERNAL_CONTACT_DETECTED");
+    }
 }

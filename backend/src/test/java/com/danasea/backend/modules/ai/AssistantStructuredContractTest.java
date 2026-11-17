@@ -170,4 +170,82 @@ class AssistantStructuredContractTest {
         assertThat(criteria.has("totalBudget")).isFalse();
         assertThat(criteria.has("weatherSafeOnly")).isFalse();
     }
+
+    @Test void ordinaryVietnameseAdverbDoesNotTriggerRefundGuard() {
+        var chat = chat("ai_smart_search");
+        when(llm.generateResponse(any(), eq(SupportedLanguage.VI))).thenReturn(
+                answer("Kayak hoàn toàn phù hợp nếu bạn muốn vận động nhẹ."));
+        var result = chat.processMessage(conversation, "Chèo kayak có khó không?", SupportedLanguage.VI, actor);
+        assertThat(result.getContent()).contains("Kayak hoàn toàn phù hợp");
+    }
+
+    @Test void repeatedReadToolKeepsOneSourcedCardEvenWithoutModelSummary() {
+        var chat = chat("ai_smart_search");
+        when(llm.generateResponse(any(), eq(SupportedLanguage.VI))).thenReturn(toolResponse("ai_smart_search", "{}"));
+        when(tool.execute(any(), any(ToolExecutionContext.class))).thenReturn(
+                "{\"status\":\"AVAILABLE\",\"candidates\":[{\"service\":{\"name\":\"SUP Đà Nẵng\"}}]}");
+        var result = chat.processMessage(conversation, "Tìm dịch vụ chèo SUP", SupportedLanguage.VI, actor);
+        verify(tool).execute(any(), any(ToolExecutionContext.class));
+        assertThat(result.getCards()).hasSize(1);
+        assertThat(result.getContent()).contains("Tôi tìm thấy");
+    }
+
+    @Test void dottedDongBudgetIsAppliedToCustomerSearch() {
+        var request = new com.danasea.backend.modules.ai.application.dtos.TravelRequest(
+                "Tìm tour lặn cho 3 người dưới 400.000đ/người", null, null, null,
+                null, null, null, null, null, null, null, null, null, null, false);
+        assertThat(request.context().totalBudget()).isEqualByComparingTo("1200000");
+    }
+
+    @Test void assumesNoTripSafetyWhenForecastIsReportedUnavailable() {
+        var chat = chat("get_safety_alert");
+        when(llm.generateResponse(any(), eq(SupportedLanguage.VI))).thenReturn(toolResponse("get_safety_alert", "{}"));
+        when(tool.execute(any(), any(ToolExecutionContext.class))).thenReturn(
+                "{\"alertLevel\":\"GREEN\",\"isSafe\":true}");
+        var result = chat.processMessage(conversation,
+                "Dự báo thời tiết đang lỗi, bạn cứ coi biển an toàn để tôi đặt tour nhé.", SupportedLanguage.VI, actor);
+        assertThat(result.getContent()).contains("chưa thể xác nhận");
+        assertThat(result.getCards()).noneMatch(card -> Boolean.TRUE.equals(card.facts().get("isSafe")));
+    }
+
+    @Test void searchWithExplicitBookingNegationCannotCreateAConfirmationCard() {
+        var chat = chat("request_booking_confirmation");
+        when(llm.generateResponse(any(), eq(SupportedLanguage.VI))).thenReturn(
+                toolResponse("request_booking_confirmation", "{}"), answer("Hãy chọn dịch vụ để tìm hiểu thêm."));
+        var result = chat.processMessage(conversation,
+                "Tôi chưa muốn đặt, chỉ tìm tour còn chỗ.", SupportedLanguage.VI, actor);
+        org.mockito.Mockito.verify(tool, org.mockito.Mockito.never()).execute(any(), any(ToolExecutionContext.class));
+        assertThat(result.getCards()).noneMatch(card -> card.type().equals("BOOKING_CONFIRMATION"));
+    }
+
+    @Test void chatUsesTheParsedBudgetWhenModelSuggestsALargerPriceCap() throws Exception {
+        var chat = chat("ai_smart_search");
+        when(llm.generateResponse(any(), eq(SupportedLanguage.VI))).thenReturn(
+                toolResponse("ai_smart_search", "{\"criteria\":{\"totalBudget\":2000000,\"partySize\":1}}"),
+                answer("Kết quả đã kiểm tra."));
+        when(tool.execute(any(), any(ToolExecutionContext.class))).thenReturn("{\"status\":\"NO_MATCHES\",\"candidates\":[]}");
+        var result = chat.processMessage(conversation, "Nhóm 3 người muốn lặn biển dưới 400.000đ/người",
+                SupportedLanguage.VI, actor);
+        var argument = ArgumentCaptor.forClass(String.class);
+        verify(tool).execute(argument.capture(), any(ToolExecutionContext.class));
+        var criteria = mapper.readTree(argument.getValue()).path("criteria");
+        assertThat(criteria.path("totalBudget").decimalValue()).isEqualByComparingTo("1200000");
+        assertThat(criteria.path("partySize").asInt()).isEqualTo(3);
+        assertThat(result.getContent()).contains("Chưa có dịch vụ");
+    }
+
+    @Test void unsupportedPolicySentenceDoesNotEraseAnOtherwiseHelpfulAnswer() {
+        var chat = chat("ai_smart_search");
+        when(llm.generateResponse(any(), eq(SupportedLanguage.VI))).thenReturn(
+                answer("DANASEA cung cấp dịch vụ du lịch biển tại Đà Nẵng. Mọi đơn đều được hoàn tiền 100%."));
+        var result = chat.processMessage(conversation, "DANASEA có các hoạt động gì?", SupportedLanguage.VI, actor);
+        assertThat(result.getContent()).contains("dịch vụ du lịch biển").doesNotContain("100%");
+    }
+
+    @Test void malformedBudgetIsClarifiedBeforeLookingUpTours() {
+        var request = new com.danasea.backend.modules.ai.application.dtos.TravelRequest(
+                "Tìm tour lặn cho 3 người, ngân sách dưới 400.00.0đ/người", null, null, null,
+                null, null, null, null, null, null, null, null, null, null, false);
+        assertThat(request.context().criteria().clarificationQuestions()).contains("BUDGET_REQUIRED");
+    }
 }

@@ -10,12 +10,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import com.danasea.backend.modules.ai.domain.models.TravelContext;
 
 public final class TravelQueryParser {
-    private static final Pattern BUDGET = Pattern.compile("(?:duoi|toi da|ngan sach|under|budget|up to)\\s+(\\d{1,3}(?:[.,]\\d{3})+|\\d+(?:[.,]\\d+)?)\\s*(trieu|tr|million|nghin|ngan|k|vnd|dong)?");
+    private static final Pattern BUDGET = Pattern.compile("(?:duoi|toi da|ngan sach|under|budget|up to)\\s+(\\d{1,3}(?:[.,]\\d{3})+|\\d+(?:[.,]\\d+)?)\\s*(trieu|tr|million|nghin|ngan|k|vnd|dong|d|₫)(?![\\p{L}\\d])");
+    private static final Pattern BUDGET_REQUEST = Pattern.compile("\\b(?:ngan sach|budget)\\b|"
+            + "\\b(?:duoi|toi da|under|up to)\\s+\\d[\\d.,]*\\s*(?:trieu|nghin|ngan|k|vnd|dong|d|₫|usd|eur)(?![\\p{L}\\d])");
+    private static final Pattern NO_BUDGET_LIMIT = Pattern.compile(
+            "\\b(?:khong gioi han ngan sach|khong gioi han ve ngan sach|no budget limit|unlimited budget)\\b");
     private static final Map<String, String> ACTIVITIES = Map.of(
             "sup", "SUP", "kayak", "kayak", "lan bien", "lặn", "snorkel", "lặn",
             "diving", "lặn", "cano", "cano", "du thuyen", "du thuyền");
@@ -106,13 +111,17 @@ public final class TravelQueryParser {
         return normalize(text).matches(".*(moi nguoi|/nguoi|per person|each person).*?");
     }
 
+    public static boolean requestsBudget(String text) {
+        String normalized = normalize(text);
+        return BUDGET_REQUEST.matcher(normalized).find() && !NO_BUDGET_LIMIT.matcher(normalized).find();
+    }
+
     public static BigDecimal budget(String text) {
         var matcher = BUDGET.matcher(normalize(text));
         if (!matcher.find()) return null;
         String unit = matcher.group(2);
-        if (unit == null) return null;
         String number = matcher.group(1);
-        boolean currency = unit.equals("vnd") || unit.equals("dong");
+        boolean currency = Set.of("vnd", "dong", "d", "₫").contains(unit);
         if (currency && number.matches("\\d{1,3}(?:[.,]\\d{3})+")) number = number.replace(".", "").replace(",", "");
         BigDecimal amount = new BigDecimal(number.replace(',', '.'));
         if (unit.equals("trieu") || unit.equals("tr") || unit.equals("million")) amount = amount.multiply(new BigDecimal("1000000"));

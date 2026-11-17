@@ -3,6 +3,8 @@ import { Minus, X, Send, RotateCcw } from 'lucide-react';
 import { useAiModalStore, type AiChatMessage } from '../../store/useAiModalStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { MarkdownText } from '../common/MarkdownText';
+import { Link } from 'react-router-dom';
+import { summarizeAssistantCard } from './assistantCardSummary';
 
 const QUICK_SUGGESTIONS_VI = [
   'Thời tiết & sóng biển hôm nay?',
@@ -130,6 +132,27 @@ export const AiChatPopup: React.FC = () => {
             ) : (
               <div className="bg-white border border-slate-200/90 text-slate-800 rounded-xl rounded-tl-xs px-3.5 py-2.5 max-w-[92%] text-xs leading-relaxed shadow-xs">
                 <MarkdownText content={renderMessageContent(msg)} />
+                {msg.responseStatus === 'PARTIAL' && msg.cards?.length ? (
+                  <p className="mt-2 text-slate-600">{isEn ? 'Partial result' : 'Kết quả một phần'}</p>
+                ) : null}
+                {msg.cards?.map((card) => {
+                  const summary = summarizeAssistantCard(card, isEn ? 'en' : 'vi');
+                  if (!summary) return null;
+                  return (
+                    <section key={card.id} className="mt-2 border-t border-slate-200 pt-2 space-y-1">
+                      <p className="font-semibold">{summary.title}</p>
+                      <dl>
+                        {summary.rows.map((row, index) => (
+                          <div key={index} className="mb-1">
+                            <dt>{row.href ? <Link className="text-sky-800 underline" to={row.href}>{row.label}</Link> : row.label}</dt>
+                            {row.value ? <dd className="font-medium">{row.value}</dd> : null}
+                          </div>
+                        ))}
+                      </dl>
+                      {summary.note ? <p className="text-slate-600">{summary.note}</p> : null}
+                    </section>
+                  );
+                })}
               </div>
             )}
           </div>
