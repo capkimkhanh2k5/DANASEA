@@ -279,14 +279,8 @@ public class RoleCopilotUseCase {
             case "admin_revenue_timeseries" -> CopilotReportAnswer.adminRevenue(data, period, english);
             case "vendor_service_count" -> CopilotReportAnswer.vendorServices(data,
                     CopilotRequest.isPublishedCount(normalized), english);
-            case "vendor_review_coaching" -> english ? "Here is the customer review and experience analysis for your shop:"
-                    : "Dưới đây là kết quả phân tích đánh giá và trải nghiệm khách hàng của gian hàng bạn:";
-            case "vendor_slot_advisor" -> english ? "Here are operating schedule recommendations based on capacity and weather:"
-                    : "Dưới đây là khuyến nghị điều chỉnh ca vận hành theo công suất và thời tiết:";
-            case "vendor_optimize_listing" -> english ? "Here are optimization suggestions to improve your service listing quality:"
-                    : "Dưới đây là gợi ý tối ưu bài đăng và nâng cao chất lượng dịch vụ:";
-            default -> english ? "Here is the detailed summary for your shop:"
-                    : "Dưới đây là kết quả phân tích số liệu cho gian hàng của bạn:";
+            default -> english ? "I retrieved the operational data. See the details below."
+                    : "Tôi đã tra cứu dữ liệu vận hành. Bạn có thể xem chi tiết bên dưới.";
         };
     }
 

@@ -881,20 +881,9 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
                       ),
                     )
                   else ...[
-                    Builder(
-                      builder: (context) {
-                        var text = msg.content;
-                        if (text.contains('Tôi đã tra cứu dữ liệu vận hành. Bạn có thể xem chi tiết bên dưới.') ||
-                            text.contains('Tôi đã tra cứu dữ liệu vận hành')) {
-                          text = text
-                              .replaceAll('Tôi đã tra cứu dữ liệu vận hành. Bạn có thể xem chi tiết bên dưới.', 'Dưới đây là kết quả phân tích số liệu cho gian hàng của bạn:')
-                              .replaceAll('Tôi đã tra cứu dữ liệu vận hành.', 'Dưới đây là kết quả phân tích số liệu cho gian hàng của bạn:');
-                        }
-                        return CopilotMarkdownText(
-                          content: text,
-                          textColor: AppColors.onSurface,
-                        );
-                      },
+                    CopilotMarkdownText(
+                      content: msg.content,
+                      textColor: AppColors.onSurface,
                     ),
                     if (msg.artifacts.isNotEmpty) ...[
                       for (final art in msg.artifacts)
