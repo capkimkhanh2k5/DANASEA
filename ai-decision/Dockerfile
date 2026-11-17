@@ -1,11 +1,11 @@
-FROM python:3.11-slim@sha256:ae952e0a57138a4317b9b61caaa19a8217c2f356803f8d7e63aad08769950937 AS build
+FROM python:3.11-slim@sha256:07d4824036af339fa1b6ef769cc99d9c10a141769538b52b3b597c84f7a7b535 AS build
 WORKDIR /build
 COPY config/requirements.lock.txt ./config/requirements.lock.txt
 COPY scripts/install_dependencies.py ./install_dependencies.py
 RUN python install_dependencies.py config/requirements.lock.txt
 RUN python -m pip uninstall -y pip
 
-FROM cgr.dev/chainguard/wolfi-base:latest@sha256:24f549a7fcace88e69b9557941168c74645688ecc4acf7fb6d734a6b74e9019d AS rootfs
+FROM cgr.dev/chainguard/wolfi-base:latest@sha256:833c48f1faf32c90e6f9501a2410a9aa28ceb2c594102edd4470053c30efa089 AS rootfs
 
 
 RUN apk --root /runtime --initdb --keys-dir /etc/apk/keys \

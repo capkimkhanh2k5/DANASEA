@@ -7,7 +7,6 @@ import {
   RotateCcw, 
   Clock, 
   Paperclip, 
-  Check, 
   Pin, 
   Trash2, 
   MoreVertical,
@@ -15,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from './CopilotArtifactCard';
+import { MarkdownText } from '../../common/MarkdownText';
 
 const QUICK_SUGGESTIONS = [
   'Doanh thu & đơn hôm nay?',
@@ -293,14 +293,7 @@ export const VendorCopilotDrawer: React.FC = () => {
                   </div>
                 ) : (
                   <div className="bg-white border border-slate-200/90 text-slate-800 rounded-xl rounded-tl-xs px-3.5 py-2.5 max-w-[92%] text-xs leading-relaxed shadow-xs">
-                    {m.toolsUsed && m.toolsUsed.length > 0 && (
-                      <div className="mb-1.5 pb-1 border-b border-slate-100 flex items-center gap-1 text-[10px] text-sky-700 font-medium">
-                        <Check className="w-3 h-3 text-sky-600 shrink-0" />
-                        <span>Đối chiếu: {m.toolsUsed.join(', ')}</span>
-                      </div>
-                    )}
-
-                    <div className="whitespace-pre-line text-slate-700">{m.content}</div>
+                    <MarkdownText content={m.content} />
 
                     {m.artifacts && m.artifacts.length > 0 && (
                       <div className="flex flex-col gap-2 mt-2">
