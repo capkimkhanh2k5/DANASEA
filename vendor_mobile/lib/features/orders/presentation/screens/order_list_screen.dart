@@ -81,15 +81,22 @@ class _OrderListScreenState extends State<OrderListScreen> {
   }
 
   String _formatShortCode(String code) {
-    final c = code.trim();
+    var c = code.trim();
+    if (c.startsWith('#')) c = c.substring(1);
+    if (c.isEmpty) return '';
+    // Nếu mã ngắn (dưới hoặc bằng 16 ký tự): Hiển thị đầy đủ 100% không cắt bớt
+    if (c.length <= 16) {
+      return '#$c';
+    }
+    // Nếu là mã UUID dài (> 16 ký tự): Hiển thị đầu - cuối rõ ràng (#00020000...0040)
     if (c.contains('-')) {
-      final lastPart = c.split('-').last;
-      if (lastPart.length <= 6) return '#...$lastPart';
+      final parts = c.split('-');
+      final first = parts.first;
+      final last = parts.last;
+      final suffix = last.length > 4 ? last.substring(last.length - 4) : last;
+      return '#$first...$suffix';
     }
-    if (c.length > 6) {
-      return '#...${c.substring(c.length - 4)}';
-    }
-    return '#$c';
+    return '#${c.substring(0, 8)}...${c.substring(c.length - 4)}';
   }
 
   @override

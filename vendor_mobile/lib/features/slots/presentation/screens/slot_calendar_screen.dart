@@ -95,9 +95,9 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
         scrolledUnderElevation: 0,
         titleSpacing: 16,
         title: const LocalizedText(
-          'Lịch hoạt động & Slot',
+          'Lịch chạy',
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: AppColors.navyAnchor,
           ),
@@ -138,9 +138,9 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Main Selector Bar
+                    // Main Selector Bar (Tinh gọn, cân đối)
                     Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       child: Row(
                         children: [
                           Expanded(
@@ -152,24 +152,37 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                               },
                               borderRadius: BorderRadius.circular(10),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 2.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
                                   children: [
-                                    const LocalizedText(
-                                      'DỊCH VỤ ÁP DỤNG',
-                                      style: TextStyle(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.tertiary,
-                                        letterSpacing: 0.5,
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.secondary.withValues(alpha: 0.1),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.surfing_rounded,
+                                        color: AppColors.secondary,
+                                        size: 17,
                                       ),
                                     ),
-                                    const SizedBox(height: 3),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Dịch vụ áp dụng',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.tertiary,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
                                             services.cast<ServiceModel?>().firstWhere(
                                                   (s) => s?.serviceId == _selectedServiceId,
                                                   orElse: () => services.isNotEmpty ? services.first : null,
@@ -182,18 +195,18 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        AnimatedRotation(
-                                          turns: _isServiceDropdownExpanded ? 0.5 : 0.0,
-                                          duration: const Duration(milliseconds: 200),
-                                          child: const Icon(
-                                            Icons.keyboard_arrow_down,
-                                            size: 20,
-                                            color: AppColors.secondary,
-                                          ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    AnimatedRotation(
+                                      turns: _isServiceDropdownExpanded ? 0.5 : 0.0,
+                                      duration: const Duration(milliseconds: 200),
+                                      child: const Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        size: 20,
+                                        color: AppColors.secondary,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -201,8 +214,8 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          InkWell(
-                            onTap: () {
+                          ElevatedButton.icon(
+                            onPressed: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => SlotConfigScreen(
@@ -212,15 +225,18 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                                 ),
                               );
                             },
-                            borderRadius: BorderRadius.circular(19),
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.secondary,
-                              ),
-                              child: const Icon(Icons.add, color: AppColors.onSecondary, size: 20),
+                            icon: const Icon(Icons.add_rounded, size: 16),
+                            label: const Text(
+                              'Thêm ca',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.secondary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                              minimumSize: const Size(0, 36),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ],
@@ -500,12 +516,27 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
 
   Widget _buildSlotItemCard(ServiceSlotModel slot) {
     final bool isFull = slot.bookedCount >= slot.capacity;
+    final double fillRatio = slot.capacity > 0
+        ? (slot.bookedCount / slot.capacity).clamp(0.0, 1.0)
+        : 0.0;
+    final int fillPercent = (fillRatio * 100).round();
+    final Color occupancyColor = slot.isBlocked
+        ? const Color(0xFF94A3B8)
+        : (fillRatio >= 1.0
+            ? const Color(0xFFDC2626)
+            : (fillRatio >= 0.8
+                ? const Color(0xFFD97706)
+                : (fillRatio >= 0.4
+                    ? const Color(0xFF0D9488)
+                    : const Color(0xFF004D56))));
+
+    final hasUnits = slot.inventoryType == 'SHARED_CAPACITY_UNITS' || slot.units.isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: slot.isBlocked
             ? Border.all(color: AppColors.errorContainer, width: 1.5)
             : Border.all(color: AppColors.borderSubtle),
@@ -516,19 +547,44 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1. Header: Time, Status Badge & 3-dot Menu (Tạm khóa / Hủy ca)
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              LocalizedText(
-                '${slot.startTime.length >= 5 ? slot.startTime.substring(0, 5) : slot.startTime} - ${slot.endTime.length >= 5 ? slot.endTime.substring(0, 5) : slot.endTime}',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: slot.isBlocked ? AppColors.tertiary : AppColors.navyAnchor,
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryContainer.withValues(alpha: 0.35),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.access_time_rounded,
+                  size: 15,
+                  color: AppColors.secondary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '${slot.startTime.length >= 5 ? slot.startTime.substring(0, 5) : slot.startTime} - ${slot.endTime.length >= 5 ? slot.endTime.substring(0, 5) : slot.endTime}',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.bold,
+                    color: slot.isBlocked ? AppColors.tertiary : AppColors.navyAnchor,
+                  ),
                 ),
               ),
               if (slot.status == SlotStatus.cancelled || slot.status == SlotStatus.closed)
-                LocalizedText(slot.status.labelVi)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: LocalizedText(
+                    slot.status.labelVi,
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.tertiary),
+                  ),
+                )
               else if (slot.isBlocked)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -537,6 +593,7 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.block, size: 11, color: AppColors.error),
                       SizedBox(width: 3),
@@ -557,250 +614,180 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.secondaryContainer.withOpacity(0.5),
+                    color: AppColors.secondaryContainer.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const LocalizedText('CÒN CHỖ', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.secondary)),
                 ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Occupancy Bar (Thanh tiến độ lấp đầy chỗ)
-          Builder(
-            builder: (context) {
-              final double fillRatio = slot.capacity > 0
-                  ? (slot.bookedCount / slot.capacity).clamp(0.0, 1.0)
-                  : 0.0;
-              final int fillPercent = (fillRatio * 100).round();
-              final Color occupancyColor = slot.isBlocked
-                  ? const Color(0xFF94A3B8)
-                  : (fillRatio >= 1.0
-                      ? const Color(0xFFDC2626)
-                      : (fillRatio >= 0.8
-                          ? const Color(0xFFD97706)
-                          : (fillRatio >= 0.4
-                              ? const Color(0xFF0D9488)
-                              : const Color(0xFF004D56))));
-
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'Tiến độ lấp đầy chỗ: ',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF64748B),
-                              ),
-                            ),
-                            Text(
-                              '$fillPercent%',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                                color: occupancyColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          '${slot.bookedCount}/${slot.capacity} khách${slot.heldCount > 0 ? ' (tạm giữ ${slot.heldCount})' : ''}',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.bold,
-                            color: occupancyColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: fillRatio,
-                        minHeight: 6,
-                        backgroundColor: const Color(0xFFE2E8F0),
-                        valueColor: AlwaysStoppedAnimation<Color>(occupancyColor),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-
-          // Chip thuyền nhỏ cho ca chia theo thuyền (SHARED_CAPACITY_UNITS)
-          if (slot.inventoryType == 'SHARED_CAPACITY_UNITS' || slot.units.isNotEmpty) ...[
-            const Text(
-              'Đơn vị thuyền / cano (Bấm để gán thiết bị nhanh):',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF64748B),
-              ),
-            ),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: (slot.units.isNotEmpty
-                      ? slot.units
-                      : [
-                          {'unitNumber': 1, 'capacity': (slot.capacity / 2).ceil()},
-                          {'unitNumber': 2, 'capacity': (slot.capacity / 2).floor()},
-                        ])
-                  .map((u) {
-                final uNum = u['unitNumber'] ?? 1;
-                final uCap = u['capacity'] ?? 0;
-                return InkWell(
-                  onTap: () => _showAssignEquipmentDialog(slot, initialUnitNumber: uNum),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE0F2FE),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFBAE6FD)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.directions_boat_filled_outlined,
-                            size: 13, color: Color(0xFF0369A1)),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Thuyền #$uNum ($uCap chỗ)',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0369A1),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.add_link, size: 12, color: Color(0xFF0284C7)),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 8),
-          ],
-
-          // Actions
-          if (slot.status != SlotStatus.cancelled)
-            Wrap(
-              alignment: WrapAlignment.end,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                // Assign equipment to slot unit button
-                InkWell(
-                  onTap: () => _showAssignEquipmentDialog(slot),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondaryContainer.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.directions_boat_outlined, size: 13, color: AppColors.secondary),
-                        SizedBox(width: 4),
-                        LocalizedText(
-                          'Gán thiết bị',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.secondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                // Toggle block button
-                InkWell(
-                  onTap: () {
+              const SizedBox(width: 4),
+              // Menu 3 chấm gom các thao tác phụ (Tạm khóa / Mở khóa, Hủy ca khẩn cấp)
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert_rounded, size: 20, color: AppColors.tertiary),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                tooltip: 'Thao tác khác',
+                onSelected: (val) {
+                  if (val == 'toggle_block') {
                     _db.toggleSlotBlocked(slot.slotId);
                     ToastNotification.showInfo(
                       context,
                       slot.isBlocked ? 'Đã mở khóa slot ${slot.startTime}' : 'Đã tạm khóa slot ${slot.startTime}',
                     );
-                  },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  } else if (val == 'cancel_slot') {
+                    _showCancelSlotDialog(slot);
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  PopupMenuItem(
+                    value: 'toggle_block',
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          slot.isBlocked ? Icons.lock_open : Icons.block,
-                          size: 14,
+                          slot.isBlocked ? Icons.lock_open_rounded : Icons.block_rounded,
+                          size: 18,
                           color: slot.isBlocked ? AppColors.secondary : AppColors.tertiary,
                         ),
-                        const SizedBox(width: 4),
-                        LocalizedText(
-                          slot.isBlocked ? 'Mở khóa' : 'Tạm khóa',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: slot.isBlocked ? AppColors.secondary : AppColors.tertiary,
-                          ),
-                        ),
+                        const SizedBox(width: 8),
+                        Text(slot.isBlocked ? 'Mở khóa ca chạy' : 'Tạm khóa ca chạy'),
                       ],
                     ),
                   ),
-                ),
-                // Cancel slot emergency button
-                InkWell(
-                  onTap: () => _showCancelSlotDialog(slot),
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.errorContainer.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                  if (slot.status != SlotStatus.cancelled)
+                    const PopupMenuItem(
+                      value: 'cancel_slot',
+                      child: Row(
+                        children: [
+                          Icon(Icons.event_busy_rounded, size: 18, color: AppColors.error),
+                          SizedBox(width: 8),
+                          Text('Hủy ca khẩn cấp', style: TextStyle(color: AppColors.error)),
+                        ],
+                      ),
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.event_busy, size: 13, color: AppColors.error),
-                        SizedBox(width: 4),
-                        LocalizedText(
-                          'Hủy ca',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.error,
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // 2. Occupancy progress bar (tinh gọn, không lồng hộp xám)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Đã đặt: ${slot.bookedCount}/${slot.capacity} khách${slot.heldCount > 0 ? ' (giữ ${slot.heldCount})' : ''}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: occupancyColor,
+                ),
+              ),
+              Text(
+                '$fillPercent%',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: occupancyColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: fillRatio,
+              minHeight: 5,
+              backgroundColor: const Color(0xFFE2E8F0),
+              valueColor: AlwaysStoppedAnimation<Color>(occupancyColor),
+            ),
+          ),
+
+          // 3. Equipment row (nếu có thuyền/cano)
+          if (hasUnits) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.directions_boat_filled_outlined, size: 13, color: Color(0xFF0369A1)),
+                const SizedBox(width: 4),
+                const Text(
+                  'Thuyền:',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: (slot.units.isNotEmpty
+                              ? slot.units
+                              : [
+                                  {'unitNumber': 1, 'capacity': (slot.capacity / 2).ceil()},
+                                  {'unitNumber': 2, 'capacity': (slot.capacity / 2).floor()},
+                                ])
+                          .map((u) {
+                        final uNum = u['unitNumber'] ?? 1;
+                        final uCap = u['capacity'] ?? 0;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: InkWell(
+                            onTap: () => _showAssignEquipmentDialog(slot, initialUnitNumber: uNum),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE0F2FE),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFBAE6FD)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '#$uNum ($uCap chỗ)',
+                                    style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0369A1),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  const Icon(Icons.add_link, size: 11, color: Color(0xFF0284C7)),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        );
+                      }).toList(),
                     ),
                   ),
                 ),
-                // Edit config button
-                InkWell(
-                  onTap: () {
+              ],
+            ),
+          ],
+
+          // 4. Clean Bottom Actions (1 dòng duy nhất)
+          if (slot.status != SlotStatus.cancelled) ...[
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (hasUnits) ...[
+                  OutlinedButton.icon(
+                    onPressed: () => _showAssignEquipmentDialog(slot),
+                    icon: const Icon(Icons.directions_boat_outlined, size: 13),
+                    label: const Text('Gán thiết bị', style: TextStyle(fontSize: 11.5)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.secondary,
+                      side: BorderSide(color: AppColors.secondary.withValues(alpha: 0.35)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                      minimumSize: const Size(0, 32),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                ElevatedButton.icon(
+                  onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => SlotConfigScreen(
@@ -810,33 +797,20 @@ class _SlotCalendarScreenState extends State<SlotCalendarScreen> {
                       ),
                     );
                   },
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.secondary.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.secondary.withOpacity(0.25)),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.edit_outlined, size: 13, color: AppColors.secondary),
-                        SizedBox(width: 4),
-                        LocalizedText(
-                          'Chỉnh sửa',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.secondary,
-                          ),
-                        ),
-                      ],
-                    ),
+                  icon: const Icon(Icons.edit_outlined, size: 13),
+                  label: const Text('Chỉnh sửa', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                    minimumSize: const Size(0, 32),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ],
             ),
+          ],
         ],
       ),
     );

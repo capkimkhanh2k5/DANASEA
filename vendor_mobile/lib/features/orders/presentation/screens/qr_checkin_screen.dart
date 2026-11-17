@@ -138,23 +138,20 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
   }
 
   String _formatShortCode(String raw) {
-    if (raw.isEmpty) return '';
-    var clean = raw.trim();
-    if (clean.startsWith('#')) clean = clean.substring(1);
-    if (clean.contains('-')) {
-      final parts = clean.split('-');
-      if (parts.length >= 4) {
-        final last = parts.last;
-        if (last.length >= 4) {
-          return '#...${last.substring(last.length - 4)}';
-        }
-        return '#...${last.padLeft(4, '0')}';
-      }
+    var c = raw.trim();
+    if (c.startsWith('#')) c = c.substring(1);
+    if (c.isEmpty) return '';
+    if (c.length <= 16) {
+      return '#$c';
     }
-    if (clean.length > 10) {
-      return '#...${clean.substring(clean.length - 4)}';
+    if (c.contains('-')) {
+      final parts = c.split('-');
+      final first = parts.first;
+      final last = parts.last;
+      final suffix = last.length > 4 ? last.substring(last.length - 4) : last;
+      return '#$first...$suffix';
     }
-    return '#$clean';
+    return '#${c.substring(0, 8)}...${c.substring(c.length - 4)}';
   }
 
   String _formatSlotTime(String t) {
