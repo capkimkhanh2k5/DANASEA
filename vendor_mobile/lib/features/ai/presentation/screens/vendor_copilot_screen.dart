@@ -265,12 +265,12 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
+                      color: const Color(0xFF004D56).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
                       Icons.history_rounded,
-                      color: AppColors.primary,
+                      color: Color(0xFF004D56),
                       size: 22,
                     ),
                   ),
@@ -305,7 +305,7 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.white),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: const Color(0xFF004D56),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -357,7 +357,7 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
 
                             return Material(
                               color: isSelected
-                                  ? const Color(0xFFE6F4F1)
+                                   ? const Color(0xFFE6F4F1)
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(10),
                               child: InkWell(
@@ -373,7 +373,7 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
                                             : Icons.chat_bubble_outline_rounded,
                                         size: 18,
                                         color: isSelected
-                                            ? AppColors.primary
+                                            ? const Color(0xFF004D56)
                                             : AppColors.onSurfaceVariant,
                                       ),
                                       const SizedBox(width: 10),
@@ -391,7 +391,7 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
                                                     ? FontWeight.bold
                                                     : FontWeight.w500,
                                                 color: isSelected
-                                                    ? AppColors.primary
+                                                    ? const Color(0xFF004D56)
                                                     : AppColors.navyAnchor,
                                               ),
                                             ),
@@ -881,9 +881,20 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
                       ),
                     )
                   else ...[
-                    CopilotMarkdownText(
-                      content: msg.content,
-                      textColor: AppColors.onSurface,
+                    Builder(
+                      builder: (context) {
+                        var text = msg.content;
+                        if (text.contains('Tôi đã tra cứu dữ liệu vận hành. Bạn có thể xem chi tiết bên dưới.') ||
+                            text.contains('Tôi đã tra cứu dữ liệu vận hành')) {
+                          text = text
+                              .replaceAll('Tôi đã tra cứu dữ liệu vận hành. Bạn có thể xem chi tiết bên dưới.', 'Dưới đây là kết quả phân tích số liệu cho gian hàng của bạn:')
+                              .replaceAll('Tôi đã tra cứu dữ liệu vận hành.', 'Dưới đây là kết quả phân tích số liệu cho gian hàng của bạn:');
+                        }
+                        return CopilotMarkdownText(
+                          content: text,
+                          textColor: AppColors.onSurface,
+                        );
+                      },
                     ),
                     if (msg.artifacts.isNotEmpty) ...[
                       for (final art in msg.artifacts)

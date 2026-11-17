@@ -183,6 +183,12 @@ class CopilotArtifactCard extends StatelessWidget {
       'staffAttitude': 'Thái độ',
       'safety': 'An toàn',
       'pricing': 'Giá cả',
+      'SAFETY': 'An toàn',
+      'PUNCTUALITY': 'Đúng giờ',
+      'VALUE': 'Giá trị',
+      'GUIDE': 'Hướng dẫn',
+      'SERVICE': 'Chất lượng',
+      'STAFF': 'Thái độ',
     };
 
     return Container(
@@ -204,22 +210,21 @@ class CopilotArtifactCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: const [
-                  Icon(Icons.star_rounded, size: 16, color: Color(0xFFF59E0B)),
-                  SizedBox(width: 6),
-                  Text(
-                    'Phân tích 4 trụ cột đánh giá',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.navyAnchor,
-                    ),
+              const Icon(Icons.star_rounded, size: 16, color: Color(0xFFF59E0B)),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  'Phân tích 4 trụ cột đánh giá',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.navyAnchor,
                   ),
-                ],
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 6),
               Text(
                 '$totalReviews đánh giá',
                 style: const TextStyle(fontSize: 10.5, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
@@ -234,10 +239,10 @@ class CopilotArtifactCard extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: 6,
               crossAxisSpacing: 8,
-              childAspectRatio: 2.8,
+              childAspectRatio: 2.5,
               children: pillars.entries.map((e) {
                 final key = e.key.toString();
-                final displayName = pillarNameMap[key] ?? key;
+                final displayName = pillarNameMap[key] ?? pillarNameMap[key.toUpperCase()] ?? key;
                 num score = 0;
                 if (e.value is Map && e.value['scoreOutOf10'] != null) {
                   score = (e.value['scoreOutOf10'] as num);
@@ -252,12 +257,15 @@ class CopilotArtifactCard extends StatelessWidget {
                     border: Border.all(color: const Color(0xFFF1F5F9)),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        displayName,
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                      Expanded(
+                        child: Text(
+                          displayName,
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF475569), fontWeight: FontWeight.w500),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
+                      const SizedBox(width: 4),
                       Text(
                         '$score/10',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
