@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 // AI Vendor Copilot Models for DANASEA
 // Connected to Spring Boot Vendor AI endpoints (/api/vendor/ai/...)
 
@@ -9,6 +11,7 @@ class CopilotMessageModel {
   final DateTime createdAt;
   final bool isVerified;
   final List<String> details;
+  final List<Map<String, dynamic>> artifacts;
 
   const CopilotMessageModel({
     required this.id,
@@ -18,11 +21,30 @@ class CopilotMessageModel {
     required this.createdAt,
     this.isVerified = false,
     this.details = const [],
+    this.artifacts = const [],
   });
 
   bool get isUser => role.toLowerCase() == 'user';
 
   factory CopilotMessageModel.fromJson(Map<String, dynamic> json) {
+    List<Map<String, dynamic>> rawArtifacts = [];
+    if (json['artifacts'] is List) {
+      rawArtifacts = [
+        for (final item in (json['artifacts'] as List).whereType<Map>())
+          Map<String, dynamic>.from(item),
+      ];
+    } else if (json['artifactsJson'] is String && (json['artifactsJson'] as String).isNotEmpty) {
+      try {
+        final decoded = jsonDecode(json['artifactsJson'] as String);
+        if (decoded is List) {
+          rawArtifacts = [
+            for (final item in decoded.whereType<Map>())
+              Map<String, dynamic>.from(item),
+          ];
+        }
+      } catch (_) {}
+    }
+
     return CopilotMessageModel(
       id: json['id']?.toString() ?? 'msg-${DateTime.now().millisecondsSinceEpoch}',
       conversationId: json['conversationId']?.toString(),
@@ -32,8 +54,9 @@ class CopilotMessageModel {
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
       isVerified: json['generatedTextVerified'] == true,
+      artifacts: rawArtifacts,
       details: [
-        for (final artifact in (json['artifacts'] as List? ?? []).whereType<Map>())
+        for (final artifact in rawArtifacts)
           ..._artifactDetails(artifact),
       ],
     );

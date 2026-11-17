@@ -7,6 +7,8 @@ import '../../../../core/data/vendor_repositories.dart';
 import '../../../../core/data/vendor_store.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/toast_notification.dart';
+import '../widgets/copilot_artifact_card.dart';
+import '../widgets/copilot_markdown_text.dart';
 
 class VendorCopilotScreen extends StatefulWidget {
   final String? initialPrompt;
@@ -341,7 +343,7 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
                       : ListView.separated(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           itemCount: _savedConversations.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 4),
+                          separatorBuilder: (_, _) => const SizedBox(height: 4),
                           itemBuilder: (context, index) {
                             final conv = _savedConversations[index];
                             final id = conv['id']?.toString() ?? '';
@@ -474,7 +476,7 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
                         maxWidth: MediaQuery.of(context).size.width * 0.8,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
+                        color: const Color(0xFF004D56),
                         borderRadius: const BorderRadius.only(
                           topLeft: Radius.circular(18),
                           topRight: Radius.circular(18),
@@ -847,7 +849,7 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
               ),
               decoration: BoxDecoration(
                 color: isUser
-                    ? AppColors.primary
+                    ? const Color(0xFF004D56)
                     : AppColors.surfaceContainerLowest,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(18),
@@ -871,30 +873,49 @@ class _VendorCopilotScreenState extends State<VendorCopilotScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SelectableText(
-                    msg.content,
-                    style: AppTypography.bodyMd(
-                      color: isUser ? Colors.white : AppColors.onSurface,
+                  if (isUser)
+                    SelectableText(
+                      msg.content,
+                      style: AppTypography.bodyMd(
+                        color: Colors.white,
+                      ),
+                    )
+                  else ...[
+                    CopilotMarkdownText(
+                      content: msg.content,
+                      textColor: AppColors.onSurface,
                     ),
-                  ),
-                  for (final detail in msg.details.take(3))
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: SelectableText(detail, style: AppTypography.bodyMd(color: AppColors.onSurface)),
-                    ),
-                  if (msg.details.length > 3)
-                    ExpansionTile(
-                      tilePadding: EdgeInsets.zero,
-                      title: Text('Xem thêm (${msg.details.length - 3})'),
-                      expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (final detail in msg.details.skip(3))
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: SelectableText(detail),
+                    if (msg.artifacts.isNotEmpty) ...[
+                      for (final art in msg.artifacts)
+                        CopilotArtifactCard(artifact: art),
+                    ] else if (msg.details.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      for (final detail in msg.details.take(3))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                margin: const EdgeInsets.only(top: 6, right: 6),
+                                width: 4,
+                                height: 4,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF0284C7),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              Expanded(
+                                child: SelectableText(
+                                  detail,
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                                ),
+                              ),
+                            ],
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
+                  ],
                   const SizedBox(height: 4),
                   Row(
                     mainAxisSize: MainAxisSize.min,
