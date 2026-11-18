@@ -130,9 +130,9 @@
     "baselineNote": "Lặp công cụ chính sách và tra đơn, trả PARTIAL cùng danh sách dịch vụ. Chưa nêu phương thức thanh toán.",
     "score": 3,
     "result": "Đạt",
-    "note": "Gọi get_payment_providers và khớp trực tiếp cấu hình đang bật VNPAY, PAYPAL, PAYOS, ZALOPAY (tắt MOMO, SEPAY); đã gỡ đường dẫn /api/payments/providers và tên class nội bộ khỏi văn bản trả lời lẫn UI card.",
-    "observations": "HTTP 200 · ANSWERED · get_payment_providers · UI & text sạch đường dẫn nội bộ",
-    "excerpt": "DANASEA hiện hỗ trợ các phương thức thanh toán sau:\n- Đang bật: VNPAY, PAYPAL, PAYOS, ZALOPAY\n- Hiện đang tắt / chưa khả dụng: MOMO, SEPAY"
+    "note": "Gọi get_payment_providers và chỉ trả lời trực tiếp các phương thức thanh toán đang khả dụng (VNPAY, PAYPAL, PAYOS, ZALOPAY), không liệt kê phương thức tắt và không lộ đường dẫn API hay tên class nội bộ.",
+    "observations": "HTTP 200 · ANSWERED · get_payment_providers · Chỉ hiển thị phương thức khả dụng",
+    "excerpt": "DANASEA hiện hỗ trợ các phương thức thanh toán sau: VNPAY, PAYPAL, PAYOS, ZALOPAY."
   },
   {
     "id": "U10",

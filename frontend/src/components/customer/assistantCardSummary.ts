@@ -270,9 +270,7 @@ export function summarizeAssistantCard(card: AssistantCard, language: 'vi' | 'en
     }
     case 'PAYMENT_PROVIDERS': {
       const enabled = list(facts.enabledProviders).filter((v): v is string => typeof v === 'string');
-      const disabled = list(facts.disabledProviders).filter((v): v is string => typeof v === 'string');
       add(copy('Đang hỗ trợ', 'Supported & active'), enabled.length ? enabled.join(', ') : copy('Chưa có', 'None'));
-      if (disabled.length) add(copy('Hiện chưa bật', 'Currently disabled'), disabled.join(', '));
       return {
         title: copy('Phương thức thanh toán', 'Payment Providers'),
         rows,

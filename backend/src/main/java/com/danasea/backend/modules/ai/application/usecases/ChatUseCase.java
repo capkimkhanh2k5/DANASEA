@@ -455,17 +455,8 @@ public class ChatUseCase {
 
     private String formatPaymentProvidersMessage(AssistantArtifact card, SupportedLanguage language) {
         List<String> enabled = stringList(card.facts().get("enabledProviders"));
-        List<String> disabled = stringList(card.facts().get("disabledProviders"));
         String enabledText = enabled.isEmpty() ? (language == SupportedLanguage.EN ? "none" : "chưa có") : String.join(", ", enabled);
-        String disabledText = disabled.isEmpty() ? (language == SupportedLanguage.EN ? "none" : "không có") : String.join(", ", disabled);
-        if (language == SupportedLanguage.EN) {
-            return messages.get("ai.payment.providers_available", language)
-                    + "\n- Enabled: " + enabledText
-                    + "\n- Currently disabled / unavailable: " + disabledText;
-        }
-        return messages.get("ai.payment.providers_available", language)
-                + "\n- Đang bật: " + enabledText
-                + "\n- Hiện đang tắt / chưa khả dụng: " + disabledText;
+        return messages.get("ai.payment.providers_available", language) + " " + enabledText + ".";
     }
 
     private List<String> stringList(Object value) {

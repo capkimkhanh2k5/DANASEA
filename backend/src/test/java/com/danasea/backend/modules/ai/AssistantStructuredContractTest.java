@@ -265,6 +265,7 @@ class AssistantStructuredContractTest {
         assertThat(result.getContent())
                 .contains("VNPAY")
                 .contains("PAYPAL")
+                .doesNotContain("MOMO")
                 .doesNotContain("/api/payments/providers")
                 .doesNotContain("PaymentProviderAvailability");
         assertThat(result.getCards()).singleElement().satisfies(c -> assertThat(c.type()).isEqualTo("PAYMENT_PROVIDERS"));
