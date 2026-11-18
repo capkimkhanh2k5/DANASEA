@@ -69,7 +69,8 @@ public class ChatUseCase {
     private static final Pattern TRIP_BRIEFING = CopilotRequest.words(
             "can mang gi|chuan bi gi|luu y an toan|cam nang|what should i bring|packing|marine briefing");
     private static final Pattern BUDGET_SEARCH = CopilotRequest.words(
-            "tim (?:tour|dich vu|trai nghiem)|co (?:nhung )?(?:tour|goi|dich vu) nao|find|search|looking for");
+            "tim (?:tour|dich vu|trai nghiem)|co (?:nhung )?(?:tour|goi|dich vu) nao|"
+                    + "find|search|looking for|show me|suggest|what tours|any tours");
     private static final Pattern OTHER_TRAVEL_INTENT = CopilotRequest.words(
             "lich trinh|so sanh|gan toi|thoi tiet|itinerary|compare|near me|forecast|weather");
     private static final Pattern BOOKING_GUIDE = CopilotRequest.words("huong dan|lam the nao|how (?:do i|to)|guide");
@@ -323,6 +324,7 @@ public class ChatUseCase {
         if (Set.of("PARTIAL", "NEEDS_INPUT", "UNAVAILABLE").contains(card.status())) {
             response.setResponseStatus("UNAVAILABLE".equals(card.status()) ? "PARTIAL" : card.status());
         }
+        enrichGroundedCitations(response, List.of(card), language, message);
         return finish(conversationId, response, List.of(card), state);
     }
 
@@ -544,7 +546,7 @@ public class ChatUseCase {
                 }
                 if (!executedNewTool) {
                     if (language != null && !cards.isEmpty()) {
-                        return finalizeFromCards(conversationId, language, cards, state, lastResponse);
+                        return finalizeFromCards(conversationId, language, cards, state, lastResponse, message);
                     }
                     break;
                 }
@@ -561,14 +563,14 @@ public class ChatUseCase {
                     protectPolicyClaims(response, message, language, cards, artifactMapper);
                 }
                 if (language != null) {
-                    enrichGroundedCitations(response, cards, language);
+                    enrichGroundedCitations(response, cards, language, message);
                 }
                 return finish(conversationId, response, cards, state);
             }
             if (toolCount >= 12) break;
         }
         if (language != null && !cards.isEmpty()) {
-            return finalizeFromCards(conversationId, language, cards, state, lastResponse);
+            return finalizeFromCards(conversationId, language, cards, state, lastResponse, message);
         }
         LlmResponse timeout = new LlmResponse();
         boolean hasServiceResults = cards.stream().anyMatch(this::hasServiceResults);
@@ -956,8 +958,18 @@ public class ChatUseCase {
     }
 
     private void enrichGroundedCitations(LlmResponse response, List<AssistantArtifact> cards, SupportedLanguage language) {
+        enrichGroundedCitations(response, cards, language, null);
+    }
+
+    private void enrichGroundedCitations(LlmResponse response, List<AssistantArtifact> cards,
+                                         SupportedLanguage language, String userMessage) {
         String content = response.getContent() == null ? "" : response.getContent();
+        String normalizedContent = TravelQueryParser.normalize(content);
         StringBuilder additions = new StringBuilder();
+        boolean addedNonSwimmer = false;
+        boolean addedUsdNote = false;
+        BigDecimal usdBudget = userMessage != null ? TravelQueryParser.usdBudgetAmount(userMessage) : null;
+
         for (AssistantArtifact card : cards) {
             if ("ai_review_summary".equals(card.tool()) && card.facts().get("highlights") instanceof List<?> highlights) {
                 List<String> missingLines = new ArrayList<>();
@@ -974,19 +986,114 @@ public class ChatUseCase {
                 }
             }
             if ("ai_recommend_services".equals(card.tool()) && "AVAILABLE".equals(card.status())) {
-                String lower = TravelQueryParser.normalize(content);
-                if (!lower.contains("consent") && !lower.contains("ca nhan hoa") && !lower.contains("cold-start")
-                        && !lower.contains("personaliz")) {
+                if (!normalizedContent.contains("consent") && !normalizedContent.contains("ca nhan hoa")
+                        && !normalizedContent.contains("cold-start") && !normalizedContent.contains("personaliz")) {
                     boolean consentUsed = card.facts().get("reasons") instanceof List<?> r
                             && r.stream().anyMatch(x -> "CONSENTED_PREFERENCE_SIGNALS".equals(x));
                     additions.append("\n\n").append(messages.get(
                             consentUsed ? "ai.recommend.consent_used" : "ai.recommend.cold_start", language));
                 }
             }
+            if ("SERVICE_LIST".equals(card.type()) && !addedNonSwimmer && needsNonSwimmerAdvisory(card, userMessage)
+                    && !normalizedContent.contains("ao phao") && !normalizedContent.contains("life jacket")) {
+                additions.append("\n\n").append(messages.get("ai.search.non_swimmer_safety", language));
+                addedNonSwimmer = true;
+            }
+            if ("ITINERARY".equals(card.type()) && !"UNAVAILABLE".equals(card.status())) {
+                String itineraryNote = groundedItinerarySummary(card, content, normalizedContent, language);
+                if (itineraryNote != null) {
+                    additions.append("\n\n").append(itineraryNote);
+                }
+            }
+            if (usdBudget != null && !addedUsdNote
+                    && ("SERVICE_LIST".equals(card.type()) || "ITINERARY".equals(card.type()))) {
+                String usdNote = formatUsdConversionNote(usdBudget, card, userMessage, language);
+                if (usdNote != null && !normalizedContent.contains("usd") && !normalizedContent.contains("ty gia")
+                        && !normalizedContent.contains("exchange rate")) {
+                    additions.append("\n\n").append(usdNote);
+                    addedUsdNote = true;
+                }
+            }
         }
         if (!additions.isEmpty()) {
             response.setContent(content + additions);
         }
+    }
+
+    private boolean needsNonSwimmerAdvisory(AssistantArtifact card, String userMessage) {
+        String normUser = TravelQueryParser.normalize(userMessage);
+        if (normUser.matches(".*(khong biet boi|khong boi|non[- ]?swimmer).*")) {
+            return true;
+        }
+        boolean excludedDiving = false;
+        boolean hasParticipationLimit = card.facts().get("limitations") instanceof List<?> limits
+                && limits.stream().anyMatch("PARTICIPATION_REQUIREMENTS_NEED_VENDOR_VERIFICATION"::equals);
+        if (card.facts().get("context") instanceof Map<?, ?> ctx
+                && ctx.get("criteria") instanceof Map<?, ?> crit) {
+            if (crit.get("excludedActivities") instanceof List<?> ex) {
+                excludedDiving = ex.stream().anyMatch("lan"::equals);
+            }
+            if (!hasParticipationLimit && crit.get("unsupportedConstraints") instanceof List<?> uc) {
+                hasParticipationLimit = uc.stream().anyMatch("PARTICIPATION_REQUIREMENTS_NEED_VENDOR_VERIFICATION"::equals);
+            }
+        }
+        return hasParticipationLimit && excludedDiving;
+    }
+
+    private String groundedItinerarySummary(AssistantArtifact card, String content, String normalizedContent,
+                                            SupportedLanguage language) {
+        if (!(card.facts().get("alternatives") instanceof List<?> alts) || alts.isEmpty()) return null;
+        if (!(alts.getFirst() instanceof Map<?, ?> alt) || !(alt.get("plan") instanceof Map<?, ?> plan)) return null;
+        if (!(plan.get("items") instanceof List<?> items) || items.isEmpty()) return null;
+
+        boolean missingItemOrTransit = items.size() >= 2
+                && !normalizedContent.contains("phut") && !normalizedContent.contains("minute")
+                && !normalizedContent.contains("di chuyen") && !normalizedContent.contains("transfer");
+        List<String> lines = new ArrayList<>();
+        NumberFormat fmt = NumberFormat.getNumberInstance(language.locale());
+        for (Object itemObj : items) {
+            if (!(itemObj instanceof Map<?, ?> item)) continue;
+            String name = item.get("serviceName") instanceof String n ? n : "";
+            if (!name.isBlank() && !content.contains(name)) {
+                missingItemOrTransit = true;
+            }
+            String start = formatTimePart(item.get("start"));
+            String end = formatTimePart(item.get("end"));
+            String price = item.get("partyTotal") instanceof Number p ? fmt.format(p) + (language == SupportedLanguage.EN ? " VND" : " ₫") : "";
+            int travel = item.get("estimatedTravelMinutes") instanceof Number m ? m.intValue() : 0;
+            String travelNote = travel > 0
+                    ? (language == SupportedLanguage.EN ? ", ~" + travel + " min transfer" : ", di chuyển ~" + travel + " phút")
+                    : "";
+            lines.add("- " + start + "–" + end + " | " + name + " (" + price + travelNote + ")");
+        }
+        if (!missingItemOrTransit || lines.isEmpty()) return null;
+        String totalStr = plan.get("totalPrice") instanceof Number tot ? fmt.format(tot) : "?";
+        String header = language == SupportedLanguage.EN
+                ? "Verified itinerary schedule (estimated total: " + totalStr + " VND):"
+                : "Lịch trình xác thực từ hệ thống (tổng ước tính: " + totalStr + " ₫):";
+        return header + "\n" + String.join("\n", lines);
+    }
+
+    private String formatTimePart(Object dateTimeVal) {
+        if (dateTimeVal instanceof List<?> parts && parts.size() >= 5) {
+            return String.format("%02d:%02d", ((Number) parts.get(3)).intValue(), ((Number) parts.get(4)).intValue());
+        }
+        String text = String.valueOf(dateTimeVal);
+        int t = text.indexOf('T');
+        return t >= 0 && text.length() >= t + 6 ? text.substring(t + 1, t + 6) : text;
+    }
+
+    private String formatUsdConversionNote(BigDecimal usdBudget, AssistantArtifact card,
+                                           String userMessage, SupportedLanguage language) {
+        BigDecimal vndBudget = card.facts().get("effectiveTotalBudget") instanceof Number n
+                ? new BigDecimal(n.toString())
+                : TravelQueryParser.budget(userMessage);
+        if (vndBudget == null) return null;
+        NumberFormat fmt = NumberFormat.getNumberInstance(language.locale());
+        String usdDisplay = usdBudget.stripTrailingZeros().toPlainString();
+        String vndDisplay = fmt.format(vndBudget);
+        String rateDisplay = fmt.format(TravelQueryParser.usdToVndRate());
+        return messages.get("ai.search.usd_converted", language, usdDisplay, vndDisplay, rateDisplay);
     }
 
     private String weatherSummaryLine(List<AssistantArtifact> cards, SupportedLanguage language) {
@@ -1018,7 +1125,8 @@ public class ChatUseCase {
     }
 
     private LlmResponse finalizeFromCards(UUID conversationId, SupportedLanguage language,
-                                          List<AssistantArtifact> cards, ObjectNode state, LlmResponse lastResponse) {
+                                          List<AssistantArtifact> cards, ObjectNode state, LlmResponse lastResponse,
+                                          String userMessage) {
         LlmResponse out = new LlmResponse();
         out.setKeyMasked(lastResponse == null ? null : lastResponse.getKeyMasked());
         boolean hasNeedsInput = cards.stream().anyMatch(c -> "NEEDS_INPUT".equals(c.status()) || !c.requiredInputs().isEmpty());
@@ -1068,7 +1176,7 @@ public class ChatUseCase {
             out.setContent(messages.get("ai.timeout", language));
             out.setResponseStatus("PARTIAL");
         }
-        enrichGroundedCitations(out, cards, language);
+        enrichGroundedCitations(out, cards, language, userMessage);
         return finish(conversationId, out, cards, state);
     }
 

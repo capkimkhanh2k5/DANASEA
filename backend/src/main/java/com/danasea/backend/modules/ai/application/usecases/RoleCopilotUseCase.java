@@ -91,6 +91,7 @@ public class RoleCopilotUseCase {
                     + "|(?<!\\btat )(?<!\\bcau )(?<!\\bdan )(?<!\\bnha )(?<!\\bbat )\\bca\\b"
                     + "(?!\\s+(?:nhan|hai|ba|bon|biet|san|tuan|thang|nam|phe|nhac|si|doi|nha|nuoc)\\b)");
     private static final Pattern VENDOR_LISTING = CopilotRequest.words("bai dang|mo ta|toi uu|tieu de|listing|optimize");
+    private static final Pattern LISTING_AUDIT_ONLY = CopilotRequest.words("thieu|con thieu|kiem tra|check|missing|audit");
     private static final Pattern VENDOR_OVERVIEW = CopilotRequest.words("kpi|tong quan|summary");
     private static final Pattern ADMIN_DISPUTE = CopilotRequest.words("khieu nai|tranh chap|dispute");
     private static final Pattern DISPUTE_SUMMARY = CopilotRequest.words("tom tat|doi chieu|mau thuan|summari[sz]e|conflict");
@@ -408,6 +409,17 @@ public class RoleCopilotUseCase {
             UUID disputeId = messageReference != null ? messageReference
                     : "DISPUTE".equalsIgnoreCase(attachmentType) ? attachmentId : null;
             if (disputeId == null) {
+                if (CHECKIN_CONFLICT.matcher(normalized).find() || DISPUTE_SUMMARY.matcher(normalized).find()) {
+                    return english
+                            ? "Dispute conflict verification methodology (customer 'not served' claim vs vendor 'checked in' claim):\n"
+                            + "1. Inspect QR check-in scan logs (HMAC-SHA256 signature), verified scan timestamp, scanning vendor device/account, and valid check-in window.\n"
+                            + "2. Cross-check slot operational status, departure manifest, and when the customer filed the complaint.\n"
+                            + "3. Collect corroborated evidence from both sides (messages, pier/beach pickup proof). NEVER side with either party or auto-refund without verified evidence. Attach the dispute case or provide its ID to extract the exact timeline."
+                            : "Quy trình đối soát mâu thuẫn tranh chấp (khách báo chưa được phục vụ nhưng vendor báo đã check-in):\n"
+                            + "1. Đối chiếu log quét mã QR check-in (chữ ký HMAC-SHA256), thời điểm quét check-in thực tế, tài khoản/thiết bị vendor thực hiện và cửa sổ check-in hợp lệ trước giờ khởi hành.\n"
+                            + "2. Đối chiếu trạng thái vận hành của ca dịch vụ, danh sách hành khách/nhật ký xuất bến và thời điểm phát sinh khiếu nại.\n"
+                            + "3. Thu thập bằng chứng từ cả hai phía (tin nhắn điều phối, hình ảnh/biên nhận điểm đón). Tuyệt đối KHÔNG tự động kết luận nghiêng về một bên hay tự động hoàn tiền khi chưa xác minh đủ bằng chứng. Hãy đính kèm hồ sơ tranh chấp hoặc cung cấp mã để tôi trích xuất timeline chi tiết.";
+                }
                 return english ? "Which dispute should I review? Attach it or provide its ID."
                         : "Bạn muốn xem hồ sơ tranh chấp nào? Hãy đính kèm hồ sơ hoặc cung cấp mã.";
             }
@@ -478,8 +490,12 @@ public class RoleCopilotUseCase {
                 serviceId = findMentionedService(vendorId, normalized);
             }
             if ("vendor_optimize_listing".equals(tool) && serviceId == null && normalized.length() > 20) {
-                return english ? "Attach a service from your shop so I can review its actual listing."
-                        : "Hãy đính kèm dịch vụ thuộc gian hàng để tôi xem đúng nội dung bài đăng.";
+                if (LISTING_AUDIT_ONLY.matcher(normalized).find()) {
+                    return english ? "Attach a service from your shop so I can review its actual listing."
+                            : "Hãy đính kèm dịch vụ thuộc gian hàng để tôi xem đúng nội dung bài đăng.";
+                }
+                args.put("title", message);
+                args.put("description", message);
             }
             if (serviceId != null) args.put("serviceId", serviceId.toString());
         }
@@ -645,6 +661,8 @@ public class RoleCopilotUseCase {
         Set<String> stopwords = Set.of("tour", "dich", "vu", "bai", "dang", "mo", "ta", "tieu", "de",
                 "cua", "toi", "cho", "thue", "bien", "da", "nang", "hay", "kiem", "tra", "viet", "lai",
                 "thieu", "thong", "tin", "sao", "hap", "dan", "tim", "danh", "gia", "review",
+                "ngay", "mai", "chi", "moi", "khach", "nen", "the", "nao", "lam", "con", "trong", "vang",
+                "ca", "slot", "thap", "cao", "kin", "gio", "sang", "chieu", "thu", "bay", "chu", "nhat", "tuan",
                 "service", "listing", "optimize", "check", "update", "write", "rewrite");
         List<String> queryTokens = Arrays.stream(question.split("[^a-z0-9]+"))
                 .filter(token -> token.length() >= 3 && !stopwords.contains(token))

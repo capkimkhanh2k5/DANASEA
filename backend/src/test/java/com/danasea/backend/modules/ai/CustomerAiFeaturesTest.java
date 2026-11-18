@@ -325,10 +325,31 @@ class CustomerAiFeaturesTest {
         assertThat(widened.limitations()).contains("EXPANDED_DATE_WINDOW_UPCOMING_7D");
         assertThat(widened.context().to()).isEqualTo(today.plusDays(7));
 
-        var explicitToday = new TravelRequest("Hôm nay đi chơi biển", null, null, 1, today, today,
+        var explicit = new TravelRequest("Hôm nay đi chơi biển", null, null, 1, today, today,
                 null, null, null, null, null, null, null, null, null).context();
-        var strict = discovery.execute(explicitToday, "SEARCH", SupportedLanguage.VI);
+        assertThat(explicit.criteria().unsupportedConstraints()).doesNotContain("EXPANDED_DATE_WINDOW_UPCOMING_7D");
+        var strict = discovery.execute(explicit, "SEARCH", SupportedLanguage.VI);
         assertThat(strict.limitations()).doesNotContain("EXPANDED_DATE_WINDOW_UPCOMING_7D");
         assertThat(strict.context().to()).isEqualTo(today);
+    }
+
+    @Test void englishQueriesAndUsdBudgetsConvertUsingActiveExchangeRate() {
+        TravelQueryParser.setUsdToVndRate(new BigDecimal("25775"));
+        assertThat(TravelQueryParser.hasUsdBudget("Find a paddleboard tour under $20")).isTrue();
+        assertThat(TravelQueryParser.budget("Find a paddleboard tour under $20")).isEqualByComparingTo("515500");
+        assertThat(TravelQueryParser.budget("I have a budget of 50 USD for a sunset cruise")).isEqualByComparingTo("1288750");
+        assertThat(TravelQueryParser.budget("under 30 dollars")).isEqualByComparingTo("773250");
+        assertThat(TravelQueryParser.includedActivities("paddleboard or sunset cruise without snorkeling"))
+                .containsExactly("du thuyen", "sup");
+        assertThat(TravelQueryParser.excludedActivities("paddleboard without snorkeling or scuba diving"))
+                .containsExactly("lan");
+
+        var malformedUsd = new TravelRequest("Find tour under $40.00.0 for 2 guests", null, null, null,
+                date, date, null, null, null, null, null, null, null, null, null).context();
+        assertThat(malformedUsd.criteria().clarificationQuestions()).contains("BUDGET_REQUIRED");
+
+        var manThaiSonTra = new TravelRequest("Tôi muốn vừa chèo SUP ở Mân Thái vừa trải nghiệm biển Sơn Trà, hãy sắp xếp hợp lý.",
+                null, null, 2, date, date, null, null, null, null, null, null, null, null, null).context();
+        assertThat(manThaiSonTra.criteria().unsupportedConstraints()).doesNotContain("PLACE_NAME_REQUIRES_COORDINATES");
     }
 }

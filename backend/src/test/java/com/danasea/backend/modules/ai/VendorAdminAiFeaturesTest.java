@@ -1258,7 +1258,7 @@ class VendorAdminAiFeaturesTest {
                 "Khách nói chưa được phục vụ nhưng vendor nói đã check-in, hãy phân tích mâu thuẫn.",
                 null, null, SupportedLanguage.VI);
         assertThat(a25.artifacts()).isEmpty();
-        assertThat(a25.message()).contains("tranh chấp");
+        assertThat(a25.message()).contains("tranh chấp").contains("QR check-in").contains("KHÔNG tự động");
 
         var a27 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
                 "Vendor đang có khiếu nại chưa giải quyết, có được đưa các đơn đó vào đối soát không?",
@@ -1324,5 +1324,29 @@ class VendorAdminAiFeaturesTest {
                 null, null, SupportedLanguage.VI);
         assertThat(v34.artifacts()).isEmpty();
         assertThat(v34.message()).contains("KHÔNG THỂ");
+
+        // V24: SEO rewrite without attached serviceId provides grounded sunrise draft
+        when(vendorAiData.listServices(vendorId)).thenReturn(List.of(
+                new VendorServiceItem(UUID.randomUUID(), vendorId, "Mô tô nước – Danabeach", "Jetski", "Jetski", BigDecimal.TEN, 1),
+                new VendorServiceItem(UUID.randomUUID(), vendorId, "Trải nghiệm cano hoàng hôn Bãi Nam mới – Danabeach", "Cano mới", "Cano", BigDecimal.TEN, 0)
+        ));
+        var v24 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Viết lại tiêu đề và mô tả tour ngắm bình minh sao cho hấp dẫn và dễ tìm kiếm.",
+                null, null, SupportedLanguage.VI);
+        assertThat(v24.toolsUsed()).containsExactly("vendor_optimize_listing");
+        assertThat(v24.message()).contains("Tiêu đề đề xuất:").contains("Mô tả đề xuất:").contains("bình minh");
+
+        // V29: "chỉ mới có 1/20 khách" avoids false "mới" service match and prioritizes 1/20 slot over 0/20
+        when(vendorAiData.listUpcomingSlots(eq(vendorId), isNull(), anyInt())).thenReturn(List.of(
+                new VendorSlotItem(UUID.randomUUID(), UUID.randomUUID(), "Trải nghiệm cano hoàng hôn Bãi Nam mới – Danabeach",
+                        today.plusDays(1), LocalTime.of(8, 0), LocalTime.of(9, 30), 20, 0, "OPEN"),
+                new VendorSlotItem(UUID.randomUUID(), UUID.randomUUID(), "Mô tô nước – Danabeach",
+                        today.plusDays(1), LocalTime.of(14, 0), LocalTime.of(15, 30), 20, 1, "OPEN")
+        ));
+        var v29 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Ca ngày mai chỉ mới có 1/20 khách, tôi nên xử lý thế nào?",
+                null, null, SupportedLanguage.VI);
+        assertThat(v29.toolsUsed()).containsExactly("vendor_slot_advisor");
+        assertThat(v29.message()).contains("Mô tô nước – Danabeach").contains("1/20 (5.0%)");
     }
 }

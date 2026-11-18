@@ -44,6 +44,7 @@ test('summarizes payment providers, itinerary list, replan proposal, and out_of_
     facts: { enabledProviders: ['VNPAY', 'PAYPAL'], disabledProviders: ['MOMO'] },
   }, 'vi');
   assert.match(paySummary?.rows[0]?.value ?? '', /VNPAY, PAYPAL/);
+  assert.equal(paySummary?.note, undefined);
 
   const listSummary = summarizeAssistantCard({
     id: 'it-list', type: 'ITINERARY_LIST', status: 'AVAILABLE',

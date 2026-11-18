@@ -42,11 +42,11 @@ public record TravelRequest(String query, UUID categoryId, BigDecimal totalBudge
         if (from == null && dates[0] == null) defaults.add("dateRange");
         if (dayStart == null && times[0] == null) defaults.add("dayStart");
         if (dayEnd == null && times[1] == null) defaults.add("dayEnd");
-        if (normalized.matches(".*(tre em|children|child|biet boi|swim|thiet bi|equipment|wheelchair).*")) {
+        if (normalized.matches(".*(tre em|children|child|biet boi|khong boi|boi loi|non-swimmer|non swimmer|swim|thiet bi|equipment|wheelchair).*")) {
             unsupported.add("PARTICIPATION_REQUIREMENTS_NEED_VENDOR_VERIFICATION");
         }
         if (latitude == null && normalized.matches(".*(gan toi|near me|my location).*")) questions.add("COORDINATES_REQUIRED");
-        if (latitude == null && normalized.matches(".*(my khe|man thai|son tra|hoi an|ngu hanh son).*")) unsupported.add("PLACE_NAME_REQUIRES_COORDINATES");
+        if (latitude == null && normalized.matches(".*\\b(hoi an)\\b.*")) unsupported.add("PLACE_NAME_REQUIRES_COORDINATES");
         BigDecimal parsedBudget = TravelQueryParser.budget(query);
         if (totalBudget == null && parsedBudget == null && TravelQueryParser.requestsBudget(query)) {
             questions.add("BUDGET_REQUIRED");

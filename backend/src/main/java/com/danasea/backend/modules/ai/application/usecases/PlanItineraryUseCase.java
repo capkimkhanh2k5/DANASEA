@@ -16,6 +16,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -339,6 +340,7 @@ public class PlanItineraryUseCase {
         List<Choice> choices = choices(found.candidates(), excludedServices, excludedSlots, restrictToServices);
         if (choices.size() >= MAX_CHOICES) unresolved.add("BOUNDED_SLOT_COVERAGE");
         List<String> requestedAreas = TravelQueryParser.coastalAreas(context.query());
+        List<String> includedActivities = TravelQueryParser.includedActivities(context.query());
         Map<UUID, TravelWeatherPort.Assessment> weatherCache = new HashMap<>();
         Map<String, Integer> rejectionCounts = new LinkedHashMap<>();
         List<Path> frontier = new ArrayList<>();
@@ -352,7 +354,7 @@ public class PlanItineraryUseCase {
             List<Path> expanded = new ArrayList<>(frontier);
             for (Path path : frontier) {
                 Path added = extend(path, choice, context, found.effectiveTotalBudget(), unresolved, weatherCache,
-                        rejectionCounts, requestedAreas, preferredServices, preferredSlots);
+                        rejectionCounts, requestedAreas, includedActivities, preferredServices, preferredSlots);
                 if (added != null) expanded.add(added);
             }
             frontier = trim(expanded, BEAM_WIDTH, requestedAreas.size());
@@ -406,7 +408,7 @@ public class PlanItineraryUseCase {
 
     private Path extend(Path path, Choice choice, TravelContext context, BigDecimal budget,
                         Set<String> unresolved, Map<UUID, TravelWeatherPort.Assessment> weatherCache,
-                        Map<String, Integer> rejectionCounts, List<String> requestedAreas,
+                        Map<String, Integer> rejectionCounts, List<String> requestedAreas, List<String> includedActivities,
                         Set<UUID> preferredServices, Set<UUID> preferredSlots) {
         LocalDate date = choice.slot().date();
         if (date.isBefore(context.from()) || date.isAfter(context.to())) {
@@ -501,9 +503,36 @@ public class PlanItineraryUseCase {
             if (primary != null) areas.add(primary);
         }
         int preferredHitDelta = (preferredSlots.contains(choice.slot().id()) ? 2 : 0)
-                + (preferredServices.contains(choice.service().id()) ? 1 : 0);
+                + (preferredServices.contains(choice.service().id()) ? 1 : 0)
+                + (matchesActivities(choice.service(), includedActivities) ? 2 : 0);
         return new Path(List.copyOf(items), total, path.relevance() + choice.relevance(), Set.copyOf(areas),
                 path.preferredHits() + preferredHitDelta);
+    }
+
+    private static boolean matchesActivities(PublishedService service, List<String> includedActivities) {
+        if (includedActivities == null || includedActivities.isEmpty()) return false;
+        String nameNorm = TravelQueryParser.normalize(service.name());
+        String descNorm = TravelQueryParser.normalize(service.description());
+        String nameCat = TravelQueryParser.normalize(
+                (service.name() == null ? "" : service.name()) + " "
+                        + (service.categoryName() == null ? "" : service.categoryName()) + " "
+                        + (service.categorySlug() == null ? "" : service.categorySlug()));
+        for (String activity : includedActivities) {
+            if (activity == null || activity.isBlank()) continue;
+            if ("sup".equals(activity)) {
+                boolean hasSupInName = hasWord(nameNorm, "sup");
+                boolean hasKayakInName = hasWord(nameNorm, "kayak") || hasWord(nameNorm, "kayaking");
+                if (hasSupInName || (!hasKayakInName && hasWord(descNorm, "sup"))) return true;
+            } else if (hasWord(nameCat, activity)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasWord(String text, String term) {
+        if (text == null || text.isBlank() || term == null || term.isBlank()) return false;
+        return Pattern.compile("(?<![a-z0-9])" + Pattern.quote(term) + "(?![a-z0-9])").matcher(text).find();
     }
 
     private static void reject(Map<String, Integer> rejectionCounts, String reason) {
@@ -517,13 +546,18 @@ public class PlanItineraryUseCase {
 
     private List<Path> trim(List<Path> paths, int limit, int requestedAreaCount) {
         Set<String> seen = new HashSet<>();
-        Comparator<Path> comparator = Comparator.comparingInt((Path path) -> path.items().size()).reversed();
+        Comparator<Path> comparator;
         if (requestedAreaCount >= 2) {
-            comparator = comparator.thenComparing(Comparator.comparingInt((Path path) -> path.coveredAreas().size()).reversed());
+            comparator = Comparator.comparingInt((Path path) -> path.coveredAreas().size()).reversed()
+                    .thenComparing(Comparator.comparingInt(Path::preferredHits).reversed())
+                    .thenComparing(Comparator.comparingInt((Path path) -> path.items().size()).reversed())
+                    .thenComparing(Path::total);
+        } else {
+            comparator = Comparator.comparingInt((Path path) -> path.items().size()).reversed()
+                    .thenComparing(Comparator.comparingInt(Path::preferredHits).reversed())
+                    .thenComparing(Path::total);
         }
         comparator = comparator
-                .thenComparing(Comparator.comparingInt(Path::preferredHits).reversed())
-                .thenComparing(Path::total)
                 .thenComparing(Comparator.comparingDouble(Path::relevance).reversed())
                 .thenComparing(this::fingerprint);
         return paths.stream().sorted(comparator)

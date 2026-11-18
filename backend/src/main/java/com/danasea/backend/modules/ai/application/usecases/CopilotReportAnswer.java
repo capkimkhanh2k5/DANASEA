@@ -515,6 +515,15 @@ final class CopilotReportAnswer {
             recs.forEach(ordered::add);
             if (CopilotRequest.matches(SLOT_HIGH_OCCUPANCY, q)) {
                 ordered.sort(Comparator.comparingDouble((JsonNode r) -> r.path("occupancyRate").asDouble(0.0)).reversed());
+            } else if (CopilotRequest.matches(SLOT_LOW_OCCUPANCY, q)) {
+                ordered.sort(Comparator
+                        .comparingInt((JsonNode r) -> {
+                            int booked = r.path("bookedCount").asInt(0);
+                            double occ = r.path("occupancyRate").asDouble(0.0);
+                            return (booked > 0 && occ < 20.0) ? 0 : (occ < 20.0 ? 1 : 2);
+                        })
+                        .thenComparingInt(r -> r.path("bookedCount").asInt(0))
+                        .thenComparingDouble(r -> r.path("occupancyRate").asDouble(0.0)));
             }
             List<String> lines = new ArrayList<>();
             int count = 0;
@@ -567,11 +576,19 @@ final class CopilotReportAnswer {
         String missingText = missing.isEmpty()
                 ? (english ? "none" : "không có mục thiếu")
                 : String.join("; ", missing);
-        return english
-                ? "Listing quality score: %d/100 (suggested category: %s — advisory only, publicationAuthorized=false; policyCompliant=%s). Missing checklist items: %s. Only use verified facts from your service; do not add unconfirmed perks or certifications."
-                        .formatted(score, category, compliant, missingText)
-                : "Điểm chất lượng bài đăng: %d/100 (danh mục gợi ý: %s — chỉ mang tính tham khảo, publicationAuthorized=false; tuân thủ nội dung=%s). Các mục còn thiếu: %s. Chỉ dùng thông tin thực tế của dịch vụ, không thêm quyền lợi hoặc chứng nhận chưa xác thực."
-                        .formatted(score, category, compliant, missingText);
+        JsonNode draft = data.path("drafts").path(english ? "EN" : "VI");
+        String draftTitle = draft.path("optimizedTitle").asText("");
+        String draftDesc = draft.path("optimizedDescription").asText("");
+        String draftBlock = (!draftTitle.isBlank() || !draftDesc.isBlank())
+                ? (english
+                        ? "\nSuggested title: \"%s\"\nSuggested description: %s".formatted(draftTitle, draftDesc)
+                        : "\nTiêu đề đề xuất: \"%s\"\nMô tả đề xuất: %s".formatted(draftTitle, draftDesc))
+                : "";
+        return (english
+                ? "Listing quality score: %d/100 (suggested category: %s — advisory only, publicationAuthorized=false; policyCompliant=%s). Missing checklist items: %s.%s\nOnly use verified facts from your service; do not add unconfirmed perks or certifications."
+                        .formatted(score, category, compliant, missingText, draftBlock)
+                : "Điểm chất lượng bài đăng: %d/100 (danh mục gợi ý: %s — chỉ mang tính tham khảo, publicationAuthorized=false; tuân thủ nội dung=%s). Các mục còn thiếu: %s.%s\nChỉ dùng thông tin thực tế của dịch vụ, không thêm quyền lợi hoặc chứng nhận chưa xác thực."
+                        .formatted(score, category, compliant, missingText, draftBlock));
     }
 
     static String contentAssessment(JsonNode data, boolean english) {

@@ -276,7 +276,6 @@ export function summarizeAssistantCard(card: AssistantCard, language: 'vi' | 'en
       return {
         title: copy('Phương thức thanh toán', 'Payment Providers'),
         rows,
-        note: copy('Nguồn trực tiếp từ PaymentProviderAvailability (/api/payments/providers).', 'Live configuration from PaymentProviderAvailability (/api/payments/providers).'),
       };
     }
     case 'BOOKING_CONFIRMATION': {
