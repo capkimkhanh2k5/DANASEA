@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from fastapi.testclient import TestClient
 
 from app.quyet_service import create_app
+from config.rubrics import RUBRICS, VERSION
 
 KEY = "unit-test-service-credentials-123456"
 AUTH = {"Authorization": "Bearer " + KEY}
@@ -48,9 +49,34 @@ class ServiceTest(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(model.calls[0][2])
-        self.assertEqual(response.json()["rubricVersion"], "danasea-2026-10-08-v1")
+        self.assertEqual(response.json()["rubricVersion"], VERSION)
+        self.assertEqual(response.json()["rubricVersion"], "danasea-2026-11-18-v2")
         self.assertFalse(response.json()["calibratedOnDanasea"])
         self.assertEqual(response.json()["answers"]["needs_review"]["noul"], 0.2)
+
+    def test_health_exposes_synced_rubric_version_and_unified_intent_contract(self) -> None:
+        with TestClient(create_app(FakeModel(), KEY)) as client:
+            health = client.get("/health")
+        self.assertEqual(health.status_code, 200)
+        self.assertEqual(health.json()["rubricVersion"], VERSION)
+        self.assertEqual(
+            set(RUBRICS["intent"]["intent"]["criteria"]),
+            {
+                "SEARCH",
+                "BOOKING",
+                "WEATHER",
+                "COMPARE",
+                "ITINERARY",
+                "SUPPORT",
+                "REVIEW",
+                "NEARBY",
+                "OTHER",
+            },
+        )
+        self.assertEqual(
+            set(RUBRICS["moderation"]),
+            {"external_payment", "spam", "abuse"},
+        )
 
     def test_client_cannot_override_questions(self) -> None:
         model = FakeModel()

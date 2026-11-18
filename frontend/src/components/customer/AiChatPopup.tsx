@@ -3,8 +3,7 @@ import { Minus, X, Send, RotateCcw } from 'lucide-react';
 import { useAiModalStore, type AiChatMessage } from '../../store/useAiModalStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { MarkdownText } from '../common/MarkdownText';
-import { Link } from 'react-router-dom';
-import { summarizeAssistantCard } from './assistantCardSummary';
+import { AssistantCardList } from './AssistantCardList';
 
 const QUICK_SUGGESTIONS_VI = [
   'Thời tiết & sóng biển hôm nay?',
@@ -21,7 +20,7 @@ const QUICK_SUGGESTIONS_EN = [
 ];
 
 export const AiChatPopup: React.FC = () => {
-  const { isOpen, messages, isGenerating, closeAiModal, sendMessage, clearHistory } = useAiModalStore();
+  const { isOpen, conversationId, messages, isGenerating, closeAiModal, sendMessage, clearHistory } = useAiModalStore();
   const { language } = useLanguageStore();
   const isEn = language === 'en';
 
@@ -135,24 +134,12 @@ export const AiChatPopup: React.FC = () => {
                 {msg.responseStatus === 'PARTIAL' && msg.cards?.length ? (
                   <p className="mt-2 text-slate-600">{isEn ? 'Partial result' : 'Kết quả một phần'}</p>
                 ) : null}
-                {msg.cards?.map((card) => {
-                  const summary = summarizeAssistantCard(card, isEn ? 'en' : 'vi');
-                  if (!summary) return null;
-                  return (
-                    <section key={card.id} className="mt-2 border-t border-slate-200 pt-2 space-y-1">
-                      <p className="font-semibold">{summary.title}</p>
-                      <dl>
-                        {summary.rows.map((row, index) => (
-                          <div key={index} className="mb-1">
-                            <dt>{row.href ? <Link className="text-sky-800 underline" to={row.href}>{row.label}</Link> : row.label}</dt>
-                            {row.value ? <dd className="font-medium">{row.value}</dd> : null}
-                          </div>
-                        ))}
-                      </dl>
-                      {summary.note ? <p className="text-slate-600">{summary.note}</p> : null}
-                    </section>
-                  );
-                })}
+                <AssistantCardList
+                  cards={msg.cards}
+                  conversationId={conversationId}
+                  language={isEn ? 'en' : 'vi'}
+                  onQuickPrompt={handleSuggestionClick}
+                />
               </div>
             )}
           </div>

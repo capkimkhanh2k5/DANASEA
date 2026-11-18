@@ -161,6 +161,51 @@ export function summarizeAssistantCard(card: AssistantCard, language: 'vi' | 'en
       return rows.length ? { title: copy('Chuẩn bị đi biển', 'Marine briefing'), rows } : null;
     }
     case 'ITINERARY': {
+      const proposal = object(facts.proposal);
+      const pendingProposals = list(facts.pendingProposals);
+      const activeProposal = Object.keys(proposal).length ? proposal
+        : (pendingProposals.length ? object(pendingProposals[0]) : {});
+      if (Object.keys(activeProposal).length) {
+        const plan = object(activeProposal.plan);
+        const items = list(plan.items);
+        const cost = numeric(plan.totalPrice);
+        const removed = list(facts.removedSlotIds).length || list(activeProposal.removedSlotIds).length;
+        const added = list(facts.addedSlotIds).length || list(activeProposal.addedSlotIds).length;
+        if (string(activeProposal.state)) add(copy('Trạng thái đề xuất', 'Proposal state'), string(activeProposal.state));
+        if (numeric(activeProposal.baseVersion) !== undefined) {
+          add(copy('Phiên bản gốc', 'Base version'), 'v' + String(activeProposal.baseVersion));
+        }
+        if (removed || added) {
+          add(copy('Thay đổi ca', 'Slot diff'), `-${removed} / +${added}`);
+        }
+        for (const item of items.slice(0, 5)) {
+          const details = object(item);
+          add(string(details.serviceTitle) ?? string(details.serviceName) ?? copy('Hoạt động', 'Activity'),
+            [time(details.startTime), time(details.endTime)].filter(Boolean).join(' – '));
+        }
+        if (cost !== undefined) add(copy('Tổng dự kiến mới', 'Updated estimate'), vnd(cost));
+        return {
+          title: copy('Đề xuất điều chỉnh lịch trình', 'Itinerary Adjustment Proposal'),
+          rows,
+          note: copy('Đề xuất chưa thay đổi lịch gốc hay đơn đã thanh toán trước khi bạn chấp nhận.', 'Proposal does not alter your saved itinerary or paid bookings until accepted.'),
+        };
+      }
+      if (list(facts.items).length && !list(facts.alternatives).length) {
+        if (numeric(facts.version) !== undefined) add(copy('Phiên bản', 'Version'), 'v' + String(facts.version));
+        if (string(facts.lifecycle)) add(copy('Trạng thái', 'Lifecycle'), string(facts.lifecycle));
+        for (const value of list(facts.items).slice(0, 6)) {
+          const item = object(value);
+          add(string(item.serviceName) ?? string(item.serviceTitle) ?? copy('Hoạt động', 'Activity'),
+            [string(item.start)?.slice(11, 16), string(item.end)?.slice(11, 16)].filter(Boolean).join(' – ') || string(item.weatherStatus));
+        }
+        const planTotal = numeric(object(facts.plan).totalPrice);
+        if (planTotal !== undefined) add(copy('Tổng dự kiến', 'Estimated total'), vnd(planTotal));
+        return {
+          title: copy('Chi tiết lịch trình đã lưu', 'Saved Itinerary Detail'),
+          rows,
+          note: copy('Lịch trình đã lưu không tự giữ chỗ tồn kho.', 'Saved itineraries do not reserve inventory.'),
+        };
+      }
       for (const value of list(facts.alternatives).slice(0, 3)) {
         const plan = object(object(value).plan);
         const cost = numeric(plan.totalPrice);
@@ -180,7 +225,68 @@ export function summarizeAssistantCard(card: AssistantCard, language: 'vi' | 'en
           : copy('Chưa có lịch phù hợp với các tiêu chí hiện tại.', 'No itinerary matched the current criteria.'),
       };
     }
+    case 'ITINERARY_LIST': {
+      const itineraries = list(facts.itineraries);
+      itineraries.slice(0, 5).forEach((entry, idx) => {
+        const item = object(entry);
+        const index = numeric(item.index) ?? idx + 1;
+        const ver = numeric(item.version);
+        const total = numeric(item.totalPrice);
+        const range = [date(item.from, language), date(item.to, language)].filter(Boolean).join(' – ');
+        add(
+          copy(`Lịch trình #${index}`, `Itinerary #${index}`),
+          [string(item.lifecycle), ver !== undefined ? `v${ver}` : undefined, range, total !== undefined ? vnd(total) : undefined]
+            .filter(Boolean)
+            .join(' · ')
+        );
+      });
+      return {
+        title: copy('Danh sách lịch trình đã lưu', 'Saved Itineraries'),
+        rows,
+        note: rows.length
+          ? copy('Chọn theo số thứ tự (ví dụ: lịch trình số 1) để xem chi tiết hoặc điều chỉnh.', 'Refer by number (e.g. itinerary #1) to inspect or adjust.')
+          : copy('Bạn chưa có lịch trình đã lưu nào.', 'You have no saved itineraries yet.'),
+      };
+    }
+    case 'ITINERARY_HISTORY': {
+      const revisions = list(facts.revisions);
+      revisions.slice(-4).forEach((revObj) => {
+        const rev = object(revObj);
+        const ver = numeric(rev.version);
+        add(
+          ver !== undefined ? `v${ver}` : copy('Phiên bản', 'Revision'),
+          [string(rev.lifecycle), string(rev.reason)].filter(Boolean).join(' · ')
+        );
+      });
+      const restored = object(facts.restoredProposal);
+      if (Object.keys(restored).length) {
+        add(copy('Đề xuất khôi phục', 'Restore proposal'), `${string(restored.state) ?? 'PENDING'} (v${String(restored.baseVersion ?? 0)})`);
+      }
+      return rows.length ? {
+        title: copy('Lịch sử phiên bản lịch trình', 'Itinerary Version History'),
+        rows,
+        note: copy('Khôi phục phiên bản tạo một đề xuất mới cần kiểm tra lại giá, ca và thời tiết trước khi chấp nhận.', 'Restoring a revision creates a proposal revalidated against live price, slot, and weather before acceptance.'),
+      } : null;
+    }
+    case 'PAYMENT_PROVIDERS': {
+      const enabled = list(facts.enabledProviders).filter((v): v is string => typeof v === 'string');
+      const disabled = list(facts.disabledProviders).filter((v): v is string => typeof v === 'string');
+      add(copy('Đang hỗ trợ', 'Supported & active'), enabled.length ? enabled.join(', ') : copy('Chưa có', 'None'));
+      if (disabled.length) add(copy('Hiện chưa bật', 'Currently disabled'), disabled.join(', '));
+      return {
+        title: copy('Phương thức thanh toán', 'Payment Providers'),
+        rows,
+        note: copy('Nguồn trực tiếp từ PaymentProviderAvailability (/api/payments/providers).', 'Live configuration from PaymentProviderAvailability (/api/payments/providers).'),
+      };
+    }
     case 'BOOKING_CONFIRMATION': {
+      if (card.status === 'out_of_stock') {
+        return {
+          title: copy('Thông tin đặt chỗ', 'Booking details'),
+          rows: [{ label: copy('Trạng thái ca', 'Slot status'), value: copy('Hết chỗ', 'Out of stock') }],
+          note: copy('Ca đã chọn vừa hết chỗ. Hệ thống không giữ chỗ hay overbook.', 'The selected slot just sold out. No hold or overbooking occurred.'),
+        };
+      }
       if (card.status !== 'CONFIRMATION_PENDING') return null;
       const amount = numeric(facts.partyTotal);
       add(copy('Khởi hành', 'Departure'), string(facts.date)?.replace('T', ' '));
@@ -192,7 +298,7 @@ export function summarizeAssistantCard(card: AssistantCard, language: 'vi' | 'en
       const grouping = list(facts.participantsPerPackage).filter((value) => numeric(value) !== undefined);
       if (grouping.length) add(copy('Số khách từng gói', 'Guests per package'), grouping.join(' + '));
       return { title: copy('Thông tin đặt chỗ', 'Booking details'), rows,
-        note: copy('Mở trang dịch vụ để kiểm tra giá và ca còn chỗ. Bạn chưa thanh toán.', 'Open the service page to check the price and departure. You have not paid.') };
+        note: copy('Kiểm tra giá, phân nhóm và bấm Xác nhận bên dưới khi sẵn sàng (chưa thu tiền tự động).', 'Review pricing and grouping and click Confirm below when ready (no automatic charge).') };
     }
     default:
       return null;

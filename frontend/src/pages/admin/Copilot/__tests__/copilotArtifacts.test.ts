@@ -10,6 +10,8 @@ import {
   extractCancellationBreakdownData,
   extractPlatformMetricsData,
   extractQueueOverviewData,
+  extractOrderRiskAssessmentData,
+  extractContentAssessmentData,
 } from '../copilotArtifactHelpers';
 
 describe('Copilot Artifact Helpers & Safety Handlers', () => {
@@ -222,6 +224,34 @@ describe('Copilot Artifact Helpers & Safety Handlers', () => {
       assert.equal(res[0].severity, 'HEALTHY');
       assert.equal(res[0].gmv, 0);
       assert.equal(res[0].cancellationRate, 0);
+    });
+
+    it('extracts order risk assessment and content moderation artifacts safely', () => {
+      const risk = extractOrderRiskAssessmentData({
+        orderId: 'order-123',
+        caseId: null,
+        status: 'NEEDS_REVIEW',
+        ruleVersion: 'velocity-demo-v1',
+        riskSignals: ['HIGH_VELOCITY'],
+        fraudConfirmed: false,
+        newCaseCreated: false,
+      });
+      assert.ok(risk);
+      assert.equal(risk.fraudConfirmed, false);
+      assert.equal(risk.newCaseCreated, false);
+      assert.deepEqual(risk.riskSignals, ['HIGH_VELOCITY']);
+
+      const mod = extractContentAssessmentData({
+        status: 'NEEDS_REVIEW',
+        reasonCodes: ['EXTERNAL_CONTACT_OR_LINK'],
+        contactMatches: ['https://example.com'],
+        publicationAuthorized: false,
+        evidenceType: 'TEXT_ONLY',
+        negatedWarningOnly: false,
+      });
+      assert.ok(mod);
+      assert.equal(mod.publicationAuthorized, false);
+      assert.equal(mod.status, 'NEEDS_REVIEW');
     });
   });
 });

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
+import com.danasea.backend.modules.ai.application.dtos.TravelRequest;
 import com.danasea.backend.modules.ai.application.ports.*;
 import com.danasea.backend.modules.ai.application.usecases.*;
 import com.danasea.backend.modules.ai.domain.exceptions.AiResourceNotFoundException;
@@ -214,5 +215,120 @@ class CustomerAiFeaturesTest {
         assertThat(useCase.execute(owner, "Vui lòng chuyển tiền ngoài DANASEA.", false).status()).isEqualTo("NEEDS_REVIEW");
         assertThat(useCase.execute(owner, "Không chuyển tiền ngoài DANASEA. Gọi 0901234567", false).reasonCodes())
                 .contains("EXTERNAL_CONTACT_DETECTED");
+    }
+
+    @Test void futureHorizonBeyond14DaysIsRejectedWhileDay14IsAllowed() {
+        LocalDate today = LocalDate.now(TravelContext.ZONE);
+        var day14 = new TravelContext("", null, null, 1, today.plusDays(14), today.plusDays(14),
+                null, null, null, null, null, List.of(), 10, 3, false);
+        day14.validateCurrentDates();
+
+        var day15 = new TravelContext("", null, null, 1, today.plusDays(15), today.plusDays(15),
+                null, null, null, null, null, List.of(), 10, 3, false);
+        assertThatThrownBy(day15::validateCurrentDates).isInstanceOf(IllegalArgumentException.class);
+
+        var day30 = new TravelContext("", null, null, 1, today.plusDays(30), today.plusDays(30),
+                null, null, null, null, null, List.of(), 10, 3, false);
+        assertThatThrownBy(day30::validateCurrentDates).isInstanceOf(IllegalArgumentException.class);
+
+        var spanCrossing14 = new TravelContext("", null, null, 1, today.plusDays(10), today.plusDays(15),
+                null, null, null, null, null, List.of(), 10, 3, false);
+        assertThatThrownBy(spanCrossing14::validateCurrentDates).isInstanceOf(IllegalArgumentException.class);
+
+        var requestDay30 = new TravelRequest("SUP", null, null, 1, today.plusDays(30), null,
+                null, null, null, null, null, null, null, null, null);
+        assertThatThrownBy(requestDay30::context).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void parserExtractsMaxActivitiesAndTravelRequestAppliesDefaultAndOverride() {
+        assertThat(TravelQueryParser.maxActivities("tối đa 4 hoạt động")).isEqualTo(4);
+        assertThat(TravelQueryParser.maxActivities("toi da 4 hoat dong")).isEqualTo(4);
+        assertThat(TravelQueryParser.maxActivities("4 hoạt động trong ngày")).isEqualTo(4);
+        assertThat(TravelQueryParser.maxActivities("max 4 activities")).isEqualTo(4);
+        assertThat(TravelQueryParser.maxActivities("up to 4 activities")).isEqualTo(4);
+        assertThat(TravelQueryParser.maxActivities("tối đa 9 hoạt động")).isEqualTo(5);
+        assertThat(TravelQueryParser.maxActivities("ngân sách tối đa 2 triệu")).isNull();
+
+        var parsed = new TravelRequest("Trong một ngày, chọn tối đa 4 hoạt động nhưng không lặp lại cùng dịch vụ.",
+                null, null, 2, date, date, null, null, null, null, null, null, null, null, null).context();
+        assertThat(parsed.maxActivities()).isEqualTo(4);
+
+        var explicit = new TravelRequest("tối đa 4 hoạt động",
+                null, null, 2, date, date, null, null, null, null, null, null, null, 2, null).context();
+        assertThat(explicit.maxActivities()).isEqualTo(2);
+
+        var defaulted = new TravelRequest("chèo SUP",
+                null, null, 2, date, date, null, null, null, null, null, null, null, null, null).context();
+        assertThat(defaulted.maxActivities()).isEqualTo(3);
+    }
+
+    @Test void supSearchExcludesKayakInSharedCategoryAndSupportFalseMatches() {
+        Slot supSlot = new Slot(UUID.randomUUID(), date, LocalTime.of(9, 0), LocalTime.of(10, 0), 10);
+        Option supOpt = new Option(UUID.randomUUID(), "SUP", "PER_PERSON", new BigDecimal("200000"), 3, new BigDecimal("600000"), "", List.of(supSlot));
+        var sup = new PublishedService(UUID.randomUUID(), UUID.randomUUID(), "Chèo SUP bình minh Mân Thái", "Trải nghiệm chèo SUP",
+                null, "Chèo SUP & Kayak", "cheo-sup-kayak", "Mân Thái", 16.086, 108.250, 60, false, new BigDecimal("4.8"), 10, List.of(supOpt));
+        var kayak = new PublishedService(UUID.randomUUID(), UUID.randomUUID(), "Chèo thuyền Kayak Bãi Rạng", "Hỗ trợ support khách du lịch",
+                null, "Chèo SUP & Kayak", "cheo-sup-kayak", "Sơn Trà", 16.106, 108.277, 60, false, new BigDecimal("4.9"), 10, List.of(supOpt));
+        var supportOnly = new PublishedService(UUID.randomUUID(), UUID.randomUUID(), "Dịch vụ Support Tour", "Support customer",
+                null, "Other", "other", "Đà Nẵng", 16.07, 108.22, 60, false, new BigDecimal("4.9"), 10, List.of(supOpt));
+        when(data.search(any())).thenReturn(List.of(kayak, supportOnly, sup));
+        var req = new TravelRequest("Tôi muốn tìm các dịch vụ chèo SUP tại Đà Nẵng vào ngày mai.", null, null, 3,
+                date, date, null, null, null, null, null, null, null, null, null).context();
+        var result = discovery.execute(req, "SEARCH", SupportedLanguage.VI);
+        assertThat(result.candidates()).extracting(c -> c.service().id()).containsExactly(sup.id());
+    }
+
+    @Test void nonSwimmerAndNoDeepDivingExcludesDivingWithoutBreakingGentleTours() {
+        assertThat(TravelQueryParser.includedActivities("Tôi đi Đà Nẵng lần đầu")).isEmpty();
+        assertThat(TravelQueryParser.excludedActivities("Tôi muốn trải nghiệm nhẹ nhàng, không biết bơi và không thích lặn sâu"))
+                .containsExactly("lan");
+
+        Slot slot = new Slot(UUID.randomUUID(), date, LocalTime.of(9, 0), LocalTime.of(10, 0), 10);
+        Option opt = new Option(UUID.randomUUID(), "Std", "PER_PERSON", new BigDecimal("200000"), 2, new BigDecimal("400000"), "", List.of(slot));
+        var diving = new PublishedService(UUID.randomUUID(), UUID.randomUUID(), "Lặn ngắm san hô Sơn Trà", "Lặn biển",
+                null, "Lặn biển", "lan-bien", "Sơn Trà", 16.10, 108.27, 60, false, null, 0, List.of(opt));
+        var scuba = new PublishedService(UUID.randomUUID(), UUID.randomUUID(), "Scuba Diving Bãi Nam", "Lặn sâu",
+                null, "Diving", "scuba-diving", "Sơn Trà", 16.10, 108.27, 60, false, null, 0, List.of(opt));
+        var gentle = new PublishedService(UUID.randomUUID(), UUID.randomUUID(), "Du thuyền ngắm cảnh Island View", "Nhẹ nhàng",
+                null, "Du thuyền", "du-thuyen", "Sông Hàn", 16.07, 108.22, 60, false, null, 0, List.of(opt));
+        when(data.search(any())).thenReturn(List.of(diving, scuba, gentle));
+
+        var req = new TravelRequest("Tôi muốn trải nghiệm nhẹ nhàng, không biết bơi và không thích lặn sâu",
+                null, null, 2, date, date, null, null, null, null, null, null, null, null, null).context();
+        var result = discovery.execute(req, "SEARCH", SupportedLanguage.VI);
+        assertThat(result.status()).isEqualTo("AVAILABLE");
+        assertThat(result.limitations()).contains("PARTICIPATION_REQUIREMENTS_NEED_VENDOR_VERIFICATION");
+        assertThat(result.candidates()).extracting(c -> c.service().id()).containsExactly(gentle.id());
+    }
+
+    @Test void multiAreaRecommendationWidensCatalogQueryWhileKeepingSingleActivityStrict() {
+        String u24Query = "Tôi muốn vừa chèo SUP ở Mân Thái vừa trải nghiệm biển Sơn Trà, hãy sắp xếp hợp lý";
+        assertThat(TravelQueryParser.isMultiActivityOrMultiAreaRequest(u24Query)).isTrue();
+        assertThat(TravelQueryParser.isMultiActivityOrMultiAreaRequest("Tôi muốn tìm các dịch vụ chèo SUP tại Đà Nẵng vào ngày mai.")).isFalse();
+
+        when(data.search(any())).thenReturn(List.of());
+        var u24Ctx = new TravelRequest(u24Query, null, null, 2, date, date, null, null, null, null, null, null, null, null, null).context();
+        discovery.execute(u24Ctx, "RECOMMENDATION", SupportedLanguage.VI);
+        verify(data).search(argThat(q -> q.keyword() == null && q.includedActivities().isEmpty()
+                && q.rankingInterests().containsAll(List.of("sup", "man thai", "son tra"))));
+    }
+
+    @Test void undatedTodaySearchWidensToSevenDaysWhileExplicitTodayStaysStrict() {
+        LocalDate today = LocalDate.now(TravelContext.ZONE);
+        assertThat(TravelQueryParser.mentionsToday("Tôi đi Đà Nẵng lần đầu")).isFalse();
+        assertThat(TravelQueryParser.mentionsToday("Hôm nay có tour nào không?")).isTrue();
+
+        when(data.searchPage(any())).thenReturn(new SearchPage(List.of(), null, true, 0, List.of()));
+        var undated = new TravelRequest("Tôi đi Đà Nẵng lần đầu", null, null, 1, today, today,
+                null, null, null, null, null, null, null, null, null).context();
+        var widened = discovery.execute(undated, "RECOMMENDATION", SupportedLanguage.VI);
+        assertThat(widened.limitations()).contains("EXPANDED_DATE_WINDOW_UPCOMING_7D");
+        assertThat(widened.context().to()).isEqualTo(today.plusDays(7));
+
+        var explicitToday = new TravelRequest("Hôm nay đi chơi biển", null, null, 1, today, today,
+                null, null, null, null, null, null, null, null, null).context();
+        var strict = discovery.execute(explicitToday, "SEARCH", SupportedLanguage.VI);
+        assertThat(strict.limitations()).doesNotContain("EXPANDED_DATE_WINDOW_UPCOMING_7D");
+        assertThat(strict.context().to()).isEqualTo(today);
     }
 }

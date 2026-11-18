@@ -7,6 +7,7 @@ import java.time.LocalTime;
 import java.time.DayOfWeek;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -21,9 +22,25 @@ public final class TravelQueryParser {
             + "\\b(?:duoi|toi da|under|up to)\\s+\\d[\\d.,]*\\s*(?:trieu|nghin|ngan|k|vnd|dong|d|₫|usd|eur)(?![\\p{L}\\d])");
     private static final Pattern NO_BUDGET_LIMIT = Pattern.compile(
             "\\b(?:khong gioi han ngan sach|khong gioi han ve ngan sach|no budget limit|unlimited budget)\\b");
-    private static final Map<String, String> ACTIVITIES = Map.of(
-            "sup", "SUP", "kayak", "kayak", "lan bien", "lặn", "snorkel", "lặn",
-            "diving", "lặn", "cano", "cano", "du thuyen", "du thuyền");
+    private static final Pattern MAX_ACTIVITIES = Pattern.compile(
+            "(?:\\b(?:toi da|max|maximum|up to)\\s+)?(?<!\\d)(\\d{1,3})\\s*(?:hoat dong|trai nghiem|activities|activity)\\b");
+    private static final Pattern ACCENTED_DIVING = Pattern.compile("(?<![\\p{L}])lặn(?![\\p{L}])");
+    private static final List<String> COASTAL_AREAS = List.of(
+            "man thai", "bai rang", "bai nam", "my khe", "non nuoc",
+            "ngu hanh son", "cu lao cham", "nam o", "xuan thieu", "song han", "son tra");
+    private static final Map<String, String> ACTIVITIES = Map.ofEntries(
+            Map.entry("sup", "SUP"),
+            Map.entry("kayak", "kayak"),
+            Map.entry("lan bien", "lặn"),
+            Map.entry("lan sau", "lặn"),
+            Map.entry("lan ngam san ho", "lặn"),
+            Map.entry("lan san ho", "lặn"),
+            Map.entry("snorkel", "lặn"),
+            Map.entry("snorkeling", "lặn"),
+            Map.entry("diving", "lặn"),
+            Map.entry("scuba", "lặn"),
+            Map.entry("cano", "cano"),
+            Map.entry("du thuyen", "du thuyền"));
 
     private TravelQueryParser() {}
 
@@ -42,7 +59,8 @@ public final class TravelQueryParser {
     public static List<String> excludedActivities(String text) { return activities(text, true); }
 
     private static List<String> activities(String text, boolean negative) {
-        String normalized = normalize(text).replaceAll("\\b(nhung|but|ma|instead|chon|tim|choose|find)\\b", ",");
+        String prepared = text == null ? "" : ACCENTED_DIVING.matcher(text.toLowerCase(Locale.ROOT)).replaceAll("lan bien");
+        String normalized = normalize(prepared).replaceAll("\\b(nhung|but|ma|instead|chon|tim|choose|find)\\b", ",");
         List<String> found = new ArrayList<>();
         for (var entry : ACTIVITIES.entrySet()) {
             var matcher = Pattern.compile("(?<![a-z])" + Pattern.quote(entry.getKey()) + "(?![a-z])").matcher(normalized);
@@ -53,6 +71,51 @@ public final class TravelQueryParser {
             }
         }
         return found.stream().distinct().sorted().toList();
+    }
+
+    public static Integer maxActivities(String text) {
+        if (text == null || text.isBlank()) return null;
+        var matcher = MAX_ACTIVITIES.matcher(normalize(text));
+        if (!matcher.find()) return null;
+        int parsed = Integer.parseInt(matcher.group(1));
+        return Math.max(1, Math.min(5, parsed));
+    }
+
+    public static List<String> coastalAreas(String text) {
+        String normalized = normalize(text);
+        if (normalized.isBlank()) return List.of();
+        List<String> areas = new ArrayList<>();
+        for (String area : COASTAL_AREAS) {
+            if (Pattern.compile("(?<![a-z])" + Pattern.quote(area) + "(?![a-z])").matcher(normalized).find()) {
+                areas.add(area);
+            }
+        }
+        return List.copyOf(areas);
+    }
+
+    public static String primaryArea(String name, String address, String description, Collection<String> requestedAreas) {
+        List<String> candidates = (requestedAreas == null || requestedAreas.isEmpty())
+                ? COASTAL_AREAS
+                : COASTAL_AREAS.stream().filter(requestedAreas::contains).toList();
+        for (String field : List.of(normalize(name), normalize(description), normalize(address))) {
+            if (field.isBlank()) continue;
+            for (String area : candidates) {
+                if (Pattern.compile("(?<![a-z])" + Pattern.quote(area) + "(?![a-z])").matcher(field).find()) {
+                    return area;
+                }
+            }
+        }
+        return null;
+    }
+
+    public static boolean isMultiActivityOrMultiAreaRequest(String text) {
+        if (text == null || text.isBlank()) return false;
+        if (includedActivities(text).size() >= 2) return true;
+        if (coastalAreas(text).size() >= 2) return true;
+        String normalized = normalize(text);
+        if (normalized.matches(".*\\bvua\\b.*\\bvua\\b.*")) return true;
+        return !includedActivities(text).isEmpty()
+                && normalized.matches(".*\\b(va|cung|ket hop|roi|and|with|then)\\b.*\\b(trai nghiem bien|hoat dong bien|tour bien|du lich bien|kham pha bien|marine experience|sea experience)\\b.*");
     }
 
     public static Integer partySize(String text) {
@@ -136,5 +199,16 @@ public final class TravelQueryParser {
         double a = Math.pow(Math.sin(dlat / 2), 2) + Math.cos(Math.toRadians(lat1))
                 * Math.cos(Math.toRadians(lat2)) * Math.pow(Math.sin(dlon / 2), 2);
         return 6371 * 2 * Math.asin(Math.sqrt(Math.min(1, a)));
+    }
+
+    public static boolean mentionsToday(String text) {
+        String normalized = normalize(text);
+        if (normalized.isBlank()) return false;
+        if (normalized.matches(".*\\b(hom nay|sang nay|chieu nay|toi nay|today|tonight|this afternoon|this evening)\\b.*")) {
+            return true;
+        }
+        LocalDate[] explicit = dates(text);
+        LocalDate today = LocalDate.now(TravelContext.ZONE);
+        return explicit[0] != null && explicit[0].equals(today);
     }
 }

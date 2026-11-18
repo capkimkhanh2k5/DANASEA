@@ -32,6 +32,8 @@ public class PolicyChatAnswer {
             + "nguyen nhan nao|risk|rui ro|revenue|report|metrics");
     private static final Pattern CHANGE = CopilotRequest.words("doi lich|doi tra|reschedul(?:e|ing)");
     private static final Pattern HOURS = CopilotRequest.words("huy truoc|truoc gio khoi hanh|cancel (?:before|more than)|hours before");
+    private static final Pattern VERSION_COMPARE = CopilotRequest.words(
+            "36 (?:tieng|gio|hours?)|70%|phien ban|legacy|standard_24h_v2|legacy_tiered_v1");
     private static final Pattern DRAFT = CopilotRequest.words("viet|soan|tra loi khach|phan hoi|hua|cam ket|draft|promise");
     private static final Pattern AUTOMATIC_REFUND = CopilotRequest.words(
             "tu quyet dinh|tu dong hoan|tu hoan|bo qua (?:buoc )?(?:duyet|xac nhan|quy tac)|"
@@ -87,15 +89,22 @@ public class PolicyChatAnswer {
         String answer = messages.get("ai.policy.standard", language,
                 percentage(tiers.getFirst().percentage()), percentage(tiers.getLast().percentage()),
                 percentage(snapshot.weatherOrVendorFaultPercentage()));
-        if (HOURS.matcher(text).find()) {
+        if (HOURS.matcher(text).find() || VERSION_COMPARE.matcher(text).find()) {
             // The common policy is a two-tier policy. An existing order can still carry a different version.
+            if (VERSION_COMPARE.matcher(text).find()) {
+                answer += "\n\n" + messages.get("ai.policy.version_comparison", language);
+            }
             answer += "\n\n" + messages.get("ai.policy.order_version", language);
         }
         if (CHANGE.matcher(text).find()) {
             answer += "\n\n" + messages.get("ai.policy.reschedule", language);
         }
         return new Reply(answer, "get_policy", "ANSWERED",
-                Map.of("policy", snapshot, "orderSpecificEligibilityChecked", false,
+                Map.of("policy", snapshot,
+                        "policyVersions", Map.of(
+                                "defaultPolicy", "STANDARD_24H_V2",
+                                "legacyPolicy", "LEGACY_TIERED_V1"),
+                        "orderSpecificEligibilityChecked", false,
                         "changeRequestRequiresHumanApproval", true));
     }
 

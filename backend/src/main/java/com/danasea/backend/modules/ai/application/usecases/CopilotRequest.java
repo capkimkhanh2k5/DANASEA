@@ -17,8 +17,8 @@ final class CopilotRequest {
             "^(?:gmv la gi|doanh thu la gi|what is gmv|what does gmv mean)[?!.]*$");
     private static final Pattern PLATFORM = words("toan san|ca san|toan bo doi tac|tat ca doi tac|toan nen tang|toan he thong|cua (?:san )?danasea|"
             + "doanh thu he thong|gmv danasea|platform wide|platform revenue|platform gmv|across the platform|entire platform|all vendors");
-    private static final Pattern OTHER_VENDOR = words("gian hang khac|doi tac khac|vendor khac|nha cung cap khac|"
-            + "another vendor|other vendors|another shop");
+    private static final Pattern OTHER_VENDOR = words("gian hang khac|doi tac khac|vendor khac|nha cung cap khac|doi thu|"
+            + "another vendor|other vendors|another shop|competitor");
     private static final Pattern SERVICE = words("dich vu|services?");
     private static final Pattern COUNT = words("may|bao nhieu|tong|so luong|dem|how many|count|total|number of");
     private static final Pattern PUBLISHED = words("da dang|dang cong khai|dang hoat dong|da xuat ban|published|active");
@@ -27,6 +27,10 @@ final class CopilotRequest {
             + "recommend a tour|plan an itinerary");
     private static final Pattern BOOKING_REPORT = words("luot dat|don dat|tinh hinh dat|thong ke|bao cao|booking metrics|"
             + "booking volume|booking count|how many|top|nhieu nhat|bao nhieu|ti le");
+    private static final Pattern MODERATION_OR_OPERATIONAL = words(
+            "bai dang|bai viet|mo ta|kiem duyet|duong link|link|so dien thoai|sdt|hotline|"
+                    + "chuyen khoan|chuyen tien|ngoai san|ngoai danasea|ngoai nen tang|quang cao|"
+                    + "vi pham|xu ly sao|listing|moderate|moderation|external link|outside danasea|off[- ]?platform");
     private static final Pattern TODAY = Pattern.compile("^(?:hom nay la ngay may|hom nay la ngay gi|hom nay thu may|"
             + "hom nay la thu may|what is today's date|what date is it today|what day is it today)[?!.]*$");
     private static final Pattern DATE = Pattern.compile("(?<![\\d/])(?:\\d{4}-\\d{2}-\\d{2}|"
@@ -54,7 +58,7 @@ final class CopilotRequest {
     }
 
     static boolean isOutsideVendorScope(String text) {
-        return (isRevenue(text) || isServiceCount(text))
+        return (isRevenue(text) || isServiceCount(text) || matches(words("thong ke|so lieu|metrics|stats|bao cao"), text))
                 && (matches(PLATFORM, text) || matches(OTHER_VENDOR, text));
     }
 
@@ -67,7 +71,7 @@ final class CopilotRequest {
     }
 
     static boolean isPersonalBooking(String text) {
-        return matches(CUSTOMER_BOOKING, text) && !matches(BOOKING_REPORT, text);
+        return matches(CUSTOMER_BOOKING, text) && !matches(BOOKING_REPORT, text) && !matches(MODERATION_OR_OPERATIONAL, text);
     }
 
     static boolean isDateQuestion(String text) {

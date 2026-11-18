@@ -37,3 +37,37 @@ test('shows the actual date and time on a marine briefing card', () => {
   }, 'vi');
   assert.equal(summary?.rows[0]?.value, '08/11/2026 · 08:30');
 });
+
+test('summarizes payment providers, itinerary list, replan proposal, and out_of_stock booking cards', () => {
+  const paySummary = summarizeAssistantCard({
+    id: 'pay', type: 'PAYMENT_PROVIDERS', status: 'AVAILABLE',
+    facts: { enabledProviders: ['VNPAY', 'PAYPAL'], disabledProviders: ['MOMO'] },
+  }, 'vi');
+  assert.match(paySummary?.rows[0]?.value ?? '', /VNPAY, PAYPAL/);
+
+  const listSummary = summarizeAssistantCard({
+    id: 'it-list', type: 'ITINERARY_LIST', status: 'AVAILABLE',
+    facts: { itineraries: [{ index: 1, version: 2, lifecycle: 'ACCEPTED', totalPrice: 500000, from: '2026-11-20', to: '2026-11-20' }] },
+  }, 'vi');
+  assert.match(listSummary?.rows[0]?.label ?? '', /#1/);
+
+  const proposalSummary = summarizeAssistantCard({
+    id: 'it-prop', type: 'ITINERARY', status: 'PROPOSED',
+    facts: {
+      removedSlotIds: ['s1'],
+      addedSlotIds: ['s2'],
+      proposal: {
+        id: 'p1', baseVersion: 2, state: 'PENDING',
+        plan: { totalPrice: 650000, items: [{ serviceTitle: 'SUP Mỹ Khê', startTime: [14, 0], endTime: [16, 0] }] },
+      },
+    },
+  }, 'vi');
+  assert.match(proposalSummary?.title ?? '', /Đề xuất/);
+  assert.match(proposalSummary?.rows.map((r) => r.value).join(' ') ?? '', /-1 \/ \+1/);
+
+  const soldOut = summarizeAssistantCard({
+    id: 'bk-out', type: 'BOOKING_CONFIRMATION', status: 'out_of_stock',
+    facts: {},
+  }, 'vi');
+  assert.match(soldOut?.note ?? '', /overbook/i);
+});

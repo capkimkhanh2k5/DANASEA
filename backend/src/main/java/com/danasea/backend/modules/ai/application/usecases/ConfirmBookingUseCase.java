@@ -272,6 +272,8 @@ public class ConfirmBookingUseCase {
 
             cardStorePort.save(newCard);
 
+            BigDecimal previousTotalAmount = cardPrice.multiply(BigDecimal.valueOf(card.getQuantity()));
+            BigDecimal newTotalAmount = currentPrice.multiply(BigDecimal.valueOf(newCard.getQuantity()));
             Map<String, Object> response = new HashMap<>();
             response.put("status", "alternative_needed");
             response.put("message", localizedOrLegacy(
@@ -280,6 +282,13 @@ public class ConfirmBookingUseCase {
             response.put("oldCardId", cardId);
             response.put("newCard", newCard);
             response.put("reason", reason);
+            response.put("previousPrice", cardPrice);
+            response.put("previousTotalAmount", previousTotalAmount);
+            response.put("newPrice", currentPrice);
+            response.put("newTotalAmount", newTotalAmount);
+            response.put("previousDate", card.getDate());
+            response.put("priceChanged", priceChanged);
+            response.put("slotChanged", !slotAvailable);
             return response;
         }
 
