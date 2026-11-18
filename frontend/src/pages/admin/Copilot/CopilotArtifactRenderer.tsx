@@ -344,13 +344,18 @@ const VendorDiagnosticsTableCard: React.FC<{ artifact: CopilotArtifact }> = ({ a
           </span>
           <span className="copilot-artifact-title">Chẩn đoán sức khỏe & Xếp hạng đối tác</span>
         </div>
-        <div className="copilot-artifact-period">{vendors.length} đối tác ghi nhận</div>
+        <div className="copilot-artifact-period">
+          {artifact.period?.from && artifact.period?.to
+            ? `Kỳ: ${artifact.period.from} - ${artifact.period.to} (${vendors.length} đối tác)`
+            : `${vendors.length} đối tác ghi nhận`}
+        </div>
       </div>
 
       <div className="copilot-table-container">
         <table className="copilot-data-table">
           <thead>
             <tr>
+              <th style={{ width: '40px', textAlign: 'center' }}>#</th>
               <th>Đối tác</th>
               <th style={{ textAlign: 'right' }}>GMV</th>
               <th style={{ textAlign: 'center' }}>Số đơn</th>
@@ -368,6 +373,9 @@ const VendorDiagnosticsTableCard: React.FC<{ artifact: CopilotArtifact }> = ({ a
 
               return (
                 <tr key={v.vendorId || idx} className={isCritical ? 'copilot-table-row--critical' : ''}>
+                  <td style={{ textAlign: 'center', fontWeight: 600, color: '#64748b' }}>
+                    {idx + 1}
+                  </td>
                   <td>
                     <div className="copilot-table-vendor-name">{v.businessName}</div>
                     {v.vendorId && (

@@ -422,6 +422,175 @@ class VendorAdminAiFeaturesTest {
     }
 
     @Test
+    @DisplayName("Admin Copilot kích hoạt admin_risk_and_support_queue_overview và admin_dispute_summarize đúng card type")
+    void adminCopilotRoutesQueueAndDisputeTools() {
+        UUID convId = UUID.randomUUID();
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Queue and Disputes",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+        when(adminAiData.getQueueOverview()).thenReturn(new AdminAiDataPort.QueueOverview(3, 7, 1));
+
+        // 1. Queue Overview Tool Dispatch
+        var queueReply = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Tổng hợp các trường hợp rủi ro, yêu cầu hỗ trợ và khiếu nại đang chờ xử lý.",
+                null, null, SupportedLanguage.VI);
+        assertThat(queueReply.artifacts()).singleElement()
+                .satisfies(card -> {
+                    assertThat(card.get("type")).isEqualTo("ADMIN_KPI_SUMMARY_CARD");
+                    assertThat(card.get("tool")).isEqualTo("admin_risk_and_support_queue_overview");
+                });
+        assertThat(queueReply.toolsUsed()).containsExactly("admin_risk_and_support_queue_overview");
+
+        // 2. Dispute Summarize Tool Dispatch
+        UUID sampleDisputeId = UUID.fromString("77777777-7777-7777-7777-777777777701");
+        var sampleEvidence = new AdminAiDataPort.DisputeFullEvidence(
+                sampleDisputeId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "Nguyễn Văn Khách",
+                "Khách khiếu nại cano", "Mô tả", List.of(), "OPEN", OffsetDateTime.now().minusHours(2),
+                UUID.randomUUID(), "Tour Cano", vendorId, "Danasea", BigDecimal.valueOf(1000000), 1,
+                UUID.randomUUID(), LocalDate.now(), "08:00 - 10:00", "OPEN", false, null,
+                "Phản hồi", List.of(), OffsetDateTime.now()
+        );
+        when(adminAiData.getDisputeFullEvidence(sampleDisputeId)).thenReturn(Optional.of(sampleEvidence));
+
+        var disputeReply = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Tóm tắt khiếu nại " + sampleDisputeId + " và đề xuất hướng xử lý.",
+                null, null, SupportedLanguage.VI);
+        assertThat(disputeReply.artifacts()).singleElement()
+                .satisfies(card -> {
+                    assertThat(card.get("type")).isEqualTo("ADMIN_DISPUTE_BRIEF_CARD");
+                    assertThat(card.get("tool")).isEqualTo("admin_dispute_summarize");
+                });
+        assertThat(disputeReply.toolsUsed()).containsExactly("admin_dispute_summarize");
+    }
+
+    @Test
+    @DisplayName("Admin DaNaBot hỗ trợ 8 kiểu câu hỏi doanh thu đối tác, xếp hạng Top N và lọc thời gian linh hoạt")
+    void testAdminVendorRevenueAndTopNRankingQuestions() {
+        UUID convId = UUID.randomUUID();
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Vendor Revenue BI",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        UUID v1Id = UUID.fromString("27afde91-58fd-5daa-b9fa-7f93f00135f0");
+        UUID v2Id = UUID.fromString("5a53c8e5-3a76-5383-b104-17b22d4af50f");
+        UUID v3Id = UUID.fromString("baea9605-392b-5003-93f1-60f2c0582f65");
+
+        var danabeach = new VendorDiagnosticItem(v1Id, "Danabeach Club (Điểm dịch vụ thể thao biển)",
+                BigDecimal.valueOf(15_000_000), 10, 0.05, 0.8, BigDecimal.valueOf(4.8), 20, "HEALTHY", List.of());
+        var surfshack = new VendorDiagnosticItem(v2Id, "Surf Shack Da Nang",
+                BigDecimal.valueOf(10_000_000), 8, 0.02, 0.75, BigDecimal.valueOf(4.9), 15, "HEALTHY", List.of());
+        var kajin = new VendorDiagnosticItem(v3Id, "Công ty TNHH Kajin Vina",
+                BigDecimal.valueOf(0), 0, 0.0, 0.0, BigDecimal.valueOf(4.5), 5, "HEALTHY", List.of());
+
+        List<VendorDiagnosticItem> allSampleVendors = List.of(danabeach, surfshack, kajin);
+
+        // When queried without vendorId filter
+        when(adminAiData.getVendorDiagnostics(any(), any(), isNull())).thenReturn(allSampleVendors);
+        // When queried with specific vendorId
+        when(adminAiData.getVendorDiagnostics(any(), any(), eq(v1Id))).thenReturn(List.of(danabeach));
+        when(adminAiData.getVendorDiagnostics(any(), any(), eq(v2Id))).thenReturn(List.of(surfshack));
+
+        // 1. Kiểu A: Thống kê doanh thu theo đối tác (toàn bộ, mặc định 30 ngày)
+        var repA = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Thống kê doanh thu theo đối tác", null, null, SupportedLanguage.VI);
+        assertThat(repA.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repA.artifacts()).singleElement().satisfies(art -> {
+            assertThat(art.get("type")).isEqualTo("ADMIN_CRITICAL_VENDORS_TABLE");
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(3); // All 3 vendors retained, including 0đ Kajin
+        });
+
+        // 2. Kiểu B: Thống kê doanh thu từng đối tác tháng 10/2026
+        var repB = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Thống kê doanh thu từng đối tác tháng 10/2026", null, null, SupportedLanguage.VI);
+        assertThat(repB.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repB.artifacts()).singleElement().satisfies(art -> {
+            assertThat(art.get("period")).isEqualTo(Map.of("from", "2026-10-01", "to", "2026-10-31"));
+        });
+
+        // 3. Kiểu C: Doanh thu của Danabeach Club (mặc định 30 ngày)
+        var repC = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu của Danabeach Club", null, null, SupportedLanguage.VI);
+        assertThat(repC.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repC.artifacts()).singleElement().satisfies(art -> {
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(1);
+        });
+        assertThat(repC.message()).contains("Danabeach Club");
+
+        // 4. Kiểu D: Doanh thu Danabeach Club từ 12/10 đến 20/10/2026
+        var repD = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu Danabeach Club từ 12/10 đến 20/10/2026", null, null, SupportedLanguage.VI);
+        assertThat(repD.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repD.artifacts()).singleElement().satisfies(art -> {
+            assertThat(art.get("period")).isEqualTo(Map.of("from", "2026-10-12", "to", "2026-10-20"));
+        });
+
+        // 5. Kiểu E: Đối tác nào có doanh thu cao nhất tháng 10/2026? (Top 1)
+        var repE = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Đối tác nào có doanh thu cao nhất tháng 10/2026?", null, null, SupportedLanguage.VI);
+        assertThat(repE.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repE.artifacts()).singleElement().satisfies(art -> {
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(1);
+            assertThat(art.get("period")).isEqualTo(Map.of("from", "2026-10-01", "to", "2026-10-31"));
+        });
+
+        // 6. Kiểu F: Xếp hạng doanh thu đối tác năm 2026 (Top 5 mặc định)
+        var repF = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Xếp hạng doanh thu đối tác năm 2026", null, null, SupportedLanguage.VI);
+        assertThat(repF.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repF.artifacts()).singleElement().satisfies(art -> {
+            assertThat(art.get("period")).isEqualTo(Map.of("from", "2026-01-01", "to", "2026-12-31"));
+        });
+
+        // 7. Kiểu G: Top 3 đối tác doanh thu cao nhất quý 3/2026 (Đúng Top 3 trong quý 3)
+        var repG = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Top 3 đối tác doanh thu cao nhất quý 3/2026", null, null, SupportedLanguage.VI);
+        assertThat(repG.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repG.artifacts()).singleElement().satisfies(art -> {
+            assertThat(art.get("period")).isEqualTo(Map.of("from", "2026-07-01", "to", "2026-09-30"));
+        });
+
+        // 8. Kiểu H: So sánh doanh thu Danabeach Club và Surf Shack trong 7 ngày gần nhất
+        var repH = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "So sánh doanh thu Danabeach Club và Surf Shack trong 7 ngày gần nhất", null, null, SupportedLanguage.VI);
+        assertThat(repH.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repH.artifacts()).singleElement().satisfies(art -> {
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(2);
+        });
+
+        // 9. Top 100 đối tác theo GMV (giới hạn theo số đối tác thực tế)
+        var repTop100 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Top 100 đối tác theo GMV", null, null, SupportedLanguage.VI);
+        assertThat(repTop100.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+
+        // 10. Vendor không tồn tại trên hệ thống
+        var repNotFound = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu của Banana Beach", null, null, SupportedLanguage.VI);
+        assertThat(repNotFound.artifacts()).isEmpty();
+        assertThat(repNotFound.message()).contains("Không tìm thấy đối tác");
+
+        // 11. Khoảng ngày sai / đảo ngược (from > to)
+        var repInvalidDate = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu Danabeach Club từ 20/10/2026 đến 12/10/2026", null, null, SupportedLanguage.VI);
+        assertThat(repInvalidDate.artifacts()).isEmpty();
+        assertThat(repInvalidDate.message()).contains("hợp lệ");
+
+        // 12. Không hồi quy câu hỏi doanh thu toàn sàn
+        when(adminAiData.getRevenueTimeSeries(any(), any(), any())).thenReturn(List.of(
+                new RevenueTimeSeriesItem("2026-11-18", BigDecimal.valueOf(50_000_000), BigDecimal.valueOf(50_000_000),
+                        BigDecimal.ZERO, BigDecimal.valueOf(5_000_000), BigDecimal.valueOf(45_000_000))));
+        var repPlatform = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu toàn sàn hôm nay", null, null, SupportedLanguage.VI);
+        assertThat(repPlatform.toolsUsed()).containsExactly("admin_revenue_timeseries");
+        assertThat(repPlatform.artifacts().getFirst().get("type")).isEqualTo("ADMIN_REVENUE_CHART_CARD");
+    }
+
+    @Test
     void vendorCopilotRoutesVietnameseAndEnglishRequestsToVendorTools() {
         UUID convId = UUID.randomUUID();
         var conv = new CopilotConversation(convId, vendorUserId, "VENDOR", vendorId, "vi", null,

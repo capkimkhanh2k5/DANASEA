@@ -1,6 +1,9 @@
 package com.danasea.backend.modules.ai.application.tools;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -59,7 +62,41 @@ public class AdminFeatureTool implements ToolExecutor {
                 case "admin_booking_cancellation_breakdown" -> adminAiData.getBookingCancellationBreakdown(from, to, groupBy);
                 case "admin_vendor_diagnostics" -> {
                     UUID vendorId = args.hasNonNull("vendorId") ? UUID.fromString(args.get("vendorId").asText()) : null;
-                    yield adminAiData.getVendorDiagnostics(from, to, vendorId);
+                    List<UUID> vendorIds = null;
+                    if (args.has("vendorIds") && args.get("vendorIds").isArray()) {
+                        vendorIds = new ArrayList<>();
+                        for (JsonNode idNode : args.get("vendorIds")) {
+                            vendorIds.add(UUID.fromString(idNode.asText()));
+                        }
+                    }
+                    Integer limit = args.hasNonNull("limit") ? args.get("limit").asInt() : null;
+                    String sortOrder = args.path("sortOrder").asText("desc");
+
+                    List<AdminAiDataPort.VendorDiagnosticItem> list = adminAiData.getVendorDiagnostics(from, to, vendorId);
+                    if (vendorIds != null && !vendorIds.isEmpty()) {
+                        final List<UUID> filterIds = vendorIds;
+                        list = list.stream().filter(item -> item.vendorId() != null && filterIds.contains(item.vendorId())).toList();
+                    }
+
+                    Comparator<AdminAiDataPort.VendorDiagnosticItem> comparator = Comparator.comparing(
+                            AdminAiDataPort.VendorDiagnosticItem::gmv,
+                            Comparator.nullsFirst(Comparator.naturalOrder())
+                    );
+                    if ("desc".equalsIgnoreCase(sortOrder)) {
+                        comparator = comparator.reversed();
+                    }
+                    comparator = comparator.thenComparing(
+                            AdminAiDataPort.VendorDiagnosticItem::businessName,
+                            Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)
+                    ).thenComparing(item -> item.vendorId() != null ? item.vendorId().toString() : "");
+
+                    list = list.stream().sorted(comparator).toList();
+
+                    if (limit != null && limit > 0 && limit < list.size()) {
+                        list = list.subList(0, limit);
+                    }
+
+                    yield list;
                 }
                 case "admin_dispute_summarize" -> {
                     if (!args.hasNonNull("disputeId")) {
