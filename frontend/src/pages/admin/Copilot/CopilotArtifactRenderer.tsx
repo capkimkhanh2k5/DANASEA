@@ -14,6 +14,7 @@ import {
   Info,
 } from 'lucide-react';
 import type { CopilotArtifact } from '../../../types/adminAi';
+import { formatDisplayCode } from '../../../utils/displayCode';
 import {
   formatVND,
   formatCompactVND,
@@ -371,7 +372,7 @@ const VendorDiagnosticsTableCard: React.FC<{ artifact: CopilotArtifact }> = ({ a
                     <div className="copilot-table-vendor-name">{v.businessName}</div>
                     {v.vendorId && (
                       <div className="copilot-table-vendor-id" title={v.vendorId}>
-                        ID: #{v.vendorId.slice(0, 8)}
+                        ID: #{formatDisplayCode(v.vendorId, 'VND')}
                       </div>
                     )}
                   </td>
@@ -690,7 +691,7 @@ const DisputeBriefCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifact })
           </span>
           <span className="copilot-artifact-title">Tóm tắt hồ sơ khiếu nại</span>
         </div>
-        <div className="copilot-artifact-period">Mã: #{dispute.disputeId.slice(0, 8)}</div>
+        <div className="copilot-artifact-period">Mã: #{formatDisplayCode(dispute.disputeId, 'DISP')}</div>
       </div>
 
       <div className="copilot-dispute-info-grid">

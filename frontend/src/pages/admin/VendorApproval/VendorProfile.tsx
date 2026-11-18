@@ -2,6 +2,7 @@ import { FileText, History, Info } from 'lucide-react';
 import type { BadgeTier, VerificationStatus } from '../../../types';
 import { AdminBadge } from '../../../components/admin/AdminUI';
 import { AdminButton, AdminDisclosure } from '../../../components/admin/AdminWorkspace';
+import { formatDisplayCode } from '../../../utils/displayCode';
 import { formatTaxCode, type VendorRecord, type VendorReviewEvent } from './vendorApprovalModel';
 
 function date(value?: string) {
@@ -61,7 +62,7 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
                     <strong>{docTitle}</strong>
                     <AdminBadge tone={statusTone as 'teal' | 'amber' | 'rose'}>{statusLabel}</AdminBadge>
                   </div>
-                  <small>Mã số hồ sơ: #{doc.id.slice(0, 8)} · Loại: {doc.docType}</small>
+                  <small>Mã số hồ sơ: #{formatDisplayCode(doc.id, 'DOC')} · Loại: {doc.docType}</small>
                   {doc.reviewedBy && (
                     <span className="admin-vendors-doc-meta">
                       Người duyệt: <strong>{doc.reviewedByName || 'Không xác định'}</strong> {doc.reviewedAt ? `(${date(doc.reviewedAt)})` : ''}
