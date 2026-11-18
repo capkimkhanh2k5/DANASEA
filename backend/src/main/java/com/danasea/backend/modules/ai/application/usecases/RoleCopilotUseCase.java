@@ -329,7 +329,10 @@ public class RoleCopilotUseCase {
                 return english
                         ? "Multiple matching vendors found: %s. Please specify the exact full name.".formatted(names)
                         : "Tìm thấy nhiều đối tác phù hợp: %s. Vui lòng nhập tên đầy đủ của đối tác.".formatted(names);
-            } else if (isExplicitVendorTargeted(normalized) && matchedVendors.isEmpty() && limit == null && !CopilotRequest.isVendorStats(normalized)) {
+            } else if (isExplicitVendorTargeted(normalized) && matchedVendors.isEmpty() && limit == null
+                    && !CopilotRequest.isVendorStats(normalized)
+                    && !CopilotRequest.isVendorRanking(normalized)
+                    && !CopilotRequest.isAllVendors(normalized)) {
                 String candidate = extractVendorQueryName(message, normalized);
                 return english
                         ? "Vendor '%s' not found on the system. Please verify the vendor name.".formatted(candidate)

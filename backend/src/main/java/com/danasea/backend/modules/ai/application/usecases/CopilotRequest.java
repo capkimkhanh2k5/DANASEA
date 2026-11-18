@@ -40,6 +40,12 @@ final class CopilotRequest {
     private static final Pattern YESTERDAY = words("hom qua|yesterday");
     private static final Pattern THIS_WEEK = words("tuan nay|this week");
     private static final Pattern LAST_WEEK = words("tuan truoc|last week");
+    private static final Pattern THIS_YEAR = words(
+            "ca nam|nam nay|trong nam|nam hien tai|ca nam nay|ca nam hien tai|this year|full year|whole year|current year|all year"
+    );
+    private static final Pattern LAST_YEAR = words(
+            "nam ngoai|nam truoc|last year|previous year"
+    );
     private static final Pattern SPECIFIC_MONTH = Pattern.compile(
             "\\b(?:thang|month)\\s*(\\d{1,2})(?:[/-]|\\s+(?:nam\\s+)?|\\s*)(\\d{4})?\\b",
             Pattern.CASE_INSENSITIVE);
@@ -56,18 +62,23 @@ final class CopilotRequest {
                     + "today|yesterday|this month|last month)(?: thi sao)?[?!.]*$");
 
     private static final Pattern VENDOR_RANKING = Pattern.compile(
-            "(?i)\\b(?:top\\s*\\d*|xep hang|dung dau|cao nhat|thap nhat|lon nhat|bac nhat)\\b"
+            "(?i)\\b(?:top\\s*\\d*|xep hang|ranking|rank|dung dau|cao nhat|thap nhat|lon nhat|bac nhat)\\b"
     );
     private static final Pattern VENDOR_COMPARE = words("so sanh|compare|doi chieu");
     private static final Pattern VENDOR_STATS = words(
-            "theo doi tac|tung doi tac|cac doi tac|tat ca doi tac|moi doi tac|toan bo doi tac"
+            "theo doi tac|tung doi tac|cac doi tac|tat ca doi tac|moi doi tac|toan bo doi tac|"
+            + "theo vendor|tung vendor|cac vendor|tat ca vendor|moi vendor|toan bo vendor|"
+            + "theo gian hang|tung gian hang|cac gian hang|tat ca gian hang|moi gian hang|toan bo gian hang"
     );
-    private static final Pattern TOP_N = Pattern.compile("(?i)\\btop\\s*(\\d+)\\b");
+    private static final Pattern TOP_N = Pattern.compile(
+            "(?i)\\b(?:top\\s*(\\d+)|(\\d+)\\s*(?:doi tac|vendor|gian hang|shop))\\b"
+    );
     private static final Pattern TOP_1 = Pattern.compile(
-            "(?i)\\b(?:ai|doi tac nao|gian hang nao)\\b.*\\b(?:cao nhat|lon nhat|dung dau|so 1)\\b"
+            "(?i)\\b(?:ai|doi tac|gian hang|vendor|don vi)\\b.*\\b(?:cao nhat|lon nhat|thap nhat|be nhat|dung dau|dan dau|so 1|top 1)\\b|"
+            + "\\b(?:cao nhat|lon nhat|thap nhat|be nhat|dung dau|dan dau|so 1|top 1)\\b.*\\b(?:ai|doi tac|gian hang|vendor|don vi)\\b"
     );
-    private static final Pattern ALL_VENDORS_RANKING = Pattern.compile(
-            "(?i)\\b(?:xep hang tat ca|toan bo doi tac|tat ca doi tac)\\b"
+    private static final Pattern ALL_VENDORS = words(
+            "toan bo|tat ca|all|moi doi tac|moi vendor|moi gian hang"
     );
 
     private CopilotRequest() {}
@@ -92,11 +103,23 @@ final class CopilotRequest {
         return matches(VENDOR_STATS, text);
     }
 
+    static boolean isAllVendors(String text) {
+        return matches(ALL_VENDORS, text);
+    }
+
     static Integer extractTopLimit(String text) {
-        if (matches(TOP_1, text)) return 1;
         var m = TOP_N.matcher(text);
-        if (m.find()) return Integer.parseInt(m.group(1));
-        if (matches(ALL_VENDORS_RANKING, text)) return null;
+        if (m.find()) {
+            String val = m.group(1) != null ? m.group(1) : m.group(2);
+            if (val != null) {
+                try {
+                    int n = Integer.parseInt(val);
+                    if (n > 0) return n;
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+        if (matches(ALL_VENDORS, text)) return null;
+        if (matches(TOP_1, text)) return 1;
         if (matches(VENDOR_RANKING, text)) return 5;
         return null;
     }
@@ -197,6 +220,15 @@ final class CopilotRequest {
             return TimeRange.of(LocalDate.of(y, 1, 1), LocalDate.of(y, 12, 31));
         }
 
+        if (matches(THIS_YEAR, normalized)) {
+            int y = today.getYear();
+            return TimeRange.of(LocalDate.of(y, 1, 1), LocalDate.of(y, 12, 31));
+        }
+        if (matches(LAST_YEAR, normalized)) {
+            int y = today.getYear() - 1;
+            return TimeRange.of(LocalDate.of(y, 1, 1), LocalDate.of(y, 12, 31));
+        }
+
         if (matches(THIS_WEEK, normalized)) {
             LocalDate monday = today.with(java.time.DayOfWeek.MONDAY);
             return TimeRange.of(monday, today);
@@ -216,7 +248,7 @@ final class CopilotRequest {
             return TimeRange.of(yesterday, yesterday);
         }
 
-        return TimeRange.of(today.minusDays(30), today);
+        return TimeRange.of(today.minusDays(29), today);
     }
 
     static boolean matches(Pattern pattern, String text) {

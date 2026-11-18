@@ -493,6 +493,7 @@ class VendorAdminAiFeaturesTest {
         when(adminAiData.getVendorDiagnostics(any(), any(), eq(v2Id))).thenReturn(List.of(surfshack));
 
         // 1. Kiểu A: Thống kê doanh thu theo đối tác (toàn bộ, mặc định 30 ngày)
+        LocalDate today = LocalDate.now(VIETNAM_ZONE);
         var repA = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
                 "Thống kê doanh thu theo đối tác", null, null, SupportedLanguage.VI);
         assertThat(repA.toolsUsed()).containsExactly("admin_vendor_diagnostics");
@@ -500,6 +501,8 @@ class VendorAdminAiFeaturesTest {
             assertThat(art.get("type")).isEqualTo("ADMIN_CRITICAL_VENDORS_TABLE");
             List<?> list = (List<?>) art.get("data");
             assertThat(list).hasSize(3); // All 3 vendors retained, including 0đ Kajin
+            assertThat(art.get("period")).isEqualTo(Map.of("from", today.minusDays(29).toString(), "to", today.toString()));
+            assertThat(java.time.temporal.ChronoUnit.DAYS.between(today.minusDays(29), today) + 1).isEqualTo(30);
         });
 
         // 2. Kiểu B: Thống kê doanh thu từng đối tác tháng 10/2026
@@ -588,6 +591,56 @@ class VendorAdminAiFeaturesTest {
                 "Doanh thu toàn sàn hôm nay", null, null, SupportedLanguage.VI);
         assertThat(repPlatform.toolsUsed()).containsExactly("admin_revenue_timeseries");
         assertThat(repPlatform.artifacts().getFirst().get("type")).isEqualTo("ADMIN_REVENUE_CHART_CARD");
+
+        // 13. "Xếp hạng toàn bộ Vendor" -> trả toàn bộ (3 đối tác)
+        var repAll1 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Xếp hạng toàn bộ Vendor", null, null, SupportedLanguage.VI);
+        assertThat(repAll1.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repAll1.artifacts()).singleElement().satisfies(art -> {
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(3);
+        });
+
+        // 14. "Xếp hạng toàn bộ doanh thu của các Vendor" -> trả toàn bộ (3 đối tác)
+        var repAll2 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Xếp hạng toàn bộ doanh thu của các Vendor", null, null, SupportedLanguage.VI);
+        assertThat(repAll2.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repAll2.artifacts()).singleElement().satisfies(art -> {
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(3);
+        });
+
+        // 15. "Đối tác có doanh thu cao nhất là?" -> trả Top 1
+        var repTop1 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Đối tác có doanh thu cao nhất là?", null, null, SupportedLanguage.VI);
+        assertThat(repTop1.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repTop1.artifacts()).singleElement().satisfies(art -> {
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(1);
+        });
+        assertThat(repTop1.message()).contains("Danabeach Club");
+
+        // 16. "Thống kê cho tôi 7 đối tác có doanh thu cao nhất cả năm" -> Top 7 theo năm hiện tại
+        String expectedYearStart = today.getYear() + "-01-01";
+        String expectedYearEnd = today.getYear() + "-12-31";
+        var repYear1 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Thống kê cho tôi 7 đối tác có doanh thu cao nhất cả năm", null, null, SupportedLanguage.VI);
+        assertThat(repYear1.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repYear1.artifacts()).singleElement().satisfies(art -> {
+            assertThat(art.get("period")).isEqualTo(Map.of("from", expectedYearStart, "to", expectedYearEnd));
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(3); // capped by available 3 vendors
+        });
+
+        // 17. "Cho tôi Top 7 đối tác có doanh thu cao nhất cả năm" -> Top 7 theo năm hiện tại
+        var repYear2 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Cho tôi Top 7 đối tác có doanh thu cao nhất cả năm", null, null, SupportedLanguage.VI);
+        assertThat(repYear2.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repYear2.artifacts()).singleElement().satisfies(art -> {
+            assertThat(art.get("period")).isEqualTo(Map.of("from", expectedYearStart, "to", expectedYearEnd));
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(3);
+        });
     }
 
     @Test

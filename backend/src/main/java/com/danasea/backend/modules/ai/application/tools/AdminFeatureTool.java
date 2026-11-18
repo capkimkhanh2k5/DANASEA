@@ -52,7 +52,7 @@ public class AdminFeatureTool implements ToolExecutor {
             JsonNode args = argumentsJson != null && !argumentsJson.isBlank()
                     ? mapper.readTree(argumentsJson) : mapper.createObjectNode();
 
-            LocalDate from = args.hasNonNull("from") ? LocalDate.parse(args.get("from").asText()) : LocalDate.now().minusDays(30);
+            LocalDate from = args.hasNonNull("from") ? LocalDate.parse(args.get("from").asText()) : LocalDate.now().minusDays(29);
             LocalDate to = args.hasNonNull("to") ? LocalDate.parse(args.get("to").asText()) : LocalDate.now();
             String groupBy = args.path("groupBy").asText("day");
 
