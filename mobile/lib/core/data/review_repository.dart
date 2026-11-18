@@ -130,6 +130,45 @@ class ReviewRepository {
     );
   }
 
+  Future<ReviewPage> getCustomerReviews({
+    int page = 0,
+    int size = 20,
+  }) async {
+    final query = Uri(
+      queryParameters: {
+        'page': '$page',
+        'size': '$size',
+        'sort': 'createdAt,desc',
+      },
+    ).query;
+    final json = await session.request(
+      '/api/customer/reviews?$query',
+      authenticated: true,
+    );
+    if (json['content'] is! List) {
+      throw AuthFailure('Dữ liệu máy chủ không hợp lệ.');
+    }
+    final rawList = (json['content'] as List)
+        .whereType<Map<String, dynamic>>()
+        .toList();
+    final items = rawList.map(reviewFromJson).toList();
+    final pageNum =
+        (json['number'] as num?)?.toInt() ??
+        (json['page'] as num?)?.toInt() ??
+        page;
+    final pageSize = (json['size'] as num?)?.toInt() ?? size;
+    final totalElements =
+        (json['totalElements'] as num?)?.toInt() ?? items.length;
+    final totalPages = (json['totalPages'] as num?)?.toInt() ?? 1;
+    return ReviewPage(
+      content: items,
+      page: pageNum,
+      size: pageSize,
+      totalElements: totalElements,
+      totalPages: totalPages,
+    );
+  }
+
   Future<ReviewModel> createReview({
     required String subOrderId,
     required int rating,

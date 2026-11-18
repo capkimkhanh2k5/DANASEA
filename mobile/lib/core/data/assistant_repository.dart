@@ -247,6 +247,39 @@ class AssistantRepository {
     return const {};
   }
 
+  /// GET /api/assistant/conversations
+  Future<List<Map<String, dynamic>>> listConversations({
+    bool? archived,
+    int limit = 30,
+  }) async {
+    try {
+      final query = archived != null ? '?archived=$archived&limit=$limit' : '?limit=$limit';
+      final body = await _session.requestJson(
+        '/api/assistant/conversations$query',
+        method: 'GET',
+        authenticated: true,
+      );
+      if (body is List) {
+        return body.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      }
+    } catch (_) {}
+    return const [];
+  }
+
+  /// DELETE /api/assistant/conversations/{id}
+  Future<bool> deleteConversation(String conversationId) async {
+    try {
+      await _session.requestJson(
+        '/api/assistant/conversations/${Uri.encodeComponent(conversationId.trim())}',
+        method: 'DELETE',
+        authenticated: true,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// GET /api/assistant/conversations/{id}/history
   Future<List<AiMessageModel>> getConversationHistory(
     String conversationId, {
