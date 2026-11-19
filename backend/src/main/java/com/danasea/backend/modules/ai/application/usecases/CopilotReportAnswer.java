@@ -250,6 +250,28 @@ final class CopilotReportAnswer {
                         .formatted(support, support, risk, disputes);
     }
 
+    static String adminVendorDiagnostics(JsonNode data, TimeRange period, String message, String normalized, boolean english) {
+        if (!data.isArray()) return unavailable(english);
+        String q = normalized != null ? normalized : "";
+
+        boolean asksLowReviewCount = CopilotRequest.matches(DIAGNOSTICS_LOW_REVIEW_COUNT, q);
+        boolean asksHighOccLowRating = CopilotRequest.matches(DIAGNOSTICS_HIGH_OCC_LOW_RATING, q);
+        boolean asksThreshold = CopilotRequest.matches(DIAGNOSTICS_THRESHOLD_RULE, q);
+        boolean asksSuspension = CopilotRequest.matches(DIAGNOSTICS_SUSPENSION, q);
+        boolean asksImprove = CopilotRequest.matches(DIAGNOSTICS_IMPROVE, q);
+        boolean hasDiagnosticIntent = asksLowReviewCount || asksHighOccLowRating || asksThreshold
+                || asksSuspension || asksImprove;
+        boolean hasRevenueOrRankingIntent = CopilotRequest.isRevenue(q)
+                || CopilotRequest.isVendorRanking(q)
+                || CopilotRequest.isVendorCompare(q)
+                || CopilotRequest.isVendorStats(q);
+
+        if (hasRevenueOrRankingIntent && !hasDiagnosticIntent && period != null) {
+            return adminVendorDiagnostics(data, period, english);
+        }
+        return adminVendorDiagnostics(data, message, normalized, english);
+    }
+
     static String adminVendorDiagnostics(JsonNode data, String message, String normalized, boolean english) {
         if (!data.isArray()) return unavailable(english);
         String q = normalized != null ? normalized : "";

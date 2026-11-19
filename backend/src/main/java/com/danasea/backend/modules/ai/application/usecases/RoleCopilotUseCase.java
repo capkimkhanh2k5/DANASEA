@@ -578,7 +578,7 @@ public class RoleCopilotUseCase {
             case "vendor_dashboard_summary" -> CopilotReportAnswer.vendorRevenue(data, period, normalized, english);
             case "admin_revenue_timeseries" -> CopilotReportAnswer.adminRevenue(data, period, normalized, english);
             case "admin_booking_cancellation_breakdown" -> CopilotReportAnswer.adminCancellations(data, period, normalized, english);
-            case "admin_vendor_diagnostics" -> CopilotReportAnswer.adminVendorDiagnostics(data, message, normalized, english);
+            case "admin_vendor_diagnostics" -> CopilotReportAnswer.adminVendorDiagnostics(data, period, message, normalized, english);
             case "admin_order_risk_assessment" -> CopilotReportAnswer.adminOrderRiskAssessment(data, english);
             case "admin_risk_and_support_queue_overview" -> CopilotReportAnswer.adminQueue(data, english);
             case "admin_dispute_summarize" -> english ? "I found the dispute evidence below. An administrator must review it before deciding."
@@ -801,9 +801,22 @@ public class RoleCopilotUseCase {
     }
 
     private boolean isVendorDiagnosticOrRevenue(String text, String rawMessage) {
-        if (CopilotRequest.isVendorCompare(text)) return true;
+        if (CopilotRequest.comparesMonths(text)) return false;
         if (CopilotRequest.isVendorRanking(text)) return true;
         if (CopilotRequest.isVendorStats(text)) return true;
+        if (CopilotRequest.isVendorCompare(text)) {
+            if (text.contains("doi tac") || text.contains("vendor") || text.contains("gian hang") || text.contains("cua ")) {
+                return true;
+            }
+            try {
+                LocalDate now = LocalDate.now(TimeRange.VIETNAM_ZONE);
+                var vendors = adminAiData.getVendorDiagnostics(now, now, null);
+                if (!findMatchingVendors(text, vendors).isEmpty()) {
+                    return true;
+                }
+            } catch (Exception ignored) {}
+            return false;
+        }
         if (CopilotRequest.matches(ADMIN_DIAGNOSTICS, text)) return true;
         if (CopilotRequest.isRevenue(text)) {
             if (text.contains("cua ") || text.contains("doi tac") || text.contains("vendor") || text.contains("gian hang")) {
@@ -867,9 +880,15 @@ public class RoleCopilotUseCase {
         return variants;
     }
 
+    private static final Pattern NON_SPECIFIC_VENDOR_TARGET = CopilotRequest.words(
+            "nao|cac|tung|tat ca|toan bo|toan san|he thong|san|moi|nhung|mot|co ty le|chi co"
+    );
+
     private boolean isExplicitVendorTargeted(String normalized) {
-        return normalized.contains("cua ") || normalized.contains("doi tac ") || normalized.contains("vendor ")
-                || normalized.contains("gian hang ");
+        var m = VENDOR_CANDIDATE.matcher(normalized);
+        if (!m.find()) return false;
+        String candidate = m.group(1).trim();
+        return !candidate.isBlank() && !CopilotRequest.matches(NON_SPECIFIC_VENDOR_TARGET, candidate);
     }
 
     private static final Pattern VENDOR_CANDIDATE = Pattern.compile(
