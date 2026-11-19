@@ -22,10 +22,14 @@ class CopilotArtifactCard extends StatelessWidget {
       return _buildKpiCard(context, data);
     } else if (type == 'VENDOR_REVIEW_COACHING_CARD') {
       return _buildReviewCoachingCard(context, data);
-    } else if (type == 'VENDOR_SLOT_ADVISOR_CARD') {
+    } else if (type == 'VENDOR_SLOT_ADVISOR_CARD' || type == 'VENDOR_SLOT_ADVISORY_CARD') {
       return _buildSlotAdvisorCard(context, data);
-    } else if (type == 'VENDOR_OPTIMIZE_LISTING_CARD') {
+    } else if (type == 'VENDOR_OPTIMIZE_LISTING_CARD' || type == 'VENDOR_LISTING_DRAFT_CARD') {
       return _buildOptimizeListingCard(context, data);
+    } else if (type == 'VENDOR_SERVICE_COUNT_CARD' || artifact['tool'] == 'vendor_service_count') {
+      return _buildServiceCountCard(context, data);
+    } else if (type == 'COPILOT_CONTENT_ASSESSMENT_CARD' || artifact['tool'] == 'vendor_text_assessment') {
+      return _buildContentAssessmentCard(context, data);
     }
     return const SizedBox.shrink();
   }
@@ -516,6 +520,246 @@ class CopilotArtifactCard extends StatelessWidget {
                 ),
               );
             }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceCountCard(BuildContext context, Map<String, dynamic> data) {
+    final int total = (data['total'] as num?)?.toInt() ?? 0;
+    final byStatus = data['byStatus'] is Map ? Map<String, dynamic>.from(data['byStatus'] as Map) : <String, dynamic>{};
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.layers_rounded, size: 16, color: Color(0xFF0284C7)),
+                  SizedBox(width: 6),
+                  Text(
+                    'Thống kê dịch vụ đối tác',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.navyAnchor,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '$total dịch vụ',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF334155),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (byStatus.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: byStatus.entries.map((entry) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        entry.key,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${entry.value}',
+                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContentAssessmentCard(BuildContext context, Map<String, dynamic> data) {
+    final status = data['status']?.toString() ?? 'NEEDS_REVIEW';
+    final reasonCodes = data['reasonCodes'] is List ? (data['reasonCodes'] as List).map((e) => e.toString()).toList() : <String>[];
+    final contactMatches = data['contactMatches'] is List ? (data['contactMatches'] as List).map((e) => e.toString()).toList() : <String>[];
+    final bool negatedWarningOnly = data['negatedWarningOnly'] == true;
+    final bool needsReview = status == 'NEEDS_REVIEW';
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.security_rounded,
+                    size: 16,
+                    color: needsReview ? const Color(0xFFD97706) : const Color(0xFF16A34A),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Thẩm định nội dung bài đăng',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.navyAnchor,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: needsReview ? const Color(0xFFFEF3C7) : const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: needsReview ? const Color(0xFFFDE68A) : const Color(0xFFBBF7D0),
+                  ),
+                ),
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: needsReview ? const Color(0xFF92400E) : const Color(0xFF166534),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              if (data['serviceId'] != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Dịch vụ: ${data['serviceId']}',
+                    style: const TextStyle(fontSize: 10, color: Color(0xFF475569)),
+                  ),
+                ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Không tự duyệt xuất bản',
+                  style: TextStyle(fontSize: 10, color: Color(0xFF475569)),
+                ),
+              ),
+              if (negatedWarningOnly)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F9FF),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFFBAE6FD)),
+                  ),
+                  child: const Text(
+                    'Chỉ là câu cảnh báo phủ định',
+                    style: TextStyle(fontSize: 10, color: Color(0xFF0369A1)),
+                  ),
+                ),
+            ],
+          ),
+          if (reasonCodes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: reasonCodes.map((code) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Text(
+                  code,
+                  style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+                ),
+              )).toList(),
+            ),
+          ],
+          if (contactMatches.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F2),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFFECDD3)),
+              ),
+              child: Text(
+                'Phát hiện thông tin liên hệ / giao dịch ngoài: ${contactMatches.join(', ')}',
+                style: const TextStyle(fontSize: 10.5, color: Color(0xFFBE123C), fontWeight: FontWeight.w500),
+              ),
+            ),
           ],
         ],
       ),
