@@ -77,6 +77,36 @@ The platform is designed around a **Modular Clean Monolith** adhering to Hexagon
 
 ---
 
+## AI Features & Capabilities
+
+DANASEA integrates a **Hybrid Dual-Engine AI Architecture** combining conversational LLM orchestration with a pinned, SHA-256 verified local decision worker (`chinhnc/Quyet-1.0-Small` on FastAPI/PyTorch) for fast structured classification, scoring, moderation, and risk evaluation. Every AI capability is strictly bounded by backend domain rules and structured response cards so natural-language output never overrides verified pricing, inventory, maritime safety thresholds, or financial state.
+
+### Architecture & Processing Principles
+- **Dual-Engine Orchestration:** A proxied conversational LLM handles multilingual dialogue (VI/EN) and multi-turn tool calling, while the local **Quyet Small Worker** executes 7 deterministic rubric tasks (`intent`, `service_category`, `review`, `moderation`, `relevance`, `complaint`, `risk`).
+- **Grounded Data & Non-Fabrication:** Conversational replies are paired with backend-verified structured cards (live pricing, slots, policies, KPIs, and cited review quotes) and marked as unverified prose so authoritative data always comes from PostgreSQL and domain services. AI read queries never mutate financial state, inventory, or listing metrics.
+- **Execution Guardrails & Fail-Closed Handling:** Protected by JVM concurrency and deadline budgets (up to 8 concurrent AI requests), Redis rate limiting, idempotency replay protection, and optimistic locking. When models are unavailable or uncertain, moderation and risk flows fail closed to human review (`NEEDS_REVIEW`).
+
+### 1. Customer AI Concierge
+- **Smart Discovery & Recommendations:** Understands natural-language queries with group size, schedule windows, non-swimmer/safety preferences, and budgets (supporting both VND and USD via live exchange rates), combining backend catalog filtering, Quyet relevance scoring, and opt-in customer preference profiles.
+- **Nearby Search & Side-by-Side Comparison:** Finds bookable coastal experiences around GPS coordinates (Haversine radius) and compares 2–4 services with exact group/package pricing (`PER_PERSON` and `PER_PACKAGE` participant allocation).
+- **Weather-Aware Itinerary Planning & Auto-Replanning:** Builds chronological multi-activity plans validated against marine weather safety and inter-beach travel times (`15 min buffer + 25 km/h`), supporting full lifecycle management (preview, draft, accepted, archived, revision restore) plus background monitoring that detects slot cancellations or severe weather and raises replanning proposals.
+- **Chat-to-Booking Confirmation:** Produces short-lived booking confirmation cards with distributed locks, real-time price and slot re-validation, atomic inventory holds, and automatic compensation rollback on failure.
+- **Grounded Support & Pre-Trip Briefings:** Answers live enabled payment methods, canonical refund/cancellation policies, extractive review summaries citing verified review IDs, order cancellation previews, manual support requests, and automated 24-hour pre-trip marine safety checklists.
+
+### 2. Vendor Growth & Operations Copilot
+- **Shop Performance & Revenue Insights:** Delivers period-flexible GMV, estimated net payout, booking volume, and listing status summaries strictly scoped to the authenticated vendor.
+- **4-Pillar Review Coaching & Reply Drafting:** Analyzes verified reviews across `GUIDE`, `SAFETY`, `PUNCTUALITY`, and `VALUE`, separates verified customer quotes from operational hypotheses, tracks badge progression guidance, and drafts contextual review replies.
+- **Weather-Aware Slot Capacity Advisor:** Evaluates upcoming 1–14 day slots for occupancy and marine weather forecasts, prioritizing maritime safety over demand (never suggesting capacity expansion under unsafe or unknown weather).
+- **Listing Optimization & Pre-Publish Content Check:** Scores listing quality (0–100), highlights missing safety/equipment information, drafts VI/EN copy from verified facts, and screens text for off-platform payments, external contacts, spam, or abuse as advisory-only checks.
+
+### 3. Admin BI, Risk & Arbitration Copilot
+- **Executive BI & Vendor Revenue Analytics:** Supports natural-language queries for platform KPIs, GMV/cash/refund/commission timeseries, month-over-month comparisons, cancellation cause breakdowns (`WEATHER`, `VENDOR_FAULT`, `CUSTOMER`, `ADMIN_OVERRIDE`, `DISPUTE`), and vendor revenue rankings (Top N, single-vendor drill-down, and multi-vendor comparison across flexible date ranges).
+- **Vendor Health Diagnostics:** Evaluates operational thresholds (`HIGH_CANCELLATION` >20% warning / >40% critical, `LOW_RATING` with minimum review counts, `OVERLOADED`, `UNDERPERFORMING`) while requiring manual evidence verification before any suspension or penalty.
+- **Transaction Risk & Content Moderation Governance:** Combines backend Velocity 3/5/3 rules (`>=3` failed payments/24h, `>=5` orders/1h, `>=3` refunds/7d) with Quyet risk/moderation scoring to route flagged cases into `NEEDS_REVIEW` without auto-locking accounts or confirming fraud automatically.
+- **Dispute Evidence Summarization & Queue Oversight:** Consolidates customer claims, vendor responses, slot status, and HMAC-SHA256 QR check-in logs into arbitration briefs alongside unified risk, dispute, and optimistic-locked support queues.
+
+---
+
 ## Getting Started
 
 ### Prerequisites
