@@ -24,18 +24,35 @@ class SubOrderDetailScreen extends StatefulWidget {
 class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
   final _db = VendorStore.instance;
   late SubOrderModel _order;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _order = widget.subOrder;
     _db.addListener(_onDbChanged);
+    _loadFreshDetail();
   }
 
   @override
   void dispose() {
     _db.removeListener(_onDbChanged);
     super.dispose();
+  }
+
+  Future<void> _loadFreshDetail() async {
+    setState(() => _isLoading = true);
+    try {
+      final fresh = await VendorOrderRepository().getSubOrderById(_order.subOrderId);
+      if (fresh != null && mounted) {
+        setState(() {
+          _order = fresh;
+        });
+      }
+    } catch (_) {}
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _onDbChanged() {
@@ -502,14 +519,18 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
           InkWell(
             onTap: () {
               Clipboard.setData(ClipboardData(text: value));
-              ToastNotification.showSuccess(context, 'Đã sao chép $label $value');
+              ToastNotification.showSuccess(context, 'Đã sao chép $value');
             },
-            borderRadius: BorderRadius.circular(4),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              child: Text(
-                'Sao chép',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.secondary),
+            borderRadius: BorderRadius.circular(6),
+            child: const Tooltip(
+              message: 'Sao chép',
+              child: Padding(
+                padding: EdgeInsets.all(4),
+                child: Icon(
+                  Icons.copy_rounded,
+                  size: 16,
+                  color: AppColors.secondary,
+                ),
               ),
             ),
           ),
@@ -554,58 +575,115 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
             color: AppColors.navyAnchor,
           ),
         ),
+        bottom: _isLoading
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(2),
+                child: LinearProgressIndicator(minHeight: 2, color: AppColors.secondary),
+              )
+            : null,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Order Lifecycle Stepper
-              _buildOrderLifecycleStepper(_order),
-              const SizedBox(height: 14),
-
-              // Customer Card
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLowest,
-                  borderRadius: AppShapes.radiusMd,
-                  boxShadow: AppShapes.shadowSm,
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: RefreshIndicator(
+          onRefresh: _loadFreshDetail,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_order.cancellationReason != null && _order.cancellationReason!.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: Row(
                       children: [
+                        const Icon(Icons.info_outline, color: Color(0xFFDC2626), size: 18),
+                        const SizedBox(width: 8),
                         Expanded(
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primaryFixed),
-                                child: Center(
-                                  child: LocalizedText(
-                                    _order.customerName.isNotEmpty ? _order.customerName[0].toUpperCase() : 'K',
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.onPrimaryFixed),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const LocalizedText('KHÁCH HÀNG CHÍNH', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.tertiary)),
-                                    LocalizedText(_order.customerName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                    LocalizedText(_order.customerPhone, style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            'Lý do hủy/hoàn: ${_order.cancellationReason}',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFDC2626)),
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (_order.rescheduledAt != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF86EFAC)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.update, color: Color(0xFF16A34A), size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Đơn hàng đã được dời lịch khởi hành thành công',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF16A34A)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                // Order Lifecycle Stepper
+                _buildOrderLifecycleStepper(_order),
+                const SizedBox(height: 14),
+
+                // Customer Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLowest,
+                    borderRadius: AppShapes.radiusMd,
+                    boxShadow: AppShapes.shadowSm,
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: const BoxDecoration(shape: BoxShape.circle, color: AppColors.primaryFixed),
+                                  child: Center(
+                                    child: LocalizedText(
+                                      _order.customerName.isNotEmpty ? _order.customerName[0].toUpperCase() : 'K',
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.onPrimaryFixed),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const LocalizedText('KHÁCH HÀNG CHÍNH', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.tertiary)),
+                                      LocalizedText(_order.customerName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      LocalizedText(_order.customerPhone.isNotEmpty ? _order.customerPhone : (_order.customerEmail ?? 'Chưa có SĐT'), style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      if (_order.customerEmail != null && _order.customerEmail!.isNotEmpty && _order.customerPhone.isNotEmpty)
+                                        LocalizedText(_order.customerEmail!, style: const TextStyle(fontSize: 11, color: AppColors.tertiary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -686,33 +764,69 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: LocalizedText(_order.serviceName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface), overflow: TextOverflow.ellipsis),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: BorderRadius.circular(8)),
-                          child: LocalizedText(
-                            _db.services.any((s) => s.id == _order.serviceId && s.locationName.isNotEmpty)
-                                ? _db.services.firstWhere((s) => s.id == _order.serviceId).locationName
-                                : (_db.vendor.businessAddress != null && _db.vendor.businessAddress!.isNotEmpty
-                                    ? _db.vendor.businessAddress!
-                                    : 'Đà Nẵng'),
-                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.onSecondaryFixed),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              LocalizedText(
+                                _order.serviceName,
+                                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.location_on, size: 13, color: AppColors.secondary),
+                                  const SizedBox(width: 3),
+                                  Expanded(
+                                    child: Text(
+                                      _db.services.any((s) => s.id == _order.serviceId && s.locationName.isNotEmpty)
+                                          ? _db.services.firstWhere((s) => s.id == _order.serviceId).locationName
+                                          : (_db.vendor.businessAddress != null && _db.vendor.businessAddress!.isNotEmpty
+                                              ? _db.vendor.businessAddress!
+                                              : '51 Võ Nguyên Giáp, Đà Nẵng'),
+                                      style: const TextStyle(fontSize: 11, color: AppColors.tertiary, fontWeight: FontWeight.w500),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
+                    if (_order.optionName != null && _order.optionName!.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          const Icon(Icons.confirmation_number_outlined, size: 16, color: AppColors.secondary),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: LocalizedText(
+                              'Gói: ${_order.optionName!}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                    ],
                     Row(
                       children: [
                         const Icon(Icons.schedule, size: 16, color: AppColors.secondary),
                         const SizedBox(width: 6),
                         Expanded(
-                          child: LocalizedText('${_order.slotDate} • ${_order.slotTime}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface), overflow: TextOverflow.ellipsis),
+                          child: LocalizedText(
+                            '${_order.slotDate} • ${_order.slotTime}${_order.endTime != null && _order.endTime!.isNotEmpty ? " - ${_order.endTime!.length >= 5 ? _order.endTime!.substring(0, 5) : _order.endTime}" : ""}',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
@@ -1115,6 +1229,7 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 // AI Vendor Copilot Models for DANASEA
 // Connected to Spring Boot Vendor AI endpoints (/api/vendor/ai/...)
 
@@ -8,6 +10,8 @@ class CopilotMessageModel {
   final String content;
   final DateTime createdAt;
   final bool isVerified;
+  final List<String> details;
+  final List<Map<String, dynamic>> artifacts;
 
   const CopilotMessageModel({
     required this.id,
@@ -15,12 +19,32 @@ class CopilotMessageModel {
     required this.role,
     required this.content,
     required this.createdAt,
-    this.isVerified = true,
+    this.isVerified = false,
+    this.details = const [],
+    this.artifacts = const [],
   });
 
   bool get isUser => role.toLowerCase() == 'user';
 
   factory CopilotMessageModel.fromJson(Map<String, dynamic> json) {
+    List<Map<String, dynamic>> rawArtifacts = [];
+    if (json['artifacts'] is List) {
+      rawArtifacts = [
+        for (final item in (json['artifacts'] as List).whereType<Map>())
+          Map<String, dynamic>.from(item),
+      ];
+    } else if (json['artifactsJson'] is String && (json['artifactsJson'] as String).isNotEmpty) {
+      try {
+        final decoded = jsonDecode(json['artifactsJson'] as String);
+        if (decoded is List) {
+          rawArtifacts = [
+            for (final item in decoded.whereType<Map>())
+              Map<String, dynamic>.from(item),
+          ];
+        }
+      } catch (_) {}
+    }
+
     return CopilotMessageModel(
       id: json['id']?.toString() ?? 'msg-${DateTime.now().millisecondsSinceEpoch}',
       conversationId: json['conversationId']?.toString(),
@@ -30,8 +54,64 @@ class CopilotMessageModel {
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
           : DateTime.now(),
       isVerified: json['generatedTextVerified'] == true,
+      artifacts: rawArtifacts,
+      details: [
+        for (final artifact in rawArtifacts)
+          ..._artifactDetails(artifact),
+      ],
     );
   }
+  static List<String> _artifactDetails(Map artifact) {
+    final data = artifact['data'];
+    if (data is! Map) return [];
+    final lines = <String>{};
+    const labels = {
+      'totalReviewsAnalyzed': 'Số đánh giá', 'averageRating': 'Điểm trung bình',
+      'totalSlotsEvaluated': 'Số ca được đánh giá', 'weatherRiskSlotsCount': 'Ca có rủi ro thời tiết',
+      'gmv': 'Tổng giá trị giao dịch (đ)', 'netPayout': 'Thực thu (đ)',
+      'totalBookings': 'Tổng đơn', 'cancelledBookings': 'Đơn đã hủy',
+      'total': 'Tổng số dịch vụ', 'listingQualityScore': 'Điểm chất lượng bài đăng',
+    };
+    for (final entry in labels.entries) {
+      if (data[entry.key] != null) lines.add('${entry.value}: ${data[entry.key]}');
+    }
+    final slotsByAdvice = <String, Set<String>>{};
+    final recommendations = data['recommendations'];
+    if (recommendations is List) {
+      for (final item in recommendations.whereType<Map>()) {
+        final advice = ['serviceTitle', 'actionTitle', 'adviceReason']
+            .map((field) => item[field]).whereType<String>()
+            .map((value) => value.trim()).where((value) => value.isNotEmpty)
+            .join(' · ');
+        if (advice.isEmpty) continue;
+        final times = slotsByAdvice.putIfAbsent(advice, () => <String>{});
+        final time = [item['date'], item['startTime']].whereType<String>().join(' ').trim();
+        if (time.isNotEmpty) times.add(time);
+      }
+    }
+    for (final entry in slotsByAdvice.entries) {
+      final times = entry.value;
+      if (times.isEmpty) {
+        lines.add(entry.key);
+      } else {
+        final scope = times.length == 1 ? times.single : '${times.length} khung giờ';
+        lines.add('$scope · ${entry.key}');
+      }
+    }
+    for (final key in ['actionItems', 'missingItems']) {
+      for (final item in (data[key] as List? ?? []).whereType<Map>()) {
+        final text = ['serviceTitle', 'date', 'startTime', 'actionTitle', 'title',
+          'recommendation', 'adviceReason', 'suggestion']
+            .map((field) => item[field]).whereType<String>()
+            .where((value) => value.trim().isNotEmpty).join(' · ');
+        if (text.isNotEmpty) lines.add(text);
+      }
+    }
+    final alerts = data['diagnosticAlerts'];
+    if (alerts is List) lines.addAll(alerts.whereType<String>());
+    return lines.toList();
+  }
+
 }
 
 class SlotRecommendationModel {
@@ -42,7 +122,7 @@ class SlotRecommendationModel {
   final String recommendationType;
   final String actionTitle;
   final String adviceReason;
-  final double bookedRatio;
+  final double? bookedRatio;
 
   const SlotRecommendationModel({
     required this.slotId,
@@ -60,11 +140,11 @@ class SlotRecommendationModel {
       slotId: json['slotId']?.toString() ?? '',
       date: json['date']?.toString() ?? '',
       startTime: json['startTime']?.toString() ?? '',
-      marineSafetyLevel: json['marineSafetyLevel']?.toString() ?? 'SAFE',
-      recommendationType: json['recommendationType']?.toString() ?? 'EXPAND_CAPACITY',
-      actionTitle: json['actionTitle']?.toString() ?? 'Đề xuất ca chạy',
+      marineSafetyLevel: (json['weatherRiskLevel'] ?? json['marineSafetyLevel'])?.toString() ?? 'UNKNOWN',
+      recommendationType: json['recommendationType']?.toString() ?? '',
+      actionTitle: json['actionTitle']?.toString() ?? '',
       adviceReason: json['adviceReason']?.toString() ?? '',
-      bookedRatio: (json['bookedRatio'] as num?)?.toDouble() ?? 0.0,
+      bookedRatio: json['occupancyRate'] is num ? (json['occupancyRate'] as num) / 100 : (json['bookedRatio'] as num?)?.toDouble(),
     );
   }
 }
@@ -78,25 +158,25 @@ class SlotAdvisorResultModel {
   final String analysisMethod;
 
   const SlotAdvisorResultModel({
-    this.totalSlotsEvaluated = 0,
-    this.highDemandSlotsCount = 0,
-    this.lowDemandSlotsCount = 0,
-    this.weatherRiskSlotsCount = 0,
+    required this.totalSlotsEvaluated,
+    required this.highDemandSlotsCount,
+    required this.lowDemandSlotsCount,
+    required this.weatherRiskSlotsCount,
     this.recommendations = const [],
     this.analysisMethod = '',
   });
 
   factory SlotAdvisorResultModel.fromJson(Map<String, dynamic> json) {
-    final recList = (json['recommendations'] as List? ?? [])
+    final recList = (json['recommendations'] as List)
         .whereType<Map<String, dynamic>>()
         .map(SlotRecommendationModel.fromJson)
         .toList();
 
     return SlotAdvisorResultModel(
-      totalSlotsEvaluated: (json['totalSlotsEvaluated'] as num?)?.toInt() ?? 0,
-      highDemandSlotsCount: (json['highDemandSlotsCount'] as num?)?.toInt() ?? 0,
-      lowDemandSlotsCount: (json['lowDemandSlotsCount'] as num?)?.toInt() ?? 0,
-      weatherRiskSlotsCount: (json['weatherRiskSlotsCount'] as num?)?.toInt() ?? 0,
+      totalSlotsEvaluated: (json['totalSlotsEvaluated'] as num).toInt(),
+      highDemandSlotsCount: (json['highDemandSlotsCount'] as num).toInt(),
+      lowDemandSlotsCount: (json['lowDemandSlotsCount'] as num).toInt(),
+      weatherRiskSlotsCount: (json['weatherRiskSlotsCount'] as num).toInt(),
       recommendations: recList,
       analysisMethod: json['analysisMethod']?.toString() ?? '',
     );
@@ -105,14 +185,14 @@ class SlotAdvisorResultModel {
 
 class ReviewCoachingResultModel {
   final int totalReviewsAnalyzed;
-  final double averageRating;
+  final double? averageRating;
   final Map<String, dynamic> pillars;
   final List<Map<String, dynamic>> actionItems;
   final Map<String, dynamic>? badgeProgression;
 
   const ReviewCoachingResultModel({
-    this.totalReviewsAnalyzed = 0,
-    this.averageRating = 5.0,
+    required this.totalReviewsAnalyzed,
+    required this.averageRating,
     this.pillars = const {},
     this.actionItems = const [],
     this.badgeProgression,
@@ -120,8 +200,8 @@ class ReviewCoachingResultModel {
 
   factory ReviewCoachingResultModel.fromJson(Map<String, dynamic> json) {
     return ReviewCoachingResultModel(
-      totalReviewsAnalyzed: (json['totalReviewsAnalyzed'] as num?)?.toInt() ?? 0,
-      averageRating: (json['averageRating'] as num?)?.toDouble() ?? 5.0,
+      totalReviewsAnalyzed: (json['totalReviewsAnalyzed'] as num).toInt(),
+      averageRating: (json['averageRating'] as num?)?.toDouble(),
       pillars: json['pillars'] is Map<String, dynamic> ? json['pillars'] as Map<String, dynamic> : {},
       actionItems: (json['actionItems'] as List? ?? [])
           .whereType<Map<String, dynamic>>()
@@ -144,17 +224,21 @@ class ReplyDraftResultModel {
     required this.reviewId,
     required this.draftedReply,
     this.alternativeShortReply,
-    this.tone = 'PROFESSIONAL',
-    this.verifiedSafe = true,
+    required this.tone,
+    required this.verifiedSafe,
   });
 
   factory ReplyDraftResultModel.fromJson(Map<String, dynamic> json) {
+    final reply = json['draftedReply'];
+    if (reply is! String || reply.trim().isEmpty) {
+      throw const FormatException('API chưa trả về nội dung bản nháp.');
+    }
     return ReplyDraftResultModel(
       reviewId: json['reviewId']?.toString() ?? '',
-      draftedReply: json['draftedReply']?.toString() ?? '',
+      draftedReply: reply,
       alternativeShortReply: json['alternativeShortReply']?.toString(),
-      tone: json['tone']?.toString() ?? 'PROFESSIONAL',
-      verifiedSafe: json['verifiedSafe'] != false,
+      tone: json['tone']?.toString() ?? '',
+      verifiedSafe: json['verifiedSafe'] as bool,
     );
   }
 }
@@ -201,7 +285,7 @@ class LocalizedListingDraftModel {
 
   factory LocalizedListingDraftModel.fromJson(Map<String, dynamic> json) {
     return LocalizedListingDraftModel(
-      language: json['language']?.toString() ?? 'vi',
+      language: json['language']?.toString() ?? '',
       optimizedTitle: json['optimizedTitle']?.toString() ?? '',
       optimizedDescription: json['optimizedDescription']?.toString() ?? '',
       sellingPoints: (json['sellingPoints'] as List? ?? []).map((e) => e.toString()).toList(),
@@ -220,14 +304,14 @@ class ListingOptimizeResultModel {
 
   const ListingOptimizeResultModel({
     this.detectedCategory = '',
-    this.listingQualityScore = 0,
+    required this.listingQualityScore,
     this.missingItems = const [],
     this.drafts = const {},
-    this.policyCompliant = true,
+    required this.policyCompliant,
   });
 
   factory ListingOptimizeResultModel.fromJson(Map<String, dynamic> json) {
-    final missingList = (json['missingItems'] as List? ?? [])
+    final missingList = (json['missingItems'] as List)
         .whereType<Map<String, dynamic>>()
         .map(MissingChecklistItemModel.fromJson)
         .toList();
@@ -243,10 +327,10 @@ class ListingOptimizeResultModel {
 
     return ListingOptimizeResultModel(
       detectedCategory: json['detectedCategory']?.toString() ?? '',
-      listingQualityScore: (json['listingQualityScore'] as num?)?.toInt() ?? 0,
+      listingQualityScore: (json['listingQualityScore'] as num).toInt(),
       missingItems: missingList,
       drafts: parsedDrafts,
-      policyCompliant: json['policyCompliant'] != false,
+      policyCompliant: json['policyCompliant'] as bool,
     );
   }
 }

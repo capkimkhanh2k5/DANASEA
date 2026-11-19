@@ -154,64 +154,6 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Dynamic Notification Banner: Pending Action
-            if (pendingCount > 0) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(AppShapes.rLg),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x0A000000), blurRadius: 6, offset: Offset(0, 2)),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withAlpha(35),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.reply_all, color: AppColors.primary, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          LocalizedText(
-                            '$pendingCount phản hồi đang chờ',
-                            style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
-                          ),
-                          LocalizedText(
-                            'Phản hồi đánh giá của khách hàng kịp thời để nâng cao uy tín',
-                            style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer,
-                        borderRadius: BorderRadius.circular(AppShapes.rFull),
-                      ),
-                      child: LocalizedText(
-                        'Ưu tiên cao',
-                        style: AppTypography.labelSm.copyWith(
-                          color: AppColors.onPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
             // Performance Metrics Hub
             Container(
               padding: const EdgeInsets.all(20),
@@ -229,26 +171,15 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            LocalizedText(
-                              'TỔNG QUAN ĐÁNH GIÁ',
-                              style: AppTypography.labelSm.copyWith(
-                                color: AppColors.secondary,
-                                letterSpacing: 0.5,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 2),
-                            LocalizedText(
-                              'Mức độ hài lòng của khách',
-                              style: AppTypography.headlineSm.copyWith(color: AppColors.onSurface),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                      const Expanded(
+                        child: Text(
+                          'Tổng quan',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.navyAnchor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -265,7 +196,9 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                             const Icon(Icons.verified, size: 14, color: Color(0xFF059669)),
                             const SizedBox(width: 4),
                             Text(
-                              '${totalReviews > 0 ? (((count5 + count4) / totalReviews) * 100).toInt() : 100}% Hài lòng',
+                              totalReviews > 0
+                                  ? '${((count5 + count4) * 100 / totalReviews).toInt()}% Hài lòng'
+                                  : 'Chưa có đánh giá',
                               style: AppTypography.labelSm.copyWith(
                                 color: const Color(0xFF059669),
                                 fontWeight: FontWeight.bold,
@@ -283,8 +216,8 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                     children: [
                       // Score Column
                       Container(
-                        width: 96,
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+                        width: 104,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(AppShapes.rMd),
@@ -308,7 +241,7 @@ class _ReviewFeedbackScreenState extends State<ReviewFeedbackScreen> {
                                 5,
                                 (index) => Icon(
                                   index < avgRating.round() ? Icons.star_rounded : Icons.star_border_rounded,
-                                  size: 15,
+                                  size: 14,
                                   color: const Color(0xFFF59E0B),
                                 ),
                               ),
@@ -849,7 +782,7 @@ class _ReviewCoachingModal extends StatefulWidget {
 class _ReviewCoachingModalState extends State<_ReviewCoachingModal> {
   final _aiRepo = VendorAiRepository();
   bool _isLoading = true;
-  ReviewCoachingResultModel _result = const ReviewCoachingResultModel();
+  ReviewCoachingResultModel? _result;
 
   @override
   void initState() {
@@ -858,18 +791,23 @@ class _ReviewCoachingModalState extends State<_ReviewCoachingModal> {
   }
 
   Future<void> _loadCoaching() async {
-    setState(() => _isLoading = true);
-    final res = await _aiRepo.getReviewCoaching();
-    if (mounted) {
-      setState(() {
-        _result = res;
-        _isLoading = false;
-      });
+    setState(() {
+      _isLoading = true;
+      _result = null;
+    });
+    try {
+      final result = await _aiRepo.getReviewCoaching();
+      if (mounted) setState(() => _result = result);
+    } catch (_) {
+      // A missing result displays the retry state below.
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final result = _result;
     return Container(
       constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
       padding: EdgeInsets.only(
@@ -925,13 +863,14 @@ class _ReviewCoachingModalState extends State<_ReviewCoachingModal> {
               ),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 20, color: AppColors.tertiary),
-                onPressed: _loadCoaching,
+                onPressed: _isLoading ? null : _loadCoaching,
               ),
             ],
           ),
           const SizedBox(height: 14),
 
           // Rating overview
+          if (result != null)
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -946,7 +885,7 @@ class _ReviewCoachingModalState extends State<_ReviewCoachingModal> {
                     const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 28),
                     const SizedBox(width: 6),
                     Text(
-                      _result.averageRating.toStringAsFixed(1),
+                      result.averageRating?.toStringAsFixed(1) ?? '—',
                       style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
                     ),
                     const Text(' / 5.0', style: TextStyle(fontSize: 12, color: AppColors.tertiary)),
@@ -957,7 +896,7 @@ class _ReviewCoachingModalState extends State<_ReviewCoachingModal> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${_result.totalReviewsAnalyzed} đánh giá',
+                      '${result.totalReviewsAnalyzed} đánh giá',
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
                     ),
                     const Text('Đã được AI phân tích', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
@@ -972,7 +911,11 @@ class _ReviewCoachingModalState extends State<_ReviewCoachingModal> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : SingleChildScrollView(
+                : result == null
+                    ? Center(child: TextButton(onPressed: _loadCoaching, child: const Text('Không tải được phân tích đánh giá. Thử lại')))
+                    : result.totalReviewsAnalyzed == 0
+                    ? const Center(child: Text('Chưa có đánh giá để phân tích.'))
+                    : SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -981,19 +924,19 @@ class _ReviewCoachingModalState extends State<_ReviewCoachingModal> {
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
                         ),
                         const SizedBox(height: 8),
-                        _buildPillarTile('Hướng dẫn viên', _result.pillars['GUIDE']),
-                        _buildPillarTile('An toàn biển & Thiết bị', _result.pillars['SAFETY']),
-                        _buildPillarTile('Đúng giờ khởi hành', _result.pillars['PUNCTUALITY']),
-                        _buildPillarTile('Giá trị & Trải nghiệm', _result.pillars['VALUE']),
+                        _buildPillarTile('Hướng dẫn viên', result.pillars['GUIDE']),
+                        _buildPillarTile('An toàn biển & Thiết bị', result.pillars['SAFETY']),
+                        _buildPillarTile('Đúng giờ khởi hành', result.pillars['PUNCTUALITY']),
+                        _buildPillarTile('Giá trị & Trải nghiệm', result.pillars['VALUE']),
                         const SizedBox(height: 16),
 
-                        if (_result.actionItems.isNotEmpty) ...[
+                        if (result.actionItems.isNotEmpty) ...[
                           const Text(
                             'Khuyến nghị hành động để tăng điểm:',
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
                           ),
                           const SizedBox(height: 8),
-                          ..._result.actionItems.map((item) {
+                          ...result.actionItems.map((item) {
                             return Container(
                               margin: const EdgeInsets.only(bottom: 8),
                               padding: const EdgeInsets.all(10),
@@ -1015,11 +958,11 @@ class _ReviewCoachingModalState extends State<_ReviewCoachingModal> {
                                           item['title']?.toString() ?? item['action']?.toString() ?? 'Hành động đề xuất',
                                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.navyAnchor),
                                         ),
-                                        if (item['description'] != null || item['reason'] != null)
+                                        if (item['recommendation'] != null || item['description'] != null || item['reason'] != null)
                                           Padding(
                                             padding: const EdgeInsets.only(top: 2),
                                             child: Text(
-                                              (item['description'] ?? item['reason']).toString(),
+                                              (item['recommendation'] ?? item['description'] ?? item['reason']).toString(),
                                               style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                                             ),
                                           ),
@@ -1041,19 +984,21 @@ class _ReviewCoachingModalState extends State<_ReviewCoachingModal> {
   }
 
   Widget _buildPillarTile(String title, dynamic data) {
-    if (data == null || data is! Map) {
+    final points = data is Map ? data['scoreOutOf10'] : null;
+    final legacy = data is Map ? data['sentimentScore'] : null;
+    if (points is! num && legacy is! num) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 6),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(title, style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant)),
-            const Text('Tích cực (100%)', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
+            const Text('Chưa có dữ liệu', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF16A34A))),
           ],
         ),
       );
     }
-    final score = (data['sentimentScore'] as num?)?.toDouble() ?? 1.0;
+    final score = points is num ? points / 10 : (legacy as num).toDouble();
     final pct = (score * 100).clamp(0, 100).toInt();
     final isGood = pct >= 70;
 
@@ -1076,7 +1021,7 @@ class _ReviewCoachingModalState extends State<_ReviewCoachingModal> {
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
-              '$pct% hài lòng',
+              '${(score * 10).toStringAsFixed(1)}/10',
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,

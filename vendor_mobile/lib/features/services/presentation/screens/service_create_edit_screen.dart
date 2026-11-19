@@ -69,6 +69,29 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
   final TextEditingController _latController = TextEditingController();
 
   final TextEditingController _lngController = TextEditingController();
+  bool _showEnglishName = false;
+  bool _isAutoSlug = true;
+
+  String _slugify(String text) {
+    var str = text.toLowerCase().trim();
+    const map = {
+      'a': 'áàảãạăắằẳẵặâấầẩẫậ',
+      'd': 'đ',
+      'e': 'éèẻẽẹêếềểễệ',
+      'i': 'íìỉĩị',
+      'o': 'óòỏõọôốồổỗộơớờởỡợ',
+      'u': 'úùủũụưứừửữự',
+      'y': 'ýỳỷỹỵ',
+    };
+    map.forEach((non, diacritics) {
+      for (int i = 0; i < diacritics.length; i++) {
+        str = str.replaceAll(diacritics[i], non);
+      }
+    });
+    str = str.replaceAll(RegExp(r'[^a-z0-9\s-]'), '');
+    str = str.replaceAll(RegExp(r'[\s-]+'), '-');
+    return str.replaceAll(RegExp(r'^-+|-+$'), '');
+  }
 
 
 
@@ -329,6 +352,8 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
   void _showListingOptimizeModal(ListingOptimizeResultModel result) {
     final viDraft = result.drafts['vi'] ?? result.drafts['VI'];
     final enDraft = result.drafts['en'] ?? result.drafts['EN'];
+    final canApply = [viDraft, enDraft].any((draft) => draft != null &&
+        (draft.optimizedTitle.trim().isNotEmpty || draft.optimizedDescription.trim().isNotEmpty));
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -508,7 +533,7 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {
+                      onPressed: !canApply ? null : () {
                         setState(() {
                           if (viDraft != null) {
                             if (viDraft.optimizedTitle.isNotEmpty) {
@@ -628,24 +653,48 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
                           ),
                           const SizedBox(height: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
-                              color: AppColors.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: AppColors.borderSubtle),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.secondary.withValues(alpha: 0.6), width: 1.2),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x06000000),
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
                                 value: optionType,
                                 isExpanded: true,
+                                borderRadius: BorderRadius.circular(12),
+                                dropdownColor: Colors.white,
+                                elevation: 3,
+                                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.secondary),
                                 items: const [
                                   DropdownMenuItem(
                                     value: 'SHARED',
-                                    child: Text('Ghép đoàn (SHARED)', style: TextStyle(fontSize: 12.5)),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.groups_rounded, size: 16, color: AppColors.secondary),
+                                        SizedBox(width: 6),
+                                        Text('Ghép đoàn', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onSurface)),
+                                      ],
+                                    ),
                                   ),
                                   DropdownMenuItem(
                                     value: 'PRIVATE',
-                                    child: Text('Bao trọn gói (PRIVATE)', style: TextStyle(fontSize: 12.5)),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.workspace_premium_rounded, size: 16, color: AppColors.primary),
+                                        SizedBox(width: 6),
+                                        Text('Bao trọn gói', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onSurface)),
+                                      ],
+                                    ),
                                   ),
                                 ],
                                 onChanged: (val) {
@@ -674,14 +723,25 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
                           Container(
                             height: 48,
                             alignment: Alignment.centerLeft,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                             decoration: BoxDecoration(
-                              color: AppColors.surfaceContainerHigh.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(10),
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
                             ),
-                            child: Text(
-                              pricingUnit == 'PER_PACKAGE' ? 'Theo gói (PER_PACKAGE)' : 'Theo người (PER_PERSON)',
-                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  pricingUnit == 'PER_PACKAGE' ? Icons.inventory_2_outlined : Icons.person_outline_rounded,
+                                  size: 15,
+                                  color: AppColors.tertiary,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  pricingUnit == 'PER_PACKAGE' ? 'Theo gói' : 'Theo người / vé',
+                                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -758,7 +818,7 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
                                   return;
                                 }
                                 if (optionType == 'PRIVATE' && (maxPaxVal == null || maxPaxVal <= 0)) {
-                                  ToastNotification.showError(ctx, 'Gói PRIVATE bắt buộc nhập số khách tối đa > 0');
+                                  ToastNotification.showError(ctx, 'Gói bao trọn bắt buộc nhập số khách tối đa > 0');
                                   return;
                                 }
 
@@ -906,39 +966,27 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
     super.initState();
 
     if (_isEdit) {
-
       final s = widget.service!;
-
       _nameViController.text = s.nameVi;
-
       _nameEnController.text = s.nameEn;
-
+      if (s.nameEn.isNotEmpty) {
+        _showEnglishName = true;
+      }
       _slugController.text = s.slug;
-
+      _isAutoSlug = s.slug.isEmpty;
       _descViController.text = s.descriptionVi;
-
       _descEnController.text = s.descriptionEn;
-
       _priceController.text = s.price.toStringAsFixed(0);
-
       _durationController.text = s.durationMinutes.toString();
-
       _capacityController.text = s.maxCapacity.toString();
-
       _meetingPointNameController.text = s.meetingPointName;
-
       _meetingPointAddressController.text = s.meetingPointAddress;
-
       _latController.text = s.latitude.toString();
-
       _lngController.text = s.longitude.toString();
-
       _category = _normalizeCategory(s.category);
-
       _images = List.from(s.images);
       _serverServiceId = s.serviceId;
       _loadServerOptionsAndImages(s.serviceId);
-
     } else {
       if (_db.categories.isEmpty) {
         VendorServiceRepository().getCategories().then((_) {
@@ -946,6 +994,15 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
         });
       }
     }
+
+    _nameViController.addListener(() {
+      if (_isAutoSlug) {
+        final slug = _slugify(_nameViController.text);
+        if (_slugController.text != slug) {
+          _slugController.text = slug;
+        }
+      }
+    });
 
   }
 
@@ -1192,297 +1249,94 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
 
-              // Vendor Mini Banner
-
-              Container(
-
-                padding: const EdgeInsets.all(12),
-
-                decoration: BoxDecoration(
-
-                  color: AppColors.surfaceContainerLow,
-
-                  borderRadius: AppShapes.radiusMd,
-
-                  boxShadow: AppShapes.shadowSm,
-
-                ),
-
-                child: Row(
-
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-
-                  children: [
-
-                    Expanded(
-
-                      child: Row(
-
-                        children: [
-
-                          Container(
-
-                            width: 32,
-
-                            height: 32,
-
-                            decoration: const BoxDecoration(
-
-                              shape: BoxShape.circle,
-
-                              color: AppColors.secondaryContainer,
-
-                            ),
-
-                            child: const Icon(Icons.kayaking, size: 18, color: AppColors.onSecondaryContainer),
-
-                          ),
-
-                          const SizedBox(width: 8),
-
-                          const Expanded(
-
-                            child: Column(
-
-                              crossAxisAlignment: CrossAxisAlignment.start,
-
-                              children: [
-
-                                LocalizedText('NHÀ CUNG CẤP', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.secondary)),
-
-                                LocalizedText('nhà cung cấp', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface), overflow: TextOverflow.ellipsis),
-
-                              ],
-
-                            ),
-
-                          ),
-
-                        ],
-
-                      ),
-
-                    ),
-
-                    const SizedBox(width: 8),
-
-                    Container(
-
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-
-                      decoration: BoxDecoration(
-
-                        color: AppColors.secondary.withValues(alpha: 0.12),
-
-                        borderRadius: BorderRadius.circular(12),
-
-                      ),
-
-                      child: const LocalizedText('Bước 1/2', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.secondary)),
-
-                    ),
-
-                  ],
-
-                ),
-
-              ),
-
-              const SizedBox(height: 12),
-
-
-
-              // Progress Bar (2 bước rõ ràng)
-
-              Row(
-
-                children: [
-
-                  Expanded(
-
-                    child: Container(height: 5, decoration: BoxDecoration(color: AppColors.secondary, borderRadius: BorderRadius.circular(3))),
-
-                  ),
-
-                  const SizedBox(width: 6),
-
-                  Expanded(
-
-                    child: Container(height: 5, decoration: BoxDecoration(color: AppColors.surfaceContainerHighest, borderRadius: BorderRadius.circular(3))),
-
-                  ),
-
-                ],
-
-              ),
-
-              const SizedBox(height: 6),
-
-              const Row(
-
-                children: [
-
-                  Expanded(
-
-                    child: LocalizedText('1. Thông tin dịch vụ',
-
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondary),
-
-                      maxLines: 1,
-
-                      overflow: TextOverflow.ellipsis,
-
-                    ),
-
-                  ),
-
-                  Expanded(
-
-                    child: LocalizedText('2. An toàn & Chứng chỉ',
-
-                      textAlign: TextAlign.end,
-
-                      style: TextStyle(fontSize: 12, color: AppColors.tertiary),
-
-                      maxLines: 1,
-
-                      overflow: TextOverflow.ellipsis,
-
-                    ),
-
-                  ),
-
-                ],
-
-              ),
-
-              const SizedBox(height: 16),
-
-
-
               // SECTION 1: Thông tin cơ bản
               _buildSectionCard(
                 key: _section1Key,
                 title: 'Thông tin cơ bản',
-
                 icon: Icons.edit_note,
-
                 child: Column(
-
                   crossAxisAlignment: CrossAxisAlignment.start,
-
                   children: [
-
-                    VendorTextField(
-
-                      controller: _nameViController,
-
-                      label: 'Tên dịch vụ',
-
-                      isRequired: true,
-
-                      hint: 'Nhập tên dịch vụ (ví dụ: Chèo SUP ngắm bình minh)',
-
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    VendorTextField(
-
-                      controller: _nameEnController,
-
-                      label: 'Tên tiếng Anh (Tùy chọn)',
-
-                      isRequired: false,
-
-                      hint: 'Nhập tên dịch vụ bằng tiếng Anh',
-
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    const LocalizedText('Đường dẫn liên kết', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.onSurface)),
-
-                    const SizedBox(height: 6),
-
-                    Container(
-
-                      height: 48,
-
-                      decoration: BoxDecoration(
-
-                        color: AppColors.surfaceContainerLow,
-
-                        borderRadius: BorderRadius.circular(12),
-
-                        border: Border.all(color: AppColors.borderSubtle.withValues(alpha: 0.8)),
-
-                      ),
-
-                      child: Row(
-
-                        children: [
-
-                          Container(
-
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-
-                            height: double.infinity,
-
-                            decoration: BoxDecoration(
-
-                              color: AppColors.secondary.withValues(alpha: 0.08),
-
-                              borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
-
-                              border: Border(right: BorderSide(color: AppColors.borderSubtle.withValues(alpha: 0.8))),
-
-                            ),
-
-                            alignment: Alignment.center,
-
-                            child: const Text(
-
-                              'danasea.vn/tours/',
-
-                              style: TextStyle(fontSize: 12.5, color: AppColors.secondary, fontWeight: FontWeight.bold),
-
-                            ),
-
-                          ),
-
-                          Expanded(
-
-                            child: Padding(
-
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-
-                              child: TextField(
-
-                                controller: _slugController,
-
-                                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500, color: AppColors.onSurface),
-
-                                decoration: const InputDecoration(
-
-                                  border: InputBorder.none,
-
-                                  isDense: true,
-
-                                  contentPadding: EdgeInsets.zero,
-
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const LocalizedText(
+                          'Tên dịch vụ',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                        ),
+                        InkWell(
+                          onTap: () => setState(() => _showEnglishName = !_showEnglishName),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(_showEnglishName ? Icons.remove_circle_outline : Icons.add_circle_outline, size: 13, color: AppColors.secondary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _showEnglishName ? 'Ẩn tên tiếng Anh' : '+ Thêm tên tiếng Anh',
+                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.secondary),
                                 ),
-
-                              ),
-
+                              ],
                             ),
-
                           ),
-
-                        ],
-
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _nameViController,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.onSurface),
+                      decoration: InputDecoration(
+                        hintText: 'VD: Chèo SUP ngắm bình minh biển Mỹ Khê',
+                        hintStyle: const TextStyle(fontSize: 13, color: AppColors.outline),
+                        filled: true,
+                        fillColor: AppColors.surfaceContainerLow,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.borderSubtle.withValues(alpha: 0.8)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: AppColors.borderSubtle.withValues(alpha: 0.8)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.secondary, width: 1.5),
+                        ),
                       ),
-
+                    ),
+                    if (_showEnglishName) ...[
+                      const SizedBox(height: 10),
+                      VendorTextField(
+                        controller: _nameEnController,
+                        label: 'Tên tiếng Anh (Tùy chọn)',
+                        isRequired: false,
+                        hint: 'VD: Sunrise SUP Surfing Experience',
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _slugController,
+                      builder: (context, val, _) {
+                        final currentSlug = val.text.isNotEmpty ? val.text : _slugify(_nameViController.text);
+                        return Row(
+                          children: [
+                            const Icon(Icons.link_rounded, size: 14, color: AppColors.secondary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Liên kết tự động: danasea.vn/tours/$currentSlug',
+                                style: const TextStyle(fontSize: 11, color: AppColors.tertiary, fontStyle: FontStyle.italic),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
 
                     const SizedBox(height: 12),
@@ -1853,16 +1707,16 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
 
               const SizedBox(height: 16),
 
-              // SECTION 2B: Gói & Lựa chọn bán (Service Options - SHARED / PRIVATE)
+              // SECTION 2B: Gói & Lựa chọn bán (Service Options)
               _buildSectionCard(
-                title: 'Gói & Lựa chọn bán (Options)',
+                title: 'Gói & Tùy chọn giá',
                 icon: Icons.sell_outlined,
                 badge: '${_serviceOptions.length} gói',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const LocalizedText(
-                      'Tùy chọn ghép đoàn (SHARED tính theo người) hoặc bao trọn cano/thuyền (PRIVATE tính theo gói).',
+                      'Tùy chọn bán theo khách ghép đoàn lẻ hoặc bao trọn tàu/cano theo gói riêng.',
                       style: TextStyle(fontSize: 11.5, color: AppColors.tertiary),
                     ),
                     const SizedBox(height: 10),
@@ -1928,9 +1782,9 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
                                               borderRadius: BorderRadius.circular(6),
                                             ),
                                             child: Text(
-                                              isPrivate ? 'PRIVATE • Trọn gói' : 'SHARED • Ghép đoàn',
+                                              isPrivate ? 'Bao trọn gói' : 'Ghép đoàn',
                                               style: TextStyle(
-                                                fontSize: 9.5,
+                                                fontSize: 10,
                                                 fontWeight: FontWeight.bold,
                                                 color: isPrivate ? AppColors.primary : AppColors.secondary,
                                               ),
@@ -1972,7 +1826,7 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
                       onPressed: () => _showOptionFormModal(),
                       icon: const Icon(Icons.add_circle_outline, size: 16),
                       label: const LocalizedText(
-                        'Thêm lựa chọn bán (SHARED / PRIVATE)',
+                        'Thêm gói / tùy chọn giá',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                       style: OutlinedButton.styleFrom(
@@ -2316,10 +2170,10 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
 
   Widget _buildStickySectionBar() {
     final sections = [
-      (title: '1. Cơ bản', key: _section1Key, icon: Icons.edit_note),
-      (title: '2. Giá & Gói', key: _section2Key, icon: Icons.sell_outlined),
-      (title: '3. Điểm đón', key: _section3Key, icon: Icons.location_on_outlined),
-      (title: '4. Hình ảnh', key: _section4Key, icon: Icons.photo_library_outlined),
+      (title: '📝 Thông tin', key: _section1Key, icon: Icons.edit_note_rounded),
+      (title: '🏷️ Giá & Gói', key: _section2Key, icon: Icons.sell_outlined),
+      (title: '📍 Điểm đón', key: _section3Key, icon: Icons.location_on_outlined),
+      (title: '📸 Hình ảnh', key: _section4Key, icon: Icons.photo_library_outlined),
     ];
     return Container(
       width: double.infinity,

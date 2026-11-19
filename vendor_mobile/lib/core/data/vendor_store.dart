@@ -227,6 +227,7 @@ class VendorStore extends ChangeNotifier {
           VendorReviewRepository().getReviews().catchError((_) => reviews),
           VendorVoucherRepository().getVouchers().catchError((_) => vouchers),
           VendorSettlementRepository().getSettlements().catchError((_) => settlements),
+          VendorSettlementRepository().getPayoutRequests().catchError((_) => payoutRequests),
           VendorDisputeRepository().getDisputes().catchError((_) => disputes),
           VendorChatRepository().getConversations().catchError((_) => conversations),
           VendorNotificationRepository().getNotifications().catchError((_) => notifications),

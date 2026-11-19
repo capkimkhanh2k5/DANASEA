@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Minus, X, Send, RotateCcw } from 'lucide-react';
 import { useAiModalStore, type AiChatMessage } from '../../store/useAiModalStore';
 import { useLanguageStore } from '../../store/useLanguageStore';
+import { MarkdownText } from '../common/MarkdownText';
 
 const QUICK_SUGGESTIONS_VI = [
   'Thời tiết & sóng biển hôm nay?',
@@ -128,7 +129,7 @@ export const AiChatPopup: React.FC = () => {
               </div>
             ) : (
               <div className="bg-white border border-slate-200/90 text-slate-800 rounded-xl rounded-tl-xs px-3.5 py-2.5 max-w-[92%] text-xs leading-relaxed shadow-xs">
-                <div className="whitespace-pre-line text-slate-700">{renderMessageContent(msg)}</div>
+                <MarkdownText content={renderMessageContent(msg)} />
               </div>
             )}
           </div>
