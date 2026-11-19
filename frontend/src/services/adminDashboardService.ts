@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { apiClient } from './apiClient';
+import { formatDisplayCode } from '../utils/displayCode';
 import type {
   AdminDashboardResponse,
   AdminDashboardQueryParams,
@@ -217,8 +218,8 @@ export const adminDashboardService = {
       ...openDisputes.map(d => ({
         id: d.id,
         type: 'disputes' as const,
-        title: `Khiếu nại #${d.id.slice(0, 8)}`,
-        subtitle: `Lý do: ${d.reason || 'Tranh chấp dịch vụ'} • Khách: ${d.customerId?.slice(0, 8) || 'N/A'}`,
+        title: `Khiếu nại #${formatDisplayCode(d.id, 'DISP')}`,
+        subtitle: `Lý do: ${d.reason || 'Tranh chấp dịch vụ'} • Khách: ${d.customerId ? formatDisplayCode(d.customerId, 'CUST') : 'N/A'}`,
         tag: d.status || 'OPEN',
         tagVariant: 'danger' as const,
         link: '/admin/disputes',
@@ -255,8 +256,8 @@ export const adminDashboardService = {
     // Chuẩn hóa 5 đơn gần nhất
     const recentOrders: DashboardRecentOrder[] = rawOrders.slice(0, 5).map(o => ({
       id: o.id,
-      orderNumber: o.id.slice(0, 8).toUpperCase(),
-      customerId: o.customerId ? o.customerId.slice(0, 8) : 'Khách vãng lai',
+      orderNumber: formatDisplayCode(o.id, 'ORD'),
+      customerId: o.customerId ? formatDisplayCode(o.customerId, 'CUST') : 'Khách vãng lai',
       status: o.status,
       paymentStatus: o.paymentStatus,
       totalAmount: o.totalAmount || 0,

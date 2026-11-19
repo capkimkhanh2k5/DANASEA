@@ -23,9 +23,11 @@ import {
   AdminPagination,
 } from '../../../components/admin/AdminWorkspace';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
+import { useAuthStore } from '../../../store/useAuthStore';
 import {
   createAdminAccount,
   filterUsers,
+  getUserInitials,
   toggleUserLock,
   updateUserRole,
   usersToCsv,
@@ -35,14 +37,59 @@ import {
 } from './usersModel';
 import './Users.css';
 
-function getUserInitials(name?: string, email?: string): string {
-  const source = name || email || 'U';
-  return source.split(' ').filter(Boolean).slice(-2).map(w => w[0]).join('').toUpperCase();
+function UserAvatarItem({
+  avatarUrl,
+  fullName,
+  email,
+  size = 'sm',
+}: {
+  avatarUrl?: string;
+  fullName?: string;
+  email?: string;
+  size?: 'sm' | 'lg';
+}) {
+  const [failed, setFailed] = useState(false);
+  const hasValidAvatar = Boolean(avatarUrl && !avatarUrl.includes('ui-avatars.com') && !failed);
+  const initials = getUserInitials(fullName, email);
+
+  if (hasValidAvatar && avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt=""
+        className={size === 'lg' ? 'admin-users-profile-avatar-lg' : 'admin-users-avatar'}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <span
+      className={size === 'lg' ? 'admin-users-profile-avatar-lg-initials' : 'admin-users-avatar-initials'}
+      aria-hidden="true"
+    >
+      {initials}
+    </span>
+  );
 }
 
 export function Users() {
   const location = useLocation();
   const demo = import.meta.env.DEV && new URLSearchParams(location.search).get('demo') === '1';
+  const currentAuthUser = useAuthStore(state => state.user);
+
+  const isCurrentUser = (u?: User | null) => {
+    if (!u || !currentAuthUser) return false;
+    if (currentAuthUser.id && u.id && currentAuthUser.id === u.id) return true;
+    if (
+      currentAuthUser.email &&
+      u.email &&
+      currentAuthUser.email.trim().toLowerCase() === u.email.trim().toLowerCase()
+    ) {
+      return true;
+    }
+    return false;
+  };
 
   const [users, setUsers] = useState<User[]>(() => demo ? MOCK_ADMIN_USERS : []);
   const [loading, setLoading] = useState(() => !demo);
@@ -178,6 +225,10 @@ export function Users() {
 
   const promptLockToggle = (user: User, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (isCurrentUser(user)) {
+      setNotice('Bạn không thể khóa tài khoản của chính mình.');
+      return;
+    }
     setLockTarget(user);
     setLockReason('');
     setIsLockModalOpen(true);
@@ -185,6 +236,12 @@ export function Users() {
 
   const confirmLockToggle = async () => {
     if (!lockTarget) return;
+    if (isCurrentUser(lockTarget)) {
+      setNotice('Bạn không thể khóa tài khoản của chính mình.');
+      setIsLockModalOpen(false);
+      setLockTarget(null);
+      return;
+    }
     if (demo) {
       const { updatedList, targetUser, nextLockedState } = toggleUserLock(
         users,
@@ -421,18 +478,16 @@ export function Users() {
             </thead>
             <tbody>
               {paginatedUsers.map(user => {
-                const hasValidAvatar = user.avatarUrl && !user.avatarUrl.includes('ui-avatars.com');
                 return (
                   <tr key={user.id}>
                     <td>
                       <div className="admin-users-identity">
-                        {hasValidAvatar ? (
-                          <img src={user.avatarUrl} alt="" className="admin-users-avatar" />
-                        ) : (
-                          <span className="admin-users-avatar-initials" aria-hidden="true">
-                            {getUserInitials(user.fullName, user.email)}
-                          </span>
-                        )}
+                        <UserAvatarItem
+                          avatarUrl={user.avatarUrl}
+                          fullName={user.fullName}
+                          email={user.email}
+                          size="sm"
+                        />
                         <div>
                           <strong>{user.fullName}</strong>
                           <span>{user.email}</span>
@@ -487,19 +542,41 @@ export function Users() {
                         >
                           <Eye size={17} aria-hidden="true" />
                         </button>
-                        <button
-                          type="button"
-                          className={`admin-action-icon-btn ${user.isLocked ? '' : 'admin-action-icon-btn--danger'}`}
-                          aria-label={user.isLocked ? `Mở khóa ${user.fullName}` : `Khóa ${user.fullName}`}
-                          title={user.isLocked ? 'Mở khóa tài khoản' : 'Khóa tài khoản'}
-                          onClick={e => promptLockToggle(user, e)}
-                        >
-                          {user.isLocked ? (
-                            <LockOpen size={16} aria-hidden="true" />
-                          ) : (
-                            <Lock size={16} aria-hidden="true" />
-                          )}
-                        </button>
+                        {(() => {
+                          const isSelf = isCurrentUser(user);
+                          return (
+                            <button
+                              type="button"
+                              className={`admin-action-icon-btn ${user.isLocked ? '' : 'admin-action-icon-btn--danger'}`}
+                              aria-label={
+                                isSelf
+                                  ? 'Bạn không thể khóa tài khoản của chính mình'
+                                  : user.isLocked
+                                  ? `Mở khóa ${user.fullName}`
+                                  : `Khóa ${user.fullName}`
+                              }
+                              title={
+                                isSelf
+                                  ? 'Bạn không thể khóa tài khoản của chính mình.'
+                                  : user.isLocked
+                                  ? 'Mở khóa tài khoản'
+                                  : 'Khóa tài khoản'
+                              }
+                              disabled={isSelf}
+                              onClick={e => {
+                                if (isSelf) return;
+                                promptLockToggle(user, e);
+                              }}
+                              style={isSelf ? { opacity: 0.35, cursor: 'not-allowed' } : undefined}
+                            >
+                              {user.isLocked ? (
+                                <LockOpen size={16} aria-hidden="true" />
+                              ) : (
+                                <Lock size={16} aria-hidden="true" />
+                              )}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </td>
                   </tr>
@@ -550,23 +627,31 @@ export function Users() {
         footer={
           selectedUser && (
             <div className="admin-users-drawer-footer">
-              <AdminButton
-                variant={selectedUser.isLocked ? 'secondary' : 'danger'}
-                onClick={() => {
-                  setIsDrawerOpen(false);
-                  promptLockToggle(selectedUser);
-                }}
-              >
-                {selectedUser.isLocked ? (
-                  <>
-                    <LockOpen size={15} aria-hidden="true" /> Mở khóa tài khoản
-                  </>
-                ) : (
-                  <>
-                    <Lock size={15} aria-hidden="true" /> Khóa tài khoản
-                  </>
-                )}
-              </AdminButton>
+              {(() => {
+                const isSelectedSelf = isCurrentUser(selectedUser);
+                return (
+                  <AdminButton
+                    variant={selectedUser.isLocked ? 'secondary' : 'danger'}
+                    disabled={isSelectedSelf}
+                    title={isSelectedSelf ? 'Bạn không thể khóa tài khoản của chính mình.' : undefined}
+                    onClick={() => {
+                      if (isSelectedSelf) return;
+                      setIsDrawerOpen(false);
+                      promptLockToggle(selectedUser);
+                    }}
+                  >
+                    {selectedUser.isLocked ? (
+                      <>
+                        <LockOpen size={15} aria-hidden="true" /> Mở khóa tài khoản
+                      </>
+                    ) : (
+                      <>
+                        <Lock size={15} aria-hidden="true" /> Khóa tài khoản
+                      </>
+                    )}
+                  </AdminButton>
+                );
+              })()}
               <AdminButton onClick={() => setIsDrawerOpen(false)}>Đóng ngăn</AdminButton>
             </div>
           )
@@ -576,17 +661,13 @@ export function Users() {
           <div className="admin-users-profile-detail">
             {/* Profile Header */}
             <div className="admin-users-profile-header">
-              {selectedUser.avatarUrl && !selectedUser.avatarUrl.includes('ui-avatars.com') ? (
-                <img
-                  src={selectedUser.avatarUrl}
-                  alt=""
-                  className="admin-users-profile-avatar-lg"
-                />
-              ) : (
-                <span className="admin-users-profile-avatar-lg-initials" aria-hidden="true">
-                  {getUserInitials(selectedUser.fullName, selectedUser.email)}
-                </span>
-              )}
+              <UserAvatarItem
+                key={`${selectedUser.id}-${selectedUser.avatarUrl || 'none'}`}
+                avatarUrl={selectedUser.avatarUrl}
+                fullName={selectedUser.fullName}
+                email={selectedUser.email}
+                size="lg"
+              />
               <div>
                 <h3>{selectedUser.fullName}</h3>
                 <p>{selectedUser.email}</p>

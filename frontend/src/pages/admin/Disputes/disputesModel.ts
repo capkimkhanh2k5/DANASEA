@@ -1,5 +1,6 @@
 import type { MOCK_ADMIN_DISPUTES } from '../../../data/adminMockData';
 import type { DisputeStatus } from '../../../types';
+import { formatDisplayCode } from '../../../utils/displayCode';
 
 export type DisputeExtended = (typeof MOCK_ADMIN_DISPUTES)[0] & {
   orderId?: string;
@@ -35,6 +36,7 @@ export function filterDisputes(
     const matchesQuery =
       !q ||
       d.id.toLowerCase().includes(q) ||
+      formatDisplayCode(d.id, 'DISP').toLowerCase().includes(q) ||
       (d.subOrderId && d.subOrderId.toLowerCase().includes(q)) ||
       (d.serviceName && d.serviceName.toLowerCase().includes(q)) ||
       (d.customerName && d.customerName.toLowerCase().includes(q)) ||

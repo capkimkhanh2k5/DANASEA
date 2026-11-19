@@ -4,6 +4,49 @@ export type UserStatusFilter = 'all' | 'active' | 'locked';
 export type UserEmailFilter = 'all' | 'verified' | 'unverified';
 export type UserRoleFilter = 'all' | Role;
 
+export function getUserInitials(name?: string, email?: string): string {
+  let source = (name || '').trim();
+
+  // 1. Remove parenthetical annotations like (DNOA), [note], etc.
+  if (source.includes('(') || source.includes('[')) {
+    const withoutParens = source
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\[[^\]]*\]/g, ' ')
+      .trim();
+    if (withoutParens.length > 0) {
+      source = withoutParens;
+    } else {
+      source = source.replace(/[()[\]{}]/g, ' ').trim();
+    }
+  }
+
+  // 2. Extract words with valid unicode letters/digits, ignoring punctuation like commas, dashes, quotes
+  const words = source
+    .split(/\s+/)
+    .map(w => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ''))
+    .filter(w => /[\p{L}\p{N}]/u.test(w));
+
+  if (words.length === 0) {
+    if (email && email.trim()) {
+      const emailClean = email.trim().replace(/^[^\p{L}\p{N}]+/u, '');
+      return (emailClean[0] || 'U').toUpperCase();
+    }
+    return 'U';
+  }
+
+  // 3. Take the last two words for clear, readable initials
+  const selectedWords = words.slice(-2);
+  const initials = selectedWords
+    .map(w => {
+      const match = w.match(/[\p{L}\p{N}]/u);
+      return match ? match[0] : '';
+    })
+    .join('')
+    .toUpperCase();
+
+  return initials || 'U';
+}
+
 export function filterUsers(
   users: User[],
   query: string,

@@ -9,20 +9,8 @@ export type PayoutExtended = (typeof MOCK_ADMIN_PAYOUTS)[0] & {
 };
 export type PayoutStatusFilter = 'all' | 'REQUESTED' | 'APPROVED' | 'PAID' | 'REJECTED';
 
-export function formatDisplayCode(id: string, prefix = 'PAY'): string {
-  if (!id) return '';
-  if (id.startsWith('PAY-') || id.startsWith('SETTLE-') || id.startsWith('ORD-') || id.startsWith('STL-') || id.startsWith('SUB-') || id.startsWith('DISP-')) return id;
-  const clean = id.replace(/-/g, '');
-  const isSeed =
-    clean.startsWith('00010000') ||
-    clean.startsWith('00060000') ||
-    clean.startsWith('00000000') ||
-    new Set(clean.slice(0, 8).split('')).size <= 2;
-  const code = isSeed
-    ? (clean.slice(0, 4) + clean.slice(-4))
-    : clean.substring(0, 8);
-  return `${prefix}-${code.toUpperCase()}`;
-}
+import { formatDisplayCode } from '../../../utils/displayCode';
+export { formatDisplayCode };
 
 export function filterPayouts(
   payouts: PayoutExtended[],

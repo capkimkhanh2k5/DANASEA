@@ -250,6 +250,28 @@ final class CopilotReportAnswer {
                         .formatted(support, support, risk, disputes);
     }
 
+    static String adminVendorDiagnostics(JsonNode data, TimeRange period, String message, String normalized, boolean english) {
+        if (!data.isArray()) return unavailable(english);
+        String q = normalized != null ? normalized : "";
+
+        boolean asksLowReviewCount = CopilotRequest.matches(DIAGNOSTICS_LOW_REVIEW_COUNT, q);
+        boolean asksHighOccLowRating = CopilotRequest.matches(DIAGNOSTICS_HIGH_OCC_LOW_RATING, q);
+        boolean asksThreshold = CopilotRequest.matches(DIAGNOSTICS_THRESHOLD_RULE, q);
+        boolean asksSuspension = CopilotRequest.matches(DIAGNOSTICS_SUSPENSION, q);
+        boolean asksImprove = CopilotRequest.matches(DIAGNOSTICS_IMPROVE, q);
+        boolean hasDiagnosticIntent = asksLowReviewCount || asksHighOccLowRating || asksThreshold
+                || asksSuspension || asksImprove;
+        boolean hasRevenueOrRankingIntent = CopilotRequest.isRevenue(q)
+                || CopilotRequest.isVendorRanking(q)
+                || CopilotRequest.isVendorCompare(q)
+                || CopilotRequest.isVendorStats(q);
+
+        if (hasRevenueOrRankingIntent && !hasDiagnosticIntent && period != null) {
+            return adminVendorDiagnostics(data, period, english);
+        }
+        return adminVendorDiagnostics(data, message, normalized, english);
+    }
+
     static String adminVendorDiagnostics(JsonNode data, String message, String normalized, boolean english) {
         if (!data.isArray()) return unavailable(english);
         String q = normalized != null ? normalized : "";
@@ -677,6 +699,51 @@ final class CopilotReportAnswer {
                         + "\nGiới hạn: Các tín hiệu chỉ đưa giao dịch vào trạng thái NEEDS_REVIEW (fraudConfirmed=false), không khẳng định gian lận hay tự khóa tài khoản khi Admin chưa kiểm tra log thanh toán.")
                         .formatted(orderId, caseId, status, ruleVersion, newCaseCreated, fraudConfirmed,
                                 failed24h, orders1h, refunds7d, paymentStatus, signalText, quyetNote);
+    }
+
+    static String adminVendorDiagnostics(JsonNode data, TimeRange period, boolean english) {
+        if (!data.isArray() || data.isEmpty()) {
+            return english
+                    ? "No vendor data recorded for the period %s.".formatted(dates(period, english))
+                    : "Không có dữ liệu đối tác trong kỳ %s.".formatted(dates(period, english));
+        }
+        String dates = dates(period, english);
+        int count = data.size();
+
+        if (count == 1) {
+            JsonNode item = data.get(0);
+            String name = item.path("businessName").asText("Đối tác");
+            String gmv = money(item.path("gmv").decimalValue(), english);
+            long orders = item.path("totalBookings").asLong(0);
+            return english
+                    ? "In period %s, vendor %s recorded GMV of %s (%d booking(s)). See details below."
+                            .formatted(dates, name, gmv, orders)
+                    : "Trong kỳ %s, đối tác %s ghi nhận GMV %s (%d đơn hàng). Chi tiết xem bảng bên dưới."
+                            .formatted(dates, name, gmv, orders);
+        }
+
+        if (count == 2) {
+            JsonNode v1 = data.get(0);
+            JsonNode v2 = data.get(1);
+            return english
+                    ? "Comparison for %s: %s (GMV %s, %d bookings) vs %s (GMV %s, %d bookings). See details below."
+                            .formatted(dates,
+                                    v1.path("businessName").asText(), money(v1.path("gmv").decimalValue(), english), v1.path("totalBookings").asLong(0),
+                                    v2.path("businessName").asText(), money(v2.path("gmv").decimalValue(), english), v2.path("totalBookings").asLong(0))
+                    : "So sánh doanh thu kỳ %s: %s đạt GMV %s (%d đơn) và %s đạt GMV %s (%d đơn). Chi tiết xem bảng bên dưới."
+                            .formatted(dates,
+                                    v1.path("businessName").asText(), money(v1.path("gmv").decimalValue(), english), v1.path("totalBookings").asLong(0),
+                                    v2.path("businessName").asText(), money(v2.path("gmv").decimalValue(), english), v2.path("totalBookings").asLong(0));
+        }
+
+        JsonNode leader = data.get(0);
+        String leaderName = leader.path("businessName").asText();
+        String leaderGmv = money(leader.path("gmv").decimalValue(), english);
+        return english
+                ? "Revenue statistics for %d vendor(s) in period %s. Leading is %s with GMV of %s. See details below."
+                        .formatted(count, dates, leaderName, leaderGmv)
+                : "Thống kê doanh thu %d đối tác kỳ %s. Dẫn đầu là %s với GMV %s. Chi tiết xem bảng bên dưới."
+                        .formatted(count, dates, leaderName, leaderGmv);
     }
 
     static String vendorServices(JsonNode data, boolean publishedOnly, boolean english) {

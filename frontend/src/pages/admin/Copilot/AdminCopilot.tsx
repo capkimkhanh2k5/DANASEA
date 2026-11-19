@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { AdminDialog } from '../../../components/admin/AdminDialog';
 import { AdminButton } from '../../../components/admin/AdminWorkspace';
+import { formatDisplayCode } from '../../../utils/displayCode';
 import { adminAiService, getAdminAiError } from '../../../services/adminAiService';
 import type {
   CopilotConversation,
@@ -479,7 +480,7 @@ export const AdminCopilot: React.FC = () => {
               <div className="admin-copilot__context-badge">
                 <Paperclip size={12} />
                 <span>
-                  {contextType === 'DISPUTE' ? 'Khiếu nại' : 'Đơn hàng'}: #{contextId.slice(0, 8)}
+                  {contextType === 'DISPUTE' ? 'Khiếu nại' : 'Đơn hàng'}: #{formatDisplayCode(contextId, contextType === 'DISPUTE' ? 'DISP' : 'ORD')}
                 </span>
                 <button
                   type="button"
@@ -631,7 +632,7 @@ export const AdminCopilot: React.FC = () => {
               <div className="admin-copilot__attachment-chip">
                 <Paperclip size={12} />
                 <span>
-                  Đính kèm: {contextType === 'DISPUTE' ? 'Hồ sơ khiếu nại' : 'Đơn hàng'} #{contextId}
+                  Đính kèm: {contextType === 'DISPUTE' ? 'Hồ sơ khiếu nại' : 'Đơn hàng'} #{formatDisplayCode(contextId, contextType === 'DISPUTE' ? 'DISP' : 'ORD')}
                 </span>
                 <button
                   type="button"

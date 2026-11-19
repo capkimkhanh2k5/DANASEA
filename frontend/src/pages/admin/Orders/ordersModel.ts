@@ -7,31 +7,8 @@ export interface AdminDisplayOrder extends MasterOrder {
   totalItems?: number;
 }
 
-export function formatDisplayCode(id: string, prefix = 'ORD'): string {
-  if (!id) return '';
-  if (
-    id.startsWith('ORD-') ||
-    id.startsWith('PAY-') ||
-    id.startsWith('STL-') ||
-    id.startsWith('CUST-') ||
-    id.startsWith('DISP-') ||
-    id.startsWith('LOG-') ||
-    id.startsWith('SETTLE-') ||
-    id.startsWith('SUB-')
-  ) {
-    return id;
-  }
-  const clean = id.replace(/-/g, '');
-  const isSeed =
-    clean.startsWith('00010000') ||
-    clean.startsWith('00060000') ||
-    clean.startsWith('00000000') ||
-    new Set(clean.slice(0, 8).split('')).size <= 2;
-  const code = isSeed
-    ? (clean.slice(0, 4) + clean.slice(-4))
-    : clean.substring(0, 8);
-  return `${prefix}-${code.toUpperCase()}`;
-}
+import { formatDisplayCode } from '../../../utils/displayCode';
+export { formatDisplayCode };
 
 export function filterMasterOrders(orders: MasterOrder[], query: string, status: string) {
   const search = query.trim().toLowerCase();

@@ -218,7 +218,7 @@ export function OrderDetailContent({
                   <dl className="admin-detail-grid" style={{ margin: '12px 0 6px', background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', border: '1px solid #edf2f5' }}>
                     <div><dt>Đơn vị vận hành</dt><dd><strong>{vendorTitle}</strong></dd></div>
                     <div><dt>Đơn giá</dt><dd>{money(sub.unitPrice)}</dd></div>
-                    <div><dt>Suất dịch vụ</dt><dd>#{sub.slotId.substring(0, 8)}</dd></div>
+                    <div><dt>Suất dịch vụ</dt><dd>#{formatDisplayCode(sub.slotId, 'SLOT')}</dd></div>
                     <div><dt>Check-in</dt><dd>{sub.checkedInAt ? dateTime(sub.checkedInAt) : 'Chưa ghi nhận'}</dd></div>
                     <div><dt>Miễn trừ trách nhiệm</dt><dd>{sub.waiverAccepted ? 'Đã chấp thuận' : 'Chưa ghi nhận'}</dd></div>
                   </dl>

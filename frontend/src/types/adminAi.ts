@@ -111,6 +111,7 @@ export interface CopilotArtifact<T = unknown> {
   tool: string;
   type: string;
   data: T;
+  period?: { from?: string; to?: string };
 }
 
 export interface CopilotConversation {

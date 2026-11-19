@@ -77,6 +77,8 @@ public class RoleCopilotUseCase {
             "(?:phan loai|chia theo|thong ke).*(?:don|booking).*(?:huy|cancel)"
                     + "|(?:theo khach hang.*vendor|khach hang.*vendor.*thoi tiet)");
     private static final Pattern ADMIN_OVERVIEW = CopilotRequest.words("dashboard|tong quan|tong hop tinh hinh|suc khoe|overview");
+    private static final Pattern ADMIN_QUEUE = CopilotRequest.words("rui ro|risk|hang doi|queue|yeu cau ho tro|cho xu ly|pending");
+    private static final Pattern UUID_REGEX = Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
     private static final Pattern VENDOR_REVIEW = CopilotRequest.words(
             "reviews?|danh gia|diem yeu|diem manh|phan tich chat luong|coaching|"
                     + "phan nan|che|khach keu|thoi gian cho|cho cano|cham tre|den tre|don tre|cho doi|complain|complaints?|waiting time");
@@ -93,7 +95,7 @@ public class RoleCopilotUseCase {
     private static final Pattern VENDOR_LISTING = CopilotRequest.words("bai dang|mo ta|toi uu|tieu de|listing|optimize");
     private static final Pattern LISTING_AUDIT_ONLY = CopilotRequest.words("thieu|con thieu|kiem tra|check|missing|audit");
     private static final Pattern VENDOR_OVERVIEW = CopilotRequest.words("kpi|tong quan|summary");
-    private static final Pattern ADMIN_DISPUTE = CopilotRequest.words("khieu nai|tranh chap|dispute");
+    private static final Pattern ADMIN_DISPUTE = CopilotRequest.words("khieu nai|tranh chap|dispute|arbitration");
     private static final Pattern DISPUTE_SUMMARY = CopilotRequest.words("tom tat|doi chieu|mau thuan|summari[sz]e|conflict");
     private static final Pattern CHECKIN_CONFLICT = CopilotRequest.words("check[- ]?in|chua duoc phuc vu|phuc vu");
     private static final Pattern SUPPORT_QUEUE = CopilotRequest.words(
@@ -151,6 +153,7 @@ public class RoleCopilotUseCase {
     private static final Pattern RETROACTIVE_PRICE_CHANGE = Pattern.compile(
             "(?:tang gia|doi gia|cap nhat gia|sua gia|change price|increase price|update price).*(?:booking|don|da thanh toan|da dat|confirmed|paid)");
 
+    private final AdminAiDataPort adminAiData;
     private final AiExtendedInsightStorePort insightStore;
     private final LlmClientPort llmClient;
     private final ModerationPort moderationPort;
@@ -196,6 +199,7 @@ public class RoleCopilotUseCase {
             @Autowired(required = false) AssessmentCaseStorePort assessmentCaseStorePort,
             @Autowired(required = false) AnalyzeTransactionRiskUseCase analyzeTransactionRiskUseCase
     ) {
+        this.adminAiData = adminAiData;
         this.insightStore = insightStore;
         this.llmClient = llmClient;
         this.moderationPort = moderationPort;
@@ -333,7 +337,7 @@ public class RoleCopilotUseCase {
         List<String> toolsUsed = new ArrayList<>();
         var toolContext = new ToolExecutionContext(effectiveLanguage, convId, actorUserId);
         String attachmentType = contextType != null ? contextType : conversation.contextType();
-        UUID attachmentId = contextType != null ? contextId : conversation.contextId();
+        UUID attachmentId = contextId != null ? contextId : conversation.contextId();
         String assistantResponse = answer(effectiveContent, admin, vendorId, isEn, toolContext,
                 attachmentType, attachmentId, artifacts, toolsUsed);
 
@@ -397,7 +401,7 @@ public class RoleCopilotUseCase {
             return ruleReply;
         }
 
-        String tool = selectTool(normalized, admin, attachmentType);
+        String tool = selectTool(normalized, admin, message, attachmentType, attachmentId);
         if (tool == null && CopilotRequest.isPeriodFollowUp(normalized)) {
             String revenueTool = admin ? "admin_revenue_timeseries" : "vendor_dashboard_summary";
             if (lastReplyUsedTool(context.conversationId(), revenueTool)) tool = revenueTool;
@@ -407,7 +411,7 @@ public class RoleCopilotUseCase {
         var args = mapper.createObjectNode();
         if ("admin_dispute_summarize".equals(tool)) {
             UUID disputeId = messageReference != null ? messageReference
-                    : "DISPUTE".equalsIgnoreCase(attachmentType) ? attachmentId : null;
+                    : ("DISPUTE".equalsIgnoreCase(attachmentType) ? attachmentId : resolveDisputeId(message, attachmentType, attachmentId));
             if (disputeId == null) {
                 if (CHECKIN_CONFLICT.matcher(normalized).find() || DISPUTE_SUMMARY.matcher(normalized).find()) {
                     return english
@@ -520,6 +524,47 @@ public class RoleCopilotUseCase {
                 return compareAdminRevenue(today, english, tool, context, artifacts, toolsUsed);
             }
             args.put("from", period.getFrom().toString()).put("to", period.getTo().toString());
+
+            if ("admin_vendor_diagnostics".equals(tool) && !args.has("vendorId")) {
+                Integer limit = CopilotRequest.extractTopLimit(normalized);
+                boolean isCompare = CopilotRequest.isVendorCompare(normalized);
+                List<AdminAiDataPort.VendorDiagnosticItem> allVendors;
+                try {
+                    allVendors = adminAiData.getVendorDiagnostics(today, today, null);
+                } catch (Exception e) {
+                    allVendors = List.of();
+                }
+                List<AdminAiDataPort.VendorDiagnosticItem> matchedVendors = findMatchingVendors(normalized, allVendors);
+                if (isCompare) {
+                    if (matchedVendors.size() < 2) {
+                        return english
+                                ? "Please specify at least two vendor names to compare."
+                                : "Vui lòng chỉ định rõ ít nhất hai đối tác cần so sánh doanh thu.";
+                    }
+                    var arr = args.putArray("vendorIds");
+                    for (var v : matchedVendors) {
+                        arr.add(v.vendorId().toString());
+                    }
+                } else if (matchedVendors.size() == 1 && limit == null && !CopilotRequest.isVendorStats(normalized)) {
+                    args.put("vendorId", matchedVendors.get(0).vendorId().toString());
+                } else if (matchedVendors.size() > 1 && limit == null
+                        && !CopilotRequest.isVendorStats(normalized) && !CopilotRequest.isVendorRanking(normalized)) {
+                    String names = matchedVendors.stream().map(AdminAiDataPort.VendorDiagnosticItem::businessName).limit(3).toList().toString();
+                    return english
+                            ? "Multiple matching vendors found: %s. Please specify the exact full name.".formatted(names)
+                            : "Tìm thấy nhiều đối tác phù hợp: %s. Vui lòng nhập tên đầy đủ của đối tác.".formatted(names);
+                } else if (isExplicitVendorTargeted(normalized) && matchedVendors.isEmpty() && limit == null
+                        && !CopilotRequest.isVendorStats(normalized)
+                        && !CopilotRequest.isVendorRanking(normalized)
+                        && !CopilotRequest.isAllVendors(normalized)) {
+                    String candidate = extractVendorQueryName(message, normalized);
+                    return english
+                            ? "Vendor '%s' not found on the system. Please verify the vendor name.".formatted(candidate)
+                            : "Không tìm thấy đối tác '%s' trên hệ thống. Vui lòng kiểm tra lại tên đối tác.".formatted(candidate);
+                } else if (limit != null) {
+                    args.put("limit", limit);
+                }
+            }
         }
 
         JsonNode data = runToolAndCollectArtifact(tool, args.toString(), admin ? adminToolMap : vendorToolMap,
@@ -533,7 +578,7 @@ public class RoleCopilotUseCase {
             case "vendor_dashboard_summary" -> CopilotReportAnswer.vendorRevenue(data, period, normalized, english);
             case "admin_revenue_timeseries" -> CopilotReportAnswer.adminRevenue(data, period, normalized, english);
             case "admin_booking_cancellation_breakdown" -> CopilotReportAnswer.adminCancellations(data, period, normalized, english);
-            case "admin_vendor_diagnostics" -> CopilotReportAnswer.adminVendorDiagnostics(data, message, normalized, english);
+            case "admin_vendor_diagnostics" -> CopilotReportAnswer.adminVendorDiagnostics(data, period, message, normalized, english);
             case "admin_order_risk_assessment" -> CopilotReportAnswer.adminOrderRiskAssessment(data, english);
             case "admin_risk_and_support_queue_overview" -> CopilotReportAnswer.adminQueue(data, english);
             case "admin_dispute_summarize" -> english ? "I found the dispute evidence below. An administrator must review it before deciding."
@@ -708,7 +753,11 @@ public class RoleCopilotUseCase {
                 .filter(used -> Arrays.asList(used.split(",")).contains(tool)).isPresent();
     }
 
-    private String selectTool(String text, boolean admin, String attachmentType) {
+    private String selectTool(String text, boolean admin) {
+        return selectTool(text, admin, text, null, null);
+    }
+
+    private String selectTool(String text, boolean admin, String rawMessage, String attachmentType, UUID attachmentId) {
         if (admin) {
             if (ADMIN_ORDER_RISK.matcher(text).find()
                     || (("ORDER".equalsIgnoreCase(attachmentType) || "RISK_CASE".equalsIgnoreCase(attachmentType)
@@ -718,7 +767,9 @@ public class RoleCopilotUseCase {
             }
             if (CONTENT_MODERATION.matcher(text).find()) return "admin_text_assessment";
             if ((ADMIN_DISPUTE.matcher(text).find() && DISPUTE_SUMMARY.matcher(text).find())
-                    || (DISPUTE_SUMMARY.matcher(text).find() && CHECKIN_CONFLICT.matcher(text).find())) {
+                    || (DISPUTE_SUMMARY.matcher(text).find() && CHECKIN_CONFLICT.matcher(text).find())
+                    || ((CopilotRequest.matches(ADMIN_DISPUTE, text) || "DISPUTE".equalsIgnoreCase(attachmentType))
+                        && (hasUuid(rawMessage) || ("DISPUTE".equalsIgnoreCase(attachmentType) && attachmentId != null)))) {
                 return "admin_dispute_summarize";
             }
             if (SUPPORT_QUEUE.matcher(text).find() && QUEUE_STATE.matcher(text).find()) {
@@ -727,12 +778,14 @@ public class RoleCopilotUseCase {
             if (REFUND_CAUSE_QUERY.matcher(text).find() || CANCELLATION_BREAKDOWN_EXPLICIT.matcher(text).find()) {
                 return "admin_booking_cancellation_breakdown";
             }
-            if (VENDOR_ACTOR.matcher(text).find() && VENDOR_DIAGNOSTIC_SIGNAL.matcher(text).find()) {
+            if ((VENDOR_ACTOR.matcher(text).find() && VENDOR_DIAGNOSTIC_SIGNAL.matcher(text).find())
+                    || isVendorDiagnosticOrRevenue(text, rawMessage)) {
                 return "admin_vendor_diagnostics";
             }
             if (CopilotRequest.isRevenue(text) || CopilotRequest.matches(ADMIN_REVENUE, text)) return "admin_revenue_timeseries";
             if (CopilotRequest.matches(ADMIN_CANCELLATION, text)) return "admin_booking_cancellation_breakdown";
             if (CopilotRequest.matches(ADMIN_DIAGNOSTICS, text)) return "admin_vendor_diagnostics";
+            if (CopilotRequest.matches(ADMIN_QUEUE, text)) return "admin_risk_and_support_queue_overview";
             if (CopilotRequest.matches(ADMIN_OVERVIEW, text)) return "admin_platform_dashboard";
         } else {
             if (CONTENT_MODERATION.matcher(text).find()) return "vendor_text_assessment";
@@ -745,6 +798,129 @@ public class RoleCopilotUseCase {
             if (CopilotRequest.matches(VENDOR_OVERVIEW, text)) return "vendor_dashboard_summary";
         }
         return null;
+    }
+
+    private boolean isVendorDiagnosticOrRevenue(String text, String rawMessage) {
+        if (CopilotRequest.comparesMonths(text)) return false;
+        if (CopilotRequest.isVendorRanking(text)) return true;
+        if (CopilotRequest.isVendorStats(text)) return true;
+        if (CopilotRequest.isVendorCompare(text)) {
+            if (text.contains("doi tac") || text.contains("vendor") || text.contains("gian hang") || text.contains("cua ")) {
+                return true;
+            }
+            try {
+                LocalDate now = LocalDate.now(TimeRange.VIETNAM_ZONE);
+                var vendors = adminAiData.getVendorDiagnostics(now, now, null);
+                if (!findMatchingVendors(text, vendors).isEmpty()) {
+                    return true;
+                }
+            } catch (Exception ignored) {}
+            return false;
+        }
+        if (CopilotRequest.matches(ADMIN_DIAGNOSTICS, text)) return true;
+        if (CopilotRequest.isRevenue(text)) {
+            if (text.contains("cua ") || text.contains("doi tac") || text.contains("vendor") || text.contains("gian hang")) {
+                return true;
+            }
+            try {
+                LocalDate now = LocalDate.now(TimeRange.VIETNAM_ZONE);
+                var vendors = adminAiData.getVendorDiagnostics(now, now, null);
+                if (!findMatchingVendors(text, vendors).isEmpty()) {
+                    return true;
+                }
+            } catch (Exception ignored) {}
+        }
+        return false;
+    }
+
+    private List<AdminAiDataPort.VendorDiagnosticItem> findMatchingVendors(
+            String normalizedQuery, List<AdminAiDataPort.VendorDiagnosticItem> allVendors
+    ) {
+        if (allVendors == null || allVendors.isEmpty()) return List.of();
+        List<AdminAiDataPort.VendorDiagnosticItem> matched = new ArrayList<>();
+        for (var v : allVendors) {
+            if (v.businessName() == null) continue;
+            var variants = getVendorNameVariants(v.businessName());
+            for (String var : variants) {
+                if (var.length() >= 4 && normalizedQuery.contains(var)) {
+                    if (!matched.contains(v)) {
+                        matched.add(v);
+                    }
+                    break;
+                }
+            }
+        }
+        return matched;
+    }
+
+    private List<String> getVendorNameVariants(String name) {
+        List<String> variants = new ArrayList<>();
+        String normFull = CopilotRequest.normalize(name).trim();
+        variants.add(normFull);
+
+        String clean = name;
+        int parenIdx = clean.indexOf('(');
+        if (parenIdx > 0) clean = clean.substring(0, parenIdx);
+        int dashIdx = clean.indexOf('–');
+        if (dashIdx < 0) dashIdx = clean.indexOf('-');
+        if (dashIdx > 0) clean = clean.substring(0, dashIdx);
+        String normClean = CopilotRequest.normalize(clean).trim();
+        if (!normClean.isEmpty()) {
+            variants.add(normClean);
+        }
+
+        if (normClean.endsWith(" da nang") && normClean.length() > 12) {
+            variants.add(normClean.substring(0, normClean.length() - 8).trim());
+        }
+        for (String p : List.of("cong ty co phan ", "cong ty tnhh ")) {
+            if (normClean.startsWith(p)) {
+                variants.add(normClean.substring(p.length()).trim());
+            }
+        }
+        return variants;
+    }
+
+    private static final Pattern NON_SPECIFIC_VENDOR_TARGET = CopilotRequest.words(
+            "nao|cac|tung|tat ca|toan bo|toan san|he thong|san|moi|nhung|mot|co ty le|chi co"
+    );
+
+    private boolean isExplicitVendorTargeted(String normalized) {
+        var m = VENDOR_CANDIDATE.matcher(normalized);
+        if (!m.find()) return false;
+        String candidate = m.group(1).trim();
+        return !candidate.isBlank() && !CopilotRequest.matches(NON_SPECIFIC_VENDOR_TARGET, candidate);
+    }
+
+    private static final Pattern VENDOR_CANDIDATE = Pattern.compile(
+            "(?:doanh thu|gmv)\\s+(?:cua|doi tac|vendor|gian hang)\\s+(.+?)(?:\\s+(?:tu|trong|thang|quy|nam|hom|7 ngay|30 ngay|\\d{1,2}/)|[?!.]|$)",
+            Pattern.CASE_INSENSITIVE
+    );
+
+    private String extractVendorQueryName(String original, String normalized) {
+        var m = VENDOR_CANDIDATE.matcher(normalized);
+        if (m.find()) {
+            return m.group(1).trim();
+        }
+        return "đối tác yêu cầu";
+    }
+
+    private boolean hasUuid(String text) {
+        return text != null && UUID_REGEX.matcher(text).find();
+    }
+
+    private UUID resolveDisputeId(String rawMessage, String contextType, UUID contextId) {
+        if ("DISPUTE".equalsIgnoreCase(contextType) && contextId != null) {
+            return contextId;
+        }
+        if (rawMessage != null) {
+            var matcher = UUID_REGEX.matcher(rawMessage);
+            if (matcher.find()) {
+                try {
+                    return UUID.fromString(matcher.group());
+                } catch (IllegalArgumentException ignored) {}
+            }
+        }
+        return contextId;
     }
 
     private String generateText(boolean admin, boolean english, ToolExecutionContext context, LocalDate today) {

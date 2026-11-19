@@ -1128,3 +1128,29 @@
     transform: rotate(360deg);
   }
 }
+
+/* ==================== RESPONSIVE VIEWPORTS (<= 768px) ==================== */
+@media (max-width: 768px) {
+  .admin-copilot {
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 120px);
+  }
+
+  .admin-copilot__sidebar {
+    width: 100%;
+    max-height: 220px;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .copilot-artifact-card {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .copilot-data-table {
+    min-width: 600px;
+  }
+}
+
