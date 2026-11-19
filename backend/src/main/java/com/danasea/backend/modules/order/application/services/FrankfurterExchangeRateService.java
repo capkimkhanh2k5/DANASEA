@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
 import com.danasea.backend.configs.properties.ExchangeRateProperties;
+import com.danasea.backend.modules.ai.domain.services.TravelQueryParser;
 import com.danasea.backend.modules.order.domain.exceptions.ExchangeRateUnavailableException;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.ExchangeRateJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaExchangeRateRepository;
@@ -79,6 +80,7 @@ public class FrankfurterExchangeRateService implements ExchangeRateService {
 
         ExchangeRateSnapshot snapshot = new ExchangeRateSnapshot(entity.getRate(), entity.getEffectiveDate(), entity.getSource());
         cachedRate.set(snapshot);
+        TravelQueryParser.setUsdToVndRate(snapshot.rate());
         return snapshot;
     }
 
@@ -121,6 +123,7 @@ public class FrankfurterExchangeRateService implements ExchangeRateService {
             saveOrUpdate(effectiveDate, fetchedRate, STATUS_ACTIVE);
             ExchangeRateSnapshot snapshot = new ExchangeRateSnapshot(fetchedRate, effectiveDate, SOURCE);
             cachedRate.set(snapshot);
+            TravelQueryParser.setUsdToVndRate(snapshot.rate());
             log.info("Successfully updated USD/VND exchange rate to {} for effective date {}", fetchedRate, effectiveDate);
             return snapshot;
         } catch (Exception ex) {
@@ -140,6 +143,7 @@ public class FrankfurterExchangeRateService implements ExchangeRateService {
             if (activeOpt.isPresent() && isFresh(activeOpt.get().getEffectiveDate(), today)) {
                 ExchangeRateJpaEntity entity = activeOpt.get();
                 cachedRate.set(new ExchangeRateSnapshot(entity.getRate(), entity.getEffectiveDate(), entity.getSource()));
+                TravelQueryParser.setUsdToVndRate(entity.getRate());
                 log.info("Loaded active exchange rate on startup: {} VND/USD (effective: {})",
                         entity.getRate(), entity.getEffectiveDate());
                 return;

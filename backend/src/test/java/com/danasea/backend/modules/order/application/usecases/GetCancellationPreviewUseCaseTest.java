@@ -191,4 +191,18 @@ class GetCancellationPreviewUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(emptyQuery))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void vendorPreviewRejectsForeignSubOrderBeforeLoadingItsMasterOrder() {
+        var sub = new SubOrder();
+        sub.setId(subOrderId);
+        sub.setMasterOrderId(masterOrderId);
+        sub.setVendorId(UUID.randomUUID());
+        when(subOrderRepository.findById(subOrderId)).thenReturn(Optional.of(sub));
+
+        assertThatThrownBy(() -> useCase.execute(
+                new GetCancellationPreviewQuery(otherCustomerId, subOrderId, false, UUID.randomUUID())))
+                .isInstanceOf(AccessDeniedException.class);
+        org.mockito.Mockito.verifyNoInteractions(masterOrderRepository);
+    }
 }

@@ -101,6 +101,15 @@ public class AIToolRegistry {
                     ),
                     "required", List.of("service_id", "option_id", "slot_id", "date", "participants")
                 )
+            ),
+            Map.of(
+                "name", "get_payment_providers",
+                "description", "Read the currently enabled and disabled payment methods configured on DANASEA (VNPAY, MOMO, SEPAY, PAYPAL, PAYOS, ZALOPAY)",
+                "parameters", Map.of(
+                    "type", "object",
+                    "properties", Map.of(),
+                    "required", List.of()
+                )
             )
         );
         return Stream.concat(legacy.stream(), CustomerFeatureToolDefinitions.definitions().stream())

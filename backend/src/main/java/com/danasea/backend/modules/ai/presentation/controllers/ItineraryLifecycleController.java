@@ -75,6 +75,11 @@ public class ItineraryLifecycleController {
     @GetMapping("/{id}/revisions")
     public List<Revision> revisions(@PathVariable UUID id) { return itineraries.revisions(id, userId()); }
 
+    @PostMapping("/{id}/revisions/{revisionVersion}/restore")
+    public Proposal restore(@PathVariable UUID id, @PathVariable long revisionVersion, @RequestBody VersionRequest request) {
+        return itineraries.restoreFromRevision(id, userId(), version(request), revisionVersion, language());
+    }
+
     private long version(VersionRequest request) {
         if (request.expectedVersion() == null || request.expectedVersion() < 0) throw new IllegalArgumentException("expectedVersion is required");
         return request.expectedVersion();

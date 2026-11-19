@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort;
@@ -84,7 +85,8 @@ public class VendorReviewCoachingUseCase {
     private static final Map<String, List<String>> ASPECT_KEYWORDS = Map.of(
             "GUIDE", List.of("guide", "instructor", "staff", "hướng dẫn", "hướng dẫn viên", "nhân viên", "nhiệt tình", "thái độ"),
             "SAFETY", List.of("safe", "safety", "equipment", "life jacket", "an toàn", "áo phao", "thiết bị", "cano", "thuyền"),
-            "PUNCTUALITY", List.of("late", "wait", "punctual", "time", "đúng giờ", "trễ", "chờ", "khởi hành", "bến"),
+            "PUNCTUALITY", List.of("late", "wait", "waiting", "delay", "delayed", "punctual", "time", "departure",
+                    "đúng giờ", "trễ", "đón trễ", "chậm trễ", "chờ", "chờ đợi", "xuất bến", "lâu", "khởi hành", "bến"),
             "VALUE", List.of("price", "expensive", "value", "worth", "giá", "đáng tiền", "đắt", "rẻ", "dịch vụ")
     );
 
@@ -110,11 +112,15 @@ public class VendorReviewCoachingUseCase {
         }
         var profile = profileOpt.get();
         UUID vendorId = profile.id();
+        if (serviceId != null) {
+            vendorAiData.getService(vendorId, serviceId)
+                    .orElseThrow(() -> new AccessDeniedException("Service does not belong to vendor"));
+        }
 
         // 1. Fetch raw reviews
         List<VendorReviewItem> reviews = vendorAiData.listReviews(vendorId, serviceId, 100);
         int totalAnalyzed = reviews.size();
-        BigDecimal avgRating = profile.ratingAvg();
+        BigDecimal avgRating = (serviceId == null && profile.ratingAvg() != null) ? profile.ratingAvg() : BigDecimal.ZERO;
         if (!reviews.isEmpty()) {
             double sum = reviews.stream().mapToInt(VendorReviewItem::rating).sum();
             avgRating = BigDecimal.valueOf(sum / reviews.size()).setScale(1, RoundingMode.HALF_UP);
@@ -150,37 +156,49 @@ public class VendorReviewCoachingUseCase {
             List<EvidenceQuote> pos = posByPillar.get(p);
             List<EvidenceQuote> neg = negByPillar.get(p);
             int total = pos.size() + neg.size();
-            int score = total == 0 ? 8 : (int) Math.round((pos.size() * 10.0) / total);
-            String sentiment = score >= 8 ? "POSITIVE" : (score >= 5 ? "NEUTRAL" : "NEEDS_IMPROVEMENT");
-            pillars.put(p, new PillarEvaluation(p, Math.max(1, Math.min(score, 10)), sentiment,
-                    pos.stream().limit(3).toList(), neg.stream().limit(3).toList()));
+            if (totalAnalyzed == 0) {
+                pillars.put(p, new PillarEvaluation(p, 0, "NO_DATA", List.of(), List.of()));
+            } else {
+                int score = total == 0 ? 5 : (int) Math.round((pos.size() * 10.0) / total);
+                String sentiment = total == 0 ? "NEUTRAL"
+                        : (score >= 8 ? "POSITIVE" : (score >= 5 ? "NEUTRAL" : "NEEDS_IMPROVEMENT"));
+                pillars.put(p, new PillarEvaluation(p, Math.max(1, Math.min(score, 10)), sentiment,
+                        pos.stream().limit(3).toList(), neg.stream().limit(3).toList()));
+            }
         }
 
         // 3. Action Recommendations
         List<ActionItem> actions = new ArrayList<>();
-        if (pillars.get("PUNCTUALITY").scoreOutOf10() < 7 || !pillars.get("PUNCTUALITY").negativeQuotes().isEmpty()) {
-            actions.add(new ActionItem("HIGH", "PUNCTUALITY",
-                    isEn ? "Optimize departure & guest check-in workflow" : "Tối ưu quy trình khởi hành & đón khách",
-                    isEn ? "Extend buffer time between slots by 15-20 minutes and assign dedicated check-in staff at Man Thai / Han River pier for punctual departure."
-                         : "Giãn khoảng cách đón giữa các ca thêm 15-20 phút và phân công nhân sự điểm danh tại bến Mân Thái/Cảng Sông Hàn để xuất bến đúng giờ."));
-        }
-        if (pillars.get("SAFETY").scoreOutOf10() < 8 || !pillars.get("SAFETY").negativeQuotes().isEmpty()) {
-            actions.add(new ActionItem("HIGH", "SAFETY",
-                    isEn ? "Inspect and standardize safety equipment" : "Kiểm tra và chuẩn hóa thiết bị bảo hộ",
-                    isEn ? "Provide properly fitted child life jackets, inspect snorkeling masks, and conduct a 5-minute safety briefing before entering the water."
-                         : "Bổ sung áo phao vừa vặn cho trẻ em, kiểm tra kính lặn và hướng dẫn kỹ năng an toàn 5 phút trước khi xuống nước."));
-        }
-        if (pillars.get("GUIDE").scoreOutOf10() < 7) {
-            actions.add(new ActionItem("MEDIUM", "GUIDE",
-                    isEn ? "Enhance instructor communication & engagement" : "Nâng cao kỹ năng giao tiếp & hướng dẫn viên",
-                    isEn ? "Encourage guides to proactively assist with photos and share engaging stories about Son Tra / Cu Lao Cham marine biodiversity."
-                         : "Khuyến khích hướng dẫn viên chủ động chụp ảnh và giải thích sinh động về hệ sinh thái biển Sơn Trà/Cù Lao Chàm."));
-        }
-        if (actions.isEmpty()) {
-            actions.add(new ActionItem("LOW", "VALUE",
-                    isEn ? "Maintain outstanding service quality" : "Tiếp tục duy trì chất lượng vượt trội",
-                    isEn ? "Your operations are receiving strong positive feedback. Consider offering early-bird sunrise packages to maximize revenue."
-                         : "Dịch vụ đang vận hành rất tốt với đánh giá tích cực. Bạn có thể mở thêm ưu đãi giờ vàng sáng sớm để tối ưu doanh thu."));
+        if (totalAnalyzed == 0) {
+            actions.add(new ActionItem("MEDIUM", "VALUE",
+                    isEn ? "Insufficient data — await verified guest reviews" : "Chưa đủ dữ liệu — chờ đánh giá thực tế",
+                    isEn ? "This service/scope has 0 verified reviews yet. Encourage completed guests to submit feedback before evaluating quality scores."
+                         : "Dịch vụ/phạm vi này hiện có 0 đánh giá đã xác minh. Chưa thể chấm điểm chất lượng; hãy nhắc khách đã hoàn thành trải nghiệm gửi nhận xét thực tế."));
+        } else {
+            if (pillars.get("PUNCTUALITY").scoreOutOf10() < 7 || !pillars.get("PUNCTUALITY").negativeQuotes().isEmpty()) {
+                actions.add(new ActionItem("HIGH", "PUNCTUALITY",
+                        isEn ? "Optimize departure & guest check-in workflow" : "Tối ưu quy trình khởi hành & đón khách",
+                        isEn ? "Extend buffer time between slots by 15-20 minutes and assign dedicated check-in staff at Man Thai / Han River pier for punctual departure."
+                             : "Giãn khoảng cách đón giữa các ca thêm 15-20 phút và phân công nhân sự điểm danh tại bến Mân Thái/Cảng Sông Hàn để xuất bến đúng giờ."));
+            }
+            if (pillars.get("SAFETY").scoreOutOf10() < 8 || !pillars.get("SAFETY").negativeQuotes().isEmpty()) {
+                actions.add(new ActionItem("HIGH", "SAFETY",
+                        isEn ? "Inspect and standardize safety equipment" : "Kiểm tra và chuẩn hóa thiết bị bảo hộ",
+                        isEn ? "Provide properly fitted child life jackets, inspect snorkeling masks, and conduct a 5-minute safety briefing before entering the water."
+                             : "Bổ sung áo phao vừa vặn cho trẻ em, kiểm tra kính lặn và hướng dẫn kỹ năng an toàn 5 phút trước khi xuống nước."));
+            }
+            if (pillars.get("GUIDE").scoreOutOf10() < 7) {
+                actions.add(new ActionItem("MEDIUM", "GUIDE",
+                        isEn ? "Enhance instructor communication & engagement" : "Nâng cao kỹ năng giao tiếp & hướng dẫn viên",
+                        isEn ? "Encourage guides to proactively assist with photos and share engaging stories about Son Tra / Cu Lao Cham marine biodiversity."
+                             : "Khuyến khích hướng dẫn viên chủ động chụp ảnh và giải thích sinh động về hệ sinh thái biển Sơn Trà/Cù Lao Chàm."));
+            }
+            if (actions.isEmpty()) {
+                actions.add(new ActionItem("LOW", "VALUE",
+                        isEn ? "Maintain outstanding service quality" : "Tiếp tục duy trì chất lượng vượt trội",
+                        isEn ? "Your operations are receiving strong positive feedback. Consider offering early-bird sunrise packages to maximize revenue."
+                             : "Dịch vụ đang vận hành rất tốt với đánh giá tích cực. Bạn có thể mở thêm ưu đãi giờ vàng sáng sớm để tối ưu doanh thu."));
+            }
         }
 
         // 4. Badge Progression Roadmap

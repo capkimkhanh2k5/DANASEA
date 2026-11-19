@@ -26,6 +26,9 @@ public class AiCatalogCandidateReader implements AiCatalogCandidateReadApi {
     private final JdbcTemplate jdbc;
     private volatile Boolean postgres;
     private static final String DISTANCE = "6371 * acos(least(1.0, greatest(-1.0, sin(radians(:lat)) * sin(radians(cast(s.latitude as double precision))) + cos(radians(:lat)) * cos(radians(cast(s.latitude as double precision))) * cos(radians(cast(s.longitude as double precision)) - radians(:lon)))))";
+    private static final String SERVICE_NAME_TEXT = "lower(coalesce(s.name,'') || ' ' || coalesce(s.name_en,''))";
+    private static final String SERVICE_TEXT = "lower(coalesce(s.name,'') || ' ' || coalesce(s.name_en,'') || ' ' || coalesce(s.description,'') || ' ' || coalesce(s.description_en,''))";
+    private static final String CATEGORY_TEXT = "lower(coalesce(c.name,'') || ' ' || coalesce(c.slug,''))";
     private static final String TEXT = "lower(coalesce(s.name,'') || ' ' || coalesce(s.name_en,'') || ' ' || coalesce(s.description,'') || ' ' || coalesce(s.description_en,'') || ' ' || coalesce(c.name,'') || ' ' || coalesce(c.slug,''))";
     private static final String ACCENTS = "áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ";
     private static final String ASCII = "aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyyd";
@@ -33,7 +36,10 @@ public class AiCatalogCandidateReader implements AiCatalogCandidateReadApi {
     @Override
     public List<UUID> candidateIds(Query criteria, int offset, int batchSize) {
         if (postgres == null) postgres = Boolean.TRUE.equals(jdbc.execute((Connection connection) -> connection.getMetaData().getDatabaseProductName().contains("PostgreSQL")));
-        String text = postgres ? "translate(" + TEXT + ", '" + ACCENTS + "', '" + ASCII + "')" : TEXT;
+        String text = translate(TEXT);
+        String serviceText = translate(SERVICE_TEXT);
+        String serviceNameText = translate(SERVICE_NAME_TEXT);
+        String catText = translate(CATEGORY_TEXT);
         StringBuilder sql = new StringBuilder("select s.id from services s left join categories c on c.id=s.category_id where s.status='PUBLISHED'");
         Map<String, Object> params = new LinkedHashMap<>();
         if (criteria.categoryId() != null) { sql.append(" and s.category_id=:category"); params.put("category", criteria.categoryId()); }
@@ -42,26 +48,69 @@ public class AiCatalogCandidateReader implements AiCatalogCandidateReadApi {
         if (!included.isEmpty()) {
             sql.append(" and (");
             List<String> predicates = new ArrayList<>();
+            List<String> includedNorm = included.stream().map(this::normalize).toList();
             for (int index = 0; index < included.size(); index++) {
-                String key = "include" + index;
-                String predicate = text + " like :" + key;
-                params.put(key, "%" + escape(normalize(included.get(index))) + "%");
+                String raw = included.get(index);
+                String norm = includedNorm.get(index);
+                String predicate;
+                if ("sup".equals(norm) && !includedNorm.contains("kayak")) {
+                    String regexKey = "includeRegex" + index;
+                    params.put(regexKey, "(^|[^a-z0-9])sup([^a-z0-9]|$)");
+                    predicate = regexPredicate(serviceText, regexKey);
+                } else if ("kayak".equals(norm) && !includedNorm.contains("sup")) {
+                    String key = "include" + index;
+                    String supRegexKey = "includeSupCat" + index;
+                    params.put(key, "%kayak%");
+                    params.put(supRegexKey, "(^|[^a-z0-9])sup([^a-z0-9]|$)");
+                    predicate = "(" + serviceText + " like :" + key + " or (" + catText + " like :" + key
+                            + " and not (" + regexPredicate(catText, supRegexKey) + ")))";
+                } else if ("lan".equals(norm)) {
+                    String regexKey = "includeRegex" + index;
+                    params.put(regexKey, "(^|[^a-z0-9])(lan|diving|scuba|snorkel|snorkeling)([^a-z0-9]|$)");
+                    predicate = regexPredicate(text, regexKey);
+                } else {
+                    String key = "include" + index;
+                    predicate = text + " like :" + key;
+                    params.put(key, "%" + escape(norm) + "%");
+                }
                 if (postgres) {
                     String ftsKey = "fts" + index;
                     predicate = "(" + predicate + " or s.search_vector @@ plainto_tsquery('simple', :" + ftsKey + "))";
-                    params.put(ftsKey, included.get(index));
+                    params.put(ftsKey, raw);
                 }
                 predicates.add(predicate);
             }
             sql.append(String.join(" or ", predicates)).append(')');
         }
-        String exclusionText = "lower(coalesce(s.name,'') || ' ' || coalesce(s.name_en,'') || ' ' || coalesce(c.name,'') || ' ' || coalesce(c.slug,''))";
-        if (postgres) exclusionText = "translate(" + exclusionText + ", '" + ACCENTS + "', '" + ASCII + "')";
+        String exclusionText = translate("lower(coalesce(s.name,'') || ' ' || coalesce(s.name_en,'') || ' ' || coalesce(c.name,'') || ' ' || coalesce(c.slug,''))");
         if (criteria.excludedActivities() != null) {
             for (int index = 0; index < criteria.excludedActivities().size(); index++) {
-                String key = "exclude" + index;
-                sql.append(" and ").append(exclusionText).append(" not like :").append(key);
-                params.put(key, "%" + escape(normalize(criteria.excludedActivities().get(index))) + "%");
+                String norm = normalize(criteria.excludedActivities().get(index));
+                if ("lan".equals(norm)) {
+                    String key = "excludeRegex" + index;
+                    params.put(key, "(^|[^a-z0-9])(lan|diving|scuba|snorkel|snorkeling)([^a-z0-9]|$)");
+                    sql.append(" and not (").append(regexPredicate(exclusionText, key)).append(')');
+                } else if ("sup".equals(norm)) {
+                    String supKey = "excludeSupRegex" + index;
+                    String kayakKey = "excludeKayakCat" + index;
+                    params.put(supKey, "(^|[^a-z0-9])sup([^a-z0-9]|$)");
+                    params.put(kayakKey, "(^|[^a-z0-9])kayak([^a-z0-9]|$)");
+                    sql.append(" and not (").append(regexPredicate(serviceNameText, supKey))
+                            .append(" or (").append(regexPredicate(catText, supKey))
+                            .append(" and not (").append(regexPredicate(catText, kayakKey)).append(")))");
+                } else if ("kayak".equals(norm)) {
+                    String key = "exclude" + index;
+                    String supKey = "excludeSupCat" + index;
+                    params.put(key, "%kayak%");
+                    params.put(supKey, "(^|[^a-z0-9])sup([^a-z0-9]|$)");
+                    sql.append(" and not (").append(serviceNameText).append(" like :").append(key)
+                            .append(" or (").append(catText).append(" like :").append(key)
+                            .append(" and not (").append(regexPredicate(catText, supKey)).append(")))");
+                } else {
+                    String key = "exclude" + index;
+                    sql.append(" and ").append(exclusionText).append(" not like :").append(key);
+                    params.put(key, "%" + escape(norm) + "%");
+                }
             }
         }
         if (criteria.latitude() != null) {
@@ -85,9 +134,16 @@ public class AiCatalogCandidateReader implements AiCatalogCandidateReadApi {
         if (criteria.rankingInterests() != null && !criteria.rankingInterests().isEmpty() && !"NEARBY".equals(criteria.mode())) {
             List<String> contributions = new ArrayList<>();
             for (int index = 0; index < criteria.rankingInterests().size(); index++) {
-                String key = "interest" + index;
-                contributions.add("case when " + text + " like :" + key + " then 1 else 0 end");
-                params.put(key, "%" + escape(normalize(criteria.rankingInterests().get(index))) + "%");
+                String normInterest = normalize(criteria.rankingInterests().get(index));
+                if ("sup".equals(normInterest)) {
+                    String key = "interestSup" + index;
+                    params.put(key, "(^|[^a-z0-9])sup([^a-z0-9]|$)");
+                    contributions.add("case when " + regexPredicate(serviceText, key) + " then 1 else 0 end");
+                } else {
+                    String key = "interest" + index;
+                    contributions.add("case when " + text + " like :" + key + " then 1 else 0 end");
+                    params.put(key, "%" + escape(normInterest) + "%");
+                }
             }
             preferenceOrder = "(" + String.join(" + ", contributions) + ") desc, ";
         }
@@ -100,6 +156,14 @@ public class AiCatalogCandidateReader implements AiCatalogCandidateReadApi {
         query.setHint("jakarta.persistence.query.timeout", 5000);
         query.setFirstResult(offset); query.setMaxResults(Math.min(15, Math.max(1, batchSize)));
         return query.getResultList().stream().map(value -> value instanceof UUID id ? id : UUID.fromString(value.toString())).toList();
+    }
+
+    private String translate(String expr) {
+        return Boolean.TRUE.equals(postgres) ? "translate(" + expr + ", '" + ACCENTS + "', '" + ASCII + "')" : expr;
+    }
+
+    private String regexPredicate(String expr, String paramKey) {
+        return Boolean.TRUE.equals(postgres) ? expr + " ~ :" + paramKey : expr + " regexp :" + paramKey;
     }
 
     private String normalize(String value) {

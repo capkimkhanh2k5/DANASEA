@@ -244,3 +244,70 @@ export function extractDisputeBriefData(data: unknown): DisputeArbitrationResult
     draftAdminNote: obj.draftAdminNote ? String(obj.draftAdminNote) : undefined,
   };
 }
+
+export interface OrderRiskAssessmentViewData {
+  orderId: string;
+  caseId: string | null;
+  status: string;
+  ruleVersion: string;
+  riskSignals: string[];
+  limitations: string[];
+  fraudConfirmed: boolean;
+  newCaseCreated: boolean;
+  observed: Record<string, unknown> | null;
+  quyetDecision: Record<string, unknown> | null;
+}
+
+export function extractOrderRiskAssessmentData(data: unknown): OrderRiskAssessmentViewData | null {
+  if (!data || typeof data !== 'object') return null;
+  const obj = data as Record<string, unknown>;
+  if (!obj.orderId && !obj.caseId && !obj.riskSignals && !obj.observed) return null;
+  return {
+    orderId: obj.orderId ? String(obj.orderId) : '—',
+    caseId: obj.caseId ? String(obj.caseId) : null,
+    status: obj.status ? String(obj.status) : 'NEEDS_REVIEW',
+    ruleVersion: obj.ruleVersion ? String(obj.ruleVersion) : 'velocity-demo-v1',
+    riskSignals: Array.isArray(obj.riskSignals) ? obj.riskSignals.map(String) : [],
+    limitations: Array.isArray(obj.limitations) ? obj.limitations.map(String) : [],
+    fraudConfirmed: Boolean(obj.fraudConfirmed),
+    newCaseCreated: Boolean(obj.newCaseCreated),
+    observed: obj.observed && typeof obj.observed === 'object' ? (obj.observed as Record<string, unknown>) : null,
+    quyetDecision:
+      obj.quyetDecision && typeof obj.quyetDecision === 'object'
+        ? (obj.quyetDecision as Record<string, unknown>)
+        : null,
+  };
+}
+
+export interface ContentAssessmentViewData {
+  status: string;
+  reasonCodes: string[];
+  contactMatches: string[];
+  publicationAuthorized: boolean;
+  evidenceType: string;
+  negatedWarningOnly: boolean;
+  persisted: boolean;
+  serviceId: string | null;
+  caseId: string | null;
+  suggestedCategory: string | null;
+  assessedTextPreview: string | null;
+}
+
+export function extractContentAssessmentData(data: unknown): ContentAssessmentViewData | null {
+  if (!data || typeof data !== 'object') return null;
+  const obj = data as Record<string, unknown>;
+  if (!obj.status && !obj.reasonCodes && !obj.evidenceType) return null;
+  return {
+    status: obj.status ? String(obj.status) : 'NEEDS_REVIEW',
+    reasonCodes: Array.isArray(obj.reasonCodes) ? obj.reasonCodes.map(String) : [],
+    contactMatches: Array.isArray(obj.contactMatches) ? obj.contactMatches.map(String) : [],
+    publicationAuthorized: Boolean(obj.publicationAuthorized),
+    evidenceType: obj.evidenceType ? String(obj.evidenceType) : 'TEXT_ONLY',
+    negatedWarningOnly: Boolean(obj.negatedWarningOnly),
+    persisted: Boolean(obj.persisted),
+    serviceId: obj.serviceId ? String(obj.serviceId) : null,
+    caseId: obj.caseId ? String(obj.caseId) : null,
+    suggestedCategory: obj.suggestedCategory ? String(obj.suggestedCategory) : null,
+    assessedTextPreview: obj.assessedTextPreview ? String(obj.assessedTextPreview) : null,
+  };
+}

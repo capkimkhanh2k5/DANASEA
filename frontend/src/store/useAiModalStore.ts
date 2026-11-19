@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { aiService } from '../services/aiService';
+import { aiService, type AssistantCard } from '../services/aiService';
 import { useAuthStore } from './useAuthStore';
 import { useLanguageStore } from './useLanguageStore';
 
@@ -8,6 +8,8 @@ export interface AiChatMessage {
   role: 'user' | 'ai';
   content: string;
   timestamp: number;
+  cards?: AssistantCard[];
+  responseStatus?: string;
 }
 
 interface AiModalState {
@@ -85,6 +87,8 @@ export const useAiModalStore = create<AiModalState>((set, get) => ({
         id: `ai-${Date.now()}`,
         role: 'ai',
         content: response.message || (isEn ? 'Your request has been received.' : 'Hệ thống đã ghi nhận yêu cầu của bạn.'),
+        cards: response.cards,
+        responseStatus: response.responseStatus,
         timestamp: Date.now(),
       };
 

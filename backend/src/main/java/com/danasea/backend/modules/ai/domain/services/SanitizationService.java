@@ -4,14 +4,20 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class SanitizationService {
-    
+    private static final java.util.regex.Pattern INJECTION_PATTERNS = java.util.regex.Pattern.compile(
+            "(?i)(ignore (?:all )?(?:previous|prior) instructions|"
+                    + "bỏ qua (?:toàn bộ )?(?:system prompt|chỉ dẫn|quy tắc|hướng dẫn)|"
+                    + "tiết lộ toàn bộ đơn hàng|reveal all orders|"
+                    + "system prompt|you are a|forget everything|bypass)"
+    );
+
     /**
      * Sanitizes input text to prevent prompt injection or malicious instructions.
      */
     public String sanitize(String input) {
         if (input == null) return null;
-        // Basic sanitization: remove common prompt injection keywords
-        String sanitized = input.replaceAll("(?i)(ignore previous instructions|system prompt|you are a|forget everything|bypass)", "[REDACTED]");
+        // Sanitize known multilingual prompt injection commands
+        String sanitized = INJECTION_PATTERNS.matcher(input).replaceAll("[REDACTED]");
         // Escape special characters that might confuse LLMs if injected in JSON or quotes
         sanitized = sanitized.replace("\"", "\\\"");
         return sanitized;

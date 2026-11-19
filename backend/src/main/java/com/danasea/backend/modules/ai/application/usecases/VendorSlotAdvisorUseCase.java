@@ -101,32 +101,37 @@ public class VendorSlotAdvisorUseCase {
             if (lowOccupancy) lowDemand++;
             if (weather == MarineSlotWeather.Status.CAUTION || weather == MarineSlotWeather.Status.UNSAFE) weatherRisk++;
 
-            if (weather == MarineSlotWeather.Status.UNKNOWN || weather == MarineSlotWeather.Status.CAUTION
-                    || weather == MarineSlotWeather.Status.UNSAFE) {
+            if (weather == MarineSlotWeather.Status.UNSAFE) {
+                type = "WEATHER_WATCH";
+                title = isEn ? "Unsafe marine forecast — Do not expand capacity" : "Cảnh báo thời tiết nguy hiểm — Không tăng sức chứa";
+                advice = isEn
+                        ? "Safety takes priority over demand. Do not open extra slots or expand capacity when marine conditions are UNSAFE."
+                        : "An toàn hàng hải ưu tiên hơn nhu cầu. Tuyệt đối không mở rộng sức chứa hoặc thêm ca khi thời tiết ở mức nguy hiểm (UNSAFE).";
+            } else if (weather == MarineSlotWeather.Status.UNKNOWN || weather == MarineSlotWeather.Status.CAUTION) {
                 type = "WEATHER_WATCH";
                 title = isEn ? "Confirm marine conditions before changing capacity" : "Xác nhận điều kiện biển trước khi đổi công suất";
                 advice = isEn
-                        ? "Check the current forecast and service safety limits before opening or expanding this slot."
-                        : "Kiểm tra dự báo hiện hành và ngưỡng an toàn của dịch vụ trước khi mở hoặc tăng công suất ca.";
+                        ? "Forecast is unavailable or requires caution (do not assume SAFE). Verify the latest marine forecast and safety limits before opening or expanding this slot."
+                        : "Dự báo hiện chưa đủ hoặc cần thận trọng (không mặc định là an toàn). Kiểm tra dự báo hiện hành và ngưỡng an toàn của dịch vụ trước khi mở hoặc tăng công suất ca.";
             } else if (occupancy >= 85.0) {
                 type = "EXPAND_CAPACITY";
                 title = isEn
                         ? "High demand — Expand capacity or open an extra slot"
                         : "Nhu cầu cao — Nên mở rộng chỗ hoặc mở thêm ca phụ";
                 advice = isEn
-                        ? String.format("Slot %s on %s has reached %.0f%% occupancy (%d/%d seats). Check inventory and operating limits before opening an additional slot.",
+                        ? String.format("Slot %s on %s has reached %.0f%% occupancy (%d/%d seats). Check inventory, crew/equipment, and operating limits before opening an additional slot.",
                                 slot.startTime(), slot.date(), occupancy, slot.bookedCount(), slot.capacity())
-                        : String.format("Ca %s ngày %s đã đạt %.0f%% công suất (%d/%d chỗ). Kiểm tra tồn chỗ và giới hạn vận hành trước khi mở thêm ca.",
+                        : String.format("Ca %s ngày %s đã đạt %.0f%% công suất (%d/%d chỗ). Kiểm tra tồn chỗ, nhân sự/thiết bị và giới hạn vận hành trước khi mở thêm ca.",
                                 slot.startTime(), slot.date(), occupancy, slot.bookedCount(), slot.capacity());
             } else if (lowOccupancy) {
                 type = "PROMOTE_OR_CONSOLIDATE";
                 title = isEn
-                        ? "Low occupancy — Consider flash promotion or slot consolidation"
-                        : "Công suất thấp — Cân nhắc kích cầu hoặc gộp ca";
+                        ? "Low occupancy — Consider flash promotion or voluntary slot consolidation"
+                        : "Công suất thấp — Cân nhắc kích cầu hoặc chủ động đề xuất gộp ca";
                 advice = isEn
-                        ? String.format("Slot %s on %s currently has %d booking(s). Consider running a Flash Sale or consolidating guests into an adjacent slot to optimize boat fuel & crew costs.",
+                        ? String.format("Slot %s on %s currently has %d booking(s). Consider running a Flash Sale or contacting guests to offer consolidation into an adjacent slot (never auto-cancel confirmed bookings).",
                                 slot.startTime(), slot.date(), slot.bookedCount())
-                        : String.format("Ca %s ngày %s mới chỉ có %d khách đặt. Cân nhắc bật khuyến mãi Flash Sale hoặc chủ động liên hệ gộp khách sang ca gần kề để tối ưu chi phí thuyền/cano.",
+                        : String.format("Ca %s ngày %s mới chỉ có %d khách đặt. Cân nhắc bật khuyến mãi Flash Sale hoặc chủ động liên hệ khách đề xuất gộp sang ca gần kề (không tự ý hủy đơn đã xác nhận).",
                                 slot.startTime(), slot.date(), slot.bookedCount());
             } else {
                 type = "KEEP_OPTIMAL";

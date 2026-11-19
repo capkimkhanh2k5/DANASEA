@@ -2,6 +2,7 @@ package com.danasea.backend.modules.ai.infrastructure.persistence;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -56,6 +57,20 @@ public class AssessmentCaseStoreAdapter implements AssessmentCaseStorePort {
         if (entity.getResolvedBy() != null) throw new AiStateConflictException("Assessment case has already been resolved");
         entity.setStatus(resolution); entity.setResolvedBy(adminId); entity.setResolutionNote(note);
         return toCase(repository.saveAndFlush(entity));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<AssessmentCase> findById(UUID id) {
+        if (id == null) return Optional.empty();
+        return repository.findById(id).map(this::toCase);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AssessmentCase> findBySourceId(UUID sourceId) {
+        if (sourceId == null) return List.of();
+        return repository.findBySourceIdOrderByCreatedAtDesc(sourceId).stream().map(this::toCase).toList();
     }
 
     private AssessmentCase toCase(AiAssessmentCaseJpaEntity entity) {

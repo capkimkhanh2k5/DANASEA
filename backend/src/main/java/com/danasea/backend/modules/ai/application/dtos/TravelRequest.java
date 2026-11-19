@@ -42,12 +42,15 @@ public record TravelRequest(String query, UUID categoryId, BigDecimal totalBudge
         if (from == null && dates[0] == null) defaults.add("dateRange");
         if (dayStart == null && times[0] == null) defaults.add("dayStart");
         if (dayEnd == null && times[1] == null) defaults.add("dayEnd");
-        if (normalized.matches(".*(tre em|children|child|biet boi|swim|thiet bi|equipment|wheelchair).*")) {
+        if (normalized.matches(".*(tre em|children|child|biet boi|khong boi|boi loi|non-swimmer|non swimmer|swim|thiet bi|equipment|wheelchair).*")) {
             unsupported.add("PARTICIPATION_REQUIREMENTS_NEED_VENDOR_VERIFICATION");
         }
         if (latitude == null && normalized.matches(".*(gan toi|near me|my location).*")) questions.add("COORDINATES_REQUIRED");
-        if (latitude == null && normalized.matches(".*(my khe|son tra|hoi an|ngu hanh son).*")) unsupported.add("PLACE_NAME_REQUIRES_COORDINATES");
+        if (latitude == null && normalized.matches(".*\\b(hoi an)\\b.*")) unsupported.add("PLACE_NAME_REQUIRES_COORDINATES");
         BigDecimal parsedBudget = TravelQueryParser.budget(query);
+        if (totalBudget == null && parsedBudget == null && TravelQueryParser.requestsBudget(query)) {
+            questions.add("BUDGET_REQUIRED");
+        }
         String basis = budgetBasis == null ? TravelQueryParser.perPersonBudget(query) ? "PER_PERSON" : "TOTAL" : budgetBasis;
         if (totalBudget == null && parsedBudget != null && !TravelQueryParser.perPersonBudget(query)
                 && !normalized.matches(".*(ca nhom|tong|total|group budget|gia dinh|family).*")) {
@@ -60,10 +63,12 @@ public record TravelRequest(String query, UUID categoryId, BigDecimal totalBudge
         // Explicit totalBudget always denotes the party total, preserving the existing API contract.
         BigDecimal budget = totalBudget != null ? totalBudget : parsedBudget;
         if (totalBudget == null && budget != null && "PER_PERSON".equals(basis)) budget = budget.multiply(BigDecimal.valueOf(party));
+        Integer parsedMaxActivities = TravelQueryParser.maxActivities(query);
+        int resolvedMaxActivities = maxActivities != null ? maxActivities : parsedMaxActivities != null ? parsedMaxActivities : 3;
         TravelContext context = new TravelContext(query, categoryId, budget, party,
                 from != null ? from : dates[0], to != null ? to : from != null ? from : dates[1],
                 dayStart != null ? dayStart : times[0], dayEnd != null ? dayEnd : times[1], latitude, longitude, radiusKm,
-                interests, limit == null ? 15 : limit, maxActivities == null ? 3 : maxActivities,
+                interests, limit == null ? 15 : limit, resolvedMaxActivities,
                 Boolean.TRUE.equals(weatherSafeOnly), new TravelCriteria(basis, TravelQueryParser.includedActivities(query),
                 exclusions.stream().distinct().toList(), defaults, unsupported, questions, offset == null ? 0 : offset,
                 Boolean.TRUE.equals(useSavedPreferences)));

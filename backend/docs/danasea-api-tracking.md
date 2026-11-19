@@ -544,6 +544,7 @@ Admin gửi `providerRefundId`, `providerAmount` và `providerCurrency` sau khi 
 - [x] POST /api/ai/itineraries/{id}/proposals/{proposalId}/accept
 - [x] POST /api/ai/itineraries/{id}/proposals/{proposalId}/reject
 - [x] POST /api/ai/itineraries/{id}/replan
+- [x] POST /api/ai/itineraries/{id}/revisions/{revisionVersion}/restore
 - [x] POST /api/ai/nearby
 - [x] POST /api/ai/recommendations
 - [x] POST /api/ai/recommendations/{id}/feedback

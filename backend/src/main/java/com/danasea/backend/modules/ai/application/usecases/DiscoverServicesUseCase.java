@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.Instant;
 import java.util.Set;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Service;
 
@@ -66,9 +68,32 @@ public class DiscoverServicesUseCase {
             return missing(context, mode, context.criteria().clarificationQuestions());
         }
         if ("NEARBY".equals(mode) && context.latitude() == null) return missing(context, mode, List.of("latitude", "longitude"));
+        Result primary = runDiscovery(context, mode, language, userId, List.of());
+        LocalDate today = LocalDate.now(TravelContext.ZONE);
+        if (("SEARCH".equals(mode) || "RECOMMENDATION".equals(mode))
+                && "NO_MATCHES".equals(primary.status())
+                && context.from().equals(today)
+                && context.to().equals(today)
+                && !TravelQueryParser.mentionsToday(context.query())) {
+            TravelContext expanded = new TravelContext(
+                    context.query(), context.categoryId(), context.totalBudget(), context.partySize(),
+                    today, today.plusDays(7), context.dayStart(), context.dayEnd(),
+                    context.latitude(), context.longitude(), context.radiusKm(),
+                    context.interests(), context.limit(), context.maxActivities(), context.weatherSafeOnly(), context.criteria());
+            return runDiscovery(expanded, mode, language, userId, List.of("EXPANDED_DATE_WINDOW_UPCOMING_7D"));
+        }
+        return primary;
+    }
+
+    private Result runDiscovery(TravelContext context, String mode, SupportedLanguage language, UUID userId, List<String> extraLimitations) {
         CustomerPreferenceReadApi.Signals signals = preferences != null && userId != null && context.criteria().useSavedPreferences()
                 ? preferences.load(userId) : null;
-        String keyword = TravelQueryParser.activityKeyword(context.query());
+        List<String> requestedIncluded = context.criteria().includedActivities().isEmpty()
+                ? TravelQueryParser.includedActivities(context.query()) : context.criteria().includedActivities();
+        boolean widenForMulti = "RECOMMENDATION".equals(mode)
+                && TravelQueryParser.isMultiActivityOrMultiAreaRequest(context.query())
+                && requestedIncluded.size() == 1;
+        String keyword = widenForMulti ? null : TravelQueryParser.activityKeyword(context.query());
         BigDecimal budget = context.totalBudget() != null ? context.totalBudget() : TravelQueryParser.budget(context.query());
         if (context.totalBudget() == null && budget != null && TravelQueryParser.perPersonBudget(context.query())) {
             budget = budget.multiply(BigDecimal.valueOf(context.partySize()));
@@ -77,18 +102,19 @@ public class DiscoverServicesUseCase {
         if (budget != null && budget.compareTo(new BigDecimal("1000000000")) > 0) {
             throw new IllegalArgumentException("Parsed budget exceeds the supported maximum");
         }
-        Query query = query(context, keyword, language, mode, budget, signals);
+        Query query = query(context, keyword, language, mode, budget, signals, widenForMulti, requestedIncluded);
         long deadline = System.nanoTime() + Duration.ofSeconds(8).toNanos();
         List<Candidate> candidates = new ArrayList<>();
         Map<UUID, TravelWeatherPort.Assessment> weatherCache = new HashMap<>();
         List<String> exclusions = new ArrayList<>(TravelQueryParser.excludedActivities(context.query()));
         exclusions.addAll(context.criteria().excludedActivities());
         if (signals != null && signals.personalizationEnabled()) exclusions.addAll(signals.exclusions().stream().map(TravelQueryParser::normalize).toList());
+        boolean strictSupSearch = !widenForMulti && requestedIncluded.equals(List.of("sup")) && !exclusions.contains("sup");
         var page = data.searchPage(query);
         List<PublishedService> retrieved = page == null ? data.search(query) : page.services();
         for (PublishedService service : retrieved) {
-            String categoryText = TravelQueryParser.normalize(service.name() + " " + service.categoryName() + " " + service.categorySlug());
-            if (exclusions.stream().anyMatch(categoryText::contains)) continue;
+            if (matchesAnyExclusion(service, exclusions)) continue;
+            if (strictSupSearch && !matchesStrictSup(service)) continue;
             List<Option> validOptions = service.options().stream()
                     .filter(option -> effectiveBudget == null || option.partyTotal().compareTo(effectiveBudget) <= 0)
                     .map(option -> new Option(option.id(), option.name(), option.pricingUnit(), option.unitPrice(),
@@ -145,6 +171,7 @@ public class DiscoverServicesUseCase {
                 ? DecisionResult.unavailable(DecisionTask.INTENT, "EMPTY_QUERY_OR_DEADLINE")
                 : decisions.decide(DecisionTask.INTENT, Map.of("message", context.query()));
         List<String> limitations = new ArrayList<>(List.of("CURRENT_INVENTORY_REVALIDATED_AT_BOOKING", "CATALOG_SCAN_LIMIT_10000", "PAGINATION_CAN_CHANGE_WITH_INVENTORY"));
+        limitations.addAll(extraLimitations);
         limitations.addAll(context.criteria().unsupportedConstraints());
         if (page != null) limitations.addAll(page.limitations());
         boolean partialWeather = context.weatherSafeOnly() && weatherCache.values().stream().anyMatch(assessment -> !assessment.acceptable() && !"UNSAFE".equals(assessment.status()))
@@ -177,17 +204,21 @@ public class DiscoverServicesUseCase {
     }
 
     public Query query(TravelContext context, String keyword, SupportedLanguage language) {
-        return query(context, keyword, language, "SEARCH", context.totalBudget(), null);
+        return query(context, keyword, language, "SEARCH", context.totalBudget(), null, false, List.of());
     }
 
     private Query query(TravelContext context, String keyword, SupportedLanguage language, String mode,
-                        BigDecimal budget, CustomerPreferenceReadApi.Signals signals) {
+                        BigDecimal budget, CustomerPreferenceReadApi.Signals signals, boolean widenForMulti, List<String> requestedIncluded) {
         List<String> exclusions = new ArrayList<>(context.criteria().excludedActivities());
         exclusions.addAll(TravelQueryParser.excludedActivities(context.query()));
         if (signals != null && signals.personalizationEnabled()) exclusions.addAll(signals.exclusions());
-        List<String> included = context.criteria().includedActivities().isEmpty()
-                ? TravelQueryParser.includedActivities(context.query()) : context.criteria().includedActivities();
+        List<String> included = widenForMulti ? List.of() : (context.criteria().includedActivities().isEmpty()
+                ? TravelQueryParser.includedActivities(context.query()) : context.criteria().includedActivities());
         List<String> rankingInterests = new ArrayList<>(context.interests());
+        if (widenForMulti) {
+            rankingInterests.addAll(requestedIncluded);
+            rankingInterests.addAll(TravelQueryParser.coastalAreas(context.query()));
+        }
         if (signals != null && signals.personalizationEnabled()) rankingInterests.addAll(signals.interests());
         return new Query(keyword, context.categoryId(), context.from(), context.to(), context.partySize(),
                 context.latitude(), context.longitude(), context.radiusKm(), Math.min(15, context.limit()), language,
@@ -198,8 +229,64 @@ public class DiscoverServicesUseCase {
         double score = service.averageRating() == null ? 0 : service.averageRating().doubleValue() / 5.0 * Math.min(1, service.reviewCount() / 10.0);
         String text = TravelQueryParser.normalize(service.name() + " " + service.description() + " " + service.categoryName());
         for (String interest : context.interests()) if (text.contains(TravelQueryParser.normalize(interest))) score += 1;
+        for (String activity : TravelQueryParser.includedActivities(context.query())) {
+            if ("sup".equals(activity) && !matchesStrictSup(service)) continue;
+            if (hasWord(text, activity)) score += 0.5;
+        }
+        String nameDescText = TravelQueryParser.normalize(service.name() + " " + service.description());
+        String addrText = TravelQueryParser.normalize(service.address());
+        for (String area : TravelQueryParser.coastalAreas(context.query())) {
+            if (hasWord(nameDescText, area)) score += 0.75;
+            else if (hasWord(addrText, area)) score += 0.25;
+        }
         if (distance != null) score += 1 / (1 + distance);
         return score;
+    }
+
+    private boolean matchesStrictSup(PublishedService service) {
+        String nameNorm = TravelQueryParser.normalize(service.name());
+        String descNorm = TravelQueryParser.normalize(service.description());
+        boolean hasSupInName = hasWord(nameNorm, "sup");
+        boolean hasKayakInName = hasWord(nameNorm, "kayak") || hasWord(nameNorm, "kayaking");
+        if (hasKayakInName && !hasSupInName) return false;
+        return hasSupInName || hasWord(descNorm, "sup");
+    }
+
+    private boolean matchesAnyExclusion(PublishedService service, List<String> exclusions) {
+        if (exclusions.isEmpty()) return false;
+        String nameNorm = TravelQueryParser.normalize(service.name());
+        String catNorm = TravelQueryParser.normalize(service.categoryName() + " " + service.categorySlug());
+        boolean mixedSupKayakCategory = hasWord(catNorm, "sup") && hasWord(catNorm, "kayak");
+        for (String raw : exclusions) {
+            String exclusion = TravelQueryParser.normalize(raw);
+            if (exclusion.isBlank()) continue;
+            if ("lan".equals(exclusion)) {
+                String combined = nameNorm + " " + catNorm;
+                if (hasWord(combined, "lan") || hasWord(combined, "diving")
+                        || hasWord(combined, "scuba") || hasWord(combined, "snorkel")
+                        || hasWord(combined, "snorkeling")) {
+                    return true;
+                }
+            } else if ("sup".equals(exclusion)) {
+                if (hasWord(nameNorm, "sup") || (!mixedSupKayakCategory && hasWord(catNorm, "sup"))) {
+                    return true;
+                }
+            } else if ("kayak".equals(exclusion)) {
+                if (hasWord(nameNorm, "kayak") || hasWord(nameNorm, "kayaking")
+                        || (!mixedSupKayakCategory && (hasWord(catNorm, "kayak") || hasWord(catNorm, "kayaking")))) {
+                    return true;
+                }
+            } else {
+                String combined = nameNorm + " " + catNorm;
+                if (combined.contains(exclusion)) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean hasWord(String text, String term) {
+        if (text == null || text.isBlank() || term == null || term.isBlank()) return false;
+        return Pattern.compile("(?<![a-z0-9])" + Pattern.quote(term) + "(?![a-z0-9])").matcher(text).find();
     }
 
     private Double distance(TravelContext context, PublishedService service) {

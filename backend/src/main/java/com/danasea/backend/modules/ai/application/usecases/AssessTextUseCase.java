@@ -14,6 +14,7 @@ import com.danasea.backend.modules.ai.application.ports.DecisionModelPort;
 import com.danasea.backend.modules.ai.domain.models.AssessmentCase;
 import com.danasea.backend.modules.ai.domain.models.DecisionResult;
 import com.danasea.backend.modules.ai.domain.models.DecisionTask;
+import com.danasea.backend.modules.ai.domain.services.TravelQueryParser;
 
 import lombok.RequiredArgsConstructor;
 
@@ -21,6 +22,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AssessTextUseCase {
     private static final Pattern CONTACT = Pattern.compile("(?<!\\d)(?:\\+84|0)(?:[ .-]?\\d){9}(?!\\d)|https?://[^\\s<>]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+    private static final Pattern PAYMENT_WARNING_ONLY = Pattern.compile(
+            "^(?:(?:vui long |xin )?(?:khong|khong nen|tuyet doi khong|dung) "
+                    + "(?:chuyen tien|chuyen khoan|thanh toan|tra tien) (?:ben )?ngoai (?:nen tang )?danasea"
+                    + "|(?:please )?(?:do not|never) (?:pay|transfer money) outside (?:the )?danasea(?: platform)?)[.!。]*$");
     public record Result(String status, List<String> reasonCodes, List<String> contactMatches,
                          DecisionResult category, DecisionResult moderation, AssessmentCase caseRecord,
                          boolean publicationAuthorized, String evidenceType) {}
@@ -36,7 +41,10 @@ public class AssessTextUseCase {
         List<String> contacts = CONTACT.matcher(text).results().map(result -> result.group()).distinct().toList();
         List<String> reasons = new ArrayList<>();
         if (!contacts.isEmpty()) reasons.add("EXTERNAL_CONTACT_DETECTED");
+        boolean warningOnly = contacts.isEmpty() && PAYMENT_WARNING_ONLY.matcher(
+                TravelQueryParser.normalize(text).strip()).matches();
         for (String hazard : List.of("external_payment", "spam", "abuse")) {
+            if (warningOnly && !"abuse".equals(hazard)) continue;
             Double probability = moderation.probability(hazard);
             if (probability != null && probability >= 0.5) reasons.add("MODEL_SUGGESTS_" + hazard.toUpperCase(Locale.ROOT));
         }
