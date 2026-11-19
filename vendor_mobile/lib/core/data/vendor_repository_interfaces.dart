@@ -100,6 +100,14 @@ abstract class IVendorSlotRepository {
   Future<List<ServiceSlotModel>> getSlotsForService(String serviceId, DateTime date);
   Future<ServiceSlotModel?> getSlotById(String slotId);
   Future<ServiceSlotModel> saveSlot(ServiceSlotModel slot);
+  Future<List<ServiceSlotModel>> batchCreateSlots({
+    required String serviceId,
+    DateTime? startDate,
+    DateTime? endDate,
+    List<String>? daysOfWeek,
+    List<DateTime>? dates,
+    required List<Map<String, dynamic>> slotTemplates,
+  });
   Future<ServiceSlotModel> updateSlotCapacity(String slotId, int newCapacity);
   Future<ServiceSlotModel> toggleBlockSlot(String slotId, bool blocked);
   Future<Map<String, dynamic>> cancelSlot(String serviceId, String slotId, String reason);
@@ -192,8 +200,10 @@ abstract class IVendorSettlementRepository {
   Future<PayoutRequestModel> requestPayout({
     String? settlementId,
     required double amount,
+    String? note,
   });
   Future<List<PayoutRequestModel>> getPayoutRequests();
+  Future<List<Map<String, dynamic>>> getEligibleSettlements();
 }
 
 abstract class IVendorDisputeRepository {
@@ -278,6 +288,7 @@ abstract class IVendorAiRepository {
   });
   Future<List<Map<String, dynamic>>> listConversations();
   Future<List<CopilotMessageModel>> getConversationHistory(String conversationId);
+  Future<bool> deleteConversation(String conversationId);
   Future<SlotAdvisorResultModel> getSlotAdvisor({String? serviceId, int horizonDays = 7});
   Future<ReviewCoachingResultModel> getReviewCoaching({String? serviceId, int periodDays = 90});
   Future<ReplyDraftResultModel> draftReviewReply({

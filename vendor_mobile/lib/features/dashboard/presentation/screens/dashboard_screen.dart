@@ -9,7 +9,6 @@ import '../../../profile/presentation/screens/edit_profile_bank_screen.dart';
 import '../../../orders/presentation/screens/order_list_screen.dart';
 import '../../../slots/presentation/screens/slot_calendar_screen.dart';
 import '../../../reviews/presentation/screens/review_feedback_screen.dart';
-import '../../../disputes/presentation/screens/dispute_management_screen.dart';
 import '../../../orders/presentation/screens/qr_checkin_screen.dart';
 import '../../../notifications/presentation/screens/notification_safety_screen.dart';
 import '../../../ai/presentation/screens/vendor_copilot_screen.dart';
@@ -70,6 +69,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (_) {}
   }
 
+  String _cleanVendorName(String raw) {
+    if (raw.isEmpty) return 'Danabeach Club';
+    return raw.contains('(') ? raw.split('(').first.trim() : raw;
+  }
+
   String _formatVnd(double amount) {
     final intVal = amount.toInt();
     final str = intVal.toString();
@@ -83,6 +87,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     }
     return '${buffer.toString().split('').reversed.join()} đ';
+  }
+
+  String _formatCompactVnd(double amount) {
+    if (amount <= 0) return '0 đ';
+    if (amount >= 1e9) {
+      final val = amount / 1e9;
+      return val == val.roundToDouble() ? '${val.toInt()} tỷ' : '${val.toStringAsFixed(2)} tỷ';
+    }
+    if (amount >= 1e6) {
+      final val = amount / 1e6;
+      final formatted = val.toStringAsFixed(2);
+      final clean = formatted.endsWith('.00')
+          ? formatted.substring(0, formatted.length - 3)
+          : (formatted.endsWith('0') ? formatted.substring(0, formatted.length - 1) : formatted);
+      return '$clean tr';
+    }
+    if (amount >= 1e3) {
+      final val = (amount / 1e3).round();
+      return '${val}k';
+    }
+    return '${amount.toInt()} đ';
   }
 
   @override
@@ -135,20 +160,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _openOrders() {
-    if (widget.onNavigateTab != null) {
+  void _openOrders({String? filter}) {
+    if (filter != null) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => OrderListScreen(
+            initialFilter: filter,
+            onOpenProfile: widget.onOpenProfile,
+            onOpenNotifications: widget.onOpenNotifications,
+          ),
+        ),
+      );
+    } else if (widget.onNavigateTab != null) {
       widget.onNavigateTab!(3);
     } else {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OrderListScreen()));
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => OrderListScreen(
+            onOpenProfile: widget.onOpenProfile,
+            onOpenNotifications: widget.onOpenNotifications,
+          ),
+        ),
+      );
     }
   }
 
   void _openReviews() {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ReviewFeedbackScreen()));
-  }
-
-  void _openDisputes() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DisputeManagementScreen()));
   }
 
   @override
@@ -194,7 +232,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                vendor.businessName.isNotEmpty ? vendor.businessName : 'Danabeach Club',
+                vendor.businessName.isNotEmpty ? _cleanVendorName(vendor.businessName) : 'Danabeach Club',
                 style: const TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
@@ -208,8 +246,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: 'AI Copilot Trợ lý',
-            icon: const Icon(Icons.auto_awesome, color: AppColors.secondary, size: 22),
+            tooltip: 'AI Trợ lý Copilot',
+            icon: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF004D56), size: 22),
             onPressed: () {
               Navigator.push(
                 context,
@@ -367,7 +405,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Detailed Settlement Sub-bar (Đã quyết toán & Chờ đối soát)
+                      // Detailed Settlement Sub-bar (Phương án B: Rút gọn 1 dòng)
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
                         decoration: BoxDecoration(
@@ -380,11 +418,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                _isBalanceVisible ? 'Đã quyết toán: ${_formatVnd(_metrics.netPayout)}' : 'Đã quyết toán: ••••',
+                                _isBalanceVisible ? 'Đã TT: ${_formatCompactVnd(_metrics.netPayout)}' : 'Đã TT: ••••',
                                 style: const TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 11.5,
                                   color: Color(0xFFE2E8F0),
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.bold,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -396,9 +434,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                _isBalanceVisible ? 'Chờ đối soát: ${_formatVnd((_metrics.totalRevenue - _metrics.netPayout) > 0 ? (_metrics.totalRevenue - _metrics.netPayout) : 0.0)}' : 'Chờ đối soát: ••••',
+                                _isBalanceVisible
+                                    ? 'Chờ soát: ${_formatCompactVnd((_metrics.totalRevenue - _metrics.netPayout) > 0 ? (_metrics.totalRevenue - _metrics.netPayout) : 0.0)}'
+                                    : 'Chờ soát: ••••',
                                 style: const TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 11.5,
                                   color: Color(0xFFFDE68A),
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -485,8 +525,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: _buildToDoItem(
                               count: '$confirmedCount',
                               label: 'Chờ check-in',
-                              countColor: const Color(0xFFD97706),
-                              onTap: _openOrders,
+                              countColor: const Color(0xFF004D56),
+                              onTap: () => _openOrders(filter: 'CONFIRMED'),
                             ),
                           ),
                           Container(width: 1, height: 26, color: const Color(0xFFE2E8F0)),
@@ -494,17 +534,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: _buildToDoItem(
                               count: '${_metrics.newOrders > 0 ? _metrics.newOrders : pendingCount}',
                               label: 'Đơn mới',
-                              countColor: const Color(0xFF0284C7),
-                              onTap: _openOrders,
+                              countColor: const Color(0xFF004D56),
+                              onTap: () => _openOrders(filter: 'PENDING'),
                             ),
                           ),
                           Container(width: 1, height: 26, color: const Color(0xFFE2E8F0)),
                           Expanded(
                             child: _buildToDoItem(
                               count: '$cancelledCount',
-                              label: 'Đơn hủy / Hoàn',
-                              countColor: const Color(0xFFDC2626),
-                              onTap: _openDisputes,
+                              label: 'Hủy / Hoàn',
+                              countColor: const Color(0xFF004D56),
+                              onTap: () => _openOrders(filter: 'CANCELLED'),
                             ),
                           ),
                           Container(width: 1, height: 26, color: const Color(0xFFE2E8F0)),
@@ -512,7 +552,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: _buildToDoItem(
                               count: '$reviewCount',
                               label: 'Đánh giá mới',
-                              countColor: const Color(0xFF7C3AED),
+                              countColor: const Color(0xFF004D56),
                               onTap: _openReviews,
                             ),
                           ),
@@ -523,7 +563,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // 3. THAO TÁC VẬN HÀNH (2x2 Grid cân đối, bỏ nút Ví trùng lặp với thẻ Hero)
+                // 3. THAO TÁC VẬN HÀNH (Đồng bộ chuẩn tone xanh Danasea #004D56 trên nền #E6F4F1)
                 const Text(
                   'Thao tác vận hành',
                   style: TextStyle(
@@ -538,8 +578,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _buildActionTile(
                         icon: Icons.qr_code_scanner,
-                        iconBg: const Color(0xFFFEE2E2),
-                        iconColor: const Color(0xFFDC2626),
+                        iconBg: const Color(0xFFE6F4F1),
+                        iconColor: const Color(0xFF004D56),
                         title: 'Quét vé QR',
                         onTap: _openQrScan,
                       ),
@@ -548,8 +588,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _buildActionTile(
                         icon: Icons.calendar_month_outlined,
-                        iconBg: const Color(0xFFCCFBF1),
-                        iconColor: const Color(0xFF0F766E),
+                        iconBg: const Color(0xFFE6F4F1),
+                        iconColor: const Color(0xFF004D56),
                         title: 'Lịch ca chạy',
                         onTap: _openSlots,
                       ),
@@ -562,8 +602,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _buildActionTile(
                         icon: Icons.star_outline_rounded,
-                        iconBg: const Color(0xFFEDE9FE),
-                        iconColor: const Color(0xFF7C3AED),
+                        iconBg: const Color(0xFFE6F4F1),
+                        iconColor: const Color(0xFF004D56),
                         title: 'Đánh giá',
                         onTap: _openReviews,
                       ),
@@ -572,9 +612,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Expanded(
                       child: _buildActionTile(
                         icon: Icons.bar_chart_rounded,
-                        iconBg: const Color(0xFFE0F2FE),
-                        iconColor: const Color(0xFF0284C7),
-                        title: 'Báo cáo phân tích',
+                        iconBg: const Color(0xFFE6F4F1),
+                        iconColor: const Color(0xFF004D56),
+                        title: 'Báo cáo',
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -700,9 +740,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ? (booked / capacity).clamp(0.0, 1.0)
                               : 0.0;
                           final int fillPercent = (fillRatio * 100).round();
-                          final Color progressColor = fillRatio >= 0.85
-                              ? const Color(0xFFD97706)
-                              : const Color(0xFF004D56);
+                          final Color progressColor = const Color(0xFF004D56);
 
                           return Container(
                             padding: const EdgeInsets.all(10),
@@ -717,12 +755,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Text(
-                                      'Tiến độ lấp đầy khách (Booked / Capacity)',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF64748B),
+                                    const Expanded(
+                                      child: Text(
+                                        'Tiến độ lấp đầy',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF64748B),
+                                        ),
                                       ),
                                     ),
                                     Text(
@@ -796,26 +836,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 100),
+                const SizedBox(height: 16),
               ],
             ),
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.secondary,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.auto_awesome, size: 20),
-        label: const Text(
-          'AI Copilot',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-        ),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const VendorCopilotScreen()),
-          );
-        },
       ),
     );
   }

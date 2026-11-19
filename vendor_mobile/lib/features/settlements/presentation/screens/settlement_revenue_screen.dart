@@ -28,6 +28,7 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
     super.initState();
     _db.addListener(_onDbChanged);
     VendorSettlementRepository().getSettlements();
+    VendorSettlementRepository().getPayoutRequests();
     VendorOrderRepository().getSubOrders();
   }
 

@@ -27,9 +27,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   late List<AiMessageModel> _messages;
   String? _conversationId;
   bool _isSending = false;
+  List<Map<String, dynamic>> _savedConversations = [];
+  bool _isLoadingHistory = false;
 
 
   @override
@@ -213,12 +216,296 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
     );
   }
 
+  Future<void> _loadSavedConversations() async {
+    setState(() => _isLoadingHistory = true);
+    try {
+      final list = await _repository.listConversations();
+      if (mounted) {
+        setState(() {
+          _savedConversations = list;
+          _isLoadingHistory = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingHistory = false);
+    }
+  }
+
+  Future<void> _selectConversation(String id) async {
+    Navigator.of(context).pop(); // Close drawer
+    if (_conversationId == id) return;
+    setState(() {
+      _conversationId = id;
+      _isSending = true;
+    });
+    try {
+      final history = await _repository.getConversationHistory(id);
+      if (mounted) {
+        setState(() {
+          _messages = history;
+          _isSending = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi tải lịch sử hội thoại: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteConversation(String id, String title) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xóa cuộc trò chuyện?'),
+        content: Text('Bạn có chắc muốn xóa "$title"? Thao tác này không thể hoàn tác.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final ok = await _repository.deleteConversation(id);
+      if (ok && mounted) {
+        setState(() {
+          _savedConversations.removeWhere((c) => c['id']?.toString() == id);
+          if (_conversationId == id) {
+            _conversationId = null;
+            _messages = [];
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã xóa cuộc trò chuyện.')),
+        );
+      }
+    }
+  }
+
+  String _formatConversationDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(raw).toLocal();
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+      if (diff.inMinutes < 1) return 'Vừa xong';
+      if (diff.inHours < 1) return '${diff.inMinutes} phút trước';
+      final hour = dt.hour.toString().padLeft(2, '0');
+      final minute = dt.minute.toString().padLeft(2, '0');
+      if (diff.inDays == 0 && dt.day == now.day) {
+        return 'Hôm nay $hour:$minute';
+      }
+      if (diff.inDays <= 1 && dt.day == now.day - 1) {
+        return 'Hôm qua $hour:$minute';
+      }
+      final day = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      return '$day/$month/${dt.year} $hour:$minute';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Widget _buildHistoryDrawer() {
+    return Drawer(
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.horizontal(right: Radius.circular(20)),
+      ),
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.history_rounded,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Lịch sử trò chuyện',
+                      style: AppTypography.headlineSm(color: AppColors.onSurface).copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 20),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  setState(() {
+                    _conversationId = null;
+                    _messages = [];
+                  });
+                },
+                icon: const Icon(Icons.add_rounded, size: 20, color: Colors.white),
+                label: const Text(
+                  'Cuộc trò chuyện mới',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const Divider(height: 16, thickness: 1, indent: 16, endIndent: 16),
+            Expanded(
+              child: _isLoadingHistory
+                  ? const Center(child: CircularProgressIndicator())
+                  : _savedConversations.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  size: 48,
+                                  color: Colors.grey.shade300,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'Chưa có lịch sử hội thoại nào.',
+                                  textAlign: TextAlign.center,
+                                  style: AppTypography.bodySm(color: AppColors.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          itemCount: _savedConversations.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 4),
+                          itemBuilder: (context, index) {
+                            final conv = _savedConversations[index];
+                            final id = conv['id']?.toString() ?? '';
+                            final title = conv['title']?.toString().trim();
+                            final displayTitle = (title != null && title.isNotEmpty)
+                                ? title
+                                : 'Cuộc trò chuyện #${index + 1}';
+                            final createdAtRaw = conv['createdAt']?.toString();
+                            final formattedTime = _formatConversationDate(createdAtRaw);
+                            final isSelected = _conversationId == id;
+
+                            return Material(
+                              color: isSelected
+                                  ? const Color(0xFFE6F4F1)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(10),
+                                onTap: () => _selectConversation(id),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        isSelected
+                                            ? Icons.chat_bubble_rounded
+                                            : Icons.chat_bubble_outline_rounded,
+                                        size: 18,
+                                        color: isSelected
+                                            ? AppColors.primary
+                                            : AppColors.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              displayTitle,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: isSelected
+                                                    ? FontWeight.bold
+                                                    : FontWeight.w500,
+                                                color: isSelected
+                                                    ? AppColors.primary
+                                                    : AppColors.onSurface,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              formattedTime,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: AppColors.onSurfaceVariant.withValues(alpha: 0.8),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.delete_outline_rounded,
+                                          size: 18,
+                                          color: AppColors.onSurfaceVariant,
+                                        ),
+                                        tooltip: 'Xóa',
+                                        onPressed: () => _confirmDeleteConversation(id, displayTitle),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Only switch to chat stream when an assistant response has arrived
     final bool hasChatted = _messages.any((m) => m.role == AiRole.assistant);
 
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: _buildHistoryDrawer(),
       backgroundColor: Colors.transparent,
       body: Container(
         decoration: const BoxDecoration(
@@ -319,6 +606,85 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                 color: AppColors.onSurface,
               ),
               onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Circular History Button (Mở Drawer Lịch sử từ trái qua phải)
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              tooltip: 'Lịch sử trò chuyện',
+              icon: const Icon(
+                Icons.history_rounded,
+                size: 20,
+                color: AppColors.onSurface,
+              ),
+              onPressed: () {
+                _loadSavedConversations();
+                _scaffoldKey.currentState?.openDrawer();
+              },
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Danasea AI Travel',
+                  style: AppTypography.bodyMd(
+                    color: AppColors.onSurface,
+                  ).copyWith(fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  'Trợ lý du lịch thông minh',
+                  style: AppTypography.labelSm(
+                    color: AppColors.onSurfaceVariant,
+                  ).copyWith(fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          // Circular New Chat Button
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              tooltip: 'Cuộc trò chuyện mới',
+              icon: const Icon(
+                Icons.add_rounded,
+                size: 20,
+                color: AppColors.onSurface,
+              ),
+              onPressed: () {
+                setState(() {
+                  _conversationId = null;
+                  _messages = [];
+                });
+              },
             ),
           ),
         ],

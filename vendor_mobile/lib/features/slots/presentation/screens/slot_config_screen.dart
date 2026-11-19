@@ -36,12 +36,55 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
   late TextEditingController _endTimeController;
   late int _capacity;
   late bool _isBlocked;
-  bool _repeatWeekdays = false;
 
   bool get _isEdit => widget.slot != null;
   int get _bookedCount => widget.slot?.bookedCount ?? 0;
   int get _heldCount => widget.slot?.heldCount ?? 0;
   int get _minAllowedCapacity => _bookedCount + _heldCount;
+
+  int get _slotDurationMinutes {
+    final startParts = _startTimeController.text.split(':');
+    final endParts = _endTimeController.text.split(':');
+    if (startParts.length >= 2 && endParts.length >= 2) {
+      final sH = int.tryParse(startParts[0]) ?? 0;
+      final sM = int.tryParse(startParts[1]) ?? 0;
+      final eH = int.tryParse(endParts[0]) ?? 0;
+      final eM = int.tryParse(endParts[1]) ?? 0;
+      final diff = (eH * 60 + eM) - (sH * 60 + sM);
+      if (diff > 0) return diff;
+    }
+    return 60;
+  }
+
+  bool get _isDateToday {
+    final now = DateTime.now();
+    final todayStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    return _dateController.text == todayStr;
+  }
+
+  bool get _isDateTomorrow {
+    final tmr = DateTime.now().add(const Duration(days: 1));
+    final tmrStr =
+        '${tmr.year}-${tmr.month.toString().padLeft(2, '0')}-${tmr.day.toString().padLeft(2, '0')}';
+    return _dateController.text == tmrStr;
+  }
+
+  void _setDateToday() {
+    final now = DateTime.now();
+    setState(() {
+      _dateController.text =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    });
+  }
+
+  void _setDateTomorrow() {
+    final tmr = DateTime.now().add(const Duration(days: 1));
+    setState(() {
+      _dateController.text =
+          '${tmr.year}-${tmr.month.toString().padLeft(2, '0')}-${tmr.day.toString().padLeft(2, '0')}';
+    });
+  }
 
   @override
   void initState() {
@@ -133,6 +176,19 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
     final start = _startTimeController.text.trim();
     final end = _endTimeController.text.trim();
 
+    final startParts = start.split(':');
+    final endParts = end.split(':');
+    if (startParts.length >= 2 && endParts.length >= 2) {
+      final sH = int.tryParse(startParts[0]) ?? 0;
+      final sM = int.tryParse(startParts[1]) ?? 0;
+      final eH = int.tryParse(endParts[0]) ?? 0;
+      final eM = int.tryParse(endParts[1]) ?? 0;
+      if (sH * 60 + sM >= eH * 60 + eM) {
+        ToastNotification.showError(context, 'Giờ bắt đầu ($start) phải trước giờ kết thúc ($end)');
+        return;
+      }
+    }
+
     if (_capacity < _minAllowedCapacity) {
       ToastNotification.showError(
         context,
@@ -215,26 +271,6 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              DropdownButtonFormField<String>(
-                initialValue: _inventoryType,
-                decoration: const InputDecoration(labelText: 'Cách quản lý sức chứa'),
-                items: const [
-                  DropdownMenuItem(value: 'PERSON_LIMIT', child: Text('Theo tổng số khách')),
-                  DropdownMenuItem(value: 'SHARED_CAPACITY_UNITS', child: Text('Theo đơn vị / thiết bị (gói riêng)')),
-                ],
-                onChanged: _isEdit ? null : (value) => setState(() => _inventoryType = value!),
-              ),
-              if (_inventoryType == 'SHARED_CAPACITY_UNITS')
-                TextField(
-                  controller: _unitsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Số chỗ từng đơn vị, cách nhau bằng dấu phẩy',
-                    helperText: 'Ví dụ 1, 2, 2: ba đơn vị có sức chứa 1, 2, 2 khách. Gói bay đôi cần đơn vị từ 2 chỗ.',
-                    helperMaxLines: 3,
-                  ),
-                ),
-              const SizedBox(height: 16),
-
               // Service Header Info
               Container(
                 padding: const EdgeInsets.all(14),
@@ -287,7 +323,76 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
               ),
               const SizedBox(height: 16),
 
-              // CARD 1: Date & Recurrence
+              // CARD 1: Cách quản lý sức chứa
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0x06102F3A), blurRadius: 8, offset: Offset(0, 2)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.tune_rounded, size: 18, color: AppColors.secondary),
+                        SizedBox(width: 8),
+                        Text(
+                          'Hình thức quản lý sức chứa',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: _inventoryType,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: AppColors.surfaceContainerLow,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'PERSON_LIMIT', child: Text('Theo tổng số khách (Mặc định)')),
+                        DropdownMenuItem(value: 'SHARED_CAPACITY_UNITS', child: Text('Theo từng thiết bị / cano (Phân bổ đơn vị)')),
+                      ],
+                      onChanged: _isEdit ? null : (value) => setState(() => _inventoryType = value!),
+                    ),
+                    if (_inventoryType == 'SHARED_CAPACITY_UNITS') ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _unitsController,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: AppColors.surfaceContainerLow,
+                          labelText: 'Số chỗ từng đơn vị (cách nhau dấu phẩy)',
+                          helperText: 'Ví dụ: 1, 2, 2 (3 thiết bị với sức chứa lần lượt 1, 2, 2 khách)',
+                          helperMaxLines: 2,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // CARD 2: Date
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -304,29 +409,62 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Expanded(
-                          child: Row(
-                            children: [
-                              Icon(Icons.calendar_today, size: 18, color: AppColors.secondary),
-                              SizedBox(width: 6),
-                              Expanded(
-                                child: LocalizedText('Ngày áp dụng',
-                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                              ),
-                            ],
-                          ),
+                        const Row(
+                          children: [
+                            Icon(Icons.calendar_today, size: 18, color: AppColors.secondary),
+                            SizedBox(width: 8),
+                            Text(
+                              'Ngày áp dụng',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: BorderRadius.circular(10)),
-                          child: const LocalizedText('Hôm nay', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.onSecondaryFixed)),
+                        Row(
+                          children: [
+                            InkWell(
+                              onTap: _setDateToday,
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: _isDateToday ? AppColors.secondary : AppColors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  'Hôm nay',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isDateToday ? Colors.white : AppColors.tertiary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            InkWell(
+                              onTap: _setDateTomorrow,
+                              borderRadius: BorderRadius.circular(10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: _isDateTomorrow ? AppColors.secondary : AppColors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  'Ngày mai',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: _isDateTomorrow ? Colors.white : AppColors.tertiary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 12),
                     InkWell(
                       onTap: _pickDate,
                       borderRadius: BorderRadius.circular(24),
@@ -341,7 +479,10 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                             const Icon(Icons.event, size: 20, color: AppColors.tertiary),
                             const SizedBox(width: 10),
                             Expanded(
-                              child: LocalizedText(_dateController.text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.onSurface)),
+                              child: Text(
+                                _dateController.text,
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.onSurface),
+                              ),
                             ),
                             const Icon(Icons.edit_calendar, size: 18, color: AppColors.secondary),
                           ],
@@ -349,15 +490,24 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Material(
-                      color: Colors.transparent,
-                      child: CheckboxListTile(
-                        value: _repeatWeekdays,
-                        onChanged: (val) => setState(() => _repeatWeekdays = val ?? false),
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        title: const LocalizedText('Lặp lại cho các ngày trong tuần (T2 - T6)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
-                        subtitle: const LocalizedText('Tạo khung giờ tương ứng cho các ngày làm việc', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.info_outline, size: 15, color: AppColors.secondary),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Ca chạy này được tạo cho riêng ngày đã chọn. Để cài đặt khung giờ tự động lặp lại cả tuần, cấu hình tại Lịch định kỳ.',
+                              style: TextStyle(fontSize: 11, color: AppColors.tertiary, height: 1.3),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -365,7 +515,7 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
               ),
               const SizedBox(height: 16),
 
-              // CARD 2: Operating Time
+              // CARD 3: Operating Time
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -382,31 +532,24 @@ class _SlotConfigScreenState extends State<SlotConfigScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Expanded(
-                          child: Row(
-                            children: [
-                              Icon(Icons.schedule, size: 18, color: AppColors.secondary),
-                              SizedBox(width: 6),
-                              Expanded(
-                                child: LocalizedText(
-                                  'Khung giờ hoạt động',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
+                        const Row(
+                          children: [
+                            Icon(Icons.schedule, size: 18, color: AppColors.secondary),
+                            SizedBox(width: 8),
+                            Text(
+                              'Khung giờ hoạt động',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                             color: AppColors.secondaryContainer.withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: LocalizedText(
-                            'Thời lượng: ${service?.durationMinutes ?? 60} phút',
+                          child: Text(
+                            'Khung: ${_slotDurationMinutes >= 60 ? "${_slotDurationMinutes ~/ 60}h${_slotDurationMinutes % 60 > 0 ? '${_slotDurationMinutes % 60}p' : ''}" : "$_slotDurationMinutes phút"} • ${service?.durationMinutes ?? 15}p/lượt',
                             style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,

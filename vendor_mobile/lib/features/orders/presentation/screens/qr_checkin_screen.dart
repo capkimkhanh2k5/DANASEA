@@ -137,6 +137,30 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
     return code.replaceAll('#', '').trim();
   }
 
+  String _formatShortCode(String raw) {
+    var c = raw.trim();
+    if (c.startsWith('#')) c = c.substring(1);
+    if (c.isEmpty) return '';
+    if (c.length <= 16) {
+      return '#$c';
+    }
+    if (c.contains('-')) {
+      final parts = c.split('-');
+      final first = parts.first;
+      final last = parts.last;
+      final suffix = last.length > 4 ? last.substring(last.length - 4) : last;
+      return '#$first...$suffix';
+    }
+    return '#${c.substring(0, 8)}...${c.substring(c.length - 4)}';
+  }
+
+  String _formatSlotTime(String t) {
+    if (t.isEmpty) return '';
+    final parts = t.split(':');
+    if (parts.length >= 2) return '${parts[0]}:${parts[1]}';
+    return t;
+  }
+
   Future<void> _verifySignedTicket(String token) async {
     _isProcessing = true;
     var title = 'Check-in thành công';
@@ -785,11 +809,6 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        final pendingOrders = _db.subOrders
-            .where((o) => o.checkedInAt == null)
-            .take(3)
-            .toList();
-
         return Padding(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(ctx).viewInsets.bottom,
@@ -855,49 +874,6 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                     }
                   },
                 ),
-                if (pendingOrders.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Đơn chờ check-in gần nhất:',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.tertiary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ActionChip(
-                        avatar: const Icon(Icons.qr_code_2, size: 14, color: AppColors.secondary),
-                        label: const Text(
-                          '#DNS-8924 (Đơn tổng Master QR)',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.secondary),
-                        ),
-                        backgroundColor: AppColors.secondaryContainer.withValues(alpha: 0.5),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _handleCode('DNS-8924');
-                        },
-                      ),
-                      ...pendingOrders.map((o) {
-                        return ActionChip(
-                          label: Text(
-                            '#${o.subOrderCode} (${o.customerName})',
-                            style: const TextStyle(fontSize: 11),
-                          ),
-                          backgroundColor: AppColors.surfaceContainerLow,
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            _handleCode(o.subOrderCode);
-                          },
-                        );
-                      }),
-                    ],
-                  ),
-                ],
                 const SizedBox(height: 16),
                 VendorButton(
                   text: 'Kiểm tra mã vé',
@@ -1035,20 +1011,46 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      '#${o.subOrderCode} • ${o.customerName}',
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.onSurface,
-                                      ),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            o.customerName.isNotEmpty ? o.customerName : 'Khách hàng',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.onSurface,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.secondaryContainer.withValues(alpha: 0.6),
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Text(
+                                            _formatSlotTime(o.slotTime),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.secondary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 2),
+                                    const SizedBox(height: 4),
                                     Text(
-                                      '${o.serviceName} • ${o.slotTime}',
+                                      '${_formatShortCode(o.subOrderCode)} • ${o.serviceName}',
                                       style: const TextStyle(
-                                        fontSize: 11,
-                                        color: AppColors.onSurfaceVariant,
+                                        fontSize: 11.5,
+                                        color: AppColors.tertiary,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -1056,6 +1058,7 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                                   ],
                                 ),
                               ),
+                              const SizedBox(width: 6),
                               const Icon(Icons.chevron_right,
                                   color: AppColors.tertiary, size: 20),
                             ],
@@ -1263,126 +1266,97 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                       ],
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 18),
 
-                  // Quick Manual Input Dock (nổi bật dưới đáy, trời nắng chói gõ 4-5 số cuối là check-in ngay)
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(14, 4, 6, 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.pin_rounded, color: AppColors.secondary, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _quickInputController,
-                            textCapitalization: TextCapitalization.characters,
-                            style: const TextStyle(fontSize: 13, color: AppColors.onSurface, fontWeight: FontWeight.w600),
-                            decoration: const InputDecoration(
-                              hintText: 'Gõ 4–5 số cuối mã vé (VD: 8924)...',
-                              hintStyle: TextStyle(fontSize: 12, color: AppColors.outline),
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.symmetric(vertical: 8),
-                            ),
-                            onSubmitted: (val) {
-                              if (val.trim().isNotEmpty) {
-                                _handleCode(val);
-                                _quickInputController.clear();
-                              }
-                            },
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () {
-                            final val = _quickInputController.text.trim();
-                            if (val.isNotEmpty) {
-                              _handleCode(val);
-                              _quickInputController.clear();
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(18),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.secondary,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: const Text(
-                              'Check-in',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Action Buttons: Manual Input Dialog + Pending Queue
+                  // 2 Nút kính mờ (Frosted Glass) tinh tế chuẩn MoMo / Zalo
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      // Nút 1: Nhập mã số thủ công
                       Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _openManualCodeDialog,
-                          icon: const Icon(Icons.keyboard_alt_outlined,
-                              size: 16, color: Colors.white),
-                          label: const Text(
-                            'Nhập mã đầy đủ',
-                            style:
-                                TextStyle(fontSize: 12, color: Colors.white),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white.withValues(alpha: 0.12),
-                            side: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.25),
+                        child: InkWell(
+                          onTap: _openManualCodeDialog,
+                          borderRadius: BorderRadius.circular(28),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(28),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.22),
+                                width: 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.35),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(22),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.keyboard_alt_outlined, size: 19, color: Colors.white),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Nhập mã số',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
+
+                      // Nút 2: Danh sách vé chờ check-in
                       Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _openPendingOrdersSheet,
-                          icon: const Icon(Icons.list_alt,
-                              size: 16, color: Colors.white),
-                          label: Text(
-                            'Chờ check-in ($pendingCount)',
-                            style: const TextStyle(
-                                fontSize: 12, color: Colors.white),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white.withValues(alpha: 0.12),
-                            side: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.25),
+                        child: InkWell(
+                          onTap: _openPendingOrdersSheet,
+                          borderRadius: BorderRadius.circular(28),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(28),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.22),
+                                width: 1.0,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.35),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(22),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.confirmation_number_outlined, size: 18, color: Colors.white),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Vé chờ ($pendingCount)',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 6),
                 ],
               ),
             ),

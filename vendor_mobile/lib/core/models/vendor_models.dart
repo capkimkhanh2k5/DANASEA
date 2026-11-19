@@ -768,11 +768,19 @@ class SubOrderModel {
   final DateTime? checkedInAt;    // SEPARATED from order status
   final String customerName;
   final String customerPhone;
+  final String? customerEmail;
   final String serviceName;
+  final String? optionName;
   final String serviceImageUrl;
   final String slotDate;
   final String slotTime;
+  final String? endTime;
   final DateTime createdAt;
+  final bool? waiverRequired;
+  final DateTime? rescheduledAt;
+  final String? originalSlotId;
+  final String? cancellationReason;
+  final String? paymentStatus;
 
   const SubOrderModel({
     required this.id,
@@ -793,11 +801,19 @@ class SubOrderModel {
     this.checkedInAt,
     required this.customerName,
     required this.customerPhone,
+    this.customerEmail,
     required this.serviceName,
+    this.optionName,
     required this.serviceImageUrl,
     required this.slotDate,
     required this.slotTime,
+    this.endTime,
     required this.createdAt,
+    this.waiverRequired,
+    this.rescheduledAt,
+    this.originalSlotId,
+    this.cancellationReason,
+    this.paymentStatus,
   });
 
   bool get isCheckedIn => checkedInAt != null;
@@ -811,6 +827,19 @@ class SubOrderModel {
   SubOrderModel copyWith({
     SubOrderStatus? status,
     DateTime? checkedInAt,
+    bool? waiverAccepted,
+    DateTime? waiverAcceptedAt,
+    String? customerName,
+    String? customerPhone,
+    String? customerEmail,
+    String? serviceName,
+    String? optionName,
+    String? slotDate,
+    String? slotTime,
+    String? endTime,
+    DateTime? rescheduledAt,
+    String? cancellationReason,
+    String? paymentStatus,
   }) {
     return SubOrderModel(
       id: id,
@@ -825,17 +854,25 @@ class SubOrderModel {
       commissionAmount: commissionAmount,
       vendorPayoutAmount: vendorPayoutAmount,
       status: status ?? this.status,
-      waiverAccepted: waiverAccepted,
-      waiverAcceptedAt: waiverAcceptedAt,
+      waiverAccepted: waiverAccepted ?? this.waiverAccepted,
+      waiverAcceptedAt: waiverAcceptedAt ?? this.waiverAcceptedAt,
       qrSecret: qrSecret,
       checkedInAt: checkedInAt ?? this.checkedInAt,
-      customerName: customerName,
-      customerPhone: customerPhone,
-      serviceName: serviceName,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      customerEmail: customerEmail ?? this.customerEmail,
+      serviceName: serviceName ?? this.serviceName,
+      optionName: optionName ?? this.optionName,
       serviceImageUrl: serviceImageUrl,
-      slotDate: slotDate,
-      slotTime: slotTime,
+      slotDate: slotDate ?? this.slotDate,
+      slotTime: slotTime ?? this.slotTime,
+      endTime: endTime ?? this.endTime,
       createdAt: createdAt,
+      waiverRequired: waiverRequired,
+      rescheduledAt: rescheduledAt ?? this.rescheduledAt,
+      originalSlotId: originalSlotId,
+      cancellationReason: cancellationReason ?? this.cancellationReason,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
     );
   }
 }
@@ -1085,10 +1122,30 @@ class ReviewModel {
 
 enum SettlementStatus {
   pending,
+  finalized,
   paid;
 
-  String get labelVi => this == SettlementStatus.pending ? 'Chờ đối soát' : 'Đã thanh toán';
-  String get dbValue => this == SettlementStatus.pending ? 'PENDING' : 'PAID';
+  String get labelVi {
+    switch (this) {
+      case SettlementStatus.pending:
+        return 'Chờ đối soát';
+      case SettlementStatus.finalized:
+        return 'Đã chốt (Sẵn sàng rút)';
+      case SettlementStatus.paid:
+        return 'Đã thanh toán';
+    }
+  }
+
+  String get dbValue {
+    switch (this) {
+      case SettlementStatus.pending:
+        return 'PENDING';
+      case SettlementStatus.finalized:
+        return 'FINALIZED';
+      case SettlementStatus.paid:
+        return 'PAID';
+    }
+  }
 }
 
 class SettlementModel {
@@ -1162,6 +1219,10 @@ class PayoutRequestModel {
   final String bankName;
   final String bankAccountNumber;
   final String bankAccountHolder;
+  final String? rejectionReason;
+  final String? bankReference;
+  final String? adminNote;
+  final String? note;
 
   const PayoutRequestModel({
     required this.id,
@@ -1175,6 +1236,10 @@ class PayoutRequestModel {
     required this.bankName,
     required this.bankAccountNumber,
     required this.bankAccountHolder,
+    this.rejectionReason,
+    this.bankReference,
+    this.adminNote,
+    this.note,
   });
 }
 
