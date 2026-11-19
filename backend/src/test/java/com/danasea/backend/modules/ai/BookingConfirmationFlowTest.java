@@ -344,6 +344,13 @@ public class BookingConfirmationFlowTest {
 
         Map<String, Object> response1 = confirmBookingUseCase.execute("card-pending-1", userId, sessionId);
         assertEquals("alternative_needed", response1.get("status"));
+        assertEquals("PRICE_CHANGED", response1.get("reason"));
+        assertEquals(Boolean.TRUE, response1.get("priceChanged"));
+        assertEquals(Boolean.FALSE, response1.get("slotChanged"));
+        assertEquals(new BigDecimal("500000.00"), response1.get("previousPrice"));
+        assertEquals(new BigDecimal("1000000.00"), response1.get("previousTotalAmount"));
+        assertEquals(new BigDecimal("450000.00"), response1.get("newPrice"));
+        assertEquals(new BigDecimal("900000.00"), response1.get("newTotalAmount"));
         ConfirmationCard card2 = (ConfirmationCard) response1.get("newCard");
         assertNotNull(card2);
         assertEquals(new BigDecimal("450000.00"), card2.getPrice());

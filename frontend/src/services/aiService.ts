@@ -6,12 +6,55 @@ export interface AssistantChatRequest {
   conversationId?: string;
 }
 
+export interface AssistantAction {
+  type: string;
+  method: string;
+  path: string;
+  parameters?: Record<string, unknown>;
+  confirmationRequired?: boolean;
+}
+
+export interface AssistantCard {
+  id: string;
+  type: string;
+  tool?: string;
+  status: string;
+  facts: Record<string, unknown>;
+  actions?: AssistantAction[];
+  requiredInputs?: string[];
+}
+
+export interface BookingConfirmOutcome {
+  status: 'success' | 'alternative_needed' | 'out_of_stock' | 'error' | string;
+  message?: string;
+  holdId?: string;
+  bookingId?: string;
+  paymentDeadline?: string;
+  oldCardId?: string;
+  reason?: string;
+  previousPrice?: number;
+  previousTotalAmount?: number;
+  newPrice?: number;
+  newTotalAmount?: number;
+  previousDate?: string;
+  priceChanged?: boolean;
+  slotChanged?: boolean;
+  newCard?: {
+    id: string;
+    price?: number;
+    quantity?: number;
+    date?: string;
+    participantsCount?: number;
+    participantsPerPackage?: number[];
+  };
+}
+
 export interface AssistantChatResponse {
   status: string;
   conversationId: string;
   message: string;
   responseStatus: string;
-  cards: unknown[];
+  cards: AssistantCard[];
   sources: unknown[];
   actions: unknown[];
   requiredInputs: string[];
@@ -52,7 +95,7 @@ export const aiService = {
     const res = await apiClient.post<AssistantChatResponse>('/assistant/chat', {
       message,
       conversationId: conversationId || undefined,
-    });
+    }, { timeout: 130_000 });
     return res.data;
   },
 
@@ -101,6 +144,39 @@ export const aiService = {
    */
   async getMarineBriefing(orderId: string): Promise<MarineBriefingOverview> {
     const res = await apiClient.get<MarineBriefingOverview>(`/ai/orders/${orderId}/marine-briefing`);
+    return res.data;
+  },
+
+  /**
+   * POST /api/assistant/conversations/{conversationId}/confirm — Xác nhận đặt chỗ từ thẻ AI
+   */
+  async confirmBooking(conversationId: string, cardId: string, sessionId?: string): Promise<BookingConfirmOutcome> {
+    const res = await apiClient.post<BookingConfirmOutcome>(
+      `/assistant/conversations/${encodeURIComponent(conversationId)}/confirm`,
+      { cardId, ...(sessionId ? { sessionId } : {}) }
+    );
+    return res.data;
+  },
+
+  /**
+   * POST /api/ai/itineraries/{itineraryId}/proposals/{proposalId}/accept
+   */
+  async acceptProposal(itineraryId: string, proposalId: string, expectedVersion: number): Promise<AiItineraryItem> {
+    const res = await apiClient.post<AiItineraryItem>(
+      `/ai/itineraries/${encodeURIComponent(itineraryId)}/proposals/${encodeURIComponent(proposalId)}/accept`,
+      { expectedVersion }
+    );
+    return res.data;
+  },
+
+  /**
+   * POST /api/ai/itineraries/{itineraryId}/proposals/{proposalId}/reject
+   */
+  async rejectProposal(itineraryId: string, proposalId: string, expectedVersion: number): Promise<Record<string, unknown>> {
+    const res = await apiClient.post<Record<string, unknown>>(
+      `/ai/itineraries/${encodeURIComponent(itineraryId)}/proposals/${encodeURIComponent(proposalId)}/reject`,
+      { expectedVersion }
+    );
     return res.data;
   },
 };

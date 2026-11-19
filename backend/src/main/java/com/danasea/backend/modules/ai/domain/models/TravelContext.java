@@ -53,8 +53,12 @@ public record TravelContext(String query, UUID categoryId, BigDecimal totalBudge
     }
 
     public void validateCurrentDates() {
-        if (from.isBefore(LocalDate.now(ZONE))) {
+        LocalDate today = LocalDate.now(ZONE);
+        if (from.isBefore(today)) {
             throw new IllegalArgumentException("Update the travel date before searching or replanning");
+        }
+        if (from.isAfter(today.plusDays(14)) || to.isAfter(today.plusDays(14))) {
+            throw new IllegalArgumentException("Travel dates must be within 14 days from today");
         }
     }
 }

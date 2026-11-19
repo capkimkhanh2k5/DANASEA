@@ -163,4 +163,96 @@ class ItineraryLifecycleHttpIntegrationTest extends BaseSecurityIntegrationTest 
                 .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":1}")).andExpect(status().isConflict());
         assertThat(store.trackedSlotIds(0, 100)).doesNotContain(firstSlot, secondSlot);
     }
+
+    @Test void horizonBeyond14DaysIsRejectedAtSearchAndPreviewEndpoints() throws Exception {
+        LocalDate day30 = LocalDate.now(TravelContext.ZONE).plusDays(30);
+        String body = "{\"query\":\"SUP\",\"partySize\":2,\"from\":\"" + day30 + "\",\"to\":\"" + day30 + "\"}";
+        mvc.perform(post("/api/ai/itineraries/preview").with(user(owner.toString()).roles("CUSTOMER"))
+                .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
+        mvc.perform(post("/api/ai/search").with(user(owner.toString()).roles("CUSTOMER"))
+                .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isBadRequest());
+    }
+
+    @Test void postgresCatalogPrecisionHandlesSupVsKayakAndNonSwimmerDivingExclusionAndMultiArea() throws Exception {
+        UUID supCat = ensureCategory("Chèo SUP & Kayak", "cheo-sup-kayak");
+        UUID diveCat = ensureCategory("Lặn biển", "lan-bien");
+        UUID boatCat = ensureCategory("Khám phá biển", "kham-pha-bien-" + UUID.randomUUID());
+
+        UUID supService = insertPublishedService("Chèo SUP bình minh Mân Thái", "Trải nghiệm chèo SUP tại Mân Thái",
+                supCat, "Bãi biển Mân Thái, Sơn Trà, Đà Nẵng", 16.086, 108.250, 8, 30);
+        UUID kayakService = insertPublishedService("Chèo thuyền Kayak Bãi Rạng", "Hỗ trợ support khách chèo kayak",
+                supCat, "Bãi Rạng, Sơn Trà, Đà Nẵng", 16.105, 108.275, 10, 0);
+        UUID diveService = insertPublishedService("Lặn ngắm san hô Sơn Trà", "Tour lặn sâu cùng hướng dẫn viên",
+                diveCat, "Bán đảo Sơn Trà, Đà Nẵng", 16.106, 108.276, 9, 40);
+        UUID sonTraMarine = insertPublishedService("Khám phá biển Sơn Trà Island View", "Ngắm cảnh biển nhẹ nhàng không cần biết bơi",
+                boatCat, "Bán đảo Sơn Trà, Đà Nẵng", 16.1067, 108.2774, 10, 30);
+
+        // U13: SUP search must NOT return Kayak in cheo-sup-kayak category
+        JsonNode u13 = mapper.readTree(mvc.perform(post("/api/ai/search").with(user(owner.toString()).roles("CUSTOMER"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"Tôi muốn tìm các dịch vụ chèo SUP tại Đà Nẵng vào ngày mai\",\"partySize\":2,\"from\":\"" + date + "\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        List<String> u13Ids = new java.util.ArrayList<>();
+        u13.path("candidates").forEach(c -> u13Ids.add(c.path("service").path("id").asText()));
+        assertThat(u13Ids).contains(supService.toString()).doesNotContain(kayakService.toString(), diveService.toString());
+
+        // U17: non-swimmer + no deep diving excludes diving without breaking gentle Island tour
+        JsonNode u17 = mapper.readTree(mvc.perform(post("/api/ai/search").with(user(owner.toString()).roles("CUSTOMER"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"Tôi muốn trải nghiệm nhẹ nhàng, không biết bơi và không thích lặn sâu\",\"partySize\":2,\"from\":\"" + date + "\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        List<String> u17Ids = new java.util.ArrayList<>();
+        u17.path("candidates").forEach(c -> u17Ids.add(c.path("service").path("id").asText()));
+        assertThat(u17.path("status").asText()).isEqualTo("AVAILABLE");
+        assertThat(u17Ids).contains(sonTraMarine.toString()).doesNotContain(diveService.toString());
+
+        // U24: Mân Thái SUP + Sơn Trà marine experience paired with transfer time
+        JsonNode u24 = mapper.readTree(mvc.perform(post("/api/ai/itineraries/preview").with(user(owner.toString()).roles("CUSTOMER"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"query\":\"Tôi muốn vừa chèo SUP ở Mân Thái vừa trải nghiệm biển Sơn Trà, hãy sắp xếp hợp lý\",\"partySize\":2,\"from\":\"" + date + "\",\"to\":\"" + date + "\",\"maxActivities\":2}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        JsonNode firstAltItems = u24.path("alternatives").get(0).path("plan").path("items");
+        assertThat(firstAltItems).hasSize(2);
+        List<String> pairedIds = List.of(firstAltItems.get(0).path("serviceId").asText(), firstAltItems.get(1).path("serviceId").asText());
+        assertThat(pairedIds).containsExactlyInAnyOrder(supService.toString(), sonTraMarine.toString());
+        assertThat(firstAltItems.get(1).path("estimatedTravelMinutes").asInt()).isGreaterThanOrEqualTo(15);
+        List<String> tradeOffs = new java.util.ArrayList<>();
+        u24.path("alternatives").get(0).path("tradeOffs").forEach(node -> tradeOffs.add(node.asText()));
+        assertThat(tradeOffs).anyMatch(entry -> entry.startsWith("REJECTION_COUNTS:"));
+    }
+
+    @Test void restoreRevisionHttpEndpointCreatesPendingProposalWithOwnershipAndCasGuard() throws Exception {
+        JsonNode saved = plan();
+        String id = saved.path("id").asText();
+        mvc.perform(post("/api/ai/itineraries/" + id + "/revisions/0/restore").with(user(other.toString()).roles("CUSTOMER"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":0}")).andExpect(status().isNotFound());
+        mvc.perform(post("/api/ai/itineraries/" + id + "/revisions/0/restore").with(user(owner.toString()).roles("CUSTOMER"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":99}")).andExpect(status().isConflict());
+        mvc.perform(post("/api/ai/itineraries/" + id + "/revisions/0/restore").with(user(owner.toString()).roles("CUSTOMER"))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":0}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.state").value("PENDING"))
+                .andExpect(jsonPath("$.trigger").value("CUSTOMER_RESTORE_REVISION"))
+                .andExpect(jsonPath("$.bookingChanged").value(false));
+    }
+
+    private UUID ensureCategory(String name, String slug) {
+        List<UUID> existing = jdbc.queryForList("select id from categories where slug=?", UUID.class, slug);
+        if (!existing.isEmpty()) return existing.getFirst();
+        UUID id = UUID.randomUUID();
+        jdbc.update("insert into categories(id,name,slug,is_active,requires_safety_cert,created_at,updated_at) values(?,?,?,true,false,now(),now())", id, name, slug);
+        return id;
+    }
+
+    private UUID insertPublishedService(String name, String description, UUID categoryId, String address,
+                                        double lat, double lon, int startHour, int startMinute) {
+        UUID serviceId = UUID.randomUUID(), optionId = UUID.randomUUID(), slotId = UUID.randomUUID();
+        jdbc.update("insert into services(id,category_id,name,description,address,status,weather_sensitive,duration_minutes,latitude,longitude,created_at,updated_at) values(?,?,?,?,?,'PUBLISHED',false,60,?,?,now(),now())",
+                serviceId, categoryId, name, description, address, lat, lon);
+        jdbc.update("insert into service_options(id,service_id,name,option_type,pricing_unit,price,status) values(?,?,'Standard','SHARED','PER_PERSON',150000,'ACTIVE')", optionId, serviceId);
+        LocalTime start = LocalTime.of(startHour, startMinute);
+        jdbc.update("insert into service_slots(id,service_id,date,start_time,end_time,capacity,booked_count,status,inventory_type,created_at,updated_at) values(?,?,?,?,?,10,0,'OPEN','PERSON_LIMIT',now(),now())",
+                slotId, serviceId, date, start, start.plusMinutes(60));
+        return serviceId;
+    }
 }

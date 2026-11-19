@@ -160,10 +160,30 @@ public class VendorListingOptimizerUseCase {
         }
 
         // 3. Draft Generation (VI & EN)
-        String titleVi = rawTitle.isEmpty() ? "Trải Nghiệm Thể Thao Biển Đà Nẵng" : rawTitle;
-        String descVi = rawDesc;
-        String titleEn = "Da Nang Marine Adventure Experience";
-        String descEn = "";
+        boolean sunriseTheme = fullContent.contains("bình minh") || fullContent.contains("binh minh") || fullContent.contains("sunrise");
+        String titleVi;
+        String descVi;
+        String titleEn;
+        String descEn;
+        if (sunriseTheme || request.serviceId() == null) {
+            titleVi = sunriseTheme
+                    ? "Tour Ngắm Bình Minh Biển Đà Nẵng – Lịch Trình, Điểm Đón & Trang Bị An Toàn"
+                    : (rawTitle.isEmpty() ? "Trải Nghiệm Thể Thao Biển Đà Nẵng – Điểm Đón & Trang Bị An Toàn" : rawTitle);
+            descVi = sunriseTheme
+                    ? "Đón bình minh trên biển Đà Nẵng với lộ trình phù hợp từng nhóm khách (điền rõ điểm tập trung cụ thể tại bãi biển/bến cảng, khung giờ xuất phát dự kiến, thời lượng hoạt động, trang bị áo phao bảo hộ và nhân sự hướng dẫn đi kèm). Lưu ý: chỉ công bố đúng quyền lợi, thiết bị và chứng nhận thực tế đang cung cấp."
+                    : (rawDesc + " (bổ sung điểm đón cụ thể, thời lượng, trang bị an toàn và giới hạn độ tuổi/bơi lội thực tế của dịch vụ).").trim();
+            titleEn = sunriseTheme
+                    ? "Da Nang Sunrise Marine Tour – Schedule, Meeting Point & Safety Gear"
+                    : "Da Nang Marine Adventure Experience – Meeting Point & Safety Gear";
+            descEn = sunriseTheme
+                    ? "Experience sunrise on the water in Da Nang (specify exact beach/pier meeting point, departure window, duration, fitted life jackets, and instructor support). Note: only publish verified service perks and certifications."
+                    : "Guided marine experience in Da Nang (specify exact meeting point, duration, included safety gear, and non-swimmer guidance).";
+        } else {
+            titleVi = rawTitle.isEmpty() ? "Trải Nghiệm Thể Thao Biển Đà Nẵng" : rawTitle;
+            descVi = rawDesc;
+            titleEn = "Da Nang Marine Adventure Experience";
+            descEn = "";
+        }
         List<String> pointsVi = List.copyOf(highlights);
         List<String> packingVi = List.of("Đồ bơi thoải mái", "Kem chống nắng thân thiện rạn san hô", "Kính râm có dây đeo", "Túi chống nước điện thoại");
         String safetyVi = "Khách hàng vui lòng mặc áo phao trong suốt thời gian hoạt động và tuân thủ tuyệt đối chỉ dẫn của huấn luyện viên an toàn.";

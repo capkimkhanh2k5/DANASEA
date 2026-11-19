@@ -11,8 +11,17 @@ import {
   User,
   Loader2,
 } from "lucide-react";
-import { aiService } from "../../../services/aiService";
+import { aiService, type AssistantCard } from "../../../services/aiService";
 import { MarkdownText } from "../../../components/common/MarkdownText";
+import { AssistantCardList } from "../../../components/customer/AssistantCardList";
+
+interface AssistantMessage {
+  id: number;
+  role: "ai" | "user";
+  content: string;
+  cards?: AssistantCard[];
+  responseStatus?: string;
+}
 
 export function AiAssistant() {
   const navigate = useNavigate();
@@ -20,7 +29,7 @@ export function AiAssistant() {
   const isEn = language === 'en';
   const [conversationId, setConversationId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<AssistantMessage[]>([
     { 
       id: 1, 
       role: "ai", 
@@ -36,22 +45,22 @@ export function AiAssistant() {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
-    
-    const userMsg = input.trim();
-    setMessages(prev => [...prev, { id: Date.now(), role: "user", content: userMsg }]);
-    setInput("");
+  const sendPrompt = async (promptText: string) => {
+    const trimmed = promptText.trim();
+    if (!trimmed || isLoading) return;
+
+    setMessages(prev => [...prev, { id: Date.now(), role: "user", content: trimmed }]);
     setIsLoading(true);
 
     try {
-      const res = await aiService.chat(userMsg, conversationId);
+      const res = await aiService.chat(trimmed, conversationId);
       if (res.conversationId) setConversationId(res.conversationId);
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: "ai",
         content: res.message || (isEn ? "The system has recorded your request." : "Hệ thống đã ghi nhận yêu cầu của bạn."),
+        cards: res.cards,
+        responseStatus: res.responseStatus,
       }]);
     } catch (err: unknown) {
       console.error("[AI Assistant] Chat request failed:", err);
@@ -68,6 +77,14 @@ export function AiAssistant() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    const userMsg = input.trim();
+    setInput("");
+    await sendPrompt(userMsg);
   };
 
   return (
@@ -170,7 +187,15 @@ export function AiAssistant() {
                   {msg.role === 'user' ? (
                     <p className="whitespace-pre-wrap">{msg.content}</p>
                   ) : (
-                    <MarkdownText content={msg.content} />
+                    <>
+                      <MarkdownText content={msg.content} />
+                      <AssistantCardList
+                        cards={msg.cards}
+                        conversationId={conversationId}
+                        language={isEn ? 'en' : 'vi'}
+                        onQuickPrompt={sendPrompt}
+                      />
+                    </>
                   )}
                 </div>
 

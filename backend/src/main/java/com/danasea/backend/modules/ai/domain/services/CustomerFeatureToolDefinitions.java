@@ -29,10 +29,28 @@ public final class CustomerFeatureToolDefinitions {
                 definition("ai_nearby_services", "Find currently bookable experiences near explicit coordinates; ask for location if missing.", Map.of("criteria", criteria), List.of("criteria")),
                 definition("ai_compare_services", "Compare two to four published services using source data and current option/party prices.", Map.of("criteria", criteria, "serviceIds", ids(4)), List.of("criteria", "serviceIds")),
                 definition("ai_plan_itinerary", "Create an owned itinerary proposal with current slots, budget and estimated transfers. It reserves no inventory and charges nothing.", Map.of("criteria", criteria), List.of("criteria")),
-                definition("ai_replan_itinerary", "Replan an owned itinerary at an expected version after explicit user request. It does not change existing bookings.", Map.of("criteria", criteria, "itineraryId", uuid(), "expectedVersion", Map.of("type", "integer", "minimum", 0), "excludedServiceIds", ids(20), "excludedSlotIds", ids(50), "trigger", Map.of("type", "string")), List.of("itineraryId", "expectedVersion")),
+                definition("ai_replan_itinerary", "Replan an owned itinerary or move a specific activity (1-based targetItemIndex) to a target time window at an expected version. Creates a PENDING proposal and never changes existing bookings.", Map.ofEntries(
+                        Map.entry("criteria", criteria),
+                        Map.entry("itineraryId", uuid()),
+                        Map.entry("expectedVersion", Map.of("type", "integer", "minimum", 0)),
+                        Map.entry("excludedServiceIds", ids(20)),
+                        Map.entry("excludedSlotIds", ids(50)),
+                        Map.entry("trigger", Map.of("type", "string")),
+                        Map.entry("targetItemIndex", Map.of("type", "integer", "minimum", 1, "maximum", 20, "description", "1-based index of the activity to move or replace")),
+                        Map.entry("targetDayStart", Map.of("type", "string", "description", "HH:mm target start time for the moved activity")),
+                        Map.entry("targetDayEnd", Map.of("type", "string", "description", "HH:mm target end time for the moved activity"))), List.of("itineraryId", "expectedVersion")),
+                definition("ai_list_itineraries", "List the authenticated customer's saved itineraries with 1-based index, version, lifecycle, and activity items.", Map.of(
+                        "page", Map.of("type", "integer", "minimum", 0, "maximum", 10000),
+                        "size", Map.of("type", "integer", "minimum", 1, "maximum", 20)), List.of()),
+                definition("ai_get_itinerary", "Read a saved itinerary owned by the authenticated customer, including current version, items, and pending proposals.", Map.of("itineraryId", uuid()), List.of("itineraryId")),
+                definition("ai_itinerary_history", "Read revision history and proposals for an owned itinerary, and optionally create a PENDING restore proposal from a prior revision after live revalidation.", Map.of(
+                        "itineraryId", uuid(),
+                        "restoreRevisionVersion", Map.of("type", "integer", "minimum", 0),
+                        "expectedVersion", Map.of("type", "integer", "minimum", 0)), List.of("itineraryId")),
                 definition("ai_review_summary", "Read an extractive summary with real public review IDs, rating counts and tentative Quyet aspect/sentiment suggestions. No reviews means no claims.", Map.of("serviceId", uuid()), List.of("serviceId")),
                 definition("ai_weather_slot", "Evaluate backend weather rules for a specific current service option and slot; unknown data never authorizes booking.", Map.of("criteria", criteria, "serviceId", uuid(), "optionId", uuid(), "slotId", uuid()), List.of("criteria", "serviceId", "optionId", "slotId")),
-                definition("ai_customer_support", "Read the authenticated customer's own order and optional cancellation preview. Ask for an order ID if missing. Never cancel, refund or change payment state.", Map.of("orderId", uuid(), "message", Map.of("type", "string"), "includeCancellationPreview", Map.of("type", "boolean")), List.of("message")));
+                definition("ai_customer_support", "Read the authenticated customer's own order and optional cancellation preview. Ask for an order ID if missing. Never cancel, refund or change payment state.", Map.of("orderId", uuid(), "message", Map.of("type", "string"), "includeCancellationPreview", Map.of("type", "boolean")), List.of("message")),
+                definition("ai_marine_briefing", "Read pre-trip marine briefing, safety checklist, and slot weather summary for an owned order.", Map.of("orderId", uuid()), List.of("orderId")));
     }
 
     private static Map<String, Object> definition(String name, String description, Map<String, Object> properties, List<String> required) {

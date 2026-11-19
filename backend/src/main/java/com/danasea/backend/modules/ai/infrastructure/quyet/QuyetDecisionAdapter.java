@@ -26,7 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Component
 public class QuyetDecisionAdapter implements DecisionModelPort {
     private static final String MODEL = "chinhnc/Quyet-1.0-Small";
-    private static final String RUBRIC_VERSION = "danasea-2026-10-08-v1";
+    private static final String RUBRIC_VERSION = "danasea-2026-11-18-v2";
     private static final Map<DecisionTask, Set<String>> CHOICES = Map.of(
             DecisionTask.INTENT, Set.of("SEARCH", "BOOKING", "WEATHER", "COMPARE", "ITINERARY", "SUPPORT", "REVIEW", "NEARBY", "OTHER"),
             DecisionTask.SERVICE_CATEGORY, Set.of("SUP", "KAYAK", "DIVING", "BOAT", "BEACH", "OTHER"),

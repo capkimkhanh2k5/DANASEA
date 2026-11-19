@@ -4,15 +4,19 @@ import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
@@ -21,8 +25,10 @@ import com.danasea.backend.modules.ai.application.ports.AiExecutionBudget;
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort;
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort.CopilotConversation;
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort.CopilotMessage;
+import com.danasea.backend.modules.ai.application.ports.AssessmentCaseStorePort;
 import com.danasea.backend.modules.ai.application.ports.LlmClientPort;
 import com.danasea.backend.modules.ai.application.ports.ModerationPort;
+import com.danasea.backend.modules.ai.application.ports.TransactionRiskReadPort;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort;
 import com.danasea.backend.modules.ai.application.tools.AdminFeatureTool;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutionContext;
@@ -60,15 +66,97 @@ public class RoleCopilotUseCase {
             + "tien hoan|so tien hoan|refunds|^tien$");
     private static final Pattern ADMIN_CANCELLATION = CopilotRequest.words("huy|ly do|thoi tiet|cancel|cancellations?|weather");
     private static final Pattern ADMIN_DIAGNOSTICS = CopilotRequest.words("vendor|doi tac|chan doan|canh bao|diagnostic");
-    private static final Pattern ADMIN_OVERVIEW = CopilotRequest.words("dashboard|tong quan|suc khoe|overview");
-    private static final Pattern VENDOR_REVIEW = CopilotRequest.words("reviews?|danh gia|diem yeu|diem manh|coaching");
-    private static final Pattern VENDOR_SLOT = CopilotRequest.words("slots?|ca|cong suat|thoi tiet|capacity|weather");
+    private static final Pattern VENDOR_ACTOR = CopilotRequest.words("vendor|doi tac");
+    private static final Pattern VENDOR_DIAGNOSTIC_SIGNAL = CopilotRequest.words(
+            "huy|ty le huy|ti le huy|canh bao|nghiem trong|critical|warning|danh gia|sao|lap day|occupancy|"
+                    + "dinh chi|suspend|cai thien|kem hieu qua|hieu suat");
+    private static final Pattern REFUND_CAUSE_QUERY = Pattern.compile(
+            "(?:nguyen nhan|ly do|nhieu nhat|top|reasons?|causes?).*(?:hoan tien|yeu cau hoan|refunds?)"
+                    + "|(?:hoan tien|yeu cau hoan|refunds?).*(?:nguyen nhan|ly do|nhieu nhat|top|reasons?|causes?)");
+    private static final Pattern CANCELLATION_BREAKDOWN_EXPLICIT = Pattern.compile(
+            "(?:phan loai|chia theo|thong ke).*(?:don|booking).*(?:huy|cancel)"
+                    + "|(?:theo khach hang.*vendor|khach hang.*vendor.*thoi tiet)");
+    private static final Pattern ADMIN_OVERVIEW = CopilotRequest.words("dashboard|tong quan|tong hop tinh hinh|suc khoe|overview");
+    private static final Pattern VENDOR_REVIEW = CopilotRequest.words(
+            "reviews?|danh gia|diem yeu|diem manh|phan tich chat luong|coaching|"
+                    + "phan nan|che|khach keu|thoi gian cho|cho cano|cham tre|den tre|don tre|cho doi|complain|complaints?|waiting time");
+    private static final Pattern VENDOR_REVIEW_REPLY = CopilotRequest.words(
+            "viet phan hoi|soan phan hoi|tra loi danh gia|reply to (?:the )?review|draft (?:a )?reply");
+    private static final Pattern REVIEW_CONTEXT = CopilotRequest.words("danh gia|review|sao");
+    private static final Pattern NO_REVIEWS_QUESTION = Pattern.compile(
+            "moi dang.*chua co danh gia|chua co danh gia|chua co review|khong co danh gia|new service.*no reviews|no reviews yet");
+    private static final Pattern VENDOR_SLOT = Pattern.compile(
+            "\\b(?:slots?|cong suat|thoi tiet|capacity|weather|mo them ca|them ca|gop ca|dong ca|cac ca|nhung ca|"
+                    + "ty le dat cho|ti le dat cho|ty le lap day|ti le lap day|lap day)\\b"
+                    + "|(?<!\\btat )(?<!\\bcau )(?<!\\bdan )(?<!\\bnha )(?<!\\bbat )\\bca\\b"
+                    + "(?!\\s+(?:nhan|hai|ba|bon|biet|san|tuan|thang|nam|phe|nhac|si|doi|nha|nuoc)\\b)");
     private static final Pattern VENDOR_LISTING = CopilotRequest.words("bai dang|mo ta|toi uu|tieu de|listing|optimize");
+    private static final Pattern LISTING_AUDIT_ONLY = CopilotRequest.words("thieu|con thieu|kiem tra|check|missing|audit");
     private static final Pattern VENDOR_OVERVIEW = CopilotRequest.words("kpi|tong quan|summary");
+    private static final Pattern ADMIN_DISPUTE = CopilotRequest.words("khieu nai|tranh chap|dispute");
+    private static final Pattern DISPUTE_SUMMARY = CopilotRequest.words("tom tat|doi chieu|mau thuan|summari[sz]e|conflict");
+    private static final Pattern CHECKIN_CONFLICT = CopilotRequest.words("check[- ]?in|chua duoc phuc vu|phuc vu");
+    private static final Pattern SUPPORT_QUEUE = CopilotRequest.words(
+            "yeu cau ho tro|yeu cau doi lich|support queue|support requests?");
+    private static final Pattern QUEUE_STATE = CopilotRequest.words(
+            "cho xu ly|cho duyet|chua duoc phe duyet|dang cho|pending|waiting|how many|bao nhieu|tom tat");
+    private static final Pattern SLOT_HORIZON = Pattern.compile("\\b(\\d{1,3}) (?:ngay|days?)\\b");
+
+    private static final Pattern CONTENT_MODERATION = Pattern.compile(
+            "\\b(?:so dien thoai|sdt|hotline|zalo|duong link|link dat tour|link ben ngoai|ngoai san|ngoai danasea|"
+                    + "ngoai nen tang|quang cao qua muc|kiem duyet|duyet dang bai|tu dong.*duyet|"
+                    + "off[- ]?platform|external link|external payment|phone number|moderate|moderation)\\b"
+                    + "|\\b(?:chuyen khoan|chuyen tien|thanh toan)\\b.*\\b(?:ngoai|ben ngoai|outside)\\b"
+                    + "|(?<!\\d)(?:\\+84|0)(?:[ .-]?\\d){9}(?!\\d)|https?://[^\\s<>]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+    private static final Pattern QUOTED_SNIPPET = Pattern.compile("[\"“]([^\"”]{5,2000})[\"”]");
+    private static final Pattern UNQUOTED_NEGATED_WARNING = Pattern.compile(
+            "(?i)(?:vui long |xin |luu y )?(?:không|khong|không nên|khong nen|tuyệt đối không|tuyet doi khong|đừng|dung)\\s+"
+                    + "(?:chuyển tiền|chuyen tien|chuyển khoản|chuyen khoan|thanh toán|thanh toan|trả tiền|tra tien)\\s+"
+                    + "(?:bên )?ngoài\\s+(?:nền tảng |nen tang )?danasea");
+    private static final Pattern CONTACT_LITERAL = Pattern.compile(
+            "(?<!\\d)(?:\\+84|0)(?:[ .-]?\\d){9}(?!\\d)|https?://[^\\s<>]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+    private static final Pattern PERSIST_MODERATION = CopilotRequest.words(
+            "tao case|luu case|lap case|gui duyet|create case|persist");
+    private static final Pattern ADMIN_ORDER_RISK = Pattern.compile(
+            "\\b(?:canh bao rui ro|tin hieu rui ro|co so rui ro|can cu rui ro|dua tren.*du lieu.*rui ro|"
+                    + "danh gia rui ro.*don|risk signals?|risk basis|risk evidence|risk assessment)\\b"
+                    + "|(?:why.*flagged)"
+                    + "|\\b(?:rui ro|risk)\\b.*\\b(?:don nay|don hang|ma don|order|case|ho so)\\b");
+    private static final Pattern THIS_ORDER_OR_CASE = CopilotRequest.words("don nay|this order|ho so nay|case nay");
+    private static final Pattern CREATE_RISK_CASE = CopilotRequest.words(
+            "tao case|lap case|danh gia moi|tao danh gia|create assessment|create case|run risk");
+    private static final Pattern UNCLEAR_PAYMENT_REVENUE = Pattern.compile(
+            "(?:chua ro trang thai|cho doi soat|unclear status|unreconciled|pending payment).*(?:ghi nhan doanh thu|doanh thu|thanh cong|recognize revenue)"
+                    + "|(?:ghi nhan doanh thu|recognize revenue).*(?:chua ro trang thai|ngay|immediately)");
+    private static final Pattern SETTLEMENT_DISPUTE_HOLD = Pattern.compile(
+            "(?:khieu nai|tranh chap|dispute|hoan thanh.*chua|chua duoc dua vao).*(?:doi soat|quyet toan|payout|settlement|chi tra)"
+                    + "|(?:doi soat|quyet toan|payout|settlement).*(?:khieu nai|tranh chap|dispute|hoan thanh.*chua|chua duoc dua vao)");
+    private static final Pattern CONCURRENT_SUPPORT_LOCK = Pattern.compile(
+            "(?:hai admin|2 admin|cung xu ly|dong thoi|concurrent|optimistic lock|xung dot).*(?:yeu cau ho tro|support request|ticket)");
+    private static final Pattern QUYET_UNAVAILABLE_SAFE = Pattern.compile(
+            "(?:quyet|model|ai).*(?:loi|unavailable|hong|chet|timeout|error|down).*(?:an toan|safe|bo qua|tu dong)"
+                    + "|tu dong danh dau.*an toan");
+    private static final Pattern AUTO_LOCK_ACCOUNT = Pattern.compile(
+            "(?:tu dong khoa|auto[- ]?lock|auto[- ]?ban|khoa tat ca tai khoan|khoa tai khoan)");
+    private static final Pattern VELOCITY_RULE_QUESTION = Pattern.compile(
+            "(?:(?:3 lan|ba lan).*thanh toan that bai.*24|5 don.*1 gio|3 lan.*hoan tien.*7 ngay|velocity|failed.*24|orders.*1h|refund.*7d)"
+                    + "|(?:(?:thanh toan that bai|tao.*don|hoan tien).*(?:xem xet rui ro|chac chan la gian lan|ai nen xu ly))");
+    private static final Pattern COMMISSION_POLICY_QUERY = Pattern.compile(
+            "(?:hoa hong|commission).*(?:nhu the nao|tinh.*sao|90 ngay|uu dai|onboarding|danh muc|mac dinh)");
+    private static final Pattern VENDOR_FAULT_CANCEL_IMPACT = Pattern.compile(
+            "(?:huy chuyen|loi van hanh|vendor huy|vendor fault|operational fault).*(?:khach hang|doanh thu|anh huong|quyet toan|hoan tien)");
+    private static final Pattern MAINTENANCE_CONFLICT = Pattern.compile(
+            "(?:bao tri|sua chua|hu hong|maintenance|repair).*(?:cano|tau|thuyen|van|thiet bi)"
+                    + "|(?:cano|tau|thuyen).*(?:bao tri|maintenance)");
+    private static final Pattern RETROACTIVE_PRICE_CHANGE = Pattern.compile(
+            "(?:tang gia|doi gia|cap nhat gia|sua gia|change price|increase price|update price).*(?:booking|don|da thanh toan|da dat|confirmed|paid)");
+
     private final AiExtendedInsightStorePort insightStore;
     private final LlmClientPort llmClient;
     private final ModerationPort moderationPort;
     private final ObjectMapper mapper;
+    private final PolicyChatAnswer policyAnswers;
+    private final VendorAiDataPort vendorAiData;
 
     private final Map<String, ToolExecutor> vendorToolMap = new HashMap<>();
     private final Map<String, ToolExecutor> adminToolMap = new HashMap<>();
@@ -83,36 +171,80 @@ public class RoleCopilotUseCase {
             AiExtendedInsightStorePort insightStore,
             LlmClientPort llmClient,
             ModerationPort moderationPort,
-            ObjectMapper mapper
+            ObjectMapper mapper, PolicyChatAnswer policyAnswers
+    ) {
+        this(vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer,
+                adminAiData, disputeSummaryUseCase, insightStore, llmClient, moderationPort, mapper, policyAnswers,
+                null, null, null, null);
+    }
+
+    @Autowired
+    public RoleCopilotUseCase(
+            VendorAiDataPort vendorAiData,
+            VendorReviewCoachingUseCase reviewCoaching,
+            VendorSlotAdvisorUseCase slotAdvisor,
+            VendorListingOptimizerUseCase listingOptimizer,
+            AdminAiDataPort adminAiData,
+            AdminDisputeSummaryUseCase disputeSummaryUseCase,
+            AiExtendedInsightStorePort insightStore,
+            LlmClientPort llmClient,
+            ModerationPort moderationPort,
+            ObjectMapper mapper,
+            PolicyChatAnswer policyAnswers,
+            @Autowired(required = false) AssessTextUseCase assessTextUseCase,
+            @Autowired(required = false) TransactionRiskReadPort transactionRiskReadPort,
+            @Autowired(required = false) AssessmentCaseStorePort assessmentCaseStorePort,
+            @Autowired(required = false) AnalyzeTransactionRiskUseCase analyzeTransactionRiskUseCase
     ) {
         this.insightStore = insightStore;
         this.llmClient = llmClient;
         this.moderationPort = moderationPort;
         this.mapper = mapper;
+        this.policyAnswers = policyAnswers;
+        this.vendorAiData = vendorAiData;
 
         // Register Vendor Tools
-        registerVendorTool("vendor_dashboard_summary", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer);
-        registerVendorTool("vendor_revenue_and_bookings", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer);
-        registerVendorTool("vendor_service_count", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer);
-        registerVendorTool("vendor_review_coaching", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer);
-        registerVendorTool("vendor_slot_advisor", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer);
-        registerVendorTool("vendor_optimize_listing", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer);
+        registerVendorTool("vendor_dashboard_summary", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
+        registerVendorTool("vendor_revenue_and_bookings", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
+        registerVendorTool("vendor_service_count", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
+        registerVendorTool("vendor_review_coaching", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
+        registerVendorTool("vendor_review_reply_draft", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
+        registerVendorTool("vendor_slot_advisor", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
+        registerVendorTool("vendor_optimize_listing", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
+        registerVendorTool("vendor_text_assessment", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
 
         // Register Admin Tools
-        registerAdminTool("admin_platform_dashboard", adminAiData, disputeSummaryUseCase);
-        registerAdminTool("admin_revenue_timeseries", adminAiData, disputeSummaryUseCase);
-        registerAdminTool("admin_booking_cancellation_breakdown", adminAiData, disputeSummaryUseCase);
-        registerAdminTool("admin_vendor_diagnostics", adminAiData, disputeSummaryUseCase);
-        registerAdminTool("admin_dispute_summarize", adminAiData, disputeSummaryUseCase);
-        registerAdminTool("admin_risk_and_support_queue_overview", adminAiData, disputeSummaryUseCase);
+        registerAdminTool("admin_platform_dashboard", adminAiData, disputeSummaryUseCase,
+                assessmentCaseStorePort, transactionRiskReadPort, analyzeTransactionRiskUseCase, assessTextUseCase);
+        registerAdminTool("admin_revenue_timeseries", adminAiData, disputeSummaryUseCase,
+                assessmentCaseStorePort, transactionRiskReadPort, analyzeTransactionRiskUseCase, assessTextUseCase);
+        registerAdminTool("admin_booking_cancellation_breakdown", adminAiData, disputeSummaryUseCase,
+                assessmentCaseStorePort, transactionRiskReadPort, analyzeTransactionRiskUseCase, assessTextUseCase);
+        registerAdminTool("admin_vendor_diagnostics", adminAiData, disputeSummaryUseCase,
+                assessmentCaseStorePort, transactionRiskReadPort, analyzeTransactionRiskUseCase, assessTextUseCase);
+        registerAdminTool("admin_dispute_summarize", adminAiData, disputeSummaryUseCase,
+                assessmentCaseStorePort, transactionRiskReadPort, analyzeTransactionRiskUseCase, assessTextUseCase);
+        registerAdminTool("admin_risk_and_support_queue_overview", adminAiData, disputeSummaryUseCase,
+                assessmentCaseStorePort, transactionRiskReadPort, analyzeTransactionRiskUseCase, assessTextUseCase);
+        registerAdminTool("admin_text_assessment", adminAiData, disputeSummaryUseCase,
+                assessmentCaseStorePort, transactionRiskReadPort, analyzeTransactionRiskUseCase, assessTextUseCase);
+        registerAdminTool("admin_order_risk_assessment", adminAiData, disputeSummaryUseCase,
+                assessmentCaseStorePort, transactionRiskReadPort, analyzeTransactionRiskUseCase, assessTextUseCase);
     }
 
-    private void registerVendorTool(String name, VendorAiDataPort data, VendorReviewCoachingUseCase r, VendorSlotAdvisorUseCase s, VendorListingOptimizerUseCase l) {
-        vendorToolMap.put(name, new VendorFeatureTool(name, data, r, s, l, mapper));
+    private void registerVendorTool(
+            String name, VendorAiDataPort data, VendorReviewCoachingUseCase r,
+            VendorSlotAdvisorUseCase s, VendorListingOptimizerUseCase l, AssessTextUseCase assessTextUseCase
+    ) {
+        vendorToolMap.put(name, new VendorFeatureTool(name, data, r, s, l, mapper, assessTextUseCase));
     }
 
-    private void registerAdminTool(String name, AdminAiDataPort data, AdminDisputeSummaryUseCase d) {
-        adminToolMap.put(name, new AdminFeatureTool(name, data, d, mapper));
+    private void registerAdminTool(
+            String name, AdminAiDataPort data, AdminDisputeSummaryUseCase d,
+            AssessmentCaseStorePort cases, TransactionRiskReadPort riskRead,
+            AnalyzeTransactionRiskUseCase riskUseCase, AssessTextUseCase assessTextUseCase
+    ) {
+        adminToolMap.put(name, new AdminFeatureTool(name, data, d, mapper, cases, riskRead, riskUseCase, assessTextUseCase));
     }
 
     // ==================== SESSION MANAGEMENT ====================
@@ -200,7 +332,10 @@ public class RoleCopilotUseCase {
         List<Map<String, Object>> artifacts = new ArrayList<>();
         List<String> toolsUsed = new ArrayList<>();
         var toolContext = new ToolExecutionContext(effectiveLanguage, convId, actorUserId);
-        String assistantResponse = answer(effectiveContent, admin, isEn, toolContext, artifacts, toolsUsed);
+        String attachmentType = contextType != null ? contextType : conversation.contextType();
+        UUID attachmentId = contextType != null ? contextId : conversation.contextId();
+        String assistantResponse = answer(effectiveContent, admin, vendorId, isEn, toolContext,
+                attachmentType, attachmentId, artifacts, toolsUsed);
 
         // 6. Persist Assistant Message
         String artifactsJson = null;
@@ -223,7 +358,8 @@ public class RoleCopilotUseCase {
     }
 
     private String answer(
-            String message, boolean admin, boolean english, ToolExecutionContext context,
+            String message, boolean admin, UUID vendorId, boolean english, ToolExecutionContext context,
+            String attachmentType, UUID attachmentId,
             List<Map<String, Object>> artifacts, List<String> toolsUsed
     ) {
         String normalized = CopilotRequest.normalize(message);
@@ -232,6 +368,17 @@ public class RoleCopilotUseCase {
             return english
                     ? "I can show data for your shop. Platform-wide reports and other vendors' data are available to administrators."
                     : "Tôi có thể tra cứu số liệu của gian hàng bạn. Báo cáo toàn sàn và số liệu của gian hàng khác dành cho quản trị viên.";
+        }
+        var policyReply = policyAnswers.resolve(message, context.language(), context.userId(), vendorId, admin,
+                "ORDER".equalsIgnoreCase(attachmentType) ? attachmentId : null);
+        if (policyReply != null) {
+            if (policyReply.tool() != null) {
+                toolsUsed.add(policyReply.tool());
+                if (!policyReply.facts().isEmpty()) {
+                    artifacts.add(Map.of("type", "POLICY", "tool", policyReply.tool(), "data", policyReply.facts()));
+                }
+            }
+            return policyReply.message();
         }
         if (CopilotRequest.isPersonalBooking(normalized)) {
             return english ? "Use the Customer Assistant to find or book a tour."
@@ -244,30 +391,138 @@ public class RoleCopilotUseCase {
             return today.format(format);
         }
 
-        String tool = selectTool(normalized, admin);
+        UUID messageReference = PolicyChatAnswer.reference(message);
+        String ruleReply = resolveOperationalRuleReply(normalized, admin, vendorId, english, attachmentType, attachmentId, messageReference);
+        if (ruleReply != null) {
+            return ruleReply;
+        }
+
+        String tool = selectTool(normalized, admin, attachmentType);
         if (tool == null && CopilotRequest.isPeriodFollowUp(normalized)) {
             String revenueTool = admin ? "admin_revenue_timeseries" : "vendor_dashboard_summary";
             if (lastReplyUsedTool(context.conversationId(), revenueTool)) tool = revenueTool;
         }
         if (tool == null) return generateText(admin, english, context, today);
 
+        var args = mapper.createObjectNode();
+        if ("admin_dispute_summarize".equals(tool)) {
+            UUID disputeId = messageReference != null ? messageReference
+                    : "DISPUTE".equalsIgnoreCase(attachmentType) ? attachmentId : null;
+            if (disputeId == null) {
+                if (CHECKIN_CONFLICT.matcher(normalized).find() || DISPUTE_SUMMARY.matcher(normalized).find()) {
+                    return english
+                            ? "Dispute conflict verification methodology (customer 'not served' claim vs vendor 'checked in' claim):\n"
+                            + "1. Inspect QR check-in scan logs (HMAC-SHA256 signature), verified scan timestamp, scanning vendor device/account, and valid check-in window.\n"
+                            + "2. Cross-check slot operational status, departure manifest, and when the customer filed the complaint.\n"
+                            + "3. Collect corroborated evidence from both sides (messages, pier/beach pickup proof). NEVER side with either party or auto-refund without verified evidence. Attach the dispute case or provide its ID to extract the exact timeline."
+                            : "Quy trình đối soát mâu thuẫn tranh chấp (khách báo chưa được phục vụ nhưng vendor báo đã check-in):\n"
+                            + "1. Đối chiếu log quét mã QR check-in (chữ ký HMAC-SHA256), thời điểm quét check-in thực tế, tài khoản/thiết bị vendor thực hiện và cửa sổ check-in hợp lệ trước giờ khởi hành.\n"
+                            + "2. Đối chiếu trạng thái vận hành của ca dịch vụ, danh sách hành khách/nhật ký xuất bến và thời điểm phát sinh khiếu nại.\n"
+                            + "3. Thu thập bằng chứng từ cả hai phía (tin nhắn điều phối, hình ảnh/biên nhận điểm đón). Tuyệt đối KHÔNG tự động kết luận nghiêng về một bên hay tự động hoàn tiền khi chưa xác minh đủ bằng chứng. Hãy đính kèm hồ sơ tranh chấp hoặc cung cấp mã để tôi trích xuất timeline chi tiết.";
+                }
+                return english ? "Which dispute should I review? Attach it or provide its ID."
+                        : "Bạn muốn xem hồ sơ tranh chấp nào? Hãy đính kèm hồ sơ hoặc cung cấp mã.";
+            }
+            args.put("disputeId", disputeId.toString());
+        }
+        if ("admin_order_risk_assessment".equals(tool)) {
+            UUID caseId = ("RISK_CASE".equalsIgnoreCase(attachmentType)
+                    || "ASSESSMENT_CASE".equalsIgnoreCase(attachmentType)
+                    || "CASE".equalsIgnoreCase(attachmentType)) ? attachmentId : null;
+            UUID orderId = "ORDER".equalsIgnoreCase(attachmentType) ? attachmentId : null;
+            if (caseId == null && orderId == null && messageReference != null) {
+                if (CopilotRequest.matches(CopilotRequest.words("case|ho so"), normalized)) {
+                    caseId = messageReference;
+                } else {
+                    orderId = messageReference;
+                }
+            }
+            if (caseId == null && orderId == null) {
+                return english
+                        ? "Which order or risk assessment case should I inspect? Attach the order/case or provide its ID so I can show verified observed facts, Velocity 3/5/3 signals, and limitations."
+                        : "Bạn muốn xem căn cứ cảnh báo rủi ro của đơn hàng hoặc hồ sơ nào? Hãy đính kèm đơn/hồ sơ hoặc cung cấp mã ID để tôi hiển thị dữ liệu thực tế (observed), tín hiệu Velocity 3/5/3 và giới hạn đánh giá.";
+            }
+            if (orderId != null) args.put("orderId", orderId.toString());
+            if (caseId != null) args.put("caseId", caseId.toString());
+            args.put("createNewAssessment", CopilotRequest.matches(CREATE_RISK_CASE, normalized));
+        }
+        if ("admin_vendor_diagnostics".equals(tool)) {
+            UUID targetVendorId = messageReference != null ? messageReference
+                    : "VENDOR".equalsIgnoreCase(attachmentType) ? attachmentId : null;
+            if (targetVendorId != null) args.put("vendorId", targetVendorId.toString());
+        }
+        if ("vendor_text_assessment".equals(tool) || "admin_text_assessment".equals(tool)) {
+            args.put("persist", CopilotRequest.matches(PERSIST_MODERATION, normalized));
+            String quoted = extractQuotedText(message);
+            if (!admin && "SERVICE".equalsIgnoreCase(attachmentType) && attachmentId != null) {
+                var ownedService = vendorAiData.getService(vendorId, attachmentId);
+                if (ownedService.isEmpty()) {
+                    return english ? "The attached service is not found in your shop."
+                            : "Không tìm thấy dịch vụ đính kèm thuộc gian hàng của bạn.";
+                }
+                if (quoted != null) {
+                    args.put("text", quoted);
+                } else if (CopilotRequest.matches(CopilotRequest.words("toi muon them|if i add|co duoc them"), normalized)) {
+                    args.put("text", message);
+                } else {
+                    args.put("serviceId", attachmentId.toString());
+                }
+            } else {
+                args.put("text", quoted != null ? quoted : message);
+            }
+        }
+        if ("vendor_review_reply_draft".equals(tool)) {
+            UUID reviewId = messageReference != null ? messageReference
+                    : "REVIEW".equalsIgnoreCase(attachmentType) ? attachmentId : null;
+            if (reviewId == null) {
+                reviewId = findSingleMatchingReview(vendorId, normalized);
+            }
+            if (reviewId == null) {
+                return english ? "Provide the review ID, or open the draft action from that review."
+                        : "Hãy cung cấp mã đánh giá hoặc mở nút soạn phản hồi ngay trên đánh giá đó.";
+            }
+            args.put("reviewId", reviewId.toString());
+        }
+        if (!admin && Set.of("vendor_review_coaching", "vendor_optimize_listing", "vendor_slot_advisor").contains(tool)) {
+            UUID serviceId = messageReference != null ? messageReference
+                    : "SERVICE".equalsIgnoreCase(attachmentType) ? attachmentId : null;
+            if (serviceId == null && normalized.length() > 20) {
+                serviceId = findMentionedService(vendorId, normalized);
+            }
+            if ("vendor_optimize_listing".equals(tool) && serviceId == null && normalized.length() > 20) {
+                if (LISTING_AUDIT_ONLY.matcher(normalized).find()) {
+                    return english ? "Attach a service from your shop so I can review its actual listing."
+                            : "Hãy đính kèm dịch vụ thuộc gian hàng để tôi xem đúng nội dung bài đăng.";
+                }
+                args.put("title", message);
+                args.put("description", message);
+            }
+            if (serviceId != null) args.put("serviceId", serviceId.toString());
+        }
+        if ("vendor_slot_advisor".equals(tool)) {
+            var horizon = SLOT_HORIZON.matcher(normalized);
+            int days = horizon.find() ? Integer.parseInt(horizon.group(1)) : 7;
+            if (days < 1 || days > 14) return english ? "Choose a slot advisory period between 1 and 14 days."
+                    : "Hãy chọn khoảng thời gian cố vấn từ 1 đến 14 ngày.";
+            args.put("horizonDays", days);
+        }
+
         TimeRange period = null;
-        String args = switch (tool) {
-            case "vendor_slot_advisor" -> "{\"horizonDays\":7}";
-            default -> "{}";
-        };
-        if ("admin_revenue_timeseries".equals(tool) || "vendor_dashboard_summary".equals(tool)) {
+        if (Set.of("admin_revenue_timeseries", "vendor_dashboard_summary",
+                "admin_booking_cancellation_breakdown", "admin_vendor_diagnostics").contains(tool)) {
             try {
                 period = CopilotRequest.revenuePeriod(message, normalized, today);
             } catch (DateTimeException | IllegalArgumentException exception) {
                 return english ? "Please enter a valid reporting period."
                         : "Vui lòng nhập khoảng ngày báo cáo hợp lệ.";
             }
-            args = mapper.createObjectNode().put("from", period.getFrom().toString())
-                    .put("to", period.getTo().toString()).toString();
+            if ("admin_revenue_timeseries".equals(tool) && CopilotRequest.comparesMonths(normalized)) {
+                return compareAdminRevenue(today, english, tool, context, artifacts, toolsUsed);
+            }
+            args.put("from", period.getFrom().toString()).put("to", period.getTo().toString());
         }
 
-        JsonNode data = runToolAndCollectArtifact(tool, args, admin ? adminToolMap : vendorToolMap,
+        JsonNode data = runToolAndCollectArtifact(tool, args.toString(), admin ? adminToolMap : vendorToolMap,
                 context, artifacts, toolsUsed);
         if (data == null) return CopilotReportAnswer.unavailable(english);
         if (period != null) {
@@ -275,8 +530,19 @@ public class RoleCopilotUseCase {
         }
 
         return switch (tool) {
-            case "vendor_dashboard_summary" -> CopilotReportAnswer.vendorRevenue(data, period, english);
-            case "admin_revenue_timeseries" -> CopilotReportAnswer.adminRevenue(data, period, english);
+            case "vendor_dashboard_summary" -> CopilotReportAnswer.vendorRevenue(data, period, normalized, english);
+            case "admin_revenue_timeseries" -> CopilotReportAnswer.adminRevenue(data, period, normalized, english);
+            case "admin_booking_cancellation_breakdown" -> CopilotReportAnswer.adminCancellations(data, period, normalized, english);
+            case "admin_vendor_diagnostics" -> CopilotReportAnswer.adminVendorDiagnostics(data, message, normalized, english);
+            case "admin_order_risk_assessment" -> CopilotReportAnswer.adminOrderRiskAssessment(data, english);
+            case "admin_risk_and_support_queue_overview" -> CopilotReportAnswer.adminQueue(data, english);
+            case "admin_dispute_summarize" -> english ? "I found the dispute evidence below. An administrator must review it before deciding."
+                    : "Tôi đã tra cứu bằng chứng của tranh chấp bên dưới. Quản trị viên cần thẩm định trước khi quyết định.";
+            case "vendor_review_coaching" -> CopilotReportAnswer.vendorReviewCoaching(data, normalized, english);
+            case "vendor_slot_advisor" -> CopilotReportAnswer.vendorSlotAdvisor(data, normalized, english);
+            case "vendor_optimize_listing" -> CopilotReportAnswer.vendorListingOptimization(data, english);
+            case "vendor_text_assessment", "admin_text_assessment" -> CopilotReportAnswer.contentAssessment(data, english);
+            case "vendor_review_reply_draft" -> data.path("draftedReply").asText(CopilotReportAnswer.unavailable(english));
             case "vendor_service_count" -> CopilotReportAnswer.vendorServices(data,
                     CopilotRequest.isPublishedCount(normalized), english);
             default -> english ? "I retrieved the operational data. See the details below."
@@ -284,21 +550,195 @@ public class RoleCopilotUseCase {
         };
     }
 
+    private String resolveOperationalRuleReply(
+            String normalized, boolean admin, UUID vendorId, boolean english,
+            String attachmentType, UUID attachmentId, UUID messageReference
+    ) {
+        if (UNCLEAR_PAYMENT_REVENUE.matcher(normalized).find()) {
+            return english
+                    ? "NO. Never recognize revenue as successful when a payment transaction has an unclear or pending status. Reconcile the final payment status with the payment gateway or verified webhook first."
+                    : "KHÔNG. Tuyệt đối không ghi nhận doanh thu thành công khi giao dịch thanh toán chưa rõ trạng thái. Cần đối soát trạng thái cuối cùng với cổng thanh toán hoặc webhook xác thực trước khi hạch toán.";
+        }
+        if (SETTLEMENT_DISPUTE_HOLD.matcher(normalized).find()) {
+            return english
+                    ? "NO. Orders with an open dispute (OPEN or UNDER_REVIEW) are excluded from vendor payout settlement (ACTIVE_DISPUTE) and held until resolved. Completed orders can also remain held while inside the 7-day dispute window (DISPUTE_WINDOW_OPEN), during a pending refund (PENDING_REFUND), or under an active disruption (ACTIVE_DISRUPTION)."
+                    : "KHÔNG. Các đơn hàng đang có khiếu nại chưa giải quyết (OPEN hoặc UNDER_REVIEW) bị loại trừ khỏi kỳ quyết toán (ACTIVE_DISPUTE) và tạm giữ tiền cho đến khi xử lý xong. Ngoài ra, đơn đã hoàn thành vẫn có thể chưa vào quyết toán nếu chưa hết cửa sổ khiếu nại 7 ngày (DISPUTE_WINDOW_OPEN), đang chờ hoàn tiền (PENDING_REFUND) hoặc có sự cố chờ xử lý (ACTIVE_DISRUPTION).";
+        }
+        if (admin && CONCURRENT_SUPPORT_LOCK.matcher(normalized).find()) {
+            return english
+                    ? "Support requests use optimistic locking via version/expectedVersion. The first administrator action updates the status and increments version; the second concurrent request carrying the stale expectedVersion is rejected with a conflict error (409 Conflict / AiStateConflictException: 'Support request version has changed'), preventing conflicting updates."
+                    : "Hệ thống áp dụng optimistic locking theo trường expectedVersion trên yêu cầu hỗ trợ. Quản trị viên xử lý trước sẽ cập nhật trạng thái và tăng version; yêu cầu đồng thời gửi sau với expectedVersion cũ sẽ bị từ chối với lỗi xung đột trạng thái (HTTP 409 Conflict / AiStateConflictException: 'Support request version has changed'), đảm bảo không tạo hai kết quả trái ngược.";
+        }
+        if (admin && QUYET_UNAVAILABLE_SAFE.matcher(normalized).find()) {
+            return english
+                    ? "NO. Under fail-closed backend rules (AnalyzeTransactionRiskUseCase and AssessTextUseCase), when Quyet AI is unavailable or errors out, the transaction/content MUST route to NEEDS_REVIEW (MODEL_UNAVAILABLE) for manual review — never automatically marked safe."
+                    : "KHÔNG. Theo cơ chế fail-closed của backend (AnalyzeTransactionRiskUseCase và AssessTextUseCase), khi Quyet AI gặp lỗi hoặc không khả dụng, giao dịch/nội dung được chuyển sang trạng thái NEEDS_REVIEW (MODEL_UNAVAILABLE) để quản trị viên thẩm định thủ công, tuyệt đối không tự động đánh dấu an toàn.";
+        }
+        if (admin && AUTO_LOCK_ACCOUNT.matcher(normalized).find()) {
+            return english
+                    ? "NO. AI only creates NEEDS_REVIEW risk cases (fraudConfirmed=false) and surfaces evidence; it has no authority to automatically lock or suspend user accounts. An authorized administrator must verify payment/order evidence and execute account actions manually."
+                    : "KHÔNG. AI chỉ lập hồ sơ đánh giá NEEDS_REVIEW (fraudConfirmed=false) và tổng hợp bằng chứng, tuyệt đối không tự động khóa tài khoản người dùng hay đối tác. Quyết định khóa tài khoản phải do quản trị viên có thẩm quyền xác minh và thực hiện.";
+        }
+        if (admin && messageReference == null
+                && !"ORDER".equalsIgnoreCase(attachmentType)
+                && !"RISK_CASE".equalsIgnoreCase(attachmentType)
+                && !CopilotRequest.matches(THIS_ORDER_OR_CASE, normalized)
+                && VELOCITY_RULE_QUESTION.matcher(normalized).find()) {
+            return english
+                    ? "Under Velocity 3/5/3 rules (velocity-demo-v1): (1) >= 3 failed payments in 24h triggers THREE_FAILED_PAYMENTS_IN_24H -> NEEDS_REVIEW; (2) >= 5 orders in 1h triggers FIVE_ORDERS_IN_1H -> NEEDS_REVIEW (velocity alert only, NOT confirmed fraud: fraudConfirmed=false); (3) >= 3 refund requests in 7d triggers THREE_REFUND_REQUESTS_IN_7D -> NEEDS_REVIEW for administrator verification."
+                    : "Theo bộ quy tắc Velocity 3/5/3 (velocity-demo-v1): (1) >= 3 lần thanh toán thất bại trong 24 giờ kích hoạt THREE_FAILED_PAYMENTS_IN_24H -> chuyển NEEDS_REVIEW; (2) >= 5 đơn hàng trong 1 giờ kích hoạt FIVE_ORDERS_IN_1H -> chuyển NEEDS_REVIEW để kiểm tra, KHÔNG kết luận chắc chắn là gian lận (fraudConfirmed=false); (3) >= 3 yêu cầu hoàn tiền trong 7 ngày kích hoạt THREE_REFUND_REQUESTS_IN_7D -> lập case NEEDS_REVIEW để Admin thẩm định.";
+        }
+        if (!admin && COMMISSION_POLICY_QUERY.matcher(normalized).find() && !CopilotRequest.isRevenue(normalized)) {
+            return english
+                    ? "Commission rates follow CommissionPolicyAdapter priority: (1) ONBOARDING rule (priority 100, default 90-day window from approval/creation if an active ONBOARDING rule is configured); (2) CATEGORY rule (priority 50); (3) platform default PLATFORM_COMMISSION_RATE in system_configs. Exact percentages depend on active system configuration and cannot be guessed."
+                    : "Tỷ lệ hoa hồng được xác định theo thứ tự ưu tiên của CommissionPolicyAdapter: (1) Quy tắc ONBOARDING (ưu tiên 100 — mặc định 90 ngày kể từ ngày duyệt/tạo tài khoản nếu hệ thống đang kích hoạt rule ONBOARDING cho đối tác mới); (2) Quy tắc theo danh mục dịch vụ CATEGORY (ưu tiên 50); (3) Tỷ lệ mặc định toàn sàn PLATFORM_COMMISSION_RATE trong system_configs. Mức % cụ thể phụ thuộc cấu hình thực tế đang bật trên hệ thống.";
+        }
+        if (!admin && VENDOR_FAULT_CANCEL_IMPACT.matcher(normalized).find()) {
+            return english
+                    ? "When a vendor cancels due to operational fault (VENDOR_FAULT): (1) the customer receives a 100% refund (or supported reschedule); (2) the fully refunded order is excluded from vendor payout settlement (FULL_REFUND) with applicable fault adjustments; (3) vendor cancellationRate increases (> 20% triggers HIGH_CANCELLATION WARNING; > 40% triggers CRITICAL)."
+                    : "Khi đối tác hủy chuyến do lỗi vận hành (VENDOR_FAULT): (1) Khách hàng được hoàn 100% tiền vé (hoặc hỗ trợ đổi lịch phù hợp); (2) Đơn hoàn 100% bị loại khỏi quyết toán (FULL_REFUND), không ghi nhận thực thu và có thể bị khấu trừ bồi hoàn theo đối soát; (3) Tỷ lệ hủy của gian hàng tăng lên (> 20.0% bật cảnh báo WARNING; > 40.0% bật CRITICAL).";
+        }
+        if (!admin && MAINTENANCE_CONFLICT.matcher(normalized).find()) {
+            return english
+                    ? "To avoid booking conflicts during canoe/equipment maintenance: (1) close or pause affected slots immediately to stop new bookings; (2) inspect all confirmed bookings on those slots; (3) assign a safety-compliant replacement vessel and notify guests, or coordinate rescheduling / 100% VENDOR_FAULT refund via support — never operate unmaintained equipment."
+                    : "Khi cần bảo trì cano/thiết bị đang gắn với booking: (1) Đóng bán ngay các slot liên quan để ngừng nhận đơn mới; (2) Rà soát danh sách booking đã xác nhận trên các ca bị ảnh hưởng; (3) Điều phối cano đạt chuẩn an toàn thay thế và báo trước cho khách, hoặc hỗ trợ đổi lịch / hoàn 100% theo lỗi vận hành (VENDOR_FAULT) — tuyệt đối không dùng thiết bị chưa bảo trì để phục vụ.";
+        }
+        if (!admin && RETROACTIVE_PRICE_CHANGE.matcher(normalized).find()) {
+            return english
+                    ? "CANNOT update prices on already-paid or confirmed bookings. Booking prices are locked at checkout/confirmation; price changes only apply to future bookings."
+                    : "KHÔNG THỂ thay đổi giá trên các booking cũ đã được khách thanh toán/xác nhận. Giá đơn hàng được khóa theo giao dịch tại thời điểm thanh toán; việc tăng giá chỉ áp dụng cho các lượt đặt mới trong tương lai.";
+        }
+        if (!admin && CopilotRequest.matches(NO_REVIEWS_QUESTION, normalized)) {
+            UUID mentioned = messageReference != null ? messageReference
+                    : "SERVICE".equalsIgnoreCase(attachmentType) ? attachmentId : findMentionedService(vendorId, normalized);
+            if (mentioned == null) {
+                return english
+                        ? "This newly published service currently has 0 verified reviews (totalReviewsAnalyzed = 0). I cannot assess its quality, invent scores, or reuse reviews from your other services."
+                        : "Dịch vụ mới đăng này hiện có 0 đánh giá (totalReviewsAnalyzed = 0). AI không đủ dữ liệu để nhận xét chất lượng và không được tạo đánh giá giả hay lấy điểm của các dịch vụ khác thay thế.";
+            }
+        }
+        return null;
+    }
+
+    private String extractQuotedText(String message) {
+        if (message == null) return null;
+        Matcher matcher = QUOTED_SNIPPET.matcher(message);
+        if (matcher.find()) {
+            return matcher.group(1).trim();
+        }
+        if (!CONTACT_LITERAL.matcher(message).find()
+                && CopilotRequest.matches(CopilotRequest.words("co nen xem|co phai|vi pham|quang cao thanh toan ngoai|is this"),
+                CopilotRequest.normalize(message))) {
+            Matcher unquoted = UNQUOTED_NEGATED_WARNING.matcher(message);
+            if (unquoted.find()) {
+                return unquoted.group().trim();
+            }
+        }
+        return null;
+    }
+
+    private UUID findSingleMatchingReview(UUID vendorId, String normalizedQuestion) {
+        var starMatcher = Pattern.compile("\\b([1-5])\\s*(?:sao|stars?)\\b").matcher(normalizedQuestion);
+        if (!starMatcher.find()) return null;
+        int rating = Integer.parseInt(starMatcher.group(1));
+        var matches = vendorAiData.listReviews(vendorId, null, 50).stream()
+                .filter(review -> review.rating() == rating)
+                .toList();
+        return matches.size() == 1 ? matches.getFirst().id() : null;
+    }
+
+    private UUID findMentionedService(UUID vendorId, String question) {
+        List<VendorAiDataPort.VendorServiceItem> services = vendorAiData.listServices(vendorId);
+        if (services.isEmpty()) return null;
+
+        var exactMatches = services.stream()
+                .filter(service -> service.title() != null && !service.title().isBlank()
+                        && question.contains(CopilotRequest.normalize(service.title())))
+                .toList();
+        if (exactMatches.size() == 1) return exactMatches.getFirst().id();
+        if (exactMatches.size() > 1) return null;
+
+        Set<String> stopwords = Set.of("tour", "dich", "vu", "bai", "dang", "mo", "ta", "tieu", "de",
+                "cua", "toi", "cho", "thue", "bien", "da", "nang", "hay", "kiem", "tra", "viet", "lai",
+                "thieu", "thong", "tin", "sao", "hap", "dan", "tim", "danh", "gia", "review",
+                "ngay", "mai", "chi", "moi", "khach", "nen", "the", "nao", "lam", "con", "trong", "vang",
+                "ca", "slot", "thap", "cao", "kin", "gio", "sang", "chieu", "thu", "bay", "chu", "nhat", "tuan",
+                "service", "listing", "optimize", "check", "update", "write", "rewrite");
+        List<String> queryTokens = Arrays.stream(question.split("[^a-z0-9]+"))
+                .filter(token -> token.length() >= 3 && !stopwords.contains(token))
+                .distinct()
+                .toList();
+        if (queryTokens.isEmpty()) return null;
+
+        var tokenMatches = services.stream()
+                .filter(service -> service.title() != null && !service.title().isBlank())
+                .filter(service -> {
+                    String normTitle = " " + CopilotRequest.normalize(service.title()) + " ";
+                    return queryTokens.stream().anyMatch(token -> normTitle.contains(" " + token + " "));
+                })
+                .toList();
+        return tokenMatches.size() == 1 ? tokenMatches.getFirst().id() : null;
+    }
+
+    private String compareAdminRevenue(LocalDate today, boolean english, String tool, ToolExecutionContext context,
+                                       List<Map<String, Object>> artifacts, List<String> toolsUsed) {
+        var current = TimeRange.of(today.withDayOfMonth(1), today);
+        var priorEnd = current.getFrom().minusDays(1);
+        var previous = TimeRange.of(priorEnd.withDayOfMonth(1), priorEnd);
+        JsonNode currentData = readAdminRevenue(tool, current, context, artifacts, toolsUsed);
+        JsonNode previousData = readAdminRevenue(tool, previous, context, artifacts, toolsUsed);
+        if (currentData == null || previousData == null) return CopilotReportAnswer.unavailable(english);
+        return CopilotReportAnswer.compareAdminRevenue(currentData, current, previousData, previous, english);
+    }
+
+    private JsonNode readAdminRevenue(String tool, TimeRange period, ToolExecutionContext context,
+                                      List<Map<String, Object>> artifacts, List<String> toolsUsed) {
+        var from = period.getFrom().toString();
+        var to = period.getTo().toString();
+        var args = mapper.createObjectNode().put("from", from).put("to", to);
+        var data = runToolAndCollectArtifact(tool, args.toString(), adminToolMap, context, artifacts, toolsUsed);
+        if (data != null) artifacts.getLast().put("period", Map.of("from", from, "to", to));
+        return data;
+    }
+
     private boolean lastReplyUsedTool(UUID conversationId, String tool) {
         return insightStore.listCopilotMessages(conversationId).reversed().stream()
                 .filter(message -> "ASSISTANT".equals(message.role()))
-                .findFirst().map(message -> tool.equals(message.toolsUsed())).orElse(false);
+                .findFirst().map(CopilotMessage::toolsUsed)
+                .filter(used -> Arrays.asList(used.split(",")).contains(tool)).isPresent();
     }
 
-    private String selectTool(String text, boolean admin) {
+    private String selectTool(String text, boolean admin, String attachmentType) {
         if (admin) {
+            if (ADMIN_ORDER_RISK.matcher(text).find()
+                    || (("ORDER".equalsIgnoreCase(attachmentType) || "RISK_CASE".equalsIgnoreCase(attachmentType)
+                    || "ASSESSMENT_CASE".equalsIgnoreCase(attachmentType))
+                    && CopilotRequest.matches(CopilotRequest.words("rui ro|risk|canh bao|tin hieu|flag"), text))) {
+                return "admin_order_risk_assessment";
+            }
+            if (CONTENT_MODERATION.matcher(text).find()) return "admin_text_assessment";
+            if ((ADMIN_DISPUTE.matcher(text).find() && DISPUTE_SUMMARY.matcher(text).find())
+                    || (DISPUTE_SUMMARY.matcher(text).find() && CHECKIN_CONFLICT.matcher(text).find())) {
+                return "admin_dispute_summarize";
+            }
+            if (SUPPORT_QUEUE.matcher(text).find() && QUEUE_STATE.matcher(text).find()) {
+                return "admin_risk_and_support_queue_overview";
+            }
+            if (REFUND_CAUSE_QUERY.matcher(text).find() || CANCELLATION_BREAKDOWN_EXPLICIT.matcher(text).find()) {
+                return "admin_booking_cancellation_breakdown";
+            }
+            if (VENDOR_ACTOR.matcher(text).find() && VENDOR_DIAGNOSTIC_SIGNAL.matcher(text).find()) {
+                return "admin_vendor_diagnostics";
+            }
             if (CopilotRequest.isRevenue(text) || CopilotRequest.matches(ADMIN_REVENUE, text)) return "admin_revenue_timeseries";
             if (CopilotRequest.matches(ADMIN_CANCELLATION, text)) return "admin_booking_cancellation_breakdown";
             if (CopilotRequest.matches(ADMIN_DIAGNOSTICS, text)) return "admin_vendor_diagnostics";
             if (CopilotRequest.matches(ADMIN_OVERVIEW, text)) return "admin_platform_dashboard";
         } else {
+            if (CONTENT_MODERATION.matcher(text).find()) return "vendor_text_assessment";
             if (CopilotRequest.isRevenue(text)) return "vendor_dashboard_summary";
             if (CopilotRequest.isServiceCount(text)) return "vendor_service_count";
+            if (VENDOR_REVIEW_REPLY.matcher(text).find() && REVIEW_CONTEXT.matcher(text).find()) return "vendor_review_reply_draft";
             if (CopilotRequest.matches(VENDOR_REVIEW, text)) return "vendor_review_coaching";
             if (CopilotRequest.matches(VENDOR_SLOT, text)) return "vendor_slot_advisor";
             if (CopilotRequest.matches(VENDOR_LISTING, text)) return "vendor_optimize_listing";
@@ -370,8 +810,10 @@ public class RoleCopilotUseCase {
             case "admin_revenue_timeseries" -> "ADMIN_REVENUE_CHART_CARD";
             case "admin_booking_cancellation_breakdown" -> "ADMIN_CANCELLATION_BREAKDOWN_CARD";
             case "admin_vendor_diagnostics" -> "ADMIN_CRITICAL_VENDORS_TABLE";
+            case "admin_order_risk_assessment" -> "ADMIN_ORDER_RISK_ASSESSMENT_CARD";
             case "admin_dispute_summarize" -> "ADMIN_DISPUTE_BRIEF_CARD";
             case "admin_platform_dashboard", "admin_risk_and_support_queue_overview" -> "ADMIN_KPI_SUMMARY_CARD";
+            case "vendor_text_assessment", "admin_text_assessment" -> "COPILOT_CONTENT_ASSESSMENT_CARD";
             case "vendor_dashboard_summary", "vendor_revenue_and_bookings" -> "VENDOR_KPI_SUMMARY_CARD";
             case "vendor_service_count" -> "VENDOR_SERVICE_COUNT_CARD";
             case "vendor_review_coaching" -> "VENDOR_REVIEW_COACHING_CARD";

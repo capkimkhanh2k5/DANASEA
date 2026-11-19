@@ -33,6 +33,9 @@ public class CustomerFeatureToolConfiguration {
     @Bean CustomerFeatureTool aiComparisonTool() { return tool("ai_compare_services"); }
     @Bean CustomerFeatureTool aiPlannerTool() { return tool("ai_plan_itinerary"); }
     @Bean CustomerFeatureTool aiReplanTool() { return tool("ai_replan_itinerary"); }
+    @Bean CustomerFeatureTool aiListItinerariesTool() { return tool("ai_list_itineraries"); }
+    @Bean CustomerFeatureTool aiGetItineraryTool() { return tool("ai_get_itinerary"); }
+    @Bean CustomerFeatureTool aiItineraryHistoryTool() { return tool("ai_itinerary_history"); }
     @Bean CustomerFeatureTool aiReviewSummaryTool() { return tool("ai_review_summary"); }
     @Bean CustomerFeatureTool aiNearbyTool() { return tool("ai_nearby_services"); }
     @Bean CustomerFeatureTool aiCustomerSupportTool() { return tool("ai_customer_support"); }

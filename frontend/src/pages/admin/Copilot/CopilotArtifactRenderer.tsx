@@ -25,6 +25,8 @@ import {
   extractPlatformMetricsData,
   extractQueueOverviewData,
   extractDisputeBriefData,
+  extractOrderRiskAssessmentData,
+  extractContentAssessmentData,
 } from './copilotArtifactHelpers';
 
 interface ArtifactRendererProps {
@@ -61,6 +63,12 @@ export const CopilotArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artif
         }
         if (type === 'ADMIN_DISPUTE_BRIEF_CARD' || tool === 'admin_dispute_summarize') {
           return <DisputeBriefCard key={key} artifact={artifact} />;
+        }
+        if (type === 'ADMIN_ORDER_RISK_ASSESSMENT_CARD' || tool === 'admin_order_risk_assessment') {
+          return <OrderRiskAssessmentCard key={key} artifact={artifact} />;
+        }
+        if (type === 'COPILOT_CONTENT_ASSESSMENT_CARD' || tool === 'admin_text_assessment') {
+          return <ContentAssessmentCard key={key} artifact={artifact} />;
         }
 
         return <SafeFallbackCard key={key} artifact={artifact} />;
@@ -748,7 +756,129 @@ const DisputeBriefCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifact })
 };
 
 /* =========================================================================
-   6. SAFE FALLBACK CARD (Never breaks, no raw JSON dump by default)
+   6. ORDER RISK ASSESSMENT CARD (A34) & CONTENT MODERATION CARD (A31/A32)
+   ========================================================================= */
+const OrderRiskAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifact }) => {
+  const risk = extractOrderRiskAssessmentData(artifact.data);
+  if (!risk) return <SafeFallbackCard artifact={artifact} />;
+
+  return (
+    <div className="copilot-artifact-card">
+      <div className="copilot-artifact-header">
+        <div className="copilot-artifact-title-group">
+          <span className="copilot-artifact-badge copilot-artifact-badge--red">
+            <ShieldAlert size={12} />
+            Đánh giá rủi ro
+          </span>
+          <span className="copilot-artifact-title">Đơn #{risk.orderId.slice(0, 8)}</span>
+        </div>
+        <div className="copilot-artifact-period">
+          {risk.ruleVersion} · {risk.status}
+        </div>
+      </div>
+
+      <div className="copilot-dispute-info-grid">
+        <div>
+          <span className="copilot-info-label">Chế độ đọc:</span>{' '}
+          <strong>{risk.newCaseCreated ? 'Đã tạo case mới' : 'Chỉ đọc (không tạo case)'}</strong>
+        </div>
+        <div>
+          <span className="copilot-info-label">Kết luận gian lận:</span>{' '}
+          <strong>{risk.fraudConfirmed ? 'Đã xác nhận' : 'Chưa tự kết luận gian lận'}</strong>
+        </div>
+        {risk.caseId && (
+          <div>
+            <span className="copilot-info-label">Mã case:</span>{' '}
+            <code>#{risk.caseId.slice(0, 8)}</code>
+          </div>
+        )}
+      </div>
+
+      {risk.riskSignals.length > 0 && (
+        <div className="copilot-dispute-facts">
+          <div className="copilot-dispute-facts-title">Tín hiệu rủi ro ghi nhận:</div>
+          <ul className="copilot-dispute-facts-list">
+            {risk.riskSignals.map((sig, idx) => (
+              <li key={idx}>
+                <AlertTriangle size={13} className="copilot-icon-warn" />
+                <span>{sig}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {risk.limitations.length > 0 && (
+        <div className="copilot-dispute-recommendation">
+          <div className="copilot-dispute-rec-header">
+            <span>Giới hạn thẩm định:</span>
+            <span className="copilot-badge-rec">{risk.limitations.join(', ')}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ContentAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifact }) => {
+  const assessment = extractContentAssessmentData(artifact.data);
+  if (!assessment) return <SafeFallbackCard artifact={artifact} />;
+
+  return (
+    <div className="copilot-artifact-card">
+      <div className="copilot-artifact-header">
+        <div className="copilot-artifact-title-group">
+          <span className="copilot-artifact-badge copilot-artifact-badge--amber">
+            <ShieldAlert size={12} />
+            Kiểm duyệt nội dung
+          </span>
+          <span className="copilot-artifact-title">{assessment.status}</span>
+        </div>
+        <div className="copilot-artifact-period">
+          {assessment.evidenceType} · Không tự duyệt xuất bản
+        </div>
+      </div>
+
+      <div className="copilot-dispute-info-grid">
+        {assessment.serviceId && (
+          <div>
+            <span className="copilot-info-label">Dịch vụ:</span>{' '}
+            <code>#{assessment.serviceId.slice(0, 8)}</code>
+          </div>
+        )}
+        {assessment.suggestedCategory && (
+          <div>
+            <span className="copilot-info-label">Gợi ý danh mục (Quyet):</span>{' '}
+            <strong>{assessment.suggestedCategory}</strong>
+          </div>
+        )}
+        {assessment.negatedWarningOnly && (
+          <div>
+            <span className="copilot-info-label">Ngữ cảnh câu cảnh báo:</span>{' '}
+            <strong>Phủ định giao dịch ngoài nền tảng</strong>
+          </div>
+        )}
+      </div>
+
+      {assessment.reasonCodes.length > 0 && (
+        <div className="copilot-dispute-facts">
+          <div className="copilot-dispute-facts-title">Mã lý do & tín hiệu:</div>
+          <ul className="copilot-dispute-facts-list">
+            {assessment.reasonCodes.map((code) => (
+              <li key={code}>
+                <Info size={13} />
+                <span>{code}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* =========================================================================
+   7. SAFE FALLBACK CARD (Never breaks, no raw JSON dump by default)
    ========================================================================= */
 const SafeFallbackCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifact }) => {
   const [showDetails, setShowDetails] = useState(false);

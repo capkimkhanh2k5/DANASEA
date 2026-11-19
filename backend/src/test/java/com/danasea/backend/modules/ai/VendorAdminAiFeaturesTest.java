@@ -46,20 +46,28 @@ import com.danasea.backend.modules.ai.application.ports.AdminAiDataPort.VendorDi
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort;
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort.CopilotConversation;
 import com.danasea.backend.modules.ai.application.ports.AiExtendedInsightStorePort.CopilotMessage;
+import com.danasea.backend.modules.ai.application.ports.AssessmentCaseStorePort;
 import com.danasea.backend.modules.ai.application.ports.DecisionModelPort;
 import com.danasea.backend.modules.ai.application.ports.LlmClientPort;
 import com.danasea.backend.modules.ai.application.ports.ModerationPort;
+import com.danasea.backend.modules.ai.application.ports.TransactionRiskReadPort;
 import com.danasea.backend.modules.ai.application.ports.TravelWeatherPort;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorProfile;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorReviewItem;
+import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorServiceItem;
 import com.danasea.backend.modules.ai.application.ports.VendorAiDataPort.VendorSlotItem;
 import com.danasea.backend.modules.ai.application.tools.AdminFeatureTool;
 import com.danasea.backend.modules.ai.application.tools.CustomerFeatureTool;
 import com.danasea.backend.modules.ai.application.tools.ToolExecutionContext;
 import com.danasea.backend.modules.ai.application.tools.VendorFeatureTool;
 import com.danasea.backend.modules.ai.application.usecases.AdminDisputeSummaryUseCase;
+import com.danasea.backend.modules.ai.application.usecases.AnalyzeTransactionRiskUseCase;
 import com.danasea.backend.modules.ai.application.usecases.AssessTextUseCase;
+import com.danasea.backend.modules.ai.domain.models.AssessmentCase;
+import com.danasea.backend.modules.ai.infrastructure.persistence.AssessmentCaseStoreAdapter;
+import com.danasea.backend.modules.ai.infrastructure.persistence.entities.AiAssessmentCaseJpaEntity;
+import com.danasea.backend.modules.ai.infrastructure.persistence.repositories.JpaAiAssessmentCaseRepository;
 import com.danasea.backend.modules.ai.application.usecases.CustomerMarineBriefingUseCase;
 import com.danasea.backend.modules.ai.application.usecases.CustomerMarineBriefingUseCase.MarineBriefingOverview;
 import com.danasea.backend.modules.ai.application.usecases.MarineSlotWeather;
@@ -143,7 +151,12 @@ class VendorAdminAiFeaturesTest {
 
         roleCopilotUseCase = new RoleCopilotUseCase(
                 vendorAiData, reviewCoachingUseCase, slotAdvisorUseCase, listingOptimizerUseCase,
-                adminAiData, disputeSummaryUseCase, insightStore, llmClient, moderationPort, mapper);
+                adminAiData, disputeSummaryUseCase, insightStore, llmClient, moderationPort, mapper,
+                new com.danasea.backend.modules.ai.application.usecases.PolicyChatAnswer(
+                        new com.danasea.backend.modules.order.application.api.AiPolicyReader(
+                                new com.danasea.backend.modules.order.domain.services.RefundPolicyEngine())::current,
+                        mock(com.danasea.backend.modules.order.application.usecases.GetCancellationPreviewUseCase.class),
+                        com.danasea.backend.shared.i18n.LocalizedMessageService.standalone()));
 
         marineBriefingUseCase = new CustomerMarineBriefingUseCase(
                 masterOrderRepo, subOrderRepo, serviceRepo, slotRepo, marineWeather, insightStore, mapper);
@@ -212,6 +225,26 @@ class VendorAdminAiFeaturesTest {
         assertThat(draft.rating()).isEqualTo(2);
         assertThat(draft.draftedReply()).isNotEmpty();
         assertThat(draft.draftedReply()).contains("Danasea Watersports");
+    }
+
+    @Test
+    @DisplayName("Vendor Review Coaching không bịa điểm khi chưa có đánh giá và chặn truy cập service của vendor khác")
+    void testVendorReviewCoaching_ZeroReviewsAndOwnershipCheck() {
+        var profile = new VendorProfile(vendorId, vendorUserId, "Danabeach Club", BigDecimal.ZERO, 0, "NONE");
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(profile));
+        UUID ownedServiceId = UUID.randomUUID();
+        when(vendorAiData.getService(vendorId, ownedServiceId)).thenReturn(Optional.of(
+                new VendorAiDataPort.VendorServiceItem(ownedServiceId, vendorId, "New Cano", "desc", "Cano", null, 0)));
+        when(vendorAiData.listReviews(eq(vendorId), eq(ownedServiceId), anyInt())).thenReturn(List.of());
+
+        CoachingResult zeroResult = reviewCoachingUseCase.execute(vendorUserId, ownedServiceId, LocalDate.now().minusDays(30), LocalDate.now());
+        assertThat(zeroResult.totalReviewsAnalyzed()).isZero();
+        assertThat(zeroResult.pillars().values()).allMatch(p -> p.scoreOutOf10() == 0 && "NO_DATA".equals(p.sentiment()));
+
+        UUID foreignServiceId = UUID.randomUUID();
+        when(vendorAiData.getService(vendorId, foreignServiceId)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> reviewCoachingUseCase.execute(vendorUserId, foreignServiceId, LocalDate.now().minusDays(30), LocalDate.now()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 
     // ==================== 2. VENDOR LISTING OPTIMIZER TESTS ====================
@@ -474,7 +507,7 @@ class VendorAdminAiFeaturesTest {
                     "Doanh thu tháng này là bao nhiêu?", null, null, SupportedLanguage.VI);
             when(insightStore.listCopilotMessages(conversation.id())).thenReturn(List.of(earlierReply));
             followUp = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, conversation.id(),
-                    "Còn tháng trước thì sao?", null, null, SupportedLanguage.VI);
+                    "Thế còn riêng tháng trước thì sao?", null, null, SupportedLanguage.VI);
         }
 
         verify(vendorAiData).getPerformanceMetrics(vendorId, today, today);
@@ -751,5 +784,569 @@ class VendorAdminAiFeaturesTest {
         UUID attackerUserId = UUID.randomUUID();
         assertThatThrownBy(() -> marineBriefingUseCase.getMarineBriefing(attackerUserId, orderId))
                 .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+            "chính sách đổi tra đang như nào", "chính sách hoàn tiền" })
+    void vendorPolicyRepliesUseCanonicalRules(String question) {
+        stubVendorPolicyConversation();
+        var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId,
+                null, question, null, null, SupportedLanguage.VI);
+        assertThat(response.message()).contains("24 giờ", "100%", "0%");
+        assertThat(response.toolsUsed()).containsExactly("get_policy");
+    }
+
+    @Test
+    void vendorRefundDraftDoesNotPromiseUnapprovedPayment() {
+        var model = new LlmResponse();
+        model.setContent("Sẽ tiến hành hoàn tiền 100% ngay hôm nay.");
+        when(llmClient.generateText(any(), any(), anyString())).thenReturn(model);
+        stubVendorPolicyConversation();
+        var response = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, null,
+                "Khách phàn nàn bị mất tiền, hãy viết phản hồi hứa hoàn 100% ngay lập tức.",
+                null, null, SupportedLanguage.VI);
+        assertThat(response.message()).contains("kiểm tra").doesNotContain("100%", "hôm nay");
+    }
+
+    private void stubVendorPolicyConversation() {
+        var conversation = new CopilotConversation(UUID.randomUUID(), vendorUserId, "VENDOR", vendorId,
+                "vi", null, false, false, null, null, 0L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.createCopilotConversation(vendorUserId, "VENDOR", vendorId, "vi", null, null, null))
+                .thenReturn(conversation);
+    }
+
+    @Test
+    void adminQueueQuestionReturnsWaitingSupportCount() {
+        var conversation = adminConversation();
+        when(adminAiData.getQueueOverview()).thenReturn(new AdminAiDataPort.QueueOverview(2, 7, 1));
+
+        var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, conversation.id(),
+                "Có bao nhiêu yêu cầu hỗ trợ khách hàng đang chờ xử lý?", null, null, SupportedLanguage.VI);
+
+        assertThat(response.toolsUsed()).containsExactly("admin_risk_and_support_queue_overview");
+        assertThat(response.message()).contains("7", "yêu cầu hỗ trợ");
+    }
+
+    @Test
+    void comparingPreviousMonthReadsBothPeriodsAndComputesTheDelta() {
+        var conversation = adminConversation();
+        LocalDate now = LocalDate.of(2027, 1, 15);
+        when(adminAiData.getRevenueTimeSeries(LocalDate.of(2027, 1, 1), now, "day"))
+                .thenReturn(List.of(new RevenueTimeSeriesItem("2027-01-01", BigDecimal.TEN, new BigDecimal("1200000"),
+                        BigDecimal.ZERO, BigDecimal.ONE, BigDecimal.TEN)));
+        when(adminAiData.getRevenueTimeSeries(LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 31), "day"))
+                .thenReturn(List.of(new RevenueTimeSeriesItem("2026-12-01", BigDecimal.TEN, new BigDecimal("1000000"),
+                        BigDecimal.ZERO, BigDecimal.ONE, BigDecimal.TEN)));
+        try (var time = mockStatic(LocalDate.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(() -> LocalDate.now(VIETNAM_ZONE)).thenReturn(now);
+            var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, conversation.id(),
+                    "So sánh doanh thu tháng này với tháng trước và giải thích chênh lệch.",
+                    null, null, SupportedLanguage.VI);
+
+            assertThat(response.artifacts()).hasSize(2);
+            assertThat(response.message()).contains("200.000", "1.200.000", "1.000.000");
+        }
+    }
+
+    @Test
+    void adminDisputeGuidanceUsesAttachedDispute() {
+        var conversation = adminConversation();
+        UUID disputeId = UUID.randomUUID();
+        when(adminAiData.getDisputeFullEvidence(disputeId)).thenReturn(Optional.empty());
+
+        roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, conversation.id(),
+                "Hãy tóm tắt khiếu nại này từ thông tin khách hàng và nhà cung cấp.",
+                "DISPUTE", disputeId, SupportedLanguage.VI);
+
+        verify(adminAiData).getDisputeFullEvidence(disputeId);
+    }
+
+    private CopilotConversation adminConversation() {
+        var conversation = new CopilotConversation(UUID.randomUUID(), adminUserId, "ADMIN", null,
+                "vi", null, false, false, null, null, 0L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(conversation.id())).thenReturn(Optional.of(conversation));
+        return conversation;
+    }
+
+    private RoleCopilotUseCase extendedCopilot(
+            AssessTextUseCase textUseCase,
+            TransactionRiskReadPort riskReadPort,
+            AssessmentCaseStorePort caseStore,
+            AnalyzeTransactionRiskUseCase riskUseCase
+    ) {
+        return new RoleCopilotUseCase(
+                vendorAiData, reviewCoachingUseCase, slotAdvisorUseCase, listingOptimizerUseCase,
+                adminAiData, disputeSummaryUseCase, insightStore, llmClient, moderationPort, mapper,
+                new com.danasea.backend.modules.ai.application.usecases.PolicyChatAnswer(
+                        new com.danasea.backend.modules.order.application.api.AiPolicyReader(
+                                new com.danasea.backend.modules.order.domain.services.RefundPolicyEngine())::current,
+                        mock(com.danasea.backend.modules.order.application.usecases.GetCancellationPreviewUseCase.class),
+                        com.danasea.backend.shared.i18n.LocalizedMessageService.standalone()),
+                textUseCase, riskReadPort, caseStore, riskUseCase);
+    }
+
+    @Test
+    void v25A31A32ModerationRoutingAvoidsSlotAndBookingCollisionsAndRespectsNegation() {
+        var caseStore = mock(AssessmentCaseStorePort.class);
+        var realAssess = new AssessTextUseCase(decisionModel, caseStore);
+        var copilot = extendedCopilot(realAssess, mock(TransactionRiskReadPort.class), caseStore, mock(AnalyzeTransactionRiskUseCase.class));
+
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "SILVER")));
+        org.mockito.Mockito.doReturn(new DecisionResult(
+                true, DecisionTask.MODERATION.wireName(), "quyet", "rev1", "v1", 5.0,
+                Map.of("external_payment", new DecisionResult.Answer("noul", null, null, 0.85, null, Map.of())),
+                null, true)).when(decisionModel).decide(eq(DecisionTask.MODERATION), any());
+
+        var vConv = vendorConversation();
+        var v25 = copilot.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Tôi muốn thêm số điện thoại cá nhân và yêu cầu khách chuyển khoản ngoài DANASEA vào mô tả.",
+                null, null, SupportedLanguage.VI);
+        assertThat(v25.toolsUsed()).containsExactly("vendor_text_assessment");
+        assertThat(v25.artifacts()).singleElement().satisfies(card -> {
+            assertThat(card.get("type")).isEqualTo("COPILOT_CONTENT_ASSESSMENT_CARD");
+            var data = mapper.valueToTree(card.get("data"));
+            assertThat(data.path("status").asText()).isEqualTo("NEEDS_REVIEW");
+            assertThat(data.path("publicationAuthorized").asBoolean()).isFalse();
+            assertThat(data.path("reasonCodes").toString()).contains("MODEL_SUGGESTS_EXTERNAL_PAYMENT");
+        });
+
+        var aConv = adminConversation();
+        var a31 = copilot.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Bài đăng chứa số điện thoại, đường link đặt tour bên ngoài và lời quảng cáo quá mức nên xử lý sao?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a31.toolsUsed()).containsExactly("admin_text_assessment");
+        assertThat(a31.message()).doesNotContain("Trợ lý khách hàng");
+        assertThat(a31.artifacts()).singleElement().satisfies(card -> {
+            assertThat(card.get("type")).isEqualTo("COPILOT_CONTENT_ASSESSMENT_CARD");
+            var data = mapper.valueToTree(card.get("data"));
+            assertThat(data.path("status").asText()).isEqualTo("NEEDS_REVIEW");
+            assertThat(data.path("publicationAuthorized").asBoolean()).isFalse();
+        });
+
+        var a32 = copilot.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Một bài viết nói “Không chuyển tiền ngoài DANASEA”. AI có nên xem đây là quảng cáo thanh toán ngoài không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a32.toolsUsed()).containsExactly("admin_text_assessment");
+        assertThat(a32.message()).contains("KHÔNG").contains("phủ định");
+        assertThat(a32.artifacts()).singleElement().satisfies(card -> {
+            assertThat(card.get("type")).isEqualTo("COPILOT_CONTENT_ASSESSMENT_CARD");
+            var data = mapper.valueToTree(card.get("data"));
+            assertThat(data.path("status").asText()).isEqualTo("NO_RULE_SIGNAL");
+            assertThat(data.path("reasonCodes")).isEmpty();
+            assertThat(data.path("contactMatches")).isEmpty();
+            assertThat(data.path("publicationAuthorized").asBoolean()).isFalse();
+        });
+    }
+
+    @Test
+    void attachedServiceModerationEnforcesOwnershipAndExtractsContacts() {
+        var caseStore = mock(AssessmentCaseStorePort.class);
+        var copilot = extendedCopilot(new AssessTextUseCase(decisionModel, caseStore),
+                mock(TransactionRiskReadPort.class), caseStore, mock(AnalyzeTransactionRiskUseCase.class));
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "SILVER")));
+
+        UUID ownServiceId = UUID.randomUUID();
+        UUID foreignServiceId = UUID.randomUUID();
+        when(vendorAiData.getService(vendorId, ownServiceId)).thenReturn(Optional.of(
+                new VendorServiceItem(ownServiceId, vendorId, "SUP Bình Minh",
+                        "Đặt trực tiếp qua 0901234567 hoặc https://example.com", "SUP", BigDecimal.ZERO, 0)));
+        when(vendorAiData.getService(vendorId, foreignServiceId)).thenReturn(Optional.empty());
+
+        var vConv = vendorConversation();
+        var ownedReply = copilot.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Kiểm tra bài đăng này có vi phạm kiểm duyệt không?",
+                "SERVICE", ownServiceId, SupportedLanguage.VI);
+        assertThat(ownedReply.toolsUsed()).containsExactly("vendor_text_assessment");
+        assertThat(ownedReply.artifacts()).singleElement().satisfies(card -> {
+            var data = mapper.valueToTree(card.get("data"));
+            assertThat(data.path("status").asText()).isEqualTo("NEEDS_REVIEW");
+            assertThat(data.path("reasonCodes").toString()).contains("EXTERNAL_CONTACT_DETECTED");
+            assertThat(data.path("contactMatches").toString()).contains("0901234567", "https://example.com");
+            assertThat(data.path("publicationAuthorized").asBoolean()).isFalse();
+        });
+
+        var foreignReply = copilot.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Kiểm tra bài đăng này có vi phạm kiểm duyệt không?",
+                "SERVICE", foreignServiceId, SupportedLanguage.VI);
+        assertThat(foreignReply.artifacts()).isEmpty();
+        assertThat(foreignReply.message()).contains("Không tìm thấy dịch vụ");
+    }
+
+    @Test
+    void vendorSlotPatternAvoidsFalseCollisionsWhileKeepingSlotPhrases() {
+        var vConv = vendorConversation();
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Vendor", BigDecimal.ZERO, 0, "NONE")));
+        when(vendorAiData.listUpcomingSlots(eq(vendorId), isNull(), anyInt())).thenReturn(List.of());
+
+        for (String slotQuestion : List.of("ca", "Kiểm tra ca tour sáng mai", "Tôi có nên mở thêm ca hoặc gộp ca không?")) {
+            var resp = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                    slotQuestion, null, null, SupportedLanguage.VI);
+            assertThat(resp.toolsUsed()).as(slotQuestion).containsExactly("vendor_slot_advisor");
+        }
+
+        for (String nonSlotQuestion : List.of(
+                "Chính sách câu cá và cả hai hoặc cả ba quy định cá biệt thì sao?",
+                "Tôi muốn tăng giá tour đã được khách thanh toán, hãy cập nhật tất cả booking cũ.")) {
+            var resp = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                    nonSlotQuestion, null, null, SupportedLanguage.VI);
+            assertThat(resp.toolsUsed()).as(nonSlotQuestion).doesNotContain("vendor_slot_advisor");
+        }
+    }
+
+    @Test
+    void v18AndV22CiteVerifiedReviewsSeparateHypothesesAndRefuseZeroReviewFabrication() {
+        var vConv = vendorConversation();
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.8), 30, "GOLD")));
+
+        UUID revWaitId = UUID.randomUUID();
+        UUID revGoodId = UUID.randomUUID();
+        when(vendorAiData.listReviews(eq(vendorId), isNull(), anyInt())).thenReturn(List.of(
+                new VendorReviewItem(revWaitId, UUID.randomUUID(), "Tour Cano", 2,
+                        "Khách phải chờ cano tại bến hơn 30 phút mới xuất bến.", OffsetDateTime.now()),
+                new VendorReviewItem(revGoodId, UUID.randomUUID(), "Tour Cano", 5,
+                        "Hướng dẫn viên rất nhiệt tình.", OffsetDateTime.now())
+        ));
+
+        var v18 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Tại sao khách thường phàn nàn về thời gian chờ cano?",
+                null, null, SupportedLanguage.VI);
+        assertThat(v18.toolsUsed()).containsExactly("vendor_review_coaching");
+        assertThat(v18.message())
+                .contains("Bằng chứng từ đánh giá đã xác minh")
+                .contains("Giả thuyết vận hành cần kiểm chứng thêm")
+                .contains(revWaitId.toString())
+                .contains("2/5")
+                .contains("chờ cano tại bến hơn 30 phút")
+                .contains("cỡ mẫu còn nhỏ");
+
+        // V22 without attachment: refuses to pass off shop-wide 4.8 rating
+        var v22NoAttach = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Dịch vụ tôi mới đăng chưa có đánh giá, AI có thể nhận xét chất lượng không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(v22NoAttach.message()).contains("0 đánh giá", "totalReviewsAnalyzed = 0").doesNotContain("4.8");
+        assertThat(v22NoAttach.artifacts()).isEmpty();
+
+        // V22 with attached zero-review service
+        UUID newServiceId = UUID.randomUUID();
+        when(vendorAiData.getService(vendorId, newServiceId)).thenReturn(Optional.of(
+                new VendorServiceItem(newServiceId, vendorId, "New Service", "desc", "Cano", null, 0)));
+        when(vendorAiData.listReviews(eq(vendorId), eq(newServiceId), anyInt())).thenReturn(List.of());
+        var v22Attached = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Dịch vụ mới này chưa có đánh giá, nhận xét chất lượng giúp tôi.",
+                "SERVICE", newServiceId, SupportedLanguage.VI);
+        assertThat(v22Attached.toolsUsed()).containsExactly("vendor_review_coaching");
+        assertThat(v22Attached.message()).contains("0 đánh giá", "totalReviewsAnalyzed = 0").doesNotContain("4.8");
+    }
+
+    @Test
+    void findMentionedServiceResolvesSingleKeywordMatchAndPromptsWhenAmbiguous() {
+        var vConv = vendorConversation();
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.5), 10, "SILVER")));
+        UUID supId = UUID.randomUUID();
+        UUID kayakId = UUID.randomUUID();
+        when(vendorAiData.listServices(vendorId)).thenReturn(List.of(
+                new VendorServiceItem(supId, vendorId, "Tour Chèo SUP Ngắm Bình Minh", "Mô tả cơ bản", "SUP", BigDecimal.ZERO, 0),
+                new VendorServiceItem(kayakId, vendorId, "Tour Kayak Bãi Bụt", "Mô tả cơ bản", "Kayak", BigDecimal.ZERO, 0)
+        ));
+        when(vendorAiData.getService(vendorId, supId)).thenReturn(Optional.of(
+                new VendorServiceItem(supId, vendorId, "Tour Chèo SUP Ngắm Bình Minh", "Mô tả cơ bản", "SUP", BigDecimal.ZERO, 0)));
+
+        var v23 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Hãy kiểm tra bài đăng SUP của tôi còn thiếu thông tin gì.",
+                null, null, SupportedLanguage.VI);
+        assertThat(v23.toolsUsed()).containsExactly("vendor_optimize_listing");
+        assertThat(v23.message()).contains("Điểm chất lượng bài đăng");
+
+        var ambiguous = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Hãy kiểm tra bài đăng lặn biển của tôi còn thiếu gì.",
+                null, null, SupportedLanguage.VI);
+        assertThat(ambiguous.artifacts()).isEmpty();
+        assertThat(ambiguous.message()).contains("đính kèm dịch vụ");
+    }
+
+    @Test
+    void adminVendorDiagnosticsAppliesThresholdRulesAndHandlesA10ThroughA15() {
+        var aConv = adminConversation();
+        var overloadedLow = new VendorDiagnosticItem(
+                UUID.randomUUID(), "Vendor Overload", BigDecimal.valueOf(5000000), 20,
+                10.0, 96.0, BigDecimal.valueOf(2.8), 6, "WARNING", List.of("LOW_RATING", "OVERLOADED"));
+        var criticalCancel = new VendorDiagnosticItem(
+                UUID.randomUUID(), "Vendor B", BigDecimal.valueOf(2000000), 10,
+                45.0, 60.0, BigDecimal.valueOf(4.2), 10, "CRITICAL", List.of("HIGH_CANCELLATION"));
+        when(adminAiData.getVendorDiagnostics(any(), any(), isNull()))
+                .thenReturn(List.of(overloadedLow, criticalCancel));
+
+        var a10 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Vendor có tỷ lệ hủy tour 45% có cần cảnh báo nghiêm trọng không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a10.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(a10.message()).contains("40.0%", "45%", "CRITICAL", "WARNING");
+
+        var a11 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Một vendor chỉ có 2 đánh giá và điểm trung bình 2 sao, có đủ để kết luận chất lượng kém không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a11.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(a11.message()).contains("ratingCount >= 3", "ratingCount >= 5", "chưa đạt ngưỡng");
+
+        var a12 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Đối tác nào có tỷ lệ lấp đầy cao nhưng điểm đánh giá thấp?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a12.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(a12.message()).contains("Vendor Overload").doesNotContain("Vendor B");
+
+        var a14 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Hãy đưa ra các đề xuất cải thiện hoạt động cho những vendor có tỷ lệ hủy cao.",
+                null, null, SupportedLanguage.VI);
+        assertThat(a14.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(a14.message()).contains("WEATHER", "VENDOR_FAULT", "Vendor B");
+
+        var a15 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Có nên đình chỉ ngay vendor chỉ vì AI đánh giá rủi ro cao không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a15.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(a15.message()).contains("KHÔNG", "NEEDS_REVIEW");
+    }
+
+    @Test
+    void adminOrderRiskAssessmentReadsCaseAndLiveVelocityWithoutWritingDbByDefault() throws Exception {
+        var repo = mock(JpaAiAssessmentCaseRepository.class);
+        var storeAdapter = new AssessmentCaseStoreAdapter(repo, mapper);
+        UUID orderId = UUID.randomUUID();
+        UUID caseId = UUID.randomUUID();
+
+        var entity = new AiAssessmentCaseJpaEntity();
+        entity.setId(caseId);
+        entity.setKind("TRANSACTION_RISK");
+        entity.setSourceId(orderId);
+        entity.setRequestedBy(adminUserId);
+        entity.setStatus("NEEDS_REVIEW");
+        entity.setEvidenceJson(mapper.writeValueAsString(Map.of(
+                "observed", Map.of("orderId", orderId, "customerId", customerUserId,
+                        "failedPayments24h", 3, "orders1h", 1, "refundRequests7d", 0, "paymentStatus", "FAILED"),
+                "riskSignals", List.of("THREE_FAILED_PAYMENTS_IN_24H"),
+                "ruleVersion", "velocity-demo-v1",
+                "fraudConfirmed", false)));
+        entity.setDecisionJson(mapper.writeValueAsString(Map.of("risk",
+                new DecisionResult(true, DecisionTask.RISK.wireName(), "quyet", "rev1", "v1", 5.0,
+                        Map.of("needs_review", new DecisionResult.Answer("noul", "YES", 0.78, 0.78, null, Map.of())),
+                        null, true))));
+
+        when(repo.findById(caseId)).thenReturn(Optional.of(entity));
+        when(repo.findBySourceIdOrderByCreatedAtDesc(orderId)).thenReturn(List.of(entity));
+
+        assertThat(storeAdapter.findById(caseId)).isPresent();
+        assertThat(storeAdapter.findBySourceId(orderId)).singleElement()
+                .satisfies(c -> assertThat(c.id()).isEqualTo(caseId));
+
+        var riskRead = mock(TransactionRiskReadPort.class);
+        var riskUseCase = mock(AnalyzeTransactionRiskUseCase.class);
+        var copilot = extendedCopilot(assessTextUseCase, riskRead, storeAdapter, riskUseCase);
+        var aConv = adminConversation();
+
+        // A34 with attached ORDER and existing case
+        var a34Existing = copilot.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Tôi muốn biết AI dựa trên những dữ liệu nào để đưa ra cảnh báo rủi ro cho đơn này.",
+                "ORDER", orderId, SupportedLanguage.VI);
+        assertThat(a34Existing.toolsUsed()).containsExactly("admin_order_risk_assessment");
+        assertThat(a34Existing.artifacts()).singleElement().satisfies(card -> {
+            assertThat(card.get("type")).isEqualTo("ADMIN_ORDER_RISK_ASSESSMENT_CARD");
+            var data = mapper.valueToTree(card.get("data"));
+            assertThat(data.path("caseId").asText()).isEqualTo(caseId.toString());
+            assertThat(data.path("newCaseCreated").asBoolean()).isFalse();
+            assertThat(data.path("fraudConfirmed").asBoolean()).isFalse();
+            assertThat(data.path("riskSignals").toString()).contains("THREE_FAILED_PAYMENTS_IN_24H");
+        });
+        verifyNoInteractions(riskUseCase);
+
+        // Live Velocity 3/5/3 read when no case exists yet (no DB write)
+        UUID freshOrderId = UUID.randomUUID();
+        when(repo.findBySourceIdOrderByCreatedAtDesc(freshOrderId)).thenReturn(List.of());
+        when(riskRead.read(freshOrderId)).thenReturn(new TransactionRiskReadPort.Facts(
+                freshOrderId, customerUserId, 3, 5, 3, "PENDING"));
+        var tool = new AdminFeatureTool("admin_order_risk_assessment", adminAiData, disputeSummaryUseCase, mapper,
+                storeAdapter, riskRead, riskUseCase);
+        var liveNode = mapper.readTree(tool.execute(
+                mapper.writeValueAsString(Map.of("orderId", freshOrderId)),
+                new ToolExecutionContext(SupportedLanguage.VI, UUID.randomUUID(), adminUserId)));
+        assertThat(liveNode.path("status").asText()).isEqualTo("NEEDS_REVIEW");
+        assertThat(liveNode.path("newCaseCreated").asBoolean()).isFalse();
+        assertThat(liveNode.path("fraudConfirmed").asBoolean()).isFalse();
+        assertThat(liveNode.path("ruleVersion").asText()).isEqualTo("velocity-demo-v1");
+        assertThat(liveNode.path("riskSignals").toString()).contains(
+                "THREE_FAILED_PAYMENTS_IN_24H", "FIVE_ORDERS_IN_1H", "THREE_REFUND_REQUESTS_IN_7D");
+        verifyNoInteractions(riskUseCase);
+
+        // A34 without orderId/caseId asks cleanly
+        var missingId = copilot.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Tôi muốn biết AI dựa trên những dữ liệu nào để đưa ra cảnh báo rủi ro cho đơn này.",
+                null, null, SupportedLanguage.VI);
+        assertThat(missingId.artifacts()).isEmpty();
+        assertThat(missingId.message()).contains("đính kèm đơn/hồ sơ");
+
+        // A18/A19/A20 Velocity rules + A21/A22 guards
+        var a19 = copilot.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Một tài khoản tạo 5 đơn hàng trong 1 giờ, đây có chắc chắn là gian lận không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a19.message()).contains("FIVE_ORDERS_IN_1H", "KHÔNG kết luận chắc chắn là gian lận", "fraudConfirmed=false");
+
+        var a21 = copilot.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Quyet AI đang lỗi, hệ thống có được tự động đánh dấu giao dịch là an toàn không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a21.message()).contains("KHÔNG", "NEEDS_REVIEW");
+
+        var a22 = copilot.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Hãy xem các giao dịch rủi ro và tự động khóa tất cả tài khoản liên quan.",
+                null, null, SupportedLanguage.VI);
+        assertThat(a22.message()).contains("KHÔNG", "quản trị viên");
+    }
+
+    @Test
+    void copilotCoversRevenueZeroDaysTimezoneCancellationsDisputeConflictsQueuesAndVendorOperations() {
+        var aConv = adminConversation();
+        LocalDate today = LocalDate.of(2026, 11, 18);
+        when(adminAiData.getRevenueTimeSeries(any(), any(), any())).thenReturn(List.of(
+                new RevenueTimeSeriesItem("2026-11-16", BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO),
+                new RevenueTimeSeriesItem("2026-11-17", BigDecimal.valueOf(500000), BigDecimal.valueOf(500000), BigDecimal.ZERO, BigDecimal.valueOf(50000), BigDecimal.valueOf(450000)),
+                new RevenueTimeSeriesItem("2026-11-18", BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO)));
+        when(adminAiData.getBookingCancellationBreakdown(any(), any(), any())).thenReturn(
+                new BookingCancellationBreakdown(20, 6, 14, 5, 3, 2, 1, 2,
+                        Map.of("WEATHER", 5L, "VENDOR_FAULT", 3L, "CUSTOMER_CANCEL", 2L, "ADMIN_OVERRIDE", 1L, "DISPUTE", 2L, "SYSTEM_TIMEOUT", 1L)));
+        when(adminAiData.getQueueOverview()).thenReturn(new AdminAiDataPort.QueueOverview(3, 8, 4));
+
+        try (var time = mockStatic(LocalDate.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(() -> LocalDate.now(VIETNAM_ZONE)).thenReturn(today);
+
+            var a05 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                    "Có ngày nào không phát sinh doanh thu không?", null, null, SupportedLanguage.VI);
+            assertThat(a05.toolsUsed()).containsExactly("admin_revenue_timeseries");
+            assertThat(a05.message()).contains("2026-11-16", "2026-11-18").doesNotContain("2026-11-17,");
+
+            var a06 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                    "Số liệu doanh thu ngày hôm nay đã được tính theo giờ Việt Nam chưa?", null, null, SupportedLanguage.VI);
+            assertThat(a06.toolsUsed()).containsExactly("admin_revenue_timeseries");
+            assertThat(a06.message()).contains("Asia/Ho_Chi_Minh");
+        }
+
+        var a08 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Hãy phân loại các đơn bị hủy theo khách hàng, vendor, thời tiết và admin.",
+                null, null, SupportedLanguage.VI);
+        assertThat(a08.toolsUsed()).containsExactly("admin_booking_cancellation_breakdown");
+        assertThat(a08.message()).contains("Thời tiết: 5", "Lỗi vendor: 3", "Khách hàng: 2",
+                "Admin xử lý: 1", "Tranh chấp: 2", "SYSTEM_TIMEOUT: 1");
+
+        var a16 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Những nguyên nhân nào đang tạo ra nhiều yêu cầu hoàn tiền nhất?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a16.toolsUsed()).containsExactly("admin_booking_cancellation_breakdown");
+        assertThat(a16.message()).contains("WEATHER (5)", "VENDOR_FAULT (3)");
+
+        var a23 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Một giao dịch thanh toán chưa rõ trạng thái, tôi có nên ghi nhận doanh thu thành công ngay không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a23.artifacts()).isEmpty();
+        assertThat(a23.message()).contains("KHÔNG", "đối soát");
+
+        var a25 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Khách nói chưa được phục vụ nhưng vendor nói đã check-in, hãy phân tích mâu thuẫn.",
+                null, null, SupportedLanguage.VI);
+        assertThat(a25.artifacts()).isEmpty();
+        assertThat(a25.message()).contains("tranh chấp").contains("QR check-in").contains("KHÔNG tự động");
+
+        var a27 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Vendor đang có khiếu nại chưa giải quyết, có được đưa các đơn đó vào đối soát không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a27.artifacts()).isEmpty();
+        assertThat(a27.message()).contains("KHÔNG", "ACTIVE_DISPUTE");
+
+        var a29 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Hãy tóm tắt các yêu cầu đổi lịch chưa được phê duyệt.",
+                null, null, SupportedLanguage.VI);
+        assertThat(a29.toolsUsed()).containsExactly("admin_risk_and_support_queue_overview");
+        assertThat(a29.message()).contains("WAITING_REVIEW", "8", "3", "4");
+
+        var a30 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, aConv.id(),
+                "Nếu hai Admin cùng xử lý một yêu cầu hỗ trợ thì hệ thống phải làm gì?",
+                null, null, SupportedLanguage.VI);
+        assertThat(a30.message()).contains("optimistic locking", "expectedVersion", "409");
+
+        // Vendor operational rules & safety checks
+        var vConv = vendorConversation();
+        when(vendorAiData.findProfileByUserId(vendorUserId)).thenReturn(Optional.of(
+                new VendorProfile(vendorId, vendorUserId, "Danasea Watersports", BigDecimal.valueOf(4.7), 20, "SILVER")));
+        when(vendorAiData.getPerformanceMetrics(eq(vendorId), any(), any())).thenReturn(
+                new VendorAiDataPort.VendorPerformanceMetrics(BigDecimal.valueOf(10_000_000),
+                        BigDecimal.valueOf(8_500_000), 10, 2, 20.0, 0, 2, 75, BigDecimal.valueOf(4.7), 20, "SILVER", List.of()));
+        when(vendorAiData.listUpcomingSlots(eq(vendorId), isNull(), anyInt())).thenReturn(List.of());
+
+        var v05 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "DANASEA tính hoa hồng đối tác như thế nào? Tôi có được ưu đãi trong 90 ngày đầu không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(v05.message()).contains("ONBOARDING", "90 ngày", "CATEGORY", "PLATFORM_COMMISSION_RATE");
+
+        var v07 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Nếu tôi hủy chuyến vì lỗi vận hành, khách hàng và doanh thu của tôi bị ảnh hưởng ra sao?",
+                null, null, SupportedLanguage.VI);
+        assertThat(v07.artifacts()).isEmpty();
+        assertThat(v07.message()).contains("100%", "FULL_REFUND", "VENDOR_FAULT");
+
+        var v12 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Tại sao doanh thu của tôi cao nhưng số tiền quyết toán lại thấp?",
+                null, null, SupportedLanguage.VI);
+        assertThat(v12.toolsUsed()).containsExactly("vendor_dashboard_summary");
+        assertThat(v12.message()).contains("10.000.000", "8.500.000", "1.500.000", "ACTIVE_DISPUTE", "sao kê quyết toán");
+
+        var v14 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Vì sao có đơn đã hoàn thành nhưng chưa được đưa vào quyết toán?",
+                null, null, SupportedLanguage.VI);
+        assertThat(v14.message()).contains("ACTIVE_DISPUTE", "DISPUTE_WINDOW_OPEN");
+
+        var v30 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Ca của tôi đang kín 95% nhưng thời tiết nguy hiểm, có nên tăng sức chứa không?",
+                null, null, SupportedLanguage.VI);
+        assertThat(v30.toolsUsed()).containsExactly("vendor_slot_advisor");
+        assertThat(v30.message()).contains("Tuyệt đối KHÔNG đề xuất tăng sức chứa");
+
+        var v33 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Tôi muốn bảo trì một cano đang được phân bổ cho các booking, cần xử lý sao?",
+                null, null, SupportedLanguage.VI);
+        assertThat(v33.message()).contains("Đóng bán ngay", "thay thế", "VENDOR_FAULT");
+
+        var v34 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Tôi muốn tăng giá tour đã được khách thanh toán, hãy cập nhật tất cả booking cũ.",
+                null, null, SupportedLanguage.VI);
+        assertThat(v34.artifacts()).isEmpty();
+        assertThat(v34.message()).contains("KHÔNG THỂ");
+
+        // V24: SEO rewrite without attached serviceId provides grounded sunrise draft
+        when(vendorAiData.listServices(vendorId)).thenReturn(List.of(
+                new VendorServiceItem(UUID.randomUUID(), vendorId, "Mô tô nước – Danabeach", "Jetski", "Jetski", BigDecimal.TEN, 1),
+                new VendorServiceItem(UUID.randomUUID(), vendorId, "Trải nghiệm cano hoàng hôn Bãi Nam mới – Danabeach", "Cano mới", "Cano", BigDecimal.TEN, 0)
+        ));
+        var v24 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Viết lại tiêu đề và mô tả tour ngắm bình minh sao cho hấp dẫn và dễ tìm kiếm.",
+                null, null, SupportedLanguage.VI);
+        assertThat(v24.toolsUsed()).containsExactly("vendor_optimize_listing");
+        assertThat(v24.message()).contains("Tiêu đề đề xuất:").contains("Mô tả đề xuất:").contains("bình minh");
+
+        // V29: "chỉ mới có 1/20 khách" avoids false "mới" service match and prioritizes 1/20 slot over 0/20
+        when(vendorAiData.listUpcomingSlots(eq(vendorId), isNull(), anyInt())).thenReturn(List.of(
+                new VendorSlotItem(UUID.randomUUID(), UUID.randomUUID(), "Trải nghiệm cano hoàng hôn Bãi Nam mới – Danabeach",
+                        today.plusDays(1), LocalTime.of(8, 0), LocalTime.of(9, 30), 20, 0, "OPEN"),
+                new VendorSlotItem(UUID.randomUUID(), UUID.randomUUID(), "Mô tô nước – Danabeach",
+                        today.plusDays(1), LocalTime.of(14, 0), LocalTime.of(15, 30), 20, 1, "OPEN")
+        ));
+        var v29 = roleCopilotUseCase.processMessage(vendorUserId, "VENDOR", vendorId, vConv.id(),
+                "Ca ngày mai chỉ mới có 1/20 khách, tôi nên xử lý thế nào?",
+                null, null, SupportedLanguage.VI);
+        assertThat(v29.toolsUsed()).containsExactly("vendor_slot_advisor");
+        assertThat(v29.message()).contains("Mô tô nước – Danabeach").contains("1/20 (5.0%)");
     }
 }
