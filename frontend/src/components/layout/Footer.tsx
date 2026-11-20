@@ -144,23 +144,35 @@ export function Footer() {
               {isEn ? 'Support & Legal' : 'Hỗ trợ & Pháp lý'}
             </h3>
             <ul className="flex flex-col gap-2.5 text-xs text-white list-none p-0 m-0 font-normal">
-              <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                {isEn ? 'Booking guide & QR check-in' : 'Cách đặt tour & quét mã QR'}
+              <li>
+                <Link to="/policy/booking-guide" className="hover:text-sky-200 transition-colors block">
+                  {isEn ? 'Booking guide & QR check-in' : 'Cách đặt tour & quét mã QR'}
+                </Link>
               </li>
-              <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                {isEn ? 'Bad weather refund policy' : 'Chính sách hoàn tiền khi thời tiết xấu'}
+              <li>
+                <Link to="/policy/refund" className="hover:text-sky-200 transition-colors block">
+                  {isEn ? 'Bad weather refund policy' : 'Chính sách hoàn tiền khi thời tiết xấu'}
+                </Link>
               </li>
-              <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                {isEn ? 'Maritime safety & rescue standards' : 'Quy chuẩn an toàn hàng hải & cứu sinh'}
+              <li>
+                <Link to="/policy/safety" className="hover:text-sky-200 transition-colors block">
+                  {isEn ? 'Maritime safety & rescue standards' : 'Quy chuẩn an toàn hàng hải & cứu sinh'}
+                </Link>
               </li>
-              <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                {isEn ? 'Son Tra coral protection pledge' : 'Cam kết bảo tồn san hô Sơn Trà'}
+              <li>
+                <Link to="/policy/conservation" className="hover:text-sky-200 transition-colors block">
+                  {isEn ? 'Son Tra coral protection pledge' : 'Cam kết bảo tồn san hô Sơn Trà'}
+                </Link>
               </li>
-              <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                {isEn ? 'Local 1:1 instructor careers' : 'Tuyển dụng HDV bản địa 1:1'}
+              <li>
+                <Link to="/policy/about" className="hover:text-sky-200 transition-colors block">
+                  {isEn ? 'Local 1:1 instructor careers' : 'Tuyển dụng HDV bản địa 1:1'}
+                </Link>
               </li>
-              <li className="hover:text-sky-200 transition-colors cursor-pointer">
-                {isEn ? 'About us & Travel license' : 'Về chúng tôi & Giấy phép lữ hành'}
+              <li>
+                <Link to="/policy/about" className="hover:text-sky-200 transition-colors block">
+                  {isEn ? 'About us & Travel license' : 'Về chúng tôi & Giấy phép lữ hành'}
+                </Link>
               </li>
             </ul>
 
