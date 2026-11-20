@@ -189,7 +189,7 @@ export function Payouts() {
         />
 
         <AtlasMetricCard
-          label="Đã giải ngân thành công"
+          label="Đã rút thành công"
           value={`${paidAmount.toLocaleString("vi-VN")} đ`}
         />
       </div>
@@ -285,7 +285,7 @@ export function Payouts() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-semibold text-slate-700">
-                    Số tiền yêu cầu giải ngân (VNĐ) *
+                    Số tiền yêu cầu rút (VNĐ) *
                   </label>
                   <button
                     type="button"
@@ -343,7 +343,7 @@ export function Payouts() {
                   className="w-full"
                   icon={isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 >
-                  {isSubmitting ? "Đang xử lý..." : `Gửi yêu cầu giải ngân (${numericAmount.toLocaleString("vi-VN")} đ)`}
+                  {isSubmitting ? "Đang xử lý..." : `Gửi yêu cầu rút tiền (${numericAmount.toLocaleString("vi-VN")} đ)`}
                 </AtlasButton>
               </div>
             </form>
@@ -356,7 +356,7 @@ export function Payouts() {
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-slate-600" />
               <h3 className="text-sm font-semibold text-slate-900">
-                Sổ Cái Lệnh Chi
+                Lịch sử yêu cầu rút tiền
               </h3>
             </div>
             <span className="text-xs text-slate-500 font-mono">{history.length} giao dịch</span>
@@ -368,7 +368,7 @@ export function Payouts() {
                 <tr className="bg-[#f8f9fa] border-b border-slate-200/80 text-slate-500 font-semibold text-xs uppercase tracking-wider">
                   <th className="py-3 px-4">MÃ &amp; KỲ</th>
                   <th className="py-3 px-3 text-center">TRẠNG THÁI</th>
-                  <th className="py-3 px-4 text-right">GIẢI NGÂN</th>
+                  <th className="py-3 px-4 text-right">SỐ TIỀN RÚT</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">

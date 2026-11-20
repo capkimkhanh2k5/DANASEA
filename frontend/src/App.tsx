@@ -23,6 +23,7 @@ const Orders = lazy(() => import("./pages/customer/Profile/Orders").then((m) => 
 const ChangePassword = lazy(() => import("./pages/customer/Profile/ChangePassword").then((m) => ({ default: m.ChangePassword })));
 const Wishlist = lazy(() => import("./pages/customer/Profile/Wishlist").then((m) => ({ default: m.Wishlist })));
 const Inbox = lazy(() => import("./pages/customer/Inbox/Inbox").then((m) => ({ default: m.Inbox })));
+const LegalPolicyPage = lazy(() => import("./pages/customer/LegalPolicyPage").then((m) => ({ default: m.LegalPolicyPage })));
 
 // Vendor Phase 4
 const VendorDashboard = lazy(() => import("./pages/vendor/Dashboard/Dashboard").then((m) => ({ default: m.Dashboard })));
@@ -89,6 +90,10 @@ function App() {
             <Route path="profile/change-password" element={<ChangePassword />} />
             <Route path="profile/wishlist" element={<Wishlist />} />
             <Route path="inbox" element={<Inbox />} />
+            <Route path="terms" element={<LegalPolicyPage />} />
+            <Route path="privacy" element={<LegalPolicyPage />} />
+            <Route path="policy" element={<LegalPolicyPage />} />
+            <Route path="policy/:tab" element={<LegalPolicyPage />} />
           </Route>
 
         {/* NHÀ CUNG CẤP */}

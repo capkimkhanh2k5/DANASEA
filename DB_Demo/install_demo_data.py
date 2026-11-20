@@ -1709,9 +1709,21 @@ def seed_demo_operating_schedule(session, base_rows):
         equipment_rule = []
         for number in range(1, unit_count + 1):
             equipment_id = str(uuid.uuid5(uuid.UUID(service_id), f'demo-equipment:{number}'))
+            s_name = service.get('name', '').lower()
+            if any(k in s_name for k in ['sup', 'kayak', 'chèo']):
+                group = 'WATER_SPORTS'
+            elif any(k in s_name for k in ['cano', 'tàu', 'thuyền', 'du thuyền']):
+                group = 'BOAT_CRUISE'
+            elif any(k in s_name for k in ['mô tô', 'jetski', 'dù bay', 'lướt ván', 'phao chuối']):
+                group = 'SURFING'
+            elif any(k in s_name for k in ['lặn', 'san hô', 'seawalker', 'đi bộ']):
+                group = 'DIVING'
+            else:
+                group = 'BOAT_CRUISE'
+
             equipment.append({'id': equipment_id, 'vendor_id': service['vendor_id'],
                               'name': f'Demo {number} – {service["name"]}',
-                              'compatibility_group': f'demo:{service_id}', 'capacity': unit_capacity})
+                              'compatibility_group': group, 'capacity': unit_capacity})
             equipment_rule.append({'unitNumber': number, 'capacity': unit_capacity, 'equipmentId': equipment_id})
 
         inventory_type = 'SHARED_CAPACITY_UNITS' if equipment_rule else 'PERSON_LIMIT'
