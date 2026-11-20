@@ -1,0 +1,706 @@
+{
+  "version": 1,
+  "researched_at": "2026-11-20",
+  "crs": "EPSG:4326",
+  "scope": "Researched water-activity area references for the current catalog. Geographic matches do not certify exact operator launch points, coral plots, licenses, weather safety, or entire routes.",
+  "land_validation": {
+    "mask_file": "land_mask.geojson",
+    "minimum_coast_clearance_m": 50,
+    "method": "Point-in-polygon against connected OpenStreetMap coastline ways with inland closures; limited to explicit coverage bounds. Distances use a local equirectangular metric approximation.",
+    "marine_grid_check": {
+      "checked_at": "2026-11-20T07:51:31.540644+00:00",
+      "request_url": "https://marine-api.open-meteo.com/v1/marine?latitude=16.048901%2C16.050466%2C16.060159%2C16.104181%2C16.102846%2C16.088058%2C16.112%2C16.12%2C16.04&longitude=108.25189%2C108.251286%2C108.249054%2C108.292191%2C108.298691%2C108.251497%2C108.326%2C108.2045%2C108.39&current=wave_height%2Cwave_period&forecast_days=1&cell_selection=sea&timezone=Asia%2FHo_Chi_Minh",
+      "note": "All nine water references returned wave data. The returned marine model grid can be many kilometres away; it does not validate the requested point as water or establish a local safe operating zone. This is an audit snapshot, not a runtime forecast.",
+      "results": [
+        {
+          "site_id": "danabeach_offshore",
+          "requested_latitude": 16.048901,
+          "requested_longitude": 108.25189,
+          "grid_latitude": 16.208336,
+          "grid_longitude": 108.29167,
+          "wave_height": 1.44,
+          "wave_period": 5.8,
+          "model_time": "2026-11-20T14:45",
+          "grid_distance_km": 18.23
+        },
+        {
+          "site_id": "surf_shack_offshore",
+          "requested_latitude": 16.050466,
+          "requested_longitude": 108.251286,
+          "grid_latitude": 16.208336,
+          "grid_longitude": 108.29167,
+          "wave_height": 1.44,
+          "wave_period": 5.8,
+          "model_time": "2026-11-20T14:45",
+          "grid_distance_km": 18.08
+        },
+        {
+          "site_id": "my_khe_offshore",
+          "requested_latitude": 16.060159,
+          "requested_longitude": 108.249054,
+          "grid_latitude": 16.208336,
+          "grid_longitude": 108.29167,
+          "wave_height": 1.44,
+          "wave_period": 5.8,
+          "model_time": "2026-11-20T14:45",
+          "grid_distance_km": 17.09
+        },
+        {
+          "site_id": "bai_rang_reef_area",
+          "requested_latitude": 16.104181,
+          "requested_longitude": 108.292191,
+          "grid_latitude": 16.208336,
+          "grid_longitude": 108.29167,
+          "wave_height": 1.44,
+          "wave_period": 5.8,
+          "model_time": "2026-11-20T14:45",
+          "grid_distance_km": 11.58
+        },
+        {
+          "site_id": "bai_nam_reef_area",
+          "requested_latitude": 16.102846,
+          "requested_longitude": 108.298691,
+          "grid_latitude": 16.208336,
+          "grid_longitude": 108.29167,
+          "wave_height": 1.44,
+          "wave_period": 5.8,
+          "model_time": "2026-11-20T14:45",
+          "grid_distance_km": 11.75
+        },
+        {
+          "site_id": "man_thai_nearshore",
+          "requested_latitude": 16.088058,
+          "requested_longitude": 108.251497,
+          "grid_latitude": 16.208336,
+          "grid_longitude": 108.29167,
+          "wave_height": 1.44,
+          "wave_period": 5.8,
+          "model_time": "2026-11-20T14:45",
+          "grid_distance_km": 14.05
+        },
+        {
+          "site_id": "son_tra_fishing_area",
+          "requested_latitude": 16.112,
+          "requested_longitude": 108.326,
+          "grid_latitude": 16.208336,
+          "grid_longitude": 108.29167,
+          "wave_height": 1.44,
+          "wave_period": 5.8,
+          "model_time": "2026-11-20T14:45",
+          "grid_distance_km": 11.32
+        },
+        {
+          "site_id": "tho_quang_offshore",
+          "requested_latitude": 16.12,
+          "requested_longitude": 108.2045,
+          "grid_latitude": 16.208336,
+          "grid_longitude": 108.29167,
+          "wave_height": 1.44,
+          "wave_period": 5.8,
+          "model_time": "2026-11-20T14:45",
+          "grid_distance_km": 13.53
+        },
+        {
+          "site_id": "son_tra_cham_route",
+          "requested_latitude": 16.04,
+          "requested_longitude": 108.39,
+          "grid_latitude": 16.041664,
+          "grid_longitude": 108.45836,
+          "wave_height": 1.52,
+          "wave_period": 5.9,
+          "model_time": "2026-11-20T14:45",
+          "grid_distance_km": 7.31
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "catalog",
+      "type": "CATALOG_DESCRIPTION",
+      "path": "DB_Demo/base/services.json",
+      "checked_at": "2026-11-20",
+      "supports": "Existing service names, activity descriptions and locations; not an operator confirmation."
+    },
+    {
+      "id": "danabeach",
+      "type": "VENUE_OWNER_STATEMENT_REPORTED",
+      "url": "https://thanhnien.vn/dai-hai-trinh-bat-tan-tai-bien-da-nang-sap-khoi-hanh-185251203120124057.htm",
+      "checked_at": "2026-11-20",
+      "supports": "Danabeach complex at 51 Vo Nguyen Giap; water point is inferred offshore, not the building pin."
+    },
+    {
+      "id": "surf_shack",
+      "type": "OPERATOR_WEBSITE",
+      "url": "https://www.surfshackvn.com/",
+      "checked_at": "2026-11-20",
+      "supports": "Beach house opposite Holiday Beach Hotel; office address must not be used as the water activity point."
+    },
+    {
+      "id": "surf_tour",
+      "type": "OPERATOR_WEBSITE",
+      "url": "https://www.surfshackvn.com/surf-tour/",
+      "checked_at": "2026-11-20",
+      "supports": "Surf spots are selected along Son Tra–Hoi An according to the day; no fixed full-route point is published."
+    },
+    {
+      "id": "dnoa_surf",
+      "type": "OPERATOR_WEBSITE",
+      "url": "https://danangadventures.com/",
+      "checked_at": "2026-11-20",
+      "supports": "Surf lessons on My Khe Beach."
+    },
+    {
+      "id": "dnoa_splash",
+      "type": "OPERATOR_WEBSITE",
+      "url": "https://danangadventures.com/product/kayaking-splash-and-dash/",
+      "checked_at": "2026-11-20",
+      "supports": "Activity location is My Khe Beach."
+    },
+    {
+      "id": "dnoa_parasail",
+      "type": "OPERATOR_WEBSITE",
+      "url": "https://danangadventures.com/product/parasailing/",
+      "checked_at": "2026-11-20",
+      "supports": "My Khe Beach; meeting beside Beach Bar Da Nang is separate from the water activity."
+    },
+    {
+      "id": "dnoa_kayak",
+      "type": "OPERATOR_WEBSITE",
+      "url": "https://danangadventures.com/product/kayk-snorkel-tour/",
+      "checked_at": "2026-11-20",
+      "supports": "My Khe departure and a coastal paddle towards an offshore reef near Son Tra; does not identify Bai Rang."
+    },
+    {
+      "id": "loca",
+      "type": "OPERATOR_WEBSITE",
+      "url": "https://locatravel.vn/ve-lan-ngam-san-ho-ban-dao-son-tra",
+      "checked_at": "2026-11-20",
+      "supports": "Current ticket identifies Bai Rang, not the historical Bai Cat Vang catalog address."
+    },
+    {
+      "id": "city_beaches",
+      "type": "CITY_TOURISM_PORTAL",
+      "url": "https://danangfantasticity.com/en/bien/bien-da-nang-2",
+      "checked_at": "2026-11-20",
+      "supports": "Bai Nam and Bai Rang are Son Tra coastal beaches associated with marine tourism and coral viewing; exact reef plots are not published here."
+    },
+    {
+      "id": "bai_rang_pin",
+      "type": "PUBLIC_MAP_REFERENCE",
+      "url": "https://vietnam.worldplaces.me/view-place/21371614-bai-rang-da-nang.html",
+      "checked_at": "2026-11-20",
+      "supports": "Public area pin 16.1056,108.29177; projected offshore using the mapped coastline."
+    },
+    {
+      "id": "bai_nam_pin",
+      "type": "PUBLIC_MAP_REFERENCE",
+      "url": "https://whereismybeach.com/en/beach/bai-nam-son-tra",
+      "checked_at": "2026-11-20",
+      "supports": "Public beach pin 16.10366,108.30093; the pin is on the resort side and is not used directly."
+    },
+    {
+      "id": "holiday_beach_pin",
+      "type": "OPENSTREETMAP_NODE",
+      "url": "https://www.openstreetmap.org/node/4231051889",
+      "checked_at": "2026-11-20",
+      "supports": "Holiday Beach Club landmark 16.049745,108.249151; water reference selected offshore."
+    },
+    {
+      "id": "gonchill",
+      "type": "OPERATOR_WEBSITE",
+      "url": "https://cheosupdanang.com/",
+      "checked_at": "2026-11-20",
+      "supports": "Man Thai departure; morning Hon Sup paddle and afternoon nearshore activity. The selected point is a nearshore reference, not the whole morning route."
+    },
+    {
+      "id": "man_thai_pin",
+      "type": "PUBLIC_MAP_REFERENCE",
+      "url": "https://vietnam.worldplaces.me/review/97232543-cho-thue-sup-da-nang-ngam-san-ho-hon-sup-bien-man-thai.html",
+      "checked_at": "2026-11-20",
+      "supports": "Public Man Thai launch-area pin 16.0893,108.24879; selected water point lies east of the coastline."
+    },
+    {
+      "id": "danafi",
+      "type": "OPERATOR_WEBSITE",
+      "url": "https://danangfishing.net/tour-cau-ca/tour-cau-ca-da-nang-chat-luong-cao/",
+      "checked_at": "2026-11-20",
+      "supports": "Fishing area is Son Tra, not the Tran Hung Dao office address; exact fishing grounds are not published."
+    },
+    {
+      "id": "danafi_pro",
+      "type": "OPERATOR_WEBSITE",
+      "url": "https://danangfishing.net/tour-cau-ca/tour-cau-ca-chuyen-nghiep-da-nang/",
+      "checked_at": "2026-11-20",
+      "supports": "Professional fishing near Son Tra; grounds vary with season and conditions."
+    },
+    {
+      "id": "tho_quang_context",
+      "type": "LOCAL_REPORTING",
+      "url": "https://www.baodanang.vn/xa-hoi/202408/xu-ly-nghiem-tinh-trang-cau-muc-tu-phat-khong-bao-dam-an-toan-3979906/index.htm",
+      "checked_at": "2026-11-20",
+      "supports": "Geographic context for Son Tra night fishing only; does not establish a currently approved commercial service."
+    }
+  ],
+  "sites": [
+    {
+      "id": "danabeach_offshore",
+      "name": "Vùng nước ngoài bãi Danabeach – Mỹ An",
+      "latitude": 16.048901,
+      "longitude": 108.25189,
+      "coordinate_role": "ACTIVITY_AREA_REFERENCE",
+      "source_ids": [
+        "danabeach",
+        "catalog"
+      ],
+      "distance_to_mapped_coast_m": 161,
+      "selection_method": "Offshore reference opposite the catalog venue, not the street address."
+    },
+    {
+      "id": "surf_shack_offshore",
+      "name": "Vùng nước Mỹ An trước Holiday Beach – Surf Shack",
+      "latitude": 16.050466,
+      "longitude": 108.251286,
+      "coordinate_role": "ACTIVITY_AREA_REFERENCE",
+      "source_ids": [
+        "surf_shack",
+        "holiday_beach_pin"
+      ],
+      "distance_to_mapped_coast_m": 161,
+      "selection_method": "Approximately 150 m seaward of the mapped shoreline beside the published beach-house landmark."
+    },
+    {
+      "id": "my_khe_offshore",
+      "name": "Vùng nước ven bãi Mỹ Khê",
+      "latitude": 16.060159,
+      "longitude": 108.249054,
+      "coordinate_role": "ACTIVITY_AREA_REFERENCE",
+      "source_ids": [
+        "dnoa_surf",
+        "dnoa_splash",
+        "dnoa_parasail",
+        "catalog"
+      ],
+      "distance_to_mapped_coast_m": 160,
+      "selection_method": "Area reference approximately 150 m offshore; providers do not publish an exact operating polygon."
+    },
+    {
+      "id": "bai_rang_reef_area",
+      "name": "Vùng nước ven bãi Rạng – Sơn Trà",
+      "latitude": 16.104181,
+      "longitude": 108.292191,
+      "coordinate_role": "ACTIVITY_AREA_REFERENCE",
+      "source_ids": [
+        "loca",
+        "bai_rang_pin",
+        "city_beaches"
+      ],
+      "distance_to_mapped_coast_m": 137,
+      "selection_method": "Offshore reference near the publicly identified snorkelling area. Not a surveyed coral patch or an authorization to dive."
+    },
+    {
+      "id": "bai_nam_reef_area",
+      "name": "Vùng nước ven bãi Nam – Sơn Trà",
+      "latitude": 16.102846,
+      "longitude": 108.298691,
+      "coordinate_role": "ACTIVITY_AREA_REFERENCE",
+      "source_ids": [
+        "bai_nam_pin",
+        "city_beaches",
+        "catalog"
+      ],
+      "distance_to_mapped_coast_m": 161,
+      "selection_method": "Water reference outside the resort-side land pin, near the catalog coral-viewing area; exact Loca plot remains unconfirmed."
+    },
+    {
+      "id": "man_thai_nearshore",
+      "name": "Vùng nước ven bãi Mân Thái",
+      "latitude": 16.088058,
+      "longitude": 108.251497,
+      "coordinate_role": "ACTIVITY_AREA_REFERENCE",
+      "source_ids": [
+        "gonchill",
+        "man_thai_pin"
+      ],
+      "distance_to_mapped_coast_m": 161,
+      "selection_method": "Nearshore activity reference, not the parking area or Hon Sup island."
+    },
+    {
+      "id": "son_tra_fishing_area",
+      "name": "Vùng nước phía đông Sơn Trà",
+      "latitude": 16.112,
+      "longitude": 108.326,
+      "coordinate_role": "ACTIVITY_AREA_REFERENCE",
+      "source_ids": [
+        "danafi",
+        "danafi_pro",
+        "catalog"
+      ],
+      "distance_to_mapped_coast_m": 822,
+      "selection_method": "Representative offshore point within the catalog region; not a publicly confirmed fishing ground."
+    },
+    {
+      "id": "tho_quang_offshore",
+      "name": "Vùng nước phía tây Sơn Trà – ngoài khu vực Tiên Sa/Thọ Quang",
+      "latitude": 16.12,
+      "longitude": 108.2045,
+      "coordinate_role": "ACTIVITY_AREA_REFERENCE",
+      "source_ids": [
+        "catalog",
+        "tho_quang_context"
+      ],
+      "distance_to_mapped_coast_m": 558,
+      "selection_method": "Open-water area reference outside port-side land; exact night-fishing position remains unconfirmed."
+    },
+    {
+      "id": "son_tra_cham_route",
+      "name": "Vùng biển giữa Sơn Trà và hướng Cù Lao Chàm",
+      "latitude": 16.04,
+      "longitude": 108.39,
+      "coordinate_role": "ACTIVITY_AREA_REFERENCE",
+      "source_ids": [
+        "catalog"
+      ],
+      "distance_to_mapped_coast_m": 10707,
+      "selection_method": "Single offshore reference inferred from the catalog route; cannot represent the full route or prove the vendor operates here."
+    }
+  ],
+  "services": [
+    {
+      "service_id": "088d874c-a61e-5b58-a7a9-497f32a56901",
+      "service_name": "Mô tô nước – Danabeach",
+      "site_id": "danabeach_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "51 Võ Nguyên Giáp, Đà Nẵng",
+        "location_name": "51 Võ Nguyên Giáp, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "160e67fc-f236-5871-9971-5555cf855d02",
+      "service_name": "Thuê ván SUP – Surf Shack",
+      "site_id": "surf_shack_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": null,
+        "location_name": "Surf Shack beach house; địa chỉ bãi cụ thể cần xác nhận"
+      }
+    },
+    {
+      "service_id": "1dd26db5-f863-5b03-b562-ac46f43df9d2",
+      "service_name": "Lớp học lướt sóng Mỹ Khê – DNOA",
+      "site_id": "my_khe_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": null,
+        "location_name": "Bãi biển Mỹ Khê, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "2cdfabcf-13a2-550a-8f9e-283aad7053c9",
+      "service_name": "Mô tô nước – Kajin Vina",
+      "site_id": "my_khe_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "Bãi biển Mỹ Khê, Đà Nẵng",
+        "location_name": "Bãi biển Mỹ Khê, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "3758c297-54ff-5887-89bd-62220227570b",
+      "service_name": "Dù bay trên biển – Danabeach",
+      "site_id": "danabeach_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "51 Võ Nguyên Giáp, Đà Nẵng",
+        "location_name": "51 Võ Nguyên Giáp, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "4190046d-112a-5b93-beb2-bcc8b1cd16d4",
+      "service_name": "Dù bay trên biển – Kajin Vina",
+      "site_id": "my_khe_offshore",
+      "basis": "Kajin has no independently located public launch point. My Khe is inferred from its jetski catalog entry; this is not operator verification.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": null,
+        "location_name": "Khu vực biển Đà Nẵng (điểm hẹn cần Vendor xác nhận)"
+      }
+    },
+    {
+      "service_id": "4b79c4cd-a138-59ca-83c3-d396c1208ac4",
+      "service_name": "Thuê ván lướt sóng – Surf Shack",
+      "site_id": "surf_shack_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": null,
+        "location_name": "Surf Shack / beach house Mỹ Khê, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "508d4dad-4227-527b-9df3-8416dd870c04",
+      "service_name": "Thuê ván lướt sóng – DNOA",
+      "site_id": "my_khe_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": null,
+        "location_name": "Bãi biển Mỹ Khê, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "5536f743-3b6d-518e-af2b-05634a218195",
+      "service_name": "Câu cá chuyên nghiệp Sơn Trà – DaNaFi",
+      "site_id": "son_tra_fishing_area",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "VARIABLE_OFFSHORE_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": null,
+        "location_name": "Vùng biển bán đảo Sơn Trà, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "57c22a43-22fd-57da-894c-257ade02450d",
+      "service_name": "Lặn ngắm san hô Sơn Trà – Loca Travel",
+      "site_id": "bai_rang_reef_area",
+      "basis": "Corrected the historical Bai Cat Vang location to Bai Rang explicitly listed by the current Loca ticket. Other commercial differences remain unverified.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "Bãi Cát Vàng, Phía Bắc Bán Đảo Sơn Trà, Đà Nẵng",
+        "location_name": "Khu Du Lịch Bãi Cát Vàng, Bán Đảo Sơn Trà"
+      }
+    },
+    {
+      "service_id": "5943ecd7-6480-5b4a-b42b-43abc0988776",
+      "service_name": "Học lướt sóng – Surf Shack",
+      "site_id": "surf_shack_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "Đường Võ Nguyên Giáp, Phước Mỹ, Sơn Trà, Đà Nẵng",
+        "location_name": "Bãi Biển Mỹ Khê"
+      }
+    },
+    {
+      "service_id": "6d4249fe-a82b-5537-a712-818b23c177d2",
+      "service_name": "Kayak kết hợp trải nghiệm biển – DNOA",
+      "site_id": "my_khe_offshore",
+      "basis": "Current DNOA itinerary starts at My Khe and paddles towards Son Tra; removed the unsupported fixed Bai Rang address. Coordinate is only the departure-area water reference.",
+      "assessment_scope": "ROUTE_REFERENCE_ONLY",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "Bãi Rạng, Đường Hoàng Sa, Phường Thọ Quang, Sơn Trà, Đà Nẵng",
+        "location_name": "Bãi Rạng - Bán đảo Sơn Trà, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "83ee83c5-c08b-5f6e-924e-db3ceaacd364",
+      "service_name": "Phao chuối – Danabeach",
+      "site_id": "danabeach_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "51 Võ Nguyên Giáp, Đà Nẵng",
+        "location_name": "51 Võ Nguyên Giáp, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "88e06f4d-fbb7-5700-a45d-0f6ad1cb0d08",
+      "service_name": "Câu cá biển bằng cano riêng – D2Tour",
+      "site_id": "son_tra_cham_route",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "ROUTE_REFERENCE_ONLY",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "Khởi hành từ Bến thuyền Thọ Quang, Đà Nẵng",
+        "location_name": "Vùng Biển Sơn Trà – Cù Lao Chàm"
+      }
+    },
+    {
+      "service_id": "9b3444ce-b7c7-5f40-9f14-2c1ca4258dea",
+      "service_name": "Câu mực đêm – Khuê Nguyễn",
+      "site_id": "tho_quang_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "VARIABLE_OFFSHORE_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "Cảng cá Thọ Quang, phường Thọ Quang, Sơn Trà, Đà Nẵng",
+        "location_name": "Vùng Biển Thọ Quang – Sơn Trà"
+      }
+    },
+    {
+      "service_id": "9b575c51-196b-56eb-940e-aaf2f61c966f",
+      "service_name": "Học kayak và trò chơi Splash & Dash – DNOA",
+      "site_id": "my_khe_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": null,
+        "location_name": "Khu vực biển Mỹ Khê, Đà Nẵng (điểm hẹn cần Vendor xác nhận)"
+      }
+    },
+    {
+      "service_id": "9f4eb04d-9ec6-5295-8de6-475b728e5cfc",
+      "service_name": "Surf tour tìm điểm sóng – Surf Shack",
+      "site_id": "surf_shack_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "ROUTE_REFERENCE_ONLY",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": null,
+        "location_name": "Tuyến điểm sóng Sơn Trà – Hội An"
+      }
+    },
+    {
+      "service_id": "a6f4ab9c-4794-542b-a443-e3013e6bbe47",
+      "service_name": "Câu cá biển Sơn Trà – DaNaFi",
+      "site_id": "son_tra_fishing_area",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "VARIABLE_OFFSHORE_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "Vùng biển bán đảo Sơn Trà, Sơn Trà, Đà Nẵng",
+        "location_name": "Rạn San Hô Bán Đảo Sơn Trà"
+      }
+    },
+    {
+      "service_id": "bf8626cd-2271-59ab-9273-4fdd10eb451e",
+      "service_name": "Thuê kayak đơn hoặc đôi – DNOA",
+      "site_id": "my_khe_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": null,
+        "location_name": "Bãi biển Mỹ Khê, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "c4c56ae2-5f9b-555c-81f1-f0d4c8dd7c1b",
+      "service_name": "Dù bay trên biển – DNOA",
+      "site_id": "my_khe_offshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "Mỹ Khê; điểm hẹn cạnh Beach Bar Da Nang",
+        "location_name": "Mỹ Khê; điểm hẹn cạnh Beach Bar Da Nang"
+      }
+    },
+    {
+      "service_id": "cd0c7a8d-b0b8-579a-968c-a1783174a0fc",
+      "service_name": "Chèo SUP Mân Thái – Go N Chill",
+      "site_id": "man_thai_nearshore",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "NEARSHORE_REFERENCE_NOT_FULL_MORNING_ROUTE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "Đường Hoàng Sa, Phường Mân Thái, Quận Sơn Trà, Đà Nẵng",
+        "location_name": "Bãi tắm Mân Thái, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "d51355fc-bf7e-5366-b199-6272efe7f52b",
+      "service_name": "Lặn ngắm san hô Bãi Nam – Loca Travel",
+      "site_id": "bai_nam_reef_area",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": "Bãi Nam, Đường Hoàng Sa, Phường Thọ Quang, Sơn Trà, Đà Nẵng",
+        "location_name": "Bãi Nam - Bán Đảo Sơn Trà, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "dab42f5f-e61d-5ebf-811d-34ab8d293143",
+      "service_name": "Câu mực đêm có bữa tối – DaNaFi",
+      "site_id": "son_tra_fishing_area",
+      "basis": "Area selected from the catalog location and the cited geographic/operator sources; the exact point is inferred offshore.",
+      "assessment_scope": "VARIABLE_OFFSHORE_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": null,
+        "location_name": "Vùng biển bán đảo Sơn Trà, Đà Nẵng"
+      }
+    },
+    {
+      "service_id": "fd6fced2-812e-56ce-817f-80bb3d0841e9",
+      "service_name": "Phao chuối – Kajin Vina",
+      "site_id": "my_khe_offshore",
+      "basis": "Kajin has no independently located public launch point. My Khe is inferred from its jetski catalog entry; this is not operator verification.",
+      "assessment_scope": "SINGLE_ACTIVITY_AREA_REFERENCE",
+      "operator_confirmed_exact_point": false,
+      "original_location": {
+        "latitude": null,
+        "longitude": null,
+        "address": null,
+        "location_name": "Khu vực biển Đà Nẵng (điểm hẹn cần Vendor xác nhận)"
+      }
+    }
+  ]
+}

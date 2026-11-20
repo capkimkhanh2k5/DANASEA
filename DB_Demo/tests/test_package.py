@@ -1,13 +1,34 @@
 """Offline fixture contract and integrity checks for DANASEA demo data package."""
 from pathlib import Path
-import copy
 import json
+import math
 import runpy
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_DIR = ROOT / 'base' if (ROOT / 'base').is_dir() else ROOT / 'data'
 INSTALLER = runpy.run_path(str(ROOT / 'install_demo_data.py'))
+
+
+def ring_contains(ring, longitude, latitude):
+    inside = False
+    for (x1, y1), (x2, y2) in zip(ring, ring[1:]):
+        if (y1 > latitude) != (y2 > latitude):
+            if longitude < (x2 - x1) * (latitude - y1) / (y2 - y1) + x1:
+                inside = not inside
+    return inside
+
+
+def land_mask_contains(mask, longitude, latitude):
+    for feature in mask['features']:
+        geometry = feature['geometry']
+        polygons = ([geometry['coordinates']] if geometry['type'] == 'Polygon'
+                    else geometry['coordinates'])
+        for rings in polygons:
+            if ring_contains(rings[0], longitude, latitude) and not any(
+                    ring_contains(hole, longitude, latitude) for hole in rings[1:]):
+                return True
+    return False
 
 
 class PackageContract(unittest.TestCase):
@@ -33,6 +54,57 @@ class PackageContract(unittest.TestCase):
         self.assertEqual('DURATION_BASED', services['mo-to-nuoc-kajin-vina'].get('operation_type'))
         self.assertEqual('DURATION_BASED', services['thue-van-sup-surf-shack'].get('operation_type'))
         self.assertEqual('FIXED_DEPARTURE', services['cau-ca-bien-bang-cano-rieng-d2tour'].get('operation_type'))
+
+    def test_weather_sensitive_services_have_valid_coordinates(self):
+        for service in self.rows()['services']:
+            if service['weather_sensitive']:
+                with self.subTest(service=service['name']):
+                    self.assertIsNotNone(service['latitude'])
+                    self.assertIsNotNone(service['longitude'])
+                    self.assertTrue(math.isfinite(float(service['latitude'])))
+                    self.assertTrue(math.isfinite(float(service['longitude'])))
+        self.validate(self.rows())
+
+    def test_missing_or_invalid_weather_coordinates_rejected(self):
+        invalid = [(None, 108.25), (16.05, None), (0, 0),
+                   (91, 108.25), (16.05, 181), (float('nan'), 108.25),
+                   (16.05, float('inf'))]
+        for latitude, longitude in invalid:
+            rows = self.rows()
+            rows['services'][0].update(latitude=latitude, longitude=longitude)
+            with self.subTest(latitude=latitude, longitude=longitude):
+                with self.assertRaisesRegex(ValueError, 'coordinate'):
+                    self.validate(rows)
+
+    def test_service_coordinates_match_sourced_offshore_activity_areas(self):
+        audit = json.loads((ROOT / 'geography/service_coordinates.json').read_text())
+        mask = json.loads((ROOT / 'geography/land_mask.geojson').read_text())
+        services = {s['id']: s for s in self.rows()['services']}
+        self.assertEqual(set(services), {s['service_id'] for s in audit['services']})
+        self.assertEqual(len(services), len(audit['services']))
+        source_ids = {source['id'] for source in audit['sources']}
+        sites = {s['id']: s for s in audit['sites']}
+        self.assertGreater(len(sites), 1, 'The catalog must not share one default weather location')
+        for entry in audit['services']:
+            service = services[entry['service_id']]
+            site = sites[entry['site_id']]
+            lat, lon = service['latitude'], service['longitude']
+            with self.subTest(service=service['name']):
+                self.assertEqual((site['latitude'], site['longitude']), (lat, lon))
+                self.assertTrue(site['source_ids'])
+                self.assertTrue(set(site['source_ids']) <= source_ids)
+                self.assertTrue(entry['basis'])
+                self.assertIsInstance(entry['operator_confirmed_exact_point'], bool)
+                if entry['operator_confirmed_exact_point']:
+                    self.assertTrue(entry.get('operator_confirmation_source'))
+                self.assertGreaterEqual(site['distance_to_mapped_coast_m'], 50)
+                self.assertTrue(any(west <= lon <= east and south <= lat <= north
+                                    for west, south, east, north in mask['coverage_bounds']))
+                self.assertFalse(land_mask_contains(mask, lon, lat), 'Activity point is on mapped land')
+        # Real land controls prevent an empty/broken mask from accepting every coordinate.
+        self.assertTrue(land_mask_contains(mask, 108.2455, 16.0482))  # An Thuong, inland surf shop
+        self.assertTrue(land_mask_contains(mask, 108.30093, 16.10366))  # Bai Nam resort-side pin
+        self.assertTrue(land_mask_contains(mask, 108.226, 16.12))  # Tien Sa peninsula
 
     def test_catalog_media_identifies_the_verified_original(self):
         _, _, manifest = INSTALLER['load_fixtures']()

@@ -1,11 +1,12 @@
 from decimal import Decimal, ROUND_HALF_UP
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 import argparse
 import copy
 import getpass
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -136,7 +137,7 @@ def manifest():
                 hashlib.sha256(path.read_bytes()).hexdigest() == digest,
                 'Manifest mismatch: ' + relative)
     required = {str(p.relative_to(ROOT)).replace('\\', '/') for p in ROOT.rglob('*')
-                if p.is_file() and p.suffix in ('.json', '.py')}
+                if p.is_file() and p.suffix in ('.json', '.geojson', '.py')}
     require(required == {line.split(None, 1)[1].strip() for line in lines if line.strip()},
             'Manifest coverage mismatch')
 
@@ -145,6 +146,13 @@ def validate_rows(rows):
     expected = dict(categories=12, users=35, vendors=16, services=24,
                     service_options=33, service_slots=24, vendor_documents=25, service_images=72)
     require(all(t in rows and len(rows[t]) == n for t, n in expected.items()), 'Unexpected package counts')
+    for service in rows['services']:
+        if service.get('weather_sensitive'):
+            lat, lon = service.get('latitude'), service.get('longitude')
+            require(all(isinstance(value, (int, float)) and not isinstance(value, bool)
+                        and math.isfinite(value) for value in (lat, lon))
+                    and -90 <= lat <= 90 and -180 <= lon <= 180 and (lat, lon) != (0, 0),
+                    f'Missing or invalid weather coordinate: {service["id"]}')
     require('service_safety_documents' in rows, 'Missing safety document dataset')
     ids = [r['id'] for rs in rows.values() for r in rs]
     require(all(str(uuid.UUID(i)) == i for i in ids), 'Invalid fixture UUID')
