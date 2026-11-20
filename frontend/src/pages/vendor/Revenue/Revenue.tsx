@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { vendorSettlementService } from '../../../services/vendorSettlementService';
 import { vendorProfileService, type VendorProfileDto } from '../../../services/vendorProfileService';
 import { vendorOrderService } from '../../../services/vendorOrderService';
+import { vendorService } from '../../../services/vendorService';
 import { getAuthoritativeCustomer } from '../../../data/demoCustomerMap';
-import type { VendorSubOrderDto } from '../../../types/vendorOrder';
+import type { VendorSubOrderDto, VendorBookingItemDto } from '../../../types/vendorOrder';
 import { 
   Printer, 
   Download, 
@@ -82,6 +83,8 @@ export function Revenue() {
 
   // Raw DB data
   const [orders, setOrders] = useState<VendorSubOrderDto[]>([]);
+  const [bookingItems, setBookingItems] = useState<VendorBookingItemDto[]>([]);
+  const [serviceNames, setServiceNames] = useState<Map<string, string>>(new Map());
   const [settlementPeriods, setSettlementPeriods] = useState<SettlementPeriod[]>([]);
   const [vendorProfile, setVendorProfile] = useState<VendorProfileDto | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
@@ -96,15 +99,29 @@ export function Revenue() {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [ordersRes, settleRes] = await Promise.allSettled([
+      const [ordersRes, bookingsRes, settleRes, servicesRes] = await Promise.allSettled([
         vendorOrderService.getVendorOrders(0, 100),
-        vendorSettlementService.getSettlements({ size: 20 })
+        vendorOrderService.getVendorBookings({ page: 0, size: 100 }),
+        vendorSettlementService.getSettlements({ size: 20 }),
+        vendorService.getMyServices(),
       ]);
 
-      if (ordersRes.status === 'fulfilled' && ordersRes.value?.content) {
+      if (ordersRes.status === 'fulfilled' && ordersRes.value?.content && ordersRes.value.content.length > 0) {
         setOrders(ordersRes.value.content);
       } else {
         setOrders([]);
+      }
+
+      if (bookingsRes.status === 'fulfilled' && bookingsRes.value?.content) {
+        setBookingItems(bookingsRes.value.content);
+      } else {
+        setBookingItems([]);
+      }
+
+      if (servicesRes.status === 'fulfilled' && servicesRes.value) {
+        const sMap = new Map<string, string>();
+        servicesRes.value.forEach((s) => sMap.set(s.id, s.name));
+        setServiceNames(sMap);
       }
 
       if (settleRes.status === 'fulfilled' && settleRes.value?.content) {
@@ -135,38 +152,72 @@ export function Revenue() {
     loadData();
   }, [loadData]);
 
-  // Map sub_orders to live cashflow transactions
+  // Map sub_orders or booking_items to live cashflow transactions
   const transactions: CashflowTransaction[] = useMemo(() => {
-    return orders.map((o) => {
-      const gross = Number(o.finalAmount ?? o.subtotalAmount ?? (o.unitPrice * (o.quantity || 1))) || 0;
+    // 1. If we have sub_orders, use them
+    if (orders.length > 0) {
+      return orders.map((o) => {
+        const gross = Number(o.finalAmount ?? o.subtotalAmount ?? (o.unitPrice * (o.quantity || 1))) || 0;
+        const commission = Math.round(gross * 0.1);
+        const net = gross - commission;
+        const createdDate = o.checkedInAt ? new Date(o.checkedInAt) : new Date();
+
+        let cashStatus: CashflowTransaction['status'] = 'ESCROW';
+        if (o.status === 'CHECKED_IN' || o.status === 'COMPLETED') {
+          cashStatus = 'AVAILABLE';
+        } else if (o.status === 'CANCELLED' || o.status === 'REFUNDED') {
+          cashStatus = 'REFUNDED';
+        }
+
+        return {
+          id: o.id,
+          code: `#VE-${o.id.substring(0, 8).toUpperCase()}`,
+          dateStr: o.checkedInAt ? o.checkedInAt.slice(0, 10) : 'Hôm nay',
+          timestamp: createdDate.getTime(),
+          serviceName: serviceNames.get(o.serviceId) || 'Dịch vụ trải nghiệm biển',
+          customerName: (o.customerName && o.customerName !== 'Khách đặt chỗ') ? o.customerName : getAuthoritativeCustomer(o.id).name,
+          quantity: o.quantity || 1,
+          grossAmount: gross,
+          commissionRate: 0.1,
+          commissionAmount: commission,
+          netAmount: net,
+          status: cashStatus,
+          orderStatus: o.status,
+        };
+      });
+    }
+
+    // 2. Authoritative Fallback: map real booking_items from PostgreSQL (/api/vendor/bookings)
+    return bookingItems.map((b) => {
+      const gross = Number(b.subtotal ?? b.price) || 0;
       const commission = Math.round(gross * 0.1);
       const net = gross - commission;
-      const createdDate = new Date();
+      const parsedDate = b.createdAt ? new Date(b.createdAt) : (b.bookingDate ? new Date(b.bookingDate) : new Date());
 
       let cashStatus: CashflowTransaction['status'] = 'ESCROW';
-      if (o.status === 'CHECKED_IN' || o.status === 'COMPLETED') {
+      if (b.bookingStatus === 'CONFIRMED' || b.bookingStatus === 'CHECKED_IN') {
         cashStatus = 'AVAILABLE';
-      } else if (o.status === 'CANCELLED' || o.status === 'REFUNDED') {
+      } else if (b.bookingStatus === 'CANCELLED' || b.bookingStatus === 'REJECTED') {
         cashStatus = 'REFUNDED';
       }
 
       return {
-        id: o.id,
-        code: `#VE-${o.id.substring(0, 8).toUpperCase()}`,
-        dateStr: o.checkedInAt ? o.checkedInAt.slice(0, 10) : 'Hôm nay',
-        timestamp: createdDate.getTime(),
-        serviceName: 'Dịch vụ trải nghiệm biển',
-        customerName: (o.customerName && o.customerName !== 'Khách đặt chỗ') ? o.customerName : getAuthoritativeCustomer(o.id).name,
-        quantity: o.quantity || 1,
+        id: b.itemId || b.bookingId,
+        code: `#VE-${(b.itemId || b.bookingId).substring(0, 8).toUpperCase()}`,
+        dateStr: b.bookingDate || (b.createdAt ? b.createdAt.slice(0, 10) : 'Hôm nay'),
+        timestamp: parsedDate.getTime(),
+        serviceName: serviceNames.get(b.serviceId) || 'Dịch vụ trải nghiệm biển',
+        customerName: getAuthoritativeCustomer(b.itemId || b.bookingId).name,
+        quantity: b.quantity || 1,
         grossAmount: gross,
         commissionRate: 0.1,
         commissionAmount: commission,
         netAmount: net,
         status: cashStatus,
-        orderStatus: o.status,
+        orderStatus: b.bookingStatus,
       };
     });
-  }, [orders]);
+  }, [orders, bookingItems, serviceNames]);
 
   // Filter transactions by time range
   const timeFilteredTransactions = useMemo(() => {

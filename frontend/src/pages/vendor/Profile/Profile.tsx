@@ -537,7 +537,7 @@ export function Profile() {
                 Tài khoản nhận tiền đối soát (Payout)
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Tài khoản này dùng để nhận tiền đối soát doanh thu định kỳ và giải ngân tự động.
+                Tài khoản này dùng để nhận tiền đối soát doanh thu định kỳ và nhận tiền rút về.
               </p>
             </div>
 
