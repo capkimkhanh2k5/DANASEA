@@ -52,7 +52,8 @@ export function Schedule() {
   const [slotsErrorMessage, setSlotsErrorMessage] = useState<string | null>(null);
 
   // Date Filter State
-  const todayStr = new Date().toISOString().split("T")[0];
+  const dateInVietnam = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' });
+  const todayStr = dateInVietnam.format(new Date());
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
 
   // Modal State: Create Slot
@@ -157,6 +158,11 @@ export function Schedule() {
   // Toggle status between OPEN and CLOSED
   const handleToggleStatus = async (slot: VendorServiceSlotDto) => {
     if (!selectedServiceId) return;
+    const currentToday = dateInVietnam.format(new Date());
+    if (slot.date < currentToday) {
+      toast.error("Ca đã qua, không thể chỉnh sửa.");
+      return;
+    }
     const nextStatus: SlotStatus = slot.status === "OPEN" ? "CLOSED" : "OPEN";
     try {
       const updated = await vendorService.updateSlot(selectedServiceId, slot.id, {
@@ -177,6 +183,11 @@ export function Schedule() {
 
   // Open Edit Capacity Modal
   const handleOpenEditCapacity = (slot: VendorServiceSlotDto) => {
+    const currentToday = dateInVietnam.format(new Date());
+    if (slot.date < currentToday) {
+      toast.error("Ca đã qua, không thể chỉnh sửa.");
+      return;
+    }
     setEditingSlot(slot);
     setInputCapacity(slot.capacity);
     setInputStatus(slot.status);
@@ -187,6 +198,11 @@ export function Schedule() {
   const handleSaveCapacity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSlot || !selectedServiceId) return;
+    const currentToday = dateInVietnam.format(new Date());
+    if (editingSlot.date < currentToday) {
+      setCapacityError("Ca đã qua, không thể chỉnh sửa.");
+      return;
+    }
 
     const booked = editingSlot.bookedCount || 0;
     if (inputCapacity < booked) {
@@ -488,6 +504,7 @@ export function Schedule() {
                 const available = slot.availableCapacity != null ? slot.availableCapacity : (slot.capacity - booked);
                 const isClosed = slot.status === "CLOSED";
                 const isFull = available <= 0;
+                const isPastSlot = slot.date < todayStr;
 
                 return (
                   <div
@@ -509,7 +526,15 @@ export function Schedule() {
                         </div>
 
                         <div>
-                          {isClosed ? (
+                          {isPastSlot ? (
+                            (slot.status as string) === "BLOCKED" ? (
+                              <AtlasBadge label="Bị chặn" variant="danger" />
+                            ) : (slot.status as string) === "CANCELLED" ? (
+                              <AtlasBadge label="Đã hủy" variant="danger" />
+                            ) : (
+                              <AtlasBadge label="Ca đã qua" variant="neutral" />
+                            )
+                          ) : isClosed ? (
                             <AtlasBadge label="Đã đóng" variant="neutral" />
                           ) : isFull ? (
                             <AtlasBadge label="Hết chỗ" variant="danger" />
@@ -538,13 +563,17 @@ export function Schedule() {
                         <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                           <div
                             className={`h-full rounded-full transition-all ${
-                              isFull ? "bg-rose-500" : isClosed ? "bg-slate-400" : "bg-slate-900"
+                              isFull ? "bg-rose-500" : isClosed ? "bg-slate-400" : isPastSlot ? "bg-slate-500" : "bg-slate-900"
                             }`}
                             style={{ width: `${Math.min(100, (booked / Math.max(1, slot.capacity)) * 100)}%` }}
                           />
                         </div>
                         <div className="flex justify-between text-xs text-slate-500">
-                          <span>Chỗ khả dụng: <strong className="font-mono text-emerald-700 font-bold">{Math.max(0, available)}</strong></span>
+                          {isPastSlot ? (
+                            <span className="text-slate-500 font-medium">Tỷ lệ lấp đầy</span>
+                          ) : (
+                            <span>Chỗ khả dụng: <strong className="font-mono text-emerald-700 font-bold">{Math.max(0, available)}</strong></span>
+                          )}
                           <span className="font-mono text-slate-400">
                             {Math.round((booked / Math.max(1, slot.capacity)) * 100)}%
                           </span>
@@ -571,23 +600,31 @@ export function Schedule() {
 
                     {/* Actions */}
                     <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                      <AtlasButton
-                        variant={isClosed ? "secondary" : "outline"}
-                        size="sm"
-                        onClick={() => handleToggleStatus(slot)}
-                        icon={isClosed ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                      >
-                        {isClosed ? "Mở nhận khách" : "Đóng ca"}
-                      </AtlasButton>
+                      <span className="inline-block" title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}>
+                        <AtlasButton
+                          variant={isClosed ? "secondary" : "outline"}
+                          size="sm"
+                          disabled={isPastSlot}
+                          title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}
+                          onClick={() => handleToggleStatus(slot)}
+                          icon={isClosed ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                        >
+                          {isClosed ? "Mở nhận khách" : "Đóng ca"}
+                        </AtlasButton>
+                      </span>
 
-                      <AtlasButton
-                        variant="primary"
-                        size="sm"
-                        onClick={() => handleOpenEditCapacity(slot)}
-                        icon={<Edit2 className="w-3.5 h-3.5" />}
-                      >
-                        Điều chỉnh
-                      </AtlasButton>
+                      <span className="inline-block" title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}>
+                        <AtlasButton
+                          variant="primary"
+                          size="sm"
+                          disabled={isPastSlot}
+                          title={isPastSlot ? "Ca đã qua, không thể chỉnh sửa." : undefined}
+                          onClick={() => handleOpenEditCapacity(slot)}
+                          icon={<Edit2 className="w-3.5 h-3.5" />}
+                        >
+                          Điều chỉnh
+                        </AtlasButton>
+                      </span>
                     </div>
                   </div>
                 );

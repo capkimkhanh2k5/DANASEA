@@ -223,6 +223,7 @@ export function AtlasButton({
   onClick,
   icon,
   disabled,
+  title,
   className = '',
   type = 'button',
 }: {
@@ -232,6 +233,7 @@ export function AtlasButton({
   onClick?: () => void;
   icon?: React.ReactNode;
   disabled?: boolean;
+  title?: string;
   className?: string;
   type?: 'button' | 'submit' | 'reset';
 }) {
@@ -252,6 +254,7 @@ export function AtlasButton({
     <button
       type={type}
       disabled={disabled}
+      title={title}
       onClick={onClick}
       className={`inline-flex items-center justify-center font-medium transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
     >
