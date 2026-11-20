@@ -1,6 +1,8 @@
 package com.danasea.backend.modules.service.application.usecases;
 
+import com.danasea.backend.modules.booking.domain.models.Booking;
 import com.danasea.backend.shared.presentation.ApiConflictException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -43,6 +45,11 @@ public class UpdateServiceSlotUseCase {
 
     @Transactional
     public ServiceSlotResponse execute(UUID userId, UUID serviceId, UUID slotId, UpdateServiceSlotRequest request) {
+        return execute(userId, serviceId, slotId, request, LocalDate.now(Booking.VIETNAM_ZONE));
+    }
+
+    @Transactional
+    public ServiceSlotResponse execute(UUID userId, UUID serviceId, UUID slotId, UpdateServiceSlotRequest request, LocalDate referenceDate) {
         if (request == null) {
             throw new IllegalArgumentException("Request cannot be null");
         }
@@ -60,6 +67,11 @@ public class UpdateServiceSlotUseCase {
 
         if (!serviceId.equals(slot.getServiceId())) {
             throw new IllegalArgumentException("Slot does not belong to the specified service");
+        }
+
+        LocalDate today = referenceDate != null ? referenceDate : LocalDate.now(Booking.VIETNAM_ZONE);
+        if (slot.getDate().isBefore(today)) {
+            throw new IllegalArgumentException("Cannot modify a slot from a past date");
         }
 
         if (request.status() == SlotStatus.OPEN && scheduleStore.blocks(serviceId, slot.getDate(), slot.getStartTime())) {
