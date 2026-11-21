@@ -1,9 +1,10 @@
 package com.danasea.backend.modules.vendor.infrastructure.storage;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,13 +12,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.cloudinary.Cloudinary;
+import com.cloudinary.Url;
 import com.danasea.backend.modules.vendor.application.ports.DocumentStoragePort;
 
 @Component
 public class CloudinaryDocumentStorageAdapter implements DocumentStoragePort {
 
     private static final Logger log = LoggerFactory.getLogger(CloudinaryDocumentStorageAdapter.class);
-    private static final int DEFAULT_EXPIRY_SECONDS = 300;
+    private static final Pattern SIGNED_PATTERN = Pattern.compile("/s--[^/]+--/");
+    private static final Pattern VERSION_PATTERN = Pattern.compile("(?:^|/)v(\\d+)/");
 
     private final Cloudinary cloudinary;
 
@@ -54,7 +57,8 @@ public class CloudinaryDocumentStorageAdapter implements DocumentStoragePort {
                 throw new RuntimeException("Cloudinary upload did not return a valid URL.");
             }
 
-            return secureUrl.toString();
+            String uploadedUrl = secureUrl.toString();
+            return buildSignedCdnUrl(uploadResult, uploadedUrl);
         } catch (IOException e) {
             log.error("Failed to read file for Cloudinary upload: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to read file for Cloudinary upload: " + e.getMessage(), e);
@@ -66,7 +70,7 @@ public class CloudinaryDocumentStorageAdapter implements DocumentStoragePort {
 
     @Override
     public String generateDeliveryUrl(String fileUrl) {
-        return generateDeliveryUrl(fileUrl, DEFAULT_EXPIRY_SECONDS);
+        return generateDeliveryUrl(fileUrl, 0);
     }
 
     @Override
@@ -75,19 +79,78 @@ public class CloudinaryDocumentStorageAdapter implements DocumentStoragePort {
             return fileUrl;
         }
 
+        // 1. If URL already has a valid CDN signature, return it directly
+        if (isSignedAuthenticatedUrl(fileUrl)) {
+            return fileUrl;
+        }
+
+        // 2. If authenticated but unsigned, generate Signed CDN Delivery URL using Cloudinary SDK
         try {
             String publicId = extractPublicId(fileUrl);
+            if (publicId == null || publicId.isBlank()) {
+                return fileUrl;
+            }
+
+            String version = extractVersion(fileUrl);
             String format = extractFormat(fileUrl);
-            long expiresAt = Instant.now().getEpochSecond() + expirySeconds;
+            String resourceType = extractResourceType(fileUrl);
 
-            Map<String, Object> options = new HashMap<>();
-            options.put("type", "authenticated");
-            options.put("expires_at", expiresAt);
-
-            return cloudinary.privateDownload(publicId, format != null ? format : "png", options);
+            return generateSignedCdnUrl(publicId, version, format, resourceType);
         } catch (Exception e) {
-            log.warn("Failed to generate private download URL for {}: {}", fileUrl, e.getMessage());
+            log.warn("Failed to generate signed CDN delivery URL for {}: {}", fileUrl, e.getMessage());
             return fileUrl;
+        }
+    }
+
+    public boolean isSignedAuthenticatedUrl(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank() || !fileUrl.contains("/authenticated/")) {
+            return false;
+        }
+        return SIGNED_PATTERN.matcher(fileUrl).find();
+    }
+
+    public String generateSignedCdnUrl(String publicId, String version, String format, String resourceType) {
+        Url urlBuilder = cloudinary.url();
+        if (resourceType != null && !resourceType.isBlank()) {
+            urlBuilder.resourceType(resourceType);
+        } else {
+            urlBuilder.resourceType("image");
+        }
+        urlBuilder.type("authenticated");
+        urlBuilder.secure(true);
+        urlBuilder.signed(true);
+        if (version != null && !version.isBlank()) {
+            urlBuilder.version(version);
+        }
+        String cleanPublicId = publicId;
+        if (format != null && !format.isBlank()) {
+            if (cleanPublicId.endsWith("." + format)) {
+                cleanPublicId = cleanPublicId.substring(0, cleanPublicId.length() - format.length() - 1);
+            }
+            urlBuilder.format(format);
+        }
+        return urlBuilder.generate(cleanPublicId);
+    }
+
+    private String buildSignedCdnUrl(Map<?, ?> uploadResult, String fallbackUrl) {
+        try {
+            String publicId = (String) uploadResult.get("public_id");
+            if (publicId == null || publicId.isBlank()) {
+                return generateDeliveryUrl(fallbackUrl);
+            }
+
+            Object versionObj = uploadResult.get("version");
+            String version = versionObj != null ? String.valueOf(versionObj) : null;
+            String format = (String) uploadResult.get("format");
+            String resourceType = (String) uploadResult.get("resource_type");
+            if (resourceType == null || resourceType.isBlank()) {
+                resourceType = "image";
+            }
+
+            return generateSignedCdnUrl(publicId, version, format, resourceType);
+        } catch (Exception e) {
+            log.warn("Failed to build signed CDN URL from upload result: {}", e.getMessage());
+            return generateDeliveryUrl(fallbackUrl);
         }
     }
 
@@ -116,6 +179,11 @@ public class CloudinaryDocumentStorageAdapter implements DocumentStoragePort {
 
         String pathAfterPrefix = fileUrl.substring(startIndex + prefixLength);
 
+        // Strip signature if present (e.g. "s--signature--/")
+        if (pathAfterPrefix.matches("^s--[^/]+--/.*")) {
+            pathAfterPrefix = pathAfterPrefix.substring(pathAfterPrefix.indexOf('/') + 1);
+        }
+
         if (pathAfterPrefix.matches("^v\\d+/.*")) {
             pathAfterPrefix = pathAfterPrefix.substring(pathAfterPrefix.indexOf('/') + 1);
         } else {
@@ -128,6 +196,11 @@ public class CloudinaryDocumentStorageAdapter implements DocumentStoragePort {
             }
         }
 
+        int queryIndex = pathAfterPrefix.indexOf('?');
+        if (queryIndex != -1) {
+            pathAfterPrefix = pathAfterPrefix.substring(0, queryIndex);
+        }
+
         int dotIndex = pathAfterPrefix.lastIndexOf('.');
         if (dotIndex != -1) {
             pathAfterPrefix = pathAfterPrefix.substring(0, dotIndex);
@@ -136,14 +209,43 @@ public class CloudinaryDocumentStorageAdapter implements DocumentStoragePort {
         return pathAfterPrefix;
     }
 
+    public String extractVersion(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return null;
+        }
+        Matcher matcher = VERSION_PATTERN.matcher(fileUrl);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return null;
+    }
+
     public String extractFormat(String fileUrl) {
         if (fileUrl == null || fileUrl.isBlank()) {
             return null;
         }
-        int dotIndex = fileUrl.lastIndexOf('.');
-        if (dotIndex != -1 && dotIndex > fileUrl.lastIndexOf('/')) {
-            return fileUrl.substring(dotIndex + 1);
+        String cleanUrl = fileUrl;
+        int queryIndex = cleanUrl.indexOf('?');
+        if (queryIndex != -1) {
+            cleanUrl = cleanUrl.substring(0, queryIndex);
+        }
+        int dotIndex = cleanUrl.lastIndexOf('.');
+        if (dotIndex != -1 && dotIndex > cleanUrl.lastIndexOf('/')) {
+            return cleanUrl.substring(dotIndex + 1);
         }
         return null;
+    }
+
+    public String extractResourceType(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return "image";
+        }
+        if (fileUrl.contains("/raw/")) {
+            return "raw";
+        }
+        if (fileUrl.contains("/video/")) {
+            return "video";
+        }
+        return "image";
     }
 }
