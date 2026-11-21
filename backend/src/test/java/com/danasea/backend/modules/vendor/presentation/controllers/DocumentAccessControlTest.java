@@ -17,6 +17,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.Uploader;
+import com.cloudinary.Url;
 import com.danasea.backend.modules.admin.application.usecases.ReviewVendorDocumentUseCase;
 import com.danasea.backend.modules.admin.presentation.AdminVendorDocumentController;
 import com.danasea.backend.modules.service.application.ports.FileStoragePort;
@@ -52,6 +53,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -65,6 +67,9 @@ class DocumentAccessControlTest {
 
     @Mock
     private Uploader uploader;
+
+    @Mock
+    private Url mockUrl;
 
     @Mock
     private JpaVendorRepository vendorRepository;
@@ -107,13 +112,13 @@ class DocumentAccessControlTest {
 
     private final String canonicalVendorDocUrl =
             "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1792170628/danasea_demo_data_package/vendor_documents/4d57d2cc.png";
-    private final String expiringVendorDocUrl =
-            "https://api.cloudinary.com/v1_1/xmxguqpi/image/download?api_key=test&expires_at=9999999999&format=png&public_id=danasea_demo_data_package/vendor_documents/4d57d2cc&signature=sig&timestamp=1000&type=authenticated";
+    private final String signedVendorDocUrl =
+            "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--SIGN1234--/v1792170628/danasea_demo_data_package/vendor_documents/4d57d2cc.png";
 
     private final String canonicalSafetyDocUrl =
             "https://res.cloudinary.com/xmxguqpi/image/authenticated/v1792170628/danasea_demo_data_package/service_safety_documents/02556a44.png";
-    private final String expiringSafetyDocUrl =
-            "https://api.cloudinary.com/v1_1/xmxguqpi/image/download?api_key=test&expires_at=9999999999&format=png&public_id=danasea_demo_data_package/service_safety_documents/02556a44&signature=sig&timestamp=1000&type=authenticated";
+    private final String signedSafetyDocUrl =
+            "https://res.cloudinary.com/xmxguqpi/image/authenticated/s--SIGN5678--/v1792170628/danasea_demo_data_package/service_safety_documents/02556a44.png";
 
     @BeforeEach
     void setUp() throws Exception {
@@ -124,6 +129,14 @@ class DocumentAccessControlTest {
         unrelatedVendorId = UUID.randomUUID();
         customerUserId = UUID.randomUUID();
         serviceId = UUID.randomUUID();
+
+        lenient().when(cloudinary.url()).thenReturn(mockUrl);
+        lenient().when(mockUrl.resourceType(any())).thenReturn(mockUrl);
+        lenient().when(mockUrl.type(any())).thenReturn(mockUrl);
+        lenient().when(mockUrl.secure(anyBoolean())).thenReturn(mockUrl);
+        lenient().when(mockUrl.signed(anyBoolean())).thenReturn(mockUrl);
+        lenient().when(mockUrl.version(any())).thenReturn(mockUrl);
+        lenient().when(mockUrl.format(any())).thenReturn(mockUrl);
 
         documentStorageAdapter = new CloudinaryDocumentStorageAdapter(cloudinary);
         serviceStorageAdapter = new CloudinaryStorageAdapter(cloudinary);
@@ -157,7 +170,7 @@ class DocumentAccessControlTest {
     }
 
     @Test
-    @DisplayName("Owning vendor authorized document access receives expiring private download URL")
+    @DisplayName("Owning vendor authorized document access receives signed CDN delivery URL without expiring privateDownload")
     void testOwningVendorAuthorizedAccess() throws Exception {
         authenticateUser(owningVendorUserId, "VENDOR");
 
@@ -175,16 +188,14 @@ class DocumentAccessControlTest {
         when(vendorDocumentRepository.findByVendorId(owningVendorId)).thenReturn(List.of(entity));
         when(vendorDocumentMapper.toDomain(entity)).thenReturn(domainDoc);
 
-        when(cloudinary.privateDownload(
-                eq("danasea_demo_data_package/vendor_documents/4d57d2cc"),
-                eq("png"),
-                argThat(m -> "authenticated".equals(m.get("type")) && m.containsKey("expires_at"))
-        )).thenReturn(expiringVendorDocUrl);
+        when(mockUrl.generate(eq("danasea_demo_data_package/vendor_documents/4d57d2cc")))
+                .thenReturn(signedVendorDocUrl);
 
         List<VendorDocument> results = getVendorDocumentsUseCase.execute(owningVendorUserId);
 
         assertEquals(1, results.size());
-        assertEquals(expiringVendorDocUrl, results.get(0).getFileUrl());
+        assertEquals(signedVendorDocUrl, results.get(0).getFileUrl());
+        assertFalse(results.get(0).getFileUrl().contains("image/download"));
         // Verify canonical URL was not corrupted in the entity
         assertEquals(canonicalVendorDocUrl, entity.getFileUrl());
     }
@@ -226,7 +237,7 @@ class DocumentAccessControlTest {
     }
 
     @Test
-    @DisplayName("Owning vendor authorized access to own service safety documents succeeds with expiring URL")
+    @DisplayName("Owning vendor authorized access to own service safety documents succeeds with signed CDN URL")
     void testOwningVendorSafetyDocumentAccessAllowed() throws Exception {
         authenticateUser(owningVendorUserId, "VENDOR");
 
@@ -245,11 +256,8 @@ class DocumentAccessControlTest {
         docEntity.setFileUrl(canonicalSafetyDocUrl);
 
         when(getSafetyDocumentsUseCase.execute(serviceId)).thenReturn(List.of(docEntity));
-        when(cloudinary.privateDownload(
-                eq("danasea_demo_data_package/service_safety_documents/02556a44"),
-                eq("png"),
-                argThat(m -> "authenticated".equals(m.get("type")) && m.containsKey("expires_at"))
-        )).thenReturn(expiringSafetyDocUrl);
+        when(mockUrl.generate(eq("danasea_demo_data_package/service_safety_documents/02556a44")))
+                .thenReturn(signedSafetyDocUrl);
 
         ResponseEntity<List<SafetyDocumentResponse>> response =
                 vendorSafetyDocumentController.listSafetyDocuments(serviceId);
@@ -257,11 +265,12 @@ class DocumentAccessControlTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(1, response.getBody().size());
-        assertEquals(expiringSafetyDocUrl, response.getBody().get(0).fileUrl());
+        assertEquals(signedSafetyDocUrl, response.getBody().get(0).fileUrl());
+        assertFalse(response.getBody().get(0).fileUrl().contains("image/download"));
     }
 
     @Test
-    @DisplayName("Admin authorized access to safety documents succeeds with expiring URL")
+    @DisplayName("Admin authorized access to safety documents succeeds with signed CDN URL")
     void testAdminAuthorizedAccessToSafetyDocuments() throws Exception {
         authenticateUser(adminUserId, "ADMIN");
 
@@ -271,11 +280,8 @@ class DocumentAccessControlTest {
         docEntity.setFileUrl(canonicalSafetyDocUrl);
 
         when(getSafetyDocumentsUseCase.execute(serviceId)).thenReturn(List.of(docEntity));
-        when(cloudinary.privateDownload(
-                eq("danasea_demo_data_package/service_safety_documents/02556a44"),
-                eq("png"),
-                argThat(m -> "authenticated".equals(m.get("type")) && m.containsKey("expires_at"))
-        )).thenReturn(expiringSafetyDocUrl);
+        when(mockUrl.generate(eq("danasea_demo_data_package/service_safety_documents/02556a44")))
+                .thenReturn(signedSafetyDocUrl);
 
         ResponseEntity<List<SafetyDocumentResponse>> response =
                 adminSafetyDocumentController.listSafetyDocuments(serviceId);
@@ -283,7 +289,8 @@ class DocumentAccessControlTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(1, response.getBody().size());
-        assertEquals(expiringSafetyDocUrl, response.getBody().get(0).fileUrl());
+        assertEquals(signedSafetyDocUrl, response.getBody().get(0).fileUrl());
+        assertFalse(response.getBody().get(0).fileUrl().contains("image/download"));
     }
 
     @Test
@@ -299,21 +306,20 @@ class DocumentAccessControlTest {
     }
 
     @Test
-    @DisplayName("Canonical authenticated URLs are preserved in DB; expiring URLs never persisted")
-    void testCanonicalUrlsStoredAndExpiringUrlsNeverPersisted() {
+    @DisplayName("Canonical authenticated URLs or signed URLs are preserved in DB; image/download never persisted")
+    void testCanonicalUrlsStoredAndDownloadUrlsNeverPersisted() {
         VendorDocumentJpaEntity entity = new VendorDocumentJpaEntity();
         entity.setFileUrl(canonicalVendorDocUrl);
 
         // Domain conversion and delivery URL generation
         VendorDocument domainDoc = new VendorDocument();
         domainDoc.setFileUrl(canonicalVendorDocUrl);
-        domainDoc.setFileUrl(expiringVendorDocUrl);
+        domainDoc.setFileUrl(signedVendorDocUrl);
 
         // Verification: The underlying entity still holds the canonical URL
         assertEquals(canonicalVendorDocUrl, entity.getFileUrl());
         assertTrue(entity.getFileUrl().contains("/image/authenticated/"));
-        assertFalse(entity.getFileUrl().contains("signature="));
-        assertFalse(entity.getFileUrl().contains("expires_at="));
+        assertFalse(entity.getFileUrl().contains("image/download"));
     }
 
     @Test
