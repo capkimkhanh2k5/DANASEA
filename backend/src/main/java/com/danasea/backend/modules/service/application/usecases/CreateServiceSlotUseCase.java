@@ -91,11 +91,11 @@ public class CreateServiceSlotUseCase {
     }
 
     List<ServiceSlotResponse> createBatch(UUID userId, UUID serviceId, List<CreateServiceSlotRequest> requests) {
+        lockOwnedService(userId, serviceId);
+
         List<ServiceSlot> slots = requests.stream()
                 .map(request -> prepareSlot(serviceId, request))
                 .toList();
-
-        lockOwnedService(userId, serviceId);
         LocalDateTime now = LocalDateTime.now(Booking.VIETNAM_ZONE);
         slots.forEach(slot -> checkAvailability(slot, now, true));
 
