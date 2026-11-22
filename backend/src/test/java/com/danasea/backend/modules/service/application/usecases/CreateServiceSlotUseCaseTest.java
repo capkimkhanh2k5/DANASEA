@@ -231,7 +231,8 @@ class CreateServiceSlotUseCaseTest {
             "2099-01-01,      ,      10:00,              PERSON_LIMIT, error.slot_date_time_required",
             "2099-01-01,      08:00, ,                   PERSON_LIMIT, error.slot_date_time_required",
             "2099-01-01,      08:00, 10:00,              ,             validation.service.slot.inventory.required",
-            "2099-01-01,      08:00, 10:00:00.000000001, PERSON_LIMIT, error.slot_time_precision"
+            "2099-01-01,      08:00, 10:00:00.000000001, PERSON_LIMIT, error.slot_time_precision",
+            "2099-01-01,      08:00:00.000000001, 10:00, PERSON_LIMIT, error.slot_time_precision"
     })
     void invalidDepartureFieldsDoNotReachAvailabilityChecks(LocalDate date, LocalTime start, LocalTime end,
                                                              InventoryType inventoryType, String messageKey) {
@@ -651,5 +652,78 @@ class CreateServiceSlotUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, req))
                 .isInstanceOfSatisfying(LocalizedException.class,
                         error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_option_not_found"));
+    }
+
+    @Test
+    void constructorWithoutServiceOptionRepositorySucceeds() {
+        CreateServiceSlotUseCase noOptionsUseCase = new CreateServiceSlotUseCase(services, slots, vendors, scheduleStore);
+        authorize();
+        when(slots.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        var request = request(InventoryType.PERSON_LIMIT, 10, null);
+        var response = noOptionsUseCase.execute(userId, serviceId, request);
+        assertThat(response).isNotNull();
+        assertThat(response.options()).isEmpty();
+    }
+
+    @Test
+    void createBatchWithoutServiceOptionRepositorySucceeds() {
+        CreateServiceSlotUseCase noOptionsUseCase = new CreateServiceSlotUseCase(services, slots, vendors, scheduleStore);
+        authorize();
+        when(slots.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        var request = request(InventoryType.PERSON_LIMIT, 10, null);
+        var response = noOptionsUseCase.createBatch(userId, serviceId, List.of(request));
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).options()).isEmpty();
+    }
+
+    @Test
+    void slotCreationResolvesOptionFromFindByServiceIdDirectly() {
+        authorize();
+        ServiceOption opt = ServiceOption.builder()
+                .id(defaultOptionId)
+                .serviceId(serviceId)
+                .name("Standard Option")
+                .optionType(OptionType.SHARED)
+                .status(OptionStatus.ACTIVE)
+                .build();
+        when(optionsPort.findByServiceId(serviceId)).thenReturn(List.of(opt));
+        when(slots.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var req = request(InventoryType.PERSON_LIMIT, 10, null);
+        var res = useCase.execute(userId, serviceId, req);
+
+        assertThat(res).isNotNull();
+        assertThat(res.options()).hasSize(1);
+        assertThat(res.options().get(0).name()).isEqualTo("Standard Option");
+    }
+
+    @Test
+    void createBatchWithServiceOptionRepositorySucceeds() {
+        authorize();
+        when(slots.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        var request = request(InventoryType.PERSON_LIMIT, 10, null);
+        var response = useCase.createBatch(userId, serviceId, List.of(request));
+        assertThat(response).hasSize(1);
+        assertThat(response.get(0).options()).hasSize(1);
+    }
+
+    @Test
+    void departureBlockedByOperatingScheduleFails() {
+        authorize();
+        when(scheduleStore.blocks(eq(serviceId), eq(tomorrow), any())).thenReturn(true);
+        var req = request(InventoryType.PERSON_LIMIT, 10, null);
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, req))
+                .isInstanceOf(ServiceSlotCreationException.class)
+                .satisfies(e -> assertThat(((ServiceSlotCreationException) e).getErrorCode()).isEqualTo("OPERATING_SCHEDULE_CONFLICT"));
+    }
+
+    @Test
+    void createBatchWhenSlotAlreadyExistsThrowsConflict() {
+        authorize();
+        when(slots.existsByServiceIdAndDateAndStartTime(eq(serviceId), eq(tomorrow), any())).thenReturn(true);
+        var req = request(InventoryType.PERSON_LIMIT, 10, null);
+        assertThatThrownBy(() -> useCase.createBatch(userId, serviceId, List.of(req)))
+                .isInstanceOf(ServiceSlotCreationException.class)
+                .satisfies(e -> assertThat(((ServiceSlotCreationException) e).getErrorCode()).isEqualTo("SLOT_ALREADY_EXISTS"));
     }
 }

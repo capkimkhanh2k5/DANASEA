@@ -254,20 +254,16 @@ public class CreateServiceSlotUseCase {
         if (!units.isEmpty()) {
             serviceSlotRepository.saveUnits(slot.getId(), units);
         }
-        if (slot.getOptionIds() != null && !slot.getOptionIds().isEmpty()) {
-            serviceSlotRepository.saveSlotOptions(slot.getId(), slot.getOptionIds());
-        }
+        serviceSlotRepository.saveSlotOptions(slot.getId(), slot.getOptionIds());
         return toResponse(saved, units, slot.getOptionIds(), optionMap);
     }
 
     private ServiceSlotResponse toResponse(ServiceSlot s, List<ServiceSlotUnit> units, List<UUID> optionIds, Map<UUID, ServiceOption> optionMap) {
-        List<ServiceSlotUnitResponse> unitResponses = units != null
-                ? units.stream().map(this::toUnitResponse).toList()
-                : List.of();
+        List<ServiceSlotUnitResponse> unitResponses = units.stream().map(this::toUnitResponse).toList();
 
-        List<ServiceSlotOptionSummaryResponse> optionSummaries = optionIds != null ? optionIds.stream()
+        List<ServiceSlotOptionSummaryResponse> optionSummaries = optionIds.stream()
                 .map(id -> {
-                    ServiceOption opt = optionMap != null ? optionMap.get(id) : null;
+                    ServiceOption opt = optionMap.get(id);
                     if (opt == null && serviceOptionRepository != null) {
                         opt = serviceOptionRepository.findById(id).orElse(null);
                     }
@@ -282,12 +278,11 @@ public class CreateServiceSlotUseCase {
                         o.getPrice(),
                         o.getMaxPaxPerPackage()
                 ))
-                .toList() : List.of();
+                .toList();
 
-        UUID singleOptionId = (optionIds != null && optionIds.size() == 1) ? optionIds.get(0) : s.getOptionId();
-        OptionType singleOptionType = (optionSummaries.size() == 1)
-                ? optionSummaries.get(0).optionType()
-                : (optionSummaries.stream().map(ServiceSlotOptionSummaryResponse::optionType).distinct().count() == 1 && !optionSummaries.isEmpty()
+        UUID singleOptionId = (optionIds.size() == 1) ? optionIds.get(0) : s.getOptionId();
+        OptionType singleOptionType = optionSummaries.isEmpty() ? null
+                : (optionSummaries.stream().map(ServiceSlotOptionSummaryResponse::optionType).distinct().count() == 1
                         ? optionSummaries.get(0).optionType()
                         : null);
         String singleOptionName = (optionSummaries.size() == 1) ? optionSummaries.get(0).name() : null;
