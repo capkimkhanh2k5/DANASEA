@@ -256,22 +256,23 @@ public class OperatingScheduleUseCase {
         }
         for (var rule : schedule.rules()) {
             List<UUID> optionIds = rule.optionIds();
-            if (optionIds != null && !optionIds.isEmpty()) {
-                if (new HashSet<>(optionIds).size() != optionIds.size()) {
-                    throw new IllegalArgumentException("Weekly rules cannot contain duplicate options");
+            if (optionIds == null || optionIds.isEmpty()) {
+                throw new IllegalArgumentException("Schedule rule must specify at least one optionId");
+            }
+            if (new HashSet<>(optionIds).size() != optionIds.size()) {
+                throw new IllegalArgumentException("Weekly rules cannot contain duplicate options");
+            }
+            for (UUID optId : optionIds) {
+                var opt = serviceOptions.findById(optId)
+                        .orElseThrow(() -> new IllegalArgumentException("Option not found: " + optId));
+                if (!serviceId.equals(opt.getServiceId())) {
+                    throw new IllegalArgumentException("Option " + optId + " does not belong to service " + serviceId);
                 }
-                for (UUID optId : optionIds) {
-                    var opt = serviceOptions.findById(optId)
-                            .orElseThrow(() -> new IllegalArgumentException("Option not found: " + optId));
-                    if (!serviceId.equals(opt.getServiceId())) {
-                        throw new IllegalArgumentException("Option " + optId + " does not belong to service " + serviceId);
-                    }
-                    if (!opt.isActive()) {
-                        throw new IllegalArgumentException("Option " + optId + " is not active");
-                    }
-                    if (opt.isPrivate() && !InventoryType.SHARED_CAPACITY_UNITS.equals(rule.inventoryType())) {
-                        throw new IllegalArgumentException("Private options require shared capacity units");
-                    }
+                if (!opt.isActive()) {
+                    throw new IllegalArgumentException("Option " + optId + " is not active");
+                }
+                if (opt.isPrivate() && !InventoryType.SHARED_CAPACITY_UNITS.equals(rule.inventoryType())) {
+                    throw new IllegalArgumentException("Private options require shared capacity units");
                 }
             }
         }

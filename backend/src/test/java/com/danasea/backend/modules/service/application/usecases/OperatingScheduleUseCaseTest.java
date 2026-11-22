@@ -160,18 +160,19 @@ class OperatingScheduleUseCaseTest {
     }
 
     @Test
-    @DisplayName("Lưu lịch (PUT): Rule không có optionId -> cho phép lưu cấu hình lịch nhưng không sinh ca rỗng gói")
-    void putSchedule_withoutOptionIds_doesNotCreateSlots() {
+    @DisplayName("Lưu lịch (PUT): Rule không có optionId -> bị từ chối rõ ràng, không âm thầm bỏ qua")
+    void putSchedule_withoutOptionIds_fails() {
         OperatingSchedule.WeeklyRule ruleWithoutOptions = new OperatingSchedule.WeeklyRule(
                 tomorrow.getDayOfWeek(), LocalTime.of(8, 0), LocalTime.of(10, 0),
                 InventoryType.PERSON_LIMIT, 10, List.of(), List.of()
         );
         OperatingSchedule schedule = new OperatingSchedule(tomorrow, tomorrow.plusDays(7), true, List.of(ruleWithoutOptions));
 
-        var result = useCase.put(userId, serviceId, schedule);
+        assertThatThrownBy(() -> useCase.put(userId, serviceId, schedule))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Schedule rule must specify at least one optionId");
 
-        assertThat(result.createdSlots()).isZero();
-        verify(store, never()).insertDeparture(any(), any());
+        verify(store, never()).save(any(), any());
     }
 
     @Test
