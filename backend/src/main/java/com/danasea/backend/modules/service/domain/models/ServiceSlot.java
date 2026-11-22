@@ -21,6 +21,7 @@ import lombok.experimental.SuperBuilder;
 @EqualsAndHashCode(callSuper = true)
 public class ServiceSlot extends BaseDomainModel {
     private UUID serviceId;
+    private UUID optionId;
     private LocalDate date;
     private LocalTime startTime;
     private LocalTime endTime;

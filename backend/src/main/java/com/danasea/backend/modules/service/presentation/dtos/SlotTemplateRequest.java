@@ -2,6 +2,7 @@ package com.danasea.backend.modules.service.presentation.dtos;
 
 import java.time.LocalTime;
 import java.util.List;
+import java.util.UUID;
 
 import com.danasea.backend.modules.service.domain.models.InventoryType;
 
@@ -21,5 +22,13 @@ public record SlotTemplateRequest(
         Integer capacity,
 
         @Valid
-        List<CreateSlotUnitRequest> units
-) {}
+        List<CreateSlotUnitRequest> units,
+
+        @NotNull(message = "{validation.service.slot.option.required}")
+        UUID optionId
+) {
+    public SlotTemplateRequest(LocalTime startTime, LocalTime endTime, InventoryType inventoryType,
+                               Integer capacity, List<CreateSlotUnitRequest> units) {
+        this(startTime, endTime, inventoryType, capacity, units, null);
+    }
+}

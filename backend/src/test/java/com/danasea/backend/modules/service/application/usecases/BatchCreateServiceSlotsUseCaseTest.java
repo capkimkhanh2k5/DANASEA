@@ -23,17 +23,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import com.danasea.backend.modules.booking.domain.models.Booking;
+import com.danasea.backend.modules.service.domain.exceptions.InvalidServiceStateException;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceSlotCreationException;
 import com.danasea.backend.modules.service.domain.exceptions.UnauthorizedServiceAccessException;
 import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedException;
 import com.danasea.backend.modules.service.domain.models.InventoryType;
 import com.danasea.backend.modules.service.domain.models.Service;
+import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
@@ -59,6 +63,7 @@ class BatchCreateServiceSlotsUseCaseTest {
     private UUID userId;
     private UUID vendorId;
     private UUID serviceId;
+    private UUID defaultOptionId;
     private LocalDate nextMonday;
     private LocalDate nextSunday;
 
@@ -75,6 +80,7 @@ class BatchCreateServiceSlotsUseCaseTest {
         userId = UUID.randomUUID();
         vendorId = UUID.randomUUID();
         serviceId = UUID.randomUUID();
+        defaultOptionId = UUID.randomUUID();
 
         // Calculate next Monday in Vietnam zone
         LocalDate today = LocalDate.now(Booking.VIETNAM_ZONE);
@@ -92,12 +98,28 @@ class BatchCreateServiceSlotsUseCaseTest {
         Service service = Service.builder()
                 .id(serviceId)
                 .vendorId(ownerVendorId)
+                .status(ServiceStatus.PUBLISHED)
                 .build();
         when(serviceRepository.findByIdForUpdate(serviceId)).thenReturn(Optional.of(service));
     }
 
     private SlotTemplateRequest template(LocalTime start, LocalTime end, int capacity) {
-        return new SlotTemplateRequest(start, end, InventoryType.PERSON_LIMIT, capacity, null);
+        return new SlotTemplateRequest(start, end, InventoryType.PERSON_LIMIT, capacity, null, defaultOptionId);
+    }
+
+    @Test
+    void templateMissingOptionIdIsRejected() {
+        authorize(vendorId);
+        var request = new BatchCreateServiceSlotsRequest(
+                nextMonday,
+                nextMonday,
+                Set.of(DayOfWeek.MONDAY),
+                List.of(new SlotTemplateRequest(LocalTime.of(8, 0), LocalTime.of(10, 0), InventoryType.PERSON_LIMIT, 10, null, null))
+        );
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, request))
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_option_required"));
     }
 
     @Test
@@ -200,7 +222,7 @@ class BatchCreateServiceSlotsUseCaseTest {
         var request = new BatchCreateServiceSlotsRequest(
                 nextMonday, nextMonday.plusDays(30), Set.of(DayOfWeek.values()),
                 List.of(new SlotTemplateRequest(LocalTime.of(8, 0), LocalTime.of(10, 0),
-                        InventoryType.SHARED_CAPACITY_UNITS, null, units)));
+                        InventoryType.SHARED_CAPACITY_UNITS, null, units, defaultOptionId)));
 
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, request))
                 .isInstanceOfSatisfying(LocalizedException.class,
@@ -480,7 +502,8 @@ class BatchCreateServiceSlotsUseCaseTest {
                 LocalTime.of(10, 0),
                 InventoryType.SHARED_CAPACITY_UNITS,
                 null,
-                units
+                units,
+                defaultOptionId
         );
 
         var request = new BatchCreateServiceSlotsRequest(
@@ -497,5 +520,34 @@ class BatchCreateServiceSlotsUseCaseTest {
         assertThat(slot.capacity()).isEqualTo(10);
         assertThat(slot.inventoryType()).isEqualTo(InventoryType.SHARED_CAPACITY_UNITS);
         verify(serviceSlotRepository).saveUnits(eq(slot.id()), anyList());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = ServiceStatus.class, mode = EnumSource.Mode.EXCLUDE, names = {"PUBLISHED"})
+    @DisplayName("Batch tạo ca bị từ chối nếu Service không ở trạng thái PUBLISHED")
+    void batchCreateSlots_whenServiceNotPublished_throwsInvalidServiceStateException(ServiceStatus nonPublishedStatus) {
+        Vendor vendor = new Vendor();
+        vendor.setId(vendorId);
+        vendor.setUserId(userId);
+        when(vendorPort.findByUserId(userId)).thenReturn(Optional.of(vendor));
+        Service service = Service.builder()
+                .id(serviceId)
+                .vendorId(vendorId)
+                .status(nonPublishedStatus)
+                .build();
+        when(serviceRepository.findByIdForUpdate(serviceId)).thenReturn(Optional.of(service));
+
+        var request = new BatchCreateServiceSlotsRequest(
+                nextMonday,
+                nextMonday,
+                Set.of(DayOfWeek.MONDAY),
+                List.of(template(LocalTime.of(8, 0), LocalTime.of(10, 0), 10))
+        );
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, request))
+                .isInstanceOf(InvalidServiceStateException.class)
+                .hasMessageContaining("Service must be PUBLISHED");
+
+        verify(serviceSlotRepository, never()).save(any());
     }
 }

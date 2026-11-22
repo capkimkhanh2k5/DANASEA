@@ -181,6 +181,11 @@ public class CreateBookingHoldUseCase {
         for (AggregationKey key : orderedKeys) {
             int qty = aggregatedQuantities.get(key);
             SlotValidationDetails details = slotDetailsMap.get(key.slotId());
+            if (details.getOptionId() != null) {
+                if (key.optionId() == null || !details.getOptionId().equals(key.optionId())) {
+                    throw new IllegalArgumentException("Slot is bound to option " + details.getOptionId() + " but booking requested " + key.optionId());
+                }
+            }
             SlotValidationDetails.ServiceOptionValidationDetails option = resolveOption(details, key.optionId());
             if (option != null && option.isPrivate()) {
                 if (!InventoryType.SHARED_CAPACITY_UNITS.equals(details.getInventoryType())) {

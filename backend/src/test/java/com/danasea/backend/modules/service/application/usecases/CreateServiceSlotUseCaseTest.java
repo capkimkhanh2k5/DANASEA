@@ -47,6 +47,12 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
+import com.danasea.backend.modules.service.domain.exceptions.ServiceSlotCreationException;
+import com.danasea.backend.modules.service.domain.models.OptionStatus;
+import com.danasea.backend.modules.service.domain.models.OptionType;
+import com.danasea.backend.modules.service.domain.models.ServiceOption;
+import com.danasea.backend.modules.service.domain.ports.ServiceOptionRepositoryPort;
+import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotResponse;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,20 +61,31 @@ class CreateServiceSlotUseCaseTest {
     @Mock private ServiceSlotRepositoryPort slots;
     @Mock private VendorPort vendors;
     @Mock private OperatingScheduleStore scheduleStore;
+    @Mock private ServiceOptionRepositoryPort optionsPort;
     @Captor private ArgumentCaptor<List<ServiceSlotUnit>> unitsCaptor;
     private CreateServiceSlotUseCase useCase;
     private UUID userId;
     private UUID vendorId;
     private UUID serviceId;
     private LocalDate tomorrow;
+    private UUID defaultOptionId;
 
     @BeforeEach
     void setUp() {
-        useCase = new CreateServiceSlotUseCase(services, slots, vendors, scheduleStore);
+        useCase = new CreateServiceSlotUseCase(services, slots, vendors, scheduleStore, optionsPort);
         userId = UUID.randomUUID();
         vendorId = UUID.randomUUID();
         serviceId = UUID.randomUUID();
         tomorrow = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(1);
+        defaultOptionId = UUID.randomUUID();
+        ServiceOption defaultOption = ServiceOption.builder()
+                .id(defaultOptionId)
+                .serviceId(serviceId)
+                .name("Standard Option")
+                .optionType(OptionType.SHARED)
+                .status(OptionStatus.ACTIVE)
+                .build();
+        org.mockito.Mockito.lenient().when(optionsPort.findById(defaultOptionId)).thenReturn(Optional.of(defaultOption));
     }
 
     @Test
@@ -201,7 +218,7 @@ class CreateServiceSlotUseCaseTest {
         authorize();
         LocalDateTime past = LocalDate.now(Booking.VIETNAM_ZONE).minusDays(1).atTime(8, 0);
         var request = new CreateServiceSlotRequest(past.toLocalDate(), past.toLocalTime(),
-                past.toLocalTime().plusMinutes(30), InventoryType.PERSON_LIMIT, 2, null);
+                past.toLocalTime().plusMinutes(30), InventoryType.PERSON_LIMIT, 2, null, defaultOptionId);
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, request))
                 .isInstanceOfSatisfying(LocalizedException.class,
                         error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_past"));
@@ -331,7 +348,7 @@ class CreateServiceSlotUseCaseTest {
     }
 
     private CreateServiceSlotRequest request(InventoryType inventoryType, Integer capacity, List<CreateSlotUnitRequest> units) {
-        return new CreateServiceSlotRequest(tomorrow, LocalTime.of(9, 0), LocalTime.of(10, 0), inventoryType, capacity, units);
+        return new CreateServiceSlotRequest(tomorrow, LocalTime.of(9, 0), LocalTime.of(10, 0), inventoryType, capacity, units, defaultOptionId);
     }
 
     private void vendor() {
@@ -371,5 +388,136 @@ class CreateServiceSlotUseCaseTest {
     private void noWrites() {
         verify(slots, never()).save(any());
         verify(slots, never()).saveUnits(any(), anyList());
+    }
+
+    @Test
+    void slotCreationWithOptionIdBindsOptionSuccessfully() {
+        authorize();
+        UUID optionId = UUID.randomUUID();
+        ServiceOption option = ServiceOption.builder()
+                .id(optionId)
+                .serviceId(serviceId)
+                .optionType(OptionType.SHARED)
+                .status(OptionStatus.ACTIVE)
+                .build();
+        when(optionsPort.findById(optionId)).thenReturn(Optional.of(option));
+        when(slots.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateServiceSlotRequest req = new CreateServiceSlotRequest(
+                tomorrow, LocalTime.of(8, 0), LocalTime.of(9, 0),
+                InventoryType.PERSON_LIMIT, 10, null, optionId);
+
+        ServiceSlotResponse res = useCase.execute(userId, serviceId, req);
+
+        assertThat(res.optionId()).isEqualTo(optionId);
+    }
+
+    @Test
+    void slotCreationWithPrivateOptionRequiresSharedCapacityUnits() {
+        authorize();
+        UUID optionId = UUID.randomUUID();
+        ServiceOption privateOption = ServiceOption.builder()
+                .id(optionId)
+                .serviceId(serviceId)
+                .optionType(OptionType.PRIVATE)
+                .status(OptionStatus.ACTIVE)
+                .build();
+        when(optionsPort.findById(optionId)).thenReturn(Optional.of(privateOption));
+
+        // When inventoryType is PERSON_LIMIT for PRIVATE option -> throw exception
+        CreateServiceSlotRequest req = new CreateServiceSlotRequest(
+                tomorrow, LocalTime.of(8, 0), LocalTime.of(9, 0),
+                InventoryType.PERSON_LIMIT, 10, null, optionId);
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, req))
+                .isInstanceOfSatisfying(com.danasea.backend.shared.i18n.LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_private_requires_shared_capacity_units"));
+    }
+
+    @Test
+    void slotCreationWithPrivateOptionAndSharedCapacityUnitsSucceeds() {
+        authorize();
+        UUID optionId = UUID.randomUUID();
+        ServiceOption privateOption = ServiceOption.builder()
+                .id(optionId)
+                .serviceId(serviceId)
+                .optionType(OptionType.PRIVATE)
+                .status(OptionStatus.ACTIVE)
+                .build();
+        when(optionsPort.findById(optionId)).thenReturn(Optional.of(privateOption));
+        when(slots.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateServiceSlotRequest req = new CreateServiceSlotRequest(
+                tomorrow, LocalTime.of(8, 0), LocalTime.of(9, 0),
+                InventoryType.SHARED_CAPACITY_UNITS, null,
+                List.of(new CreateSlotUnitRequest(1, 4)), optionId);
+
+        ServiceSlotResponse res = useCase.execute(userId, serviceId, req);
+
+        assertThat(res.optionId()).isEqualTo(optionId);
+        assertThat(res.inventoryType()).isEqualTo(InventoryType.SHARED_CAPACITY_UNITS);
+    }
+
+    @Test
+    void slotCreationWithoutOptionIdFails() {
+        authorize();
+        CreateServiceSlotRequest req = new CreateServiceSlotRequest(
+                tomorrow, LocalTime.of(8, 0), LocalTime.of(9, 0),
+                InventoryType.PERSON_LIMIT, 10, null, null);
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, req))
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_option_required"));
+    }
+
+    @Test
+    void slotCreationWithInactiveOptionFails() {
+        authorize();
+        UUID inactiveOptId = UUID.randomUUID();
+        when(optionsPort.findById(inactiveOptId)).thenReturn(Optional.of(ServiceOption.builder()
+                .id(inactiveOptId)
+                .serviceId(serviceId)
+                .status(OptionStatus.INACTIVE)
+                .build()));
+
+        CreateServiceSlotRequest req = new CreateServiceSlotRequest(
+                tomorrow, LocalTime.of(8, 0), LocalTime.of(9, 0),
+                InventoryType.PERSON_LIMIT, 10, null, inactiveOptId);
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, req))
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_option_inactive"));
+    }
+
+    @Test
+    void slotCreationWithOptionBelongingToDifferentServiceFails() {
+        authorize();
+        UUID otherOptId = UUID.randomUUID();
+        when(optionsPort.findById(otherOptId)).thenReturn(Optional.of(ServiceOption.builder()
+                .id(otherOptId)
+                .serviceId(UUID.randomUUID())
+                .status(OptionStatus.ACTIVE)
+                .build()));
+
+        CreateServiceSlotRequest req = new CreateServiceSlotRequest(
+                tomorrow, LocalTime.of(8, 0), LocalTime.of(9, 0),
+                InventoryType.PERSON_LIMIT, 10, null, otherOptId);
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, req))
+                .isInstanceOfSatisfying(LocalizedException.class,
+                        error -> assertThat(error.getMessageRef().key()).isEqualTo("error.slot_option_not_owned"));
+    }
+
+    @Test
+    void slotCreationMapsOptionTypeAndOptionNameToResponse() {
+        authorize();
+        when(slots.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateServiceSlotRequest req = request(InventoryType.PERSON_LIMIT, 10, null);
+        ServiceSlotResponse res = useCase.execute(userId, serviceId, req);
+
+        assertThat(res.optionId()).isEqualTo(defaultOptionId);
+        assertThat(res.optionType()).isEqualTo(OptionType.SHARED);
+        assertThat(res.optionName()).isEqualTo("Standard Option");
     }
 }

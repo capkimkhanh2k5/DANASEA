@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.danasea.backend.modules.service.domain.models.InventoryType;
+import com.danasea.backend.modules.service.domain.models.OptionType;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import lombok.Builder;
 
@@ -13,6 +14,9 @@ import lombok.Builder;
 public record ServiceSlotResponse(
         UUID id,
         UUID serviceId,
+        UUID optionId,
+        OptionType optionType,
+        String optionName,
         LocalDate date,
         LocalTime startTime,
         LocalTime endTime,
@@ -22,4 +26,20 @@ public record ServiceSlotResponse(
         Integer bookedCount,
         Integer availableCapacity,
         List<ServiceSlotUnitResponse> units
-) {}
+) {
+    public ServiceSlotResponse(
+            UUID id,
+            UUID serviceId,
+            UUID optionId,
+            LocalDate date,
+            LocalTime startTime,
+            LocalTime endTime,
+            SlotStatus status,
+            InventoryType inventoryType,
+            Integer capacity,
+            Integer bookedCount,
+            Integer availableCapacity,
+            List<ServiceSlotUnitResponse> units) {
+        this(id, serviceId, optionId, null, null, date, startTime, endTime, status, inventoryType, capacity, bookedCount, availableCapacity, units);
+    }
+}

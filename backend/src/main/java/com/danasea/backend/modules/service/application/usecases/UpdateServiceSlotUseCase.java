@@ -19,9 +19,11 @@ import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundExce
 import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedException;
 import com.danasea.backend.modules.service.domain.models.InventoryType;
 import com.danasea.backend.modules.service.domain.models.Service;
+import com.danasea.backend.modules.service.domain.models.ServiceOption;
 import com.danasea.backend.modules.service.domain.models.ServiceSlot;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.domain.models.ServiceSlotUnit;
+import com.danasea.backend.modules.service.domain.ports.ServiceOptionRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
@@ -32,16 +34,39 @@ import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotUnitResp
 import com.danasea.backend.modules.service.presentation.dtos.UpdateServiceSlotRequest;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 public class UpdateServiceSlotUseCase {
 
     private final ServiceRepositoryPort serviceRepository;
     private final ServiceSlotRepositoryPort serviceSlotRepository;
     private final VendorPort vendorPort;
     private final OperatingScheduleStore scheduleStore;
+    private final ServiceOptionRepositoryPort serviceOptionRepository;
+
+    @Autowired
+    public UpdateServiceSlotUseCase(
+            ServiceRepositoryPort serviceRepository,
+            ServiceSlotRepositoryPort serviceSlotRepository,
+            VendorPort vendorPort,
+            OperatingScheduleStore scheduleStore,
+            ServiceOptionRepositoryPort serviceOptionRepository) {
+        this.serviceRepository = serviceRepository;
+        this.serviceSlotRepository = serviceSlotRepository;
+        this.vendorPort = vendorPort;
+        this.scheduleStore = scheduleStore;
+        this.serviceOptionRepository = serviceOptionRepository;
+    }
+
+    public UpdateServiceSlotUseCase(
+            ServiceRepositoryPort serviceRepository,
+            ServiceSlotRepositoryPort serviceSlotRepository,
+            VendorPort vendorPort,
+            OperatingScheduleStore scheduleStore) {
+        this(serviceRepository, serviceSlotRepository, vendorPort, scheduleStore, null);
+    }
 
     @Transactional
     public ServiceSlotResponse execute(UUID userId, UUID serviceId, UUID slotId, UpdateServiceSlotRequest request) {
@@ -181,9 +206,16 @@ public class UpdateServiceSlotUseCase {
                 ? units.stream().map(this::toUnitResponse).toList()
                 : List.of();
 
+        ServiceOption option = (serviceOptionRepository != null && s.getOptionId() != null)
+                ? serviceOptionRepository.findById(s.getOptionId()).orElse(null)
+                : null;
+
         return ServiceSlotResponse.builder()
                 .id(s.getId())
                 .serviceId(s.getServiceId())
+                .optionId(s.getOptionId())
+                .optionType(option != null ? option.getOptionType() : null)
+                .optionName(option != null ? option.getName() : null)
                 .date(s.getDate())
                 .startTime(s.getStartTime())
                 .endTime(s.getEndTime())

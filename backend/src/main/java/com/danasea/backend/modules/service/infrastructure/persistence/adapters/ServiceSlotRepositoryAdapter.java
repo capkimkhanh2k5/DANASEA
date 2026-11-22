@@ -249,6 +249,7 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
         ServiceSlotJpaEntity entity = new ServiceSlotJpaEntity();
         entity.setId(domain.getId());
         entity.setServiceId(domain.getServiceId());
+        entity.setOptionId(domain.getOptionId());
         entity.setDate(domain.getDate());
         entity.setStartTime(domain.getStartTime());
         entity.setEndTime(domain.getEndTime());
@@ -265,6 +266,7 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
         if (entity == null) return null;
         ServiceSlot domain = ServiceSlot.builder()
                 .serviceId(entity.getServiceId())
+                .optionId(entity.getOptionId())
                 .date(entity.getDate())
                 .startTime(entity.getStartTime())
                 .endTime(entity.getEndTime())

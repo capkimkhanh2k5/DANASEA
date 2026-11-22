@@ -28,6 +28,7 @@ public class SlotValidationDetails {
     private UUID slotId;
     private UUID serviceId;
     private UUID vendorId;
+    private UUID optionId;
     private String serviceName;
     private LocalDate bookingDate;
     private LocalTime bookingTime;

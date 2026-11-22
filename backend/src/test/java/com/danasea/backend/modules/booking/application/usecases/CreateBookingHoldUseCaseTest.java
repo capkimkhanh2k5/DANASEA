@@ -434,4 +434,39 @@ class CreateBookingHoldUseCaseTest {
         verify(inventoryLockPort, never()).acquireHolds(any(), any(), any());
         verify(bookingRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("Should reject booking when slot is bound to option A but booking requests option B")
+    void testSlotOptionMismatch_RejectsBooking() {
+        UUID customerId = UUID.randomUUID();
+        UUID slotId = UUID.randomUUID();
+        UUID optionA = UUID.randomUUID();
+        UUID optionB = UUID.randomUUID();
+
+        SlotValidationDetails details = SlotValidationDetails.builder()
+                .slotId(slotId)
+                .serviceId(UUID.randomUUID())
+                .vendorId(UUID.randomUUID())
+                .optionId(optionA)
+                .bookingDate(LocalDate.now().plusDays(1))
+                .bookingTime(LocalTime.of(10, 0))
+                .capacity(10)
+                .bookedCount(0)
+                .status(SlotStatus.OPEN)
+                .servicePublished(true)
+                .build();
+
+        when(serviceSlotPort.findSlotDetailsBatch(List.of(slotId))).thenReturn(List.of(details));
+
+        CreateBookingHoldCommand command = new CreateBookingHoldCommand(
+                customerId,
+                List.of(new BookingHoldItemDto(slotId, 1, optionB, null, false, null))
+        );
+
+        assertThatThrownBy(() -> useCase.execute(command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Slot is bound to option");
+
+        verify(inventoryLockPort, never()).acquireHolds(any(), any(), any());
+    }
 }

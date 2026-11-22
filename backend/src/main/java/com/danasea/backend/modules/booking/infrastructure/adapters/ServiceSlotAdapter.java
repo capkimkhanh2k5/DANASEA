@@ -122,6 +122,7 @@ public class ServiceSlotAdapter implements ServiceSlotPort {
                     return SlotValidationDetails.builder()
                             .slotId(slot.getId())
                             .serviceId(slot.getServiceId())
+                            .optionId(slot.getOptionId())
                             .vendorId(service != null ? service.getVendorId() : null)
                             .serviceName(service != null ? service.getName() : null)
                             .bookingDate(slot.getDate())

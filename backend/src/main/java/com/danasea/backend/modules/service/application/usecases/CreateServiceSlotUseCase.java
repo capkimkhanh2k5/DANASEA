@@ -7,9 +7,13 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,9 +22,11 @@ import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundExce
 import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedException;
 import com.danasea.backend.modules.service.domain.models.InventoryType;
 import com.danasea.backend.modules.service.domain.models.Service;
+import com.danasea.backend.modules.service.domain.models.ServiceOption;
 import com.danasea.backend.modules.service.domain.models.ServiceSlot;
 import com.danasea.backend.modules.service.domain.models.ServiceSlotUnit;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
+import com.danasea.backend.modules.service.domain.ports.ServiceOptionRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
@@ -31,16 +37,36 @@ import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotResponse
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotUnitResponse;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 
-import lombok.RequiredArgsConstructor;
-
 @Component
-@RequiredArgsConstructor
 public class CreateServiceSlotUseCase {
 
     private final ServiceRepositoryPort serviceRepository;
     private final ServiceSlotRepositoryPort serviceSlotRepository;
     private final VendorPort vendorPort;
     private final OperatingScheduleStore scheduleStore;
+    private final ServiceOptionRepositoryPort serviceOptionRepository;
+
+    @Autowired
+    public CreateServiceSlotUseCase(
+            ServiceRepositoryPort serviceRepository,
+            ServiceSlotRepositoryPort serviceSlotRepository,
+            VendorPort vendorPort,
+            OperatingScheduleStore scheduleStore,
+            ServiceOptionRepositoryPort serviceOptionRepository) {
+        this.serviceRepository = serviceRepository;
+        this.serviceSlotRepository = serviceSlotRepository;
+        this.vendorPort = vendorPort;
+        this.scheduleStore = scheduleStore;
+        this.serviceOptionRepository = serviceOptionRepository;
+    }
+
+    public CreateServiceSlotUseCase(
+            ServiceRepositoryPort serviceRepository,
+            ServiceSlotRepositoryPort serviceSlotRepository,
+            VendorPort vendorPort,
+            OperatingScheduleStore scheduleStore) {
+        this(serviceRepository, serviceSlotRepository, vendorPort, scheduleStore, null);
+    }
 
     @Transactional
     public ServiceSlotResponse execute(UUID userId, UUID serviceId, CreateServiceSlotRequest request) {
@@ -51,7 +77,10 @@ public class CreateServiceSlotUseCase {
         lockOwnedService(userId, serviceId);
         ServiceSlot slot = prepareSlot(serviceId, request);
         checkAvailability(slot, LocalDateTime.now(Booking.VIETNAM_ZONE), false);
-        return persistSlot(slot);
+        ServiceOption option = (serviceOptionRepository != null && slot.getOptionId() != null)
+                ? serviceOptionRepository.findById(slot.getOptionId()).orElse(null)
+                : null;
+        return persistSlot(slot, option);
     }
 
     List<ServiceSlotResponse> createBatch(UUID userId, UUID serviceId, List<CreateServiceSlotRequest> requests) {
@@ -62,7 +91,21 @@ public class CreateServiceSlotUseCase {
         lockOwnedService(userId, serviceId);
         LocalDateTime now = LocalDateTime.now(Booking.VIETNAM_ZONE);
         slots.forEach(slot -> checkAvailability(slot, now, true));
-        return slots.stream().map(this::persistSlot).toList();
+
+        Map<UUID, ServiceOption> optionMap = serviceOptionRepository != null
+                ? serviceOptionRepository.findByServiceId(serviceId).stream()
+                        .collect(Collectors.toMap(ServiceOption::getId, Function.identity(), (a, b) -> a))
+                : Map.of();
+
+        return slots.stream()
+                .map(slot -> {
+                    ServiceOption opt = optionMap.get(slot.getOptionId());
+                    if (opt == null && serviceOptionRepository != null && slot.getOptionId() != null) {
+                        opt = serviceOptionRepository.findById(slot.getOptionId()).orElse(null);
+                    }
+                    return persistSlot(slot, opt);
+                })
+                .toList();
     }
 
     private void lockOwnedService(UUID userId, UUID serviceId) {
@@ -109,6 +152,24 @@ public class CreateServiceSlotUseCase {
             throw invalid("validation.service.slot.inventory.required");
         }
 
+        if (request.optionId() == null) {
+            throw invalid("error.slot_option_required");
+        }
+
+        if (serviceOptionRepository != null) {
+            ServiceOption option = serviceOptionRepository.findById(request.optionId())
+                    .orElseThrow(() -> invalid("error.slot_option_not_found"));
+            if (!serviceId.equals(option.getServiceId())) {
+                throw invalid("error.slot_option_not_owned");
+            }
+            if (!option.isActive()) {
+                throw invalid("error.slot_option_inactive");
+            }
+            if (option.isPrivate() && !InventoryType.SHARED_CAPACITY_UNITS.equals(request.inventoryType())) {
+                throw invalid("error.slot_private_requires_shared_capacity_units");
+            }
+        }
+
         int totalCapacity;
         List<ServiceSlotUnit> units = new ArrayList<>();
         UUID slotId = UUID.randomUUID();
@@ -152,6 +213,7 @@ public class CreateServiceSlotUseCase {
 
         ServiceSlot slot = ServiceSlot.builder()
                 .serviceId(serviceId)
+                .optionId(request.optionId())
                 .date(request.date())
                 .startTime(request.startTime())
                 .endTime(request.endTime())
@@ -166,15 +228,19 @@ public class CreateServiceSlotUseCase {
     }
 
     private ServiceSlotResponse persistSlot(ServiceSlot slot) {
+        return persistSlot(slot, null);
+    }
+
+    private ServiceSlotResponse persistSlot(ServiceSlot slot, ServiceOption option) {
         ServiceSlot saved = serviceSlotRepository.save(slot);
         List<ServiceSlotUnit> units = slot.getUnits();
         if (!units.isEmpty()) {
             serviceSlotRepository.saveUnits(slot.getId(), units);
         }
-        return toResponse(saved, units);
+        return toResponse(saved, units, option);
     }
 
-    private ServiceSlotResponse toResponse(ServiceSlot s, List<ServiceSlotUnit> units) {
+    private ServiceSlotResponse toResponse(ServiceSlot s, List<ServiceSlotUnit> units, ServiceOption option) {
         List<ServiceSlotUnitResponse> unitResponses = units != null
                 ? units.stream().map(this::toUnitResponse).toList()
                 : List.of();
@@ -182,6 +248,9 @@ public class CreateServiceSlotUseCase {
         return ServiceSlotResponse.builder()
                 .id(s.getId())
                 .serviceId(s.getServiceId())
+                .optionId(s.getOptionId())
+                .optionType(option != null ? option.getOptionType() : null)
+                .optionName(option != null ? option.getName() : null)
                 .date(s.getDate())
                 .startTime(s.getStartTime())
                 .endTime(s.getEndTime())
