@@ -206,6 +206,31 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
         return count != null && count > 0;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasAnyBookingForService(UUID serviceId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM booking_items WHERE service_id = ?",
+                Integer.class,
+                serviceId
+        );
+        return count != null && count > 0;
+    }
+
+    @Override
+    @Transactional
+    public void deleteByServiceId(UUID serviceId) {
+        jdbcTemplate.update("""
+                DELETE FROM service_operating_schedule_slots 
+                WHERE slot_id IN (SELECT id FROM service_slots WHERE service_id = ?)
+                """, serviceId);
+        jdbcTemplate.update("""
+                DELETE FROM service_slot_units 
+                WHERE slot_id IN (SELECT id FROM service_slots WHERE service_id = ?)
+                """, serviceId);
+        jdbcTemplate.update("DELETE FROM service_slots WHERE service_id = ?", serviceId);
+    }
+
     private List<ServiceSlot> mapEntitiesWithUnits(List<ServiceSlotJpaEntity> entities) {
         if (entities.isEmpty()) return Collections.emptyList();
         List<UUID> slotIds = entities.stream().map(ServiceSlotJpaEntity::getId).toList();

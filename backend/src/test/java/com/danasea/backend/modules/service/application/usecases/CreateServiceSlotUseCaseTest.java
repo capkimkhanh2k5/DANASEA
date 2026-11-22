@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.danasea.backend.modules.booking.domain.models.Booking;
+import com.danasea.backend.modules.service.domain.exceptions.InvalidServiceStateException;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.UnauthorizedServiceAccessException;
 import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedException;
@@ -18,6 +19,7 @@ import com.danasea.backend.modules.service.domain.models.InventoryType;
 import com.danasea.backend.modules.service.domain.models.Service;
 import com.danasea.backend.modules.service.domain.models.ServiceSlot;
 import com.danasea.backend.modules.service.domain.models.ServiceSlotUnit;
+import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
@@ -338,10 +340,32 @@ class CreateServiceSlotUseCaseTest {
         when(vendors.findByUserId(userId)).thenReturn(Optional.of(vendor));
     }
 
+    @ParameterizedTest
+    @MethodSource("nonPublishedStatuses")
+    void cannotCreateSlotForNonPublishedService(ServiceStatus status) {
+        vendor();
+        when(services.findByIdForUpdate(serviceId))
+                .thenReturn(Optional.of(Service.builder().id(serviceId).vendorId(vendorId).status(status).build()));
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, request(InventoryType.PERSON_LIMIT, 10, null)))
+                .isInstanceOf(InvalidServiceStateException.class)
+                .hasMessageContaining("Service must be PUBLISHED");
+        noWrites();
+    }
+
+    static Stream<Arguments> nonPublishedStatuses() {
+        return Stream.of(
+                Arguments.of(ServiceStatus.DRAFT),
+                Arguments.of(ServiceStatus.PENDING_REVIEW),
+                Arguments.of(ServiceStatus.REJECTED),
+                Arguments.of(ServiceStatus.PAUSED)
+        );
+    }
+
     private void authorize() {
         vendor();
         when(services.findByIdForUpdate(serviceId))
-                .thenReturn(Optional.of(Service.builder().id(serviceId).vendorId(vendorId).build()));
+                .thenReturn(Optional.of(Service.builder().id(serviceId).vendorId(vendorId).status(ServiceStatus.PUBLISHED).build()));
     }
 
     private void noWrites() {

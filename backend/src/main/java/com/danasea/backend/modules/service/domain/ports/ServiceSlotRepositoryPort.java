@@ -40,4 +40,8 @@ public interface ServiceSlotRepositoryPort {
     int getCommittedCountForUnit(UUID slotId, int unitNumber);
 
     boolean hasPrivateCommitmentForUnit(UUID slotId, int unitNumber);
+
+    boolean hasAnyBookingForService(UUID serviceId);
+
+    void deleteByServiceId(UUID serviceId);
 }

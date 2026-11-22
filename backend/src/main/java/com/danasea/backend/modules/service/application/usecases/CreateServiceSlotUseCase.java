@@ -71,6 +71,7 @@ public class CreateServiceSlotUseCase {
         Service service = serviceRepository.findByIdForUpdate(serviceId)
                 .orElseThrow(() -> new ServiceNotFoundException(serviceId));
         service.validateOwnership(vendor.getId());
+        service.validateSlotCreatable();
     }
 
     private void checkAvailability(ServiceSlot slot, LocalDateTime now, boolean batch) {
