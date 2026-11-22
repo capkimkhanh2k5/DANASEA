@@ -273,7 +273,32 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
                 "JOIN bookings b ON bi.booking_id = b.id " +
                 "WHERE bi.slot_id = ? AND bi.option_id = ? AND (b.status = 'CONFIRMED' AND NOT bi.capacity_released OR b.status IN ('HOLD', 'PENDING_PAYMENT') AND b.hold_expires_at > CURRENT_TIMESTAMP)";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, slotId, optionId);
-        return count != null && count > 0;
+        if (count != null && count > 0) {
+            return true;
+        }
+
+        if (redisTemplate != null) {
+            String key = "inventory:slot:" + slotId + ":holds";
+            Map<Object, Object> entries = redisTemplate.opsForHash().entries(key);
+            if (entries != null && !entries.isEmpty()) {
+                long now = System.currentTimeMillis() / 1000;
+                for (Object val : entries.values()) {
+                    if (val != null) {
+                        String s = val.toString();
+                        int pipe = s.indexOf('|');
+                        if (pipe > 0) {
+                            try {
+                                long expireAt = Long.parseLong(s.substring(0, pipe));
+                                if (expireAt > now) {
+                                    return true;
+                                }
+                            } catch (NumberFormatException ignored) {}
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     @Override

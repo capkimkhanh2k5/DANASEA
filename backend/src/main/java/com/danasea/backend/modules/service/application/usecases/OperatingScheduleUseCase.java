@@ -8,6 +8,7 @@ import com.danasea.backend.modules.service.domain.models.InventoryType;
 import com.danasea.backend.modules.service.domain.models.OperatingSchedule;
 import com.danasea.backend.modules.service.domain.models.OperatingScheduleException;
 import com.danasea.backend.modules.service.domain.models.Service;
+import com.danasea.backend.modules.service.domain.models.ServiceOption;
 import com.danasea.backend.modules.service.domain.ports.ServiceOptionRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
@@ -182,11 +183,49 @@ public class OperatingScheduleUseCase {
     }
 
     private boolean materializeDeparture(Service service, OperatingSchedule.Departure departure) {
-        var slotId = store.insertDeparture(service.getId(), departure);
+        List<UUID> configuredOptionIds = departure.rule().optionIds();
+        if (configuredOptionIds == null || configuredOptionIds.isEmpty()) {
+            return false;
+        }
+
+        List<UUID> activeOptionIds = configuredOptionIds;
+        if (serviceOptions != null) {
+            activeOptionIds = configuredOptionIds.stream()
+                    .map(serviceOptions::findById)
+                    .flatMap(Optional::stream)
+                    .filter(opt -> service.getId().equals(opt.getServiceId()) && opt.isActive())
+                    .map(ServiceOption::getId)
+                    .toList();
+            if (activeOptionIds.isEmpty()) {
+                return false;
+            }
+            boolean hasPrivate = activeOptionIds.stream()
+                    .map(serviceOptions::findById)
+                    .flatMap(Optional::stream)
+                    .anyMatch(ServiceOption::isPrivate);
+            if (hasPrivate && !InventoryType.SHARED_CAPACITY_UNITS.equals(departure.rule().inventoryType())) {
+                return false;
+            }
+        }
+
+        OperatingSchedule.Departure validatedDeparture = new OperatingSchedule.Departure(
+                departure.date(),
+                new OperatingSchedule.WeeklyRule(
+                        departure.rule().dayOfWeek(),
+                        departure.rule().startTime(),
+                        departure.rule().endTime(),
+                        departure.rule().inventoryType(),
+                        departure.rule().capacity(),
+                        departure.rule().units(),
+                        activeOptionIds
+                )
+        );
+
+        var slotId = store.insertDeparture(service.getId(), validatedDeparture);
         if (slotId.isEmpty()) {
             return false;
         }
-        var assignments = departure.rule().units().stream().filter(unit -> unit.equipmentId() != null)
+        var assignments = validatedDeparture.rule().units().stream().filter(unit -> unit.equipmentId() != null)
                 .collect(Collectors.toMap(OperatingSchedule.Unit::unitNumber, OperatingSchedule.Unit::equipmentId));
         if (!assignments.isEmpty()) {
             equipment.attachGenerated(service.getVendorId(), slotId.get(), assignments);
