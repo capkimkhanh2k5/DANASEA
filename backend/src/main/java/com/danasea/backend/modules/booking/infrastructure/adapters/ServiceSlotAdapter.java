@@ -1,5 +1,6 @@
 package com.danasea.backend.modules.booking.infrastructure.adapters;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -10,6 +11,8 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,13 +36,35 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import lombok.RequiredArgsConstructor;
 
 @Component
-@RequiredArgsConstructor
 public class ServiceSlotAdapter implements ServiceSlotPort {
 
     private final JpaServiceSlotRepository jpaServiceSlotRepository;
     private final JpaServiceRepository jpaServiceRepository;
     private final JpaServiceSlotUnitRepository jpaServiceSlotUnitRepository;
     private final JpaServiceOptionRepository jpaServiceOptionRepository;
+    private final JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    public ServiceSlotAdapter(
+            JpaServiceSlotRepository jpaServiceSlotRepository,
+            JpaServiceRepository jpaServiceRepository,
+            JpaServiceSlotUnitRepository jpaServiceSlotUnitRepository,
+            JpaServiceOptionRepository jpaServiceOptionRepository,
+            JdbcTemplate jdbcTemplate) {
+        this.jpaServiceSlotRepository = jpaServiceSlotRepository;
+        this.jpaServiceRepository = jpaServiceRepository;
+        this.jpaServiceSlotUnitRepository = jpaServiceSlotUnitRepository;
+        this.jpaServiceOptionRepository = jpaServiceOptionRepository;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public ServiceSlotAdapter(
+            JpaServiceSlotRepository jpaServiceSlotRepository,
+            JpaServiceRepository jpaServiceRepository,
+            JpaServiceSlotUnitRepository jpaServiceSlotUnitRepository,
+            JpaServiceOptionRepository jpaServiceOptionRepository) {
+        this(jpaServiceSlotRepository, jpaServiceRepository, jpaServiceSlotUnitRepository, jpaServiceOptionRepository, null);
+    }
 
     @Override
     @Transactional
@@ -88,10 +113,29 @@ public class ServiceSlotAdapter implements ServiceSlotPort {
             optionsByServiceId.put(serviceId, opts);
         }
 
+        Map<UUID, List<UUID>> slotOptionIds = new HashMap<>();
+        if (jdbcTemplate != null && !slotIds.isEmpty()) {
+            String inSql = String.join(",", Collections.nCopies(slotIds.size(), "?"));
+            jdbcTemplate.query(
+                    "SELECT slot_id, option_id FROM service_slot_options WHERE slot_id IN (" + inSql + ") ORDER BY created_at ASC",
+                    rs -> {
+                        UUID slotId = rs.getObject("slot_id", UUID.class);
+                        UUID optionId = rs.getObject("option_id", UUID.class);
+                        slotOptionIds.computeIfAbsent(slotId, k -> new ArrayList<>()).add(optionId);
+                    },
+                    slotIds.toArray()
+            );
+        }
+
         return slotEntities.stream()
                 .map(slot -> {
                     ServiceJpaEntity service = serviceMap.get(slot.getServiceId());
                     boolean published = service != null && ServiceStatus.PUBLISHED.equals(service.getStatus());
+
+                    List<UUID> allowedOptionIds = slotOptionIds.getOrDefault(slot.getId(), Collections.emptyList());
+                    if (allowedOptionIds.isEmpty() && slot.getOptionId() != null) {
+                        allowedOptionIds = List.of(slot.getOptionId());
+                    }
 
                     List<ServiceSlotUnitJpaEntity> rawUnits = unitsBySlotId.getOrDefault(slot.getId(), Collections.emptyList());
                     List<SlotValidationDetails.SlotUnitValidationDetails> slotUnits = rawUnits.stream()
@@ -123,6 +167,7 @@ public class ServiceSlotAdapter implements ServiceSlotPort {
                             .slotId(slot.getId())
                             .serviceId(slot.getServiceId())
                             .optionId(slot.getOptionId())
+                            .allowedOptionIds(allowedOptionIds)
                             .vendorId(service != null ? service.getVendorId() : null)
                             .serviceName(service != null ? service.getName() : null)
                             .bookingDate(slot.getDate())

@@ -50,7 +50,7 @@ public class BatchCreateServiceSlotsUseCase {
             for (SlotTemplateRequest template : templates) {
                 candidates.add(new CreateServiceSlotRequest(
                         date, template.startTime(), template.endTime(), template.inventoryType(),
-                        template.capacity(), template.units(), template.optionId()));
+                        template.capacity(), template.units(), template.optionId(), template.optionIds()));
             }
         }
 
@@ -125,7 +125,7 @@ public class BatchCreateServiceSlotsUseCase {
             if (template == null || template.startTime() == null || template.endTime() == null) {
                 throw invalid("error.slot_time_required");
             }
-            if (template.optionId() == null) {
+            if (template.resolveOptionIds().isEmpty()) {
                 throw invalid("error.slot_option_required");
             }
             if (!startTimes.add(template.startTime())) {

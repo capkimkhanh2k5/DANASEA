@@ -29,6 +29,8 @@ public class SlotValidationDetails {
     private UUID serviceId;
     private UUID vendorId;
     private UUID optionId;
+    @Builder.Default
+    private List<UUID> allowedOptionIds = new ArrayList<>();
     private String serviceName;
     private LocalDate bookingDate;
     private LocalTime bookingTime;

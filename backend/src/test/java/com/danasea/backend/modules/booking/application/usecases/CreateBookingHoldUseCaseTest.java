@@ -469,4 +469,85 @@ class CreateBookingHoldUseCaseTest {
 
         verify(inventoryLockPort, never()).acquireHolds(any(), any(), any());
     }
+
+    @Test
+    @DisplayName("Should accept booking when slot supports multiple options and requested option is one of them")
+    void testSlotWithMultipleAllowedOptions_AllowsSupportedOption() {
+        UUID customerId = UUID.randomUUID();
+        UUID slotId = UUID.randomUUID();
+        UUID optionA = UUID.randomUUID();
+        UUID optionB = UUID.randomUUID();
+
+        SlotValidationDetails.ServiceOptionValidationDetails optBDetails = SlotValidationDetails.ServiceOptionValidationDetails.builder()
+                .id(optionB)
+                .name("Option B")
+                .optionType(com.danasea.backend.modules.service.domain.models.OptionType.SHARED)
+                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE)
+                .price(new BigDecimal("50.00"))
+                .build();
+
+        SlotValidationDetails details = SlotValidationDetails.builder()
+                .slotId(slotId)
+                .serviceId(UUID.randomUUID())
+                .vendorId(UUID.randomUUID())
+                .allowedOptionIds(List.of(optionA, optionB))
+                .options(java.util.Map.of(optionB, optBDetails))
+                .bookingDate(LocalDate.now().plusDays(1))
+                .bookingTime(LocalTime.of(10, 0))
+                .capacity(10)
+                .bookedCount(0)
+                .status(SlotStatus.OPEN)
+                .price(new BigDecimal("50.00"))
+                .servicePublished(true)
+                .build();
+
+        when(serviceSlotPort.findSlotDetailsBatch(List.of(slotId))).thenReturn(List.of(details));
+        when(bookingRepository.save(any(Booking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateBookingHoldCommand command = new CreateBookingHoldCommand(
+                customerId,
+                List.of(new BookingHoldItemDto(slotId, 2, optionB, null, false, null))
+        );
+
+        BookingHoldResult result = useCase.execute(command);
+        assertThat(result).isNotNull();
+        assertThat(result.status()).isEqualTo(BookingStatus.HOLD);
+        verify(inventoryLockPort).acquireHolds(eq(result.bookingId()), any(), any());
+    }
+
+    @Test
+    @DisplayName("Should reject booking when slot supports multiple options but requested option is not allowed")
+    void testSlotWithMultipleAllowedOptions_RejectsUnsupportedOption() {
+        UUID customerId = UUID.randomUUID();
+        UUID slotId = UUID.randomUUID();
+        UUID optionA = UUID.randomUUID();
+        UUID optionB = UUID.randomUUID();
+        UUID optionC = UUID.randomUUID();
+
+        SlotValidationDetails details = SlotValidationDetails.builder()
+                .slotId(slotId)
+                .serviceId(UUID.randomUUID())
+                .vendorId(UUID.randomUUID())
+                .allowedOptionIds(List.of(optionA, optionB))
+                .bookingDate(LocalDate.now().plusDays(1))
+                .bookingTime(LocalTime.of(10, 0))
+                .capacity(10)
+                .bookedCount(0)
+                .status(SlotStatus.OPEN)
+                .servicePublished(true)
+                .build();
+
+        when(serviceSlotPort.findSlotDetailsBatch(List.of(slotId))).thenReturn(List.of(details));
+
+        CreateBookingHoldCommand command = new CreateBookingHoldCommand(
+                customerId,
+                List.of(new BookingHoldItemDto(slotId, 1, optionC, null, false, null))
+        );
+
+        assertThatThrownBy(() -> useCase.execute(command))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Slot does not support option");
+
+        verify(inventoryLockPort, never()).acquireHolds(any(), any(), any());
+    }
 }

@@ -181,7 +181,11 @@ public class CreateBookingHoldUseCase {
         for (AggregationKey key : orderedKeys) {
             int qty = aggregatedQuantities.get(key);
             SlotValidationDetails details = slotDetailsMap.get(key.slotId());
-            if (details.getOptionId() != null) {
+            if (details.getAllowedOptionIds() != null && !details.getAllowedOptionIds().isEmpty()) {
+                if (key.optionId() == null || !details.getAllowedOptionIds().contains(key.optionId())) {
+                    throw new IllegalArgumentException("Slot does not support option " + key.optionId());
+                }
+            } else if (details.getOptionId() != null) {
                 if (key.optionId() == null || !details.getOptionId().equals(key.optionId())) {
                     throw new IllegalArgumentException("Slot is bound to option " + details.getOptionId() + " but booking requested " + key.optionId());
                 }

@@ -17,6 +17,7 @@ public record ServiceSlotResponse(
         UUID optionId,
         OptionType optionType,
         String optionName,
+        List<ServiceSlotOptionSummaryResponse> options,
         LocalDate date,
         LocalTime startTime,
         LocalTime endTime,
@@ -31,6 +32,8 @@ public record ServiceSlotResponse(
             UUID id,
             UUID serviceId,
             UUID optionId,
+            OptionType optionType,
+            String optionName,
             LocalDate date,
             LocalTime startTime,
             LocalTime endTime,
@@ -40,6 +43,22 @@ public record ServiceSlotResponse(
             Integer bookedCount,
             Integer availableCapacity,
             List<ServiceSlotUnitResponse> units) {
-        this(id, serviceId, optionId, null, null, date, startTime, endTime, status, inventoryType, capacity, bookedCount, availableCapacity, units);
+        this(id, serviceId, optionId, optionType, optionName, List.of(), date, startTime, endTime, status, inventoryType, capacity, bookedCount, availableCapacity, units);
+    }
+
+    public ServiceSlotResponse(
+            UUID id,
+            UUID serviceId,
+            UUID optionId,
+            LocalDate date,
+            LocalTime startTime,
+            LocalTime endTime,
+            SlotStatus status,
+            InventoryType inventoryType,
+            Integer capacity,
+            Integer bookedCount,
+            Integer availableCapacity,
+            List<ServiceSlotUnitResponse> units) {
+        this(id, serviceId, optionId, null, null, List.of(), date, startTime, endTime, status, inventoryType, capacity, bookedCount, availableCapacity, units);
     }
 }

@@ -106,7 +106,11 @@ public class GetServiceSlotsAvailabilityUseCase {
             if (!SlotStatus.OPEN.equals(slot.getStatus())) {
                 continue;
             }
-            if (slot.getOptionId() != null && !slot.getOptionId().equals(option.getId())) {
+            if (slot.getOptionIds() != null && !slot.getOptionIds().isEmpty()) {
+                if (!slot.getOptionIds().contains(option.getId())) {
+                    continue;
+                }
+            } else if (slot.getOptionId() != null && !slot.getOptionId().equals(option.getId())) {
                 continue;
             }
             if (slot.getDate().isBefore(today)) {

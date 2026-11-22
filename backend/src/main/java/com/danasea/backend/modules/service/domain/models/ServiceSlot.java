@@ -22,6 +22,8 @@ import lombok.experimental.SuperBuilder;
 public class ServiceSlot extends BaseDomainModel {
     private UUID serviceId;
     private UUID optionId;
+    @Builder.Default
+    private List<UUID> optionIds = new ArrayList<>();
     private LocalDate date;
     private LocalTime startTime;
     private LocalTime endTime;
@@ -31,6 +33,16 @@ public class ServiceSlot extends BaseDomainModel {
     private InventoryType inventoryType;
     @Builder.Default
     private List<ServiceSlotUnit> units = new ArrayList<>();
+
+    public UUID getOptionId() {
+        if (this.optionId != null) {
+            return this.optionId;
+        }
+        if (this.optionIds != null && !this.optionIds.isEmpty()) {
+            return this.optionIds.get(0);
+        }
+        return null;
+    }
 
     public boolean isOpen() {
         return SlotStatus.OPEN.equals(this.status);

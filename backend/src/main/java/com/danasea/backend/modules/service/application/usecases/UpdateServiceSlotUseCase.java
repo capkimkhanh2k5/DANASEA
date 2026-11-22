@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedException;
 import com.danasea.backend.modules.service.domain.models.InventoryType;
+import com.danasea.backend.modules.service.domain.models.OptionType;
 import com.danasea.backend.modules.service.domain.models.Service;
 import com.danasea.backend.modules.service.domain.models.ServiceOption;
 import com.danasea.backend.modules.service.domain.models.ServiceSlot;
@@ -29,6 +31,7 @@ import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPor
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
 import com.danasea.backend.modules.service.infrastructure.persistence.adapters.OperatingScheduleStore;
 import com.danasea.backend.modules.service.presentation.dtos.CreateSlotUnitRequest;
+import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotOptionSummaryResponse;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotResponse;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotUnitResponse;
 import com.danasea.backend.modules.service.presentation.dtos.UpdateServiceSlotRequest;
@@ -206,16 +209,38 @@ public class UpdateServiceSlotUseCase {
                 ? units.stream().map(this::toUnitResponse).toList()
                 : List.of();
 
-        ServiceOption option = (serviceOptionRepository != null && s.getOptionId() != null)
-                ? serviceOptionRepository.findById(s.getOptionId()).orElse(null)
-                : null;
+        List<UUID> optIds = (s.getOptionIds() != null && !s.getOptionIds().isEmpty())
+                ? s.getOptionIds()
+                : (s.getOptionId() != null ? List.of(s.getOptionId()) : List.of());
+
+        List<ServiceSlotOptionSummaryResponse> optionSummaries = serviceOptionRepository != null ? optIds.stream()
+                .map(serviceOptionRepository::findById)
+                .flatMap(Optional::stream)
+                .map(o -> new ServiceSlotOptionSummaryResponse(
+                        o.getId(),
+                        o.getName(),
+                        o.getOptionType(),
+                        o.getPricingUnit(),
+                        o.getPrice(),
+                        o.getMaxPaxPerPackage()
+                ))
+                .toList() : List.of();
+
+        UUID singleOptionId = (optIds.size() == 1) ? optIds.get(0) : s.getOptionId();
+        OptionType singleOptionType = (optionSummaries.size() == 1)
+                ? optionSummaries.get(0).optionType()
+                : (optionSummaries.stream().map(ServiceSlotOptionSummaryResponse::optionType).distinct().count() == 1 && !optionSummaries.isEmpty()
+                        ? optionSummaries.get(0).optionType()
+                        : null);
+        String singleOptionName = (optionSummaries.size() == 1) ? optionSummaries.get(0).name() : null;
 
         return ServiceSlotResponse.builder()
                 .id(s.getId())
                 .serviceId(s.getServiceId())
-                .optionId(s.getOptionId())
-                .optionType(option != null ? option.getOptionType() : null)
-                .optionName(option != null ? option.getName() : null)
+                .optionId(singleOptionId)
+                .optionType(singleOptionType)
+                .optionName(singleOptionName)
+                .options(optionSummaries)
                 .date(s.getDate())
                 .startTime(s.getStartTime())
                 .endTime(s.getEndTime())

@@ -1,9 +1,11 @@
 package com.danasea.backend.modules.service.infrastructure.persistence.adapters;
 
+import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -221,6 +223,10 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
     @Transactional
     public void deleteByServiceId(UUID serviceId) {
         jdbcTemplate.update("""
+                DELETE FROM service_slot_options 
+                WHERE slot_id IN (SELECT id FROM service_slots WHERE service_id = ?)
+                """, serviceId);
+        jdbcTemplate.update("""
                 DELETE FROM service_operating_schedule_slots 
                 WHERE slot_id IN (SELECT id FROM service_slots WHERE service_id = ?)
                 """, serviceId);
@@ -231,6 +237,51 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
         jdbcTemplate.update("DELETE FROM service_slots WHERE service_id = ?", serviceId);
     }
 
+    @Override
+    @Transactional
+    public void saveSlotOptions(UUID slotId, List<UUID> optionIds) {
+        if (slotId == null || optionIds == null || optionIds.isEmpty()) return;
+        jdbcTemplate.update("DELETE FROM service_slot_options WHERE slot_id = ?", slotId);
+        List<Object[]> batch = optionIds.stream()
+                .distinct()
+                .map(optId -> new Object[] { slotId, optId })
+                .toList();
+        jdbcTemplate.batchUpdate(
+                "INSERT INTO service_slot_options (slot_id, option_id) VALUES (?, ?) ON CONFLICT (slot_id, option_id) DO NOTHING",
+                batch,
+                new int[] { Types.OTHER, Types.OTHER }
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UUID> findOptionIdsBySlotId(UUID slotId) {
+        if (slotId == null) return Collections.emptyList();
+        return jdbcTemplate.query(
+                "SELECT option_id FROM service_slot_options WHERE slot_id = ? ORDER BY created_at ASC",
+                (rs, rowNum) -> rs.getObject("option_id", UUID.class),
+                slotId
+        );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, List<UUID>> findOptionIdsBySlotIds(List<UUID> slotIds) {
+        if (slotIds == null || slotIds.isEmpty()) return Collections.emptyMap();
+        String inSql = String.join(",", Collections.nCopies(slotIds.size(), "?"));
+        Map<UUID, List<UUID>> map = new HashMap<>();
+        jdbcTemplate.query(
+                "SELECT slot_id, option_id FROM service_slot_options WHERE slot_id IN (" + inSql + ") ORDER BY created_at ASC",
+                rs -> {
+                    UUID slotId = rs.getObject("slot_id", UUID.class);
+                    UUID optionId = rs.getObject("option_id", UUID.class);
+                    map.computeIfAbsent(slotId, k -> new ArrayList<>()).add(optionId);
+                },
+                slotIds.toArray()
+        );
+        return map;
+    }
+
     private List<ServiceSlot> mapEntitiesWithUnits(List<ServiceSlotJpaEntity> entities) {
         if (entities.isEmpty()) return Collections.emptyList();
         List<UUID> slotIds = entities.stream().map(ServiceSlotJpaEntity::getId).toList();
@@ -238,9 +289,16 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
         Map<UUID, List<ServiceSlotUnit>> unitsBySlotId = unitEntities.stream()
                 .map(this::toUnitDomain)
                 .collect(Collectors.groupingBy(ServiceSlotUnit::getSlotId));
+        Map<UUID, List<UUID>> optionIdsBySlotId = findOptionIdsBySlotIds(slotIds);
 
         return entities.stream()
-                .map(e -> toDomain(e, unitsBySlotId.getOrDefault(e.getId(), Collections.emptyList())))
+                .map(e -> {
+                    List<UUID> optIds = optionIdsBySlotId.getOrDefault(e.getId(), Collections.emptyList());
+                    if (optIds.isEmpty() && e.getOptionId() != null) {
+                        optIds = List.of(e.getOptionId());
+                    }
+                    return toDomain(e, unitsBySlotId.getOrDefault(e.getId(), Collections.emptyList()), optIds);
+                })
                 .toList();
     }
 
@@ -264,9 +322,19 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
 
     private ServiceSlot toDomain(ServiceSlotJpaEntity entity, List<ServiceSlotUnit> units) {
         if (entity == null) return null;
+        List<UUID> optIds = findOptionIdsBySlotId(entity.getId());
+        if (optIds.isEmpty() && entity.getOptionId() != null) {
+            optIds = List.of(entity.getOptionId());
+        }
+        return toDomain(entity, units, optIds);
+    }
+
+    private ServiceSlot toDomain(ServiceSlotJpaEntity entity, List<ServiceSlotUnit> units, List<UUID> optionIds) {
+        if (entity == null) return null;
         ServiceSlot domain = ServiceSlot.builder()
                 .serviceId(entity.getServiceId())
                 .optionId(entity.getOptionId())
+                .optionIds(optionIds != null ? new ArrayList<>(optionIds) : new ArrayList<>())
                 .date(entity.getDate())
                 .startTime(entity.getStartTime())
                 .endTime(entity.getEndTime())

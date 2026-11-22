@@ -114,7 +114,7 @@ class BatchCreateServiceSlotsUseCaseTest {
                 nextMonday,
                 nextMonday,
                 Set.of(DayOfWeek.MONDAY),
-                List.of(new SlotTemplateRequest(LocalTime.of(8, 0), LocalTime.of(10, 0), InventoryType.PERSON_LIMIT, 10, null, null))
+                List.of(new SlotTemplateRequest(LocalTime.of(8, 0), LocalTime.of(10, 0), InventoryType.PERSON_LIMIT, 10, null, (UUID) null))
         );
 
         assertThatThrownBy(() -> useCase.execute(userId, serviceId, request))
@@ -549,5 +549,33 @@ class BatchCreateServiceSlotsUseCaseTest {
                 .hasMessageContaining("Service must be PUBLISHED");
 
         verify(serviceSlotRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Batch tạo ca hỗ trợ template chứa nhiều optionIds")
+    void batchCreateSlots_withMultipleOptionIds_succeeds() {
+        authorize(vendorId);
+        UUID optionA = UUID.randomUUID();
+        UUID optionB = UUID.randomUUID();
+
+        var request = new BatchCreateServiceSlotsRequest(
+                nextMonday,
+                nextMonday,
+                Set.of(DayOfWeek.MONDAY),
+                List.of(new SlotTemplateRequest(
+                        LocalTime.of(8, 0),
+                        LocalTime.of(10, 0),
+                        InventoryType.PERSON_LIMIT,
+                        10,
+                        null,
+                        List.of(optionA, optionB)
+                ))
+        );
+
+        var response = useCase.execute(userId, serviceId, request);
+
+        assertThat(response.totalCreated()).isEqualTo(1);
+        assertThat(response.slots()).hasSize(1);
+        verify(serviceSlotRepository).saveSlotOptions(any(), eq(List.of(optionA, optionB)));
     }
 }
