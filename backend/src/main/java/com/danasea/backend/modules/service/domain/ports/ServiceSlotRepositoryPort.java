@@ -44,9 +44,13 @@ public interface ServiceSlotRepositoryPort {
 
     boolean hasAnyBookingForService(UUID serviceId);
 
+    boolean hasActiveBookingOrHoldForOption(UUID slotId, UUID optionId);
+
     void deleteByServiceId(UUID serviceId);
 
     void saveSlotOptions(UUID slotId, List<UUID> optionIds);
+
+    void updateSlotOptions(UUID slotId, List<UUID> optionIds);
 
     List<UUID> findOptionIdsBySlotId(UUID slotId);
 

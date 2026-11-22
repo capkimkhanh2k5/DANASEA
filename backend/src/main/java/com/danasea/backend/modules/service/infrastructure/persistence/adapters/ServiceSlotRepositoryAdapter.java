@@ -254,6 +254,29 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
     }
 
     @Override
+    @Transactional
+    public void updateSlotOptions(UUID slotId, List<UUID> optionIds) {
+        if (slotId == null) return;
+        jdbcTemplate.update("DELETE FROM service_slot_options WHERE slot_id = ?", slotId);
+        if (optionIds != null && !optionIds.isEmpty()) {
+            saveSlotOptions(slotId, optionIds);
+        }
+        UUID singleOptId = (optionIds != null && optionIds.size() == 1) ? optionIds.get(0) : null;
+        jdbcTemplate.update("UPDATE service_slots SET option_id = ? WHERE id = ?", singleOptId, slotId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hasActiveBookingOrHoldForOption(UUID slotId, UUID optionId) {
+        if (slotId == null || optionId == null) return false;
+        String sql = "SELECT COUNT(*) FROM booking_items bi " +
+                "JOIN bookings b ON bi.booking_id = b.id " +
+                "WHERE bi.slot_id = ? AND bi.option_id = ? AND (b.status = 'CONFIRMED' AND NOT bi.capacity_released OR b.status IN ('HOLD', 'PENDING_PAYMENT') AND b.hold_expires_at > CURRENT_TIMESTAMP)";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, slotId, optionId);
+        return count != null && count > 0;
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<UUID> findOptionIdsBySlotId(UUID slotId) {
         if (slotId == null) return Collections.emptyList();

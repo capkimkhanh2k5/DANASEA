@@ -200,6 +200,49 @@ public class UpdateServiceSlotUseCase {
             }
         }
 
+        if (request.optionIds() != null) {
+            if (request.optionIds().isEmpty()) {
+                throw new IllegalArgumentException("Slot must have at least one option assigned");
+            }
+            if (new HashSet<>(request.optionIds()).size() != request.optionIds().size()) {
+                throw new IllegalArgumentException("Duplicate options in slot update");
+            }
+            if (serviceOptionRepository != null) {
+                boolean hasPrivate = false;
+                for (UUID optId : request.optionIds()) {
+                    ServiceOption opt = serviceOptionRepository.findById(optId)
+                            .orElseThrow(() -> new IllegalArgumentException("Option not found: " + optId));
+                    if (!serviceId.equals(opt.getServiceId())) {
+                        throw new IllegalArgumentException("Option does not belong to the specified service");
+                    }
+                    if (!opt.isActive()) {
+                        throw new IllegalArgumentException("Option is not active: " + optId);
+                    }
+                    if (opt.isPrivate()) {
+                        hasPrivate = true;
+                    }
+                }
+                if (hasPrivate && !InventoryType.SHARED_CAPACITY_UNITS.equals(slot.getInventoryType())) {
+                    throw new IllegalArgumentException("Private options require shared capacity units");
+                }
+            }
+
+            List<UUID> currentOptIds = serviceSlotRepository.findOptionIdsBySlotId(slotId);
+            Set<UUID> nextOptIds = new HashSet<>(request.optionIds());
+            for (UUID oldOptId : currentOptIds) {
+                if (!nextOptIds.contains(oldOptId)) {
+                    if (serviceSlotRepository.hasActiveBookingOrHoldForOption(slotId, oldOptId)) {
+                        throw new IllegalArgumentException("Cannot remove option " + oldOptId + " from slot because it has active bookings or holds");
+                    }
+                }
+            }
+
+            serviceSlotRepository.updateSlotOptions(slotId, request.optionIds());
+            slot.setOptionIds(request.optionIds());
+            UUID singleOptionId = request.optionIds().size() == 1 ? request.optionIds().get(0) : null;
+            slot.setOptionId(singleOptionId);
+        }
+
         ServiceSlot saved = serviceSlotRepository.save(slot);
         return toResponse(saved, updatedUnits);
     }
@@ -211,7 +254,10 @@ public class UpdateServiceSlotUseCase {
 
         List<UUID> optIds = (s.getOptionIds() != null && !s.getOptionIds().isEmpty())
                 ? s.getOptionIds()
-                : (s.getOptionId() != null ? List.of(s.getOptionId()) : List.of());
+                : serviceSlotRepository.findOptionIdsBySlotId(s.getId());
+        if (optIds.isEmpty() && s.getOptionId() != null) {
+            optIds = List.of(s.getOptionId());
+        }
 
         List<ServiceSlotOptionSummaryResponse> optionSummaries = serviceOptionRepository != null ? optIds.stream()
                 .map(serviceOptionRepository::findById)
