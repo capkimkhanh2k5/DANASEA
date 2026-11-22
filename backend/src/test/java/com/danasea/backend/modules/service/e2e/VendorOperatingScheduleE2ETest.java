@@ -28,6 +28,7 @@ class VendorOperatingScheduleE2ETest extends BaseServiceE2ETest {
     @Test
     void materializesPhysicalEquipmentAndPauseClosesOnlyGeneratedSales() throws Exception {
         UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        UUID optionId = seedOption(serviceId).getId();
         LocalDate date = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(1);
         String slots = VENDOR_API_BASE + "/" + serviceId + "/slots";
         String schedule = VENDOR_API_BASE + "/" + serviceId + "/operating-schedule";
@@ -41,11 +42,12 @@ class VendorOperatingScheduleE2ETest extends BaseServiceE2ETest {
         String rules = """
                 {"startsOn":"%s","endsOn":"%s","active":%s,"rules":[
                     {"dayOfWeek":"%s","startTime":"08:00","endTime":"10:00","inventoryType":"SHARED_CAPACITY_UNITS",
+                     "optionIds":["%s"],
                      "units":[{"unitNumber":1,"capacity":8,"equipmentId":"%s"}]}
                 ]}
                 """;
         mockMvc.perform(authenticateAsVendorA(put(schedule).contentType(MediaType.APPLICATION_JSON)
-                        .content(rules.formatted(date, date, true, date.getDayOfWeek(), equipmentId))))
+                        .content(rules.formatted(date, date, true, date.getDayOfWeek(), optionId, equipmentId))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.createdSlots").value(1));
         assertThat(jdbc.queryForObject("""
                 SELECT u.equipment_id FROM service_slot_units u JOIN service_slots s ON s.id = u.slot_id
@@ -53,11 +55,11 @@ class VendorOperatingScheduleE2ETest extends BaseServiceE2ETest {
                 """, UUID.class, serviceId, date)).isEqualTo(equipmentId);
 
         mockMvc.perform(authenticateAsVendorA(post(slots).contentType(MediaType.APPLICATION_JSON).content("""
-                {"date":"%s","startTime":"14:00","endTime":"16:00","inventoryType":"PERSON_LIMIT","capacity":8}
-                """.formatted(date)))).andExpect(status().isCreated());
+                {"date":"%s","startTime":"14:00","endTime":"16:00","inventoryType":"PERSON_LIMIT","capacity":8,"optionIds":["%s"]}
+                """.formatted(date, optionId)))).andExpect(status().isCreated());
         entityManager.flush();
         mockMvc.perform(authenticateAsVendorA(put(schedule).contentType(MediaType.APPLICATION_JSON)
-                        .content(rules.formatted(date, date, false, date.getDayOfWeek(), equipmentId))))
+                        .content(rules.formatted(date, date, false, date.getDayOfWeek(), optionId, equipmentId))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.closedSlots").value(1));
         assertThat(slotStatuses(serviceId, date)).containsExactly("CLOSED", "OPEN");
     }
@@ -65,15 +67,16 @@ class VendorOperatingScheduleE2ETest extends BaseServiceE2ETest {
     @Test
     void blocksExistingAndMissingDeparturesAndCannotBeBypassedByLegacySlotApi() throws Exception {
         UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        UUID optionId = seedOption(serviceId).getId();
         LocalDate date = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(1);
         String slots = VENDOR_API_BASE + "/" + serviceId + "/slots";
         String schedule = VENDOR_API_BASE + "/" + serviceId + "/operating-schedule";
         String rules = """
                 {"startsOn":"%s","endsOn":"%s","active":true,"rules":[
-                    {"dayOfWeek":"%s","startTime":"08:00","endTime":"10:00","inventoryType":"PERSON_LIMIT","capacity":8},
-                    {"dayOfWeek":"%s","startTime":"14:00","endTime":"16:00","inventoryType":"PERSON_LIMIT","capacity":8}
+                    {"dayOfWeek":"%s","startTime":"08:00","endTime":"10:00","inventoryType":"PERSON_LIMIT","capacity":8,"optionIds":["%s"]},
+                    {"dayOfWeek":"%s","startTime":"14:00","endTime":"16:00","inventoryType":"PERSON_LIMIT","capacity":8,"optionIds":["%s"]}
                 ]}
-                """.formatted(date, date, date.getDayOfWeek(), date.getDayOfWeek());
+                """.formatted(date, date, date.getDayOfWeek(), optionId, date.getDayOfWeek(), optionId);
 
         mockMvc.perform(authenticateAsVendorB(put(schedule).contentType(MediaType.APPLICATION_JSON).content(rules)))
                 .andExpect(status().isForbidden());
@@ -89,8 +92,8 @@ class VendorOperatingScheduleE2ETest extends BaseServiceE2ETest {
         assertThat(slotStatuses(serviceId, date)).containsExactly("OPEN");
 
         mockMvc.perform(authenticateAsVendorA(post(slots).contentType(MediaType.APPLICATION_JSON).content("""
-                {"date":"%s","startTime":"08:00","endTime":"10:00","inventoryType":"PERSON_LIMIT","capacity":8}
-                """.formatted(date)))).andExpect(status().isConflict())
+                {"date":"%s","startTime":"08:00","endTime":"10:00","inventoryType":"PERSON_LIMIT","capacity":8,"optionIds":["%s"]}
+                """.formatted(date, optionId)))).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("OPERATING_SCHEDULE_CONFLICT"));
 
         UUID afternoonId = jdbc.queryForObject("""
@@ -120,6 +123,21 @@ class VendorOperatingScheduleE2ETest extends BaseServiceE2ETest {
                 .andExpect(status().isOk());
         entityManager.flush();
         assertThat(slotStatuses(serviceId, date)).containsExactly("OPEN");
+    }
+
+    @Test
+    void rejectsSchedulePutWithoutOptionIds() throws Exception {
+        UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        LocalDate date = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(1);
+        String schedule = VENDOR_API_BASE + "/" + serviceId + "/operating-schedule";
+        String rules = """
+                {"startsOn":"%s","endsOn":"%s","active":true,"rules":[
+                    {"dayOfWeek":"%s","startTime":"08:00","endTime":"10:00","inventoryType":"PERSON_LIMIT","capacity":8}
+                ]}
+                """.formatted(date, date, date.getDayOfWeek());
+
+        mockMvc.perform(authenticateAsVendorA(put(schedule).contentType(MediaType.APPLICATION_JSON).content(rules)))
+                .andExpect(status().isBadRequest());
     }
 
     private static String exception(LocalDate date, String time) {

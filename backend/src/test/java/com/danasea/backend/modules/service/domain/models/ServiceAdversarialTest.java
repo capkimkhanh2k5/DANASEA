@@ -244,7 +244,7 @@ class ServiceAdversarialTest {
     class DeleteValidationMatrixTests {
 
         @Test
-        @DisplayName("validateDeletable succeeds only when status is DRAFT")
+        @DisplayName("validateDeletable succeeds when status is DRAFT")
         void validateDeletable_fromDraft_shouldSucceed() {
             Service service = Service.builder()
                     .id(UUID.randomUUID())
@@ -255,9 +255,21 @@ class ServiceAdversarialTest {
             assertEquals(ServiceStatus.DRAFT, service.getStatus());
         }
 
+        @Test
+        @DisplayName("validateDeletable succeeds when status is REJECTED")
+        void validateDeletable_fromRejected_shouldSucceed() {
+            Service service = Service.builder()
+                    .id(UUID.randomUUID())
+                    .status(ServiceStatus.REJECTED)
+                    .build();
+
+            service.validateDeletable(); // No exception
+            assertEquals(ServiceStatus.REJECTED, service.getStatus());
+        }
+
         @ParameterizedTest
-        @EnumSource(value = ServiceStatus.class, names = {"PENDING_REVIEW", "PUBLISHED", "PAUSED", "REJECTED"})
-        @DisplayName("validateDeletable throws InvalidServiceStateException for all non-DRAFT states")
+        @EnumSource(value = ServiceStatus.class, names = {"PENDING_REVIEW", "PUBLISHED", "PAUSED"})
+        @DisplayName("validateDeletable throws InvalidServiceStateException for non-deletable states")
         void validateDeletable_nonDraft_shouldThrow(ServiceStatus initialStatus) {
             Service service = Service.builder()
                     .id(UUID.randomUUID())

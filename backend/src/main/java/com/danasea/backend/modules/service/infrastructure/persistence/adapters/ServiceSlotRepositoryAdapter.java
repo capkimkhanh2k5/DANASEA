@@ -41,7 +41,7 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
     @Transactional
     public ServiceSlot save(ServiceSlot slot) {
         ServiceSlotJpaEntity entity = toEntity(slot);
-        ServiceSlotJpaEntity saved = jpaServiceSlotRepository.save(entity);
+        ServiceSlotJpaEntity saved = jpaServiceSlotRepository.saveAndFlush(entity);
         return toDomain(saved, slot.getUnits());
     }
 
@@ -241,6 +241,7 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
     @Transactional
     public void saveSlotOptions(UUID slotId, List<UUID> optionIds) {
         if (slotId == null || optionIds == null || optionIds.isEmpty()) return;
+        jpaServiceSlotRepository.flush();
         jdbcTemplate.update("DELETE FROM service_slot_options WHERE slot_id = ?", slotId);
         List<Object[]> batch = optionIds.stream()
                 .distinct()
@@ -257,6 +258,7 @@ public class ServiceSlotRepositoryAdapter implements ServiceSlotRepositoryPort {
     @Transactional
     public void updateSlotOptions(UUID slotId, List<UUID> optionIds) {
         if (slotId == null) return;
+        jpaServiceSlotRepository.flush();
         jdbcTemplate.update("DELETE FROM service_slot_options WHERE slot_id = ?", slotId);
         if (optionIds != null && !optionIds.isEmpty()) {
             saveSlotOptions(slotId, optionIds);
