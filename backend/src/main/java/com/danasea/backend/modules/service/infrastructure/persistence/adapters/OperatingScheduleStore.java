@@ -134,14 +134,16 @@ public class OperatingScheduleStore {
     public Optional<UUID> insertDeparture(UUID serviceId, OperatingSchedule.Departure departure) {
         var slotId = UUID.randomUUID();
         var rule = departure.rule();
+        List<UUID> optionIds = rule.optionIds() != null ? rule.optionIds() : List.of();
+        UUID singleOptionId = optionIds.size() == 1 ? optionIds.get(0) : null;
         int inserted = jdbc.update("""
                 INSERT INTO service_slots
                     (id, service_id, date, start_time, end_time, capacity, booked_count, status,
-                     inventory_type, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, 0, 'OPEN', ?, now(), now())
+                     inventory_type, option_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 0, 'OPEN', ?, ?, now(), now())
                 ON CONFLICT (service_id, date, start_time) DO NOTHING
                 """, slotId, serviceId, departure.date(), rule.startTime(), rule.endTime(), rule.totalCapacity(),
-                rule.inventoryType().name());
+                rule.inventoryType().name(), singleOptionId);
         if (inserted == 0) {
             return Optional.empty();
         }
@@ -153,6 +155,13 @@ public class OperatingScheduleStore {
                     """, rule.units().stream().map(unit -> new Object[] {
                             UUID.randomUUID(), slotId, unit.unitNumber(), unit.capacity()
                     }).toList(), new int[] {Types.OTHER, Types.OTHER, Types.INTEGER, Types.INTEGER});
+        }
+        if (!optionIds.isEmpty()) {
+            jdbc.batchUpdate("""
+                    INSERT INTO service_slot_options (slot_id, option_id)
+                    VALUES (?, ?) ON CONFLICT DO NOTHING
+                    """, optionIds.stream().map(optId -> new Object[] { slotId, optId }).toList(),
+                    new int[] { Types.OTHER, Types.OTHER });
         }
         jdbc.update("INSERT INTO service_operating_schedule_slots (slot_id) VALUES (?)", slotId);
         return Optional.of(slotId);

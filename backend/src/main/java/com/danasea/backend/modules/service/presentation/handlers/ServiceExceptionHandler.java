@@ -3,6 +3,7 @@ package com.danasea.backend.modules.service.presentation.handlers;
 import com.danasea.backend.modules.service.domain.exceptions.CategoryInactiveException;
 import com.danasea.backend.modules.service.domain.exceptions.CategoryNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.ImageNotFoundException;
+import com.danasea.backend.modules.service.domain.exceptions.InvalidDocumentStateException;
 import com.danasea.backend.modules.service.domain.exceptions.InvalidFileTypeException;
 import com.danasea.backend.modules.service.domain.exceptions.InvalidServiceStateException;
 import com.danasea.backend.modules.service.domain.exceptions.MaxImagesExceededException;
@@ -63,6 +64,12 @@ public class ServiceExceptionHandler extends LocalizedExceptionHandlerSupport {
     public ResponseEntity<ErrorResponse> handleInvalidState(InvalidServiceStateException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(error("INVALID_SERVICE_STATE"));
+    }
+
+    @ExceptionHandler(InvalidDocumentStateException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidDocumentState(InvalidDocumentStateException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(error("INVALID_DOCUMENT_STATE"));
     }
 
     @ExceptionHandler(ServiceImagesRequiredException.class)

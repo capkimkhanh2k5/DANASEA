@@ -398,9 +398,11 @@ public class ServiceTier2BoundaryCornerCaseE2ETest extends BaseServiceE2ETest {
     }
 
     @Test
-    @DisplayName("F8.B4: Fail when attempting to delete REJECTED service (400 per R3)")
-    void f8_testDeleteService_Fail_RejectedServiceBlocked() throws Exception {
-        invalidState("delete", ServiceStatus.REJECTED);
+    @DisplayName("F8.B4: Delete REJECTED service without bookings succeeds (204 No Content per approved V61 rules)")
+    void f8_testDeleteService_Success_RejectedServiceWithoutBookings() throws Exception {
+        UUID serviceId = seed(ServiceStatus.REJECTED).getId();
+        addImage(serviceId, 0);
+        assertDeleted(serviceId);
     }
 
     @Test

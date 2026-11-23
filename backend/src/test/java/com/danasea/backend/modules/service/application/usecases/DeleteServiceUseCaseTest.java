@@ -23,7 +23,9 @@ import com.danasea.backend.modules.service.domain.models.Service;
 import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.domain.ports.ServiceImageRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
+import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
+import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSafetyDocumentRepository;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 import com.danasea.backend.modules.vendor.domain.models.VerificationStatus;
 
@@ -34,6 +36,8 @@ class DeleteServiceUseCaseTest {
     @Mock private ServiceRepositoryPort serviceRepository;
     @Mock private ServiceImageRepositoryPort serviceImageRepository;
     @Mock private VendorPort vendorPort;
+    @Mock private ServiceSlotRepositoryPort serviceSlotRepository;
+    @Mock private JpaServiceSafetyDocumentRepository safetyDocumentRepository;
 
     private DeleteServiceUseCase useCase;
 
@@ -43,7 +47,7 @@ class DeleteServiceUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new DeleteServiceUseCase(serviceRepository, serviceImageRepository, vendorPort);
+        useCase = new DeleteServiceUseCase(serviceRepository, serviceImageRepository, vendorPort, serviceSlotRepository, safetyDocumentRepository);
     }
 
     private Vendor vendor() {
@@ -98,6 +102,40 @@ class DeleteServiceUseCaseTest {
         assertThatThrownBy(() -> useCase.execute(userId, serviceId))
                 .isInstanceOf(InvalidServiceStateException.class);
 
+        verify(serviceRepository, never()).deleteById(any());
+    }
+
+    @Test
+    @DisplayName("✅ Xóa khi REJECTED và không có booking → thành công và dọn dẹp slots")
+    void delete_rejected_noBookings_success() {
+        Service rejected = serviceWithStatus(vendorId, ServiceStatus.REJECTED);
+
+        when(vendorPort.findByUserId(userId)).thenReturn(Optional.of(vendor()));
+        when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(rejected));
+        when(serviceSlotRepository.hasAnyBookingForService(serviceId)).thenReturn(false);
+
+        assertThatCode(() -> useCase.execute(userId, serviceId)).doesNotThrowAnyException();
+
+        verify(serviceSlotRepository).deleteByServiceId(serviceId);
+        verify(safetyDocumentRepository).deleteByServiceId(serviceId);
+        verify(serviceImageRepository).deleteByServiceId(serviceId);
+        verify(serviceRepository).deleteById(serviceId);
+    }
+
+    @Test
+    @DisplayName("❌ Xóa khi REJECTED nhưng đã có booking → ném InvalidServiceStateException")
+    void delete_rejected_withBookings_throwsException() {
+        Service rejected = serviceWithStatus(vendorId, ServiceStatus.REJECTED);
+
+        when(vendorPort.findByUserId(userId)).thenReturn(Optional.of(vendor()));
+        when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(rejected));
+        when(serviceSlotRepository.hasAnyBookingForService(serviceId)).thenReturn(true);
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId))
+                .isInstanceOf(InvalidServiceStateException.class)
+                .hasMessageContaining("booking history");
+
+        verify(serviceSlotRepository, never()).deleteByServiceId(any());
         verify(serviceRepository, never()).deleteById(any());
     }
 }

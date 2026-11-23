@@ -19,6 +19,9 @@ public class ServiceSlotJpaEntity extends BaseJpaEntity {
 
     private UUID serviceId;
 
+    @Column(name = "option_id")
+    private UUID optionId;
+
     private LocalDate date;
 
     private LocalTime startTime;

@@ -4,9 +4,12 @@ import com.danasea.backend.shared.presentation.ApiConflictException;
 import com.danasea.backend.modules.booking.domain.models.Booking;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedException;
+import com.danasea.backend.modules.service.domain.models.InventoryType;
 import com.danasea.backend.modules.service.domain.models.OperatingSchedule;
 import com.danasea.backend.modules.service.domain.models.OperatingScheduleException;
 import com.danasea.backend.modules.service.domain.models.Service;
+import com.danasea.backend.modules.service.domain.models.ServiceOption;
+import com.danasea.backend.modules.service.domain.ports.ServiceOptionRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
 import com.danasea.backend.modules.service.infrastructure.persistence.adapters.OperatingScheduleStore;
@@ -15,25 +18,48 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Component
-@RequiredArgsConstructor
 public class OperatingScheduleUseCase {
     private final ServiceRepositoryPort services;
     private final VendorPort vendors;
     private final OperatingScheduleStore store;
     private final EquipmentAssignmentService equipment;
+    private final ServiceOptionRepositoryPort serviceOptions;
+
+    @Autowired
+    public OperatingScheduleUseCase(
+            ServiceRepositoryPort services,
+            VendorPort vendors,
+            OperatingScheduleStore store,
+            EquipmentAssignmentService equipment,
+            ServiceOptionRepositoryPort serviceOptions) {
+        this.services = services;
+        this.vendors = vendors;
+        this.store = store;
+        this.equipment = equipment;
+        this.serviceOptions = serviceOptions;
+    }
+
+    public OperatingScheduleUseCase(
+            ServiceRepositoryPort services,
+            VendorPort vendors,
+            OperatingScheduleStore store,
+            EquipmentAssignmentService equipment) {
+        this(services, vendors, store, equipment, null);
+    }
 
     @Transactional(readOnly = true)
     public Optional<OperatingSchedule> get(UUID userId, UUID serviceId) {
@@ -45,6 +71,7 @@ public class OperatingScheduleUseCase {
     public ScheduleUpdate put(UUID userId, UUID serviceId, OperatingSchedule schedule) {
         Service service = ownedService(userId, serviceId, true);
         validateEquipment(service.getVendorId(), schedule);
+        validateScheduleOptions(service.getId(), schedule);
         store.save(serviceId, schedule);
 
         LocalDateTime now = LocalDateTime.now(Booking.VIETNAM_ZONE);
@@ -156,11 +183,49 @@ public class OperatingScheduleUseCase {
     }
 
     private boolean materializeDeparture(Service service, OperatingSchedule.Departure departure) {
-        var slotId = store.insertDeparture(service.getId(), departure);
+        List<UUID> configuredOptionIds = departure.rule().optionIds();
+        if (configuredOptionIds == null || configuredOptionIds.isEmpty()) {
+            return false;
+        }
+
+        List<UUID> activeOptionIds = configuredOptionIds;
+        if (serviceOptions != null) {
+            activeOptionIds = configuredOptionIds.stream()
+                    .map(serviceOptions::findById)
+                    .flatMap(Optional::stream)
+                    .filter(opt -> service.getId().equals(opt.getServiceId()) && opt.isActive())
+                    .map(ServiceOption::getId)
+                    .toList();
+            if (activeOptionIds.isEmpty()) {
+                return false;
+            }
+            boolean hasPrivate = activeOptionIds.stream()
+                    .map(serviceOptions::findById)
+                    .flatMap(Optional::stream)
+                    .anyMatch(ServiceOption::isPrivate);
+            if (hasPrivate && !InventoryType.SHARED_CAPACITY_UNITS.equals(departure.rule().inventoryType())) {
+                return false;
+            }
+        }
+
+        OperatingSchedule.Departure validatedDeparture = new OperatingSchedule.Departure(
+                departure.date(),
+                new OperatingSchedule.WeeklyRule(
+                        departure.rule().dayOfWeek(),
+                        departure.rule().startTime(),
+                        departure.rule().endTime(),
+                        departure.rule().inventoryType(),
+                        departure.rule().capacity(),
+                        departure.rule().units(),
+                        activeOptionIds
+                )
+        );
+
+        var slotId = store.insertDeparture(service.getId(), validatedDeparture);
         if (slotId.isEmpty()) {
             return false;
         }
-        var assignments = departure.rule().units().stream().filter(unit -> unit.equipmentId() != null)
+        var assignments = validatedDeparture.rule().units().stream().filter(unit -> unit.equipmentId() != null)
                 .collect(Collectors.toMap(OperatingSchedule.Unit::unitNumber, OperatingSchedule.Unit::equipmentId));
         if (!assignments.isEmpty()) {
             equipment.attachGenerated(service.getVendorId(), slotId.get(), assignments);
@@ -182,6 +247,34 @@ public class OperatingScheduleUseCase {
         }
         if (!expectedCapacities.isEmpty()) {
             equipment.validateScheduleEquipment(vendorId, expectedCapacities);
+        }
+    }
+
+    private void validateScheduleOptions(UUID serviceId, OperatingSchedule schedule) {
+        if (serviceOptions == null) {
+            return;
+        }
+        for (var rule : schedule.rules()) {
+            List<UUID> optionIds = rule.optionIds();
+            if (optionIds == null || optionIds.isEmpty()) {
+                throw new IllegalArgumentException("Schedule rule must specify at least one optionId");
+            }
+            if (new HashSet<>(optionIds).size() != optionIds.size()) {
+                throw new IllegalArgumentException("Weekly rules cannot contain duplicate options");
+            }
+            for (UUID optId : optionIds) {
+                var opt = serviceOptions.findById(optId)
+                        .orElseThrow(() -> new IllegalArgumentException("Option not found: " + optId));
+                if (!serviceId.equals(opt.getServiceId())) {
+                    throw new IllegalArgumentException("Option " + optId + " does not belong to service " + serviceId);
+                }
+                if (!opt.isActive()) {
+                    throw new IllegalArgumentException("Option " + optId + " is not active");
+                }
+                if (opt.isPrivate() && !InventoryType.SHARED_CAPACITY_UNITS.equals(rule.inventoryType())) {
+                    throw new IllegalArgumentException("Private options require shared capacity units");
+                }
+            }
         }
     }
 

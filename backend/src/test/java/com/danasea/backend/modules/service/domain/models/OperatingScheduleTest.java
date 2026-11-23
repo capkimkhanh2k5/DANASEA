@@ -79,6 +79,24 @@ class OperatingScheduleTest {
                 .containsExactly(morning, adjacent);
     }
 
+    @Test
+    void weeklyRulePreservesConfiguredOptionIds() {
+        UUID opt1 = UUID.randomUUID();
+        UUID opt2 = UUID.randomUUID();
+        var ruleWithOptions = new OperatingSchedule.WeeklyRule(
+                TODAY.getDayOfWeek(), MORNING, MORNING.plusHours(2),
+                InventoryType.PERSON_LIMIT, 12, List.of(), List.of(opt1, opt2)
+        );
+
+        assertThat(ruleWithOptions.optionIds()).containsExactly(opt1, opt2);
+
+        var ruleDefault = new OperatingSchedule.WeeklyRule(
+                TODAY.getDayOfWeek(), MORNING, MORNING.plusHours(2),
+                InventoryType.PERSON_LIMIT, 12, List.of()
+        );
+        assertThat(ruleDefault.optionIds()).isEmpty();
+    }
+
     private static OperatingSchedule.WeeklyRule rule(DayOfWeek day, LocalTime time) {
         return new OperatingSchedule.WeeklyRule(day, time, time.plusHours(2),
                 InventoryType.PERSON_LIMIT, 12, List.of());

@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -18,30 +19,57 @@ import org.springframework.transaction.annotation.Transactional;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.exceptions.VendorNotApprovedException;
 import com.danasea.backend.modules.service.domain.models.InventoryType;
+import com.danasea.backend.modules.service.domain.models.OptionType;
 import com.danasea.backend.modules.service.domain.models.Service;
+import com.danasea.backend.modules.service.domain.models.ServiceOption;
 import com.danasea.backend.modules.service.domain.models.ServiceSlot;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.domain.models.ServiceSlotUnit;
+import com.danasea.backend.modules.service.domain.ports.ServiceOptionRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
 import com.danasea.backend.modules.service.infrastructure.persistence.adapters.OperatingScheduleStore;
 import com.danasea.backend.modules.service.presentation.dtos.CreateSlotUnitRequest;
+import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotOptionSummaryResponse;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotResponse;
 import com.danasea.backend.modules.service.presentation.dtos.ServiceSlotUnitResponse;
 import com.danasea.backend.modules.service.presentation.dtos.UpdateServiceSlotRequest;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 @Component
-@RequiredArgsConstructor
 public class UpdateServiceSlotUseCase {
 
     private final ServiceRepositoryPort serviceRepository;
     private final ServiceSlotRepositoryPort serviceSlotRepository;
     private final VendorPort vendorPort;
     private final OperatingScheduleStore scheduleStore;
+    private final ServiceOptionRepositoryPort serviceOptionRepository;
+
+    @Autowired
+    public UpdateServiceSlotUseCase(
+            ServiceRepositoryPort serviceRepository,
+            ServiceSlotRepositoryPort serviceSlotRepository,
+            VendorPort vendorPort,
+            OperatingScheduleStore scheduleStore,
+            ServiceOptionRepositoryPort serviceOptionRepository) {
+        this.serviceRepository = serviceRepository;
+        this.serviceSlotRepository = serviceSlotRepository;
+        this.vendorPort = vendorPort;
+        this.scheduleStore = scheduleStore;
+        this.serviceOptionRepository = serviceOptionRepository;
+    }
+
+    public UpdateServiceSlotUseCase(
+            ServiceRepositoryPort serviceRepository,
+            ServiceSlotRepositoryPort serviceSlotRepository,
+            VendorPort vendorPort,
+            OperatingScheduleStore scheduleStore) {
+        this(serviceRepository, serviceSlotRepository, vendorPort, scheduleStore, null);
+    }
 
     @Transactional
     public ServiceSlotResponse execute(UUID userId, UUID serviceId, UUID slotId, UpdateServiceSlotRequest request) {
@@ -172,6 +200,49 @@ public class UpdateServiceSlotUseCase {
             }
         }
 
+        if (request.optionIds() != null) {
+            if (request.optionIds().isEmpty()) {
+                throw new IllegalArgumentException("Slot must have at least one option assigned");
+            }
+            if (new HashSet<>(request.optionIds()).size() != request.optionIds().size()) {
+                throw new IllegalArgumentException("Duplicate options in slot update");
+            }
+            if (serviceOptionRepository != null) {
+                boolean hasPrivate = false;
+                for (UUID optId : request.optionIds()) {
+                    ServiceOption opt = serviceOptionRepository.findById(optId)
+                            .orElseThrow(() -> new IllegalArgumentException("Option not found: " + optId));
+                    if (!serviceId.equals(opt.getServiceId())) {
+                        throw new IllegalArgumentException("Option does not belong to the specified service");
+                    }
+                    if (!opt.isActive()) {
+                        throw new IllegalArgumentException("Option is not active: " + optId);
+                    }
+                    if (opt.isPrivate()) {
+                        hasPrivate = true;
+                    }
+                }
+                if (hasPrivate && !InventoryType.SHARED_CAPACITY_UNITS.equals(slot.getInventoryType())) {
+                    throw new IllegalArgumentException("Private options require shared capacity units");
+                }
+            }
+
+            List<UUID> currentOptIds = serviceSlotRepository.findOptionIdsBySlotId(slotId);
+            Set<UUID> nextOptIds = new HashSet<>(request.optionIds());
+            for (UUID oldOptId : currentOptIds) {
+                if (!nextOptIds.contains(oldOptId)) {
+                    if (serviceSlotRepository.hasActiveBookingOrHoldForOption(slotId, oldOptId)) {
+                        throw new IllegalArgumentException("Cannot remove option " + oldOptId + " from slot because it has active bookings or holds");
+                    }
+                }
+            }
+
+            serviceSlotRepository.updateSlotOptions(slotId, request.optionIds());
+            slot.setOptionIds(request.optionIds());
+            UUID singleOptionId = request.optionIds().size() == 1 ? request.optionIds().get(0) : null;
+            slot.setOptionId(singleOptionId);
+        }
+
         ServiceSlot saved = serviceSlotRepository.save(slot);
         return toResponse(saved, updatedUnits);
     }
@@ -181,9 +252,41 @@ public class UpdateServiceSlotUseCase {
                 ? units.stream().map(this::toUnitResponse).toList()
                 : List.of();
 
+        List<UUID> optIds = (s.getOptionIds() != null && !s.getOptionIds().isEmpty())
+                ? s.getOptionIds()
+                : serviceSlotRepository.findOptionIdsBySlotId(s.getId());
+        if (optIds.isEmpty() && s.getOptionId() != null) {
+            optIds = List.of(s.getOptionId());
+        }
+
+        List<ServiceSlotOptionSummaryResponse> optionSummaries = serviceOptionRepository != null ? optIds.stream()
+                .map(serviceOptionRepository::findById)
+                .flatMap(Optional::stream)
+                .map(o -> new ServiceSlotOptionSummaryResponse(
+                        o.getId(),
+                        o.getName(),
+                        o.getOptionType(),
+                        o.getPricingUnit(),
+                        o.getPrice(),
+                        o.getMaxPaxPerPackage()
+                ))
+                .toList() : List.of();
+
+        UUID singleOptionId = (optIds.size() == 1) ? optIds.get(0) : s.getOptionId();
+        OptionType singleOptionType = (optionSummaries.size() == 1)
+                ? optionSummaries.get(0).optionType()
+                : (optionSummaries.stream().map(ServiceSlotOptionSummaryResponse::optionType).distinct().count() == 1 && !optionSummaries.isEmpty()
+                        ? optionSummaries.get(0).optionType()
+                        : null);
+        String singleOptionName = (optionSummaries.size() == 1) ? optionSummaries.get(0).name() : null;
+
         return ServiceSlotResponse.builder()
                 .id(s.getId())
                 .serviceId(s.getServiceId())
+                .optionId(singleOptionId)
+                .optionType(singleOptionType)
+                .optionName(singleOptionName)
+                .options(optionSummaries)
                 .date(s.getDate())
                 .startTime(s.getStartTime())
                 .endTime(s.getEndTime())
