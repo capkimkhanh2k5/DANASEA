@@ -210,4 +210,56 @@ class ApproveSafetyDocumentUseCaseTest {
                 useCase.canPublish(serviceId)
         );
     }
+
+    @Test
+    @DisplayName("AC4.10: Publish Guard — Chứng từ REJECTED cũ không chặn bản mới APPROVED -> Cho phép Publish")
+    void shouldAllowPublishWhenOneDocRejectedAndAnotherDocApproved() {
+        serviceEntity.setWeatherSensitive(true);
+
+        when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(serviceEntity));
+        when(categoryRepository.findByIdForUpdate(categoryId)).thenReturn(Optional.of(categoryEntity));
+        // existsByServiceIdAndStatus(serviceId, APPROVED) returns true even if other docs are REJECTED
+        when(safetyDocumentRepository.existsByServiceIdAndStatus(serviceId, DocStatus.APPROVED)).thenReturn(true);
+
+        boolean canPublish = useCase.canPublish(serviceId);
+
+        assertTrue(canPublish);
+        verify(safetyDocumentRepository).existsByServiceIdAndStatus(serviceId, DocStatus.APPROVED);
+    }
+
+    @Test
+    @DisplayName("AC4.11: Publish Guard — Khi chỉ có chứng từ REJECTED/PENDING -> Chặn Publish")
+    void shouldBlockPublishWhenOnlyRejectedOrPendingDocsExist() {
+        serviceEntity.setWeatherSensitive(true);
+
+        when(serviceRepository.findById(serviceId)).thenReturn(Optional.of(serviceEntity));
+        when(categoryRepository.findByIdForUpdate(categoryId)).thenReturn(Optional.of(categoryEntity));
+        when(safetyDocumentRepository.existsByServiceIdAndStatus(serviceId, DocStatus.APPROVED)).thenReturn(false);
+
+        assertThrows(SafetyDocumentRequiredException.class, () ->
+                useCase.canPublish(serviceId)
+        );
+    }
+
+    @Test
+    @DisplayName("AC4.12: Không cho phép duyệt chứng từ ở trạng thái khác PENDING (VD: WITHDRAWN)")
+    void shouldThrowWhenApprovingNonPendingDocument() {
+        documentEntity.setStatus(DocStatus.WITHDRAWN);
+        when(safetyDocumentRepository.findByIdAndServiceId(documentId, serviceId)).thenReturn(Optional.of(documentEntity));
+
+        assertThrows(com.danasea.backend.modules.service.domain.exceptions.InvalidDocumentStateException.class, () ->
+                useCase.approve(serviceId, documentId, adminId)
+        );
+    }
+
+    @Test
+    @DisplayName("AC4.13: Không cho phép từ chối chứng từ đã APPROVED")
+    void shouldThrowWhenRejectingApprovedDocument() {
+        documentEntity.setStatus(DocStatus.APPROVED);
+        when(safetyDocumentRepository.findByIdAndServiceId(documentId, serviceId)).thenReturn(Optional.of(documentEntity));
+
+        assertThrows(com.danasea.backend.modules.service.domain.exceptions.InvalidDocumentStateException.class, () ->
+                useCase.reject(serviceId, documentId, adminId, "Late rejection")
+        );
+    }
 }

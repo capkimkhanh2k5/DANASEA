@@ -8,6 +8,9 @@ import com.danasea.backend.modules.account.domain.models.Role;
 import com.danasea.backend.modules.account.infrastructure.persistence.entities.UserJpaEntity;
 import com.danasea.backend.modules.account.infrastructure.persistence.repositories.JpaUserRepository;
 import com.danasea.backend.modules.service.domain.models.DocStatus;
+import com.danasea.backend.modules.service.domain.models.OptionStatus;
+import com.danasea.backend.modules.service.domain.models.OptionType;
+import com.danasea.backend.modules.service.domain.models.PricingUnit;
 import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.*;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.*;
@@ -77,6 +80,7 @@ public abstract class BaseServiceE2ETest extends BaseSecurityIntegrationTest {
     @Autowired protected MockMvc mockMvc;
     @Autowired protected ObjectMapper objectMapper;
     @Autowired protected JpaServiceRepository serviceRepository;
+    @Autowired protected JpaServiceOptionRepository optionRepository;
     @Autowired protected JpaServiceImageRepository imageRepository;
     @Autowired protected JpaCategoryRepository categoryRepository;
     @Autowired private JpaUserRepository userRepository;
@@ -263,6 +267,22 @@ public abstract class BaseServiceE2ETest extends BaseSecurityIntegrationTest {
         service = serviceRepository.saveAndFlush(service);
         serviceIds.add(service.getId());
         return service;
+    }
+
+    protected ServiceOptionJpaEntity seedOption(UUID serviceId, OptionType type) {
+        ServiceOptionJpaEntity option = ServiceOptionJpaEntity.builder()
+                .serviceId(serviceId)
+                .name(type == OptionType.PRIVATE ? "Private Charter" : "Standard Option")
+                .optionType(type)
+                .pricingUnit(type == OptionType.PRIVATE ? PricingUnit.PER_PACKAGE : PricingUnit.PER_PERSON)
+                .price(new BigDecimal("250000.00"))
+                .status(OptionStatus.ACTIVE)
+                .build();
+        return optionRepository.saveAndFlush(option);
+    }
+
+    protected ServiceOptionJpaEntity seedOption(UUID serviceId) {
+        return seedOption(serviceId, OptionType.SHARED);
     }
 
     protected ServiceImageJpaEntity addImage(UUID serviceId, int order) {

@@ -32,6 +32,7 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
     @Test
     void createsBatchSlotsSuccessfully() throws Exception {
         UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        UUID optionId = seedOption(serviceId).getId();
         LocalDate start = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(2);
         LocalDate end = start.plusDays(2);
         String batchUrl = VENDOR_API_BASE + "/" + serviceId + "/slots/batch";
@@ -46,13 +47,15 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
                             "startTime": "08:00",
                             "endTime": "10:00",
                             "inventoryType": "PERSON_LIMIT",
-                            "capacity": 10
+                            "capacity": 10,
+                            "optionIds": ["%s"]
                         },
                         {
                             "startTime": "14:00",
                             "endTime": "16:00",
                             "inventoryType": "PERSON_LIMIT",
-                            "capacity": 12
+                            "capacity": 12,
+                            "optionIds": ["%s"]
                         }
                     ]
                 }
@@ -61,7 +64,9 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
                 end,
                 start.getDayOfWeek(),
                 start.plusDays(1).getDayOfWeek(),
-                start.plusDays(2).getDayOfWeek()
+                start.plusDays(2).getDayOfWeek(),
+                optionId,
+                optionId
         );
 
         mockMvc.perform(authenticateAsVendorA(post(batchUrl)
@@ -86,6 +91,7 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
     @Test
     void createsOnlyTheFourSelectedDates() throws Exception {
         UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        UUID optionId = seedOption(serviceId).getId();
         LocalDate first = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(2);
         String batchUrl = VENDOR_API_BASE + "/" + serviceId + "/slots/batch";
 
@@ -99,11 +105,12 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
                                             "startTime": "08:00",
                                             "endTime": "10:00",
                                             "inventoryType": "PERSON_LIMIT",
-                                            "capacity": 10
+                                            "capacity": 10,
+                                            "optionIds": ["%s"]
                                         }
                                     ]
                                 }
-                                """.formatted(first, first.plusDays(1), first.plusDays(4), first.plusDays(5)))))
+                                """.formatted(first, first.plusDays(1), first.plusDays(4), first.plusDays(5), optionId))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.totalCreated").value(4));
 
@@ -115,6 +122,7 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
     @Test
     void persistsTheFullThirtyOneDayWorkloadAtTheLimit() throws Exception {
         UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        UUID optionId = seedOption(serviceId).getId();
         LocalDate first = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(2);
         String batchUrl = VENDOR_API_BASE + "/" + serviceId + "/slots/batch";
         String slotTemplates = IntStream.range(8, 12)
@@ -123,6 +131,7 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
                             "startTime": "%02d:00",
                             "endTime": "%02d:00",
                             "inventoryType": "SHARED_CAPACITY_UNITS",
+                            "optionIds": ["%s"],
                             "units": [
                                 {"unitNumber": 1, "capacity": 4},
                                 {"unitNumber": 2, "capacity": 4},
@@ -130,7 +139,7 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
                                 {"unitNumber": 4, "capacity": 4}
                             ]
                         }
-                        """.formatted(hour, hour + 1))
+                        """.formatted(hour, hour + 1, optionId))
                 .collect(Collectors.joining(","));
 
         mockMvc.perform(authenticateAsVendorA(post(batchUrl)
@@ -163,6 +172,7 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
     })
     void rejectsBatchWhenSlotAlreadyExistsAndRollsBack(String language, String message) throws Exception {
         UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        UUID optionId = seedOption(serviceId).getId();
         LocalDate start = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(3);
         LocalDate end = start.plusDays(1);
         String singleSlotUrl = VENDOR_API_BASE + "/" + serviceId + "/slots";
@@ -177,9 +187,10 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
                                     "startTime": "08:00",
                                     "endTime": "10:00",
                                     "inventoryType": "PERSON_LIMIT",
-                                    "capacity": 10
+                                    "capacity": 10,
+                                    "optionIds": ["%s"]
                                 }
-                                """.formatted(end))))
+                                """.formatted(end, optionId))))
                 .andExpect(status().isCreated());
 
         entityManager.flush();
@@ -194,11 +205,12 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
                             "startTime": "08:00",
                             "endTime": "10:00",
                             "inventoryType": "PERSON_LIMIT",
-                            "capacity": 10
+                            "capacity": 10,
+                            "optionIds": ["%s"]
                         }
                     ]
                 }
-                """.formatted(start, end, start.getDayOfWeek(), end.getDayOfWeek());
+                """.formatted(start, end, start.getDayOfWeek(), end.getDayOfWeek(), optionId);
 
         // Batch attempt should fail because day 2 has duplicate slot
         mockMvc.perform(authenticateAsVendorA(post(batchUrl)
@@ -269,5 +281,34 @@ class VendorBatchServiceSlotE2ETest extends BaseServiceE2ETest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rejectsBatchWhenOptionsAreMissing() throws Exception {
+        UUID serviceId = seed(ServiceStatus.PUBLISHED).getId();
+        LocalDate start = LocalDate.now(Booking.VIETNAM_ZONE).plusDays(2);
+        String batchUrl = VENDOR_API_BASE + "/" + serviceId + "/slots/batch";
+
+        String jsonPayload = """
+                {
+                    "startDate": "%s",
+                    "endDate": "%s",
+                    "daysOfWeek": ["%s"],
+                    "slotTemplates": [
+                        {
+                            "startTime": "08:00",
+                            "endTime": "10:00",
+                            "inventoryType": "PERSON_LIMIT",
+                            "capacity": 10
+                        }
+                    ]
+                }
+                """.formatted(start, start, start.getDayOfWeek());
+
+        mockMvc.perform(authenticateAsVendorA(post(batchUrl)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonPayload)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
     }
 }

@@ -77,12 +77,19 @@ public record OperatingSchedule(LocalDate startsOn, LocalDate endsOn, boolean ac
     public record Departure(LocalDate date, WeeklyRule rule) {}
 
     public record WeeklyRule(DayOfWeek dayOfWeek, LocalTime startTime, LocalTime endTime,
-                             InventoryType inventoryType, Integer capacity, List<Unit> units) {
+                             InventoryType inventoryType, Integer capacity, List<Unit> units,
+                             List<UUID> optionIds) {
+        public WeeklyRule(DayOfWeek dayOfWeek, LocalTime startTime, LocalTime endTime,
+                          InventoryType inventoryType, Integer capacity, List<Unit> units) {
+            this(dayOfWeek, startTime, endTime, inventoryType, capacity, units, List.of());
+        }
+
         public WeeklyRule {
             if (dayOfWeek == null || startTime == null || endTime == null || !startTime.isBefore(endTime)
                     || startTime.getNano() != 0 || endTime.getNano() != 0 || inventoryType == null) {
                 throw new IllegalArgumentException("Weekly rules require a day, whole-second times and inventory type");
             }
+            optionIds = optionIds != null ? List.copyOf(optionIds) : List.of();
             if (inventoryType == InventoryType.PERSON_LIMIT) {
                 if (capacity == null || capacity < 1 || (units != null && !units.isEmpty())) {
                     throw new IllegalArgumentException("Person inventory requires positive capacity and no units");

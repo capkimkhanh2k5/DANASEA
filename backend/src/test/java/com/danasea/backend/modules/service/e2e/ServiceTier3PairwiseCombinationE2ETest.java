@@ -62,12 +62,17 @@ public class ServiceTier3PairwiseCombinationE2ETest extends BaseServiceE2ETest {
     }
 
     @Test
-    @DisplayName("P4: Deletion Constraints Across State Lifecycle: Only DRAFT deletable")
+    @DisplayName("P4: Deletion Constraints Across State Lifecycle: DRAFT and REJECTED deletable, others blocked")
     void testPairwise_CreateDraft_Then_AttemptDelete_AcrossAllStateTransitions() throws Exception {
         UUID draft = id(create(standardPayload()));
         addImage(draft, 0);
         assertDeleted(draft);
-        for (ServiceStatus state : List.of(ServiceStatus.PENDING_REVIEW, ServiceStatus.PUBLISHED, ServiceStatus.PAUSED, ServiceStatus.REJECTED)) {
+
+        UUID rejected = seed(ServiceStatus.REJECTED).getId();
+        addImage(rejected, 0);
+        assertDeleted(rejected);
+
+        for (ServiceStatus state : List.of(ServiceStatus.PENDING_REVIEW, ServiceStatus.PUBLISHED, ServiceStatus.PAUSED)) {
             invalidState("delete", state);
         }
     }

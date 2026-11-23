@@ -8,6 +8,7 @@ import com.danasea.backend.shared.core.domain.models.BaseDomainModel;
 import java.math.BigDecimal;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -45,6 +46,7 @@ public class Service extends BaseDomainModel {
     private BigDecimal avgRating;
     private Integer ratingCount;
     private Integer viewCount;
+    @Builder.Default
     private OperationType operationType = OperationType.FIXED_DEPARTURE;
 
     public boolean isDraft() {
@@ -129,8 +131,14 @@ public class Service extends BaseDomainModel {
     }
 
     public void validateDeletable() {
-        if (!isDraft()) {
-            throw new InvalidServiceStateException("Cannot delete service in status " + this.status + ". Only DRAFT services can be deleted.");
+        if (!isDraft() && !isRejected()) {
+            throw new InvalidServiceStateException("Cannot delete service in status " + this.status + ". Only DRAFT or REJECTED services can be deleted.");
+        }
+    }
+
+    public void validateSlotCreatable() {
+        if (!isPublished()) {
+            throw new InvalidServiceStateException("Cannot create departure slot for service in status " + this.status + ". Service must be PUBLISHED.");
         }
     }
 
