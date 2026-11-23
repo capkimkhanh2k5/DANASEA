@@ -674,6 +674,48 @@ class VendorAdminAiFeaturesTest {
             List<?> list = (List<?>) art.get("data");
             assertThat(list).hasSize(3);
         });
+
+        // 18. English Top 1 by GMV: "Which vendor has the highest GMV?"
+        var repEnTop1Gmv = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Which vendor has the highest GMV?", null, null, SupportedLanguage.EN);
+        assertThat(repEnTop1Gmv.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repEnTop1Gmv.artifacts()).singleElement().satisfies(art -> {
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(1);
+        });
+        assertThat(repEnTop1Gmv.message()).contains("Danabeach Club")
+                .contains("GMV of 15,000,000 VND");
+
+        // 19. English Top 1 by revenue: "Which vendor has the highest revenue?"
+        var repEnTop1Rev = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Which vendor has the highest revenue?", null, null, SupportedLanguage.EN);
+        assertThat(repEnTop1Rev.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repEnTop1Rev.artifacts()).singleElement().satisfies(art -> {
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(1);
+        });
+        assertThat(repEnTop1Rev.message()).contains("Danabeach Club");
+
+        // 20. English Top earner: "Who is the top earning vendor?"
+        var repEnTopEarner = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Who is the top earning vendor?", null, null, SupportedLanguage.EN);
+        assertThat(repEnTopEarner.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repEnTopEarner.artifacts()).singleElement().satisfies(art -> {
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(1);
+        });
+        assertThat(repEnTopEarner.message()).contains("Danabeach Club");
+
+        // 21. English Top 3: "Show me the top 3 vendors by GMV."
+        var repEnTop3 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Show me the top 3 vendors by GMV.", null, null, SupportedLanguage.EN);
+        assertThat(repEnTop3.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(repEnTop3.artifacts()).singleElement().satisfies(art -> {
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(3);
+        });
+        assertThat(repEnTop3.message()).contains("Revenue statistics for 3 vendor(s)")
+                .contains("Leading is Danabeach Club");
     }
 
     @Test
@@ -1570,5 +1612,594 @@ class VendorAdminAiFeaturesTest {
                 null, null, SupportedLanguage.VI);
         assertThat(v29.toolsUsed()).containsExactly("vendor_slot_advisor");
         assertThat(v29.message()).contains("Mô tô nước – Danabeach").contains("1/20 (5.0%)");
+    }
+
+    @Test
+    @DisplayName("Admin DaNaBot chẩn đoán sức khỏe đối tác ngắn gọn, phân biệt flagged vendors với issue count, không biến thành doanh thu")
+    void testAdminVendorDiagnosticsHealthAndIssueDistinction() {
+        UUID convId = UUID.randomUUID();
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Vendor Diagnostics",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        UUID v1Id = UUID.fromString("27afde91-58fd-5daa-b9fa-7f93f00135f0");
+        UUID v2Id = UUID.fromString("5a53c8e5-3a76-5383-b104-17b22d4af50f");
+        UUID v3Id = UUID.fromString("baea9605-392b-5003-93f1-60f2c0582f65");
+
+        // Danabeach: HEALTHY, 0 issues
+        var danabeach = new VendorDiagnosticItem(v1Id, "Danabeach Club",
+                BigDecimal.valueOf(15_000_000), 10, 0.0, 0.8, BigDecimal.valueOf(4.8), 20, "HEALTHY", List.of());
+        // Surf Shack: WARNING, 2 issues (HIGH_CANCELLATION, LOW_RATING)
+        var surfshack = new VendorDiagnosticItem(v2Id, "Surf Shack Da Nang",
+                BigDecimal.valueOf(10_000_000), 8, 25.0, 0.75, BigDecimal.valueOf(3.2), 15, "WARNING",
+                List.of("HIGH_CANCELLATION", "LOW_RATING"));
+        // Kajin: CRITICAL, 1 issue (HIGH_CANCELLATION)
+        var kajin = new VendorDiagnosticItem(v3Id, "Công ty TNHH Kajin Vina",
+                BigDecimal.valueOf(2_000_000), 2, 45.0, 0.1, BigDecimal.valueOf(4.0), 5, "CRITICAL",
+                List.of("HIGH_CANCELLATION"));
+
+        List<VendorDiagnosticItem> allSampleVendors = List.of(danabeach, surfshack, kajin);
+        when(adminAiData.getVendorDiagnostics(any(), any(), isNull())).thenReturn(allSampleVendors);
+        when(adminAiData.getVendorDiagnostics(any(), any(), eq(v1Id))).thenReturn(List.of(danabeach));
+
+        // 1. "Chẩn đoán sức khỏe toàn bộ đối tác" -> Admin Diagnostics (NOT GMV)
+        var respHealthAll = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Chẩn đoán sức khỏe toàn bộ đối tác", null, null, SupportedLanguage.VI);
+        assertThat(respHealthAll.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(respHealthAll.artifacts()).singleElement().satisfies(art ->
+                assertThat(art.get("type")).isEqualTo("ADMIN_CRITICAL_VENDORS_TABLE"));
+        // Message phải là tổng quan ngắn gọn (1-2 câu), phân biệt 2 đối tác cần lưu ý, 3 vấn đề, 3 đối tác đánh giá
+        assertThat(respHealthAll.message())
+                .contains("Hệ thống đã đánh giá 3 đối tác")
+                .contains("2 đối tác cần lưu ý")
+                .contains("tổng số 3 vấn đề")
+                .contains("Chi tiết tình trạng từng đối tác được hiển thị trong bảng bên dưới.")
+                .doesNotContain("Thống kê doanh thu", "Dẫn đầu là", "GMV 15.000.000");
+
+        // 2. Các câu hỏi chẩn đoán biến thể tự nhiên
+        for (String q : List.of("Xem tình hình hoạt động đối tác", "Cảnh báo đối tác", "Chẩn đoán Vendor")) {
+            var rep = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    q, null, null, SupportedLanguage.VI);
+            assertThat(rep.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+            assertThat(rep.message()).contains("Hệ thống đã đánh giá 3 đối tác", "2 đối tác cần lưu ý", "3 vấn đề");
+        }
+
+        // 3. Chẩn đoán một đối tác cụ thể: "Chẩn đoán Danabeach Club"
+        var respSingle = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Chẩn đoán Danabeach Club", null, null, SupportedLanguage.VI);
+        assertThat(respSingle.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(respSingle.message())
+                .contains("Danabeach Club", "HEALTHY")
+                .contains("Chi tiết xem bảng bên dưới.");
+
+        // 4. Không làm hỏng câu thống kê doanh thu toàn bộ Vendor
+        var respRevAll = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Thống kê doanh thu toàn bộ Vendor", null, null, SupportedLanguage.VI);
+        assertThat(respRevAll.toolsUsed()).containsExactly("admin_vendor_diagnostics");
+        assertThat(respRevAll.message())
+                .contains("Thống kê doanh thu 3 đối tác")
+                .contains("Dẫn đầu là Danabeach Club với GMV 15.000.000 ₫");
+
+        // 5. Chuẩn hóa ngôn ngữ: Tiếng Việt ưu tiên theo nội dung câu hỏi dù header gửi EN
+        var repViWithEnHeader = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Xem tình hình hoạt động đối tác.", null, null, SupportedLanguage.EN);
+        assertThat(repViWithEnHeader.message()).contains("Hệ thống đã đánh giá", "đối tác cần lưu ý");
+
+        var repRevViWithEnHeader = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu của Danabeach Club là bao nhiêu?", null, null, SupportedLanguage.EN);
+        assertThat(repRevViWithEnHeader.message()).contains("Trong kỳ", "Danabeach Club");
+
+        // Tiếng Anh ưu tiên theo nội dung câu hỏi dù header gửi VI -> Top 1 English response
+        var repEnWithViHeader = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Which vendor has the highest GMV?", null, null, SupportedLanguage.VI);
+        assertThat(repEnWithViHeader.message())
+                .contains("In period", "Danabeach Club", "recorded GMV of 15,000,000 VND");
+        assertThat(repEnWithViHeader.artifacts()).singleElement().satisfies(art -> {
+            List<?> list = (List<?>) art.get("data");
+            assertThat(list).hasSize(1);
+        });
+    }
+
+    @Test
+    @DisplayName("Admin DaNaBot trả lời lịch tự nhiên chính xác theo Asia/Ho_Chi_Minh và xử lý biên ngày tháng năm nhuận")
+    void testNaturalDateQuestionsAndCalendarBoundaries() {
+        UUID convId = UUID.randomUUID();
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Calendar QA",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        // Base date: 2026-11-20 (Thứ Sáu)
+        var today = LocalDate.of(2026, 11, 20);
+
+        try (var time = mockStatic(LocalDate.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(() -> LocalDate.now(VIETNAM_ZONE)).thenReturn(today);
+
+            // Hôm nay
+            var r1 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "Hôm nay là ngày mấy, thứ mấy?", null, null, SupportedLanguage.VI);
+            assertThat(r1.message()).isEqualTo("Hôm nay là Thứ Sáu, 20/11/2026.");
+            assertThat(r1.toolsUsed()).isEmpty();
+
+            var r2 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "Nay thứ mấy?", null, null, SupportedLanguage.VI);
+            assertThat(r2.message()).isEqualTo("Hôm nay là Thứ Sáu, 20/11/2026.");
+
+            // Ngày mai
+            var r3 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "Ngày mai là ngày nào, thứ mấy?", null, null, SupportedLanguage.VI);
+            assertThat(r3.message()).isEqualTo("Ngày mai là Thứ Bảy, 21/11/2026.");
+
+            // Hôm qua
+            var r4 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "Hôm qua là ngày nào?", null, null, SupportedLanguage.VI);
+            assertThat(r4.message()).isEqualTo("Hôm qua là Thứ Năm, 19/11/2026.");
+
+            // Ngày mốt
+            var r5 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "Ngày mốt là thứ mấy?", null, null, SupportedLanguage.VI);
+            assertThat(r5.message()).isEqualTo("Ngày mốt là Chủ Nhật, 22/11/2026.");
+
+            // Tiếng Anh
+            var rEnToday = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "What is today's date?", null, null, SupportedLanguage.EN);
+            assertThat(rEnToday.message()).isEqualTo("Today is Friday, November 20, 2026.");
+
+            var rEnTomorrow = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "What day is tomorrow?", null, null, SupportedLanguage.EN);
+            assertThat(rEnTomorrow.message()).isEqualTo("Tomorrow is Saturday, November 21, 2026.");
+
+            var rEnYesterday = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "What was yesterday's date?", null, null, SupportedLanguage.EN);
+            assertThat(rEnYesterday.message()).isEqualTo("Yesterday was Thursday, November 19, 2026.");
+
+            var rEnDayAfter = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "What day is the day after tomorrow?", null, null, SupportedLanguage.EN);
+            assertThat(rEnDayAfter.message()).isEqualTo("The day after tomorrow is Sunday, November 22, 2026.");
+        }
+
+        // Test biên năm: 2026-12-31 (Thứ Năm) -> Ngày mai là 2027-01-01 (Thứ Sáu)
+        var yearEnd = LocalDate.of(2026, 12, 31);
+        try (var time = mockStatic(LocalDate.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(() -> LocalDate.now(VIETNAM_ZONE)).thenReturn(yearEnd);
+
+            var rYear = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "Ngày mai là ngày nào, thứ mấy?", null, null, SupportedLanguage.VI);
+            assertThat(rYear.message()).isEqualTo("Ngày mai là Thứ Sáu, 01/01/2027.");
+        }
+
+        // Test năm nhuận: 2028-02-28 (Thứ Hai) -> Ngày mai là 2028-02-29 (Thứ Ba), Ngày mốt là 2028-03-01 (Thứ Tư)
+        var leapFeb28 = LocalDate.of(2028, 2, 28);
+        try (var time = mockStatic(LocalDate.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(() -> LocalDate.now(VIETNAM_ZONE)).thenReturn(leapFeb28);
+
+            var rLeapTomorrow = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "Ngày mai là ngày nào, thứ mấy?", null, null, SupportedLanguage.VI);
+            assertThat(rLeapTomorrow.message()).isEqualTo("Ngày mai là Thứ Ba, 29/02/2028.");
+
+            var rLeapDayAfter = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "Ngày mốt là thứ mấy?", null, null, SupportedLanguage.VI);
+            assertThat(rLeapDayAfter.message()).isEqualTo("Ngày mốt là Thứ Tư, 01/03/2028.");
+        }
+
+        // Test lùi tháng: 2026-03-01 (Chủ Nhật) -> Hôm qua là 2026-02-28 (Thứ Bảy)
+        var march1 = LocalDate.of(2026, 3, 1);
+        try (var time = mockStatic(LocalDate.class,
+                withSettings().mockMaker(MockMakers.INLINE).defaultAnswer(CALLS_REAL_METHODS))) {
+            time.when(() -> LocalDate.now(VIETNAM_ZONE)).thenReturn(march1);
+
+            var rYesterday = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                    "Hôm qua là ngày nào?", null, null, SupportedLanguage.VI);
+            assertThat(rYesterday.message()).isEqualTo("Hôm qua là Thứ Bảy, 28/02/2026.");
+        }
+
+        // Câu hỏi doanh thu ngày mai KHÔNG bị nhận nhầm thành câu hỏi lịch
+        var rRevTomorrow = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu ngày mai là bao nhiêu?", null, null, SupportedLanguage.VI);
+        assertThat(rRevTomorrow.message()).doesNotContain("Ngày mai là");
+
+        var rOrdersYesterday = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Có bao nhiêu đơn hàng hôm qua?", null, null, SupportedLanguage.VI);
+        assertThat(rOrdersYesterday.message()).doesNotContain("Hôm qua là");
+    }
+
+    // ==================== ADMIN ORDER & DISPUTE STATUS LOOKUP TESTS ====================
+
+    @Test
+    @DisplayName("T01: Hỏi không ID đơn hàng: 'Kiểm tra đơn hàng đã thanh toán chưa?' -> Nhắc cung cấp ID hoặc #ORD-XXXXXXXX, không hỏi kỳ báo cáo/GMV")
+    void testAdminOrderStatusLookup_T01_NoIdProvided_PromptsForId() {
+        UUID convId = UUID.randomUUID();
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Order Status QA",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Kiểm tra đơn hàng đã thanh toán chưa?", null, null, SupportedLanguage.VI);
+
+        assertThat(response.message()).contains("Vui lòng cung cấp mã đơn hàng");
+        assertThat(response.message()).contains("#ORD-XXXXXXXX");
+        assertThat(response.message()).doesNotContain("khoảng ngày");
+        assertThat(response.message()).doesNotContain("GMV");
+        assertThat(response.toolsUsed()).isEmpty();
+        assertThat(response.artifacts()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("T02: Tra cứu đơn hàng theo UUID: 'Đơn hàng 00010000-0000-0000-0000-000000000036 đã thanh toán chưa?' -> Trả về PAID, #ORD-00010036, 950.000 ₫")
+    void testAdminOrderStatusLookup_T02_WithUuid_ReturnsPaidStatus() {
+        UUID convId = UUID.randomUUID();
+        UUID orderId = UUID.fromString("00010000-0000-0000-0000-000000000036");
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Order QA",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        var masterInfo = new AdminAiDataPort.MasterOrderInfo(
+                orderId, "ORD-00010036", "PAID", "PAID",
+                new BigDecimal("950000.00"), BigDecimal.ZERO, OffsetDateTime.now()
+        );
+        when(adminAiData.getMasterOrder(orderId)).thenReturn(Optional.of(masterInfo));
+
+        var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Đơn hàng 00010000-0000-0000-0000-000000000036 đã thanh toán chưa?", null, null, SupportedLanguage.VI);
+
+        assertThat(response.toolsUsed()).contains("admin_order_status_lookup");
+        assertThat(response.message()).isEqualTo("Đơn hàng #ORD-00010036 đã thanh toán thành công. Trạng thái đơn hàng: PAID. Tổng giá trị: 950.000 ₫.");
+        assertThat(response.artifacts()).hasSize(1);
+        assertThat(response.artifacts().get(0).get("type")).isEqualTo("ADMIN_ORDER_STATUS_CARD");
+    }
+
+    @Test
+    @DisplayName("T03: Tra cứu đơn hàng theo context ORDER -> Trả về kết quả chính xác từ contextId")
+    void testAdminOrderStatusLookup_T03_WithOrderContext_ReturnsPaidStatus() {
+        UUID convId = UUID.randomUUID();
+        UUID orderId = UUID.fromString("00010000-0000-0000-0000-000000000036");
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Order QA",
+                false, false, "ORDER", orderId, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        var masterInfo = new AdminAiDataPort.MasterOrderInfo(
+                orderId, "ORD-00010036", "PAID", "PAID",
+                new BigDecimal("950000.00"), BigDecimal.ZERO, OffsetDateTime.now()
+        );
+        when(adminAiData.getMasterOrder(orderId)).thenReturn(Optional.of(masterInfo));
+
+        var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Kiểm tra đơn hàng này đã thanh toán chưa?", "ORDER", orderId, SupportedLanguage.VI);
+
+        assertThat(response.toolsUsed()).contains("admin_order_status_lookup");
+        assertThat(response.message()).isEqualTo("Đơn hàng #ORD-00010036 đã thanh toán thành công. Trạng thái đơn hàng: PAID. Tổng giá trị: 950.000 ₫.");
+    }
+
+    @Test
+    @DisplayName("T04: Tra cứu khiếu nại theo UUID: 'Khiếu nại 77777777-7777-7777-7777-777777777701 đã hoàn tất chưa?' -> Trả về RESOLVED_REFUND kèm lưu ý chuyển tiền")
+    void testAdminDisputeStatus_T04_WithDisputeUuid_ReturnsResolvedRefund() {
+        UUID convId = UUID.randomUUID();
+        UUID disputeId = UUID.fromString("77777777-7777-7777-7777-777777777701");
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Dispute QA",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        var evidence = new AdminAiDataPort.DisputeFullEvidence(
+                disputeId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                "Nguyễn Văn A", "SERVICE_NOT_PROVIDED", "Khách báo chưa được phục vụ",
+                List.of(), "RESOLVED_REFUND", OffsetDateTime.now().minusDays(1),
+                UUID.randomUUID(), "Lặn Biển Sơn Trà", UUID.randomUUID(), "Cano Biển Đà Nẵng",
+                new BigDecimal("950000.00"), 1, UUID.randomUUID(), LocalDate.now().minusDays(2),
+                "08:00 - 12:00", "COMPLETED", false, null,
+                "Đối tác phản hồi", List.of(), OffsetDateTime.now().minusHours(12)
+        );
+        when(adminAiData.getDisputeFullEvidence(disputeId)).thenReturn(Optional.of(evidence));
+
+        var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Khiếu nại 77777777-7777-7777-7777-777777777701 đã hoàn tất chưa?", null, null, SupportedLanguage.VI);
+
+        assertThat(response.toolsUsed()).contains("admin_dispute_summarize");
+        assertThat(response.message()).isEqualTo(
+                "Khiếu nại #DISP-77777701 đã được giải quyết với kết quả chấp thuận hoàn tiền (RESOLVED_REFUND). "
+                + "Lưu ý: Kết quả giải quyết chưa bao gồm xác nhận giao dịch chuyển tiền hoàn tất. Chi tiết hồ sơ xem bên dưới."
+        );
+        assertThat(response.artifacts()).hasSize(1);
+        assertThat(response.artifacts().get(0).get("type")).isEqualTo("ADMIN_DISPUTE_BRIEF_CARD");
+    }
+
+    @Test
+    @DisplayName("T05: Tra cứu khiếu nại theo context DISPUTE -> Trả về RESOLVED_REFUND chính xác")
+    void testAdminDisputeStatus_T05_WithDisputeContext_ReturnsResolvedRefund() {
+        UUID convId = UUID.randomUUID();
+        UUID disputeId = UUID.fromString("77777777-7777-7777-7777-777777777701");
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Dispute QA",
+                false, false, "DISPUTE", disputeId, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        var evidence = new AdminAiDataPort.DisputeFullEvidence(
+                disputeId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                "Nguyễn Văn A", "SERVICE_NOT_PROVIDED", "Khách báo chưa được phục vụ",
+                List.of(), "RESOLVED_REFUND", OffsetDateTime.now().minusDays(1),
+                UUID.randomUUID(), "Lặn Biển Sơn Trà", UUID.randomUUID(), "Cano Biển Đà Nẵng",
+                new BigDecimal("950000.00"), 1, UUID.randomUUID(), LocalDate.now().minusDays(2),
+                "08:00 - 12:00", "COMPLETED", false, null,
+                "Đối tác phản hồi", List.of(), OffsetDateTime.now().minusHours(12)
+        );
+        when(adminAiData.getDisputeFullEvidence(disputeId)).thenReturn(Optional.of(evidence));
+
+        var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Hồ sơ này đang ở trạng thái nào?", "DISPUTE", disputeId, SupportedLanguage.VI);
+
+        assertThat(response.toolsUsed()).contains("admin_dispute_summarize");
+        assertThat(response.message()).contains("RESOLVED_REFUND");
+        assertThat(response.message()).contains("#DISP-77777701");
+    }
+
+    @Test
+    @DisplayName("T06: Tóm tắt khiếu nại: 'Tóm tắt khiếu nại 77777777-7777-7777-7777-777777777701' -> Trả về tóm tắt diễn biến, dịch vụ, các bên")
+    void testAdminDisputeSummary_T06_ProvidesEvidenceBrief() {
+        UUID convId = UUID.randomUUID();
+        UUID disputeId = UUID.fromString("77777777-7777-7777-7777-777777777701");
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Dispute QA",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        var evidence = new AdminAiDataPort.DisputeFullEvidence(
+                disputeId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                "Nguyễn Văn A", "SERVICE_NOT_PROVIDED", "Khách báo chưa được phục vụ",
+                List.of(), "RESOLVED_REFUND", OffsetDateTime.now().minusDays(1),
+                UUID.randomUUID(), "Lặn Biển Sơn Trà", UUID.randomUUID(), "Cano Biển Đà Nẵng",
+                new BigDecimal("950000.00"), 1, UUID.randomUUID(), LocalDate.now().minusDays(2),
+                "08:00 - 12:00", "COMPLETED", false, null,
+                "Đối tác phản hồi", List.of(), OffsetDateTime.now().minusHours(12)
+        );
+        when(adminAiData.getDisputeFullEvidence(disputeId)).thenReturn(Optional.of(evidence));
+
+        var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Tóm tắt khiếu nại 77777777-7777-7777-7777-777777777701", null, null, SupportedLanguage.VI);
+
+        assertThat(response.toolsUsed()).contains("admin_dispute_summarize");
+        assertThat(response.message()).contains("Tóm tắt khiếu nại #DISP-77777701");
+        assertThat(response.message()).contains("Lặn Biển Sơn Trà");
+        assertThat(response.message()).contains("Cano Biển Đà Nẵng");
+    }
+
+    @Test
+    @DisplayName("T07: Tra cứu ID không tồn tại -> Thông báo lịch sự không tìm thấy, không lỗi 500, không hallucination")
+    void testAdminOrderStatusAndDispute_T07_NotFound_HandledGracefully() {
+        UUID convId = UUID.randomUUID();
+        UUID nonExistentOrder = UUID.fromString("00010000-0000-0000-0000-000000000999");
+        UUID nonExistentDispute = UUID.fromString("77777777-7777-7777-7777-777777777999");
+
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "NotFound QA",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        when(adminAiData.getMasterOrder(nonExistentOrder)).thenReturn(Optional.empty());
+        when(adminAiData.getDisputeFullEvidence(nonExistentDispute)).thenReturn(Optional.empty());
+
+        // Order not found
+        var rOrder = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Đơn hàng 00010000-0000-0000-0000-000000000999 đã thanh toán chưa?", null, null, SupportedLanguage.VI);
+        assertThat(rOrder.message()).contains("Không tìm thấy đơn hàng với mã ID 00010000-0000-0000-0000-000000000999 trên hệ thống");
+        assertThat(rOrder.toolsUsed()).isEmpty();
+
+        // Dispute not found
+        var rDispute = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Khiếu nại 77777777-7777-7777-7777-777777777999 đã hoàn tất chưa?", null, null, SupportedLanguage.VI);
+        assertThat(rDispute.message()).contains("Không tìm thấy hồ sơ khiếu nại với mã ID 77777777-7777-7777-7777-777777777999 trên hệ thống");
+        assertThat(rDispute.toolsUsed()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("T08: Tra cứu theo mã ngắn #ORD-00010036 -> Giải mã an toàn và trả kết quả chính xác")
+    void testAdminOrderStatusLookup_T08_WithShortCode_ResolvesAndReturnsStatus() {
+        UUID convId = UUID.randomUUID();
+        UUID orderId = UUID.fromString("00010000-0000-0000-0000-000000000036");
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "ShortCode QA",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        when(adminAiData.resolveMasterOrderIdByCode("#ORD-00010036")).thenReturn(Optional.of(orderId));
+        var masterInfo = new AdminAiDataPort.MasterOrderInfo(
+                orderId, "ORD-00010036", "PAID", "PAID",
+                new BigDecimal("950000.00"), BigDecimal.ZERO, OffsetDateTime.now()
+        );
+        when(adminAiData.getMasterOrder(orderId)).thenReturn(Optional.of(masterInfo));
+
+        var response = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Kiểm tra đơn hàng #ORD-00010036 đã thanh toán chưa?", null, null, SupportedLanguage.VI);
+
+        assertThat(response.toolsUsed()).contains("admin_order_status_lookup");
+        assertThat(response.message()).isEqualTo("Đơn hàng #ORD-00010036 đã thanh toán thành công. Trạng thái đơn hàng: PAID. Tổng giá trị: 950.000 ₫.");
+    }
+
+    @Test
+    @DisplayName("Issue 1: Hỏi giờ và ngày thực tế theo múi giờ Việt Nam, không nhầm doanh thu theo giờ")
+    void testCurrentTimeQueries_ReturnsVietnamTimeDeterministically() {
+        UUID convId = UUID.randomUUID();
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Time QA",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        // 1. "Bây giờ là mấy giờ?"
+        var r1 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Bây giờ là mấy giờ?", null, null, SupportedLanguage.VI);
+        assertThat(r1.toolsUsed()).isEmpty();
+        assertThat(r1.message()).startsWith("Bây giờ là ").contains("(theo giờ Việt Nam).");
+
+        // 2. "Mấy giờ rồi?"
+        var r2 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Mấy giờ rồi?", null, null, SupportedLanguage.VI);
+        assertThat(r2.toolsUsed()).isEmpty();
+        assertThat(r2.message()).startsWith("Bây giờ là ").contains("(theo giờ Việt Nam).");
+
+        // 3. "Hiện tại là mấy giờ?"
+        var r3 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Hiện tại là mấy giờ?", null, null, SupportedLanguage.VI);
+        assertThat(r3.toolsUsed()).isEmpty();
+        assertThat(r3.message()).startsWith("Bây giờ là ").contains("(theo giờ Việt Nam).");
+
+        // 4. "Bây giờ là mấy giờ, ngày mấy?"
+        var r4 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Bây giờ là mấy giờ, ngày mấy?", null, null, SupportedLanguage.VI);
+        assertThat(r4.toolsUsed()).isEmpty();
+        assertThat(r4.message()).startsWith("Bây giờ là ").contains("(theo giờ Việt Nam).");
+
+        // 5. "Hôm nay là ngày mấy, thứ mấy?"
+        var r5 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Hôm nay là ngày mấy, thứ mấy?", null, null, SupportedLanguage.VI);
+        assertThat(r5.toolsUsed()).isEmpty();
+        assertThat(r5.message()).startsWith("Hôm nay là ");
+
+        // 6. Clock vs Revenue Guard: "Doanh thu theo giờ hôm nay" must NOT trigger clock query
+        when(adminAiData.getRevenueTimeSeries(any(), any(), any())).thenReturn(List.of(
+                new AdminAiDataPort.RevenueTimeSeriesItem("2026-11-22",
+                        BigDecimal.valueOf(1000000), BigDecimal.valueOf(1000000), BigDecimal.ZERO, BigDecimal.valueOf(100000), BigDecimal.valueOf(900000))
+        ));
+        var r6 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu theo giờ hôm nay", null, null, SupportedLanguage.VI);
+        assertThat(r6.toolsUsed()).contains("admin_revenue_timeseries");
+        assertThat(r6.message()).doesNotContain("Bây giờ là ");
+    }
+
+    @Test
+    @DisplayName("Issue 2: Tra cứu đơn hàng bằng UUID qua các cấu trúc câu khác nhau và kiểm tra lỗi không tồn tại")
+    void testOrderUuidLookup_VariousPhrasings() {
+        UUID convId = UUID.randomUUID();
+        UUID orderId = UUID.fromString("00010000-0000-0000-0000-000000000036");
+        UUID nonExistentId = UUID.fromString("00010000-0000-0000-0000-000000000999");
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Order UUID QA",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        var masterInfo = new AdminAiDataPort.MasterOrderInfo(
+                orderId, "ORD-00010036", "PAID", "PAID",
+                new BigDecimal("950000.00"), BigDecimal.ZERO, OffsetDateTime.now()
+        );
+        when(adminAiData.getMasterOrder(orderId)).thenReturn(Optional.of(masterInfo));
+        when(adminAiData.getMasterOrder(nonExistentId)).thenReturn(Optional.empty());
+
+        // 1. "Tra cứu đơn hàng [UUID]"
+        var r1 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Tra cứu đơn hàng 00010000-0000-0000-0000-000000000036", null, null, SupportedLanguage.VI);
+        assertThat(r1.toolsUsed()).contains("admin_order_status_lookup");
+        assertThat(r1.message()).contains("Đơn hàng #ORD-00010036 đã thanh toán thành công");
+
+        // 2. "Xem thông tin đơn hàng [UUID]"
+        var r2 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Xem thông tin đơn hàng 00010000-0000-0000-0000-000000000036", null, null, SupportedLanguage.VI);
+        assertThat(r2.toolsUsed()).contains("admin_order_status_lookup");
+        assertThat(r2.message()).contains("Đơn hàng #ORD-00010036 đã thanh toán thành công");
+
+        // 3. "Tra cứu đơn hàng [Non-existent UUID]" -> returns not found message, not metric/period fallback
+        var r3 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Tra cứu đơn hàng 00010000-0000-0000-0000-000000000999", null, null, SupportedLanguage.VI);
+        assertThat(r3.toolsUsed()).isEmpty();
+        assertThat(r3.message()).contains("Không tìm thấy đơn hàng với mã ID 00010000-0000-0000-0000-000000000999 trên hệ thống. Vui lòng kiểm tra lại mã đơn hàng.");
+
+        // 4. Dispute UUID query does not get hijacked by order lookup
+        UUID disputeId = UUID.fromString("77777777-7777-7777-7777-777777777701");
+        var evidence = new AdminAiDataPort.DisputeFullEvidence(
+                disputeId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                "Nguyễn Văn A", "SERVICE_NOT_PROVIDED", "Khách báo chưa được phục vụ",
+                List.of(), "RESOLVED_REFUND", OffsetDateTime.now().minusDays(1),
+                UUID.randomUUID(), "Lặn Biển Sơn Trà", UUID.randomUUID(), "Cano Biển Đà Nẵng",
+                new BigDecimal("950000.00"), 1, UUID.randomUUID(), LocalDate.now().minusDays(2),
+                "08:00 - 12:00", "COMPLETED", false, null,
+                "Đối tác phản hồi", List.of(), OffsetDateTime.now().minusHours(12)
+        );
+        when(adminAiData.getDisputeFullEvidence(disputeId)).thenReturn(Optional.of(evidence));
+        var r4 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Tóm tắt khiếu nại 77777777-7777-7777-7777-777777777701", null, null, SupportedLanguage.VI);
+        assertThat(r4.toolsUsed()).contains("admin_dispute_summarize");
+        assertThat(r4.toolsUsed()).doesNotContain("admin_order_status_lookup");
+    }
+
+    @Test
+    @DisplayName("Issue 3: Tra cứu doanh thu theo quý (quý này, quý trước, quý 3/2026, Top 5 Vendor quý này)")
+    void testQuarterRevenueQueries() {
+        UUID convId = UUID.randomUUID();
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Quarter QA",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        when(adminAiData.getRevenueTimeSeries(any(), any(), any())).thenReturn(List.of(
+                new AdminAiDataPort.RevenueTimeSeriesItem("2026-11-22",
+                        BigDecimal.valueOf(5000000), BigDecimal.valueOf(5000000), BigDecimal.ZERO, BigDecimal.valueOf(500000), BigDecimal.valueOf(4500000))
+        ));
+
+        // 1. "Doanh thu quý này"
+        var r1 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu quý này", null, null, SupportedLanguage.VI);
+        assertThat(r1.toolsUsed()).contains("admin_revenue_timeseries");
+        assertThat(r1.artifacts()).isNotEmpty();
+
+        // 2. "Doanh thu quý trước"
+        var r2 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu quý trước", null, null, SupportedLanguage.VI);
+        assertThat(r2.toolsUsed()).contains("admin_revenue_timeseries");
+
+        // 3. "Doanh thu quý 3/2026"
+        var r3 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu quý 3/2026", null, null, SupportedLanguage.VI);
+        assertThat(r3.toolsUsed()).contains("admin_revenue_timeseries");
+
+        // 4. "Top 5 Vendor quý này"
+        when(adminAiData.getVendorDiagnostics(any(), any(), any())).thenReturn(List.of(
+                new AdminAiDataPort.VendorDiagnosticItem(UUID.randomUUID(), "Cano Danang",
+                        BigDecimal.valueOf(50000000), 50L, 0.05, 0.85, BigDecimal.valueOf(4.8), 20, "HEALTHY", List.of())
+        ));
+        var r4 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Top 5 Vendor quý này", null, null, SupportedLanguage.VI);
+        assertThat(r4.toolsUsed()).contains("admin_vendor_diagnostics");
+    }
+
+    @Test
+    @DisplayName("Issue 4: Chặn tra cứu tương lai và chốt giới hạn đến ngày hôm nay với ghi chú minh bạch")
+    void testFutureRevenueQueries_PreventedOrCapped() {
+        UUID convId = UUID.randomUUID();
+        var conv = new CopilotConversation(convId, adminUserId, "ADMIN", null, "vi", "Future QA",
+                false, false, null, null, 1L, OffsetDateTime.now(), OffsetDateTime.now());
+        when(insightStore.getCopilotConversation(convId)).thenReturn(Optional.of(conv));
+        when(insightStore.listCopilotMessages(convId)).thenReturn(List.of());
+
+        // 1. "Doanh thu ngày mai" -> Pure future period rejected
+        var r1 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu ngày mai", null, null, SupportedLanguage.VI);
+        assertThat(r1.toolsUsed()).isEmpty();
+        assertThat(r1.message()).isEqualTo("Hệ thống chỉ thống kê doanh thu thực tế đã phát sinh và không hỗ trợ dự báo tương lai. Vui lòng chọn khoảng thời gian đến thời điểm hiện tại.");
+
+        // 2. "Doanh thu tháng sau" -> Pure future period rejected
+        var r2 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu tháng sau", null, null, SupportedLanguage.VI);
+        assertThat(r2.toolsUsed()).isEmpty();
+        assertThat(r2.message()).isEqualTo("Hệ thống chỉ thống kê doanh thu thực tế đã phát sinh và không hỗ trợ dự báo tương lai. Vui lòng chọn khoảng thời gian đến thời điểm hiện tại.");
+
+        // 3. "Doanh thu từ hôm nay đến ngày mai" -> Capped at today with transparent note
+        when(adminAiData.getRevenueTimeSeries(any(), any(), any())).thenReturn(List.of(
+                new AdminAiDataPort.RevenueTimeSeriesItem("2026-11-22",
+                        BigDecimal.valueOf(2000000), BigDecimal.valueOf(2000000), BigDecimal.ZERO, BigDecimal.valueOf(200000), BigDecimal.valueOf(1800000))
+        ));
+        var r3 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu từ hôm nay đến ngày mai", null, null, SupportedLanguage.VI);
+        assertThat(r3.toolsUsed()).contains("admin_revenue_timeseries");
+        assertThat(r3.message()).contains("(Lưu ý: Dữ liệu được thống kê đến ngày hôm nay [");
+
+        // 4. "Doanh thu từ bây giờ đến 20/12/2026" -> Capped at today with transparent note
+        var r4 = roleCopilotUseCase.processMessage(adminUserId, "ADMIN", null, convId,
+                "Doanh thu từ bây giờ đến 20/12/2026", null, null, SupportedLanguage.VI);
+        assertThat(r4.toolsUsed()).contains("admin_revenue_timeseries");
+        assertThat(r4.message()).contains("(Lưu ý: Dữ liệu được thống kê đến ngày hôm nay [");
     }
 }

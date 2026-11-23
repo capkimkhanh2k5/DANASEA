@@ -12,6 +12,7 @@ import {
   UserX,
   ShieldAlert,
   Info,
+  Package,
 } from 'lucide-react';
 import type { CopilotArtifact } from '../../../types/adminAi';
 import { formatDisplayCode } from '../../../utils/displayCode';
@@ -70,6 +71,9 @@ export const CopilotArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artif
         }
         if (type === 'COPILOT_CONTENT_ASSESSMENT_CARD' || tool === 'admin_text_assessment') {
           return <ContentAssessmentCard key={key} artifact={artifact} />;
+        }
+        if (type === 'ADMIN_ORDER_STATUS_CARD' || tool === 'admin_order_status_lookup') {
+          return <OrderStatusCard key={key} artifact={artifact} />;
         }
 
         return <SafeFallbackCard key={key} artifact={artifact} />;
@@ -335,7 +339,7 @@ const VendorDiagnosticsTableCard: React.FC<{ artifact: CopilotArtifact }> = ({ a
             <Building2 size={12} />
             Dữ liệu hệ thống
           </span>
-          <span className="copilot-artifact-title">Chẩn đoán hoạt động đối tác</span>
+          <span className="copilot-artifact-title">Thống kê & Đánh giá đối tác</span>
         </div>
         <div className="copilot-artifact-empty">Không có dữ liệu đối tác trong kỳ tra cứu.</div>
       </div>
@@ -350,7 +354,7 @@ const VendorDiagnosticsTableCard: React.FC<{ artifact: CopilotArtifact }> = ({ a
             <Building2 size={12} />
             Dữ liệu hệ thống
           </span>
-          <span className="copilot-artifact-title">Chẩn đoán sức khỏe & Xếp hạng đối tác</span>
+          <span className="copilot-artifact-title">Thống kê & Đánh giá đối tác</span>
         </div>
         <div className="copilot-artifact-period">
           {artifact.period?.from && artifact.period?.to
@@ -887,7 +891,213 @@ const ContentAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifa
 };
 
 /* =========================================================================
-   7. SAFE FALLBACK CARD (Never breaks, no raw JSON dump by default)
+   7. ORDER STATUS LOOKUP CARD (Clean, no raw JSON/UUID by default)
+   ========================================================================= */
+export interface MasterOrderArtifactData {
+  orderId: string;
+  displayCode: string;
+  status: string;
+  paymentStatus: string;
+  totalAmount: number;
+  discountAmount?: number;
+  createdAt?: string;
+}
+
+function extractOrderStatusData(data: unknown): MasterOrderArtifactData | null {
+  if (!data || typeof data !== 'object') return null;
+  const obj = data as Record<string, unknown>;
+  if (!obj.orderId && !obj.displayCode && !obj.status) return null;
+  return {
+    orderId: String(obj.orderId ?? ''),
+    displayCode: String(obj.displayCode ?? ''),
+    status: String(obj.status ?? 'UNKNOWN').toUpperCase(),
+    paymentStatus: String(obj.paymentStatus ?? 'UNKNOWN').toUpperCase(),
+    totalAmount: Number(obj.totalAmount ?? 0) || 0,
+    discountAmount:
+      obj.discountAmount !== undefined && obj.discountAmount !== null
+        ? Number(obj.discountAmount)
+        : undefined,
+    createdAt: obj.createdAt ? String(obj.createdAt) : undefined,
+  };
+}
+
+function formatMasterOrderStatus(status?: string): {
+  label: string;
+  tone: 'healthy' | 'warning' | 'critical' | 'neutral';
+} {
+  const s = String(status ?? '').toUpperCase();
+  switch (s) {
+    case 'PAID':
+      return { label: 'Đã thanh toán', tone: 'healthy' };
+    case 'COMPLETED':
+      return { label: 'Hoàn thành', tone: 'healthy' };
+    case 'CONFIRMED':
+      return { label: 'Đã xác nhận', tone: 'healthy' };
+    case 'PENDING':
+    case 'PENDING_PAYMENT':
+      return { label: 'Chờ thanh toán', tone: 'warning' };
+    case 'PROCESSING':
+    case 'IN_PROGRESS':
+      return { label: 'Đang xử lý', tone: 'warning' };
+    case 'CANCELLED':
+      return { label: 'Đã hủy', tone: 'critical' };
+    case 'NO_REFUND':
+      return { label: 'Hủy không hoàn tiền', tone: 'critical' };
+    default:
+      return { label: status || 'Không rõ', tone: 'neutral' };
+  }
+}
+
+function formatPaymentOrderStatus(paymentStatus?: string): {
+  label: string;
+  tone: 'healthy' | 'warning' | 'critical' | 'neutral';
+} {
+  const p = String(paymentStatus ?? '').toUpperCase();
+  switch (p) {
+    case 'PAID':
+      return { label: 'Đã thanh toán', tone: 'healthy' };
+    case 'UNPAID':
+      return { label: 'Chưa thanh toán', tone: 'warning' };
+    case 'PENDING':
+    case 'PENDING_PAYMENT':
+      return { label: 'Chờ thanh toán', tone: 'warning' };
+    case 'REFUNDED':
+      return { label: 'Đã hoàn tiền', tone: 'healthy' };
+    case 'PARTIALLY_REFUNDED':
+      return { label: 'Hoàn một phần', tone: 'healthy' };
+    case 'NO_REFUND':
+      return { label: 'Không hoàn tiền', tone: 'critical' };
+    case 'FAILED':
+      return { label: 'Thanh toán thất bại', tone: 'critical' };
+    default:
+      return { label: paymentStatus || 'Không xác định', tone: 'neutral' };
+  }
+}
+
+function formatDateTime(isoString?: string | null): string {
+  if (!isoString) return '';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    return new Intl.DateTimeFormat('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(d);
+  } catch {
+    return '';
+  }
+}
+
+function getStatusBadgeClass(tone: 'healthy' | 'warning' | 'critical' | 'neutral'): string {
+  switch (tone) {
+    case 'healthy':
+      return 'copilot-badge-severity copilot-badge-severity--healthy';
+    case 'warning':
+      return 'copilot-badge-severity copilot-badge-severity--warning';
+    case 'critical':
+      return 'copilot-badge-severity copilot-badge-severity--critical';
+    case 'neutral':
+    default:
+      return 'copilot-issue-tag';
+  }
+}
+
+const OrderStatusCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifact }) => {
+  const [showDebug, setShowDebug] = useState(false);
+  const order = extractOrderStatusData(artifact.data);
+
+  if (!order) {
+    return <SafeFallbackCard artifact={artifact} />;
+  }
+
+  const rawDisplay =
+    order.displayCode || (order.orderId ? formatDisplayCode(order.orderId, 'ORD') : '');
+  const displayCode = rawDisplay.startsWith('#')
+    ? rawDisplay
+    : rawDisplay.startsWith('ORD-')
+      ? `#${rawDisplay}`
+      : `#ORD-${rawDisplay}`;
+
+  const statusInfo = formatMasterOrderStatus(order.status);
+  const paymentInfo = formatPaymentOrderStatus(order.paymentStatus);
+  const formattedCreatedAt = formatDateTime(order.createdAt);
+
+  return (
+    <div className="copilot-artifact-card">
+      <div className="copilot-artifact-header">
+        <div className="copilot-artifact-header-left">
+          <span className="copilot-artifact-badge">
+            <Package size={12} />
+            Dữ liệu hệ thống
+          </span>
+          <span className="copilot-artifact-title">Thông tin đơn hàng {displayCode}</span>
+        </div>
+        {formattedCreatedAt && (
+          <div className="copilot-artifact-period">
+            Tạo lúc: {formattedCreatedAt}
+          </div>
+        )}
+      </div>
+
+      <div className="copilot-dispute-info-grid">
+        <div>
+          <span className="copilot-info-label">Mã đơn hàng:</span>{' '}
+          <strong>{displayCode}</strong>
+        </div>
+        <div>
+          <span className="copilot-info-label">Trạng thái đơn:</span>{' '}
+          <span className={getStatusBadgeClass(statusInfo.tone)}>{statusInfo.label}</span>
+        </div>
+        <div>
+          <span className="copilot-info-label">Thanh toán:</span>{' '}
+          <span className={getStatusBadgeClass(paymentInfo.tone)}>{paymentInfo.label}</span>
+        </div>
+        <div>
+          <span className="copilot-info-label">Tổng thanh toán:</span>{' '}
+          <strong style={{ color: '#0B5D6F' }}>{formatVND(order.totalAmount)}</strong>
+        </div>
+        {order.discountAmount !== undefined && order.discountAmount > 0 && (
+          <div>
+            <span className="copilot-info-label">Giảm giá:</span>{' '}
+            <span>{formatVND(order.discountAmount)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Optional Technical Debug Details */}
+      <div style={{ marginTop: '8px', borderTop: '1px solid #f1f5f9', paddingTop: '6px' }}>
+        <button
+          type="button"
+          onClick={() => setShowDebug((prev) => !prev)}
+          className="copilot-artifact-toggle-btn"
+        >
+          {showDebug ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          <span>{showDebug ? 'Thu gọn chi tiết kỹ thuật' : 'Xem chi tiết kỹ thuật (Debug)'}</span>
+        </button>
+
+        {showDebug && (
+          <div style={{ marginTop: '6px' }}>
+            {order.orderId && (
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>
+                <span>Order UUID: </span>
+                <code>{order.orderId}</code>
+              </div>
+            )}
+            <pre className="copilot-artifact-raw-box">
+              {JSON.stringify(artifact.data, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* =========================================================================
+   8. SAFE FALLBACK CARD (Never breaks, no raw JSON dump by default)
    ========================================================================= */
 const SafeFallbackCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifact }) => {
   const [showDetails, setShowDetails] = useState(false);

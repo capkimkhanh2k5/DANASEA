@@ -92,6 +92,16 @@ public interface AdminAiDataPort {
             long openDisputesCount
     ) {}
 
+    record MasterOrderInfo(
+            UUID orderId,
+            String displayCode,
+            String status,
+            String paymentStatus,
+            BigDecimal totalAmount,
+            BigDecimal discountAmount,
+            OffsetDateTime createdAt
+    ) {}
+
     PlatformDashboardMetrics getPlatformDashboardMetrics();
 
     List<RevenueTimeSeriesItem> getRevenueTimeSeries(LocalDate from, LocalDate to, String groupBy);
@@ -103,4 +113,8 @@ public interface AdminAiDataPort {
     Optional<DisputeFullEvidence> getDisputeFullEvidence(UUID disputeId);
 
     QueueOverview getQueueOverview();
+
+    Optional<MasterOrderInfo> getMasterOrder(UUID orderId);
+
+    Optional<UUID> resolveMasterOrderIdByCode(String code);
 }

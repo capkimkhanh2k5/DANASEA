@@ -24,6 +24,7 @@ public class AdminDisputeSummaryUseCase {
 
     public record DisputeArbitrationResult(
             UUID disputeId,
+            String status,
             UUID subOrderId,
             UUID orderId,
             String customerName,
@@ -118,7 +119,7 @@ public class AdminDisputeSummaryUseCase {
         String analysisMethod = "DETERMINISTIC_EVIDENCE_SUMMARY";
 
         DisputeArbitrationResult result = new DisputeArbitrationResult(
-                disputeId, evidence.subOrderId(), evidence.orderId(),
+                disputeId, evidence.status(), evidence.subOrderId(), evidence.orderId(),
                 evidence.customerName(), evidence.vendorBusinessName(), evidence.serviceTitle(),
                 evidence.disputeReason(), timeline, customerClaim, vendorDefense, systemFacts,
                 recommendedRes, null, reason, draftNote, analysisMethod, OffsetDateTime.now()

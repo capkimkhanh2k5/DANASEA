@@ -2,6 +2,8 @@ package com.danasea.backend.modules.ai.application.usecases;
 
 import java.time.DateTimeException;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -69,7 +72,7 @@ public class RoleCopilotUseCase {
     private static final Pattern VENDOR_ACTOR = CopilotRequest.words("vendor|doi tac");
     private static final Pattern VENDOR_DIAGNOSTIC_SIGNAL = CopilotRequest.words(
             "huy|ty le huy|ti le huy|canh bao|nghiem trong|critical|warning|danh gia|sao|lap day|occupancy|"
-                    + "dinh chi|suspend|cai thien|kem hieu qua|hieu suat");
+                    + "dinh chi|suspend|cai thien|kem hieu qua|hieu suat|suc khoe|tinh hinh|hoat dong|chan doan|diagnostic|health");
     private static final Pattern REFUND_CAUSE_QUERY = Pattern.compile(
             "(?:nguyen nhan|ly do|nhieu nhat|top|reasons?|causes?).*(?:hoan tien|yeu cau hoan|refunds?)"
                     + "|(?:hoan tien|yeu cau hoan|refunds?).*(?:nguyen nhan|ly do|nhieu nhat|top|reasons?|causes?)");
@@ -119,6 +122,13 @@ public class RoleCopilotUseCase {
             "(?<!\\d)(?:\\+84|0)(?:[ .-]?\\d){9}(?!\\d)|https?://[^\\s<>]+|[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
     private static final Pattern PERSIST_MODERATION = CopilotRequest.words(
             "tao case|luu case|lap case|gui duyet|create case|persist");
+    private static final Pattern ORDER_SHORT_CODE = Pattern.compile("(?i)#?ORD-([0-9a-fA-F]{8})\\b");
+    private static final Pattern ADMIN_ORDER_STATUS = Pattern.compile(
+            "(?:don hang|don nay|order|master[- ]?order).*(?:thanh toan|trang thai|paid|payment|status)"
+                    + "|(?:thanh toan|trang thai|status).*(?:don hang|don nay|order|master[- ]?order)"
+                    + "|(?:da thanh toan chua|trang thai thanh toan)"
+                    + "|(?:kiem tra|tra cuu|xem thong tin|thong tin|chi tiet).*don"
+    );
     private static final Pattern ADMIN_ORDER_RISK = Pattern.compile(
             "\\b(?:canh bao rui ro|tin hieu rui ro|co so rui ro|can cu rui ro|dua tren.*du lieu.*rui ro|"
                     + "danh gia rui ro.*don|risk signals?|risk basis|risk evidence|risk assessment)\\b"
@@ -234,6 +244,8 @@ public class RoleCopilotUseCase {
                 assessmentCaseStorePort, transactionRiskReadPort, analyzeTransactionRiskUseCase, assessTextUseCase);
         registerAdminTool("admin_order_risk_assessment", adminAiData, disputeSummaryUseCase,
                 assessmentCaseStorePort, transactionRiskReadPort, analyzeTransactionRiskUseCase, assessTextUseCase);
+        registerAdminTool("admin_order_status_lookup", adminAiData, disputeSummaryUseCase,
+                assessmentCaseStorePort, transactionRiskReadPort, analyzeTransactionRiskUseCase, assessTextUseCase);
     }
 
     private void registerVendorTool(
@@ -315,13 +327,14 @@ public class RoleCopilotUseCase {
         }
 
         // 1. Get or create conversation (Multi-Session Thread)
-        boolean isEn = effectiveLanguage == SupportedLanguage.EN;
+        SupportedLanguage resolvedLanguage = CopilotRequest.detectLanguage(effectiveContent, effectiveLanguage);
+        boolean isEn = resolvedLanguage == SupportedLanguage.EN;
         CopilotConversation conversation;
         if (conversationId != null) {
             conversation = requireConversationScope(conversationId, actorUserId, actorRole, vendorId);
         } else {
             conversation = insightStore.createCopilotConversation(
-                    actorUserId, actorRole, vendorId, effectiveLanguage.code(),
+                    actorUserId, actorRole, vendorId, resolvedLanguage.code(),
                     null, contextType, contextId);
         }
 
@@ -335,7 +348,7 @@ public class RoleCopilotUseCase {
 
         List<Map<String, Object>> artifacts = new ArrayList<>();
         List<String> toolsUsed = new ArrayList<>();
-        var toolContext = new ToolExecutionContext(effectiveLanguage, convId, actorUserId);
+        var toolContext = new ToolExecutionContext(resolvedLanguage, convId, actorUserId);
         String attachmentType = contextType != null ? contextType : conversation.contextType();
         UUID attachmentId = contextId != null ? contextId : conversation.contextId();
         String assistantResponse = answer(effectiveContent, admin, vendorId, isEn, toolContext,
@@ -388,11 +401,33 @@ public class RoleCopilotUseCase {
             return english ? "Use the Customer Assistant to find or book a tour."
                     : "Bạn có thể tìm và đặt tour trong Trợ lý khách hàng.";
         }
-        if (CopilotRequest.isDateQuestion(normalized) && !CopilotRequest.isRevenue(normalized)
-                && !CopilotRequest.isServiceCount(normalized)) {
-            var format = DateTimeFormatter.ofPattern(english ? "'Today is' EEEE, MMMM d, uuuu." : "'Hôm nay là' EEEE, dd/MM/uuuu.",
-                    english ? Locale.ENGLISH : Locale.forLanguageTag("vi-VN"));
-            return today.format(format);
+        CopilotRequest.RelativeDateQuery dateQuery = CopilotRequest.detectDateQuery(normalized);
+        if (dateQuery != null) {
+            LocalDate targetDate = today.plusDays(dateQuery.dayOffset());
+            LocalTime nowTime = LocalTime.now(TimeRange.VIETNAM_ZONE);
+            if (english) {
+                String dayName = targetDate.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, uuuu", Locale.ENGLISH));
+                String timeStr = nowTime.format(DateTimeFormatter.ofPattern("HH:mm"));
+                return switch (dateQuery) {
+                    case CURRENT_TIME -> "It is currently " + timeStr + " (Vietnam time, UTC+7).";
+                    case CURRENT_TIME_AND_DATE -> "It is currently " + timeStr + ", " + dayName + " (Vietnam time, UTC+7).";
+                    case TODAY -> "Today is " + dayName + ".";
+                    case TOMORROW -> "Tomorrow is " + dayName + ".";
+                    case YESTERDAY -> "Yesterday was " + dayName + ".";
+                    case DAY_AFTER_TOMORROW -> "The day after tomorrow is " + dayName + ".";
+                };
+            } else {
+                String formattedDate = targetDate.format(DateTimeFormatter.ofPattern("EEEE, dd/MM/uuuu", Locale.forLanguageTag("vi-VN")));
+                String timeStr = nowTime.format(DateTimeFormatter.ofPattern("HH:mm"));
+                return switch (dateQuery) {
+                    case CURRENT_TIME -> "Bây giờ là " + timeStr + " (theo giờ Việt Nam).";
+                    case CURRENT_TIME_AND_DATE -> "Bây giờ là " + timeStr + ", " + formattedDate + " (theo giờ Việt Nam).";
+                    case TODAY -> "Hôm nay là " + formattedDate + ".";
+                    case TOMORROW -> "Ngày mai là " + formattedDate + ".";
+                    case YESTERDAY -> "Hôm qua là " + formattedDate + ".";
+                    case DAY_AFTER_TOMORROW -> "Ngày mốt là " + formattedDate + ".";
+                };
+            }
         }
 
         UUID messageReference = PolicyChatAnswer.reference(message);
@@ -409,6 +444,39 @@ public class RoleCopilotUseCase {
         if (tool == null) return generateText(admin, english, context, today);
 
         var args = mapper.createObjectNode();
+        if ("admin_order_status_lookup".equals(tool)) {
+            UUID orderId = "ORDER".equalsIgnoreCase(attachmentType) ? attachmentId : null;
+            String rawCode = null;
+            if (orderId == null) {
+                orderId = messageReference;
+            }
+            if (orderId == null) {
+                Matcher shortMatcher = ORDER_SHORT_CODE.matcher(message);
+                if (shortMatcher.find()) {
+                    rawCode = shortMatcher.group();
+                    Optional<UUID> resolved = adminAiData.resolveMasterOrderIdByCode(rawCode);
+                    if (resolved.isPresent()) {
+                        orderId = resolved.get();
+                    } else {
+                        return english
+                                ? "Could not uniquely resolve order code " + rawCode + ". Please provide the full 36-character UUID of the order."
+                                : "Không thể xác định duy nhất mã đơn hàng " + rawCode + ". Vui lòng cung cấp mã UUID đầy đủ của đơn hàng.";
+                    }
+                }
+            }
+            if (orderId == null) {
+                return english
+                        ? "Please provide the Order ID (full UUID or #ORD-XXXXXXXX) or attach the order context to check its status."
+                        : "Vui lòng cung cấp mã đơn hàng (mã UUID đầy đủ hoặc #ORD-XXXXXXXX) hoặc đính kèm đơn hàng để tôi kiểm tra trạng thái.";
+            }
+            if (adminAiData.getMasterOrder(orderId).isEmpty()) {
+                String displayId = rawCode != null ? rawCode : orderId.toString();
+                return english
+                        ? "Order with ID " + displayId + " was not found on the system. Please verify the order ID."
+                        : "Không tìm thấy đơn hàng với mã ID " + displayId + " trên hệ thống. Vui lòng kiểm tra lại mã đơn hàng.";
+            }
+            args.put("orderId", orderId.toString());
+        }
         if ("admin_dispute_summarize".equals(tool)) {
             UUID disputeId = messageReference != null ? messageReference
                     : ("DISPUTE".equalsIgnoreCase(attachmentType) ? attachmentId : resolveDisputeId(message, attachmentType, attachmentId));
@@ -426,6 +494,11 @@ public class RoleCopilotUseCase {
                 }
                 return english ? "Which dispute should I review? Attach it or provide its ID."
                         : "Bạn muốn xem hồ sơ tranh chấp nào? Hãy đính kèm hồ sơ hoặc cung cấp mã.";
+            }
+            if (adminAiData.getDisputeFullEvidence(disputeId).isEmpty()) {
+                return english
+                        ? "Dispute with ID " + disputeId + " was not found on the system. Please verify the dispute ID."
+                        : "Không tìm thấy hồ sơ khiếu nại với mã ID " + disputeId + " trên hệ thống. Vui lòng kiểm tra lại mã hồ sơ.";
             }
             args.put("disputeId", disputeId.toString());
         }
@@ -512,6 +585,7 @@ public class RoleCopilotUseCase {
         }
 
         TimeRange period = null;
+        boolean periodCappedAtToday = false;
         if (Set.of("admin_revenue_timeseries", "vendor_dashboard_summary",
                 "admin_booking_cancellation_breakdown", "admin_vendor_diagnostics").contains(tool)) {
             try {
@@ -519,6 +593,17 @@ public class RoleCopilotUseCase {
             } catch (DateTimeException | IllegalArgumentException exception) {
                 return english ? "Please enter a valid reporting period."
                         : "Vui lòng nhập khoảng ngày báo cáo hợp lệ.";
+            }
+            if (admin) {
+                if (period.getFrom().isAfter(today)) {
+                    return english
+                            ? "The system only reports actual historical revenue and does not support future forecasting. Please select a period up to the current date."
+                            : "Hệ thống chỉ thống kê doanh thu thực tế đã phát sinh và không hỗ trợ dự báo tương lai. Vui lòng chọn khoảng thời gian đến thời điểm hiện tại.";
+                }
+                if (period.getTo().isAfter(today) && CopilotRequest.hasFutureIntent(normalized)) {
+                    period = TimeRange.of(period.getFrom(), today);
+                    periodCappedAtToday = true;
+                }
             }
             if ("admin_revenue_timeseries".equals(tool) && CopilotRequest.comparesMonths(normalized)) {
                 return compareAdminRevenue(today, english, tool, context, artifacts, toolsUsed);
@@ -574,15 +659,15 @@ public class RoleCopilotUseCase {
             artifacts.getLast().put("period", Map.of("from", period.getFrom().toString(), "to", period.getTo().toString()));
         }
 
-        return switch (tool) {
+        String response = switch (tool) {
             case "vendor_dashboard_summary" -> CopilotReportAnswer.vendorRevenue(data, period, normalized, english);
             case "admin_revenue_timeseries" -> CopilotReportAnswer.adminRevenue(data, period, normalized, english);
             case "admin_booking_cancellation_breakdown" -> CopilotReportAnswer.adminCancellations(data, period, normalized, english);
             case "admin_vendor_diagnostics" -> CopilotReportAnswer.adminVendorDiagnostics(data, period, message, normalized, english);
+            case "admin_order_status_lookup" -> CopilotReportAnswer.adminOrderStatus(data, english);
             case "admin_order_risk_assessment" -> CopilotReportAnswer.adminOrderRiskAssessment(data, english);
             case "admin_risk_and_support_queue_overview" -> CopilotReportAnswer.adminQueue(data, english);
-            case "admin_dispute_summarize" -> english ? "I found the dispute evidence below. An administrator must review it before deciding."
-                    : "Tôi đã tra cứu bằng chứng của tranh chấp bên dưới. Quản trị viên cần thẩm định trước khi quyết định.";
+            case "admin_dispute_summarize" -> CopilotReportAnswer.adminDispute(data, normalized, english);
             case "vendor_review_coaching" -> CopilotReportAnswer.vendorReviewCoaching(data, normalized, english);
             case "vendor_slot_advisor" -> CopilotReportAnswer.vendorSlotAdvisor(data, normalized, english);
             case "vendor_optimize_listing" -> CopilotReportAnswer.vendorListingOptimization(data, english);
@@ -593,6 +678,14 @@ public class RoleCopilotUseCase {
             default -> english ? "I retrieved the operational data. See the details below."
                     : "Tôi đã tra cứu dữ liệu vận hành. Bạn có thể xem chi tiết bên dưới.";
         };
+
+        if (periodCappedAtToday) {
+            String note = english
+                    ? "(Note: Data is reported up to today [" + today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) + "] as future data is not yet available)."
+                    : "(Lưu ý: Dữ liệu được thống kê đến ngày hôm nay [" + today.format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) + "] do chưa có số liệu tương lai).";
+            response = response + "\n\n" + note;
+        }
+        return response;
     }
 
     private String resolveOperationalRuleReply(
@@ -765,13 +858,20 @@ public class RoleCopilotUseCase {
                     && CopilotRequest.matches(CopilotRequest.words("rui ro|risk|canh bao|tin hieu|flag"), text))) {
                 return "admin_order_risk_assessment";
             }
-            if (CONTENT_MODERATION.matcher(text).find()) return "admin_text_assessment";
             if ((ADMIN_DISPUTE.matcher(text).find() && DISPUTE_SUMMARY.matcher(text).find())
                     || (DISPUTE_SUMMARY.matcher(text).find() && CHECKIN_CONFLICT.matcher(text).find())
                     || ((CopilotRequest.matches(ADMIN_DISPUTE, text) || "DISPUTE".equalsIgnoreCase(attachmentType))
                         && (hasUuid(rawMessage) || ("DISPUTE".equalsIgnoreCase(attachmentType) && attachmentId != null)))) {
                 return "admin_dispute_summarize";
             }
+            if (ORDER_SHORT_CODE.matcher(rawMessage).find()
+                    || ADMIN_ORDER_STATUS.matcher(text).find()
+                    || (hasUuid(rawMessage) && CopilotRequest.matches(CopilotRequest.words("don hang|don nay|order|orders|master[- ]?order"), text) && !CopilotRequest.matches(ADMIN_DISPUTE, text))
+                    || ("ORDER".equalsIgnoreCase(attachmentType)
+                    && CopilotRequest.matches(CopilotRequest.words("thanh toan|paid|payment|trang thai|status|don hang|don nay|order|kiem tra"), text))) {
+                return "admin_order_status_lookup";
+            }
+            if (CONTENT_MODERATION.matcher(text).find()) return "admin_text_assessment";
             if (SUPPORT_QUEUE.matcher(text).find() && QUEUE_STATE.matcher(text).find()) {
                 return "admin_risk_and_support_queue_overview";
             }
@@ -986,6 +1086,7 @@ public class RoleCopilotUseCase {
             case "admin_revenue_timeseries" -> "ADMIN_REVENUE_CHART_CARD";
             case "admin_booking_cancellation_breakdown" -> "ADMIN_CANCELLATION_BREAKDOWN_CARD";
             case "admin_vendor_diagnostics" -> "ADMIN_CRITICAL_VENDORS_TABLE";
+            case "admin_order_status_lookup" -> "ADMIN_ORDER_STATUS_CARD";
             case "admin_order_risk_assessment" -> "ADMIN_ORDER_RISK_ASSESSMENT_CARD";
             case "admin_dispute_summarize" -> "ADMIN_DISPUTE_BRIEF_CARD";
             case "admin_platform_dashboard", "admin_risk_and_support_queue_overview" -> "ADMIN_KPI_SUMMARY_CARD";

@@ -42,6 +42,11 @@ final class CopilotReportAnswer {
             "dinh chi|suspend|tu dong.*khoa|xu phat");
     private static final Pattern DIAGNOSTICS_IMPROVE = CopilotRequest.words(
             "cai thien|de xuat|khuyen nghi|improve|recommendation");
+    private static final Pattern DIAGNOSTICS_GENERAL_INTENT = Pattern.compile(
+            "\\b(?:chan doan|diagnostic|diagnostics|suc khoe|health|canh bao|warning|warnings|alert|alerts|"
+            + "tinh hinh hoat dong|hoat dong doi tac|hoat dong vendor|tinh hinh doi tac|tinh hinh vendor|"
+            + "chat luong|hieu suat|kem hieu qua|ti le huy|ty le huy|cancellation rate|ti le lap day|ty le lap day)\\b"
+    );
     private static final Pattern SLOT_UNSAFE_OR_UNKNOWN = CopilotRequest.words(
             "nguy hiem|chua co du lieu|khong ro|unsafe|high_risk|unknown|khong an toan|thoi tiet xau");
     private static final Pattern SLOT_LOW_OCCUPANCY = Pattern.compile(
@@ -259,12 +264,13 @@ final class CopilotReportAnswer {
         boolean asksThreshold = CopilotRequest.matches(DIAGNOSTICS_THRESHOLD_RULE, q);
         boolean asksSuspension = CopilotRequest.matches(DIAGNOSTICS_SUSPENSION, q);
         boolean asksImprove = CopilotRequest.matches(DIAGNOSTICS_IMPROVE, q);
+        boolean asksGeneralDiagnostic = CopilotRequest.matches(DIAGNOSTICS_GENERAL_INTENT, q);
         boolean hasDiagnosticIntent = asksLowReviewCount || asksHighOccLowRating || asksThreshold
-                || asksSuspension || asksImprove;
+                || asksSuspension || asksImprove || asksGeneralDiagnostic;
         boolean hasRevenueOrRankingIntent = CopilotRequest.isRevenue(q)
                 || CopilotRequest.isVendorRanking(q)
                 || CopilotRequest.isVendorCompare(q)
-                || CopilotRequest.isVendorStats(q);
+                || (CopilotRequest.isVendorStats(q) && !hasDiagnosticIntent);
 
         if (hasRevenueOrRankingIntent && !hasDiagnosticIntent && period != null) {
             return adminVendorDiagnostics(data, period, english);
@@ -311,6 +317,7 @@ final class CopilotReportAnswer {
         List<JsonNode> highOccLowRating = new ArrayList<>();
         List<JsonNode> highCancel = new ArrayList<>();
         List<JsonNode> flagged = new ArrayList<>();
+        long totalIssues = 0;
 
         for (JsonNode item : data) {
             String name = item.path("businessName").asText("");
@@ -323,8 +330,12 @@ final class CopilotReportAnswer {
             BigDecimal rating = item.path("ratingAvg").decimalValue();
             int ratingCount = item.path("ratingCount").asInt(0);
             String severity = item.path("severity").asText("HEALTHY");
-            if (!"HEALTHY".equals(severity)) {
+            if (!"HEALTHY".equalsIgnoreCase(severity)) {
                 flagged.add(item);
+                JsonNode issues = item.path("issueTypes");
+                if (issues.isArray()) {
+                    totalIssues += issues.size();
+                }
             }
             if (cancelRate > 20.0) {
                 highCancel.add(item);
@@ -351,8 +362,14 @@ final class CopilotReportAnswer {
         }
 
         if (!matchedByName.isEmpty()) {
-            sb.append(english ? "Matched vendor diagnostics: " : "Số liệu đối tác được nhắc tới: ");
-            sb.append(formatVendorList(matchedByName, english));
+            if (matchedByName.size() == 1) {
+                sb.append(english ? "Matched vendor diagnostics: " : "Chẩn đoán đối tác: ");
+                sb.append(formatVendorList(matchedByName, english));
+                sb.append(english ? " See details in the table below." : " Chi tiết xem bảng bên dưới.");
+            } else {
+                sb.append(english ? "Matched vendor diagnostics: " : "Số liệu các đối tác được nhắc tới: ");
+                sb.append(formatVendorList(matchedByName, english));
+            }
             return sb.toString().strip();
         }
 
@@ -371,18 +388,19 @@ final class CopilotReportAnswer {
 
         if (!flagged.isEmpty()) {
             sb.append(english
-                    ? "Live vendor diagnostics (%d flagged out of %d): ".formatted(flagged.size(), data.size())
-                    : "Chẩn đoán đối tác thực tế (%d cảnh báo / %d đối tác): ".formatted(flagged.size(), data.size()));
-            sb.append(formatVendorList(flagged, english));
+                    ? "Evaluated %d vendor(s), with %d vendor(s) needing attention and %d total issue(s) recorded under current data. Detailed status for each vendor is shown in the table below."
+                            .formatted(data.size(), flagged.size(), totalIssues)
+                    : "Hệ thống đã đánh giá %d đối tác, trong đó %d đối tác cần lưu ý với tổng số %d vấn đề được ghi nhận theo dữ liệu hiện tại. Chi tiết tình trạng từng đối tác được hiển thị trong bảng bên dưới."
+                            .formatted(data.size(), flagged.size(), totalIssues));
         } else if (data.isEmpty()) {
             sb.append(english
-                    ? "Live diagnostics: no vendor performance records in this period."
-                    : "Dữ liệu hiện tại: không có bản ghi hiệu suất đối tác trong kỳ này.");
+                    ? "No vendor performance records in this period."
+                    : "Không có dữ liệu đối tác trong kỳ tra cứu.");
         } else {
             sb.append(english
-                    ? "Live diagnostics: all %d evaluated vendor(s) are currently HEALTHY."
+                    ? "Evaluated %d vendor(s) and all are currently in good operating status (HEALTHY, no threshold warnings). Detailed status for each vendor is shown in the table below."
                             .formatted(data.size())
-                    : "Dữ liệu hiện tại: toàn bộ %d đối tác đang ở trạng thái HEALTHY (chưa ghi nhận cảnh báo vượt ngưỡng)."
+                    : "Hệ thống đã đánh giá %d đối tác và toàn bộ đang ở trạng thái hoạt động tốt (HEALTHY, chưa ghi nhận cảnh báo vượt ngưỡng). Chi tiết tình trạng từng đối tác được hiển thị trong bảng bên dưới."
                             .formatted(data.size()));
         }
         return sb.toString().strip();
@@ -699,6 +717,111 @@ final class CopilotReportAnswer {
                         + "\nGiới hạn: Các tín hiệu chỉ đưa giao dịch vào trạng thái NEEDS_REVIEW (fraudConfirmed=false), không khẳng định gian lận hay tự khóa tài khoản khi Admin chưa kiểm tra log thanh toán.")
                         .formatted(orderId, caseId, status, ruleVersion, newCaseCreated, fraudConfirmed,
                                 failed24h, orders1h, refunds7d, paymentStatus, signalText, quyetNote);
+    }
+
+    static String adminOrderStatus(JsonNode data, boolean english) {
+        if (!data.has("orderId")) return unavailable(english);
+        String displayCode = data.path("displayCode").asText("");
+        if (displayCode.isBlank()) {
+            displayCode = "ORD-" + data.path("orderId").asText().substring(0, 8).toUpperCase(Locale.ROOT);
+        }
+        String codeFormatted = displayCode.startsWith("#") ? displayCode : "#" + displayCode;
+        String status = data.path("status").asText("UNKNOWN");
+        String paymentStatus = data.path("paymentStatus").asText("UNKNOWN");
+        BigDecimal totalAmount = data.path("totalAmount").decimalValue();
+        String formattedAmount = money(totalAmount, english);
+
+        if (english) {
+            String paymentDesc = switch (paymentStatus) {
+                case "PAID" -> "has been successfully paid";
+                case "UNPAID" -> "is unpaid";
+                case "REFUNDED" -> "has been refunded";
+                case "NO_REFUND" -> "is non-refundable (late cancellation)";
+                default -> "has payment status: " + paymentStatus;
+            };
+            return "Order %s %s. Order status: %s. Total amount: %s."
+                    .formatted(codeFormatted, paymentDesc, status, formattedAmount);
+        } else {
+            String paymentDesc = switch (paymentStatus) {
+                case "PAID" -> "đã thanh toán thành công";
+                case "UNPAID" -> "chưa thanh toán";
+                case "REFUNDED" -> "đã được hoàn tiền";
+                case "NO_REFUND" -> "hủy không hoàn tiền (hủy trễ)";
+                default -> "có trạng thái thanh toán: " + paymentStatus;
+            };
+            return "Đơn hàng %s %s. Trạng thái đơn hàng: %s. Tổng giá trị: %s."
+                    .formatted(codeFormatted, paymentDesc, status, formattedAmount);
+        }
+    }
+
+    static String adminDispute(JsonNode data, String normalizedQuestion, boolean english) {
+        if (!data.has("disputeId")) return unavailable(english);
+        String disputeId = data.path("disputeId").asText("");
+        String displayCode = formatDisputeCode(disputeId);
+        String status = data.path("status").asText("UNKNOWN");
+
+        boolean asksSummaryOnly = CopilotRequest.matches(CopilotRequest.words("tom tat|summary|summarize|doi chieu|mau thuan"), normalizedQuestion)
+                && !CopilotRequest.matches(CopilotRequest.words("trang thai|status|hoan tat|da giai quyet|da hoan thanh|xong|dang xu ly"), normalizedQuestion);
+
+        if (asksSummaryOnly) {
+            String service = data.path("serviceTitle").asText("Dịch vụ");
+            String customer = data.path("customerName").asText("Khách hàng");
+            String vendor = data.path("vendorBusinessName").asText("Đối tác");
+            String timeline = data.path("timelineSummary").asText("");
+            return english
+                    ? "Dispute %s summary: Status %s. Service: %s (Customer: %s, Vendor: %s). Timeline: %s. An administrator must review all evidence before deciding. See case details below."
+                            .formatted(displayCode, status, service, customer, vendor, timeline)
+                    : "Tóm tắt khiếu nại %s: Trạng thái %s. Dịch vụ: %s (Khách hàng: %s, Đối tác: %s). Diễn biến: %s. Quản trị viên cần thẩm định đối chiếu bằng chứng trước khi quyết định. Chi tiết hồ sơ xem bên dưới."
+                            .formatted(displayCode, status, service, customer, vendor, timeline);
+        }
+
+        if ("RESOLVED_REFUND".equalsIgnoreCase(status)) {
+            return english
+                    ? "Dispute %s has been resolved with a refund approved (RESOLVED_REFUND). Note: The dispute resolution does not verify whether the refund payout transaction has completed. See case details below."
+                            .formatted(displayCode)
+                    : "Khiếu nại %s đã được giải quyết với kết quả chấp thuận hoàn tiền (RESOLVED_REFUND). Lưu ý: Kết quả giải quyết chưa bao gồm xác nhận giao dịch chuyển tiền hoàn tất. Chi tiết hồ sơ xem bên dưới."
+                            .formatted(displayCode);
+        }
+
+        if ("RESOLVED_REJECTED".equalsIgnoreCase(status)) {
+            return english
+                    ? "Dispute %s has been resolved with rejection (RESOLVED_REJECTED). See case details below."
+                            .formatted(displayCode)
+                    : "Khiếu nại %s đã được giải quyết với kết quả từ chối khiếu nại (RESOLVED_REJECTED). Chi tiết hồ sơ xem bên dưới."
+                            .formatted(displayCode);
+        }
+
+        if ("OPEN".equalsIgnoreCase(status) || "UNDER_REVIEW".equalsIgnoreCase(status)) {
+            return english
+                    ? "Dispute %s is currently %s and pending review. An administrator must review both parties' evidence before deciding. See case details below."
+                            .formatted(displayCode, status)
+                    : "Khiếu nại %s hiện đang ở trạng thái %s và chờ xử lý. Quản trị viên cần thẩm định bằng chứng của hai bên trước khi đưa ra quyết định. Chi tiết hồ sơ xem bên dưới."
+                            .formatted(displayCode, status);
+        }
+
+        return english
+                ? "Dispute %s is in status %s. See case details below."
+                        .formatted(displayCode, status)
+                : "Khiếu nại %s đang ở trạng thái %s. Chi tiết hồ sơ xem bên dưới."
+                        .formatted(displayCode, status);
+    }
+
+    private static String formatDisputeCode(String disputeIdStr) {
+        if (disputeIdStr == null || disputeIdStr.isBlank()) return "#DISP-UNKNOWN";
+        try {
+            java.util.UUID id = java.util.UUID.fromString(disputeIdStr);
+            String clean = id.toString().replace("-", "");
+            boolean isSeed = clean.startsWith("00010000")
+                    || clean.startsWith("00060000")
+                    || clean.startsWith("00000000")
+                    || clean.substring(0, Math.min(clean.length(), 8)).chars().distinct().count() <= 2;
+            String code = isSeed
+                    ? (clean.substring(0, 4) + clean.substring(clean.length() - 4))
+                    : clean.substring(0, 8);
+            return "#DISP-" + code.toUpperCase(Locale.ROOT);
+        } catch (Exception e) {
+            return "#" + disputeIdStr;
+        }
     }
 
     static String adminVendorDiagnostics(JsonNode data, TimeRange period, boolean english) {

@@ -3,6 +3,7 @@ package com.danasea.backend.modules.ai.infrastructure.adapters;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +26,9 @@ import com.danasea.backend.modules.dispute.domain.models.DisputeStatus;
 import com.danasea.backend.modules.dispute.infrastructure.persistence.entities.DisputeJpaEntity;
 import com.danasea.backend.modules.dispute.infrastructure.persistence.repositories.JpaDisputeRepository;
 import com.danasea.backend.modules.order.domain.models.RefundReason;
+import com.danasea.backend.modules.order.infrastructure.persistence.entities.MasterOrderJpaEntity;
 import com.danasea.backend.modules.order.infrastructure.persistence.entities.SubOrderJpaEntity;
+import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaMasterOrderRepository;
 import com.danasea.backend.modules.order.infrastructure.persistence.repositories.JpaSubOrderRepository;
 import com.danasea.backend.modules.report.application.usecases.GetAdminDashboardUseCase;
 import com.danasea.backend.modules.report.application.usecases.GetBookingReportUseCase;
@@ -46,10 +50,7 @@ import com.danasea.backend.modules.service.infrastructure.persistence.repositori
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 
-import lombok.RequiredArgsConstructor;
-
 @Component
-@RequiredArgsConstructor
 public class JpaAdminAiDataAdapter implements AdminAiDataPort {
 
     private final GetAdminDashboardUseCase adminDashboardUseCase;
@@ -66,6 +67,60 @@ public class JpaAdminAiDataAdapter implements AdminAiDataPort {
     private final JpaAiAssessmentCaseRepository assessmentCaseRepo;
     private final JpaAiCustomerSupportRequestRepository supportRequestRepo;
     private final VendorInternalApi vendorInternalApi;
+    private final JpaMasterOrderRepository masterOrderRepo;
+
+    @Autowired
+    public JpaAdminAiDataAdapter(
+            GetAdminDashboardUseCase adminDashboardUseCase,
+            GetRevenueReportUseCase revenueReportUseCase,
+            GetBookingReportUseCase bookingReportUseCase,
+            GetVendorPerformanceReportUseCase vendorPerformanceReportUseCase,
+            JpaDisputeRepository disputeRepo,
+            JpaSubOrderRepository subOrderRepo,
+            JpaUserRepository userRepo,
+            JpaServiceRepository serviceRepo,
+            JpaServiceSlotRepository slotRepo,
+            JpaCheckinTokenRepository checkinRepo,
+            JpaAiAssessmentCaseRepository assessmentCaseRepo,
+            JpaAiCustomerSupportRequestRepository supportRequestRepo,
+            VendorInternalApi vendorInternalApi,
+            JpaMasterOrderRepository masterOrderRepo
+    ) {
+        this.adminDashboardUseCase = adminDashboardUseCase;
+        this.revenueReportUseCase = revenueReportUseCase;
+        this.bookingReportUseCase = bookingReportUseCase;
+        this.vendorPerformanceReportUseCase = vendorPerformanceReportUseCase;
+        this.disputeRepo = disputeRepo;
+        this.subOrderRepo = subOrderRepo;
+        this.userRepo = userRepo;
+        this.serviceRepo = serviceRepo;
+        this.slotRepo = slotRepo;
+        this.checkinRepo = checkinRepo;
+        this.assessmentCaseRepo = assessmentCaseRepo;
+        this.supportRequestRepo = supportRequestRepo;
+        this.vendorInternalApi = vendorInternalApi;
+        this.masterOrderRepo = masterOrderRepo;
+    }
+
+    public JpaAdminAiDataAdapter(
+            GetAdminDashboardUseCase adminDashboardUseCase,
+            GetRevenueReportUseCase revenueReportUseCase,
+            GetBookingReportUseCase bookingReportUseCase,
+            GetVendorPerformanceReportUseCase vendorPerformanceReportUseCase,
+            JpaDisputeRepository disputeRepo,
+            JpaSubOrderRepository subOrderRepo,
+            JpaUserRepository userRepo,
+            JpaServiceRepository serviceRepo,
+            JpaServiceSlotRepository slotRepo,
+            JpaCheckinTokenRepository checkinRepo,
+            JpaAiAssessmentCaseRepository assessmentCaseRepo,
+            JpaAiCustomerSupportRequestRepository supportRequestRepo,
+            VendorInternalApi vendorInternalApi
+    ) {
+        this(adminDashboardUseCase, revenueReportUseCase, bookingReportUseCase, vendorPerformanceReportUseCase,
+                disputeRepo, subOrderRepo, userRepo, serviceRepo, slotRepo, checkinRepo, assessmentCaseRepo,
+                supportRequestRepo, vendorInternalApi, null);
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -243,5 +298,54 @@ public class JpaAdminAiDataAdapter implements AdminAiDataPort {
         long openDisputes = disputeRepo.countByStatus(DisputeStatus.OPEN) + disputeRepo.countByStatus(DisputeStatus.UNDER_REVIEW);
 
         return new QueueOverview(pendingRisk, pendingSupport, openDisputes);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<MasterOrderInfo> getMasterOrder(UUID orderId) {
+        if (orderId == null) return Optional.empty();
+        return masterOrderRepo.findById(orderId).map(order -> new MasterOrderInfo(
+                order.getId(),
+                formatOrderDisplayCode(order.getId()),
+                order.getStatus() != null ? order.getStatus().name() : "UNKNOWN",
+                order.getPaymentStatus() != null ? order.getPaymentStatus().name() : "UNKNOWN",
+                order.getTotalAmount() != null ? order.getTotalAmount() : BigDecimal.ZERO,
+                order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO,
+                order.getCreatedAt()
+        ));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<UUID> resolveMasterOrderIdByCode(String code) {
+        if (code == null || code.isBlank()) return Optional.empty();
+        String normalized = code.trim().replace("#", "").toUpperCase(java.util.Locale.ROOT);
+        if (!normalized.startsWith("ORD-")) {
+            normalized = "ORD-" + normalized;
+        }
+        List<MasterOrderJpaEntity> all = masterOrderRepo.findAll();
+        List<UUID> matches = new ArrayList<>();
+        for (MasterOrderJpaEntity order : all) {
+            if (formatOrderDisplayCode(order.getId()).equalsIgnoreCase(normalized)) {
+                matches.add(order.getId());
+            }
+        }
+        if (matches.size() == 1) {
+            return Optional.of(matches.get(0));
+        }
+        return Optional.empty();
+    }
+
+    public static String formatOrderDisplayCode(UUID id) {
+        if (id == null) return "";
+        String clean = id.toString().replace("-", "");
+        boolean isSeed = clean.startsWith("00010000")
+                || clean.startsWith("00060000")
+                || clean.startsWith("00000000")
+                || clean.substring(0, Math.min(clean.length(), 8)).chars().distinct().count() <= 2;
+        String code = isSeed
+                ? (clean.substring(0, 4) + clean.substring(clean.length() - 4))
+                : clean.substring(0, 8);
+        return "ORD-" + code.toUpperCase(java.util.Locale.ROOT);
     }
 }

@@ -153,6 +153,14 @@ public class AdminFeatureTool implements ToolExecutor {
                     SupportedLanguage lang = context.language() != null ? context.language() : SupportedLanguage.VI;
                     yield disputeSummaryUseCase.execute(adminUserId, disputeId, lang);
                 }
+                case "admin_order_status_lookup" -> {
+                    if (!args.hasNonNull("orderId")) {
+                        throw new IllegalArgumentException("orderId is required for order status lookup");
+                    }
+                    UUID orderId = UUID.fromString(args.get("orderId").asText());
+                    yield adminAiData.getMasterOrder(orderId)
+                            .orElseThrow(() -> new IllegalArgumentException("Order not found with ID: " + orderId));
+                }
                 case "admin_risk_and_support_queue_overview" -> adminAiData.getQueueOverview();
                 case "admin_text_assessment" -> {
                     String text = args.hasNonNull("text") ? args.get("text").asText("") : "";
