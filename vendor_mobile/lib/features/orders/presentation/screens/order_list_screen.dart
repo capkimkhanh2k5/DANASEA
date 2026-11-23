@@ -6,6 +6,7 @@ import '../../../../core/data/vendor_store.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../core/widgets/partner_account_app_bar_button.dart';
+import '../../../../core/utils/display_code.dart';
 import 'sub_order_detail_screen.dart';
 
 class OrderListScreen extends StatefulWidget {
@@ -29,7 +30,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   late String _selectedFilter; // all, PENDING, CONFIRMED, COMPLETED, REJECTED, CANCELLED
-  String _selectedShift = 'all'; // all, today, morning, afternoon
+  String _selectedShift = 'all'; // all, today, tomorrow, week
 
   String _normalize(String s) {
     var str = s.toLowerCase();
@@ -80,23 +81,8 @@ class _OrderListScreenState extends State<OrderListScreen> {
     return true;
   }
 
-  String _formatShortCode(String code) {
-    var c = code.trim();
-    if (c.startsWith('#')) c = c.substring(1);
-    if (c.isEmpty) return '';
-    // Nếu mã ngắn (dưới hoặc bằng 16 ký tự): Hiển thị đầy đủ 100% không cắt bớt
-    if (c.length <= 16) {
-      return '#$c';
-    }
-    // Nếu là mã UUID dài (> 16 ký tự): Hiển thị đầu - cuối rõ ràng (#00020000...0040)
-    if (c.contains('-')) {
-      final parts = c.split('-');
-      final first = parts.first;
-      final last = parts.last;
-      final suffix = last.length > 4 ? last.substring(last.length - 4) : last;
-      return '#$first...$suffix';
-    }
-    return '#${c.substring(0, 8)}...${c.substring(c.length - 4)}';
+  String _formatShortCode(String code, {String prefix = 'SUB'}) {
+    return formatDisplayCodeWithHash(code, prefix: prefix);
   }
 
   @override
@@ -150,9 +136,6 @@ class _OrderListScreenState extends State<OrderListScreen> {
     }).toList();
 
     final allCount = _db.subOrders.length;
-    final todayCount = _db.subOrders.where((o) => _matchesShift(o, 'today')).length;
-    final tomorrowCount = _db.subOrders.where((o) => _matchesShift(o, 'tomorrow')).length;
-    final weekCount = _db.subOrders.where((o) => _matchesShift(o, 'week')).length;
 
     final pendingCount = _db.subOrders.where((o) => o.status == SubOrderStatus.pending).length;
     final confirmedCount = _db.subOrders.where((o) => o.status == SubOrderStatus.confirmed).length;
@@ -237,123 +220,68 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   ),
                   const SizedBox(width: 8),
 
-                  // Shift Filter Popup Menu (Gọn gàng, không bị 2 hàng pill đè nhau)
-                  PopupMenuButton<String>(
-                    initialValue: _selectedShift,
-                    tooltip: 'Lọc ca chạy',
-                    onSelected: (val) => setState(() => _selectedShift = val),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 4,
-                    color: Colors.white,
-                    itemBuilder: (ctx) => [
-                          PopupMenuItem(
-                            value: 'all',
-                            child: Row(
-                              children: [
-                                const Icon(Icons.schedule_rounded, size: 16, color: AppColors.secondary),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Tất cả ($allCount)',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: _selectedShift == 'all' ? FontWeight.bold : FontWeight.normal,
-                                    color: _selectedShift == 'all' ? AppColors.secondary : AppColors.onSurface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'today',
-                            child: Row(
-                              children: [
-                                const Icon(Icons.today_rounded, size: 16, color: Color(0xFF0F766E)),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Hôm nay ($todayCount)',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: _selectedShift == 'today' ? FontWeight.bold : FontWeight.normal,
-                                    color: _selectedShift == 'today' ? AppColors.secondary : AppColors.onSurface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'tomorrow',
-                            child: Row(
-                              children: [
-                                const Icon(Icons.wb_sunny_rounded, size: 16, color: Color(0xFFD97706)),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Ngày mai ($tomorrowCount)',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: _selectedShift == 'tomorrow' ? FontWeight.bold : FontWeight.normal,
-                                    color: _selectedShift == 'tomorrow' ? AppColors.secondary : AppColors.onSurface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'week',
-                            child: Row(
-                              children: [
-                                const Icon(Icons.date_range_rounded, size: 16, color: Color(0xFF0284C7)),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Tuần này ($weekCount)',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: _selectedShift == 'week' ? FontWeight.bold : FontWeight.normal,
-                                    color: _selectedShift == 'week' ? AppColors.secondary : AppColors.onSurface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                    ],
-                    child: Container(
-                      height: 42,
-                      padding: const EdgeInsets.symmetric(horizontal: 11),
-                      decoration: BoxDecoration(
-                        color: _selectedShift != 'all'
-                            ? AppColors.secondary.withValues(alpha: 0.1)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: _selectedShift != 'all'
-                              ? AppColors.secondary
-                              : const Color(0xFFE2E8F0),
-                          width: _selectedShift != 'all' ? 1.5 : 1.0,
-                        ),
+                  // Shift Filter Dropdown (PopupMenuButton chuẩn neo chính xác góc phải bên dưới nút bấm)
+                  Theme(
+                    data: Theme.of(context).copyWith(
+                      hoverColor: Colors.transparent,
+                      splashColor: AppColors.secondary.withValues(alpha: 0.1),
+                      highlightColor: Colors.transparent,
+                    ),
+                    child: PopupMenuButton<String>(
+                      tooltip: '',
+                      offset: const Offset(0, 46),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.zero,
+                        side: BorderSide(color: Color(0xFFE2E8F0)),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _getShiftIcon(_selectedShift),
-                            size: 15,
-                            color: _selectedShift != 'all' ? AppColors.secondary : AppColors.tertiary,
+                      color: Colors.white,
+                      elevation: 4,
+                      surfaceTintColor: Colors.transparent,
+                      onSelected: (val) {
+                        setState(() => _selectedShift = val);
+                      },
+                      itemBuilder: (ctx) => [
+                        _buildShiftPopupItem('all', 'Tất cả'),
+                        _buildShiftPopupItem('today', 'Hôm nay'),
+                        _buildShiftPopupItem('tomorrow', 'Ngày mai'),
+                        _buildShiftPopupItem('week', 'Tuần này'),
+                      ],
+                      child: Container(
+                        height: 42,
+                        constraints: const BoxConstraints(minWidth: 84),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: _selectedShift != 'all'
+                              ? AppColors.secondary.withValues(alpha: 0.1)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: _selectedShift != 'all'
+                                ? AppColors.secondary
+                                : const Color(0xFFE2E8F0),
+                            width: _selectedShift != 'all' ? 1.5 : 1.0,
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            _getShiftLabel(_selectedShift),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: _selectedShift != 'all' ? FontWeight.bold : FontWeight.w600,
-                              color: _selectedShift != 'all' ? AppColors.secondary : AppColors.onSurface,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            LocalizedText(
+                              _getShiftLabel(_selectedShift),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: _selectedShift != 'all' ? FontWeight.bold : FontWeight.w600,
+                                color: _selectedShift != 'all' ? AppColors.secondary : AppColors.onSurface,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 2),
-                          Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 16,
-                            color: _selectedShift != 'all' ? AppColors.secondary : AppColors.tertiary,
-                          ),
-                        ],
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 17,
+                              color: _selectedShift != 'all' ? AppColors.secondary : AppColors.tertiary,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -437,18 +365,21 @@ class _OrderListScreenState extends State<OrderListScreen> {
     }
   }
 
-  IconData _getShiftIcon(String key) {
-    switch (key) {
-      case 'today':
-        return Icons.today_rounded;
-      case 'tomorrow':
-        return Icons.wb_sunny_rounded;
-      case 'week':
-        return Icons.date_range_rounded;
-      case 'all':
-      default:
-        return Icons.schedule_rounded;
-    }
+  PopupMenuItem<String> _buildShiftPopupItem(String key, String label) {
+    final isSelected = _selectedShift == key;
+    return PopupMenuItem<String>(
+      value: key,
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: LocalizedText(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected ? AppColors.secondary : AppColors.onSurface,
+        ),
+      ),
+    );
   }
 
   Widget _buildFilterTab(String key, String label, int count) {
@@ -515,7 +446,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             children: [
               Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF2E7D32)),
               SizedBox(width: 4),
-              Text(
+              LocalizedText(
                 'Đã check-in',
                 style: TextStyle(
                   fontSize: 11,
@@ -538,7 +469,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
             children: [
               Icon(Icons.pending_rounded, size: 12, color: Color(0xFFE65100)),
               SizedBox(width: 4),
-              Text(
+              LocalizedText(
                 'Chờ check-in',
                 style: TextStyle(
                   fontSize: 11,
@@ -608,7 +539,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
+                            child: LocalizedText(
                               order.customerName.isNotEmpty ? order.customerName : 'Khách hàng',
                               style: const TextStyle(
                                 fontSize: 13,
@@ -642,7 +573,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
-                Text(
+                LocalizedText(
                   '${order.quantity} khách • ${order.slotDate} (${order.slotTime})',
                   style: const TextStyle(
                     fontSize: 12,
@@ -662,7 +593,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                         children: [
                           const Icon(Icons.access_time_rounded, size: 12, color: Color(0xFF2E7D32)),
                           const SizedBox(width: 4),
-                          Text(
+                          LocalizedText(
                             'Check-in: ${order.checkedInAt!.hour.toString().padLeft(2, '0')}:${order.checkedInAt!.minute.toString().padLeft(2, '0')}',
                             style: const TextStyle(
                               fontSize: 11,
@@ -681,7 +612,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
-                        const Text(
+                        const LocalizedText(
                           'Tổng thanh toán: ',
                           style: TextStyle(fontSize: 12, color: AppColors.tertiary),
                         ),
@@ -716,7 +647,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                         children: [
                           Icon(Icons.receipt_long_rounded, size: 14, color: AppColors.onSecondary),
                           SizedBox(width: 4),
-                          Text(
+                          LocalizedText(
                             'Chi tiết đơn',
                             style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.onSecondary),
                           ),
@@ -733,7 +664,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    const LocalizedText(
                       'Mã đơn hàng',
                       style: TextStyle(
                         fontSize: 12,
@@ -743,7 +674,7 @@ class _OrderListScreenState extends State<OrderListScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        _formatShortCode(order.subOrderCode),
+                        _formatShortCode(order.subOrderCode.isNotEmpty ? order.subOrderCode : order.id, prefix: 'SUB'),
                         textAlign: TextAlign.right,
                         style: const TextStyle(
                           fontSize: 12,

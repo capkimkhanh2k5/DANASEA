@@ -3,10 +3,12 @@ import 'package:mobile/core/l10n/app_localizations.dart';
 import '../../../../core/auth/auth_session.dart';
 import '../../../../core/data/assistant_repository.dart';
 import '../../../../core/data/order_repository.dart';
+import '../../../../core/data/catalog_repository.dart';
 import '../../../../core/models/danasea_models.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/utils/display_code.dart';
 import '../../../experience_detail/presentation/screens/catalog_detail_screen.dart';
 import '../../../experience_detail/presentation/screens/experience_detail_screen.dart';
 
@@ -33,6 +35,15 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
   bool _isSending = false;
   List<Map<String, dynamic>> _savedConversations = [];
   bool _isLoadingHistory = false;
+
+  String? _pinnedContextType;
+  String? _pinnedContextId;
+  String? _pinnedContextTitle;
+  bool _showAttachMenu = false;
+
+  String _formatShortCode(String raw, {String prefix = 'ORD'}) {
+    return formatDisplayCode(raw, prefix: prefix);
+  }
 
 
   @override
@@ -96,6 +107,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
       final reply = await _repository.chat(
         message: trimmed,
         conversationId: _conversationId,
+        contextType: _pinnedContextType,
+        contextId: _pinnedContextId,
       );
       if (!mounted) return;
       setState(() {
@@ -143,6 +156,64 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
       _scrollToBottom();
     } finally {
       if (mounted) setState(() => _isSending = false);
+    }
+  }
+
+  void _resetConversation() {
+    if (_isSending) return;
+    setState(() {
+      _conversationId = null;
+      _messages.clear();
+      _pinnedContextId = null;
+      _pinnedContextType = null;
+      _pinnedContextTitle = null;
+    });
+  }
+
+  Future<void> _confirmResetConversation() async {
+    if (_isSending) return;
+    if (_messages.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const LocalizedText(
+          'Làm mới cuộc trò chuyện?',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        content: const LocalizedText(
+          'Bạn có chắc chắn muốn làm mới và xóa nội dung cuộc trò chuyện hiện tại không?',
+          style: TextStyle(fontSize: 13.5, color: AppColors.onSurfaceVariant),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const LocalizedText(
+              'Hủy',
+              style: TextStyle(color: AppColors.tertiary, fontWeight: FontWeight.w600),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE53935),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+            child: const LocalizedText(
+              'Xóa & làm mới',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      _resetConversation();
     }
   }
 
@@ -521,57 +592,77 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
         ),
         child: SafeArea(
           bottom: false,
-          child: Column(
+          child: Stack(
             children: [
-              // 1. TOP BAR
-              _buildTopBar(),
+              Column(
+                children: [
+                  // 1. TOP BAR
+                  _buildTopBar(),
 
-              // 2. MAIN BODY (HERO OR CHAT STREAM)
-              Expanded(
-                child: hasChatted
-                    ? _buildChatStream()
-                    : _buildHeroCenter(),
-              ),
+                  // 2. MAIN BODY (HERO OR CHAT STREAM)
+                  Expanded(
+                    child: hasChatted
+                        ? _buildChatStream()
+                        : _buildHeroCenter(),
+                  ),
 
-              // USER QUERY BUBBLE RIGHT ABOVE INPUT BAR (WHEN THINKING IN HERO VIEW)
-              if (!hasChatted && _isSending && _messages.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: const BorderRadius.only(
-                          topLeft: Radius.circular(18),
-                          topRight: Radius.circular(18),
-                          bottomLeft: Radius.circular(18),
-                          bottomRight: Radius.circular(4),
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
+                  // USER QUERY BUBBLE RIGHT ABOVE INPUT BAR (WHEN THINKING IN HERO VIEW)
+                  if (!hasChatted && _isSending && _messages.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.8,
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        _messages.last.content,
-                        style: AppTypography.bodyMd(
-                          color: Colors.white,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(18),
+                              topRight: Radius.circular(18),
+                              bottomLeft: Radius.circular(18),
+                              bottomRight: Radius.circular(4),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            _messages.last.content,
+                            style: AppTypography.bodyMd(
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
                     ),
+
+                  // 3. FLOATING INPUT BAR
+                  _buildFloatingInputBar(),
+                ],
+              ),
+              if (_showAttachMenu) ...[
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () => setState(() => _showAttachMenu = false),
+                    child: const SizedBox.expand(),
                   ),
                 ),
-
-              // 3. FLOATING INPUT BAR
-              _buildFloatingInputBar(),
+                Positioned(
+                  left: 20,
+                  bottom: MediaQuery.of(context).padding.bottom +
+                      MediaQuery.of(context).viewInsets.bottom +
+                      58,
+                  child: _buildMessengerMenu(),
+                ),
+              ],
             ],
           ),
         ),
@@ -679,12 +770,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                 size: 20,
                 color: AppColors.onSurface,
               ),
-              onPressed: () {
-                setState(() {
-                  _conversationId = null;
-                  _messages = [];
-                });
-              },
+              onPressed: _confirmResetConversation,
             ),
           ),
         ],
@@ -932,6 +1018,328 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
     );
   }
 
+  void _openContextPickerSheet({required String type}) {
+    final isOrder = type == 'ORDER';
+    int activeTab = isOrder ? 0 : 1;
+    final searchCtrl = TextEditingController();
+    bool isLoading = true;
+    List<MasterOrderModel> orders = [];
+    List<ServiceModel> services = [];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            void loadData() async {
+              try {
+                final oResult = await OrderRepository().list(page: 0, size: 20);
+                final sResult = await CatalogRepository().search(page: 0);
+                if (ctx.mounted) {
+                  setSheetState(() {
+                    orders = oResult.content;
+                    services = sResult.items;
+                    isLoading = false;
+                  });
+                }
+              } catch (_) {
+                if (ctx.mounted) {
+                  setSheetState(() {
+                    isLoading = false;
+                  });
+                }
+              }
+            }
+
+            if (isLoading) {
+              loadData();
+            }
+
+            final query = searchCtrl.text.trim().toLowerCase();
+            final filteredOrders = orders.where((o) {
+              if (query.isEmpty) return true;
+              return o.id.toLowerCase().contains(query) ||
+                  o.subOrders.any((s) => s.serviceName.toLowerCase().contains(query));
+            }).toList();
+
+            final filteredServices = services.where((s) {
+              if (query.isEmpty) return true;
+              return s.name.toLowerCase().contains(query) ||
+                  s.id.toLowerCase().contains(query);
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.72,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  // Handle
+                  Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isOrder ? 'Ghim đơn hàng' : 'Ghim Tour / Dịch vụ',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.onSurface,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.tertiary),
+                          onPressed: () => Navigator.pop(sheetCtx),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Search box & Direct ID Pin Row
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: TextField(
+                              controller: searchCtrl,
+                              onChanged: (_) => setSheetState(() {}),
+                              style: const TextStyle(fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: isOrder
+                                    ? 'Nhập mã đơn hoặc tìm kiếm...'
+                                    : 'Nhập mã tour hoặc tìm kiếm...',
+                                hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.outline),
+                                prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.tertiary),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (searchCtrl.text.trim().isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              final customId = searchCtrl.text.trim();
+                              if (customId.isEmpty) return;
+                              Navigator.pop(sheetCtx);
+                              setState(() {
+                                _pinnedContextType = type;
+                                _pinnedContextId = customId;
+                                _pinnedContextTitle = '${isOrder ? 'Đơn' : 'Tour'} #${_formatShortCode(customId, prefix: isOrder ? 'ORD' : 'SRV')}';
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              minimumSize: const Size(0, 38),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Ghim', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // List items
+                  Expanded(
+                    child: isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : activeTab == 0
+                            ? (filteredOrders.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'Chưa có đơn hàng nào',
+                                      style: TextStyle(fontSize: 13, color: AppColors.tertiary),
+                                    ),
+                                  )
+                                : ListView.separated(
+                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                                    itemCount: filteredOrders.length,
+                                    separatorBuilder: (context, index) => const SizedBox(height: 8),
+                                    itemBuilder: (context, idx) {
+                                      final o = filteredOrders[idx];
+                                      final tourName = o.subOrders.isNotEmpty ? o.subOrders.first.serviceName : 'Đơn hàng';
+                                      final isCurrent = _pinnedContextId == o.id;
+                                      return InkWell(
+                                        onTap: () {
+                                          Navigator.pop(sheetCtx);
+                                          setState(() {
+                                            _pinnedContextType = 'ORDER';
+                                            _pinnedContextId = o.id;
+                                            _pinnedContextTitle = 'Đơn #${_formatShortCode(o.id, prefix: 'ORD')}';
+                                          });
+                                        },
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: isCurrent ? AppColors.primaryContainer.withValues(alpha: 0.3) : AppColors.surfaceContainerLow,
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: isCurrent ? AppColors.primary : const Color(0xFFE2E8F0),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                padding: const EdgeInsets.all(8),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: const Icon(Icons.receipt_long_outlined, size: 20, color: AppColors.primary),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      tourName,
+                                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(height: 3),
+                                                    Text(
+                                                      '#${_formatShortCode(o.id, prefix: 'ORD')}',
+                                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.navyAnchor),
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      '${o.totalAmount} đ',
+                                                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.primary),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ))
+                            : (filteredServices.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'Không tìm thấy tour/dịch vụ nào',
+                                      style: TextStyle(fontSize: 13, color: AppColors.tertiary),
+                                    ),
+                                  )
+                                : ListView.separated(
+                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+                                    itemCount: filteredServices.length,
+                                    separatorBuilder: (context, index) => const SizedBox(height: 8),
+                                    itemBuilder: (context, idx) {
+                                      final s = filteredServices[idx];
+                                      final isCurrent = _pinnedContextId == s.id;
+                                      return InkWell(
+                                        onTap: () {
+                                          Navigator.pop(sheetCtx);
+                                          setState(() {
+                                            _pinnedContextType = 'SERVICE';
+                                            _pinnedContextId = s.id;
+                                            _pinnedContextTitle = 'Tour: ${s.name}';
+                                          });
+                                        },
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: isCurrent ? AppColors.primaryContainer.withValues(alpha: 0.3) : AppColors.surfaceContainerLow,
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: isCurrent ? AppColors.primary : const Color(0xFFE2E8F0),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              ClipRRect(
+                                                borderRadius: BorderRadius.circular(8),
+                                                child: s.imageUrls.isNotEmpty
+                                                    ? Image.network(
+                                                        s.imageUrls.first,
+                                                        width: 40,
+                                                        height: 40,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (context, error, stackTrace) => Container(
+                                                          width: 40,
+                                                          height: 40,
+                                                          color: AppColors.surfaceContainer,
+                                                          child: const Icon(Icons.surfing, size: 20, color: AppColors.primary),
+                                                        ),
+                                                      )
+                                                    : Container(
+                                                        width: 40,
+                                                        height: 40,
+                                                        color: AppColors.surfaceContainer,
+                                                        child: const Icon(Icons.surfing, size: 20, color: AppColors.primary),
+                                                      ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      s.name,
+                                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(height: 2),
+                                                    Text(
+                                                      '#${_formatShortCode(s.id, prefix: 'SRV')}',
+                                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.navyAnchor),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  )),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildFloatingInputBar() {
     return Container(
       margin: EdgeInsets.fromLTRB(
@@ -955,6 +1363,50 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Pinned Context Badge if any
+          if (_pinnedContextId != null) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _pinnedContextType == 'ORDER' ? Icons.receipt_long_outlined : Icons.surfing_outlined,
+                      size: 13,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 5),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.65),
+                      child: Text(
+                        _pinnedContextTitle ?? '',
+                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.primary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    InkWell(
+                      onTap: () => setState(() {
+                        _pinnedContextType = null;
+                        _pinnedContextId = null;
+                        _pinnedContextTitle = null;
+                      }),
+                      child: const Icon(Icons.close_rounded, size: 14, color: AppColors.primary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           // Input field
           TextField(
             controller: _controller,
@@ -974,20 +1426,18 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
           ),
           const SizedBox(height: 4),
 
-          // Bottom buttons row: (+)  [Image]  ... [Mic] [Send]
+          // Bottom buttons row: (📎)  [Image]  ... [Mic] [Send]
           Row(
             children: [
-              // Plus button (+)
+              // Pin context paperclip button (📎)
               _buildToolCircleButton(
-                icon: Icons.add,
-                onTap: () {},
-              ),
-              const SizedBox(width: 8),
-
-              // Image icon
-              _buildToolCircleButton(
-                icon: Icons.image_outlined,
-                onTap: () {},
+                icon: Icons.attach_file_rounded,
+                isActive: _showAttachMenu || _pinnedContextId != null,
+                onTap: () {
+                  setState(() {
+                    _showAttachMenu = !_showAttachMenu;
+                  });
+                },
               ),
 
               const Spacer(),
@@ -1049,6 +1499,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
   Widget _buildToolCircleButton({
     required IconData icon,
     required VoidCallback onTap,
+    bool isActive = false,
   }) {
     return InkWell(
       onTap: onTap,
@@ -1057,13 +1508,108 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
         width: 32,
         height: 32,
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
+          color: isActive ? AppColors.primary.withValues(alpha: 0.15) : AppColors.surfaceContainerLow,
           shape: BoxShape.circle,
+          border: isActive ? Border.all(color: AppColors.primary, width: 1.2) : null,
         ),
         child: Icon(
           icon,
           size: 17,
-          color: AppColors.onSurfaceVariant,
+          color: isActive ? AppColors.primary : AppColors.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessengerMenu() {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 0.85 + (0.15 * value),
+          alignment: Alignment.bottomLeft,
+          child: Opacity(
+            opacity: value.clamp(0.0, 1.0),
+            child: child,
+          ),
+        );
+      },
+      child: Container(
+        width: 175,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildMessengerMenuItem(
+              title: 'Đơn của tôi',
+              onTap: () {
+                setState(() => _showAttachMenu = false);
+                _openContextPickerSheet(type: 'ORDER');
+              },
+            ),
+            const Divider(color: Color(0xFFF1F5F9), height: 1),
+            _buildMessengerMenuItem(
+              title: 'Tour / Dịch vụ',
+              onTap: () {
+                setState(() => _showAttachMenu = false);
+                _openContextPickerSheet(type: 'SERVICE');
+              },
+            ),
+            if (_pinnedContextId != null) ...[
+              const Divider(color: Color(0xFFF1F5F9), height: 1),
+              _buildMessengerMenuItem(
+                title: 'Gỡ ghim hiện tại',
+                textColor: const Color(0xFFE53935),
+                onTap: () {
+                  setState(() {
+                    _showAttachMenu = false;
+                    _pinnedContextType = null;
+                    _pinnedContextId = null;
+                    _pinnedContextTitle = null;
+                  });
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessengerMenuItem({
+    required String title,
+    required VoidCallback onTap,
+    Color textColor = AppColors.navyAnchor,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+        child: Text(
+          title,
+          style: TextStyle(
+            color: textColor,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.1,
+          ),
         ),
       ),
     );

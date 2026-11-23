@@ -1753,4 +1753,7 @@ const englishTranslations = <String, String>{
       "Enter policy question or handoff message...",
   "Hỏi AI về đơn": "Ask AI about order",
   "Gửi phiếu CSKH": "Submit support ticket",
+  "Làm mới cuộc trò chuyện?": "Reset conversation?",
+  "Bạn có chắc chắn muốn làm mới và xóa nội dung cuộc trò chuyện hiện tại không?": "Are you sure you want to clear the current conversation and start fresh?",
+  "Xóa & làm mới": "Clear & reset",
 };

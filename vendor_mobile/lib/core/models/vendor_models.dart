@@ -634,7 +634,7 @@ enum SlotStatus {
 
 class ServiceSlotModel {
   final String inventoryType;
-  final List<Map<String, int>> units;
+  final List<Map<String, dynamic>> units;
   final String id;
   final String serviceId;
   final DateTime date;

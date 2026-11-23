@@ -5,6 +5,7 @@ import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../core/widgets/toast_notification.dart';
+import '../../../../core/utils/display_code.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/data/vendor_store.dart';
 import '../../../../core/data/vendor_repositories.dart';
@@ -60,6 +61,10 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
       }
     }
     return '${buffer.toString().split('').reversed.join()} đ';
+  }
+
+  String _formatShortCode(String raw, {String prefix = 'PAY'}) {
+    return formatDisplayCodeWithHash(raw, prefix: prefix);
   }
 
   void _openPayoutRequestSheet(SettlementModel settlement) {
@@ -127,10 +132,15 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          'Kỳ #${settlement.id}',
-                          style: const TextStyle(fontSize: 12, color: AppColors.tertiary, fontWeight: FontWeight.bold),
+                        Expanded(
+                          child: Text(
+                            'Kỳ ${_formatShortCode(settlement.id, prefix: 'STL')}',
+                            style: const TextStyle(fontSize: 12, color: AppColors.tertiary, fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
                           '${settlement.periodStart.day}/${settlement.periodStart.month} - ${settlement.periodEnd.day}/${settlement.periodEnd.month}/${settlement.periodEnd.year}',
                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.onSurface),
@@ -428,10 +438,15 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  '#${p.id}',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.onSurface),
+                                Expanded(
+                                  child: Text(
+                                    _formatShortCode(p.id, prefix: 'PAY'),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.onSurface),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
+                                const SizedBox(width: 8),
                                 StatusBadge(status: p.status.toBadgeStatus()),
                               ],
                             ),
@@ -587,7 +602,7 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                             borderRadius: BorderRadius.circular(AppShapes.rFull),
                           ),
                           child: LocalizedText(
-                            'KỲ ĐỐI SOÁT #${currentSettlement.id}',
+                            'KỲ ĐỐI SOÁT ${_formatShortCode(currentSettlement.id, prefix: 'STL')}',
                             style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -865,7 +880,7 @@ class _PayoutDetailScreenState extends State<PayoutDetailScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 LocalizedText(
-                                  '#${o.id} • ${o.quantity} khách • ${o.slotDate}',
+                                  '${_formatShortCode(o.id, prefix: 'SUB')} • ${o.quantity} khách • ${o.slotDate}',
                                   style: AppTypography.bodySm.copyWith(color: AppColors.tertiary, fontSize: 12),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,

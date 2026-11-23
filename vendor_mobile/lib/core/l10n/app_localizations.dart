@@ -32,11 +32,46 @@ class AppLanguage extends ChangeNotifier {
 String tr(BuildContext context, String source) =>
     translate(source, Localizations.localeOf(context).languageCode);
 
+final Map<String, String> _viTranslations = () {
+  final map = <String, String>{};
+  for (final entry in englishTranslations.entries) {
+    if (!entry.key.contains('{')) {
+      map[entry.value] = entry.key;
+      map[entry.value.toLowerCase()] = entry.key;
+    }
+  }
+  // Common backend & system phrases
+  map['AVAILABLE'] = 'Mở đặt chỗ';
+  map['OPEN'] = 'Mở đón khách';
+  map['CLOSED'] = 'Tạm đóng';
+  map['TEMPORARILY_LOCKED'] = 'Tạm khóa';
+  map['PENDING'] = 'Chờ duyệt';
+  map['CONFIRMED'] = 'Đã xác nhận';
+  map['COMPLETED'] = 'Đã hoàn thành';
+  map['REJECTED'] = 'Đã từ chối';
+  map['CANCELLED'] = 'Đã hủy';
+  map['REFUNDED'] = 'Hoàn tiền';
+  map['SELECTED SERVICE'] = 'DỊCH VỤ ĐANG CHỌN';
+  map['Maximum capacity'] = 'Sức chứa tối đa';
+  map['Start time'] = 'Giờ bắt đầu';
+  map['End time'] = 'Giờ kết thúc';
+  map['guests'] = 'khách';
+  map['slot'] = 'ca';
+  map['slots'] = 'ca';
+  return map;
+}();
+
 /// Translate only catalogued UI phrases; unknown content is preserved.
 /// Templates are anchored and sorted by specificity, so e.g. a guest count
 /// cannot shadow an order summary. Captured values are never used as regexes.
 String translate(String source, String language, [int depth = 0]) {
-  if (language != 'en' || depth > 4) return source;
+  if (depth > 4) return source;
+  if (language == 'vi') {
+    final viMatch = _viTranslations[source] ?? _viTranslations[source.toLowerCase()];
+    if (viMatch != null) return viMatch;
+    return source;
+  }
+  if (language != 'en') return source;
   final exact = englishTranslations[source];
   if (exact != null) return exact;
   final amount = RegExp(r'^([0-9.,]+)đ$').firstMatch(source);

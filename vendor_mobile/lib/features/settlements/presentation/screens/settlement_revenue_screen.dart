@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/status_badge.dart';
+import '../../../../core/utils/display_code.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/data/vendor_store.dart';
 import '../../../../core/data/vendor_repositories.dart';
@@ -1215,7 +1216,7 @@ class _SettlementRevenueScreenState extends State<SettlementRevenueScreen> {
                               children: [
                                 Flexible(
                                   child: Text(
-                                    '#${order.subOrderCode}',
+                                    formatDisplayCodeWithHash(order.subOrderCode.isNotEmpty ? order.subOrderCode : order.id, prefix: 'SUB'),
                                     style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.secondary),
                                     overflow: TextOverflow.ellipsis,
                                   ),

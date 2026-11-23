@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../theme/app_colors.dart';
 import '../../features/profile/presentation/screens/partner_account_screen.dart';
 import 'symbolic_vendor_avatar.dart';
@@ -37,7 +38,7 @@ class PartnerAccountAppBarButton extends StatelessWidget {
                 animate: true,
               ),
               SizedBox(width: 6),
-              Text(
+              LocalizedText(
                 'Tài khoản',
                 style: TextStyle(
                   fontSize: 11,

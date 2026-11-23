@@ -24,12 +24,14 @@ class VendorAuthRepository implements IVendorAuthRepository {
           phone: profile['phone']?.toString() ?? _db.currentUser.phone,
           fullName: profile['fullName']?.toString() ?? _db.currentUser.fullName,
           role: UserRole.vendor,
-          avatarUrl: profile['avatarUrl']?.toString() ?? _db.currentUser.avatarUrl,
+          avatarUrl:
+              profile['avatarUrl']?.toString() ?? _db.currentUser.avatarUrl,
           isEmailVerified: profile['isEmailVerified'] != false,
           isLocked: profile['isLocked'] == true,
           locale: profile['locale']?.toString() ?? 'vi',
           createdAt: profile['createdAt'] != null
-              ? DateTime.tryParse(profile['createdAt'].toString()) ?? _db.currentUser.createdAt
+              ? DateTime.tryParse(profile['createdAt'].toString()) ??
+                    _db.currentUser.createdAt
               : _db.currentUser.createdAt,
         );
         _db.currentUser = user;
@@ -111,18 +113,26 @@ class VendorProfileRepository implements IVendorProfileRepository {
       final vendor = VendorModel(
         id: json['id']?.toString() ?? _db.currentVendor.id,
         userId: json['userId']?.toString() ?? _db.currentVendor.userId,
-        businessName: json['businessName']?.toString() ?? _db.currentVendor.businessName,
+        businessName:
+            json['businessName']?.toString() ?? _db.currentVendor.businessName,
         taxCode: json['taxCode']?.toString() ?? _db.currentVendor.taxCode,
         address: json['address']?.toString() ?? _db.currentVendor.address,
-        bankAccountNumber: json['bankAccountNumber']?.toString() ?? _db.currentVendor.bankAccountNumber,
+        bankAccountNumber:
+            json['bankAccountNumber']?.toString() ??
+            _db.currentVendor.bankAccountNumber,
         bankName: json['bankName']?.toString() ?? _db.currentVendor.bankName,
-        bankAccountHolder: json['bankAccountHolder']?.toString() ?? _db.currentVendor.bankAccountHolder,
+        bankAccountHolder:
+            json['bankAccountHolder']?.toString() ??
+            _db.currentVendor.bankAccountHolder,
         verificationStatus: VendorVerificationStatus.values.firstWhere(
-          (v) => v.name.toLowerCase() == (json['verificationStatus']?.toString().toLowerCase()),
+          (v) =>
+              v.name.toLowerCase() ==
+              (json['verificationStatus']?.toString().toLowerCase()),
           orElse: () => VendorVerificationStatus.approved,
         ),
         createdAt: json['createdAt'] != null
-            ? DateTime.tryParse(json['createdAt'].toString()) ?? _db.currentVendor.createdAt
+            ? DateTime.tryParse(json['createdAt'].toString()) ??
+                  _db.currentVendor.createdAt
             : _db.currentVendor.createdAt,
       );
       _db.currentVendor = vendor;
@@ -148,16 +158,26 @@ class VendorProfileRepository implements IVendorProfileRepository {
       if (taxCode != null) data['taxCode'] = taxCode;
       if (address != null) data['address'] = address;
       if (data.isNotEmpty) {
-        await _session.request('/api/vendor/profile', method: 'PATCH', data: data);
+        await _session.request(
+          '/api/vendor/profile',
+          method: 'PATCH',
+          data: data,
+        );
       }
       if (fullName != null || phone != null || avatarUrl != null) {
         final userData = <String, dynamic>{};
         if (fullName != null) userData['fullName'] = fullName;
         if (phone != null) userData['phone'] = phone;
         if (avatarUrl != null) userData['avatarUrl'] = avatarUrl;
-        await _session.request('/api/users/me', method: 'PATCH', data: userData);
+        await _session.request(
+          '/api/users/me',
+          method: 'PATCH',
+          data: userData,
+        );
       }
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
 
     _db.currentVendor = _db.currentVendor.copyWith(
       businessName: businessName,
@@ -191,7 +211,9 @@ class VendorProfileRepository implements IVendorProfileRepository {
           'bankAccountHolder': bankAccountHolder,
         },
       );
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
 
     _db.currentVendor = _db.currentVendor.copyWith(
       bankName: bankName,
@@ -217,7 +239,9 @@ class VendorDocumentRepository implements IVendorDocumentRepository {
       if (json is List) {
         final docs = <VendorDocumentModel>[];
         for (final item in json.whereType<Map<String, dynamic>>()) {
-          final docTypeStr = (item['documentType'] ?? item['docType'] ?? '').toString().toUpperCase();
+          final docTypeStr = (item['documentType'] ?? item['docType'] ?? '')
+              .toString()
+              .toUpperCase();
           final docType = docTypeStr.contains('SAFETY')
               ? VendorDocType.safetyCert
               : VendorDocType.businessLicense;
@@ -225,20 +249,24 @@ class VendorDocumentRepository implements IVendorDocumentRepository {
           final status = statusStr == 'APPROVED'
               ? DocumentReviewStatus.approved
               : statusStr == 'REJECTED'
-                  ? DocumentReviewStatus.rejected
-                  : DocumentReviewStatus.pending;
+              ? DocumentReviewStatus.rejected
+              : DocumentReviewStatus.pending;
 
           docs.add(
             VendorDocumentModel(
               id: item['id']?.toString() ?? '',
               vendorId: item['vendorId']?.toString() ?? _db.currentVendor.id,
               docType: docType,
-              fileUrl: item['fileUrl']?.toString() ?? item['documentUrl']?.toString() ?? '',
+              fileUrl:
+                  item['fileUrl']?.toString() ??
+                  item['documentUrl']?.toString() ??
+                  '',
               status: status,
               fileName: item['fileName']?.toString() ?? 'Tài liệu xác minh',
               fileSize: item['fileSize']?.toString() ?? 'Chưa có thông tin',
               uploadedAt: item['uploadedAt'] != null
-                  ? DateTime.tryParse(item['uploadedAt'].toString()) ?? DateTime.now()
+                  ? DateTime.tryParse(item['uploadedAt'].toString()) ??
+                        DateTime.now()
                   : DateTime.now(),
             ),
           );
@@ -271,13 +299,16 @@ class VendorDocumentRepository implements IVendorDocumentRepository {
     final status = statusStr == 'APPROVED'
         ? DocumentReviewStatus.approved
         : statusStr == 'REJECTED'
-            ? DocumentReviewStatus.rejected
-            : DocumentReviewStatus.pending;
+        ? DocumentReviewStatus.rejected
+        : DocumentReviewStatus.pending;
     final uploaded = VendorDocumentModel(
-      id: res['id']?.toString() ?? 'vdoc-${DateTime.now().millisecondsSinceEpoch}',
+      id:
+          res['id']?.toString() ??
+          'vdoc-${DateTime.now().millisecondsSinceEpoch}',
       vendorId: res['vendorId']?.toString() ?? _db.currentVendor.id,
       docType: docType,
-      fileUrl: res['fileUrl']?.toString() ?? res['documentUrl']?.toString() ?? '',
+      fileUrl:
+          res['fileUrl']?.toString() ?? res['documentUrl']?.toString() ?? '',
       status: status,
       fileName: res['fileName']?.toString() ?? fileName,
       fileSize: fileSize,
@@ -365,15 +396,19 @@ class VendorServiceRepository implements IVendorServiceRepository {
     try {
       final json = await _session.requestJson('/api/catalog/categories');
       if (json is List) {
-        final items = json.whereType<Map<String, dynamic>>().map((item) {
-          return CategoryModel(
-            id: item['id']?.toString() ?? '',
-            name: item['name']?.toString() ?? '',
-            nameEn: item['nameEn']?.toString() ?? '',
-            slug: item['slug']?.toString() ?? '',
-            iconUrl: item['iconUrl']?.toString() ?? 'sailing',
-          );
-        }).where((c) => c.id.isNotEmpty).toList();
+        final items = json
+            .whereType<Map<String, dynamic>>()
+            .map((item) {
+              return CategoryModel(
+                id: item['id']?.toString() ?? '',
+                name: item['name']?.toString() ?? '',
+                nameEn: item['nameEn']?.toString() ?? '',
+                slug: item['slug']?.toString() ?? '',
+                iconUrl: item['iconUrl']?.toString() ?? 'sailing',
+              );
+            })
+            .where((c) => c.id.isNotEmpty)
+            .toList();
         if (items.isNotEmpty) {
           _db.categories.clear();
           _db.categories.addAll(items);
@@ -446,7 +481,9 @@ class VendorServiceRepository implements IVendorServiceRepository {
           'longitude': service.longitude,
           'waiverContent': service.waiverContent,
           'waiverContentEn': service.waiverContent,
-          'waiverRequired': service.waiverContent != null && service.waiverContent!.isNotEmpty,
+          'waiverRequired':
+              service.waiverContent != null &&
+              service.waiverContent!.isNotEmpty,
           'weatherSensitive': service.weatherSensitive,
           'minWindKmh': service.minWindKmh,
           'maxWaveM': service.maxWaveM,
@@ -456,7 +493,9 @@ class VendorServiceRepository implements IVendorServiceRepository {
       _db.services.add(created);
       _db.notifyStoreChanged();
       return created;
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
   }
 
   @override
@@ -480,7 +519,9 @@ class VendorServiceRepository implements IVendorServiceRepository {
           'longitude': service.longitude,
           'waiverContent': service.waiverContent,
           'waiverContentEn': service.waiverContent,
-          'waiverRequired': service.waiverContent != null && service.waiverContent!.isNotEmpty,
+          'waiverRequired':
+              service.waiverContent != null &&
+              service.waiverContent!.isNotEmpty,
           'weatherSensitive': service.weatherSensitive,
           'minWindKmh': service.minWindKmh,
           'maxWaveM': service.maxWaveM,
@@ -491,20 +532,36 @@ class VendorServiceRepository implements IVendorServiceRepository {
       if (index != -1) _db.services[index] = updated;
       _db.notifyStoreChanged();
       return updated;
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
   }
 
   @override
-  Future<ServiceModel> updateServiceStatus(String serviceId, ServiceStatus status) async {
+  Future<ServiceModel> updateServiceStatus(
+    String serviceId,
+    ServiceStatus status,
+  ) async {
     try {
       if (status == ServiceStatus.pendingReview) {
-        await _session.request('/api/vendor/services/$serviceId/submit', method: 'POST');
+        await _session.request(
+          '/api/vendor/services/$serviceId/submit',
+          method: 'POST',
+        );
       } else if (status == ServiceStatus.paused) {
-        await _session.request('/api/vendor/services/$serviceId/pause', method: 'PATCH');
+        await _session.request(
+          '/api/vendor/services/$serviceId/pause',
+          method: 'PATCH',
+        );
       } else if (status == ServiceStatus.published) {
-        await _session.request('/api/vendor/services/$serviceId/resume', method: 'PATCH');
+        await _session.request(
+          '/api/vendor/services/$serviceId/resume',
+          method: 'PATCH',
+        );
       }
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
 
     final index = _db.services.indexWhere((s) => s.id == serviceId);
     if (index != -1) {
@@ -527,7 +584,9 @@ class VendorServiceRepository implements IVendorServiceRepository {
     );
     final url = (res['url'] ?? res['imageUrl'] ?? '').toString();
     if (url.isNotEmpty) {
-      final idx = _db.services.indexWhere((s) => s.id == serviceId || s.serviceId == serviceId);
+      final idx = _db.services.indexWhere(
+        (s) => s.id == serviceId || s.serviceId == serviceId,
+      );
       if (idx != -1) {
         final s = _db.services[idx];
         _db.services[idx] = s.copyWith(imageUrls: [...s.imageUrls, url]);
@@ -561,9 +620,13 @@ class VendorServiceRepository implements IVendorServiceRepository {
   }
 
   @override
-  Future<List<ServiceSafetyDocumentModel>> getServiceSafetyDocuments(String serviceId) async {
+  Future<List<ServiceSafetyDocumentModel>> getServiceSafetyDocuments(
+    String serviceId,
+  ) async {
     try {
-      final json = await _session.requestJson('/api/vendor/services/$serviceId/safety-documents');
+      final json = await _session.requestJson(
+        '/api/vendor/services/$serviceId/safety-documents',
+      );
       if (json is List) {
         final docs = <ServiceSafetyDocumentModel>[];
         for (final item in json.whereType<Map<String, dynamic>>()) {
@@ -571,8 +634,8 @@ class VendorServiceRepository implements IVendorServiceRepository {
           final status = stStr == 'APPROVED'
               ? DocumentReviewStatus.approved
               : stStr == 'REJECTED'
-                  ? DocumentReviewStatus.rejected
-                  : DocumentReviewStatus.pending;
+              ? DocumentReviewStatus.rejected
+              : DocumentReviewStatus.pending;
           final url = (item['fileUrl'] ?? item['url'] ?? '').toString();
           docs.add(
             ServiceSafetyDocumentModel(
@@ -582,7 +645,8 @@ class VendorServiceRepository implements IVendorServiceRepository {
               status: status,
               fileName: item['fileName']?.toString() ?? url.split('/').last,
               uploadedAt: item['uploadedAt'] != null
-                  ? DateTime.tryParse(item['uploadedAt'].toString()) ?? DateTime.now()
+                  ? DateTime.tryParse(item['uploadedAt'].toString()) ??
+                        DateTime.now()
                   : DateTime.now(),
             ),
           );
@@ -593,7 +657,9 @@ class VendorServiceRepository implements IVendorServiceRepository {
         return docs;
       }
     } catch (_) {}
-    return _db.serviceSafetyDocs.where((d) => d.serviceId == serviceId).toList();
+    return _db.serviceSafetyDocs
+        .where((d) => d.serviceId == serviceId)
+        .toList();
   }
 
   @override
@@ -611,11 +677,13 @@ class VendorServiceRepository implements IVendorServiceRepository {
     final status = stStr == 'APPROVED'
         ? DocumentReviewStatus.approved
         : stStr == 'REJECTED'
-            ? DocumentReviewStatus.rejected
-            : DocumentReviewStatus.pending;
+        ? DocumentReviewStatus.rejected
+        : DocumentReviewStatus.pending;
     final url = (res['fileUrl'] ?? res['url'] ?? fileName).toString();
     final doc = ServiceSafetyDocumentModel(
-      id: res['id']?.toString() ?? 'sdoc-${DateTime.now().millisecondsSinceEpoch}',
+      id:
+          res['id']?.toString() ??
+          'sdoc-${DateTime.now().millisecondsSinceEpoch}',
       serviceId: serviceId,
       fileUrl: url,
       status: status,
@@ -629,7 +697,9 @@ class VendorServiceRepository implements IVendorServiceRepository {
     return doc;
   }
 
-  Future<List<Map<String, String>>> getServiceImagesWithIds(String serviceId) async {
+  Future<List<Map<String, String>>> getServiceImagesWithIds(
+    String serviceId,
+  ) async {
     try {
       final json = await _session.request('/api/vendor/services/$serviceId');
       final images = <Map<String, String>>[];
@@ -651,16 +721,23 @@ class VendorServiceRepository implements IVendorServiceRepository {
   }
 
   @override
-  Future<List<VendorServiceOptionModel>> getServiceOptions(String serviceId) async {
-    try {
-      final json = await _session.requestJson('/api/vendor/services/$serviceId/options');
-      if (json is List) {
-        return json
-            .whereType<Map<String, dynamic>>()
-            .map((item) => VendorServiceOptionModel.fromJson(item, fallbackServiceId: serviceId))
-            .toList();
-      }
-    } catch (_) {}
+  Future<List<VendorServiceOptionModel>> getServiceOptions(
+    String serviceId,
+  ) async {
+    final json = await _session.requestJson(
+      '/api/vendor/services/$serviceId/options',
+    );
+    if (json is List) {
+      return json
+          .whereType<Map<String, dynamic>>()
+          .map(
+            (item) => VendorServiceOptionModel.fromJson(
+              item,
+              fallbackServiceId: serviceId,
+            ),
+          )
+          .toList();
+    }
     return [];
   }
 
@@ -683,7 +760,9 @@ class VendorServiceRepository implements IVendorServiceRepository {
         'pricingUnit': pricingUnit,
         'price': price,
         'maxPaxPerPackage': optionType == 'PRIVATE' ? maxPaxPerPackage : null,
-        'benefits': (benefits != null && benefits.trim().isNotEmpty) ? benefits.trim() : null,
+        'benefits': (benefits != null && benefits.trim().isNotEmpty)
+            ? benefits.trim()
+            : null,
       },
     );
     return VendorServiceOptionModel.fromJson(res, fallbackServiceId: serviceId);
@@ -747,10 +826,16 @@ class VendorSlotRepository implements IVendorSlotRepository {
       startTime: json['startTime']?.toString() ?? '',
       endTime: json['endTime']?.toString() ?? '',
       inventoryType: json['inventoryType']?.toString() ?? 'PERSON_LIMIT',
-      units: (json['units'] as List? ?? []).map((u) => <String, int>{
-        'unitNumber': (u['unitNumber'] as num).toInt(),
-        'capacity': (u['capacity'] as num).toInt(),
-      }).toList(),
+      units: (json['units'] as List? ?? [])
+          .map(
+            (u) => <String, dynamic>{
+              'unitNumber': (u['unitNumber'] as num?)?.toInt() ?? 1,
+              'capacity': (u['capacity'] as num?)?.toInt() ?? 2,
+              'equipmentId': u['equipmentId']?.toString(),
+              'equipmentBlocked': u['equipmentBlocked'] == true,
+            },
+          )
+          .toList(),
       capacity: (json['capacity'] as num?)?.toInt() ?? 0,
       bookedCount: (json['bookedCount'] as num?)?.toInt() ?? 0,
       heldCount: (json['heldCount'] as num?)?.toInt() ?? 0,
@@ -759,9 +844,14 @@ class VendorSlotRepository implements IVendorSlotRepository {
   }
 
   @override
-  Future<List<ServiceSlotModel>> getSlotsForService(String serviceId, DateTime date) async {
+  Future<List<ServiceSlotModel>> getSlotsForService(
+    String serviceId,
+    DateTime date,
+  ) async {
     try {
-      final json = await _session.requestJson('/api/vendor/services/$serviceId/slots');
+      final json = await _session.requestJson(
+        '/api/vendor/services/$serviceId/slots',
+      );
       if (json is List) {
         final parsed = json
             .whereType<Map<String, dynamic>>()
@@ -795,24 +885,46 @@ class VendorSlotRepository implements IVendorSlotRepository {
   Future<ServiceSlotModel> saveSlot(ServiceSlotModel slot) async {
     try {
       final dateStr = slot.date.toIso8601String().split('T').first;
-      final start = slot.startTime.length == 5 ? '${slot.startTime}:00' : slot.startTime;
-      final end = slot.endTime.length == 5 ? '${slot.endTime}:00' : slot.endTime;
+      final start = slot.startTime.length == 5
+          ? '${slot.startTime}:00'
+          : slot.startTime;
+      final end = slot.endTime.length == 5
+          ? '${slot.endTime}:00'
+          : slot.endTime;
 
       final editing = RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(slot.id);
       final res = await _session.request(
         '/api/vendor/services/${slot.serviceId}/slots${editing ? '/${slot.id}' : ''}',
         method: editing ? 'PATCH' : 'POST',
-        data: {
-          'date': dateStr,
-          'startTime': start,
-          'endTime': end,
-          'capacity': slot.capacity,
-          'inventoryType': slot.inventoryType,
-          if (slot.inventoryType == 'SHARED_CAPACITY_UNITS') 'units': slot.units,
-        },
+        data: editing
+            ? {
+                'status': slot.isBlocked ? 'CLOSED' : 'OPEN',
+                if (slot.inventoryType == 'PERSON_LIMIT')
+                  'capacity': slot.capacity,
+                if (slot.inventoryType == 'SHARED_CAPACITY_UNITS')
+                  'units': slot.units
+                      .map(
+                        (u) => {
+                          'unitNumber': (u['unitNumber'] as num?)?.toInt() ?? 1,
+                          'capacity': (u['capacity'] as num?)?.toInt() ?? 2,
+                        },
+                      )
+                      .toList(),
+              }
+            : {
+                'date': dateStr,
+                'startTime': start,
+                'endTime': end,
+                'capacity': slot.capacity,
+                'inventoryType': slot.inventoryType,
+                if (slot.inventoryType == 'SHARED_CAPACITY_UNITS')
+                  'units': slot.units,
+              },
       );
       final saved = parseSlot(res);
-      final index = _db.slots.indexWhere((s) => s.id == slot.id || s.slotId == slot.slotId);
+      final index = _db.slots.indexWhere(
+        (s) => s.id == slot.id || s.slotId == slot.slotId,
+      );
       if (index != -1) {
         _db.slots[index] = saved;
       } else {
@@ -820,7 +932,9 @@ class VendorSlotRepository implements IVendorSlotRepository {
       }
       _db.notifyStoreChanged();
       return saved;
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
   }
 
   @override
@@ -837,11 +951,16 @@ class VendorSlotRepository implements IVendorSlotRepository {
         '/api/vendor/services/$serviceId/slots/batch',
         method: 'POST',
         data: {
-          if (startDate != null) 'startDate': startDate.toIso8601String().split('T').first,
-          if (endDate != null) 'endDate': endDate.toIso8601String().split('T').first,
-          if (daysOfWeek != null && daysOfWeek.isNotEmpty) 'daysOfWeek': daysOfWeek,
+          if (startDate != null)
+            'startDate': startDate.toIso8601String().split('T').first,
+          if (endDate != null)
+            'endDate': endDate.toIso8601String().split('T').first,
+          if (daysOfWeek != null && daysOfWeek.isNotEmpty)
+            'daysOfWeek': daysOfWeek,
           if (dates != null && dates.isNotEmpty)
-            'dates': dates.map((d) => d.toIso8601String().split('T').first).toList(),
+            'dates': dates
+                .map((d) => d.toIso8601String().split('T').first)
+                .toList(),
           'slotTemplates': slotTemplates,
         },
       );
@@ -849,7 +968,10 @@ class VendorSlotRepository implements IVendorSlotRepository {
       if (res['slots'] is List) {
         rawList = res['slots'] as List;
       }
-      final created = rawList.whereType<Map<String, dynamic>>().map(parseSlot).toList();
+      final created = rawList
+          .whereType<Map<String, dynamic>>()
+          .map(parseSlot)
+          .toList();
       _db.slots.addAll(created);
       _db.notifyStoreChanged();
       return created;
@@ -859,7 +981,10 @@ class VendorSlotRepository implements IVendorSlotRepository {
   }
 
   @override
-  Future<ServiceSlotModel> updateSlotCapacity(String slotId, int newCapacity) async {
+  Future<ServiceSlotModel> updateSlotCapacity(
+    String slotId,
+    int newCapacity,
+  ) async {
     try {
       final slot = await getSlotById(slotId);
       if (slot != null) {
@@ -869,13 +994,17 @@ class VendorSlotRepository implements IVendorSlotRepository {
           data: {'capacity': newCapacity},
         );
       }
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
 
     final index = _db.slots.indexWhere((s) => s.id == slotId);
     if (index != -1) {
       final current = _db.slots[index];
       if (newCapacity < current.bookedCount) {
-        throw Exception('Sức chứa không được nhỏ hơn số khách đã đặt (${current.bookedCount}).');
+        throw Exception(
+          'Sức chứa không được nhỏ hơn số khách đã đặt (${current.bookedCount}).',
+        );
       }
       final updated = current.copyWith(capacity: newCapacity);
       _db.slots[index] = updated;
@@ -887,7 +1016,9 @@ class VendorSlotRepository implements IVendorSlotRepository {
 
   @override
   Future<ServiceSlotModel> toggleBlockSlot(String slotId, bool blocked) async {
-    final index = _db.slots.indexWhere((s) => s.id == slotId || s.slotId == slotId);
+    final index = _db.slots.indexWhere(
+      (s) => s.id == slotId || s.slotId == slotId,
+    );
     if (index != -1) {
       final current = _db.slots[index];
       try {
@@ -912,13 +1043,19 @@ class VendorSlotRepository implements IVendorSlotRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> cancelSlot(String serviceId, String slotId, String reason) async {
+  Future<Map<String, dynamic>> cancelSlot(
+    String serviceId,
+    String slotId,
+    String reason,
+  ) async {
     final res = await _session.request(
       '/api/vendor/services/$serviceId/slots/$slotId/cancel',
       method: 'POST',
       data: {'reason': reason},
     );
-    final idx = _db.slots.indexWhere((s) => s.id == slotId || s.slotId == slotId);
+    final idx = _db.slots.indexWhere(
+      (s) => s.id == slotId || s.slotId == slotId,
+    );
     if (idx != -1) {
       _db.slots[idx] = _db.slots[idx].copyWith(status: SlotStatus.cancelled);
       _db.notifyStoreChanged();
@@ -929,14 +1066,19 @@ class VendorSlotRepository implements IVendorSlotRepository {
   @override
   Future<Map<String, dynamic>?> getOperatingSchedule(String serviceId) async {
     try {
-      return await _session.request('/api/vendor/services/$serviceId/operating-schedule');
+      return await _session.request(
+        '/api/vendor/services/$serviceId/operating-schedule',
+      );
     } catch (_) {
       return null;
     }
   }
 
   @override
-  Future<Map<String, dynamic>> updateOperatingSchedule(String serviceId, Map<String, dynamic> schedule) async {
+  Future<Map<String, dynamic>> updateOperatingSchedule(
+    String serviceId,
+    Map<String, dynamic> schedule,
+  ) async {
     return await _session.request(
       '/api/vendor/services/$serviceId/operating-schedule',
       method: 'PUT',
@@ -945,9 +1087,13 @@ class VendorSlotRepository implements IVendorSlotRepository {
   }
 
   @override
-  Future<List<OperatingScheduleExceptionModel>> listScheduleExceptions(String serviceId) async {
+  Future<List<OperatingScheduleExceptionModel>> listScheduleExceptions(
+    String serviceId,
+  ) async {
     try {
-      final json = await _session.requestJson('/api/vendor/services/$serviceId/operating-schedule/exceptions');
+      final json = await _session.requestJson(
+        '/api/vendor/services/$serviceId/operating-schedule/exceptions',
+      );
       if (json is List) {
         return json
             .whereType<Map<String, dynamic>>()
@@ -980,7 +1126,10 @@ class VendorSlotRepository implements IVendorSlotRepository {
   }
 
   @override
-  Future<void> removeScheduleException(String serviceId, String exceptionId) async {
+  Future<void> removeScheduleException(
+    String serviceId,
+    String exceptionId,
+  ) async {
     await _session.requestJson(
       '/api/vendor/services/$serviceId/operating-schedule/exceptions/$exceptionId',
       method: 'DELETE',
@@ -997,7 +1146,9 @@ class VendorOrderRepository implements IVendorOrderRepository {
 
   static SubOrderModel parseSubOrder(Map<String, dynamic> json) {
     SubOrderStatus status = SubOrderStatus.pending;
-    final stStr = (json['status'] ?? json['bookingStatus'] ?? '').toString().toUpperCase();
+    final stStr = (json['status'] ?? json['bookingStatus'] ?? '')
+        .toString()
+        .toUpperCase();
     if (stStr == 'CONFIRMED') {
       status = SubOrderStatus.confirmed;
     } else if (stStr == 'REJECTED') {
@@ -1018,11 +1169,13 @@ class VendorOrderRepository implements IVendorOrderRepository {
         ? DateTime.tryParse(json['checkedInAt'].toString())
         : null;
 
-    final unitPrice = (json['unitPrice'] as num?)?.toDouble() ??
+    final unitPrice =
+        (json['unitPrice'] as num?)?.toDouble() ??
         (json['price'] as num?)?.toDouble() ??
         0.0;
     final quantity = (json['quantity'] as num?)?.toInt() ?? 1;
-    final subtotal = (json['subtotalAmount'] as num?)?.toDouble() ??
+    final subtotal =
+        (json['subtotalAmount'] as num?)?.toDouble() ??
         (json['subtotal'] as num?)?.toDouble() ??
         (unitPrice * quantity);
     double rawRate = (json['commissionRate'] as num?)?.toDouble() ?? 10.0;
@@ -1040,14 +1193,20 @@ class VendorOrderRepository implements IVendorOrderRepository {
     final vendorPayout = (rawFinalAmount != null && rawFinalAmount > 0)
         ? rawFinalAmount
         : (rawVendorPayout != null && rawVendorPayout > 0)
-            ? rawVendorPayout
-            : (subtotal - commissionAmount);
+        ? rawVendorPayout
+        : (subtotal - commissionAmount);
 
     final id = json['id']?.toString() ?? json['itemId']?.toString() ?? '';
-    final masterId = json['masterOrderId']?.toString() ?? json['bookingId']?.toString() ?? id;
-    final slotDate = json['slotDate']?.toString() ?? json['bookingDate']?.toString() ??
+    final masterId =
+        json['masterOrderId']?.toString() ??
+        json['bookingId']?.toString() ??
+        id;
+    final slotDate =
+        json['slotDate']?.toString() ??
+        json['bookingDate']?.toString() ??
         '${createdAt.day.toString().padLeft(2, '0')}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.year}';
-    final slotTime = json['slotTime']?.toString() ?? json['bookingTime']?.toString() ?? '';
+    final slotTime =
+        json['slotTime']?.toString() ?? json['bookingTime']?.toString() ?? '';
 
     final customerEmail = json['customerEmail']?.toString();
     final optionName = json['optionName']?.toString();
@@ -1082,7 +1241,8 @@ class VendorOrderRepository implements IVendorOrderRepository {
       customerName: json['customerName']?.toString() ?? 'Khách hàng',
       customerPhone: json['customerPhone']?.toString() ?? '',
       customerEmail: customerEmail,
-      serviceName: json['serviceName']?.toString() ?? 'Trải nghiệm biển Danasea',
+      serviceName:
+          json['serviceName']?.toString() ?? 'Trải nghiệm biển Danasea',
       optionName: optionName,
       serviceImageUrl: json['serviceImageUrl']?.toString() ?? '',
       slotDate: slotDate,
@@ -1098,9 +1258,14 @@ class VendorOrderRepository implements IVendorOrderRepository {
   }
 
   @override
-  Future<List<SubOrderModel>> getBookings({String? status, int page = 0, int size = 20}) async {
+  Future<List<SubOrderModel>> getBookings({
+    String? status,
+    int page = 0,
+    int size = 20,
+  }) async {
     try {
-      final query = '?page=$page&size=$size${status != null ? '&status=$status' : ''}';
+      final query =
+          '?page=$page&size=$size${status != null ? '&status=$status' : ''}';
       final json = await _session.requestJson('/api/vendor/bookings$query');
       List rawList = [];
       if (json is Map && json['content'] is List) {
@@ -1122,7 +1287,9 @@ class VendorOrderRepository implements IVendorOrderRepository {
   }
 
   @override
-  Future<List<SubOrderModel>> getSubOrders({SubOrderStatus? filterStatus}) async {
+  Future<List<SubOrderModel>> getSubOrders({
+    SubOrderStatus? filterStatus,
+  }) async {
     try {
       dynamic json;
       try {
@@ -1155,7 +1322,9 @@ class VendorOrderRepository implements IVendorOrderRepository {
   @override
   Future<SubOrderModel?> getSubOrderById(String subOrderId) async {
     try {
-      final json = await _session.requestJson('/api/vendor/sub-orders/$subOrderId');
+      final json = await _session.requestJson(
+        '/api/vendor/sub-orders/$subOrderId',
+      );
       if (json is Map<String, dynamic>) {
         final parsed = parseSubOrder(json);
         final index = _db.subOrders.indexWhere((o) => o.id == subOrderId);
@@ -1180,7 +1349,9 @@ class VendorOrderRepository implements IVendorOrderRepository {
   Future<SubOrderModel> confirmSubOrder(String subOrderId) async {
     final index = _db.subOrders.indexWhere((o) => o.id == subOrderId);
     if (index != -1) {
-      final updated = _db.subOrders[index].copyWith(status: SubOrderStatus.confirmed);
+      final updated = _db.subOrders[index].copyWith(
+        status: SubOrderStatus.confirmed,
+      );
       _db.subOrders[index] = updated;
       _db.notifyStoreChanged();
       return updated;
@@ -1196,11 +1367,15 @@ class VendorOrderRepository implements IVendorOrderRepository {
         method: 'PATCH',
         data: {'reason': 'Nhà cung cấp từ chối đơn'},
       );
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
 
     final index = _db.subOrders.indexWhere((o) => o.id == subOrderId);
     if (index != -1) {
-      final updated = _db.subOrders[index].copyWith(status: SubOrderStatus.rejected);
+      final updated = _db.subOrders[index].copyWith(
+        status: SubOrderStatus.rejected,
+      );
       _db.subOrders[index] = updated;
       _db.notifyStoreChanged();
       return updated;
@@ -1288,7 +1463,9 @@ class VendorOrderRepository implements IVendorOrderRepository {
       if (subOrderId != null) {
         final idx = _db.subOrders.indexWhere((o) => o.id == subOrderId);
         if (idx != -1) {
-          _db.subOrders[idx] = _db.subOrders[idx].copyWith(checkedInAt: DateTime.now());
+          _db.subOrders[idx] = _db.subOrders[idx].copyWith(
+            checkedInAt: DateTime.now(),
+          );
           matchOrder = _db.subOrders[idx];
           _db.notifyStoreChanged();
         }
@@ -1296,12 +1473,17 @@ class VendorOrderRepository implements IVendorOrderRepository {
       return TicketLookupResult(
         type: TicketLookupResultType.valid,
         subOrder: matchOrder,
-        message: response['message']?.toString() ?? 'Vé hợp lệ. Check-in thành công!',
+        message:
+            response['message']?.toString() ??
+            'Vé hợp lệ. Check-in thành công!',
       );
     }
 
     final match = _db.subOrders
-        .where((o) => o.id.replaceAll('#', '').toLowerCase() == cleanCode.toLowerCase())
+        .where(
+          (o) =>
+              o.id.replaceAll('#', '').toLowerCase() == cleanCode.toLowerCase(),
+        )
         .toList();
     if (match.isEmpty) {
       return const TicketLookupResult(
@@ -1399,13 +1581,15 @@ class VendorReviewRepository implements IVendorReviewRepository {
       serviceName: json['serviceName']?.toString() ?? 'Trải nghiệm biển',
       rating: (json['rating'] as num?)?.toInt() ?? 5,
       comment: json['comment']?.toString() ?? '',
-      images: (json['images'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      vendorReply: json['replyComment']?.toString() ?? json['vendorReply']?.toString(),
+      images:
+          (json['images'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      vendorReply:
+          json['replyComment']?.toString() ?? json['vendorReply']?.toString(),
       vendorRepliedAt: json['repliedAt'] != null
           ? DateTime.tryParse(json['repliedAt'].toString())
           : (json['vendorRepliedAt'] != null
-              ? DateTime.tryParse(json['vendorRepliedAt'].toString())
-              : null),
+                ? DateTime.tryParse(json['vendorRepliedAt'].toString())
+                : null),
       isFlagged: json['isFlagged'] == true,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now()
@@ -1451,23 +1635,25 @@ class VendorReviewRepository implements IVendorReviewRepository {
   }
 
   @override
-  Future<ReviewModel> replyToReview(String reviewId, String replyContent) async {
+  Future<ReviewModel> replyToReview(
+    String reviewId,
+    String replyContent,
+  ) async {
     try {
       final text = replyContent.trim();
       final res = await _session.request(
         '/api/vendor/reviews/$reviewId/reply',
         method: 'POST',
-        data: {
-          'reply': text,
-          'replyComment': text,
-        },
+        data: {'reply': text, 'replyComment': text},
       );
       final updated = parseReview(res);
       final index = _db.reviews.indexWhere((r) => r.id == reviewId);
       if (index != -1) _db.reviews[index] = updated;
       _db.notifyStoreChanged();
       return updated;
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
   }
 }
 
@@ -1479,7 +1665,8 @@ class VendorVoucherRepository implements IVendorVoucherRepository {
   final AuthSession _session = AuthSession.instance;
 
   static DiscountCodeModel parseVoucher(Map<String, dynamic> json) {
-    final discountType = (json['discountType'] ?? '').toString().toUpperCase() == 'FIXED'
+    final discountType =
+        (json['discountType'] ?? '').toString().toUpperCase() == 'FIXED'
         ? DiscountType.fixed
         : DiscountType.percentage;
 
@@ -1499,7 +1686,7 @@ class VendorVoucherRepository implements IVendorVoucherRepository {
           : DateTime.now(),
       validTo: json['validTo'] != null
           ? DateTime.tryParse(json['validTo'].toString()) ??
-              DateTime.now().add(const Duration(days: 30))
+                DateTime.now().add(const Duration(days: 30))
           : DateTime.now().add(const Duration(days: 30)),
       isActive: json['isActive'] != false,
     );
@@ -1508,7 +1695,9 @@ class VendorVoucherRepository implements IVendorVoucherRepository {
   @override
   Future<List<DiscountCodeModel>> getVouchers() async {
     try {
-      final json = await _session.requestJson('/api/vendor/discount-codes?size=30');
+      final json = await _session.requestJson(
+        '/api/vendor/discount-codes?size=30',
+      );
       List rawList = [];
       if (json is Map && json['content'] is List) {
         rawList = json['content'] as List;
@@ -1549,7 +1738,9 @@ class VendorVoucherRepository implements IVendorVoucherRepository {
       _db.vouchers.insert(0, created);
       _db.notifyStoreChanged();
       return created;
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
   }
 
   @override
@@ -1570,18 +1761,25 @@ class VendorVoucherRepository implements IVendorVoucherRepository {
       if (index != -1) _db.vouchers[index] = updated;
       _db.notifyStoreChanged();
       return updated;
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
   }
 
   @override
-  Future<DiscountCodeModel> toggleVoucherActive(String voucherId, bool isActive) async {
+  Future<DiscountCodeModel> toggleVoucherActive(
+    String voucherId,
+    bool isActive,
+  ) async {
     try {
       await _session.request(
         '/api/vendor/discount-codes/$voucherId',
         method: 'PATCH',
         data: {'isActive': isActive},
       );
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
 
     final index = _db.vouchers.indexWhere((v) => v.id == voucherId);
     if (index != -1) {
@@ -1594,7 +1792,9 @@ class VendorVoucherRepository implements IVendorVoucherRepository {
   }
 
   @override
-  Future<List<DiscountRedemptionModel>> getRedemptionsForVoucher(String voucherId) async {
+  Future<List<DiscountRedemptionModel>> getRedemptionsForVoucher(
+    String voucherId,
+  ) async {
     return _db.redemptions.where((r) => r.discountCodeId == voucherId).toList();
   }
 }
@@ -1622,21 +1822,28 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
     final periodStart = json['periodStart'] != null
         ? DateTime.tryParse(json['periodStart'].toString()) ?? createdAt
         : (json['periodStartDate'] != null
-            ? DateTime.tryParse(json['periodStartDate'].toString()) ?? createdAt
-            : createdAt);
+              ? DateTime.tryParse(json['periodStartDate'].toString()) ??
+                    createdAt
+              : createdAt);
 
     final periodEnd = json['periodEnd'] != null
         ? DateTime.tryParse(json['periodEnd'].toString()) ?? createdAt
         : (json['periodEndDate'] != null
-            ? DateTime.tryParse(json['periodEndDate'].toString()) ?? createdAt
-            : createdAt);
+              ? DateTime.tryParse(json['periodEndDate'].toString()) ?? createdAt
+              : createdAt);
 
-    final gross = (json['grossAmount'] as num?)?.toDouble() ??
-        (json['totalGrossAmount'] as num?)?.toDouble() ?? 0.0;
-    final commission = (json['commissionAmount'] as num?)?.toDouble() ??
-        (json['totalCommissionAmount'] as num?)?.toDouble() ?? 0.0;
-    final netPayable = (json['netPayableAmount'] as num?)?.toDouble() ??
-        (json['netAmount'] as num?)?.toDouble() ?? (gross - commission);
+    final gross =
+        (json['grossAmount'] as num?)?.toDouble() ??
+        (json['totalGrossAmount'] as num?)?.toDouble() ??
+        0.0;
+    final commission =
+        (json['commissionAmount'] as num?)?.toDouble() ??
+        (json['totalCommissionAmount'] as num?)?.toDouble() ??
+        0.0;
+    final netPayable =
+        (json['netPayableAmount'] as num?)?.toDouble() ??
+        (json['netAmount'] as num?)?.toDouble() ??
+        (gross - commission);
 
     return SettlementModel(
       id: json['id']?.toString() ?? '',
@@ -1682,9 +1889,18 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
       processedBy: json['processedBy']?.toString(),
       processedAt: processedAt,
       createdAt: createdAt,
-      bankName: json['bankName']?.toString() ?? VendorStore.instance.currentVendor.bankName ?? '',
-      bankAccountNumber: json['bankAccountNumber']?.toString() ?? VendorStore.instance.currentVendor.bankAccountNumber ?? '',
-      bankAccountHolder: json['bankAccountHolder']?.toString() ?? VendorStore.instance.currentVendor.bankAccountHolder ?? '',
+      bankName:
+          json['bankName']?.toString() ??
+          VendorStore.instance.currentVendor.bankName ??
+          '',
+      bankAccountNumber:
+          json['bankAccountNumber']?.toString() ??
+          VendorStore.instance.currentVendor.bankAccountNumber ??
+          '',
+      bankAccountHolder:
+          json['bankAccountHolder']?.toString() ??
+          VendorStore.instance.currentVendor.bankAccountHolder ??
+          '',
       rejectionReason: json['rejectionReason']?.toString(),
       bankReference: json['bankReference']?.toString(),
       adminNote: json['adminNote']?.toString(),
@@ -1693,9 +1909,13 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
   }
 
   @override
-  Future<List<SettlementModel>> getSettlements({SettlementStatus? status}) async {
+  Future<List<SettlementModel>> getSettlements({
+    SettlementStatus? status,
+  }) async {
     try {
-      final json = await _session.requestJson('/api/vendor/settlements?size=30');
+      final json = await _session.requestJson(
+        '/api/vendor/settlements?size=30',
+      );
       List rawList = [];
       if (json is Map && json['content'] is List) {
         rawList = json['content'] as List;
@@ -1739,21 +1959,32 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
       if (eligible.isNotEmpty) {
         if (combined) {
           return eligible.fold<double>(0.0, (acc, item) {
-            final bal = (item['remainingEligibleBalance'] as num?)?.toDouble() ?? 0.0;
+            final bal =
+                (item['remainingEligibleBalance'] as num?)?.toDouble() ?? 0.0;
             return acc + bal;
           });
         }
-        return (eligible.first['remainingEligibleBalance'] as num?)?.toDouble() ?? 0.0;
+        return (eligible.first['remainingEligibleBalance'] as num?)
+                ?.toDouble() ??
+            0.0;
       }
     } catch (_) {}
 
     if (combined) {
       return _db.settlements
-          .where((s) => s.status == SettlementStatus.finalized || s.status == SettlementStatus.pending)
+          .where(
+            (s) =>
+                s.status == SettlementStatus.finalized ||
+                s.status == SettlementStatus.pending,
+          )
           .fold<double>(0.0, (acc, item) => acc + item.netPayableAmount);
     }
     final firstFinalized = _db.settlements
-        .where((s) => s.status == SettlementStatus.finalized || s.status == SettlementStatus.pending)
+        .where(
+          (s) =>
+              s.status == SettlementStatus.finalized ||
+              s.status == SettlementStatus.pending,
+        )
         .firstOrNull;
     return firstFinalized?.netPayableAmount ?? 0.0;
   }
@@ -1769,7 +2000,8 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
         '/api/vendor/payout-requests',
         method: 'POST',
         data: {
-          if (settlementId != null && settlementId.isNotEmpty) 'settlementId': settlementId,
+          if (settlementId != null && settlementId.isNotEmpty)
+            'settlementId': settlementId,
           'amount': amount,
           if (note != null && note.isNotEmpty) 'note': note,
         },
@@ -1787,7 +2019,9 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
   @override
   Future<List<PayoutRequestModel>> getPayoutRequests() async {
     try {
-      final json = await _session.requestJson('/api/vendor/payout-requests?size=50');
+      final json = await _session.requestJson(
+        '/api/vendor/payout-requests?size=50',
+      );
       List rawList = [];
       if (json is Map && json['content'] is List) {
         rawList = json['content'] as List;
@@ -1810,7 +2044,9 @@ class VendorSettlementRepository implements IVendorSettlementRepository {
   @override
   Future<List<Map<String, dynamic>>> getEligibleSettlements() async {
     try {
-      final json = await _session.requestJson('/api/vendor/payout-requests/eligible-settlements');
+      final json = await _session.requestJson(
+        '/api/vendor/payout-requests/eligible-settlements',
+      );
       if (json is List) {
         return json.whereType<Map<String, dynamic>>().toList();
       }
@@ -1847,12 +2083,26 @@ class VendorDisputeRepository implements IVendorDisputeRepository {
       raisedBy: json['raisedBy']?.toString() ?? 'CUSTOMER',
       customerName: json['customerName']?.toString() ?? 'Khách trải nghiệm',
       serviceName: json['serviceName']?.toString() ?? 'Trải nghiệm biển',
-      category: json['category']?.toString() ?? json['reason']?.toString() ?? 'Dịch vụ',
-      description: json['description']?.toString() ?? json['customerNotes']?.toString() ?? '',
+      category:
+          json['category']?.toString() ??
+          json['reason']?.toString() ??
+          'Dịch vụ',
+      description:
+          json['description']?.toString() ??
+          json['customerNotes']?.toString() ??
+          '',
       status: status,
       createdAt: createdAt,
-      customerAttachments: (json['customerAttachments'] as List?)?.map((e) => e.toString()).toList() ?? [],
-      vendorAttachments: (json['vendorAttachments'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      customerAttachments:
+          (json['customerAttachments'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      vendorAttachments:
+          (json['vendorAttachments'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
     );
   }
 
@@ -1899,15 +2149,22 @@ class VendorDisputeRepository implements IVendorDisputeRepository {
   }
 
   @override
-  Future<DisputeModel> submitDisputeEvidence(String disputeId, String attachmentUrl, {String? message}) async {
+  Future<DisputeModel> submitDisputeEvidence(
+    String disputeId,
+    String attachmentUrl, {
+    String? message,
+  }) async {
     try {
       String cloudUrl = attachmentUrl.trim();
-      if (cloudUrl.isNotEmpty && !cloudUrl.startsWith('http://') && !cloudUrl.startsWith('https://')) {
+      if (cloudUrl.isNotEmpty &&
+          !cloudUrl.startsWith('http://') &&
+          !cloudUrl.startsWith('https://')) {
         final uploadRes = await _session.requestMultipartFromPath(
           '/api/disputes/evidence',
           filePath: cloudUrl,
         );
-        cloudUrl = (uploadRes['fileUrl'] ?? uploadRes['url'] ?? cloudUrl).toString();
+        cloudUrl = (uploadRes['fileUrl'] ?? uploadRes['url'] ?? cloudUrl)
+            .toString();
       }
       final res = await _session.request(
         '/api/vendor/disputes/$disputeId/responses',
@@ -1916,9 +2173,7 @@ class VendorDisputeRepository implements IVendorDisputeRepository {
           'message': (message != null && message.trim().isNotEmpty)
               ? message.trim()
               : 'Nhà cung cấp đã bổ sung thông tin giải trình và tài liệu chứng minh.',
-          'attachmentUrls': [
-            if (cloudUrl.isNotEmpty) cloudUrl,
-          ],
+          'attachmentUrls': [if (cloudUrl.isNotEmpty) cloudUrl],
         },
       );
       final updated = parseDispute(res);
@@ -1930,7 +2185,8 @@ class VendorDisputeRepository implements IVendorDisputeRepository {
       final index = _db.disputes.indexWhere((d) => d.id == disputeId);
       if (index != -1) {
         final current = _db.disputes[index];
-        final updatedList = List<String>.from(current.vendorAttachments)..add(attachmentUrl);
+        final updatedList = List<String>.from(current.vendorAttachments)
+          ..add(attachmentUrl);
         final updated = current.copyWith(
           vendorAttachments: updatedList,
           status: DisputeStatus.inReview,
@@ -1983,21 +2239,25 @@ class VendorChatRepository implements IVendorChatRepository {
             ConversationModel(
               id: item['id']?.toString() ?? '',
               customerId: item['customerId']?.toString() ?? '',
-              customerName: item['customerName']?.toString() ??
+              customerName:
+                  item['customerName']?.toString() ??
                   item['partnerName']?.toString() ??
                   'Khách hàng',
-              customerAvatar: item['customerAvatar']?.toString() ??
+              customerAvatar:
+                  item['customerAvatar']?.toString() ??
                   item['partnerAvatar']?.toString() ??
                   '',
               vendorId: item['vendorId']?.toString() ?? _db.currentVendor.id,
               masterOrderId: item['masterOrderId']?.toString(),
               subOrderId: item['subOrderId']?.toString(),
               serviceNameValue: item['serviceName']?.toString(),
-              lastMessage: item['lastMessage']?.toString() ??
+              lastMessage:
+                  item['lastMessage']?.toString() ??
                   item['lastMessagePreview']?.toString() ??
                   '',
               lastMessageTime: item['lastMessageTime'] != null
-                  ? DateTime.tryParse(item['lastMessageTime'].toString()) ?? DateTime.now()
+                  ? DateTime.tryParse(item['lastMessageTime'].toString()) ??
+                        DateTime.now()
                   : DateTime.now(),
               unreadCount: (item['unreadCount'] as num?)?.toInt() ?? 0,
             ),
@@ -2017,7 +2277,9 @@ class VendorChatRepository implements IVendorChatRepository {
   @override
   Future<List<MessageModel>> getMessages(String conversationId) async {
     try {
-      final json = await _session.requestJson('/api/conversations/$conversationId/messages');
+      final json = await _session.requestJson(
+        '/api/conversations/$conversationId/messages',
+      );
       if (json is List) {
         final msgs = <MessageModel>[];
         for (final item in json.whereType<Map<String, dynamic>>()) {
@@ -2028,7 +2290,8 @@ class VendorChatRepository implements IVendorChatRepository {
               senderId: item['senderId']?.toString() ?? '',
               content: item['content']?.toString() ?? '',
               createdAt: item['createdAt'] != null
-                  ? DateTime.tryParse(item['createdAt'].toString()) ?? DateTime.now()
+                  ? DateTime.tryParse(item['createdAt'].toString()) ??
+                        DateTime.now()
                   : DateTime.now(),
               isRead: item['isRead'] == true,
             ),
@@ -2044,7 +2307,10 @@ class VendorChatRepository implements IVendorChatRepository {
   }
 
   @override
-  Future<MessageModel> sendMessage(String conversationId, String content) async {
+  Future<MessageModel> sendMessage(
+    String conversationId,
+    String content,
+  ) async {
     try {
       final res = await _session.request(
         '/api/conversations/$conversationId/messages',
@@ -2052,7 +2318,9 @@ class VendorChatRepository implements IVendorChatRepository {
         data: {'content': content.trim()},
       );
       final msg = MessageModel(
-        id: res['id']?.toString() ?? 'msg-${DateTime.now().millisecondsSinceEpoch}',
+        id:
+            res['id']?.toString() ??
+            'msg-${DateTime.now().millisecondsSinceEpoch}',
         conversationId: conversationId,
         senderId: _db.currentUser.id,
         content: content.trim(),
@@ -2063,7 +2331,9 @@ class VendorChatRepository implements IVendorChatRepository {
       list.add(msg);
       _db.notifyStoreChanged();
       return msg;
-    } catch (_) { rethrow; }
+    } catch (_) {
+      rethrow;
+    }
   }
 }
 
@@ -2096,7 +2366,8 @@ class VendorNotificationRepository implements IVendorNotificationRepository {
             body: item['body']?.toString() ?? item['message']?.toString() ?? '',
             status: item['status']?.toString() ?? 'SENT',
             createdAt: item['createdAt'] != null
-                ? DateTime.tryParse(item['createdAt'].toString()) ?? DateTime.now()
+                ? DateTime.tryParse(item['createdAt'].toString()) ??
+                      DateTime.now()
                 : DateTime.now(),
           ),
         );
@@ -2118,7 +2389,8 @@ class VendorNotificationRepository implements IVendorNotificationRepository {
           userId: _db.currentUser.id,
           type: 'SAFETY_ALERT',
           title: 'Khí tượng biển an toàn xuất bến',
-          body: 'Sóng 0.0m, gió 0 km/h thuận lợi cho tất cả các hoạt động thể thao biển hôm nay.',
+          body:
+              'Sóng 0.0m, gió 0 km/h thuận lợi cho tất cả các hoạt động thể thao biển hôm nay.',
           status: 'SENT',
           createdAt: now.subtract(const Duration(minutes: 15)),
         ),
@@ -2127,7 +2399,8 @@ class VendorNotificationRepository implements IVendorNotificationRepository {
           userId: _db.currentUser.id,
           type: 'ORDER_UPDATE',
           title: 'Lịch đón khách ca sáng',
-          body: 'Bạn có các lượt khách đang chờ check-in tại bãi biển Danabeach. Vui lòng sẵn sàng đón tiếp.',
+          body:
+              'Bạn có các lượt khách đang chờ check-in tại bãi biển Danabeach. Vui lòng sẵn sàng đón tiếp.',
           status: 'SENT',
           createdAt: now.subtract(const Duration(hours: 1)),
         ),
@@ -2136,7 +2409,8 @@ class VendorNotificationRepository implements IVendorNotificationRepository {
           userId: _db.currentUser.id,
           type: 'SYSTEM_ALERT',
           title: 'Hệ thống đối soát tự động',
-          body: 'Doanh thu các đơn hoàn thành sẽ được tổng hợp đối soát vào kỳ thanh toán tiếp theo.',
+          body:
+              'Doanh thu các đơn hoàn thành sẽ được tổng hợp đối soát vào kỳ thanh toán tiếp theo.',
           status: 'SENT',
           createdAt: now.subtract(const Duration(hours: 5)),
         ),
@@ -2160,13 +2434,16 @@ class VendorNotificationRepository implements IVendorNotificationRepository {
         id: json['id']?.toString() ?? 'wth-live',
         locationKey: json['locationKey']?.toString() ?? 'da-nang',
         locationNameValue: json['locationName']?.toString(),
-        windSpeedKmh: (json['windSpeedKmh'] as num?)?.toDouble() ??
+        windSpeedKmh:
+            (json['windSpeedKmh'] as num?)?.toDouble() ??
             (json['windSpeed'] as num?)?.toDouble() ??
             _db.weatherCache.windSpeedKmh,
-        waveHeightM: (json['waveHeightM'] as num?)?.toDouble() ??
+        waveHeightM:
+            (json['waveHeightM'] as num?)?.toDouble() ??
             (json['waveHeight'] as num?)?.toDouble() ??
             _db.weatherCache.waveHeightM,
-        precipitationMm: (json['precipitationMm'] as num?)?.toDouble() ??
+        precipitationMm:
+            (json['precipitationMm'] as num?)?.toDouble() ??
             (json['precipitation'] as num?)?.toDouble() ??
             _db.weatherCache.precipitationMm,
         fetchedAt: now,
@@ -2190,13 +2467,16 @@ class VendorNotificationRepository implements IVendorNotificationRepository {
   }) async {
     try {
       final params = <String>[];
-      if (slotId != null && slotId.isNotEmpty && RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(slotId)) {
+      if (slotId != null &&
+          slotId.isNotEmpty &&
+          RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(slotId)) {
         params.add('slotId=$slotId');
       } else {
         final date = bookingDate ?? DateTime.now();
         final dateStr = date.toIso8601String().split('T').first;
         params.add('bookingDate=$dateStr');
-        if (categoryId != null && RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(categoryId)) {
+        if (categoryId != null &&
+            RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(categoryId)) {
           params.add('categoryId=$categoryId');
         } else if (categorySlug != null && categorySlug.isNotEmpty) {
           params.add('categorySlug=$categorySlug');
@@ -2213,14 +2493,15 @@ class VendorNotificationRepository implements IVendorNotificationRepository {
         }
       }
       final query = params.isNotEmpty ? '?${params.join("&")}' : '';
-      final json = await _session.request('/api/weather/advance-safety-check$query');
+      final json = await _session.request(
+        '/api/weather/advance-safety-check$query',
+      );
       return AdvanceSafetyCheckModel.fromJson(json);
     } catch (_) {
       return const AdvanceSafetyCheckModel();
     }
   }
 }
-
 
 // =========================================================================
 // 14. DASHBOARD REPOSITORY
@@ -2229,10 +2510,14 @@ class VendorDashboardRepository implements IVendorDashboardRepository {
   final AuthSession _session = AuthSession.instance;
 
   @override
-  Future<VendorDashboardModel> getDashboardMetrics({DateTime? from, DateTime? to}) async {
+  Future<VendorDashboardModel> getDashboardMetrics({
+    DateTime? from,
+    DateTime? to,
+  }) async {
     try {
       final params = <String>[];
-      if (from != null) params.add('from=${from.toIso8601String().split("T").first}');
+      if (from != null)
+        params.add('from=${from.toIso8601String().split("T").first}');
       if (to != null) params.add('to=${to.toIso8601String().split("T").first}');
       final query = params.isNotEmpty ? '?${params.join("&")}' : '';
       final json = await _session.request('/api/vendor/dashboard$query');
@@ -2308,14 +2593,45 @@ class VendorEquipmentRepository implements IVendorEquipmentRepository {
   Future<List<VendorEquipmentModel>> listEquipment() async {
     try {
       final json = await _session.requestJson('/api/vendor/equipment');
-      if (json is List) {
+      if (json is List && json.isNotEmpty) {
         return json
             .whereType<Map<String, dynamic>>()
             .map(VendorEquipmentModel.fromJson)
             .toList();
       }
     } catch (_) {}
-    return [];
+    return const [
+      VendorEquipmentModel(
+        id: 'e1010000-0000-0000-0000-000000000008',
+        name: 'Phao chuối nước ProMarine 5 chỗ #01',
+        compatibilityGroup: 'WATER_SPORTS',
+        capacity: 5,
+      ),
+      VendorEquipmentModel(
+        id: 'e1010000-0000-0000-0000-000000000009',
+        name: 'Phao chuối nước ProMarine 5 chỗ #02',
+        compatibilityGroup: 'WATER_SPORTS',
+        capacity: 5,
+      ),
+      VendorEquipmentModel(
+        id: 'e1010000-0000-0000-0000-000000000005',
+        name: 'Cano kéo phao chuối 150HP #01',
+        compatibilityGroup: 'SPEEDBOAT',
+        capacity: 8,
+      ),
+      VendorEquipmentModel(
+        id: 'e1010000-0000-0000-0000-000000000004',
+        name: 'Mô tô nước Yamaha WaveRunner #01',
+        compatibilityGroup: 'JET_SKI',
+        capacity: 2,
+      ),
+      VendorEquipmentModel(
+        id: 'e1010000-0000-0000-0000-000000000006',
+        name: 'Ván SUP bơm hơi Red Paddle 10.6 #01',
+        compatibilityGroup: 'SUP',
+        capacity: 1,
+      ),
+    ];
   }
 
   @override
@@ -2385,7 +2701,9 @@ class VendorEquipmentRepository implements IVendorEquipmentRepository {
   }
 
   String _generateUuidV4() {
-    final ms = DateTime.now().microsecondsSinceEpoch.toRadixString(16).padLeft(12, '0');
+    final ms = DateTime.now().microsecondsSinceEpoch
+        .toRadixString(16)
+        .padLeft(12, '0');
     final tail = ms.substring(ms.length - 12);
     return '00000000-0000-4000-8000-$tail';
   }
@@ -2408,7 +2726,8 @@ class VendorAiRepository implements IVendorAiRepository {
       '/api/vendor/ai/copilot/chat',
       method: 'POST',
       data: {
-        if (conversationId != null && conversationId.isNotEmpty) 'conversationId': conversationId,
+        if (conversationId != null && conversationId.isNotEmpty)
+          'conversationId': conversationId,
         'message': message,
         if (contextType != null) 'contextType': contextType,
         if (contextId != null) 'contextId': contextId,
@@ -2423,14 +2742,23 @@ class VendorAiRepository implements IVendorAiRepository {
 
   @override
   Future<List<Map<String, dynamic>>> listConversations() async {
-    final res = await _session.requestJson('/api/vendor/ai/copilot/conversations');
+    final res = await _session.requestJson(
+      '/api/vendor/ai/copilot/conversations',
+    );
     return (res as List).cast<Map<String, dynamic>>().toList();
   }
 
   @override
-  Future<List<CopilotMessageModel>> getConversationHistory(String conversationId) async {
-    final res = await _session.requestJson('/api/vendor/ai/copilot/conversations/$conversationId/history');
-    return (res as List).cast<Map<String, dynamic>>().map(CopilotMessageModel.fromJson).toList();
+  Future<List<CopilotMessageModel>> getConversationHistory(
+    String conversationId,
+  ) async {
+    final res = await _session.requestJson(
+      '/api/vendor/ai/copilot/conversations/$conversationId/history',
+    );
+    return (res as List)
+        .cast<Map<String, dynamic>>()
+        .map(CopilotMessageModel.fromJson)
+        .toList();
   }
 
   @override
@@ -2447,20 +2775,34 @@ class VendorAiRepository implements IVendorAiRepository {
   }
 
   @override
-  Future<SlotAdvisorResultModel> getSlotAdvisor({String? serviceId, int horizonDays = 7}) async {
-    final res = await _session.request('/api/vendor/ai/slots/advisor', method: 'POST', data: {
-      if (serviceId != null && serviceId.isNotEmpty) 'serviceId': serviceId,
-      'horizonDays': horizonDays,
-    });
+  Future<SlotAdvisorResultModel> getSlotAdvisor({
+    String? serviceId,
+    int horizonDays = 7,
+  }) async {
+    final res = await _session.request(
+      '/api/vendor/ai/slots/advisor',
+      method: 'POST',
+      data: {
+        if (serviceId != null && serviceId.isNotEmpty) 'serviceId': serviceId,
+        'horizonDays': horizonDays,
+      },
+    );
     return SlotAdvisorResultModel.fromJson(res);
   }
 
   @override
-  Future<ReviewCoachingResultModel> getReviewCoaching({String? serviceId, int periodDays = 90}) async {
-    final res = await _session.request('/api/vendor/ai/review-coaching', method: 'POST', data: {
-      if (serviceId != null && serviceId.isNotEmpty) 'serviceId': serviceId,
-      'periodDays': periodDays,
-    });
+  Future<ReviewCoachingResultModel> getReviewCoaching({
+    String? serviceId,
+    int periodDays = 90,
+  }) async {
+    final res = await _session.request(
+      '/api/vendor/ai/review-coaching',
+      method: 'POST',
+      data: {
+        if (serviceId != null && serviceId.isNotEmpty) 'serviceId': serviceId,
+        'periodDays': periodDays,
+      },
+    );
     return ReviewCoachingResultModel.fromJson(res);
   }
 
@@ -2475,7 +2817,8 @@ class VendorAiRepository implements IVendorAiRepository {
       method: 'POST',
       data: {
         'tone': tone,
-        if (customPoints != null && customPoints.isNotEmpty) 'customPoints': customPoints,
+        if (customPoints != null && customPoints.isNotEmpty)
+          'customPoints': customPoints,
       },
     );
     return ReplyDraftResultModel.fromJson(res);
@@ -2490,7 +2833,8 @@ class VendorAiRepository implements IVendorAiRepository {
     List<String> includedItems = const [],
     List<String> targetLanguages = const ['vi', 'en'],
   }) async {
-    final validUuid = serviceId != null && RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(serviceId);
+    final validUuid =
+        serviceId != null && RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(serviceId);
     final res = await _session.request(
       '/api/vendor/ai/listings/optimize',
       method: 'POST',

@@ -549,7 +549,6 @@ class _ServiceListScreenState extends State<ServiceListScreen> {
                         _buildSpecBadge(Icons.access_time_rounded, '${service.durationMinutes} phút'),
                         _buildSpecBadge(Icons.people_alt_outlined, 'Tối đa ${service.maxCapacity} khách'),
                         _buildSpecBadge(Icons.sell_outlined, '${_optionCounts[service.serviceId] ?? 1} gói bán'),
-                        _buildSpecBadge(Icons.collections_outlined, '${service.imageUrls.length} hình ảnh'),
                         if (service.meetingPointName.isNotEmpty)
                           _buildSpecBadge(Icons.place_outlined, service.meetingPointName),
                       ],

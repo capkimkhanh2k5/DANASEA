@@ -9,12 +9,11 @@ import '../../../../core/data/vendor_store.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/vendor_button.dart';
 import '../../../../core/widgets/toast_notification.dart';
+import '../../../../core/utils/display_code.dart';
 import 'sub_order_detail_screen.dart';
 
 class QrCheckinScreen extends StatefulWidget {
-  final String? initialLookupCode;
-
-  const QrCheckinScreen({super.key, this.initialLookupCode});
+  const QrCheckinScreen({super.key});
 
   @override
   State<QrCheckinScreen> createState() => _QrCheckinScreenState();
@@ -48,13 +47,6 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
     _laserAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
     );
-
-    if (widget.initialLookupCode != null &&
-        widget.initialLookupCode!.trim().isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _handleCode(widget.initialLookupCode!);
-      });
-    }
   }
 
   @override
@@ -137,21 +129,8 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
     return code.replaceAll('#', '').trim();
   }
 
-  String _formatShortCode(String raw) {
-    var c = raw.trim();
-    if (c.startsWith('#')) c = c.substring(1);
-    if (c.isEmpty) return '';
-    if (c.length <= 16) {
-      return '#$c';
-    }
-    if (c.contains('-')) {
-      final parts = c.split('-');
-      final first = parts.first;
-      final last = parts.last;
-      final suffix = last.length > 4 ? last.substring(last.length - 4) : last;
-      return '#$first...$suffix';
-    }
-    return '#${c.substring(0, 8)}...${c.substring(c.length - 4)}';
+  String _formatShortCode(String raw, {String prefix = 'SUB'}) {
+    return formatDisplayCodeWithHash(raw, prefix: prefix);
   }
 
   String _formatSlotTime(String t) {
@@ -433,43 +412,56 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.person, size: 15, color: AppColors.secondary),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    vendorOrders.first.customerName,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.onSurface,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.person, size: 15, color: AppColors.secondary),
+                                    const SizedBox(width: 6),
+                                    Flexible(
+                                      child: Text(
+                                        vendorOrders.first.customerName.isNotEmpty
+                                            ? vendorOrders.first.customerName
+                                            : 'Khách hàng',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.onSurface,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '(${vendorOrders.first.customerPhone})',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Mã đơn tổng: #${vendorOrders.first.masterOrderCode}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontFamily: 'monospace',
-                                  color: AppColors.tertiary,
-                                  fontWeight: FontWeight.bold,
+                                    if (vendorOrders.first.customerPhone.isNotEmpty) ...[
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '(${vendorOrders.first.customerPhone})',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Mã đơn tổng: ${_formatShortCode(vendorOrders.first.masterOrderCode.isNotEmpty ? vendorOrders.first.masterOrderCode : vendorOrders.first.masterOrderId, prefix: 'ORD')}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontFamily: 'monospace',
+                                    color: AppColors.tertiary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
@@ -1046,7 +1038,7 @@ class _QrCheckinScreenState extends State<QrCheckinScreen>
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${_formatShortCode(o.subOrderCode)} • ${o.serviceName}',
+                                      '${_formatShortCode(o.subOrderCode.isNotEmpty ? o.subOrderCode : o.id, prefix: 'SUB')} • ${o.serviceName}',
                                       style: const TextStyle(
                                         fontSize: 11.5,
                                         color: AppColors.tertiary,
