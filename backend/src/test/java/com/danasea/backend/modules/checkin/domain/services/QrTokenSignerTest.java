@@ -105,7 +105,9 @@ class QrTokenSignerTest {
         UUID subOrderId = UUID.randomUUID();
         OffsetDateTime expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusHours(3);
         String token = signer.generateToken(subOrderId, expiresAt);
-        String tampered = token.substring(0, token.length() - 2) + "ff";
+        char lastChar = token.charAt(token.length() - 1);
+        char tamperedChar = lastChar == 'f' ? '0' : 'f';
+        String tampered = token.substring(0, token.length() - 1) + tamperedChar;
 
         assertThatThrownBy(() -> signer.parsePayload(tampered))
                 .isInstanceOf(InvalidQrSignatureException.class);
