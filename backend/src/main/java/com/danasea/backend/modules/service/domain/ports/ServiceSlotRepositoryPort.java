@@ -3,6 +3,7 @@ package com.danasea.backend.modules.service.domain.ports;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,4 +41,18 @@ public interface ServiceSlotRepositoryPort {
     int getCommittedCountForUnit(UUID slotId, int unitNumber);
 
     boolean hasPrivateCommitmentForUnit(UUID slotId, int unitNumber);
+
+    boolean hasAnyBookingForService(UUID serviceId);
+
+    boolean hasActiveBookingOrHoldForOption(UUID slotId, UUID optionId);
+
+    void deleteByServiceId(UUID serviceId);
+
+    void saveSlotOptions(UUID slotId, List<UUID> optionIds);
+
+    void updateSlotOptions(UUID slotId, List<UUID> optionIds);
+
+    List<UUID> findOptionIdsBySlotId(UUID slotId);
+
+    Map<UUID, List<UUID>> findOptionIdsBySlotIds(List<UUID> slotIds);
 }

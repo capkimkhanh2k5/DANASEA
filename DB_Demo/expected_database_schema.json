@@ -1,5 +1,5 @@
 {
-  "reviewedMigrations": "V1-V59",
+  "reviewedMigrations": "V1-V61",
   "classification": {
     "ai_assessment_cases": "replace",
     "ai_chat_requests": "replace",
@@ -59,6 +59,7 @@
     "service_operating_schedules": "replace",
     "service_options": "replace",
     "service_safety_documents": "replace",
+    "service_slot_options": "replace",
     "service_slot_units": "replace",
     "service_slots": "replace",
     "services": "replace",
@@ -4277,6 +4278,30 @@
         ]
       },
       {
+        "name": "public.service_slot_options",
+        "kind": "r",
+        "columns": [
+          [
+            "slot_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "option_id",
+            "uuid",
+            true,
+            ""
+          ],
+          [
+            "created_at",
+            "timestamp with time zone",
+            true,
+            ""
+          ]
+        ]
+      },
+      {
         "name": "public.service_slot_units",
         "kind": "r",
         "columns": [
@@ -4404,6 +4429,12 @@
             "inventory_type",
             "character varying(50)",
             true,
+            ""
+          ],
+          [
+            "option_id",
+            "uuid",
+            false,
             ""
           ]
         ]
@@ -7028,6 +7059,32 @@
         "validated": true
       },
       {
+        "name": "service_slot_options_option_id_fkey",
+        "child": "public.service_slot_options",
+        "parent": "public.service_options",
+        "childcolumns": [
+          "option_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (option_id) REFERENCES service_options(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "service_slot_options_slot_id_fkey",
+        "child": "public.service_slot_options",
+        "parent": "public.service_slots",
+        "childcolumns": [
+          "slot_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (slot_id) REFERENCES service_slots(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
         "name": "service_slot_units_equipment_id_fkey",
         "child": "public.service_slot_units",
         "parent": "public.vendor_equipment",
@@ -7051,6 +7108,19 @@
           "id"
         ],
         "definition": "FOREIGN KEY (slot_id) REFERENCES service_slots(id) ON DELETE CASCADE",
+        "validated": true
+      },
+      {
+        "name": "fk_service_slots_option_id",
+        "child": "public.service_slots",
+        "parent": "public.service_options",
+        "childcolumns": [
+          "option_id"
+        ],
+        "parentcolumns": [
+          "id"
+        ],
+        "definition": "FOREIGN KEY (option_id) REFERENCES service_options(id) ON DELETE SET NULL",
         "validated": true
       },
       {

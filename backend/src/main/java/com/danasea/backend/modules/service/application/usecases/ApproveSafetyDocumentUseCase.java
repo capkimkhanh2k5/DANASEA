@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import com.danasea.backend.modules.service.domain.exceptions.CategoryNotFoundException;
+import com.danasea.backend.modules.service.domain.exceptions.InvalidDocumentStateException;
 import com.danasea.backend.modules.service.domain.exceptions.SafetyDocumentRequiredException;
 import com.danasea.backend.modules.service.domain.exceptions.ServiceNotFoundException;
 import com.danasea.backend.modules.service.domain.models.DocStatus;
@@ -25,6 +26,9 @@ public class ApproveSafetyDocumentUseCase {
 
     public ServiceSafetyDocumentJpaEntity approve(UUID serviceId, UUID documentId, UUID adminId) {
         var document = findDocument(serviceId, documentId);
+        if (document.getStatus() != DocStatus.PENDING) {
+            throw new InvalidDocumentStateException("Only PENDING documents can be approved, but document is " + document.getStatus());
+        }
 
         document.setStatus(DocStatus.APPROVED);
         document.setReviewedBy(adminId);
@@ -40,6 +44,9 @@ public class ApproveSafetyDocumentUseCase {
             UUID adminId,
             String rejectionReason) {
         var document = findDocument(serviceId, documentId);
+        if (document.getStatus() != DocStatus.PENDING) {
+            throw new InvalidDocumentStateException("Only PENDING documents can be rejected, but document is " + document.getStatus());
+        }
 
         document.setStatus(DocStatus.REJECTED);
         document.setReviewedBy(adminId);

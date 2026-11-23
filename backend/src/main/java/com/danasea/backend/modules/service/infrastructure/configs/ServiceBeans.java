@@ -19,7 +19,9 @@ import com.danasea.backend.modules.service.domain.ports.AuditLogPort;
 import com.danasea.backend.modules.service.domain.ports.CategoryRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceImageRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
+import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
+import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSafetyDocumentRepository;
 
 @Configuration
 public class ServiceBeans {
@@ -87,8 +89,10 @@ public class ServiceBeans {
     public DeleteServiceUseCase deleteServiceUseCase(
             ServiceRepositoryPort serviceRepository,
             ServiceImageRepositoryPort serviceImageRepository,
-            VendorPort vendorPort) {
-        return new DeleteServiceUseCase(serviceRepository, serviceImageRepository, vendorPort);
+            VendorPort vendorPort,
+            ServiceSlotRepositoryPort serviceSlotRepository,
+            JpaServiceSafetyDocumentRepository safetyDocumentRepository) {
+        return new DeleteServiceUseCase(serviceRepository, serviceImageRepository, vendorPort, serviceSlotRepository, safetyDocumentRepository);
     }
 
     @Bean

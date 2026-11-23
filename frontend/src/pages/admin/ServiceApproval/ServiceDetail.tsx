@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Anchor, Compass, FileCheck, FileText, History, ShieldCheck, Waves, Wind } from 'lucide-react';
 import type { ServiceStatus } from '../../../types';
 import { AdminBadge } from '../../../components/admin/AdminUI';
-import { AdminDisclosure } from '../../../components/admin/AdminWorkspace';
+import { AdminButton, AdminDisclosure, AdminNotice } from '../../../components/admin/AdminWorkspace';
+import { AdminDialog } from '../../../components/admin/AdminDialog';
 import { AdminDocumentPreviewModal } from '../../../components/admin/AdminDocumentPreviewModal';
 import type { ServiceRecord, ServiceReviewEvent } from './serviceApprovalModel';
 import { adminServiceApprovalService } from '../../../services/adminServiceApprovalService';
@@ -64,6 +65,11 @@ export function ServiceDetail({
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [docActionId, setDocActionId] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<{ url: string; title: string } | null>(null);
+  const [rejectDocTarget, setRejectDocTarget] = useState<SafetyDocumentResponse | null>(null);
+  const [rejectDocReason, setRejectDocReason] = useState('');
+  const [rejectDocError, setRejectDocError] = useState<string | null>(null);
+  const [isSubmittingDocReject, setIsSubmittingDocReject] = useState(false);
+  const [docNotice, setDocNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (demo || !service?.id) return;
@@ -87,24 +93,45 @@ export function ServiceDetail({
       setDocActionId(docId);
       const updated = await adminServiceApprovalService.approveSafetyDocument(service.id, docId);
       setSafetyDocs(prev => prev.map(d => d.id === docId ? updated : d));
-    } catch (e) {
+      setDocNotice('Đã phê duyệt chứng chỉ an toàn thành công.');
+    } catch (e: unknown) {
       console.error(e);
+      setDocNotice(e instanceof Error ? e.message : 'Phê duyệt chứng chỉ an toàn thất bại.');
     } finally {
       setDocActionId(null);
     }
   };
 
-  const handleRejectDoc = async (docId: string) => {
-    const reason = window.prompt('Nhập lý do từ chối chứng chỉ an toàn:') || '';
-    if (!reason.trim()) return;
+  const handleOpenRejectDocModal = (doc: SafetyDocumentResponse) => {
+    setRejectDocTarget(doc);
+    setRejectDocReason('');
+    setRejectDocError(null);
+  };
+
+  const handleConfirmRejectDoc = async () => {
+    if (!rejectDocTarget || !service?.id) return;
+    const trimmed = rejectDocReason.trim();
+    if (!trimmed) {
+      setRejectDocError('Vui lòng nhập lý do từ chối chứng chỉ an toàn.');
+      return;
+    }
+    if (trimmed.length > 255) {
+      setRejectDocError('Lý do từ chối không được vượt quá 255 ký tự.');
+      return;
+    }
+    setIsSubmittingDocReject(true);
+    setRejectDocError(null);
     try {
-      setDocActionId(docId);
-      const updated = await adminServiceApprovalService.rejectSafetyDocument(service.id, docId, reason.trim());
-      setSafetyDocs(prev => prev.map(d => d.id === docId ? updated : d));
-    } catch (e) {
-      console.error(e);
+      const updated = await adminServiceApprovalService.rejectSafetyDocument(service.id, rejectDocTarget.id, trimmed);
+      setSafetyDocs(prev => prev.map(d => d.id === rejectDocTarget.id ? updated : d));
+      setDocNotice('Đã từ chối chứng chỉ an toàn.');
+      setRejectDocTarget(null);
+      setRejectDocReason('');
+    } catch (e: unknown) {
+      console.error('[ServiceDetail] Lỗi từ chối chứng chỉ an toàn:', e);
+      setRejectDocError(e instanceof Error ? e.message : 'Từ chối chứng chỉ an toàn thất bại.');
     } finally {
-      setDocActionId(null);
+      setIsSubmittingDocReject(false);
     }
   };
 
@@ -223,6 +250,11 @@ export function ServiceDetail({
               <FileCheck size={16} /> Chứng chỉ an toàn biển ({safetyDocs.length})
             </strong>
           </div>
+          {docNotice && (
+            <div style={{ marginBottom: '10px' }}>
+              <AdminNotice message={docNotice} onDismiss={() => setDocNotice(null)} />
+            </div>
+          )}
           {loadingDocs ? (
             <p className="admin-detail-note">Đang tải danh sách chứng chỉ an toàn...</p>
           ) : safetyDocs.length === 0 ? (
@@ -284,7 +316,7 @@ export function ServiceDetail({
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <button
                           type="button"
-                          disabled={docActionId === doc.id}
+                          disabled={docActionId === doc.id || isSubmittingDocReject}
                           onClick={() => handleApproveDoc(doc.id)}
                           style={{
                             fontSize: '12px',
@@ -300,8 +332,8 @@ export function ServiceDetail({
                         </button>
                         <button
                           type="button"
-                          disabled={docActionId === doc.id}
-                          onClick={() => handleRejectDoc(doc.id)}
+                          disabled={docActionId === doc.id || isSubmittingDocReject}
+                          onClick={() => handleOpenRejectDocModal(doc)}
                           style={{
                             fontSize: '12px',
                             padding: '4px 8px',
@@ -479,6 +511,67 @@ export function ServiceDetail({
         title={previewDoc?.title || 'Chứng chỉ an toàn biển'}
         description="Hồ sơ chứng chỉ an toàn hàng hải khai báo cho dịch vụ"
       />
+
+      <AdminDialog
+        open={Boolean(rejectDocTarget)}
+        onClose={() => {
+          if (!isSubmittingDocReject) {
+            setRejectDocTarget(null);
+            setRejectDocError(null);
+          }
+        }}
+        title="Từ chối Chứng chỉ An toàn"
+        description="Lý do từ chối sẽ được lưu vào hồ sơ chứng chỉ và gửi thông báo phản hồi tới Đơn vị vận hành."
+        footer={
+          <>
+            <AdminButton
+              disabled={isSubmittingDocReject}
+              onClick={() => {
+                setRejectDocTarget(null);
+                setRejectDocError(null);
+              }}
+            >
+              Hủy
+            </AdminButton>
+            <AdminButton
+              variant="danger"
+              loading={isSubmittingDocReject}
+              disabled={isSubmittingDocReject || !rejectDocReason.trim() || rejectDocReason.trim().length > 255}
+              onClick={handleConfirmRejectDoc}
+            >
+              Xác nhận từ chối
+            </AdminButton>
+          </>
+        }
+      >
+        <div className="admin-services-confirm-dialog">
+          {rejectDocError && (
+            <div style={{ marginBottom: '12px', color: '#e11d48', fontSize: '13px', background: '#ffe4e6', padding: '8px 12px', borderRadius: '6px' }}>
+              {rejectDocError}
+            </div>
+          )}
+          <label className="admin-field">
+            <span>
+              Lý do từ chối <small>(bắt buộc, tối đa 255 ký tự)</small>
+            </span>
+            <textarea
+              value={rejectDocReason}
+              onChange={e => {
+                setRejectDocReason(e.target.value);
+                if (rejectDocError) setRejectDocError(null);
+              }}
+              maxLength={255}
+              rows={3}
+              placeholder="Nêu rõ lý do chứng chỉ không đạt yêu cầu (ví dụ: Giấy chứng nhận kiểm định đã hết hạn, ảnh chụp mờ không rõ số hiệu)..."
+              disabled={isSubmittingDocReject}
+              autoFocus
+            />
+            <span style={{ fontSize: '11px', color: '#64748b', display: 'block', textAlign: 'right', marginTop: '4px' }}>
+              {rejectDocReason.trim().length} / 255 ký tự
+            </span>
+          </label>
+        </div>
+      </AdminDialog>
     </div>
   );
 }

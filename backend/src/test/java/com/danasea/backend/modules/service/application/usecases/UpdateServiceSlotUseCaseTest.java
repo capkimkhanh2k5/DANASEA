@@ -14,6 +14,7 @@ import com.danasea.backend.modules.service.domain.models.Service;
 import com.danasea.backend.modules.service.domain.models.ServiceSlot;
 import com.danasea.backend.modules.service.domain.models.ServiceSlotUnit;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
+import com.danasea.backend.modules.service.domain.ports.ServiceOptionRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.ServiceSlotRepositoryPort;
 import com.danasea.backend.modules.service.domain.ports.VendorPort;
@@ -50,6 +51,9 @@ class UpdateServiceSlotUseCaseTest {
     @Mock
     private OperatingScheduleStore scheduleStore;
 
+    @Mock
+    private ServiceOptionRepositoryPort serviceOptionRepository;
+
     private UpdateServiceSlotUseCase useCase;
 
     private UUID userId;
@@ -62,7 +66,7 @@ class UpdateServiceSlotUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new UpdateServiceSlotUseCase(serviceRepository, serviceSlotRepository, vendorPort, scheduleStore);
+        useCase = new UpdateServiceSlotUseCase(serviceRepository, serviceSlotRepository, vendorPort, scheduleStore, serviceOptionRepository);
         userId = UUID.randomUUID();
         vendorId = UUID.randomUUID();
         serviceId = UUID.randomUUID();
@@ -234,5 +238,128 @@ class UpdateServiceSlotUseCaseTest {
                 .hasMessageContaining("Slot does not belong to the specified service");
 
         verify(serviceSlotRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("8. Cập nhật thêm Option cho Slot hợp lệ -> thành công và lưu liên kết")
+    void testUpdateSlot_AddOption_Succeeds() {
+        authorizeVendorAndService();
+        ServiceSlot slot = buildSlot(tomorrow, InventoryType.PERSON_LIMIT, 10, 0, SlotStatus.OPEN);
+        when(serviceSlotRepository.findByIdForUpdate(slotId)).thenReturn(Optional.of(slot));
+        when(serviceSlotRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UUID option1 = UUID.randomUUID();
+        UUID option2 = UUID.randomUUID();
+        com.danasea.backend.modules.service.domain.models.ServiceOption opt1 = com.danasea.backend.modules.service.domain.models.ServiceOption.builder()
+                .id(option1).serviceId(serviceId).name("Gói Chuẩn").optionType(com.danasea.backend.modules.service.domain.models.OptionType.SHARED)
+                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE).build();
+        com.danasea.backend.modules.service.domain.models.ServiceOption opt2 = com.danasea.backend.modules.service.domain.models.ServiceOption.builder()
+                .id(option2).serviceId(serviceId).name("Gói VIP").optionType(com.danasea.backend.modules.service.domain.models.OptionType.SHARED)
+                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE).build();
+
+        when(serviceOptionRepository.findById(option1)).thenReturn(Optional.of(opt1));
+        when(serviceOptionRepository.findById(option2)).thenReturn(Optional.of(opt2));
+        when(serviceSlotRepository.findOptionIdsBySlotId(slotId)).thenReturn(List.of(option1));
+
+        UpdateServiceSlotRequest request = new UpdateServiceSlotRequest(null, null, null, List.of(option1, option2));
+
+        ServiceSlotResponse response = useCase.execute(userId, serviceId, slotId, request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.options()).hasSize(2);
+        verify(serviceSlotRepository).updateSlotOptions(slotId, List.of(option1, option2));
+    }
+
+    @Test
+    @DisplayName("9. Bỏ Option khỏi Slot khi không có booking/hold nào -> thành công")
+    void testUpdateSlot_RemoveOptionWithoutBookings_Succeeds() {
+        authorizeVendorAndService();
+        ServiceSlot slot = buildSlot(tomorrow, InventoryType.PERSON_LIMIT, 10, 0, SlotStatus.OPEN);
+        when(serviceSlotRepository.findByIdForUpdate(slotId)).thenReturn(Optional.of(slot));
+        when(serviceSlotRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UUID option1 = UUID.randomUUID();
+        UUID option2 = UUID.randomUUID();
+        com.danasea.backend.modules.service.domain.models.ServiceOption opt1 = com.danasea.backend.modules.service.domain.models.ServiceOption.builder()
+                .id(option1).serviceId(serviceId).name("Gói Giữ Lại").optionType(com.danasea.backend.modules.service.domain.models.OptionType.SHARED)
+                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE).build();
+
+        when(serviceOptionRepository.findById(option1)).thenReturn(Optional.of(opt1));
+        when(serviceSlotRepository.findOptionIdsBySlotId(slotId)).thenReturn(List.of(option1, option2));
+        when(serviceSlotRepository.hasActiveBookingOrHoldForOption(slotId, option2)).thenReturn(false);
+
+        UpdateServiceSlotRequest request = new UpdateServiceSlotRequest(null, null, null, List.of(option1));
+
+        ServiceSlotResponse response = useCase.execute(userId, serviceId, slotId, request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.options()).hasSize(1);
+        verify(serviceSlotRepository).updateSlotOptions(slotId, List.of(option1));
+    }
+
+    @Test
+    @DisplayName("10. Bỏ Option khỏi Slot khi đang có booking/hold -> bị chặn với lỗi rõ ràng")
+    void testUpdateSlot_RemoveOptionWithActiveBooking_Fails() {
+        authorizeVendorAndService();
+        ServiceSlot slot = buildSlot(tomorrow, InventoryType.PERSON_LIMIT, 10, 0, SlotStatus.OPEN);
+        when(serviceSlotRepository.findByIdForUpdate(slotId)).thenReturn(Optional.of(slot));
+
+        UUID option1 = UUID.randomUUID();
+        UUID option2 = UUID.randomUUID();
+        com.danasea.backend.modules.service.domain.models.ServiceOption opt1 = com.danasea.backend.modules.service.domain.models.ServiceOption.builder()
+                .id(option1).serviceId(serviceId).name("Gói Giữ Lại").optionType(com.danasea.backend.modules.service.domain.models.OptionType.SHARED)
+                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE).build();
+
+        when(serviceOptionRepository.findById(option1)).thenReturn(Optional.of(opt1));
+        when(serviceSlotRepository.findOptionIdsBySlotId(slotId)).thenReturn(List.of(option1, option2));
+        when(serviceSlotRepository.hasActiveBookingOrHoldForOption(slotId, option2)).thenReturn(true);
+
+        UpdateServiceSlotRequest request = new UpdateServiceSlotRequest(null, null, null, List.of(option1));
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, slotId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot remove option " + option2 + " from slot because it has active bookings or holds");
+
+        verify(serviceSlotRepository, never()).updateSlotOptions(any(), any());
+    }
+
+    @Test
+    @DisplayName("11. Cập nhật gói rỗng optionIds=[] -> bị từ chối")
+    void testUpdateSlot_EmptyOptionIds_Fails() {
+        authorizeVendorAndService();
+        ServiceSlot slot = buildSlot(tomorrow, InventoryType.PERSON_LIMIT, 10, 0, SlotStatus.OPEN);
+        when(serviceSlotRepository.findByIdForUpdate(slotId)).thenReturn(Optional.of(slot));
+
+        UpdateServiceSlotRequest request = new UpdateServiceSlotRequest(null, null, null, List.of());
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, slotId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Slot must have at least one option assigned");
+
+        verify(serviceSlotRepository, never()).updateSlotOptions(any(), any());
+    }
+
+    @Test
+    @DisplayName("12. Gán Option PRIVATE cho ca PERSON_LIMIT -> bị từ chối")
+    void testUpdateSlot_PrivateOptionOnPersonLimit_Fails() {
+        authorizeVendorAndService();
+        ServiceSlot slot = buildSlot(tomorrow, InventoryType.PERSON_LIMIT, 10, 0, SlotStatus.OPEN);
+        when(serviceSlotRepository.findByIdForUpdate(slotId)).thenReturn(Optional.of(slot));
+
+        UUID privateOptId = UUID.randomUUID();
+        com.danasea.backend.modules.service.domain.models.ServiceOption privateOpt = com.danasea.backend.modules.service.domain.models.ServiceOption.builder()
+                .id(privateOptId).serviceId(serviceId).name("Thuê Nguyên Cano")
+                .optionType(com.danasea.backend.modules.service.domain.models.OptionType.PRIVATE)
+                .status(com.danasea.backend.modules.service.domain.models.OptionStatus.ACTIVE).build();
+
+        when(serviceOptionRepository.findById(privateOptId)).thenReturn(Optional.of(privateOpt));
+
+        UpdateServiceSlotRequest request = new UpdateServiceSlotRequest(null, null, null, List.of(privateOptId));
+
+        assertThatThrownBy(() -> useCase.execute(userId, serviceId, slotId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Private options require shared capacity units");
+
+        verify(serviceSlotRepository, never()).updateSlotOptions(any(), any());
     }
 }
