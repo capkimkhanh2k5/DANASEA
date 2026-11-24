@@ -5,7 +5,7 @@ import {
   Pin, 
   Trash2, 
   MoreVertical,
-  X
+  Paperclip
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from '../../../components/vendor/copilot/CopilotArtifactCard';
@@ -20,8 +20,6 @@ export function VendorCopilotPage() {
     messages,
     isLoading,
     isSessionsLoading,
-    attachedContext,
-    clearAttachedContext,
     loadConversations,
     selectConversation,
     startNewConversation,
@@ -162,15 +160,6 @@ export function VendorCopilotPage() {
           <div className="flex items-center gap-2.5">
             <span className="font-bold text-sm text-slate-900">DANASEA Copilot</span>
           </div>
-
-          {attachedContext && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-sky-50 rounded-lg border border-sky-200 text-xs text-sky-900">
-              <span className="font-medium">Ngữ cảnh: {attachedContext.label}</span>
-              <button onClick={clearAttachedContext} className="hover:text-sky-700 cursor-pointer">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Message Thread - Full Width Scroll Container with Flush Scrollbar */}
@@ -201,6 +190,13 @@ export function VendorCopilotPage() {
                         : 'bg-slate-50 border border-slate-200/90 text-slate-900 rounded-tl-xs shadow-2xs'
                     }`}
                   >
+                    {isUser && m.context && (
+                      <div className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/15 border border-white/20 text-sky-200 text-[11px] font-medium">
+                        <Paperclip className="w-3 h-3 text-sky-300 shrink-0" />
+                        <span className="truncate max-w-[240px]">{m.context.label}</span>
+                      </div>
+                    )}
+
                     {isUser ? (
                       <div className="whitespace-pre-wrap">{formatTextWithDisplayCodes(m.content)}</div>
                     ) : (
