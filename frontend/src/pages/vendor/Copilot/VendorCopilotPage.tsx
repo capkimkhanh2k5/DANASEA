@@ -5,10 +5,11 @@ import {
   Pin, 
   Trash2, 
   MoreVertical,
-  Paperclip
+  FileText
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from '../../../components/vendor/copilot/CopilotArtifactCard';
+import { ContextPreviewCard } from '../../../components/vendor/copilot/ContextPreviewCard';
 import { MarkdownText } from '../../../components/common/MarkdownText';
 import { VendorCopilotActionDeck } from '../../../components/vendor/copilot/VendorCopilotActionDeck';
 import { formatTextWithDisplayCodes } from '../../../utils/displayCode';
@@ -183,33 +184,56 @@ export function VendorCopilotPage() {
                   key={m.id}
                   className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                 >
-                  <div
-                    className={`max-w-[80%] rounded-2xl p-4 text-xs leading-relaxed ${
-                      isUser
-                        ? 'bg-slate-900 text-white rounded-tr-xs'
-                        : 'bg-slate-50 border border-slate-200/90 text-slate-900 rounded-tl-xs shadow-2xs'
-                    }`}
-                  >
+                  <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[85%]`}>
                     {isUser && m.context && (
-                      <div className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/15 border border-white/20 text-sky-200 text-[11px] font-medium">
-                        <Paperclip className="w-3 h-3 text-sky-300 shrink-0" />
-                        <span className="truncate max-w-[240px]">{m.context.label}</span>
+                      <div className="mb-2 self-end w-full flex justify-end">
+                        <ContextPreviewCard context={m.context} />
                       </div>
                     )}
 
-                    {isUser ? (
-                      <div className="whitespace-pre-wrap">{formatTextWithDisplayCodes(m.content)}</div>
-                    ) : (
-                      <MarkdownText content={m.content} />
-                    )}
-
-                    {!isUser && m.artifacts && m.artifacts.length > 0 && (
-                      <div className="flex flex-col gap-2 mt-3">
-                        {m.artifacts.map((art, aIdx) => (
-                          <CopilotArtifactCard key={aIdx} artifact={art} />
+                    {isUser && m.media && m.media.length > 0 && (
+                      <div className="mb-2 flex flex-wrap gap-2 justify-end">
+                        {m.media.map((med) => (
+                          <div key={med.id} className="rounded-xl overflow-hidden border border-slate-200/80 bg-slate-50 max-w-[200px] shadow-2xs">
+                            {med.type === 'image' && (med.previewUrl || med.url) ? (
+                              <img
+                                src={med.previewUrl || med.url}
+                                alt={med.name}
+                                className="w-full max-h-[140px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(med.url || med.previewUrl, '_blank')}
+                              />
+                            ) : (
+                              <div className="p-2 text-[11px] font-mono text-slate-700 truncate max-w-[160px] flex items-center gap-1.5">
+                                <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="truncate">{med.name}</span>
+                              </div>
+                            )}
+                          </div>
                         ))}
                       </div>
                     )}
+
+                    <div
+                      className={`w-full rounded-2xl p-4 text-xs leading-relaxed ${
+                        isUser
+                          ? 'bg-slate-900 text-white rounded-tr-xs'
+                          : 'bg-slate-50 border border-slate-200/90 text-slate-900 rounded-tl-xs shadow-2xs'
+                      }`}
+                    >
+                      {isUser ? (
+                        <div className="whitespace-pre-wrap">{formatTextWithDisplayCodes(m.content)}</div>
+                      ) : (
+                        <MarkdownText content={m.content} />
+                      )}
+
+                      {!isUser && m.artifacts && m.artifacts.length > 0 && (
+                        <div className="flex flex-col gap-2 mt-3">
+                          {m.artifacts.map((art, aIdx) => (
+                            <CopilotArtifactCard key={aIdx} artifact={art} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <span className="text-[10px] text-slate-400 mt-1 px-1 font-mono tabular-nums">
                     {new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}

@@ -9,10 +9,11 @@ import {
   Trash2, 
   MoreVertical,
   Plus,
-  Paperclip
+  FileText
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from './CopilotArtifactCard';
+import { ContextPreviewCard } from './ContextPreviewCard';
 import { MarkdownText } from '../../common/MarkdownText';
 import { VendorCopilotActionDeck } from './VendorCopilotActionDeck';
 import { formatTextWithDisplayCodes } from '../../../utils/displayCode';
@@ -252,14 +253,36 @@ export const VendorCopilotDrawer: React.FC = () => {
                 className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} animate-in fade-in duration-100`}
               >
                 {isUser ? (
-                  <div className="bg-sky-700 text-white rounded-xl rounded-tr-xs px-3.5 py-2.5 max-w-[85%] text-xs font-normal leading-relaxed shadow-xs">
+                  <div className="flex flex-col items-end max-w-[90%]">
                     {m.context && (
-                      <div className="mb-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/15 border border-white/20 text-sky-200 text-[10px] font-medium">
-                        <Paperclip className="w-2.5 h-2.5 text-sky-300 shrink-0" />
-                        <span className="truncate max-w-[180px]">{m.context.label}</span>
+                      <div className="mb-1.5 self-end w-full flex justify-end">
+                        <ContextPreviewCard context={m.context} />
                       </div>
                     )}
-                    <div>{formatTextWithDisplayCodes(m.content)}</div>
+                    {m.media && m.media.length > 0 && (
+                      <div className="mb-1.5 flex flex-wrap gap-1.5 justify-end">
+                        {m.media.map((med) => (
+                          <div key={med.id} className="rounded-lg overflow-hidden border border-slate-200/80 bg-slate-50 max-w-[160px] shadow-2xs">
+                            {med.type === 'image' && (med.previewUrl || med.url) ? (
+                              <img
+                                src={med.previewUrl || med.url}
+                                alt={med.name}
+                                className="w-full max-h-[110px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(med.url || med.previewUrl, '_blank')}
+                              />
+                            ) : (
+                              <div className="p-1.5 text-[10px] font-mono text-slate-700 truncate max-w-[130px] flex items-center gap-1">
+                                <FileText className="w-3 h-3 text-slate-400 shrink-0" />
+                                <span className="truncate">{med.name}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="w-full bg-sky-700 text-white rounded-xl rounded-tr-xs px-3.5 py-2.5 text-xs font-normal leading-relaxed shadow-xs">
+                      {formatTextWithDisplayCodes(m.content)}
+                    </div>
                   </div>
                 ) : (
                   <div className="bg-white border border-slate-200/90 text-slate-800 rounded-xl rounded-tl-xs px-3.5 py-2.5 max-w-[92%] text-xs leading-relaxed shadow-xs">

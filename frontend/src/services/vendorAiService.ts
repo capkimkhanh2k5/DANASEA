@@ -16,7 +16,7 @@ import type {
 export const vendorAiService = {
   /**
    * POST /api/vendor/ai/listings/optimize
-   * AI tối ưu hóa tiêu đề, mô tả chuẩn SEO, trang bị an toàn và đa ngữ cho Tour
+   * Gợi ý tiêu đề, mô tả, trang bị an toàn và đa ngữ cho Tour
    */
   async optimizeListing(req: OptimizeListingRequest): Promise<OptimizeListingResult> {
     const res = await apiClient.post<OptimizeListingResult>('/vendor/ai/listings/optimize', req);
