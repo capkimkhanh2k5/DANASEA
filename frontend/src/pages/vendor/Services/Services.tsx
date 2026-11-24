@@ -24,7 +24,8 @@ import {
   Star, 
   Package,
   AlertCircle,
-  MoreVertical
+  MoreVertical,
+  HelpCircle
 } from 'lucide-react';
 import { 
   AtlasPageHeader, 
@@ -55,6 +56,19 @@ export function Services() {
   // Three-dots action menu state
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
+
+  // Confirm dialog state (replaces native window.confirm)
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    confirmVariant?: 'primary' | 'danger' | 'warning';
+    onConfirm: () => void;
+  } | null>(null);
+
+  // Rejection reason viewing modal
+  const [rejectionModal, setRejectionModal] = useState<{ serviceName: string; reason: string } | null>(null);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -96,83 +110,111 @@ export function Services() {
   }, [loadData]);
 
   // Handle Submit for Review (DRAFT or REJECTED)
-  const handleSubmitForReview = async (service: VendorServiceDto) => {
+  const handleSubmitForReview = (service: VendorServiceDto) => {
     if (!service.images || service.images.length === 0) {
       toast.warning('Dịch vụ cần ít nhất 1 ảnh để gửi duyệt. Vui lòng mở chỉnh sửa dịch vụ và tải ảnh lên.');
       return;
     }
-    if (!window.confirm(`Bạn có chắc muốn gửi duyệt dịch vụ "${service.name}" tới Quản trị viên?`)) {
-      return;
-    }
-    setActionInProgressId(service.id);
-    try {
-      const updated = await vendorService.submitForReview(service.id);
-      setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
-      showToast(`Đã gửi duyệt thành công dịch vụ "${service.name}". Trạng thái chuyển thành Chờ duyệt.`);
-    } catch (err: unknown) {
-      console.error('[Services] Lỗi submit duyệt:', err);
-      const msg = extractErrorMessage(err, 'Không thể gửi duyệt dịch vụ');
-      toast.error(msg);
-    } finally {
-      setActionInProgressId(null);
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Gửi duyệt dịch vụ',
+      message: `Bạn có chắc muốn gửi duyệt dịch vụ "${service.name}" tới Quản trị viên để kiểm tra và mở bán?`,
+      confirmLabel: 'Gửi duyệt',
+      confirmVariant: 'primary',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setActionInProgressId(service.id);
+        try {
+          const updated = await vendorService.submitForReview(service.id);
+          setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
+          showToast(`Đã gửi duyệt thành công dịch vụ "${service.name}". Trạng thái chuyển thành Chờ duyệt.`);
+        } catch (err: unknown) {
+          console.error('[Services] Lỗi submit duyệt:', err);
+          const msg = extractErrorMessage(err, 'Không thể gửi duyệt dịch vụ');
+          toast.error(msg);
+        } finally {
+          setActionInProgressId(null);
+        }
+      }
+    });
   };
 
   // Handle Pause (PUBLISHED -> PAUSED)
-  const handlePauseService = async (service: VendorServiceDto) => {
-    if (!window.confirm(`Bạn có chắc muốn tạm ngưng nhận khách cho dịch vụ "${service.name}"?`)) {
-      return;
-    }
-    setActionInProgressId(service.id);
-    try {
-      const updated = await vendorService.pauseService(service.id);
-      setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
-      showToast(`Đã tạm ngưng dịch vụ "${service.name}".`);
-    } catch (err: unknown) {
-      console.error('[Services] Lỗi tạm ngưng:', err);
-      const msg = extractErrorMessage(err, 'Không thể tạm ngưng dịch vụ');
-      toast.error(msg);
-    } finally {
-      setActionInProgressId(null);
-    }
+  const handlePauseService = (service: VendorServiceDto) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Tạm ngưng nhận khách',
+      message: `Bạn có chắc muốn tạm ngưng nhận khách cho dịch vụ "${service.name}"? Dịch vụ sẽ tạm thời ẩn khỏi kết quả tìm kiếm của khách hàng.`,
+      confirmLabel: 'Tạm ngưng',
+      confirmVariant: 'warning',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setActionInProgressId(service.id);
+        try {
+          const updated = await vendorService.pauseService(service.id);
+          setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
+          showToast(`Đã tạm ngưng dịch vụ "${service.name}".`);
+        } catch (err: unknown) {
+          console.error('[Services] Lỗi tạm ngưng:', err);
+          const msg = extractErrorMessage(err, 'Không thể tạm ngưng dịch vụ');
+          toast.error(msg);
+        } finally {
+          setActionInProgressId(null);
+        }
+      }
+    });
   };
 
   // Handle Resume (PAUSED -> PUBLISHED)
-  const handleResumeService = async (service: VendorServiceDto) => {
-    if (!window.confirm(`Bạn có chắc muốn mở bán lại dịch vụ "${service.name}"?`)) {
-      return;
-    }
-    setActionInProgressId(service.id);
-    try {
-      const updated = await vendorService.resumeService(service.id);
-      setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
-      showToast(`Đã mở bán lại thành công dịch vụ "${service.name}".`);
-    } catch (err: unknown) {
-      console.error('[Services] Lỗi mở bán lại:', err);
-      const msg = extractErrorMessage(err, 'Không thể mở bán lại dịch vụ');
-      toast.error(msg);
-    } finally {
-      setActionInProgressId(null);
-    }
+  const handleResumeService = (service: VendorServiceDto) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Mở bán lại dịch vụ',
+      message: `Bạn có chắc muốn mở bán lại dịch vụ "${service.name}"? Dịch vụ sẽ hiển thị trở lại để khách hàng đặt chỗ.`,
+      confirmLabel: 'Mở bán lại',
+      confirmVariant: 'primary',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setActionInProgressId(service.id);
+        try {
+          const updated = await vendorService.resumeService(service.id);
+          setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
+          showToast(`Đã mở bán lại thành công dịch vụ "${service.name}".`);
+        } catch (err: unknown) {
+          console.error('[Services] Lỗi mở bán lại:', err);
+          const msg = extractErrorMessage(err, 'Không thể mở bán lại dịch vụ');
+          toast.error(msg);
+        } finally {
+          setActionInProgressId(null);
+        }
+      }
+    });
   };
 
   // Handle Delete (Only DRAFT or REJECTED)
-  const handleDeleteService = async (id: string, name: string) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa vĩnh viễn dịch vụ "${name}"? Thao tác này không thể hoàn tác.`)) {
-      return;
-    }
-    setActionInProgressId(id);
-    try {
-      await vendorService.deleteService(id);
-      setServices(prev => prev.filter(s => s.id !== id));
-      showToast(`Đã xóa vĩnh viễn dịch vụ "${name}".`);
-    } catch (err: unknown) {
-      console.error('[Services] Lỗi xóa dịch vụ:', err);
-      const msg = extractErrorMessage(err, 'Không thể xóa dịch vụ');
-      toast.error(msg);
-    } finally {
-      setActionInProgressId(null);
-    }
+  const handleDeleteService = (id: string, name: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Xóa vĩnh viễn dịch vụ',
+      message: `Bạn có chắc muốn xóa vĩnh viễn dịch vụ "${name}"? Toàn bộ ảnh, lựa chọn giá và dữ liệu liên quan sẽ bị xóa. Thao tác này không thể hoàn tác.`,
+      confirmLabel: 'Xóa vĩnh viễn',
+      confirmVariant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setActionInProgressId(id);
+        try {
+          await vendorService.deleteService(id);
+          setServices(prev => prev.filter(s => s.id !== id));
+          showToast(`Đã xóa vĩnh viễn dịch vụ "${name}".`);
+        } catch (err: unknown) {
+          console.error('[Services] Lỗi xóa dịch vụ:', err);
+          const msg = extractErrorMessage(err, 'Không thể xóa dịch vụ');
+          toast.error(msg);
+        } finally {
+          setActionInProgressId(null);
+        }
+      }
+    });
   };
 
   // Quick Price Edit
@@ -184,26 +226,39 @@ export function Services() {
       return;
     }
 
+    const executePriceUpdate = async () => {
+      if (!editingService) return;
+      setActionInProgressId(editingService.id);
+      try {
+        const updated = await vendorService.updateService(editingService.id, { price: newPrice });
+        setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
+        showToast(`Đã cập nhật giá mới: ${newPrice.toLocaleString('vi-VN')} đ cho "${editingService.name}"`);
+        setEditingService(null);
+      } catch (err: unknown) {
+        console.error('[Services] Lỗi sửa giá nhanh:', err);
+        const msg = extractErrorMessage(err, 'Cập nhật giá thất bại');
+        toast.error(msg);
+      } finally {
+        setActionInProgressId(null);
+      }
+    };
+
     if (editingService.status === 'PUBLISHED') {
-      const confirmWarning = window.confirm(
-        'LƯU Ý: Dịch vụ đang mở bán (PUBLISHED). Khi chỉnh sửa giá, Backend sẽ tự động chuyển trạng thái về "Chờ duyệt" (PENDING_REVIEW) để Admin kiểm duyệt lại.\n\nBạn có chắc muốn tiếp tục?'
-      );
-      if (!confirmWarning) return;
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Cập nhật giá dịch vụ đang mở bán',
+        message: 'Dịch vụ đang mở bán (PUBLISHED). Khi chỉnh sửa giá, hệ thống sẽ tự động chuyển trạng thái về "Chờ duyệt" (PENDING_REVIEW) để Admin kiểm duyệt lại. Bạn có chắc muốn tiếp tục?',
+        confirmLabel: 'Tiếp tục & Gửi duyệt',
+        confirmVariant: 'warning',
+        onConfirm: () => {
+          setConfirmDialog(null);
+          executePriceUpdate();
+        }
+      });
+      return;
     }
 
-    setActionInProgressId(editingService.id);
-    try {
-      const updated = await vendorService.updateService(editingService.id, { price: newPrice });
-      setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
-      showToast(`Đã cập nhật giá mới: ${newPrice.toLocaleString('vi-VN')} đ cho "${editingService.name}"`);
-      setEditingService(null);
-    } catch (err: unknown) {
-      console.error('[Services] Lỗi sửa giá nhanh:', err);
-      const msg = extractErrorMessage(err, 'Cập nhật giá thất bại');
-      toast.error(msg);
-    } finally {
-      setActionInProgressId(null);
-    }
+    await executePriceUpdate();
   };
 
   // Category map helper for defensive display
@@ -256,7 +311,7 @@ export function Services() {
   const draftCount = services.filter(s => s.status === 'DRAFT').length;
   const pausedCount = services.filter(s => s.status === 'PAUSED').length;
 
-  const renderStatusBadge = (status: ServiceStatus, reason?: string) => {
+  const renderStatusBadge = (status: ServiceStatus, reason?: string, serviceName?: string) => {
     switch (status) {
       case 'PUBLISHED':
         return <AtlasBadge label="Đang mở bán" variant="success" />;
@@ -266,12 +321,20 @@ export function Services() {
         return <AtlasBadge label="Đã duyệt" variant="info" />;
       case 'REJECTED':
         return (
-          <div className="flex flex-col items-center gap-0.5">
+          <div className="inline-flex items-center gap-1.5 justify-center">
             <AtlasBadge label="Bị từ chối" variant="danger" />
             {reason && (
-              <span className="text-xs text-rose-600 max-w-[130px] truncate" title={reason}>
-                {reason}
-              </span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRejectionModal({ serviceName: serviceName || 'Dịch vụ', reason });
+                }}
+                className="w-5 h-5 rounded-md inline-flex items-center justify-center text-rose-600 hover:bg-rose-100 hover:text-rose-700 transition-colors cursor-pointer"
+                title="Bấm để xem lý do từ chối"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+              </button>
             )}
           </div>
         );
@@ -404,15 +467,15 @@ export function Services() {
         <div className="overflow-x-auto scrollbar-thin min-h-[360px]">
           <table className="w-full text-left text-sm border-collapse table-auto">
             <thead>
-              <tr className="bg-[#f8f9fa] text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200/80">
-                <th className="py-3.5 px-4">TÊN DỊCH VỤ &amp; TRẢI NGHIỆM</th>
-                <th className="py-3.5 px-4 w-[130px]">DANH MỤC</th>
-                <th className="py-3.5 px-4 text-right w-[130px]">ĐƠN GIÁ</th>
-                <th className="py-3.5 px-4 w-[120px]">THỜI LƯỢNG</th>
-                <th className="py-3.5 px-4 w-[130px]">SỨC CHỨA / CA</th>
-                <th className="py-3.5 px-4 text-center w-[110px]">ĐÁNH GIÁ</th>
-                <th className="py-3.5 px-4 text-center w-[130px]">TRẠNG THÁI</th>
-                <th className="py-3.5 px-4 text-center w-[90px]">THAO TÁC</th>
+              <tr className="bg-[#f8f9fa] text-slate-600 text-xs font-semibold border-b border-slate-200/80">
+                <th className="py-3.5 px-4">Tên dịch vụ &amp; trải nghiệm</th>
+                <th className="py-3.5 px-4 w-[130px]">Danh mục</th>
+                <th className="py-3.5 px-4 text-right w-[130px]">Đơn giá</th>
+                <th className="py-3.5 px-4 w-[120px]">Thời lượng</th>
+                <th className="py-3.5 px-4 w-[130px]">Sức chứa / ca</th>
+                <th className="py-3.5 px-4 text-center w-[110px]">Đánh giá</th>
+                <th className="py-3.5 px-4 text-center w-[130px]">Trạng thái</th>
+                <th className="py-3.5 px-4 text-center w-[90px]">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -536,7 +599,7 @@ export function Services() {
 
                       {/* Status */}
                       <td className="py-3.5 px-4 text-center">
-                        {renderStatusBadge(service.status, service.rejectionReason || undefined)}
+                        {renderStatusBadge(service.status, service.rejectionReason || undefined, service.name)}
                       </td>
 
                       {/* Actions */}
@@ -719,7 +782,7 @@ export function Services() {
                   Lưu ý: Sửa giá dịch vụ đang mở bán sẽ chuyển trạng thái về &quot;Chờ duyệt&quot; theo quy định an toàn của sàn.
                 </p>
               )}
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                 Đơn giá mới (VNĐ):
               </label>
               <input
@@ -748,6 +811,88 @@ export function Services() {
                 disabled={actionInProgressId === editingService.id}
               >
                 {actionInProgressId === editingService.id ? 'Đang lưu...' : 'Lưu đơn giá'}
+              </AtlasButton>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Confirmation Dialog (replaces native window.confirm) */}
+      {confirmDialog && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200/90 w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="font-bold text-base text-slate-900 font-display">{confirmDialog.title}</h3>
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed font-normal">
+              {confirmDialog.message}
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <AtlasButton
+                variant="outline"
+                size="sm"
+                onClick={() => setConfirmDialog(null)}
+              >
+                Hủy bỏ
+              </AtlasButton>
+              <AtlasButton
+                variant={confirmDialog.confirmVariant === 'danger' ? 'danger' : 'primary'}
+                size="sm"
+                onClick={confirmDialog.onConfirm}
+              >
+                {confirmDialog.confirmLabel}
+              </AtlasButton>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Rejection Reason Modal */}
+      {rejectionModal && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200/90 w-full max-w-md p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-rose-600">
+                <AlertCircle className="w-5 h-5 shrink-0" />
+                <h3 className="font-bold text-base text-slate-900 font-display">Lý do từ chối duyệt</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRejectionModal(null)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs text-slate-500 font-medium">Dịch vụ: <span className="text-slate-800 font-semibold">{rejectionModal.serviceName}</span></p>
+              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200/80 text-rose-900 text-xs leading-relaxed font-medium">
+                {rejectionModal.reason}
+              </div>
+              <p className="text-[11px] text-slate-500 italic">
+                Vui lòng cập nhật lại thông tin hoặc chứng từ theo yêu cầu rồi bấm &quot;Gửi duyệt&quot; lại.
+              </p>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <AtlasButton
+                variant="outline"
+                size="sm"
+                onClick={() => setRejectionModal(null)}
+              >
+                Đã hiểu
               </AtlasButton>
             </div>
           </div>

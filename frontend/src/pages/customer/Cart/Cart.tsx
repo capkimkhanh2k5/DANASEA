@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { BookingStepper } from "../../../components/customer/BookingStepper";
-import { useCartStore } from "../../../store/useCartStore";
+import { useCartStore, isCartItemExpired } from "../../../store/useCartStore";
 import { useLanguageStore } from "../../../store/useLanguageStore";
 import {
   ShoppingCart,
@@ -12,16 +12,23 @@ import {
   ShieldCheck,
   ArrowRight,
   BadgeCheck,
+  AlertTriangle,
+  AlertCircle,
+  CalendarX2,
 } from "lucide-react";
 
 export function Cart() {
   const navigate = useNavigate();
   const { language } = useLanguageStore();
   const isEn = language === 'en';
-  const { items, removeItem, updateQuantity, getTotalPrice } = useCartStore();
+  const { items, removeItem, removeExpiredItems, updateQuantity, getTotalPrice } = useCartStore();
+
+  const expiredItems = items.filter(isCartItemExpired);
+  const hasExpiredItems = expiredItems.length > 0;
+  const validItems = items.filter((item) => !isCartItemExpired(item));
 
   const handleCheckout = () => {
-    if (items.length > 0) {
+    if (items.length > 0 && !hasExpiredItems) {
       navigate('/checkout');
     }
   };
@@ -44,9 +51,44 @@ export function Cart() {
                   {isEn ? "Your Cart" : "Giỏ hàng của bạn"}
                 </h1>
                 <p className="text-sm text-slate-600 mt-1">
-                  {items.length} {isEn ? "experiences ready to reserve" : "trải nghiệm đã sẵn sàng để giữ chỗ"}
+                  {items.length} {isEn ? "experiences in cart" : "trải nghiệm trong giỏ hàng"}
+                  {validItems.length > 0 && validItems.length !== items.length && (
+                    <span className="text-emerald-700 font-semibold ml-1">
+                      ({validItems.length} {isEn ? "ready to reserve" : "hợp lệ sẵn sàng giữ chỗ"})
+                    </span>
+                  )}
                 </p>
               </div>
+
+              {/* Expired Items Alert Banner */}
+              {hasExpiredItems && (
+                <div className="p-4 rounded-2xl bg-rose-50/90 border border-rose-200/90 text-rose-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-150">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center text-rose-700 shrink-0 mt-0.5 sm:mt-0">
+                      <AlertTriangle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs sm:text-sm font-bold text-rose-900">
+                        {isEn ? "Some experiences have passed departure time" : `Có ${expiredItems.length} trải nghiệm đã qua thời gian khởi hành`}
+                      </h4>
+                      <p className="text-xs text-rose-700 mt-0.5">
+                        {isEn
+                          ? "Please remove expired items or select a new departure slot to proceed to checkout."
+                          : "Vui lòng xóa các mục đã hết hạn hoặc chọn lại ca mới để tiếp tục đặt chỗ."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={removeExpiredItems}
+                    className="px-3 py-1.5 rounded-xl bg-rose-700 hover:bg-rose-800 text-white text-xs font-semibold shrink-0 cursor-pointer transition-colors shadow-2xs self-start sm:self-auto flex items-center gap-1.5"
+                  >
+                    <CalendarX2 className="w-3.5 h-3.5" />
+                    <span>{isEn ? "Remove expired items" : "Xóa các mục đã hết hạn"}</span>
+                  </button>
+                </div>
+              )}
 
               {items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-slate-200/80 shadow-xs text-center px-4">
@@ -71,6 +113,7 @@ export function Cart() {
                 </div>
               ) : (
                 items.map((item) => {
+                  const isExpired = isCartItemExpired(item);
                   const title = (isEn && item.serviceNameEn) ? item.serviceNameEn : (item.serviceName || (isEn ? 'Da Nang Ocean Experience' : 'Trải nghiệm biển Đà Nẵng'));
                   const image = item.thumbnailUrl || 'https://images.unsplash.com/photo-1502680390469-be75c86b636f?w=800';
                   const location = item.locationName || 'Đà Nẵng';
@@ -81,11 +124,23 @@ export function Cart() {
                   return (
                     <article 
                       key={item.id} 
-                      className="p-5 rounded-2xl bg-white shadow-xs hover:shadow-md transition-shadow relative overflow-hidden flex flex-col sm:flex-row gap-5 border border-slate-200/80"
+                      className={`p-5 rounded-2xl bg-white shadow-xs transition-shadow relative overflow-hidden flex flex-col sm:flex-row gap-5 border ${
+                        isExpired
+                          ? 'border-rose-200/90 bg-rose-50/20'
+                          : 'border-slate-200/80 hover:shadow-md'
+                      }`}
                     >
                       {/* Photo Thumbnail */}
                       <div className="w-full sm:w-48 h-36 rounded-xl overflow-hidden shrink-0 relative bg-slate-100">
-                        <img className="w-full h-full object-cover" alt={title} src={image} />
+                        <img className={`w-full h-full object-cover ${isExpired ? 'grayscale-40 opacity-90' : ''}`} alt={title} src={image} />
+                        {isExpired && (
+                          <div className="absolute inset-0 bg-slate-900/30 flex items-center justify-center p-2 text-center">
+                            <span className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-[11px] font-bold shadow-md flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              {isEn ? "Expired slot" : "Đã qua giờ"}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Content Details */}
@@ -96,15 +151,24 @@ export function Cart() {
                               <BadgeCheck className="w-4 h-4 text-sky-600 shrink-0" />
                               <span className="font-semibold text-slate-800 truncate">{vendor}</span>
                             </div>
-                            <button 
-                              onClick={() => removeItem(item.id)} 
-                              aria-label={isEn ? "Remove item" : "Xoá mục trải nghiệm"} 
-                              title={isEn ? "Remove from cart" : "Xoá khỏi giỏ"}
-                              className="text-slate-400 hover:text-rose-600 transition-colors p-1 cursor-pointer" 
-                              type="button"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+
+                            <div className="flex items-center gap-2">
+                              {isExpired && (
+                                <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[11px] font-semibold border border-rose-200 flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3" />
+                                  {isEn ? "Past departure" : "Quá giờ khởi hành"}
+                                </span>
+                              )}
+                              <button 
+                                onClick={() => removeItem(item.id)} 
+                                aria-label={isEn ? "Remove item" : "Xoá mục trải nghiệm"} 
+                                title={isEn ? "Remove from cart" : "Xoá khỏi giỏ"}
+                                className="text-slate-400 hover:text-rose-600 transition-colors p-1 cursor-pointer" 
+                                type="button"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                           
                           <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-snug line-clamp-2">
@@ -113,8 +177,8 @@ export function Cart() {
                         </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-600">
-                          <div className="flex items-center gap-1.5 truncate">
-                            <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <div className={`flex items-center gap-1.5 truncate ${isExpired ? 'text-rose-600 font-semibold' : ''}`}>
+                            <Clock className={`w-3.5 h-3.5 shrink-0 ${isExpired ? 'text-rose-500' : 'text-slate-400'}`} />
                             <span className="truncate">{timeStr}, {dateStr}</span>
                           </div>
                           <div className="flex items-center gap-1.5 truncate">
@@ -131,7 +195,7 @@ export function Cart() {
                               <button
                                 type="button"
                                 onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                disabled={item.quantity <= 1}
+                                disabled={isExpired || item.quantity <= 1}
                                 className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
                               >
                                 <Minus className="w-3.5 h-3.5" />
@@ -140,7 +204,8 @@ export function Cart() {
                               <button
                                 type="button"
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                                disabled={isExpired}
+                                className="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
                               >
                                 <Plus className="w-3.5 h-3.5" />
                               </button>
@@ -148,14 +213,18 @@ export function Cart() {
                             
                             <Link 
                               to={`/tour/${item.serviceId}?editCartItemId=${item.id}`} 
-                              className="text-xs text-slate-600 hover:text-slate-900 hover:underline font-medium"
+                              className={`text-xs font-semibold hover:underline ${
+                                isExpired ? 'text-rose-600 hover:text-rose-800' : 'text-slate-600 hover:text-slate-900'
+                              }`}
                             >
-                              {isEn ? "View details" : "Xem lại chi tiết"}
+                              {isExpired 
+                                ? (isEn ? "Reschedule new slot" : "Chọn lại ca khởi hành mới") 
+                                : (isEn ? "View details" : "Xem lại chi tiết")}
                             </Link>
                           </div>
 
                           <div className="flex items-baseline gap-1 text-right">
-                            <span className="text-base sm:text-lg text-slate-900 font-bold tabular-nums">
+                            <span className={`text-base sm:text-lg font-bold tabular-nums ${isExpired ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                               {(item.quantity * item.unitPrice).toLocaleString('vi-VN')}₫
                             </span>
                           </div>
@@ -293,16 +362,26 @@ export function Cart() {
                 {/* Primary CTA - Ocean Blue DANASEA Button */}
                 <button 
                   onClick={handleCheckout} 
-                  disabled={items.length === 0}
+                  disabled={items.length === 0 || hasExpiredItems}
                   className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center transition-colors cursor-pointer ${
-                    items.length > 0 
+                    items.length > 0 && !hasExpiredItems
                       ? 'bg-[#0284c7] hover:bg-[#0369a1] text-white active:scale-95 shadow-xs' 
-                      : 'bg-slate-100 text-slate-600 border border-slate-300 cursor-not-allowed'
+                      : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
                   }`} 
                   type="button"
                 >
-                  {isEn ? "Proceed to Checkout" : "Tiến hành thanh toán"}
+                  {hasExpiredItems
+                    ? (isEn ? "Resolve expired items to proceed" : "Xử lý ca hết hạn để tiếp tục")
+                    : (isEn ? "Proceed to Checkout" : "Tiến hành thanh toán")}
                 </button>
+
+                {hasExpiredItems && (
+                  <p className="text-[11px] text-rose-600 text-center font-medium leading-normal">
+                    {isEn
+                      ? "Cart has experiences with past departure times. Remove or change slot to checkout."
+                      : "Giỏ hàng có trải nghiệm đã qua giờ khởi hành. Hãy xóa hoặc chọn lại ca mới để thanh toán."}
+                  </p>
+                )}
               </div>
             </aside>
           </div>

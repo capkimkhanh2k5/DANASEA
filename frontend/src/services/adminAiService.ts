@@ -1,5 +1,6 @@
 import axios, { type AxiosRequestConfig } from 'axios';
 import { apiClient } from './apiClient';
+import { translateDisplayCodesToUuids, resolveDisplayCodeToUuid } from '../utils/displayCode';
 import type {
   DisputeArbitrationResult,
   DisputeSummary,
@@ -95,9 +96,14 @@ export class AdminAiService {
     const config: AxiosRequestConfig = {
       timeout: AI_TIMEOUT_CONFIG.COPILOT_CHAT_MS,
     };
+    const effectivePayload: CopilotChatRequestDto = {
+      ...payload,
+      message: translateDisplayCodesToUuids(payload.message),
+      contextId: payload.contextId ? resolveDisplayCodeToUuid(payload.contextId) : payload.contextId,
+    };
     const response = await apiClient.post<CopilotChatResponse>(
       '/admin/ai/copilot/chat',
-      payload,
+      effectivePayload,
       config
     );
     return response.data;

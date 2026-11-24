@@ -6,6 +6,7 @@ import { Home } from "./pages/customer/Home";
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import { ToastContainer } from "./components/common/ToastContainer";
 import { SessionBridge } from "./components/common/SessionBridge";
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
 
 // Lazy-loaded layouts & routes to keep the initial Homepage bundle small and fast
 const VendorLayout = lazy(() => import("./layouts/VendorLayout").then((m) => ({ default: m.VendorLayout })));
@@ -28,7 +29,7 @@ const LegalPolicyPage = lazy(() => import("./pages/customer/LegalPolicyPage").th
 
 // Vendor Phase 4
 const VendorDashboard = lazy(() => import("./pages/vendor/Dashboard/Dashboard").then((m) => ({ default: m.Dashboard })));
-const AnalyticsDashboard = lazy(() => import("./pages/vendor/Analytics/AnalyticsDashboard").then((m) => ({ default: m.AnalyticsDashboard })));
+const BusinessReportDashboard = lazy(() => import("./pages/vendor/BusinessReport/BusinessReportDashboard").then((m) => ({ default: m.BusinessReportDashboard })));
 const Services = lazy(() => import("./pages/vendor/Services/Services").then((m) => ({ default: m.Services })));
 const Equipment = lazy(() => import("./pages/vendor/Equipment/Equipment").then((m) => ({ default: m.Equipment })));
 const ServiceForm = lazy(() => import("./pages/vendor/Services/ServiceForm").then((m) => ({ default: m.ServiceForm })));
@@ -61,13 +62,20 @@ const Logs = lazy(() => import("./pages/admin/Logs/Logs").then((m) => ({ default
 
 function App() {
   return (
-    <BrowserRouter>
-      <ScrollToTop />
-      <SessionBridge />
-      <ToastContainer />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ScrollToTop />
+        <SessionBridge />
+        <ToastContainer />
 
-      <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
-        <Routes>
+        <Suspense
+          fallback={
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-xl border-2 border-slate-300 border-t-slate-800 animate-spin" />
+            </div>
+          }
+        >
+          <Routes>
           {/* KHÁCH HÀNG */}
           <Route path="/" element={<CustomerLayout />}>
             <Route index element={<Home />} />
@@ -102,7 +110,8 @@ function App() {
         <Route path="/vendor" element={<VendorLayout />}>
           <Route index element={<VendorDashboard />} />
           <Route path="copilot" element={<VendorCopilotPage />} />
-          <Route path="analytics" element={<AnalyticsDashboard />} />
+          <Route path="analytics" element={<BusinessReportDashboard />} />
+          <Route path="reports" element={<BusinessReportDashboard />} />
           <Route path="profile" element={<VendorProfile />} />
           <Route path="services" element={<Services />} />
           <Route path="equipment" element={<Equipment />} />
@@ -139,7 +148,8 @@ function App() {
         </Routes>
       </Suspense>
     </BrowserRouter>
-  );
+  </ErrorBoundary>
+);
 }
 
 export default App;

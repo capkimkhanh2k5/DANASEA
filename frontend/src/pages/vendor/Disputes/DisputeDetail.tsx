@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { disputeService } from '../../../services/disputeService';
 import type { DisputeResponse } from '../../../types/dispute';
 import { toast } from '../../../store/useToastStore';
-import { ArrowLeft, Loader2, Send, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Loader2, Send, CheckCircle2, AlertTriangle, ShieldCheck, Upload, X, FileText } from 'lucide-react';
+import { formatDisplayCode } from '../../../utils/displayCode';
 
 export function DisputeDetail() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +14,26 @@ export function DisputeDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [vendorResponseText, setVendorResponseText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [evidenceFiles, setEvidenceFiles] = useState<{ url: string; name: string }[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadEvidence = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    e.target.value = '';
+    setIsUploading(true);
+    try {
+      const res = await disputeService.uploadEvidence(file);
+      setEvidenceFiles((prev) => [...prev, { url: res.fileUrl, name: file.name }]);
+      toast.success(`Đã tải lên bằng chứng: ${file.name}`);
+    } catch {
+      toast.error('Tải lên bằng chứng thất bại');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const fetchDetail = useCallback(async () => {
     if (!id) return;
@@ -38,10 +59,15 @@ export function DisputeDetail() {
     e.preventDefault();
     if (!id || !vendorResponseText.trim()) return;
 
+    let finalResponse = vendorResponseText.trim();
+    if (evidenceFiles.length > 0) {
+      finalResponse += '\n\n[Bằng chứng / Hồ sơ đính kèm từ NCC]:\n' + evidenceFiles.map((f) => `- ${f.name}: ${f.url}`).join('\n');
+    }
+
     try {
       setIsSubmitting(true);
       const updated = await disputeService.submitVendorResponse(id, {
-        response: vendorResponseText.trim(),
+        response: finalResponse,
       });
       setDispute(updated);
       toast.success('Gửi văn bản giải trình thành công!');
@@ -78,8 +104,8 @@ export function DisputeDetail() {
         );
       case 'UNDER_REVIEW':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono tabular-nums bg-indigo-50 text-indigo-700 text-xs font-semibold border border-indigo-200">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-mono tabular-nums bg-sky-50 text-sky-700 text-xs font-semibold border border-sky-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
             <span>Đang xử lý (Admin)</span>
           </span>
         );
@@ -172,12 +198,12 @@ export function DisputeDetail() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-slate-900 tracking-tight font-display">
-                Chi tiết vụ việc #DIS-{dispute.id.slice(0, 8).toUpperCase()}
+                Chi tiết vụ việc #{formatDisplayCode(dispute.id, 'DISP')}
               </h1>
               {getStatusBadge(dispute.status)}
             </div>
             <p className="text-xs text-slate-500">
-              Hồ sơ khiếu nại cho đơn hàng con #VE-{dispute.subOrderId.slice(0, 8).toUpperCase()}
+              Hồ sơ khiếu nại cho đơn hàng con #{formatDisplayCode(dispute.subOrderId, 'SUB')}
             </p>
           </div>
         </div>
@@ -264,6 +290,52 @@ export function DisputeDetail() {
                     className="w-full p-3 rounded-lg border border-slate-200 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900 resize-none leading-relaxed"
                     required
                   />
+
+                  {/* Hidden File Input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={handleUploadEvidence}
+                  />
+
+                  {/* Evidence Upload & Chips */}
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-600" /> : <Upload className="w-3.5 h-3.5" />}
+                        <span>{isUploading ? 'Đang tải lên...' : 'Đính kèm bằng chứng (Ảnh / PDF)'}</span>
+                      </button>
+                    </div>
+
+                    {evidenceFiles.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {evidenceFiles.map((f, idx) => (
+                          <div
+                            key={idx}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200 text-sky-800 text-xs shadow-2xs"
+                          >
+                            <FileText className="w-3 h-3 text-sky-600 shrink-0" />
+                            <span className="truncate max-w-[180px] font-mono text-[11px]">{f.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setEvidenceFiles((prev) => prev.filter((_, i) => i !== idx))}
+                              className="text-sky-400 hover:text-rose-600 p-0.5 rounded cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <button
                     type="submit"
                     disabled={isSubmitting || !vendorResponseText.trim()}
@@ -317,15 +389,15 @@ export function DisputeDetail() {
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between items-center py-0.5">
                   <span className="text-slate-500">Mã khiếu nại:</span>
-                  <span className="font-mono font-bold text-slate-900">#DIS-{dispute.id.slice(0, 8).toUpperCase()}</span>
+                  <span className="font-mono font-bold text-slate-900">#{formatDisplayCode(dispute.id, 'DISP')}</span>
                 </div>
                 <div className="flex justify-between items-center py-0.5">
                   <span className="text-slate-500">Đơn hàng con:</span>
-                  <span className="font-mono font-bold text-slate-800">#VE-{dispute.subOrderId.slice(0, 8).toUpperCase()}</span>
+                  <span className="font-mono font-bold text-slate-800">#{formatDisplayCode(dispute.subOrderId, 'SUB')}</span>
                 </div>
                 <div className="flex justify-between items-center py-0.5">
                   <span className="text-slate-500">Mã đơn tổng:</span>
-                  <span className="font-mono text-slate-600">#ORD-{dispute.orderId.slice(0, 8).toUpperCase()}</span>
+                  <span className="font-mono text-slate-600">#{formatDisplayCode(dispute.orderId, 'ORD')}</span>
                 </div>
                 <div className="flex justify-between items-center py-0.5">
                   <span className="text-slate-500">Ngày tạo:</span>

@@ -3,6 +3,7 @@ import { vendorSettlementService } from '../../../services/vendorSettlementServi
 import { vendorProfileService, type VendorProfileDto } from '../../../services/vendorProfileService';
 import { vendorOrderService } from '../../../services/vendorOrderService';
 import { vendorService } from '../../../services/vendorService';
+import { vendorReportService } from '../../../services/vendorReportService';
 import { getAuthoritativeCustomer } from '../../../data/demoCustomerMap';
 import type { VendorSubOrderDto, VendorBookingItemDto } from '../../../types/vendorOrder';
 import { 
@@ -27,6 +28,7 @@ import {
   AtlasPagination
 } from '../../../components/vendor/atlas/AtlasDesignSystem';
 import { toast } from '../../../store/useToastStore';
+import { formatDisplayCode } from '../../../utils/displayCode';
 
 export type TimeRangeFilter = 'TODAY' | 'THIS_WEEK' | 'THIS_MONTH' | 'ALL_TIME';
 
@@ -171,7 +173,7 @@ export function Revenue() {
 
         return {
           id: o.id,
-          code: `#VE-${o.id.substring(0, 8).toUpperCase()}`,
+          code: `#${formatDisplayCode(o.id, 'SUB')}`,
           dateStr: o.checkedInAt ? o.checkedInAt.slice(0, 10) : 'Hôm nay',
           timestamp: createdDate.getTime(),
           serviceName: serviceNames.get(o.serviceId) || 'Dịch vụ trải nghiệm biển',
@@ -203,7 +205,7 @@ export function Revenue() {
 
       return {
         id: b.itemId || b.bookingId,
-        code: `#VE-${(b.itemId || b.bookingId).substring(0, 8).toUpperCase()}`,
+        code: `#VE-${formatDisplayCode(b.itemId || b.bookingId, 'SUB').replace(/^SUB-/, '')}`,
         dateStr: b.bookingDate || (b.createdAt ? b.createdAt.slice(0, 10) : 'Hôm nay'),
         timestamp: parsedDate.getTime(),
         serviceName: serviceNames.get(b.serviceId) || 'Dịch vụ trải nghiệm biển',
@@ -285,38 +287,59 @@ export function Revenue() {
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const paginatedRows = filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (filteredRows.length === 0) {
       toast.error('Không có dữ liệu giao dịch để xuất file CSV.');
       return;
     }
 
-    const csvRows = [
-      ['Mã Giao Dịch', 'Thời Gian', 'Dịch Vụ', 'Khách Hàng', 'Số Lượng', 'Doanh Thu Gộp', 'Khấu Trừ Sàn', 'Thực Nhận', 'Trạng Thái Dòng Tiền'],
-      ...filteredRows.map((item) => [
-        `"${item.code}"`,
-        `"${item.dateStr}"`,
-        `"${item.serviceName}"`,
-        `"${item.customerName}"`,
-        item.quantity.toString(),
-        item.grossAmount.toString(),
-        item.commissionAmount.toString(),
-        item.netAmount.toString(),
-        `"${item.status === 'AVAILABLE' ? 'Khả dụng' : item.status === 'ESCROW' ? 'Đang ký quỹ' : 'Đã hoàn tiền'}"`,
-      ]),
-    ];
+    const now = new Date();
+    const toDateStr = now.toISOString().slice(0, 10);
+    let fromDateStr = toDateStr;
+    if (timeRange === 'THIS_WEEK') {
+      const dayOfWeek = now.getDay() || 7;
+      const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek + 1);
+      fromDateStr = startOfWeek.toISOString().slice(0, 10);
+    } else if (timeRange === 'THIS_MONTH') {
+      fromDateStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+    } else if (timeRange === 'ALL_TIME') {
+      fromDateStr = new Date(now.getTime() - 90 * 86400000).toISOString().slice(0, 10);
+    }
 
-    const csvString = '\uFEFF' + csvRows.map((e) => e.join(',')).join('\r\n');
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `DANASEA_DONG_TIEN_${timeRange}_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    toast.success(`Đã xuất ${filteredRows.length} dòng giao dịch thành công!`);
+    try {
+      // 1. Try server-side official report export
+      await vendorReportService.exportReport('revenue', fromDateStr, toDateStr, 'day');
+      toast.success('Đã tải báo cáo doanh thu chính thức từ hệ thống!');
+      return;
+    } catch {
+      // 2. Fallback to client-side formatted CSV
+      const csvRows = [
+        ['Mã Giao Dịch', 'Thời Gian', 'Dịch Vụ', 'Khách Hàng', 'Số Lượng', 'Doanh Thu Gộp', 'Khấu Trừ Sàn', 'Thực Nhận', 'Trạng Thái Dòng Tiền'],
+        ...filteredRows.map((item) => [
+          `"${item.code}"`,
+          `"${item.dateStr}"`,
+          `"${item.serviceName}"`,
+          `"${item.customerName}"`,
+          item.quantity.toString(),
+          item.grossAmount.toString(),
+          item.commissionAmount.toString(),
+          item.netAmount.toString(),
+          `"${item.status === 'AVAILABLE' ? 'Khả dụng' : item.status === 'ESCROW' ? 'Đang ký quỹ' : 'Đã hoàn tiền'}"`,
+        ]),
+      ];
+
+      const csvString = '\uFEFF' + csvRows.map((e) => e.join(',')).join('\r\n');
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `DANASEA_DONG_TIEN_${timeRange}_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Đã xuất ${filteredRows.length} dòng giao dịch thành công!`);
+    }
   };
 
   return (
@@ -472,14 +495,14 @@ export function Revenue() {
               <div className="overflow-x-auto flex-1 scrollbar-thin">
                 <table className="w-full text-left text-sm border-collapse table-auto">
                   <thead>
-                    <tr className="bg-[#f8f9fa] text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200/80">
-                      <th className="py-3.5 px-4 w-[130px]">MÃ GIAO DỊCH</th>
-                      <th className="py-3.5 px-4 w-[160px]">THỜI GIAN</th>
-                      <th className="py-3.5 px-4">DỊCH VỤ & KHÁCH HÀNG</th>
-                      <th className="py-3.5 px-4 text-right w-[140px]">DOANH THU GỘP</th>
-                      <th className="py-3.5 px-4 text-right w-[130px]">KHẤU TRỪ SÀN</th>
-                      <th className="py-3.5 px-4 text-right w-[140px]">THỰC NHẬN</th>
-                      <th className="py-3.5 px-4 text-center w-[150px]">TRẠNG THÁI</th>
+                    <tr className="bg-[#f8f9fa] text-slate-600 text-xs font-semibold border-b border-slate-200/80">
+                      <th className="py-3.5 px-4 w-[130px]">Mã giao dịch</th>
+                      <th className="py-3.5 px-4 w-[160px]">Thời gian</th>
+                      <th className="py-3.5 px-4">Dịch vụ &amp; khách hàng</th>
+                      <th className="py-3.5 px-4 text-right w-[140px]">Doanh thu gộp</th>
+                      <th className="py-3.5 px-4 text-right w-[130px]">Khấu trừ sàn</th>
+                      <th className="py-3.5 px-4 text-right w-[140px]">Thực nhận</th>
+                      <th className="py-3.5 px-4 text-center w-[150px]">Trạng thái</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -560,14 +583,14 @@ export function Revenue() {
             <div className="overflow-x-auto flex-1 scrollbar-thin">
               <table className="w-full text-left text-sm border-collapse table-auto">
                 <thead>
-                  <tr className="bg-[#f8f9fa] text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200/80">
-                    <th className="py-3.5 px-4 w-[160px]">MÃ KỲ ĐỐI SOÁT</th>
-                    <th className="py-3.5 px-4">KHOẢNG THỜI GIAN</th>
-                    <th className="py-3.5 px-4 text-right w-[150px]">DOANH THU GỘP</th>
-                    <th className="py-3.5 px-4 text-right w-[130px]">KHẤU TRỪ</th>
-                    <th className="py-3.5 px-4 text-right w-[150px]">THỰC NHẬN</th>
-                    <th className="py-3.5 px-4 text-center w-[150px]">TRẠNG THÁI</th>
-                    <th className="py-3.5 px-4 text-center w-[120px]">THAO TÁC</th>
+                  <tr className="bg-[#f8f9fa] text-slate-600 text-xs font-semibold border-b border-slate-200/80">
+                    <th className="py-3.5 px-4 w-[160px]">Mã kỳ đối soát</th>
+                    <th className="py-3.5 px-4">Khoảng thời gian</th>
+                    <th className="py-3.5 px-4 text-right w-[150px]">Doanh thu gộp</th>
+                    <th className="py-3.5 px-4 text-right w-[130px]">Khấu trừ</th>
+                    <th className="py-3.5 px-4 text-right w-[150px]">Thực nhận</th>
+                    <th className="py-3.5 px-4 text-center w-[150px]">Trạng thái</th>
+                    <th className="py-3.5 px-4 text-center w-[120px]">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">

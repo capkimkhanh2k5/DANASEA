@@ -299,7 +299,7 @@ export function ServiceDetail({
                         }}
                       >
                         <span>Chứng từ an toàn #{idx + 1}</span>
-                        <span style={{ fontSize: '11px', textDecoration: 'none', color: '#64748b' }}>🔍 Xem trước</span>
+                        <span style={{ fontSize: '11px', textDecoration: 'none', color: '#64748b' }}>(Xem trước)</span>
                       </button>
                       {doc.rejectionReason && (
                         <div style={{ color: '#e11d48', fontSize: '12px' }}>
@@ -408,7 +408,7 @@ export function ServiceDetail({
 
       {/* 4. Waiver Content Disclosure */}
       <AdminDisclosure
-        title="Cam kết Miễn trừ Trách nhiệm (Waiver)"
+        title="Cam kết Miễn trừ Trách nhiệm"
         description="Nội dung điều khoản khách du lịch ký xác nhận an toàn trước khi khởi hành"
         defaultOpen={true}
       >

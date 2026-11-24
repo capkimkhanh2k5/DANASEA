@@ -140,7 +140,7 @@ export function Disputes() {
           const matchedVendor = vendors.find(v => v.id === subOrd?.vendorId);
           const matchedUser = users.find(u => u.id === d.customerId);
 
-          const customerName = matchedUser?.fullName || `Khách hàng ${d.customerId.substring(0, 8)}`;
+          const customerName = matchedUser?.fullName || `Khách hàng #${formatDisplayCode(d.customerId, 'CUST')}`;
           const customerPhone = matchedUser?.phone || '';
           const serviceVendorId = (matchedService as (ServiceSummaryDto & { vendorId?: string }) | undefined)?.vendorId;
           const subOrdExt = subOrd as (SubOrderResponse & { vendorName?: string; serviceName?: string }) | undefined;
