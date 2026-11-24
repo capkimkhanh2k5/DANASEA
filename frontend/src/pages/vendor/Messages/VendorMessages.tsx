@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { communicationService, type ConversationItem, type MessageItem } from '../../../services/communicationService';
+import { disputeService } from '../../../services/disputeService';
 import { vendorOrderService } from '../../../services/vendorOrderService';
 import { getAuthoritativeCustomer } from '../../../data/demoCustomerMap';
 import { formatDisplayCode } from '../../../utils/displayCode';
@@ -26,8 +27,10 @@ export function VendorMessages() {
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [customerNames, setCustomerNames] = useState<Record<string, string>>({});
+  const [uploadingImage, setUploadingImage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load Vendor Conversations & Order metadata to match customer names
   const loadConversations = useCallback(async () => {
@@ -142,6 +145,53 @@ export function VendorMessages() {
       // ignore
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeConvId || sending || uploadingImage) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Kích thước ảnh tối đa là 5MB');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      let attachmentUrl = '';
+      try {
+        const uploadRes = await disputeService.uploadEvidence(file);
+        attachmentUrl = uploadRes.fileUrl;
+      } catch {
+        // Fallback to base64 Data URL if evidence upload endpoint fails/offline
+        attachmentUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      if (attachmentUrl) {
+        const textPayload = inputMessage.trim() || '[Hình ảnh]';
+        setInputMessage('');
+        const saved = await communicationService.sendMessage(activeConvId, textPayload, attachmentUrl);
+        setMessages((prev) => [...prev, saved]);
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === activeConvId
+              ? { ...c, lastMessage: saved, updatedAt: saved.createdAt }
+              : c
+          )
+        );
+      }
+    } catch {
+      alert('Không thể gửi hình ảnh. Vui lòng thử lại sau.');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -346,6 +396,16 @@ export function VendorMessages() {
                           }`}
                         >
                           <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                          {m.attachmentUrl && (
+                            <div className="mt-2 rounded-xl overflow-hidden border border-slate-200/50 bg-slate-100 max-w-[280px]">
+                              <img
+                                src={m.attachmentUrl}
+                                alt="Ảnh đính kèm"
+                                className="w-full max-h-[220px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(m.attachmentUrl!, '_blank')}
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
                       <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1 px-1 font-mono tabular-nums">
@@ -361,13 +421,27 @@ export function VendorMessages() {
 
             {/* Bottom Input Area - FROZEN STICKY BOTTOM */}
             <div className="py-3 px-6 border-t border-slate-200/80 bg-white shrink-0 w-full sticky bottom-0 z-10">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
               <form onSubmit={handleSendMessage} className="flex items-center gap-2.5 w-full">
                 <button
                   type="button"
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage || sending}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0 cursor-pointer disabled:opacity-50"
                   title="Gửi hình ảnh"
+                  aria-label="Gửi hình ảnh"
                 >
-                  <ImageIcon className="w-4 h-4" />
+                  {uploadingImage ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
+                  ) : (
+                    <ImageIcon className="w-4 h-4" />
+                  )}
                 </button>
 
                 <div className="flex-1 relative flex items-center">

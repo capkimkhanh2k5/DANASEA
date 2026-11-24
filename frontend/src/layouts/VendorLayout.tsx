@@ -27,8 +27,8 @@ import {
 import { AtlasAvatar } from "../components/vendor/atlas/AtlasDesignSystem";
 import { toast } from "../store/useToastStore";
 import { formatDisplayCode } from "../utils/displayCode";
-import { useVendorCopilotStore } from "../store/useVendorCopilotStore";
 import { VendorCopilotDrawer } from "../components/vendor/copilot/VendorCopilotDrawer";
+import { DraggableFloatingCopilot } from "../components/vendor/copilot/DraggableFloatingCopilot";
 
 interface NavItem {
   to: string;
@@ -118,8 +118,6 @@ export function VendorLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, accessToken } = useAuthStore();
-  const isCopilotOpen = useVendorCopilotStore((s) => s.isOpen);
-  const toggleCopilot = useVendorCopilotStore((s) => s.toggleCopilot);
 
   const vendorDisplayName = 
     (user?.email && VENDOR_BRAND_MAP[user.email]) ||
@@ -543,31 +541,8 @@ export function VendorLayout() {
         </main>
       </div>
 
-      {/* Floating Copilot Trigger Button (Styled identically to Customer deck) */}
-      {location.pathname !== "/vendor/copilot" && (
-        <aside
-          aria-label="Menu Trợ lý Copilot"
-          className="fixed bottom-6 right-6 z-40 flex flex-col items-center select-none print:hidden"
-        >
-          <div className="relative group/btn flex items-center">
-            <span className="absolute right-full mr-3 px-2.5 py-1 rounded-lg bg-slate-900/90 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none shadow-md">
-              DANASEA Copilot
-            </span>
-            <button
-              type="button"
-              onClick={toggleCopilot}
-              aria-label="Trợ lý kinh doanh DANASEA Copilot"
-              className={`relative w-14 h-14 rounded-full flex items-center justify-center border shadow-xl transition-all duration-150 cursor-pointer active:scale-95 ${
-                isCopilotOpen
-                  ? "bg-slate-900 text-white border-slate-900 ring-2 ring-sky-500/30 shadow-slate-900/25"
-                  : "bg-slate-900 text-white border-slate-800 hover:bg-slate-800"
-              }`}
-            >
-              <Sparkles className="w-6 h-6 text-white transition-transform duration-150 group-hover/btn:scale-105" />
-            </button>
-          </div>
-        </aside>
-      )}
+      {/* Draggable Floating Copilot Trigger Button */}
+      <DraggableFloatingCopilot />
 
       {/* Vendor Copilot Slide-over Drawer */}
       <VendorCopilotDrawer />
