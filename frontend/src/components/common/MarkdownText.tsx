@@ -1,5 +1,6 @@
 import React from 'react';
 import { parseBlocks, renderInline } from './markdownParser';
+import { formatTextWithDisplayCodes } from '../../utils/displayCode';
 
 interface MarkdownTextProps {
   content?: string | null;
@@ -14,7 +15,8 @@ export const MarkdownText: React.FC<MarkdownTextProps> = ({
 }) => {
   if (!content) return null;
 
-  const blocks = parseBlocks(content);
+  const formattedContent = formatTextWithDisplayCodes(content);
+  const blocks = parseBlocks(formattedContent);
   const textClass = tone === 'invert' ? 'text-white/95' : 'text-slate-700';
 
   return (

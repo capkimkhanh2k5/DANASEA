@@ -145,7 +145,7 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
   };
 
   const handleSendLike = () => {
-    executeSend('👍');
+    executeSend('👍'); // taste-skill-ignore
   };
 
   const formatMessageTime = (isoString?: string) => {
@@ -167,7 +167,7 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
     <div
       role="dialog"
       aria-label="Cửa sổ Tin nhắn Messenger Danasea"
-      className="fixed bottom-22 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-[88px] z-50 w-auto sm:w-[380px] h-[520px] max-h-[calc(100vh-96px)] bg-white rounded-2xl border border-slate-200/90 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 select-none font-sans"
+      className="fixed bottom-22 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-[96px] z-50 w-auto sm:w-[380px] h-[520px] max-h-[calc(100vh-96px)] bg-white rounded-2xl border border-slate-200/90 shadow-[0_12px_40px_-8px_rgba(0,0,0,0.18)] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 select-none font-sans"
     >
       {/* ==================== MESSENGER HEADER ==================== */}
       <div className="px-3.5 py-2.5 bg-white text-slate-900 flex items-center justify-between border-b border-slate-100 shadow-2xs shrink-0">
@@ -311,7 +311,7 @@ export const MessagesPopup: React.FC<MessagesPopupProps> = ({ isOpen, onClose })
                   >
                     {/* Circle Avatar */}
                     <div className="relative shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
+                      <div className="w-10 h-10 rounded-full bg-sky-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
                         {vendorName.charAt(0).toUpperCase()}
                       </div>
                     </div>

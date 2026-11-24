@@ -4,6 +4,8 @@ import { useAiModalStore, type AiChatMessage } from '../../store/useAiModalStore
 import { useLanguageStore } from '../../store/useLanguageStore';
 import { MarkdownText } from '../common/MarkdownText';
 import { AssistantCardList } from './AssistantCardList';
+import { formatTextWithDisplayCodes } from '../../utils/displayCode';
+import { DanaseaAiMascot } from './DanaseaAiMascot';
 
 const QUICK_SUGGESTIONS_VI = [
   'Thời tiết & sóng biển hôm nay?',
@@ -76,13 +78,14 @@ export const AiChatPopup: React.FC = () => {
     <div
       role="dialog"
       aria-label={isEn ? 'AI Tour Assistant Window' : 'Cửa sổ Trợ lý tư vấn dịch vụ'}
-      className="fixed bottom-20 right-3 left-3 sm:left-auto sm:bottom-6 sm:right-[88px] z-50 w-auto sm:w-[360px] h-[480px] max-h-[calc(100vh-80px)] bg-white rounded-2xl border border-slate-200/90 shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-left"
+      className="fixed bottom-20 right-3 left-3 sm:left-auto sm:bottom-6 sm:right-[96px] z-50 w-auto sm:w-[360px] h-[480px] max-h-[calc(100vh-80px)] bg-white rounded-2xl border border-slate-200/90 shadow-xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-left"
     >
       {/* Top Header - Streamlined and styled identically to MessagesPopup */}
       <div className="px-3.5 py-2.5 bg-white text-slate-900 flex items-center justify-between border-b border-slate-100 shadow-2xs shrink-0">
-        <div className="min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <DanaseaAiMascot size={26} className="shrink-0" />
           <h3 className="font-semibold text-xs sm:text-[13px] text-slate-900 truncate leading-snug">
-            {isEn ? 'AI Assistant' : 'Trợ lý tư vấn dịch vụ'}
+            {isEn ? 'DANASEA AI Assistant' : 'Trợ lý AI DANASEA'}
           </h3>
         </div>
 
@@ -126,7 +129,7 @@ export const AiChatPopup: React.FC = () => {
           >
             {msg.role === 'user' ? (
               <div className="bg-sky-700 text-white rounded-xl rounded-tr-xs px-3.5 py-2.5 max-w-[85%] text-xs font-normal leading-relaxed shadow-xs">
-                {msg.content}
+                {formatTextWithDisplayCodes(msg.content)}
               </div>
             ) : (
               <div className="bg-white border border-slate-200/90 text-slate-800 rounded-xl rounded-tl-xs px-3.5 py-2.5 max-w-[92%] text-xs leading-relaxed shadow-xs">

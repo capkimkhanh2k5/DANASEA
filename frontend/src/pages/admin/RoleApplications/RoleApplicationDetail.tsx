@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Building2, CreditCard, User, AlertCircle, CheckCircle2, ShieldCheck, XCircle } from 'lucide-react';
+import { formatDisplayCode } from '../../../utils/displayCode';
 import type { PartnerApplicationResponse } from '../../../types/partnerApplication';
 import { AdminBadge } from '../../../components/admin/AdminUI';
 import { AdminButton, AdminDisclosure } from '../../../components/admin/AdminWorkspace';
@@ -56,8 +57,8 @@ export function RoleApplicationDetail({
       <section className="admin-detail-section" aria-label="Tổng quan đơn xét duyệt">
         <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="space-y-1">
-            <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider">
-              Mã đơn: {application.id}
+            <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider" title={application.id}>
+              Mã đơn: #{formatDisplayCode(application.id, 'APP')}
             </span>
             <h2 className="text-lg font-bold text-slate-900 tracking-tight">
               {application.businessName}
@@ -65,7 +66,7 @@ export function RoleApplicationDetail({
             <p className="text-xs text-slate-600 flex items-center gap-1.5">
               <User size={14} className="text-slate-400 shrink-0" aria-hidden="true" />
               <span>Mã người dùng: </span>
-              <span className="font-mono text-slate-800">{application.userId}</span>
+              <span className="font-mono text-slate-800" title={application.userId}>#{formatDisplayCode(application.userId, 'USER')}</span>
             </p>
           </div>
           <AdminBadge tone={getStatusTone(application.status)}>

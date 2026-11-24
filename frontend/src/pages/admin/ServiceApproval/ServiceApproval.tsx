@@ -17,6 +17,7 @@ import {
   type ServiceReviewState,
 } from './serviceApprovalModel';
 import { ServiceDetail, ServiceStatusBadge } from './ServiceDetail';
+import { formatDisplayCode } from '../../../utils/displayCode';
 import './ServiceApproval.css';
 
 function mapResultToRecord(
@@ -28,7 +29,7 @@ function mapResultToRecord(
   const vendorName =
     vendorMap?.get(s.vendorId) ||
     MOCK_ADMIN_VENDORS.find(v => v.id === s.vendorId)?.businessName ||
-    (s.vendorId ? `Đối tác ${s.vendorId.substring(0, 8)}` : 'Chưa liên kết đối tác');
+    (s.vendorId ? `Đối tác #${formatDisplayCode(s.vendorId, 'VND')}` : 'Chưa liên kết đối tác');
 
   const categoryName =
     categoryMap?.get(s.categoryId) ||

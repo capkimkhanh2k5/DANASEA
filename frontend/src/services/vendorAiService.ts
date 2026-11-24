@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { translateDisplayCodesToUuids, resolveDisplayCodeToUuid } from '../utils/displayCode';
 import type { 
   CoachingResult, 
   ReplyDraftResult, 
@@ -27,7 +28,12 @@ export const vendorAiService = {
    * Chat hỏi đáp KPIs, doanh thu, phân tích đơn hàng và hỗ trợ đính kèm ngữ cảnh
    */
   async chatCopilot(req: CopilotChatRequest, language: 'vi' | 'en' = 'vi'): Promise<CopilotChatResponse> {
-    const res = await apiClient.post<CopilotChatResponse>('/vendor/ai/copilot/chat', req, {
+    const effectiveReq: CopilotChatRequest = {
+      ...req,
+      message: translateDisplayCodesToUuids(req.message),
+      contextId: req.contextId ? resolveDisplayCodeToUuid(req.contextId) : req.contextId,
+    };
+    const res = await apiClient.post<CopilotChatResponse>('/vendor/ai/copilot/chat', effectiveReq, {
       headers: { 'Accept-Language': language },
     });
     return res.data;
