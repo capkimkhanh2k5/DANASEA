@@ -192,15 +192,15 @@ export function OrderDetailContent({
             {subs.map(sub => {
               const service = MOCK_ADMIN_SERVICES.find(s => s.id === sub.serviceId);
               const vendor = MOCK_ADMIN_VENDORS.find(v => v.id === sub.vendorId);
-              const serviceTitle = service?.name || `Trải nghiệm #${sub.serviceId.substring(0, 8)}`;
-              const vendorTitle = vendor?.businessName || `Đối tác #${sub.vendorId.substring(0, 8)}`;
+              const serviceTitle = service?.name || `Trải nghiệm #${formatDisplayCode(sub.serviceId, 'SRV')}`;
+              const vendorTitle = vendor?.businessName || `Đối tác #${formatDisplayCode(sub.vendorId, 'VND')}`;
 
               return (
                 <article key={sub.id} className="admin-orders-sub">
                   <div className="admin-orders-sub-heading">
                     <div>
                       <h4>{serviceTitle}</h4>
-                      <p>Số lượng: {sub.quantity} khách · Mã đơn con: #{sub.id}</p>
+                      <p>Số lượng: {sub.quantity} khách · Mã đơn con: #{formatDisplayCode(sub.id, 'SUB')}</p>
                     </div>
                     <OrderStatus status={sub.status} />
                   </div>
@@ -707,9 +707,7 @@ export function AdminOrders() {
                   const customerName = ext.customerName || customer?.fullName || order.customerId;
                   const customerSub = customer?.phone
                     ? customer.phone
-                    : order.customerId.length > 16
-                    ? `Mã: ${order.customerId.substring(0, 8)}...`
-                    : `Mã: ${order.customerId}`;
+                    : `Mã: #${formatDisplayCode(order.customerId, 'CUST')}`;
                   const orderPayment = paymentMap.get(order.id);
 
                   return (

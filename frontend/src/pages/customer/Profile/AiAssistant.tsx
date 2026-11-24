@@ -14,6 +14,7 @@ import {
 import { aiService, type AssistantCard } from "../../../services/aiService";
 import { MarkdownText } from "../../../components/common/MarkdownText";
 import { AssistantCardList } from "../../../components/customer/AssistantCardList";
+import { formatTextWithDisplayCodes } from "../../../utils/displayCode";
 
 interface AssistantMessage {
   id: number;
@@ -185,7 +186,7 @@ export function AiAssistant() {
                   }`}
                 >
                   {msg.role === 'user' ? (
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                    <p className="whitespace-pre-wrap">{formatTextWithDisplayCodes(msg.content)}</p>
                   ) : (
                     <>
                       <MarkdownText content={msg.content} />

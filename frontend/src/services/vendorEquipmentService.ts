@@ -47,4 +47,41 @@ export const vendorEquipmentService = {
     const res = await apiClient.post<BackendEquipment>('/vendor/equipment', data);
     return res.data;
   },
+
+  /**
+   * Gán thiết bị vào ca vận hành cụ thể
+   * PUT /api/vendor/equipment/{equipmentId}/slots/{slotId}/units/{unitNumber}
+   */
+  async attachEquipmentToSlot(equipmentId: string, slotId: string, unitNumber: number): Promise<void> {
+    await apiClient.put(`/vendor/equipment/${equipmentId}/slots/${slotId}/units/${unitNumber}`);
+  },
+
+  /**
+   * Lên lịch hoặc cập nhật bảo trì phương tiện / thiết bị
+   * PUT /api/vendor/equipment/{equipmentId}/maintenance/{maintenanceId}
+   */
+  async scheduleMaintenance(
+    equipmentId: string,
+    maintenanceIdOrData: string | { start: string; end: string; urgent: boolean; reason: string },
+    optionalData?: { start: string; end: string; urgent: boolean; reason: string }
+  ): Promise<EquipmentMaintenanceDto> {
+    const maintenanceId = typeof maintenanceIdOrData === 'string' ? maintenanceIdOrData : crypto.randomUUID();
+    const data = typeof maintenanceIdOrData === 'string' ? optionalData! : maintenanceIdOrData;
+    const res = await apiClient.put<EquipmentMaintenanceDto>(
+      `/vendor/equipment/${equipmentId}/maintenance/${maintenanceId}`,
+      data
+    );
+    return res.data;
+  },
+
+  /**
+   * Đọc chi tiết kết quả và lịch bảo trì
+   * GET /api/vendor/equipment/{equipmentId}/maintenance/{maintenanceId}
+   */
+  async getMaintenance(equipmentId: string, maintenanceId: string): Promise<EquipmentMaintenanceDto> {
+    const res = await apiClient.get<EquipmentMaintenanceDto>(
+      `/vendor/equipment/${equipmentId}/maintenance/${maintenanceId}`
+    );
+    return res.data;
+  },
 };

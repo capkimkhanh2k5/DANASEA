@@ -4,9 +4,12 @@ import com.danasea.backend.modules.ai.domain.exceptions.AiConversationLocaleMism
 import com.danasea.backend.security.authentication.domain.exceptions.EmailNotVerifiedException;
 import com.danasea.backend.security.authentication.domain.exceptions.InvalidCredentialsException;
 import com.danasea.backend.security.authentication.infrastructure.security.CookieUtils;
+import com.danasea.backend.security.authentication.infrastructure.security.JwtProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.danasea.backend.security.authorization.domain.exceptions.AccessDeniedException;
 import com.danasea.backend.shared.i18n.LocalizedException;
 import com.danasea.backend.shared.i18n.LocalizedMessageService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -27,6 +30,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class GlobalExceptionHandler {
 
     private final LocalizedMessageService messages;
+    private boolean cookieSecure = true;
 
     public GlobalExceptionHandler(LocalizedMessageService messages) {
         this.messages = messages;
@@ -34,6 +38,11 @@ public class GlobalExceptionHandler {
 
     public GlobalExceptionHandler() {
         this(LocalizedMessageService.standalone());
+    }
+
+    @Autowired(required = false)
+    void setJwtProperties(JwtProperties jwtProperties) {
+        this.cookieSecure = jwtProperties.cookieSecure();
     }
 
     @ExceptionHandler(LocalizedException.class)
@@ -52,9 +61,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleInvalidCredentials(
             InvalidCredentialsException exception,
+            HttpServletRequest request,
             HttpServletResponse response) {
-                
-        CookieUtils.clearRefreshTokenCookie(response);
+
+        String requestUri = request != null ? request.getRequestURI() : null;
+        if (requestUri == null || requestUri.startsWith("/api/auth/")) {
+            CookieUtils.clearRefreshTokenCookie(response, cookieSecure);
+        }
 
         if (exception instanceof EmailNotVerifiedException) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)

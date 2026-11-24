@@ -667,7 +667,7 @@ export function Logs() {
         open={Boolean(selectedLog)}
         variant="drawer"
         title={selectedLog ? `Chi tiết kiểm toán: #${formatDisplayCode(selectedLog.id, 'LOG')}` : ''}
-        description={selectedLog ? `Mã bản ghi hệ thống: ${selectedLog.id}` : "Bản ghi lưu vết hoạt động quản trị trên hệ thống DANASEA."}
+        description={selectedLog ? `Mã bản ghi hệ thống: #${formatDisplayCode(selectedLog.id, 'LOG')}` : "Bản ghi lưu vết hoạt động quản trị trên hệ thống DANASEA."}
         onClose={() => setSelectedLog(null)}
         footer={
           <AdminButton variant="secondary" onClick={() => setSelectedLog(null)}>
@@ -714,7 +714,7 @@ export function Logs() {
                 </div>
                 <div>
                   <dt>Mã định danh User</dt>
-                  <dd className="admin-log-entity-id">{selectedLog.actorUserId || 'Tự động (System)'}</dd>
+                  <dd className="admin-log-entity-id" title={selectedLog.actorUserId}>{selectedLog.actorUserId ? '#' + formatDisplayCode(selectedLog.actorUserId, 'USER') : 'Tự động (System)'}</dd>
                 </div>
                 <div>
                   <dt>Thời gian thực hiện</dt>

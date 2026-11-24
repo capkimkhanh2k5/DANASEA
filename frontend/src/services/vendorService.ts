@@ -151,4 +151,71 @@ export const vendorService = {
     const res = await apiClient.put<OperatingScheduleUpdateResponse>(`/vendor/services/${serviceId}/operating-schedule`, data);
     return res.data;
   },
+
+  // 7. OPERATING SCHEDULE EXCEPTIONS (Ngày nghỉ đột xuất, bảo dưỡng, đóng bán)
+  async getOperatingScheduleExceptions(serviceId: string): Promise<OperatingScheduleExceptionDto[]> {
+    const res = await apiClient.get<OperatingScheduleExceptionDto[]>(`/vendor/services/${serviceId}/operating-schedule/exceptions`);
+    return res.data || [];
+  },
+
+  async addOperatingScheduleException(
+    serviceId: string,
+    data: { dateFrom: string; dateTo: string; startTime?: string; reason: string }
+  ): Promise<OperatingScheduleExceptionDto> {
+    const res = await apiClient.post<OperatingScheduleExceptionDto>(
+      `/vendor/services/${serviceId}/operating-schedule/exceptions`,
+      data
+    );
+    return res.data;
+  },
+
+  async removeOperatingScheduleException(serviceId: string, exceptionId: string): Promise<void> {
+    await apiClient.delete(`/vendor/services/${serviceId}/operating-schedule/exceptions/${exceptionId}`);
+  },
+
+  // 8. DEPARTURE CANCELLATION (Hủy ca do bão biển, sự cố kỹ thuật)
+  async cancelSlotDeparture(
+    serviceId: string,
+    slotId: string,
+    reason: string
+  ): Promise<SlotDepartureCancellationDto> {
+    const res = await apiClient.post<SlotDepartureCancellationDto>(
+      `/vendor/services/${serviceId}/slots/${slotId}/cancel`,
+      { reason }
+    );
+    return res.data;
+  },
+
+  async getSlotDepartureCancellation(
+    serviceId: string,
+    slotId: string
+  ): Promise<SlotDepartureCancellationStatusDto> {
+    const res = await apiClient.get<SlotDepartureCancellationStatusDto>(
+      `/vendor/services/${serviceId}/slots/${slotId}/cancel`
+    );
+    return res.data;
+  },
 };
+
+export interface OperatingScheduleExceptionDto {
+  id: string;
+  dateFrom: string;
+  dateTo: string;
+  startTime?: string | null;
+  reason: string;
+}
+
+export interface SlotDepartureCancellationDto {
+  slotId: string;
+  reason: string;
+  cancelledAt: string;
+}
+
+export interface SlotDepartureCancellationStatusDto {
+  cancellation: SlotDepartureCancellationDto;
+  existingRefundsToReview: Array<{
+    subOrderId: string;
+    refundAmount: number;
+    status: string;
+  }>;
+}

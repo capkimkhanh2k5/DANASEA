@@ -1,20 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Bot, 
+  Sparkles, 
   X, 
   Minus, 
-  Send, 
   RotateCcw, 
   Clock, 
-  Paperclip, 
   Pin, 
   Trash2, 
   MoreVertical,
-  Plus 
+  Plus,
+  Paperclip
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from './CopilotArtifactCard';
 import { MarkdownText } from '../../common/MarkdownText';
+import { VendorCopilotActionDeck } from './VendorCopilotActionDeck';
+import { formatTextWithDisplayCodes } from '../../../utils/displayCode';
 
 const QUICK_SUGGESTIONS = [
   'Doanh thu & đơn hôm nay?',
@@ -34,7 +35,6 @@ export const VendorCopilotDrawer: React.FC = () => {
     isSessionsLoading,
     attachedContext,
     clearAttachedContext,
-    setAttachedContext,
     selectConversation,
     startNewConversation,
     sendMessage,
@@ -42,15 +42,10 @@ export const VendorCopilotDrawer: React.FC = () => {
     togglePinConversation,
   } = useVendorCopilotStore();
 
-  const [inputValue, setInputValue] = useState('');
   const [showSessions, setShowSessions] = useState(false);
-  const [showAttachModal, setShowAttachModal] = useState(false);
-  const [attachType, setAttachType] = useState<'ORDER' | 'SERVICE'>('ORDER');
-  const [attachIdInput, setAttachIdInput] = useState('');
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,54 +69,23 @@ export const VendorCopilotDrawer: React.FC = () => {
     }
   }, [messages, isOpen, isLoading]);
 
-  // Auto-focus input when opened
-  useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen]);
-
   if (!isOpen) return null;
-
-  const handleSend = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
-
-    const text = inputValue.trim();
-    setInputValue('');
-    await sendMessage(text);
-  };
 
   const handleSuggestionClick = async (suggestion: string) => {
     if (isLoading) return;
     await sendMessage(suggestion);
   };
 
-  const handleApplyAttach = () => {
-    if (attachIdInput.trim()) {
-      setAttachedContext({
-        type: attachType,
-        id: attachIdInput.trim(),
-        label: `${attachType === 'ORDER' ? 'Đơn' : 'Tour'} #${attachIdInput.trim().slice(0, 8)}`,
-      });
-      setShowAttachModal(false);
-      setAttachIdInput('');
-    }
-  };
-
   return (
     <div
       role="dialog"
       aria-label="Cửa sổ Trợ lý kinh doanh DANASEA Copilot"
-      className="fixed bottom-20 right-3 left-3 sm:left-auto sm:bottom-6 sm:right-[88px] z-50 w-auto sm:w-[400px] h-[540px] max-h-[calc(100vh-80px)] bg-white rounded-2xl border border-slate-200/90 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-left print:hidden select-none"
+      className="fixed bottom-20 right-3 left-3 sm:left-auto sm:bottom-6 sm:right-[96px] z-50 w-auto sm:w-[400px] h-[540px] max-h-[calc(100vh-80px)] bg-white rounded-2xl border border-slate-200/90 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150 text-left print:hidden select-none"
     >
       {/* Top Header */}
       <div className="px-3.5 py-2.5 bg-white text-slate-900 flex items-center justify-between border-b border-slate-100 shadow-2xs shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <Bot className="w-4 h-4 text-sky-600 shrink-0" strokeWidth={1.75} />
+          <Sparkles className="w-4 h-4 text-sky-600 shrink-0" strokeWidth={1.75} />
           <h3 className="font-semibold text-xs sm:text-[13px] text-slate-900 truncate leading-snug">
             DANASEA Copilot
           </h3>
@@ -201,7 +165,7 @@ export const VendorCopilotDrawer: React.FC = () => {
                 >
                   <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     {c.pinned && <Pin className="w-3 h-3 text-amber-500 fill-amber-500 shrink-0" />}
-                    <span className="truncate text-[11px]">{c.title || 'Đoạn chat không tên'}</span>
+                    <span className="truncate text-[11px]">{formatTextWithDisplayCodes(c.title) || 'Đoạn chat không tên'}</span>
                   </div>
 
                   <div className="flex items-center gap-1 ml-1 shrink-0">
@@ -289,7 +253,13 @@ export const VendorCopilotDrawer: React.FC = () => {
               >
                 {isUser ? (
                   <div className="bg-sky-700 text-white rounded-xl rounded-tr-xs px-3.5 py-2.5 max-w-[85%] text-xs font-normal leading-relaxed shadow-xs">
-                    {m.content}
+                    {m.context && (
+                      <div className="mb-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/15 border border-white/20 text-sky-200 text-[10px] font-medium">
+                        <Paperclip className="w-2.5 h-2.5 text-sky-300 shrink-0" />
+                        <span className="truncate max-w-[180px]">{m.context.label}</span>
+                      </div>
+                    )}
+                    <div>{formatTextWithDisplayCodes(m.content)}</div>
                   </div>
                 ) : (
                   <div className="bg-white border border-slate-200/90 text-slate-800 rounded-xl rounded-tl-xs px-3.5 py-2.5 max-w-[92%] text-xs leading-relaxed shadow-xs">
@@ -336,103 +306,10 @@ export const VendorCopilotDrawer: React.FC = () => {
         ))}
       </div>
 
-      {/* Input Deck */}
-      <form onSubmit={handleSend} className="p-3 bg-white border-t border-slate-200/90 flex items-center gap-2 shrink-0">
-        <button
-          type="button"
-          onClick={() => setShowAttachModal(true)}
-          title="Kẹp ghim đơn hàng hoặc tour"
-          className="w-9 h-9 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors cursor-pointer shrink-0"
-        >
-          <Paperclip className="w-3.5 h-3.5" />
-        </button>
-
-        <input
-          ref={inputRef}
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder={attachedContext ? `Hỏi về ${attachedContext.label}...` : "Hỏi doanh thu, đơn hàng, ca vắng..."}
-          disabled={isLoading}
-          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sky-500 focus:bg-white transition-all shadow-xs"
-        />
-
-        <button
-          type="submit"
-          disabled={isLoading || !inputValue.trim()}
-          title="Gửi câu hỏi"
-          className="w-9 h-9 rounded-xl bg-sky-700 hover:bg-sky-800 text-white flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 shadow-xs"
-        >
-          <Send className="w-3.5 h-3.5" />
-        </button>
-      </form>
-
-      {/* Attach Modal Popup */}
-      {showAttachModal && (
-        <div className="absolute inset-0 z-50 bg-slate-900/30 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl max-w-xs w-full p-4 shadow-xl border border-slate-200 flex flex-col gap-3 text-xs">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h4 className="font-bold text-slate-900 text-xs">Ghim ngữ cảnh</h4>
-              <button onClick={() => setShowAttachModal(false)} className="text-slate-400 hover:text-slate-700">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="font-medium text-slate-700 text-[11px]">Đối tượng:</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setAttachType('ORDER')}
-                  className={`p-1.5 rounded-lg border text-center font-semibold text-[11px] transition-colors cursor-pointer ${
-                    attachType === 'ORDER' ? 'bg-sky-50 border-sky-500 text-sky-700' : 'bg-slate-50 border-slate-200 text-slate-600'
-                  }`}
-                >
-                  Đơn hàng
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAttachType('SERVICE')}
-                  className={`p-1.5 rounded-lg border text-center font-semibold text-[11px] transition-colors cursor-pointer ${
-                    attachType === 'SERVICE' ? 'bg-sky-50 border-sky-500 text-sky-700' : 'bg-slate-50 border-slate-200 text-slate-600'
-                  }`}
-                >
-                  Dịch vụ
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="font-medium text-slate-700 text-[11px]">Mã ID:</label>
-              <input
-                type="text"
-                value={attachIdInput}
-                onChange={(e) => setAttachIdInput(e.target.value)}
-                placeholder="Nhập mã đơn / ID..."
-                className="w-full text-xs p-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              />
-            </div>
-
-            <div className="flex justify-end gap-1.5 pt-1.5 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowAttachModal(false)}
-                className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-medium hover:bg-slate-200"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyAttach}
-                disabled={!attachIdInput.trim()}
-                className="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-medium hover:bg-slate-800 disabled:opacity-40"
-              >
-                Ghim
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Messenger-Style Input Action Deck */}
+      <div className="p-3 bg-white border-t border-slate-200/90 shrink-0">
+        <VendorCopilotActionDeck isCompact={true} />
+      </div>
     </div>
   );
 };

@@ -4,38 +4,28 @@ export interface ImageScene {
   id: string;
   url: string;
   label: string;
-  badge: string;
-  subtitle: string;
 }
 
 const AUTH_SCENES: ImageScene[] = [
   {
     id: 'hero',
     url: '/images/scenes/sean-oulashin-KMn4VEeEPR8-unsplash.jpg',
-    label: 'Bãi biển Mỹ Khê & Biển Sớm',
-    badge: '01 / 04',
-    subtitle: 'Mặt trời ló rạng & chèo SUP bình minh',
+    label: 'Bãi biển Mỹ Khê',
   },
   {
     id: 'bays',
     url: '/images/scenes/danny-rienecker-19Dam2dFVC8-unsplash.jpg',
     label: 'Vịnh Bán Đảo Sơn Trà',
-    badge: '02 / 04',
-    subtitle: 'Nước ngọc bích & rạn san hô hoang sơ',
   },
   {
     id: 'sports',
     url: '/images/scenes/brandon-mcdonald-_oU62drqdho-unsplash.jpg',
     label: 'Đại Dương & Thể Thao Biển',
-    badge: '03 / 04',
-    subtitle: 'Cano cao tốc & lướt ván dù lượn',
   },
   {
     id: 'sunset',
     url: '/images/scenes/austin-neill-uHD0uyp79Dg-unsplash.jpg',
-    label: 'Hoàng Hôn Non Nước Lãng Mạn',
-    badge: '04 / 04',
-    subtitle: 'Ráng chiều đỏ & không gian biển yên bình',
+    label: 'Hoàng Hôn Non Nước',
   },
 ];
 

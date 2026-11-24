@@ -19,11 +19,53 @@ export interface CartItem {
   vendorName?: string;
 }
 
+export function isCartItemExpired(item: { date?: string; selectedDate?: string; timeSlot?: string }): boolean {
+  const dateStr = item.selectedDate || item.date;
+  if (!dateStr) return false;
+
+  let year: number;
+  let month: number;
+  let day: number;
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+    const parts = dateStr.slice(0, 10).split('-').map(Number);
+    year = parts[0];
+    month = parts[1] - 1;
+    day = parts[2];
+  } else if (/^\d{2}\/\d{2}\/\d{4}/.test(dateStr)) {
+    const parts = dateStr.slice(0, 10).split('/').map(Number);
+    day = parts[0];
+    month = parts[1] - 1;
+    year = parts[2];
+  } else {
+    const parsed = new Date(dateStr);
+    if (isNaN(parsed.getTime())) return false;
+    year = parsed.getFullYear();
+    month = parsed.getMonth();
+    day = parsed.getDate();
+  }
+
+  // Parse start time (e.g. "05:30:00 - 07:30:00" -> 05:30)
+  let hour = 23;
+  let minute = 59;
+  if (item.timeSlot) {
+    const match = item.timeSlot.match(/^(\d{1,2}):(\d{2})/);
+    if (match) {
+      hour = parseInt(match[1], 10);
+      minute = parseInt(match[2], 10);
+    }
+  }
+
+  const slotStart = new Date(year, month, day, hour, minute, 0, 0);
+  return slotStart.getTime() <= Date.now();
+}
+
 interface CartState {
   items: CartItem[];
   addItem: (item: Omit<CartItem, 'id'>) => void;
   updateCartItem: (id: string, updatedData: Partial<Omit<CartItem, 'id'>>) => void;
   removeItem: (id: string) => void;
+  removeExpiredItems: () => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
   
@@ -78,6 +120,10 @@ export const useCartStore = create<CartState>()(
       
       removeItem: (id) => set((state) => ({
         items: state.items.filter((item) => item.id !== id)
+      })),
+
+      removeExpiredItems: () => set((state) => ({
+        items: state.items.filter((item) => !isCartItemExpired(item))
       })),
       
       updateQuantity: (id, quantity) => set((state) => ({

@@ -5,6 +5,7 @@ import { useCartStore } from "../../store/useCartStore";
 import { useWishlistStore } from "../../store/useWishlistStore";
 import { useLanguageStore } from "../../store/useLanguageStore";
 import { notificationService } from "../../services/notificationService";
+import { logoutSession } from "../../services/sessionService";
 import { localizeNotificationTitle, localizeNotificationBody } from "../../utils/notificationLocalization";
 import {
   Heart,
@@ -31,6 +32,7 @@ import {
   Store,
 } from "lucide-react";
 import type { NotificationResponse } from "../../types/notification";
+import { formatDisplayCode } from "../../utils/displayCode";
 
 const normalizeText = (str?: string | null) => {
   return (str || '')
@@ -205,7 +207,7 @@ export function Header() {
   const location = useLocation();
 
   
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const cartItemCount = useCartStore((state) => state.getTotalItems());
   const wishlistCount = useWishlistStore((state) => state.wishlistIds.length);
   const { language, setLanguage, t } = useLanguageStore();
@@ -296,6 +298,9 @@ export function Header() {
     const fetchUnread = async () => {
       await Promise.resolve();
       if (ignore) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
       const { isAuthenticated: authStatus, accessToken } = useAuthStore.getState();
       if (!authStatus || !accessToken) {
         setUnreadNotifs(0);
@@ -308,11 +313,18 @@ export function Header() {
         if (!ignore) setUnreadNotifs(0);
       }
     };
-    fetchUnread();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchUnread();
+      }
+    };
+    void fetchUnread();
     const interval = setInterval(fetchUnread, 15000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       ignore = true;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isAuthenticated]);
 
@@ -413,10 +425,10 @@ export function Header() {
               className={`ml-2 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 ${
                 isTransparent
                   ? "bg-white/20 text-white backdrop-blur-xs border border-white/30 hover:bg-white/30"
-                  : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/80"
+                  : "bg-slate-100 text-slate-800 hover:bg-slate-200/80 border border-slate-200"
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+              <ShieldCheck className="w-3.5 h-3.5 text-slate-700" />
               <span>{language === 'en' ? 'Admin Portal' : 'Quản trị viên'}</span>
             </Link>
           )}
@@ -536,11 +548,11 @@ export function Header() {
                     </div>
                   )}
                   {isAuthenticated && user?.role === 'ADMIN' && (
-                    <div className="p-1 bg-indigo-50/50">
+                    <div className="p-1 bg-slate-50">
                       <Link
                         to="/admin"
                         onClick={() => setShowAccountMenu(false)}
-                        className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-xs"
+                        className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white transition-colors shadow-xs"
                       >
                         <div className="flex items-center gap-2">
                           <ShieldCheck className="w-3.5 h-3.5 text-white" />
@@ -675,8 +687,8 @@ export function Header() {
                       <button
                         type="button"
                         onClick={() => {
-                          logout();
                           setShowAccountMenu(false);
+                          void logoutSession();
                         }}
                         className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50/60 transition-colors text-xs font-medium cursor-pointer"
                       >
@@ -824,12 +836,12 @@ export function Header() {
                           setAccountMenuView('menu');
                           let targetUrl: string;
                           if (selectedNotif.relatedEntityType === 'SUB_ORDER' && selectedNotif.relatedEntityId) {
-                            targetUrl = `/profile/orders?subOrderId=${selectedNotif.relatedEntityId}`;
+                            targetUrl = `/profile/orders?subOrderId=${encodeURIComponent(formatDisplayCode(selectedNotif.relatedEntityId, 'SUB'))}`;
                             if (selectedNotif.type?.includes('RESCHEDULE')) {
-                              targetUrl += `&rescheduleSubOrderId=${selectedNotif.relatedEntityId}`;
+                              targetUrl += `&rescheduleSubOrderId=${encodeURIComponent(formatDisplayCode(selectedNotif.relatedEntityId, 'SUB'))}`;
                             }
                           } else if (selectedNotif.relatedEntityType === 'ORDER' && selectedNotif.relatedEntityId) {
-                            targetUrl = `/profile/orders?orderId=${selectedNotif.relatedEntityId}`;
+                            targetUrl = `/profile/orders?orderId=${encodeURIComponent(formatDisplayCode(selectedNotif.relatedEntityId, 'ORD'))}`;
                           } else {
                             targetUrl = '/profile/orders?tab=all';
                           }

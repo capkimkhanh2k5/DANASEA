@@ -7,6 +7,7 @@ import { AdminBadge, AdminState } from '../../../components/admin/AdminUI';
 import { AdminButton, AdminFilterTabs, AdminNotice, AdminPagination } from '../../../components/admin/AdminWorkspace';
 import { filterApplications, formatDate, getStatusTone, getStatusLabel, MOCK_PARTNER_APPLICATIONS } from './roleApplicationsModel';
 import { RoleApplicationDetail } from './RoleApplicationDetail';
+import { formatDisplayCode } from '../../../utils/displayCode';
 import './RoleApplications.css';
 
 const PAGE_SIZE = 8;
@@ -281,7 +282,7 @@ export function RoleApplications() {
                       <tr key={app.id} data-selected={app.id === selectedApp?.id}>
                         <td>
                           <div className="font-semibold text-slate-900">{app.businessName}</div>
-                          <span className="text-[11px] text-slate-500 font-mono">User: {app.userId.slice(0, 8)}...</span>
+                          <span className="text-[11px] text-slate-500 font-mono" title={app.userId}>User: #{formatDisplayCode(app.userId, 'USER')}</span>
                         </td>
                         <td>
                           <span className="font-mono text-slate-800 text-xs">{app.taxCode || 'Chưa cung cấp'}</span>

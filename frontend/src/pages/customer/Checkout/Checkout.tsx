@@ -1,6 +1,6 @@
 import { BookingStepper } from "../../../components/customer/BookingStepper";
 import { useNavigate } from "react-router-dom";
-import { useCartStore } from "../../../store/useCartStore";
+import { useCartStore, isCartItemExpired } from "../../../store/useCartStore";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useLanguageStore } from "../../../store/useLanguageStore";
 import { bookingService } from "../../../services/bookingService";
@@ -195,6 +195,11 @@ export function Checkout() {
 
     if (!items.every((item) => VALID_UUID_REGEX.test(item.slotId) && VALID_UUID_REGEX.test(item.serviceId))) {
       useCartStore.getState().clearCart();
+      navigate('/cart');
+      return;
+    }
+
+    if (items.some(isCartItemExpired)) {
       navigate('/cart');
       return;
     }
