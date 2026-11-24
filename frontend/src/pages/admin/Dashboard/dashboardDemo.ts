@@ -6,6 +6,7 @@ import {
   MOCK_ADMIN_SUB_ORDERS,
   MOCK_ADMIN_VENDORS
 } from '../../../data/adminMockData';
+import { formatDisplayCode } from '../../../utils/displayCode';
 
 const DEMO_SERVICE_NAMES: Record<string, string> = {
   '088d874c-a61e-5b58-a7a9-497f32a56901': 'Mô tô nước – Danabeach',
@@ -33,13 +34,13 @@ const DEMO_SERVICE_NAMES: Record<string, string> = {
 
 function getVendorName(vendorId: string): string {
   const found = MOCK_ADMIN_VENDORS.find(v => v.id === vendorId);
-  return found?.businessName || `Đối tác #${vendorId.slice(0, 8)}`;
+  return found?.businessName || `Đối tác #${formatDisplayCode(vendorId, 'VND')}`;
 }
 
 function getServiceName(serviceId: string): string {
   if (DEMO_SERVICE_NAMES[serviceId]) return DEMO_SERVICE_NAMES[serviceId];
   const found = MOCK_ADMIN_SERVICES.find(s => s.id === serviceId);
-  return found?.name || `Trải nghiệm #${serviceId.slice(0, 8)}`;
+  return found?.name || `Trải nghiệm #${formatDisplayCode(serviceId, 'SRV')}`;
 }
 
 function computeHotServices(range: DateRange): HotServiceItem[] {
