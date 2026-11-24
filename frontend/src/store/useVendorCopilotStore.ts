@@ -10,6 +10,7 @@ export interface ChatUiMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  context?: AttachedContext;
   artifacts?: CopilotArtifact[];
   toolsUsed?: string[];
   createdAt: string;
@@ -188,17 +189,26 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
       effectiveText = `${mediaList}\n\n${trimmed}`;
     }
 
+    // If context is attached and user asks generic reference ('này', 'đó', 'dịch vụ này'),
+    // clarify the target object label so BE NLP/LLM disambiguates intent from generic count questions
+    let apiMessage = effectiveText;
+    if (attachedContext && attachedContext.label) {
+      apiMessage = `[Về ${attachedContext.label} (ID: ${attachedContext.id})] ${effectiveText}`;
+    }
+
     const userMsgId = 'user-' + Date.now();
     const userMsg: ChatUiMessage = {
       id: userMsgId,
       role: 'user',
       content: effectiveText,
+      context: attachedContext, // Preserve attached context chip inside the sent message
       createdAt: new Date().toISOString(),
     };
 
     set((state) => ({
       messages: [...state.messages, userMsg],
       isLoading: true,
+      attachedContext: undefined, // Consume pinned context on send like LLM attachments
       attachedMedia: [],
       error: null,
     }));
@@ -207,7 +217,7 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
       const detectedLang = detectLanguage(effectiveText);
       const res = await vendorAiService.chatCopilot({
         conversationId: activeConversationId,
-        message: effectiveText,
+        message: apiMessage,
         contextType: attachedContext?.type,
         contextId: attachedContext?.id,
       }, detectedLang);
@@ -242,7 +252,7 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
           {
             id: 'err-' + Date.now(),
             role: 'assistant',
-            content: `⚠️ ${errorText}`,
+            content: errorText,
             createdAt: new Date().toISOString(),
           },
         ],

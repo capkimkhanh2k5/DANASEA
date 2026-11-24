@@ -8,7 +8,8 @@ import {
   Pin, 
   Trash2, 
   MoreVertical,
-  Plus 
+  Plus,
+  Paperclip
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from './CopilotArtifactCard';
@@ -252,7 +253,13 @@ export const VendorCopilotDrawer: React.FC = () => {
               >
                 {isUser ? (
                   <div className="bg-sky-700 text-white rounded-xl rounded-tr-xs px-3.5 py-2.5 max-w-[85%] text-xs font-normal leading-relaxed shadow-xs">
-                    {formatTextWithDisplayCodes(m.content)}
+                    {m.context && (
+                      <div className="mb-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/15 border border-white/20 text-sky-200 text-[10px] font-medium">
+                        <Paperclip className="w-2.5 h-2.5 text-sky-300 shrink-0" />
+                        <span className="truncate max-w-[180px]">{m.context.label}</span>
+                      </div>
+                    )}
+                    <div>{formatTextWithDisplayCodes(m.content)}</div>
                   </div>
                 ) : (
                   <div className="bg-white border border-slate-200/90 text-slate-800 rounded-xl rounded-tl-xs px-3.5 py-2.5 max-w-[92%] text-xs leading-relaxed shadow-xs">
