@@ -145,10 +145,28 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
           }
         }
         const toolsUsedList = m.toolsUsed ? m.toolsUsed.split(',').filter(Boolean) : undefined;
+
+        // Parse legacy or backend-saved prefix "[Về [Dịch vụ...] (ID: ...)]" out of user text into clean context chip
+        let displayContent = m.content;
+        let extractedContext: AttachedContext | undefined;
+        const prefixMatch = m.content.match(/^\[Về (?:\[(.+?)\] )?(.+?) \(ID: ([a-f0-9-]+)\)\] (.*)$/s);
+        if (prefixMatch && m.role.toLowerCase() === 'user') {
+          const typeStr = prefixMatch[1] || 'SERVICE';
+          const labelStr = prefixMatch[2];
+          const idStr = prefixMatch[3];
+          displayContent = prefixMatch[4];
+          extractedContext = {
+            type: (typeStr.includes('Dịch vụ') ? 'SERVICE' : 'ORDER') as VendorContextType,
+            id: idStr,
+            label: labelStr,
+          };
+        }
+
         return {
           id: m.id,
           role: m.role.toLowerCase() === 'user' ? 'user' : 'assistant',
-          content: m.content,
+          content: displayContent,
+          context: extractedContext,
           artifacts: parsedArtifacts,
           toolsUsed: toolsUsedList,
           createdAt: m.createdAt,
@@ -189,19 +207,12 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
       effectiveText = `${mediaList}\n\n${trimmed}`;
     }
 
-    // If context is attached and user asks generic reference ('này', 'đó', 'dịch vụ này'),
-    // clarify the target object label so BE NLP/LLM disambiguates intent from generic count questions
-    let apiMessage = effectiveText;
-    if (attachedContext && attachedContext.label) {
-      apiMessage = `[Về ${attachedContext.label} (ID: ${attachedContext.id})] ${effectiveText}`;
-    }
-
     const userMsgId = 'user-' + Date.now();
     const userMsg: ChatUiMessage = {
       id: userMsgId,
       role: 'user',
-      content: effectiveText,
-      context: attachedContext, // Preserve attached context chip inside the sent message
+      content: effectiveText, // Pure user text, zero prefix strings
+      context: attachedContext, // Clean context chip rendered above or inside message
       createdAt: new Date().toISOString(),
     };
 
@@ -217,7 +228,7 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
       const detectedLang = detectLanguage(effectiveText);
       const res = await vendorAiService.chatCopilot({
         conversationId: activeConversationId,
-        message: apiMessage,
+        message: effectiveText, // Send clean user message
         contextType: attachedContext?.type,
         contextId: attachedContext?.id,
       }, detectedLang);

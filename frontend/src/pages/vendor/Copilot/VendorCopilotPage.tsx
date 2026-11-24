@@ -183,33 +183,35 @@ export function VendorCopilotPage() {
                   key={m.id}
                   className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                 >
-                  <div
-                    className={`max-w-[80%] rounded-2xl p-4 text-xs leading-relaxed ${
-                      isUser
-                        ? 'bg-slate-900 text-white rounded-tr-xs'
-                        : 'bg-slate-50 border border-slate-200/90 text-slate-900 rounded-tl-xs shadow-2xs'
-                    }`}
-                  >
+                  <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-[80%]`}>
                     {isUser && m.context && (
-                      <div className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/15 border border-white/20 text-sky-200 text-[11px] font-medium">
-                        <Paperclip className="w-3 h-3 text-sky-300 shrink-0" />
-                        <span className="truncate max-w-[240px]">{m.context.label}</span>
+                      <div className="mb-1.5 self-end inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200/80 text-sky-800 text-[11px] font-medium shadow-2xs">
+                        <Paperclip className="w-3 h-3 text-sky-600 shrink-0" />
+                        <span className="truncate max-w-[280px]">{m.context.label}</span>
                       </div>
                     )}
 
-                    {isUser ? (
-                      <div className="whitespace-pre-wrap">{formatTextWithDisplayCodes(m.content)}</div>
-                    ) : (
-                      <MarkdownText content={m.content} />
-                    )}
+                    <div
+                      className={`w-full rounded-2xl p-4 text-xs leading-relaxed ${
+                        isUser
+                          ? 'bg-slate-900 text-white rounded-tr-xs'
+                          : 'bg-slate-50 border border-slate-200/90 text-slate-900 rounded-tl-xs shadow-2xs'
+                      }`}
+                    >
+                      {isUser ? (
+                        <div className="whitespace-pre-wrap">{formatTextWithDisplayCodes(m.content)}</div>
+                      ) : (
+                        <MarkdownText content={m.content} />
+                      )}
 
-                    {!isUser && m.artifacts && m.artifacts.length > 0 && (
-                      <div className="flex flex-col gap-2 mt-3">
-                        {m.artifacts.map((art, aIdx) => (
-                          <CopilotArtifactCard key={aIdx} artifact={art} />
-                        ))}
-                      </div>
-                    )}
+                      {!isUser && m.artifacts && m.artifacts.length > 0 && (
+                        <div className="flex flex-col gap-2 mt-3">
+                          {m.artifacts.map((art, aIdx) => (
+                            <CopilotArtifactCard key={aIdx} artifact={art} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <span className="text-[10px] text-slate-400 mt-1 px-1 font-mono tabular-nums">
                     {new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
