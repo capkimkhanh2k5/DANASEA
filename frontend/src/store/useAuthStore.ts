@@ -9,6 +9,8 @@ interface AuthState {
   isAuthenticated: boolean;
   setAuth: (user: User, token: string) => void;
   setPendingToken: (token: string) => void;
+  setAccessToken: (token: string) => void;
+  updateUser: (patch: Partial<User>) => void;
   login: (userData: User, token?: string) => void;
   logout: () => void;
   switchRole: (roleKey: 'customer' | 'vendor' | 'admin') => User;
@@ -63,6 +65,13 @@ const OFFICIAL_SEED_ACCOUNTS: Record<'customer' | 'vendor' | 'admin', User & { p
   },
 };
 
+let authEpoch = 0;
+
+/** Monotonic counter bumped on login/logout/account-switch so in-flight refreshes never overwrite a newer session. */
+export function getAuthEpoch() {
+  return authEpoch;
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -71,21 +80,32 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
 
       setAuth: (user, token) => {
-        if (import.meta.env.DEV) {
+        authEpoch += 1;
+        if (import.meta.env?.DEV) {
           console.log('[useAuthStore] Setting authenticated user:', user.email, 'Role:', user.role);
         }
         set({ user, accessToken: token, isAuthenticated: true });
       },
 
       setPendingToken: (token) => {
-        if (import.meta.env.DEV) {
+        authEpoch += 1;
+        if (import.meta.env?.DEV) {
           console.log('[useAuthStore] Setting temporary registration token (unauthenticated) for OTP flow');
         }
         set({ user: null, accessToken: token, isAuthenticated: false });
       },
 
+      setAccessToken: (token) => {
+        set({ accessToken: token });
+      },
+
+      updateUser: (patch) => {
+        set((state) => (state.user ? { user: { ...state.user, ...patch } } : state));
+      },
+
       login: (userData, token) => {
-        if (import.meta.env.DEV) {
+        authEpoch += 1;
+        if (import.meta.env?.DEV) {
           console.log('[useAuthStore] login() invoked for:', userData.email);
         }
         set({
@@ -96,7 +116,8 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        if (import.meta.env.DEV) {
+        authEpoch += 1;
+        if (import.meta.env?.DEV) {
           console.log('[useAuthStore] logout() invoked. Clearing state.');
         }
         set({ user: null, accessToken: null, isAuthenticated: false });

@@ -100,8 +100,9 @@ app:
     hold-duration: ${APP_BOOKING_HOLD_DURATION:5m}
   jwt:
     secret: ${APP_JWT_SECRET}
-    access-token-minutes: ${APP_JWT_ACCESS_TOKEN_MINUTES:15}
+    access-token-minutes: ${APP_JWT_ACCESS_TOKEN_MINUTES:60}
     refresh-token-days: ${APP_JWT_REFRESH_TOKEN_DAYS:7}
+    cookie-secure: ${APP_JWT_COOKIE_SECURE:true}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080,http://localhost:5173}
   oauth2:

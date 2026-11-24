@@ -2,6 +2,7 @@ package com.danasea.backend.modules.ai.application.usecases;
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -48,6 +49,9 @@ final class CopilotReportAnswer {
             "1/20|it khach|cong suat thap|low occupancy|con trong|vang khach");
     private static final Pattern SLOT_HIGH_OCCUPANCY = Pattern.compile(
             "90%|95%|kin cho|mo them ca|tang suc chua|high demand|extra slot|expand capacity");
+    private static final Pattern CANCELLATION_DETAIL_REQUEST = CopilotRequest.words(
+            "phan loai|chia theo|nguyen nhan|ly do|nhieu nhat|top|reasons?|causes?|"
+                    + "khach hang|vendor|thoi tiet|admin|hoan tien|refunds?|breakdown");
 
     private CopilotReportAnswer() {}
 
@@ -214,6 +218,23 @@ final class CopilotReportAnswer {
         sb.append(english
                 ? "%s had %d cancellations out of %d bookings (%s).".formatted(dates(period, true), cancelled, all, share)
                 : "Kỳ %s có %d/%d đơn hủy (%s).".formatted(dates(period, false), cancelled, all, share));
+
+        String q = normalizedQuestion != null ? normalizedQuestion : "";
+        boolean asksDetail = CopilotRequest.matches(CANCELLATION_DETAIL_REQUEST, q);
+
+        if (!asksDetail) {
+            if (cancelled == 0) {
+                sb.append(english
+                        ? " No cancellation or refund records in this period. See the card below for details."
+                        : " Chưa ghi nhận yêu cầu hủy/hoàn tiền nào trong kỳ này. Chi tiết xem thẻ bên dưới.");
+            } else {
+                sb.append(english
+                        ? " See the breakdown card below for details by cause."
+                        : " Chi tiết phân loại nguyên nhân xem thẻ bên dưới.");
+            }
+            return sb.toString();
+        }
+
         sb.append(english
                 ? "\nBreakdown by category: %s.".formatted(String.join(", ", categoryParts))
                 : "\nPhân loại theo nhóm nguyên nhân: %s.".formatted(String.join(", ", categoryParts)));
@@ -227,14 +248,15 @@ final class CopilotReportAnswer {
                     .toList();
             if (!rankedReasons.isEmpty()) {
                 sb.append(english
-                        ? "\nTop reasons (cancellationsByReason): %s.".formatted(String.join(", ", rankedReasons))
-                        : "\nCác lý do hủy/hoàn tiền phổ biến (cancellationsByReason): %s.".formatted(String.join(", ", rankedReasons)));
+                        ? "\nTop cancellation/refund reasons: %s.".formatted(String.join(", ", rankedReasons))
+                        : "\nCác lý do hủy/hoàn tiền phổ biến: %s.".formatted(String.join(", ", rankedReasons)));
             }
         } else if (cancelled == 0) {
             sb.append(english
                     ? "\nNo cancellation or refund reason records in this period."
                     : "\nChưa ghi nhận yêu cầu hủy/hoàn tiền nào trong kỳ này.");
         }
+        sb.append(english ? "\nSee the card below for full details." : "\nChi tiết xem thẻ bên dưới.");
         return sb.toString();
     }
 
@@ -353,6 +375,7 @@ final class CopilotReportAnswer {
         if (!matchedByName.isEmpty()) {
             sb.append(english ? "Matched vendor diagnostics: " : "Số liệu đối tác được nhắc tới: ");
             sb.append(formatVendorList(matchedByName, english));
+            sb.append(english ? ". See the table below for details." : ". Chi tiết xem bảng bên dưới.");
             return sb.toString().strip();
         }
 
@@ -363,50 +386,92 @@ final class CopilotReportAnswer {
                                 .formatted(data.size())
                         : "Dữ liệu hiện tại: 0 đối tác vượt ngưỡng hủy 20.0%% trong số %d đối tác.".formatted(data.size()));
             } else {
-                sb.append(english ? "High-cancellation vendors: " : "Đối tác có tỷ lệ hủy cao (> 20%%): ");
+                sb.append(english ? "Vendors with a high cancellation rate (over 20%): " : "Đối tác có tỷ lệ hủy cao (trên 20%): ");
+                highCancel.sort(Comparator.comparingDouble((JsonNode i) -> i.path("cancellationRate").asDouble(0.0)).reversed());
                 sb.append(formatVendorList(highCancel, english));
             }
             return sb.toString().strip();
         }
 
         if (!flagged.isEmpty()) {
-            sb.append(english
-                    ? "Live vendor diagnostics (%d flagged out of %d): ".formatted(flagged.size(), data.size())
-                    : "Chẩn đoán đối tác thực tế (%d cảnh báo / %d đối tác): ".formatted(flagged.size(), data.size()));
-            sb.append(formatVendorList(flagged, english));
+            sb.append(flaggedSummary(flagged, data.size(), english));
         } else if (data.isEmpty()) {
             sb.append(english
                     ? "Live diagnostics: no vendor performance records in this period."
                     : "Dữ liệu hiện tại: không có bản ghi hiệu suất đối tác trong kỳ này.");
         } else {
             sb.append(english
-                    ? "Live diagnostics: all %d evaluated vendor(s) are currently HEALTHY."
+                    ? "All %d evaluated vendor(s) are currently stable with no threshold alerts. See the table below for details."
                             .formatted(data.size())
-                    : "Dữ liệu hiện tại: toàn bộ %d đối tác đang ở trạng thái HEALTHY (chưa ghi nhận cảnh báo vượt ngưỡng)."
+                    : "Toàn bộ %d đối tác hiện đang hoạt động ổn định, chưa ghi nhận cảnh báo vượt ngưỡng. Chi tiết xem bảng bên dưới."
                             .formatted(data.size()));
         }
         return sb.toString().strip();
     }
 
+    private static final int MAX_NAMED_VENDORS = 3;
+
+    private static String severityLabel(String severity, boolean english) {
+        return switch (severity) {
+            case "CRITICAL" -> english ? "critical" : "nghiêm trọng";
+            case "WARNING" -> english ? "needs attention" : "cần lưu ý";
+            default -> english ? "stable" : "ổn định";
+        };
+    }
+
+    /** Short natural-language list of vendor names; details live in the card, not in the message. */
+    private static String vendorNames(List<JsonNode> items, boolean english) {
+        List<String> names = items.stream().limit(MAX_NAMED_VENDORS)
+                .map(item -> item.path("businessName").asText("Vendor")).toList();
+        String joined = String.join(", ", names);
+        int rest = items.size() - names.size();
+        if (rest <= 0) return joined;
+        return english ? joined + " and " + rest + " more" : joined + " và " + rest + " đối tác khác";
+    }
+
+    /** Human-readable one-liner for explicitly requested vendors (no raw enum/field dump). */
     private static String formatVendorList(List<JsonNode> items, boolean english) {
         List<String> lines = new ArrayList<>();
-        for (JsonNode item : items.stream().limit(8).toList()) {
+        for (JsonNode item : items.stream().limit(MAX_NAMED_VENDORS).toList()) {
             String name = item.path("businessName").asText("Vendor");
-            String severity = item.path("severity").asText("HEALTHY");
+            String severity = severityLabel(item.path("severity").asText("HEALTHY"), english);
             double cancel = item.path("cancellationRate").asDouble(0.0);
             double occ = item.path("slotOccupancyRate").asDouble(0.0);
             BigDecimal rating = item.path("ratingAvg").decimalValue();
             int ratingCount = item.path("ratingCount").asInt(0);
-            List<String> issues = new ArrayList<>();
-            item.path("issueTypes").forEach(n -> issues.add(n.asText()));
-            String issueStr = issues.isEmpty() ? "NONE" : String.join(", ", issues);
+            String ratingText = ratingCount == 0
+                    ? (english ? "no reviews yet" : "chưa có đánh giá")
+                    : (english ? "%s stars (%d reviews)" : "%s sao (%d lượt)")
+                            .formatted(rating.stripTrailingZeros().toPlainString(), ratingCount);
             lines.add(english
-                    ? "%s [%s | cancel=%.2f%%, occupancy=%.2f%%, rating=%s (%d reviews), issues=%s]"
-                            .formatted(name, severity, cancel, occ, rating.stripTrailingZeros().toPlainString(), ratingCount, issueStr)
-                    : "%s [%s | tỷ lệ hủy=%.2f%%, lấp đầy=%.2f%%, đánh giá=%s (%d lượt), cảnh báo=%s]"
-                            .formatted(name, severity, cancel, occ, rating.stripTrailingZeros().toPlainString(), ratingCount, issueStr));
+                    ? "%s - %s: cancellation %.1f%%, occupancy %.1f%%, %s"
+                            .formatted(name, severity, cancel, occ, ratingText)
+                    : "%s - %s: tỷ lệ hủy %.1f%%, lấp đầy %.1f%%, %s"
+                            .formatted(name, severity, cancel, occ, ratingText));
         }
+        int rest = items.size() - lines.size();
+        if (rest > 0) lines.add(english ? "and " + rest + " more (see the table below)" : "và " + rest + " đối tác khác (xem bảng bên dưới)");
         return String.join("; ", lines);
+    }
+
+    private static String flaggedSummary(List<JsonNode> flagged, int total, boolean english) {
+        long critical = flagged.stream().filter(i -> "CRITICAL".equals(i.path("severity").asText())).count();
+        long warning = flagged.size() - critical;
+        List<String> breakdown = new ArrayList<>();
+        if (critical > 0) breakdown.add(english ? critical + " critical" : critical + " nghiêm trọng");
+        if (warning > 0) breakdown.add(english ? warning + " to monitor" : warning + " cần theo dõi");
+        String breakdownText = breakdown.isEmpty() ? "" : " (" + String.join(", ", breakdown) + ")";
+
+        List<JsonNode> ranked = flagged.stream()
+                .sorted(Comparator.comparingInt((JsonNode i) -> "CRITICAL".equals(i.path("severity").asText()) ? 0 : 1)
+                        .thenComparing((JsonNode i) -> -i.path("cancellationRate").asDouble(0.0)))
+                .toList();
+        String names = vendorNames(ranked, english);
+        return english
+                ? "%d/%d vendors need attention%s. Most notable: %s. See the table below for details."
+                        .formatted(flagged.size(), total, breakdownText, names)
+                : "Có %d/%d đối tác cần lưu ý%s. Đáng chú ý nhất: %s. Chi tiết từng chỉ số xem bảng bên dưới."
+                        .formatted(flagged.size(), total, breakdownText, names);
     }
 
     static String vendorReviewCoaching(JsonNode data, String normalizedQuestion, boolean english) {
@@ -431,7 +496,9 @@ final class CopilotReportAnswer {
             JsonNode pillar = pillarsNode.path(key);
             if (!pillar.isMissingNode()) {
                 pillarLines.add("%s: %d/10 (%s)".formatted(
-                        key, pillar.path("scoreOutOf10").asInt(0), pillar.path("sentiment").asText("NEUTRAL")));
+                        pillarLabel(key, english),
+                        pillar.path("scoreOutOf10").asInt(0),
+                        sentimentLabel(pillar.path("sentiment").asText("NEUTRAL"), english)));
                 collectQuotes(pillar.path("negativeQuotes"), key, seenQuotes, allQuotes, topicQuotes);
                 collectQuotes(pillar.path("positiveQuotes"), key, seenQuotes, allQuotes, topicQuotes);
             }
@@ -453,14 +520,25 @@ final class CopilotReportAnswer {
 
         if (!pillarLines.isEmpty()) {
             sb.append(english
-                    ? "\n4-pillar summary: %s.".formatted(String.join(", ", pillarLines))
+                    ? "\n4-pillar overview: %s.".formatted(String.join(", ", pillarLines))
                     : "\nTổng hợp 4 trụ cột: %s.".formatted(String.join(", ", pillarLines)));
+        }
+
+        if (!topicWaiting) {
+            String roadmap = data.path("badgeProgression").path("roadmapNote").asText("");
+            if (!roadmap.isBlank()) {
+                sb.append(english ? "\nBadge roadmap (non-guaranteed): " : "\nLộ trình huy hiệu (không cam kết chắc chắn): ").append(roadmap);
+            }
+            sb.append(english
+                    ? "\nSee the review coaching card below for pillar details and action recommendations."
+                    : "\nChi tiết điểm từng trụ cột và khuyến nghị cải thiện xem thẻ bên dưới.");
+            return sb.toString();
         }
 
         sb.append(english
                 ? "\n\nVerified Review Evidence:"
                 : "\n\nBằng chứng từ đánh giá đã xác minh:");
-        List<String> cited = topicWaiting ? topicQuotes : allQuotes;
+        List<String> cited = topicQuotes;
         if (cited.isEmpty()) {
             sb.append(english
                     ? "\n- Found 0 matching quotes for this topic out of %d analyzed review(s).".formatted(totalAnalyzed)
@@ -474,24 +552,36 @@ final class CopilotReportAnswer {
         sb.append(english
                 ? "\n\nOperational Hypotheses Requiring Verification (unconfirmed by system data):"
                 : "\n\nGiả thuyết vận hành cần kiểm chứng thêm (chưa xác nhận từ dữ liệu hệ thống):");
-        if (topicWaiting) {
-            sb.append(english
-                    ? "\n- Possible operational factors to verify against pier/dispatch logs (not confirmed from telemetry): check-in buffer between slots, boat/cano turnaround scheduling, and guest delay notifications."
-                    : "\n- Các yếu tố vận hành cần đối chiếu thêm từ nhật ký bến/điều phối (chưa xác nhận từ dữ liệu hệ thống): thời gian đệm giữa các ca xuất bến, năng lực quay vòng cano giờ cao điểm, và quy trình báo trước khi trễ giờ.");
-        }
-        JsonNode actions = data.path("actionItems");
-        if (actions.isArray() && !actions.isEmpty()) {
-            for (JsonNode action : actions) {
-                sb.append("\n- [").append(action.path("pillar").asText("")).append("] ")
-                        .append(action.path("title").asText("")).append(": ")
-                        .append(action.path("recommendation").asText(""));
-            }
-        }
+        sb.append(english
+                ? "\n- Possible operational factors to verify against pier/dispatch logs (not confirmed from telemetry): check-in buffer between slots, boat/cano turnaround scheduling, and guest delay notifications."
+                : "\n- Các yếu tố vận hành cần đối chiếu thêm từ nhật ký bến/điều phối (chưa xác nhận từ dữ liệu hệ thống): thời gian đệm giữa các ca xuất bến, năng lực quay vòng cano giờ cao điểm, và quy trình báo trước khi trễ giờ.");
         String roadmap = data.path("badgeProgression").path("roadmapNote").asText("");
         if (!roadmap.isBlank()) {
             sb.append(english ? "\nBadge roadmap (non-guaranteed): " : "\nLộ trình huy hiệu (không cam kết chắc chắn): ").append(roadmap);
         }
+        sb.append(english
+                ? "\nSee the card below for full pillar scores and recommendations."
+                : "\nChi tiết các khuyến nghị khắc phục xem thẻ bên dưới.");
         return sb.toString();
+    }
+
+    private static String pillarLabel(String key, boolean english) {
+        return switch (key) {
+            case "GUIDE" -> english ? "Guide" : "Hướng dẫn viên";
+            case "SAFETY" -> english ? "Safety" : "An toàn";
+            case "PUNCTUALITY" -> english ? "Punctuality" : "Đúng giờ";
+            case "VALUE" -> english ? "Value" : "Giá trị";
+            default -> key;
+        };
+    }
+
+    private static String sentimentLabel(String sentiment, boolean english) {
+        return switch (sentiment) {
+            case "POSITIVE" -> english ? "positive" : "tích cực";
+            case "NEGATIVE" -> english ? "needs improvement" : "cần cải thiện";
+            case "NO_DATA" -> english ? "no data" : "chưa có dữ liệu";
+            default -> english ? "neutral" : "trung lập";
+        };
     }
 
     private static void collectQuotes(JsonNode quotesNode, String pillar, Set<String> seen,
@@ -516,6 +606,10 @@ final class CopilotReportAnswer {
     }
 
     static String vendorSlotAdvisor(JsonNode data, String normalizedQuestion, boolean english) {
+        return vendorSlotAdvisor(data, normalizedQuestion, null, english);
+    }
+
+    static String vendorSlotAdvisor(JsonNode data, String normalizedQuestion, LocalDate targetDate, boolean english) {
         if (!data.has("totalSlotsEvaluated")) return unavailable(english);
         int evaluated = data.path("totalSlotsEvaluated").asInt(0);
         long highDemand = data.path("highDemandSlotsCount").asLong(0);
@@ -524,11 +618,27 @@ final class CopilotReportAnswer {
         String q = normalizedQuestion != null ? normalizedQuestion : "";
 
         StringBuilder sb = new StringBuilder();
-        sb.append(english
-                ? "Evaluated %d upcoming slot(s) (high demand: %d, low demand: %d, weather watch/risk: %d)."
-                        .formatted(evaluated, highDemand, lowDemand, weatherRisk)
-                : "Đã kiểm tra %d ca sắp tới (nhu cầu cao: %d, công suất thấp: %d, cần lưu ý thời tiết: %d)."
-                        .formatted(evaluated, highDemand, lowDemand, weatherRisk));
+        if (targetDate != null) {
+            String dateLabel = targetDate.format(english ? DateTimeFormatter.ISO_LOCAL_DATE : VI_DATE);
+            if (evaluated == 0) {
+                return english
+                        ? "There are currently 0 scheduled slots on %s for this scope. See the advisory card below for details."
+                                .formatted(dateLabel)
+                        : "Ngày %s hiện có 0 ca hoạt động được mở cho phạm vi tra cứu này. Chi tiết xem thẻ bên dưới."
+                                .formatted(dateLabel);
+            }
+            sb.append(english
+                    ? "On %s, there are %d scheduled slot(s) (high demand: %d, low demand: %d, weather watch/risk: %d)."
+                            .formatted(dateLabel, evaluated, highDemand, lowDemand, weatherRisk)
+                    : "Ngày %s có %d ca hoạt động (nhu cầu cao: %d, công suất thấp: %d, cần lưu ý thời tiết: %d)."
+                            .formatted(dateLabel, evaluated, highDemand, lowDemand, weatherRisk));
+        } else {
+            sb.append(english
+                    ? "Evaluated %d upcoming slot(s) (high demand: %d, low demand: %d, weather watch/risk: %d)."
+                            .formatted(evaluated, highDemand, lowDemand, weatherRisk)
+                    : "Đã kiểm tra %d ca sắp tới (nhu cầu cao: %d, công suất thấp: %d, cần lưu ý thời tiết: %d)."
+                            .formatted(evaluated, highDemand, lowDemand, weatherRisk));
+        }
 
         boolean hasRiskyOrUnknownSlot = false;
         JsonNode recs = data.path("recommendations");
@@ -554,30 +664,52 @@ final class CopilotReportAnswer {
                 if ("HIGH_RISK".equals(weatherLevel) || "UNKNOWN".equals(weatherLevel) || "MODERATE".equals(weatherLevel)) {
                     hasRiskyOrUnknownSlot = true;
                 }
-                if (count++ < 5) {
-                    lines.add("%s (%s %s): %d/%d (%.1f%%) | weather=%s | %s — %s".formatted(
-                            rec.path("serviceTitle").asText("Service"),
-                            rec.path("date").asText(""),
-                            rec.path("startTime").asText(""),
-                            rec.path("bookedCount").asInt(0),
-                            rec.path("capacity").asInt(0),
-                            rec.path("occupancyRate").asDouble(0.0),
-                            weatherLevel,
-                            rec.path("recommendationType").asText(""),
-                            rec.path("adviceReason").asText("")));
+                if (count++ < 3) {
+                    String dateStr = formatJsonDate(rec.path("date"));
+                    String timeStr = formatJsonTime(rec.path("startTime"));
+                    lines.add(english
+                            ? "- %s (%s %s): %d/%d (%.1f%%) — weather: %s, suggestion: %s."
+                                    .formatted(
+                                            rec.path("serviceTitle").asText("Service"),
+                                            dateStr,
+                                            timeStr,
+                                            rec.path("bookedCount").asInt(0),
+                                            rec.path("capacity").asInt(0),
+                                            rec.path("occupancyRate").asDouble(0.0),
+                                            weatherLabel(weatherLevel, true),
+                                            slotRecommendationLabel(rec.path("recommendationType").asText(""), true))
+                            : "- %s (%s %s): %d/%d (%.1f%%) — thời tiết %s, gợi ý %s."
+                                    .formatted(
+                                            rec.path("serviceTitle").asText("Dịch vụ"),
+                                            dateStr,
+                                            timeStr,
+                                            rec.path("bookedCount").asInt(0),
+                                            rec.path("capacity").asInt(0),
+                                            rec.path("occupancyRate").asDouble(0.0),
+                                            weatherLabel(weatherLevel, false),
+                                            slotRecommendationLabel(rec.path("recommendationType").asText(""), false)));
                 }
             }
             sb.append("\n").append(String.join("\n", lines));
+            if (ordered.size() > 3) {
+                sb.append(english
+                        ? "\n... and %d more slot(s). See the advisory card below for details.".formatted(ordered.size() - 3)
+                        : "\n... và %d ca khác. Chi tiết từng ca xem thẻ bên dưới.".formatted(ordered.size() - 3));
+            } else {
+                sb.append(english
+                        ? "\nSee the advisory card below for full recommendations."
+                        : "\nChi tiết khuyến nghị từng ca xem thẻ bên dưới.");
+            }
         }
 
         if (hasRiskyOrUnknownSlot || CopilotRequest.matches(SLOT_UNSAFE_OR_UNKNOWN, q)) {
             sb.append(english
                     ? "\nSafety rule: Marine safety ALWAYS overrides demand. NEVER expand capacity or open extra slots when weather is HIGH_RISK (UNSAFE) or UNKNOWN (missing forecast is never assumed safe)."
-                    : "\nQuy tắc an toàn: An toàn hàng hải luôn ưu tiên hơn nhu cầu. Tuyệt đối KHÔNG đề xuất tăng sức chứa hay mở thêm ca khi thời tiết ở mức HIGH_RISK (nguy hiểm) hoặc UNKNOWN (chưa có dữ liệu dự báo không được coi là an toàn).");
+                    : "\nQuy tắc an toàn: An toàn hàng hải luôn ưu tiên hơn nhu cầu. Tuyệt đối KHÔNG đề xuất tăng sức chứa hay mở thêm ca khi thời tiết nguy hiểm hoặc chưa có dữ liệu dự báo.");
         } else if (CopilotRequest.matches(SLOT_HIGH_OCCUPANCY, q)) {
             sb.append(english
-                    ? "\nBefore opening an extra slot when occupancy is high (>= 85-90%), confirm SAFE marine weather, boat/equipment capacity, and available guide crew."
-                    : "\nTrước khi mở thêm ca khi công suất đạt cao (>= 85–90%), cần kiểm tra dự báo thời tiết an toàn (SAFE), giới hạn sức chứa tàu/thiết bị và nhân sự hướng dẫn viên.");
+                    ? "\nBefore opening an extra slot when occupancy is high (>= 85-90%), confirm safe marine weather, boat/equipment capacity, and available guide crew."
+                    : "\nTrước khi mở thêm ca khi công suất đạt cao (>= 85–90%), cần kiểm tra dự báo thời tiết an toàn, giới hạn sức chứa tàu/thiết bị và nhân sự hướng dẫn viên.");
         } else if (CopilotRequest.matches(SLOT_LOW_OCCUPANCY, q)) {
             sb.append(english
                     ? "\nFor low-occupancy slots (< 20%), consider a promotional Flash Sale or proactively offering guests voluntary consolidation into an adjacent slot — never auto-cancel confirmed bookings."
@@ -586,18 +718,112 @@ final class CopilotReportAnswer {
         return sb.toString();
     }
 
+    private static String weatherLabel(String weatherLevel, boolean english) {
+        return switch (weatherLevel) {
+            case "SAFE" -> english ? "safe" : "an toàn";
+            case "MODERATE" -> english ? "moderate caution" : "cần theo dõi";
+            case "HIGH_RISK" -> english ? "high risk" : "nguy hiểm";
+            default -> english ? "forecast unavailable" : "chưa có dự báo";
+        };
+    }
+
+    private static String slotRecommendationLabel(String recType, boolean english) {
+        return switch (recType) {
+            case "EXPAND_CAPACITY" -> english ? "consider expanding capacity" : "có thể cân nhắc mở rộng sức chứa";
+            case "ADD_SLOT" -> english ? "consider adding an extra slot" : "có thể cân nhắc mở thêm ca";
+            case "WEATHER_WATCH" -> english ? "monitor marine weather" : "theo dõi sát thời tiết biển";
+            case "PROMOTE_OR_CONSOLIDATE" -> english ? "promote or offer voluntary consolidation" : "kích cầu hoặc đề xuất gộp ca";
+            case "KEEP_OPTIMAL" -> english ? "maintain current schedule" : "duy trì lịch hiện tại";
+            default -> english ? "review slot status" : "kiểm tra thêm tình trạng ca";
+        };
+    }
+
+    private static String formatJsonDate(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) return "";
+        if (node.isArray() && node.size() >= 3) {
+            return "%04d-%02d-%02d".formatted(node.get(0).asInt(), node.get(1).asInt(), node.get(2).asInt());
+        }
+        return node.asText("");
+    }
+
+    private static String formatJsonTime(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) return "";
+        if (node.isArray() && node.size() >= 2) {
+            return "%02d:%02d".formatted(node.get(0).asInt(), node.get(1).asInt());
+        }
+        String raw = node.asText("");
+        return raw.length() >= 5 ? raw.substring(0, 5) : raw;
+    }
+
+    static String vendorServiceDetail(JsonNode data, boolean english) {
+        if (!data.has("title")) return unavailable(english);
+        String title = data.path("title").asText(english ? "Service" : "Dịch vụ");
+        JsonNode options = data.path("options");
+        List<BigDecimal> optionPrices = new ArrayList<>();
+        if (options.isArray()) {
+            for (JsonNode opt : options) {
+                if (opt.path("price").isNumber()) {
+                    optionPrices.add(opt.path("price").decimalValue());
+                }
+            }
+        }
+        BigDecimal basePrice = data.path("basePrice").isNumber() ? data.path("basePrice").decimalValue() : null;
+
+        if (!optionPrices.isEmpty()) {
+            BigDecimal min = optionPrices.stream().min(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
+            BigDecimal max = optionPrices.stream().max(BigDecimal::compareTo).orElse(min);
+            String priceText = min.compareTo(max) == 0
+                    ? money(min, english)
+                    : (english ? "%s – %s".formatted(money(min, true), money(max, true))
+                            : "từ %s đến %s".formatted(money(min, false), money(max, false)));
+            return english
+                    ? "Service \"%s\" currently has %d active pricing option(s) priced at %s. See the service card below for full package details."
+                            .formatted(title, optionPrices.size(), priceText)
+                    : "Dịch vụ \"%s\" hiện có %d gói đang áp dụng với mức giá %s. Chi tiết từng gói xem thẻ bên dưới."
+                            .formatted(title, optionPrices.size(), priceText);
+        }
+        if (basePrice != null) {
+            return english
+                    ? "Service \"%s\" has a listed base price of %s. See the service card below for full details."
+                            .formatted(title, money(basePrice, true))
+                    : "Dịch vụ \"%s\" có giá niêm yết %s. Chi tiết xem thẻ bên dưới."
+                            .formatted(title, money(basePrice, false));
+        }
+        return english
+                ? "Service \"%s\" does not have a listed price yet. See the service card below for details."
+                        .formatted(title)
+                : "Dịch vụ \"%s\" hiện chưa có mức giá niêm yết. Chi tiết xem thẻ bên dưới."
+                        .formatted(title);
+    }
+
     static String vendorListingOptimization(JsonNode data, boolean english) {
         if (!data.has("listingQualityScore")) return unavailable(english);
         int score = data.path("listingQualityScore").asInt(0);
-        String category = data.path("detectedCategory").asText("COASTAL_EXPERIENCE");
         boolean compliant = data.path("policyCompliant").asBoolean(true);
         List<String> missing = new ArrayList<>();
         for (JsonNode item : data.path("missingItems")) {
-            missing.add(item.path("itemCode").asText() + ": " + item.path("description").asText());
+            String desc = item.path("description").asText("").trim();
+            if (!desc.isBlank()) missing.add(desc);
         }
-        String missingText = missing.isEmpty()
-                ? (english ? "none" : "không có mục thiếu")
-                : String.join("; ", missing);
+        String complianceNote = compliant
+                ? (english ? "policy check passed" : "đạt chuẩn nội dung")
+                : (english ? "needs policy review" : "cần rà soát lại nội dung");
+        String missingSummary;
+        if (missing.isEmpty()) {
+            missingSummary = english
+                    ? "All baseline checklist items are covered."
+                    : "Bài đăng đã đáp ứng các tiêu chí cơ bản.";
+        } else if (missing.size() <= 2) {
+            missingSummary = english
+                    ? "Missing items: %s. See the card below for details.".formatted(String.join("; ", missing))
+                    : "Cần bổ sung: %s. Chi tiết xem thẻ bên dưới.".formatted(String.join("; ", missing));
+        } else {
+            missingSummary = english
+                    ? "%d checklist items need attention (e.g. %s). See the card below for the full list."
+                            .formatted(missing.size(), String.join("; ", missing.subList(0, 2)))
+                    : "Còn thiếu %d tiêu chí cần bổ sung (ví dụ: %s). Chi tiết xem thẻ bên dưới."
+                            .formatted(missing.size(), String.join("; ", missing.subList(0, 2)));
+        }
         JsonNode draft = data.path("drafts").path(english ? "EN" : "VI");
         String draftTitle = draft.path("optimizedTitle").asText("");
         String draftDesc = draft.path("optimizedDescription").asText("");
@@ -607,98 +833,74 @@ final class CopilotReportAnswer {
                         : "\nTiêu đề đề xuất: \"%s\"\nMô tả đề xuất: %s".formatted(draftTitle, draftDesc))
                 : "";
         return (english
-                ? "Listing quality score: %d/100 (suggested category: %s — advisory only, publicationAuthorized=false; policyCompliant=%s). Missing checklist items: %s.%s\nOnly use verified facts from your service; do not add unconfirmed perks or certifications."
-                        .formatted(score, category, compliant, missingText, draftBlock)
-                : "Điểm chất lượng bài đăng: %d/100 (danh mục gợi ý: %s — chỉ mang tính tham khảo, publicationAuthorized=false; tuân thủ nội dung=%s). Các mục còn thiếu: %s.%s\nChỉ dùng thông tin thực tế của dịch vụ, không thêm quyền lợi hoặc chứng nhận chưa xác thực."
-                        .formatted(score, category, compliant, missingText, draftBlock));
+                ? "Listing quality score: %d/100 (%s; advisory only, not automatically published). %s%s\nOnly use verified facts from your service; do not add unconfirmed perks or certifications."
+                        .formatted(score, complianceNote, missingSummary, draftBlock)
+                : "Điểm chất lượng bài đăng: %d/100 (%s; kết quả chỉ mang tính tham khảo, không tự động xuất bản). %s%s\nChỉ dùng thông tin thực tế của dịch vụ, không thêm quyền lợi hoặc chứng nhận chưa xác thực."
+                        .formatted(score, complianceNote, missingSummary, draftBlock));
     }
 
     static String contentAssessment(JsonNode data, boolean english) {
         if (!data.has("status")) return unavailable(english);
         String status = data.path("status").asText("NEEDS_REVIEW");
         boolean negatedWarningOnly = data.path("negatedWarningOnly").asBoolean(false);
-        boolean publicationAuthorized = data.path("publicationAuthorized").asBoolean(false);
 
-        List<String> reasons = new ArrayList<>();
-        data.path("reasonCodes").forEach(n -> reasons.add(n.asText()));
-        List<String> contacts = new ArrayList<>();
-        data.path("contactMatches").forEach(n -> contacts.add(n.asText()));
+        int reasonCount = data.path("reasonCodes").isArray() ? data.path("reasonCodes").size() : 0;
+        int contactCount = data.path("contactMatches").isArray() ? data.path("contactMatches").size() : 0;
 
         if (negatedWarningOnly && "NO_RULE_SIGNAL".equals(status)) {
             return english
-                    ? "NO — this phrase is a customer-protection negation warning against off-platform payments, NOT an off-platform payment promotion (status: NO_RULE_SIGNAL, contactMatches: [], publicationAuthorized: %s). Only escalate if phone numbers, external links, or payment solicitation are included."
-                            .formatted(publicationAuthorized)
-                    : "KHÔNG — đây là câu cảnh báo phủ định nhằm nhắc nhở không giao dịch ngoài nền tảng, KHÔNG phải quảng cáo thanh toán ngoài (status: NO_RULE_SIGNAL, contactMatches: [], publicationAuthorized: %s). Chỉ cần chuyển kiểm duyệt nếu nội dung kèm số điện thoại, đường link hoặc lời mời chuyển khoản ngoài sàn."
-                            .formatted(publicationAuthorized);
+                    ? "NO — this phrase is a customer-protection negation warning against off-platform payments, NOT an off-platform payment promotion. Only escalate if phone numbers, external links, or payment solicitation are included. See the card below for details."
+                    : "KHÔNG — đây là câu cảnh báo phủ định nhằm nhắc nhở không giao dịch ngoài nền tảng, KHÔNG phải quảng cáo thanh toán ngoài. Chỉ cần chuyển kiểm duyệt nếu nội dung kèm số điện thoại, đường link hoặc lời mời chuyển khoản ngoài sàn. Chi tiết xem thẻ bên dưới.";
         }
 
         if ("NEEDS_REVIEW".equals(status)) {
+            String detectedSummary = contactCount > 0
+                    ? (english
+                            ? "Detected %d policy signal(s) including %d external contact/link match(es). "
+                                    .formatted(Math.max(reasonCount, 1), contactCount)
+                            : "Phát hiện %d tín hiệu cần xem xét (trong đó có %d mẫu liên hệ/đường link ngoài nền tảng). "
+                                    .formatted(Math.max(reasonCount, 1), contactCount))
+                    : (english
+                            ? "Detected %d policy signal(s) requiring moderator review. ".formatted(Math.max(reasonCount, 1))
+                            : "Phát hiện %d tín hiệu cần quản trị viên kiểm duyệt. ".formatted(Math.max(reasonCount, 1)));
             return english
-                    ? "Content flagged as NEEDS_REVIEW (publicationAuthorized: %s). Reason codes: %s; detected contacts: %s. Listings must not include personal phone numbers, external booking links, off-platform bank transfers, or exaggerated claims; remove them or route to moderator review before publishing."
-                            .formatted(publicationAuthorized, reasons.isEmpty() ? "NONE" : reasons, contacts)
-                    : "Nội dung bị gắn trạng thái NEEDS_REVIEW (publicationAuthorized: %s). Mã lý do: %s; liên hệ phát hiện: %s. Không được đưa số điện thoại cá nhân, đường link đặt tour ngoài, yêu cầu chuyển khoản ngoài DANASEA hoặc quảng cáo quá mức vào bài đăng; cần gỡ bỏ hoặc chuyển quản trị viên kiểm duyệt trước khi xuất bản."
-                            .formatted(publicationAuthorized, reasons.isEmpty() ? "NONE" : reasons, contacts);
+                    ? "Content flagged for manual review (AI never auto-approves publication). %sListings must not include personal phone numbers, external booking links, off-platform bank transfers, or exaggerated claims. See the card below for details."
+                            .formatted(detectedSummary)
+                    : "Nội dung cần được kiểm duyệt trước khi xuất bản (hệ thống không tự động duyệt bài). %sKhông được đưa số điện thoại cá nhân, đường link đặt tour ngoài, yêu cầu chuyển khoản ngoài DANASEA hoặc quảng cáo quá mức vào bài đăng. Chi tiết xem thẻ bên dưới."
+                            .formatted(detectedSummary);
         }
 
-        String category = data.path("suggestedCategory").asText("");
-        String catNote = category.isBlank() ? "" : (english ? " Suggested category (advisory only): " + category + "." : " Danh mục gợi ý (chỉ tham khảo): " + category + ".");
         return english
-                ? "Content check completed (status: %s, reasonCodes: %s, publicationAuthorized: %s).%s AI checks are advisory only and never grant publication approval."
-                        .formatted(status, reasons, publicationAuthorized, catNote)
-                : "Đã kiểm tra nội dung (status: %s, reasonCodes: %s, publicationAuthorized: %s).%s Kết quả AI chỉ mang tính gợi ý/kiểm tra trước, không thay thế quyền phê duyệt xuất bản bài đăng."
-                        .formatted(status, reasons, publicationAuthorized, catNote);
+                ? "Content check completed with no automated rule violations detected. AI checks are advisory only and never grant publication approval. See the card below for details."
+                : "Đã hoàn tất kiểm tra nhanh nội dung, chưa phát hiện dấu hiệu vi phạm quy tắc tự động. Kết quả AI chỉ mang tính tham khảo, không thay thế quyền phê duyệt xuất bản bài đăng. Chi tiết xem thẻ bên dưới.";
     }
 
     static String adminOrderRiskAssessment(JsonNode data, boolean english) {
         if (!data.has("status") && !data.has("orderId")) return unavailable(english);
-        String orderId = data.path("orderId").asText("N/A");
-        String caseId = data.path("caseId").isNull() || data.path("caseId").asText("").isBlank()
-                ? (english ? "none (live read only)" : "chưa lưu case mới (chỉ đọc trực tiếp)")
-                : data.path("caseId").asText();
-        String status = data.path("status").asText("NEEDS_REVIEW");
-        String ruleVersion = data.path("ruleVersion").asText("velocity-demo-v1");
         boolean newCaseCreated = data.path("newCaseCreated").asBoolean(false);
-        boolean fraudConfirmed = data.path("fraudConfirmed").asBoolean(false);
-
         JsonNode observed = data.path("observed");
         long failed24h = observed.path("failedPayments24h").asLong(0);
         long orders1h = observed.path("orders1h").asLong(0);
         long refunds7d = observed.path("refundRequests7d").asLong(0);
-        String paymentStatus = observed.path("paymentStatus").asText("UNKNOWN");
 
-        List<String> signals = new ArrayList<>();
-        data.path("riskSignals").forEach(n -> signals.add(n.asText()));
-        String signalText = signals.isEmpty()
-                ? (english ? "none triggered" : "không có tín hiệu kích hoạt")
-                : String.join(", ", signals);
-
-        JsonNode quyet = data.path("quyetDecision");
-        String quyetNote;
-        if (quyet.isMissingNode() || quyet.isNull()) {
-            quyetNote = english ? "Not evaluated/persisted in live read." : "Chưa đánh giá/lưu quyết định Quyet trong chế độ chỉ đọc.";
-        } else {
-            boolean available = quyet.path("available").asBoolean(false);
-            JsonNode answersNode = quyet.has("answers") ? quyet.path("answers") : quyet.path("choices");
-            quyetNote = english
-                    ? "available=%s, answers=%s".formatted(available, answersNode.toString())
-                    : "available=%s, kết quả=%s".formatted(available, answersNode.toString());
-        }
+        int signalCount = data.path("riskSignals").isArray() ? data.path("riskSignals").size() : 0;
+        String signalSummary = signalCount == 0
+                ? (english ? "no Velocity threshold signals triggered" : "chưa ghi nhận tín hiệu vượt ngưỡng Velocity")
+                : (english ? "%d Velocity risk signal(s) triggered".formatted(signalCount)
+                        : "ghi nhận %d tín hiệu rủi ro Velocity cần xem xét".formatted(signalCount));
+        String modeNote = newCaseCreated
+                ? (english ? "a new review case has been recorded" : "đã lập hồ sơ thẩm định mới")
+                : (english ? "read-only check, no new case created" : "chế độ chỉ đọc, chưa tạo hồ sơ mới");
 
         return english
-                ? ("Order risk evidence for orderId=%s (caseId=%s, status=%s, ruleVersion=%s, newCaseCreated=%s, fraudConfirmed=%s)."
-                        + "\nVerified observed facts: failedPayments24h=%d, orders1h=%d, refundRequests7d=%d, paymentStatus=%s."
-                        + "\nTriggered Velocity 3/5/3 signals: %s."
-                        + "\nQuyet AI decision: %s"
-                        + "\nLimitations: Risk signals indicate NEEDS_REVIEW only and never confirm fraud automatically; verify payment logs before acting.")
-                        .formatted(orderId, caseId, status, ruleVersion, newCaseCreated, fraudConfirmed,
-                                failed24h, orders1h, refunds7d, paymentStatus, signalText, quyetNote)
-                : ("Căn cứ đánh giá rủi ro cho đơn %s (caseId=%s, status=%s, ruleVersion=%s, newCaseCreated=%s, fraudConfirmed=%s)."
-                        + "\nDữ liệu thực tế đã xác minh (observed): thanh toán thất bại 24h=%d, số đơn trong 1h=%d, yêu cầu hoàn tiền 7 ngày=%d, trạng thái thanh toán=%s."
-                        + "\nTín hiệu Velocity 3/5/3 kích hoạt: %s."
-                        + "\nNhận định Quyet AI: %s"
-                        + "\nGiới hạn: Các tín hiệu chỉ đưa giao dịch vào trạng thái NEEDS_REVIEW (fraudConfirmed=false), không khẳng định gian lận hay tự khóa tài khoản khi Admin chưa kiểm tra log thanh toán.")
-                        .formatted(orderId, caseId, status, ruleVersion, newCaseCreated, fraudConfirmed,
-                                failed24h, orders1h, refunds7d, paymentStatus, signalText, quyetNote);
+                ? ("Order risk assessment summary (%s; %s)."
+                        + " Observed activity: %d failed payment(s) in 24h, %d order(s) in 1h, and %d refund request(s) in 7d."
+                        + " Risk signals are advisory only and never confirm fraud automatically — verify payment logs before acting. See the risk card below for full details.")
+                        .formatted(signalSummary, modeNote, failed24h, orders1h, refunds7d)
+                : ("Tổng hợp căn cứ đánh giá rủi ro đơn hàng (%s; %s)."
+                        + " Số liệu ghi nhận: %d lần thanh toán thất bại trong 24 giờ, %d đơn trong 1 giờ và %d yêu cầu hoàn tiền trong 7 ngày."
+                        + " Các tín hiệu chỉ mang tính cảnh báo (chưa tự kết luận gian lận), quản trị viên cần đối chiếu log thanh toán trước khi xử lý. Chi tiết xem thẻ bên dưới.")
+                        .formatted(signalSummary, modeNote, failed24h, orders1h, refunds7d);
     }
 
     static String adminVendorDiagnostics(JsonNode data, TimeRange period, boolean english) {

@@ -5,6 +5,7 @@ import { useCartStore } from "../../store/useCartStore";
 import { useWishlistStore } from "../../store/useWishlistStore";
 import { useLanguageStore } from "../../store/useLanguageStore";
 import { notificationService } from "../../services/notificationService";
+import { logoutSession } from "../../services/sessionService";
 import { localizeNotificationTitle, localizeNotificationBody } from "../../utils/notificationLocalization";
 import {
   Heart,
@@ -206,7 +207,7 @@ export function Header() {
   const location = useLocation();
 
   
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const cartItemCount = useCartStore((state) => state.getTotalItems());
   const wishlistCount = useWishlistStore((state) => state.wishlistIds.length);
   const { language, setLanguage, t } = useLanguageStore();
@@ -297,6 +298,9 @@ export function Header() {
     const fetchUnread = async () => {
       await Promise.resolve();
       if (ignore) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
       const { isAuthenticated: authStatus, accessToken } = useAuthStore.getState();
       if (!authStatus || !accessToken) {
         setUnreadNotifs(0);
@@ -309,11 +313,18 @@ export function Header() {
         if (!ignore) setUnreadNotifs(0);
       }
     };
-    fetchUnread();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchUnread();
+      }
+    };
+    void fetchUnread();
     const interval = setInterval(fetchUnread, 15000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       ignore = true;
       clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [isAuthenticated]);
 
@@ -676,8 +687,8 @@ export function Header() {
                       <button
                         type="button"
                         onClick={() => {
-                          logout();
                           setShowAccountMenu(false);
+                          void logoutSession();
                         }}
                         className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-slate-600 hover:text-rose-600 hover:bg-rose-50/60 transition-colors text-xs font-medium cursor-pointer"
                       >

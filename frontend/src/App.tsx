@@ -5,6 +5,7 @@ import { Home } from "./pages/customer/Home";
 
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import { ToastContainer } from "./components/common/ToastContainer";
+import { SessionBridge } from "./components/common/SessionBridge";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 
 // Lazy-loaded layouts & routes to keep the initial Homepage bundle small and fast
@@ -64,6 +65,7 @@ function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <ScrollToTop />
+        <SessionBridge />
         <ToastContainer />
 
         <Suspense

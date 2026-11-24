@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuthStore } from "../store/useAuthStore";
+import { useAuthHydrated } from "../hooks/useAuthHydrated";
 import { createPortal } from "react-dom";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { notificationService } from "../services/notificationService";
+import { logoutSession } from "../services/sessionService";
 import type { NotificationResponse } from "../types/notification";
 import { 
   LayoutDashboard, 
@@ -118,6 +120,10 @@ export function VendorLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, accessToken } = useAuthStore();
+  const hydrated = useAuthHydrated();
+  const isAuthorizedVendor = Boolean(
+    hydrated && accessToken && isAuthenticated && user && (user.role === "VENDOR" || user.role === "ADMIN")
+  );
 
   const vendorDisplayName = 
     (user?.email && VENDOR_BRAND_MAP[user.email]) ||
@@ -126,15 +132,19 @@ export function VendorLayout() {
     "Công ty TNHH Kajin Vina";
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!accessToken || !isAuthenticated) {
-      navigate("/auth", { replace: true });
+      navigate("/auth", {
+        replace: true,
+        state: { returnTo: `${location.pathname}${location.search}` },
+      });
       return;
     }
     if (user && user.role !== "VENDOR" && user.role !== "ADMIN") {
       toast.warning("Tài khoản chưa được kích hoạt quyền Đối tác vận hành.");
       navigate("/profile", { replace: true });
     }
-  }, [accessToken, isAuthenticated, user, navigate]);
+  }, [hydrated, accessToken, isAuthenticated, user, navigate, location.pathname, location.search]);
 
   const [prevPath, setPrevPath] = useState(location.pathname);
   const [animationClass, setAnimationClass] = useState("animate-fade-in-up");
@@ -205,12 +215,20 @@ export function VendorLayout() {
 
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthorizedVendor) {
       loadNotifications();
     }
-  }, [isAuthenticated, loadNotifications]);
+  }, [isAuthorizedVendor, loadNotifications]);
 
-  if (!accessToken || !isAuthenticated) {
+  if (!hydrated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-600">
+        <p className="text-sm font-semibold">Đang khôi phục phiên làm việc…</p>
+      </div>
+    );
+  }
+
+  if (!accessToken || !isAuthenticated || (user && user.role !== "VENDOR" && user.role !== "ADMIN")) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50 text-slate-600">
         <p className="text-sm font-semibold">Chuyển hướng xác thực tài khoản đối tác...</p>
@@ -495,9 +513,9 @@ export function VendorLayout() {
 
           {/* Logout Button */}
           <button
-            onClick={() => {
-              useAuthStore.getState().logout();
-              navigate("/auth");
+            onClick={async () => {
+              await logoutSession();
+              navigate("/auth", { replace: true });
             }}
             title={!isExpanded ? "Đăng xuất" : undefined}
             className={`group flex items-center h-9 rounded-xl text-xs font-medium text-rose-600 hover:bg-rose-50 transition-all duration-150 cursor-pointer ${

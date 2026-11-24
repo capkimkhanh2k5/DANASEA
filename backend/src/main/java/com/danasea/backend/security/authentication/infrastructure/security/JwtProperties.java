@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
+import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.validation.annotation.Validated;
 
 import jakarta.validation.constraints.NotBlank;
@@ -18,8 +20,14 @@ import java.time.Duration;
 public record JwtProperties (
     @NotBlank String secret,
     @Positive long accessTokenMinutes,
-    @Positive long refreshTokenDays
+    @Positive long refreshTokenDays,
+    @DefaultValue("true") boolean cookieSecure
 ) {
+    public JwtProperties(String secret, long accessTokenMinutes, long refreshTokenDays) {
+        this(secret, accessTokenMinutes, refreshTokenDays, true);
+    }
+
+    @ConstructorBinding
     public JwtProperties {
         if (secret != null && secret.getBytes(StandardCharsets.UTF_8).length < 32) {
             throw new IllegalArgumentException("The JWT signing secret must contain at least 256 bits.");

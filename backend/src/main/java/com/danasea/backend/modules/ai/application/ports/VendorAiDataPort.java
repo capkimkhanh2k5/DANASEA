@@ -30,6 +30,29 @@ public interface VendorAiDataPort {
             Integer reviewCount
     ) {}
 
+    record VendorServicePriceOption(
+            UUID id,
+            String name,
+            String pricingUnit,
+            BigDecimal price,
+            Integer maxPaxPerPackage,
+            String status
+    ) {}
+
+    record VendorServiceDetail(
+            UUID id,
+            UUID vendorId,
+            String title,
+            String categoryName,
+            String status,
+            BigDecimal basePrice,
+            Integer durationMinutes,
+            Integer capacityPerSlot,
+            BigDecimal averageRating,
+            Integer reviewCount,
+            List<VendorServicePriceOption> options
+    ) {}
+
     record VendorSlotItem(
             UUID slotId,
             UUID serviceId,
@@ -69,8 +92,17 @@ public interface VendorAiDataPort {
     Optional<VendorProfile> findProfileByUserId(UUID userId);
     Optional<VendorProfile> findProfileByVendorId(UUID vendorId);
     List<VendorServiceItem> listServices(UUID vendorId);
+    default List<VendorServiceItem> listAllOwnedServices(UUID vendorId) {
+        return listServices(vendorId);
+    }
     Map<String, Long> countServicesByStatus(UUID vendorId);
     Optional<VendorServiceItem> getService(UUID vendorId, UUID serviceId);
+    default Optional<VendorServiceDetail> getServiceDetail(UUID vendorId, UUID serviceId) {
+        return getService(vendorId, serviceId).map(s -> new VendorServiceDetail(
+                s.id(), s.vendorId(), s.title(), s.categoryName(), "PUBLISHED",
+                null, null, null, s.averageRating(), s.reviewCount(), List.of()
+        ));
+    }
     List<VendorSlotItem> listUpcomingSlots(UUID vendorId, UUID serviceId, int horizonDays);
     List<VendorReviewItem> listReviews(UUID vendorId, UUID serviceId, int limit);
     VendorPerformanceMetrics getPerformanceMetrics(UUID vendorId, LocalDate from, LocalDate to);

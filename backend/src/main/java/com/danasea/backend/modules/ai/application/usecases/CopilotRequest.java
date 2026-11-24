@@ -21,6 +21,26 @@ final class CopilotRequest {
             + "another vendor|other vendors|another shop|competitor");
     private static final Pattern SERVICE = words("dich vu|services?");
     private static final Pattern COUNT = words("may|bao nhieu|tong|so luong|dem|how many|count|total|number of");
+    private static final Pattern ATTACHED_CONTEXT_PREFIX = Pattern.compile(
+            "^\\s*\\[(?:v[eê]|about)\\b(?:[^\\[\\]]|\\[[^\\[\\]]*\\])*\\]\\s*",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern SERVICE_PRICE_QUERY = Pattern.compile(
+            "(?i)\\b(?:gia bao nhieu|bao nhieu tien|gia ve|gia tour|gia dich vu|bang gia|muc gia|don gia|"
+                    + "co gia|gia hien tai|gia niem yet|how much|what(?:\\s+is|'s)?\\s+the\\s+price|pricing|price\\s+of)\\b"
+    );
+    private static final Pattern SERVICE_COUNT_PHRASE = Pattern.compile(
+            "(?i)\\b(?:may|bao nhieu|tong(?: so)?|so luong|dem|how many|number of|count|total)\\s+"
+                    + "(?:cac\\s+|nhung\\s+|so\\s+|published\\s+|active\\s+|draft\\s+|paused\\s+|pending\\s+)?(?:dich vu|services?)\\b"
+                    + "|\\b(?:dich vu|services?)\\b[^?!.,;]{0,40}\\b(?:la\\s+|co\\s+)?(?:bao nhieu|may)\\b"
+                    + "(?!\\s*(?:tien|vnd|dong|ca|slots?|khach|nguoi|don|bookings?|orders?|danh gia|reviews?|sao)\\b)"
+    );
+    private static final Pattern NON_SERVICE_COUNT_OBJECT = Pattern.compile(
+            "(?i)\\b(?:may|bao nhieu|so luong|tong(?: so)?|how many|number of|count)\\s+"
+                    + "(?:ca|slots?|don|bookings?|orders?|khach|nguoi|danh gia|reviews?|luot|ve|tien)\\b"
+    );
+    private static final Pattern TOMORROW_PERIOD = words("ngay mai|tomorrow");
+    private static final Pattern DAY_AFTER_TOMORROW = words("ngay kia|day after tomorrow");
     private static final Pattern PUBLISHED = words("da dang|dang cong khai|dang hoat dong|da xuat ban|published|active");
     private static final Pattern CUSTOMER_BOOKING = words("dat tour|dat ve|dat chuyen|dat dich vu|tim tour|tim dich vu|"
             + "goi y tour|tu van tour|len lich trinh|book a tour|book a service|find a tour|find services|"
@@ -87,6 +107,12 @@ final class CopilotRequest {
 
     private CopilotRequest() {}
 
+    static String stripAttachedContextPrefix(String text) {
+        if (text == null || text.isBlank()) return "";
+        String stripped = ATTACHED_CONTEXT_PREFIX.matcher(text).replaceFirst("").strip();
+        return stripped.isBlank() ? text.strip() : stripped;
+    }
+
     static String normalize(String text) {
         return TravelQueryParser.normalize(text).replaceAll("[\\s-]+", " ").strip();
     }
@@ -133,8 +159,47 @@ final class CopilotRequest {
                 && (matches(PLATFORM, text) || matches(OTHER_VENDOR, text));
     }
 
+    static boolean isServicePrice(String text) {
+        return matches(SERVICE_PRICE_QUERY, text);
+    }
+
     static boolean isServiceCount(String text) {
-        return matches(SERVICE, text) && matches(COUNT, text);
+        if (isServicePrice(text) || matches(NON_SERVICE_COUNT_OBJECT, text)) return false;
+        return matches(SERVICE, text) && matches(COUNT, text) && matches(SERVICE_COUNT_PHRASE, text);
+    }
+
+    static LocalDate slotTargetDate(String original, String normalized, LocalDate today) {
+        if (original != null) {
+            var dates = new ArrayList<LocalDate>();
+            var yearMatcher = FOUR_DIGIT_YEAR.matcher(original);
+            Integer contextYear = null;
+            if (yearMatcher.find()) {
+                try {
+                    contextYear = Integer.parseInt(yearMatcher.group(1));
+                } catch (Exception ignored) {}
+            }
+            var matcher = DATE.matcher(original);
+            while (matcher.find()) {
+                String value = matcher.group();
+                try {
+                    if (!value.contains("/")) {
+                        dates.add(LocalDate.parse(value));
+                    } else {
+                        long slashCount = value.chars().filter(ch -> ch == '/').count();
+                        String withYear = slashCount == 1
+                                ? value + "/" + (contextYear != null ? contextYear : today.getYear())
+                                : value;
+                        dates.add(LocalDate.parse(withYear, LOCAL_DATE));
+                    }
+                } catch (Exception ignored) {}
+            }
+            if (dates.size() == 1) return dates.getFirst();
+        }
+        if (normalized == null) return null;
+        if (matches(DAY_AFTER_TOMORROW, normalized)) return today.plusDays(2);
+        if (matches(TOMORROW_PERIOD, normalized)) return today.plusDays(1);
+        if (matches(TODAY_PERIOD, normalized)) return today;
+        return null;
     }
 
     static boolean isPublishedCount(String text) {

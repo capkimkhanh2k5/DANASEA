@@ -67,6 +67,10 @@ public class VendorSlotAdvisorUseCase {
     }
 
     public SlotAdvisorResult execute(UUID vendorUserId, UUID serviceId, int horizonDays, SupportedLanguage language) {
+        return execute(vendorUserId, serviceId, horizonDays, null, language);
+    }
+
+    public SlotAdvisorResult execute(UUID vendorUserId, UUID serviceId, int horizonDays, LocalDate targetDate, SupportedLanguage language) {
         boolean isEn = language == SupportedLanguage.EN;
         var profile = vendorAiData.findProfileByUserId(vendorUserId)
                 .orElseThrow(() -> new IllegalArgumentException("Vendor profile not found for user: " + vendorUserId));
@@ -74,6 +78,13 @@ public class VendorSlotAdvisorUseCase {
 
         int boundedDays = Math.max(1, Math.min(horizonDays <= 0 ? 7 : horizonDays, 14));
         List<VendorSlotItem> slots = vendorAiData.listUpcomingSlots(vendorId, serviceId, boundedDays);
+        if (targetDate != null && !slots.isEmpty()) {
+            LocalDate today = LocalDate.now(TimeRange.VIETNAM_ZONE);
+            boolean hasCurrentOrFutureSlots = slots.stream().anyMatch(s -> s.date() != null && !s.date().isBefore(today));
+            if (hasCurrentOrFutureSlots) {
+                slots = slots.stream().filter(s -> targetDate.equals(s.date())).toList();
+            }
+        }
 
         List<SlotRecommendation> recs = new ArrayList<>();
         long highDemand = 0;

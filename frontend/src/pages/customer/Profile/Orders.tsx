@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useSearchParams, Navigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation, Navigate, Link } from "react-router-dom";
 import {
   Compass,
   Receipt,
@@ -35,6 +35,7 @@ import { disputeService } from "../../../services/disputeService";
 import { notificationService } from "../../../services/notificationService";
 import type { DisputeReason, DisputeResponse } from "../../../types/dispute";
 import { useAuthStore } from "../../../store/useAuthStore";
+import { useAuthHydrated } from "../../../hooks/useAuthHydrated";
 import { useLanguageStore } from "../../../store/useLanguageStore";
 import { toast } from "../../../store/useToastStore";
 import type {
@@ -53,8 +54,10 @@ type OrderFilter = "all" | "upcoming" | "pending" | "completed" | "cancelled";
 
 export function Orders() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user, isAuthenticated, accessToken } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const { language } = useLanguageStore();
   const isEn = language === 'en';
 
@@ -907,9 +910,13 @@ export function Orders() {
 
 
 
+  if (!hydrated) {
+    return <main className="w-full pt-20 bg-slate-50/50 flex-1 min-h-screen" />;
+  }
+
   // Redirect unauthenticated user directly to login
   if (!isAuthenticated || !user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to="/auth" replace state={{ returnTo: `${location.pathname}${location.search}` }} />;
   }
 
   return (
