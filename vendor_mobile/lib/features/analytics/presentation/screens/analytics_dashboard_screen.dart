@@ -355,43 +355,44 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 1,
+        titleSpacing: 0,
         title: const Text(
           'Báo cáo phân tích kinh doanh',
           style: TextStyle(
-            fontSize: 17,
+            fontSize: 16.5,
             fontWeight: FontWeight.bold,
             color: Color(0xFF0F172A),
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: OutlinedButton.icon(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
               onPressed: _isExporting ? null : _exportCsvData,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.secondary,
-                backgroundColor: const Color(0xFFF0FDFA),
-                side: const BorderSide(color: Color(0xFF99F6E4)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              ),
+              tooltip: 'Xuất file CSV',
+              splashRadius: 22,
               icon: _isExporting
                   ? const SizedBox(
-                      width: 14,
-                      height: 14,
+                      width: 18,
+                      height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.secondary),
                     )
-                  : const Icon(
-                      Icons.file_download_outlined,
-                      size: 16,
-                      color: AppColors.secondary,
+                  : Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDFA),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF99F6E4)),
+                      ),
+                      child: const Icon(
+                        Icons.file_download_outlined,
+                        size: 20,
+                        color: AppColors.secondary,
+                      ),
                     ),
-              label: const Text(
-                'Xuất file CSV',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondary),
-              ),
             ),
           ),
         ],
@@ -800,136 +801,131 @@ class _AnalyticsDashboardScreenState extends State<AnalyticsDashboardScreen> {
                         ),
                       )
                     else
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          headingRowColor: WidgetStateProperty.all(
-                            const Color(0xFFF8F9FA),
-                          ),
-                          headingTextStyle: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF64748B),
-                          ),
-                          dataTextStyle: const TextStyle(
-                            fontSize: 12.5,
-                            color: Color(0xFF334155),
-                          ),
-                          columns: const [
-                            DataColumn(label: Text('TÊN TOUR / DỊCH VỤ')),
-                            DataColumn(label: Text('ĐỊA ĐIỂM')),
-                            DataColumn(label: Text('LƯỢT KHÁCH')),
-                            DataColumn(
-                              label: Text('DOANH THU'),
-                              numeric: true,
-                            ),
-                            DataColumn(label: Text('CÔNG SUẤT')),
-                            DataColumn(label: Text('TRẠNG THÁI')),
-                          ],
-                          rows: services.map((s) {
-                            final guestCount = subOrders
-                                .where((o) => o.serviceId == s.serviceId)
-                                .fold<int>(0, (sum, o) => sum + o.quantity);
-                            final isPublished =
-                                s.status == ServiceStatus.published;
-                            return DataRow(
-                              cells: [
-                                DataCell(
-                                  ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: 180,
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: services.length,
+                        separatorBuilder: (context, index) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+                        itemBuilder: (context, index) {
+                          final s = services[index];
+                          final guestCount = subOrders
+                              .where((o) => o.serviceId == s.serviceId)
+                              .fold<int>(0, (sum, o) => sum + o.quantity);
+                          final isPublished = s.status == ServiceStatus.published;
+                          final rank = index + 1;
+                          final isTop3 = rank <= 3;
+                          final rankColor = rank == 1
+                              ? const Color(0xFFD97706)
+                              : (rank == 2
+                                  ? const Color(0xFF64748B)
+                                  : (rank == 3
+                                      ? const Color(0xFFB45309)
+                                      : const Color(0xFF94A3B8)));
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                // Thứ hạng
+                                Container(
+                                  width: 26,
+                                  height: 26,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: isTop3
+                                        ? rankColor.withValues(alpha: 0.12)
+                                        : const Color(0xFFF1F5F9),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Text(
+                                    '$rank',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: isTop3 ? rankColor : const Color(0xFF64748B),
                                     ),
-                                    child: Text(
-                                      s.nameVi,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+
+                                // Tên tour & lượt khách
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        s.nameVi,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF0F172A),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            guestCount > 0 ? '$guestCount lượt khách' : 'Chưa có khách',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: Color(0xFF64748B),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          if (s.maxCapacity > 0) ...[
+                                            const Text(' • ', style: TextStyle(color: Color(0xFFCBD5E1), fontSize: 11)),
+                                            Text(
+                                              '${s.maxCapacity} chỗ/ca',
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                color: Color(0xFF64748B),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+
+                                // Doanh thu / Giá & Trạng thái
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      s.price > 0 ? _formatVnd(s.price) : '---',
                                       style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF0F172A),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.secondary,
                                       ),
                                     ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    s.meetingPointName.isNotEmpty
-                                        ? s.meetingPointName
-                                        : 'Đà Nẵng',
-                                    style: const TextStyle(
-                                      color: Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    guestCount > 0
-                                        ? '$guestCount lượt'
-                                        : '---',
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    s.price > 0
-                                        ? _formatVnd(s.price)
-                                        : '---',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF0F172A),
-                                    ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      s.maxCapacity > 0
-                                          ? '${s.maxCapacity} khách/ca'
-                                          : '---',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF334155),
+                                    const SizedBox(height: 3),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isPublished ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        isPublished ? 'Hoạt động' : s.status.name.toUpperCase(),
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: isPublished ? const Color(0xFF166534) : const Color(0xFF64748B),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isPublished
-                                          ? const Color(0xFFDCFCE7)
-                                          : const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      isPublished
-                                          ? 'Đang hoạt động'
-                                          : s.status.name.toUpperCase(),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: isPublished
-                                            ? const Color(0xFF166534)
-                                            : const Color(0xFF475569),
-                                      ),
-                                    ),
-                                  ),
+                                  ],
                                 ),
                               ],
-                            );
-                          }).toList(),
-                        ),
+                            ),
+                          );
+                        },
                       ),
                   ],
                 ),

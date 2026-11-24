@@ -258,7 +258,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                   children: [
                                     Expanded(
                                       child: LocalizedText(
-                                        'ĐÃ PHÊ DUYỆT (APPROVED)',
+                                        'ĐÃ PHÊ DUYỆT',
                                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondary),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -315,14 +315,10 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                 child: const Icon(Icons.verified, color: AppColors.secondary, size: 20),
                               ),
                               const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: const [
-                                    LocalizedText('Giấy tờ & Pháp lý bến bãi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
-                                    SizedBox(height: 2),
-                                    LocalizedText('Hồ sơ pháp nhân & chứng chỉ an toàn', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
-                                  ],
+                              const Expanded(
+                                child: LocalizedText(
+                                  'Giấy tờ & Pháp lý bến bãi',
+                                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.onSurface),
                                 ),
                               ),
                               const Icon(Icons.chevron_right, color: AppColors.outlineVariant),
@@ -355,14 +351,10 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                 child: const Icon(Icons.account_balance, color: AppColors.primary, size: 20),
                               ),
                               const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: const [
-                                    LocalizedText('Tài khoản ngân hàng nhận tiền', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
-                                    SizedBox(height: 2),
-                                    LocalizedText('Cấu hình tài khoản nhận đối soát doanh thu', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
-                                  ],
+                              const Expanded(
+                                child: LocalizedText(
+                                  'Tài khoản ngân hàng nhận tiền',
+                                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.onSurface),
                                 ),
                               ),
                               const Icon(Icons.chevron_right, color: AppColors.outlineVariant),
@@ -395,14 +387,10 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                 child: const Icon(Icons.handyman_outlined, color: AppColors.secondary, size: 20),
                               ),
                               const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: const [
-                                    LocalizedText('Quản lý thiết bị & Bảo trì', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface)),
-                                    SizedBox(height: 2),
-                                    LocalizedText('Danh mục Cano, Kayak, SUP, Áo phao & lịch bảo dưỡng', style: TextStyle(fontSize: 11, color: AppColors.tertiary)),
-                                  ],
+                              const Expanded(
+                                child: LocalizedText(
+                                  'Quản lý thiết bị & Bảo trì',
+                                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.onSurface),
                                 ),
                               ),
                               const Icon(Icons.chevron_right, color: AppColors.outlineVariant),

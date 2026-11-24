@@ -148,6 +148,8 @@ class AssistantRepository {
     required String message,
     String? conversationId,
     String? idempotencyKey,
+    String? contextType,
+    String? contextId,
   }) async {
     final trimmed = message.trim();
     if (trimmed.isEmpty) {
@@ -163,6 +165,10 @@ class AssistantRepository {
         'message': trimmed,
         if (conversationId != null && conversationId.trim().isNotEmpty)
           'conversationId': conversationId.trim(),
+        if (contextType != null && contextType.trim().isNotEmpty)
+          'contextType': contextType.trim(),
+        if (contextId != null && contextId.trim().isNotEmpty)
+          'contextId': contextId.trim(),
       },
       retry: false,
       authenticated: _session.profile != null,

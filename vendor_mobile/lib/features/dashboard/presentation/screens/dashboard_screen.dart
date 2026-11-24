@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/l10n/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/data/vendor_store.dart';
 import '../../../../core/data/vendor_repositories.dart';
@@ -375,7 +376,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
+                                  LocalizedText(
                                     'Chi tiết ví',
                                     style: TextStyle(
                                       fontSize: 11.5,
@@ -418,7 +419,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                _isBalanceVisible ? 'Đã TT: ${_formatCompactVnd(_metrics.netPayout)}' : 'Đã TT: ••••',
+                                _isBalanceVisible ? '${tr(context, 'Đã TT')}: ${_formatCompactVnd(_metrics.netPayout)}' : '${tr(context, 'Đã TT')}: ••••',
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   color: Color(0xFFE2E8F0),
@@ -435,8 +436,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Expanded(
                               child: Text(
                                 _isBalanceVisible
-                                    ? 'Chờ soát: ${_formatCompactVnd((_metrics.totalRevenue - _metrics.netPayout) > 0 ? (_metrics.totalRevenue - _metrics.netPayout) : 0.0)}'
-                                    : 'Chờ soát: ••••',
+                                    ? '${tr(context, 'Chờ soát')}: ${_formatCompactVnd((_metrics.totalRevenue - _metrics.netPayout) > 0 ? (_metrics.totalRevenue - _metrics.netPayout) : 0.0)}'
+                                    : '${tr(context, 'Chờ soát')}: ••••',
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   color: Color(0xFFFDE68A),
@@ -472,7 +473,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  'Tài khoản nhận tiền: ${vendor.bankName != null && vendor.bankName!.isNotEmpty ? vendor.bankName : 'Chưa liên kết'} (••••${(vendor.bankAccountNumber ?? '').length > 4 ? vendor.bankAccountNumber!.substring(vendor.bankAccountNumber!.length - 4) : (vendor.bankAccountNumber ?? 'Chưa có')})',
+                                  '${tr(context, 'Tài khoản nhận tiền')}: ${vendor.bankName != null && vendor.bankName!.isNotEmpty ? vendor.bankName : tr(context, 'Chưa liên kết')} (••••${(vendor.bankAccountNumber ?? '').length > 4 ? vendor.bankAccountNumber!.substring(vendor.bankAccountNumber!.length - 4) : (vendor.bankAccountNumber ?? tr(context, 'Chưa có'))})',
                                   style: const TextStyle(
                                     fontSize: 11,
                                     color: Colors.white,
@@ -510,7 +511,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      const LocalizedText(
                         'Việc cần xử lý',
                         style: TextStyle(
                           fontSize: 14,
@@ -564,7 +565,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 16),
 
                 // 3. THAO TÁC VẬN HÀNH (Đồng bộ chuẩn tone xanh Danasea #004D56 trên nền #E6F4F1)
-                const Text(
+                const LocalizedText(
                   'Thao tác vận hành',
                   style: TextStyle(
                     fontSize: 15,
@@ -632,7 +633,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    const LocalizedText(
                       'Chuyến xuất bến gần nhất',
                       style: TextStyle(
                         fontSize: 15,
@@ -642,7 +643,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     InkWell(
                       onTap: _openSlots,
-                      child: const Text(
+                      child: const LocalizedText(
                         'Xem lịch',
                         style: TextStyle(
                           fontSize: 12,
@@ -704,7 +705,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         color: const Color(0xFFE0F2FE),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
-                                      child: const Text(
+                                      child: const LocalizedText(
                                         'Chuẩn bị đón khách',
                                         style: TextStyle(
                                           fontSize: 10,
@@ -717,7 +718,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  nextService?.nameVi ?? (nextSlot != null ? 'Ca chạy đã lên lịch' : 'Chưa có ca chạy hôm nay'),
+                                  (AppLanguage.instance.code == 'en' ? (nextService?.nameEn.isNotEmpty == true ? nextService!.nameEn : nextService?.nameVi) : nextService?.nameVi) ??
+                                      (nextSlot != null ? tr(context, 'Ca chạy đã lên lịch') : tr(context, 'Chưa có ca chạy hôm nay')),
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
@@ -756,7 +758,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     const Expanded(
-                                      child: Text(
+                                      child: LocalizedText(
                                         'Tiến độ lấp đầy',
                                         style: TextStyle(
                                           fontSize: 11.5,
@@ -766,7 +768,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       ),
                                     ),
                                     Text(
-                                      '$booked/$capacity khách ($fillPercent%)',
+                                      '$booked/$capacity ${tr(context, 'khách')} ($fillPercent%)',
                                       style: TextStyle(
                                         fontSize: 11.5,
                                         fontWeight: FontWeight.bold,
@@ -797,9 +799,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: ElevatedButton.icon(
                               onPressed: _openQrScan,
                               icon: const Icon(Icons.qr_code_scanner_rounded, size: 17),
-                              label: const Text(
-                                'Soát vé QR ca này',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              label: const Flexible(
+                                child: LocalizedText(
+                                  'Soát vé QR ca này',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF004D56),
@@ -808,7 +814,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 6),
                               ),
                             ),
                           ),
@@ -817,9 +823,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             child: OutlinedButton.icon(
                               onPressed: _openOrders,
                               icon: const Icon(Icons.people_outline, size: 16),
-                              label: const Text(
-                                'Danh sách khách',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                              label: const Flexible(
+                                child: LocalizedText(
+                                  'Danh sách khách',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: const Color(0xFF004D56),
@@ -827,7 +837,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: 11),
+                                padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 6),
                               ),
                             ),
                           ),
@@ -867,7 +877,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 2),
-            Text(
+            LocalizedText(
               label,
               style: const TextStyle(
                 fontSize: 10.5,
@@ -920,7 +930,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
+              child: LocalizedText(
                 title,
                 style: const TextStyle(
                   fontSize: 13.5,

@@ -157,7 +157,7 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
               children: [
                 // Compact Marine Station Badge
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF0FDF4),
                     borderRadius: BorderRadius.circular(12),
@@ -165,24 +165,20 @@ class _NotificationSafetyScreenState extends State<NotificationSafetyScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.radar_rounded, size: 16, color: Color(0xFF16A34A)),
-                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Trạm quan trắc ${weather.locationKey.isNotEmpty ? weather.locationKey : "Đà Nẵng"} • Cập nhật ${weather.fetchedAt.hour.toString().padLeft(2, '0')}:${weather.fetchedAt.minute.toString().padLeft(2, '0')}',
-                          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF15803D)),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF16A34A),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'TRỰC TUYẾN',
-                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white),
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF16A34A),
+                          shape: BoxShape.circle,
                         ),
                       ),
                     ],

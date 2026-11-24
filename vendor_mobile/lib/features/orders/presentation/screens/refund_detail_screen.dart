@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_shapes.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/data/vendor_store.dart';
+import '../../../../core/utils/display_code.dart';
 import 'sub_order_detail_screen.dart';
 
 class RefundDetailScreen extends StatelessWidget {
@@ -127,7 +128,7 @@ class RefundDetailScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           LocalizedText(
-                            'Khoản hoàn tiền được xử lý theo quy định bảo vệ khách hàng do điều kiện thời tiết biển bất khả kháng (Đơn #${subOrder.subOrderCode}).',
+                            'Khoản hoàn tiền được xử lý theo quy định bảo vệ khách hàng do điều kiện thời tiết biển bất khả kháng (Đơn ${formatDisplayCodeWithHash(subOrder.subOrderCode.isNotEmpty ? subOrder.subOrderCode : subOrder.id, prefix: 'SUB')}).',
                             style: const TextStyle(fontSize: 11, color: AppColors.onSecondaryFixedVariant),
                           ),
                         ],
@@ -171,7 +172,7 @@ class RefundDetailScreen extends StatelessWidget {
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: LocalizedText(
-                                      'Đơn con: #${subOrder.subOrderCode}',
+                                      'Đơn con: ${formatDisplayCodeWithHash(subOrder.subOrderCode.isNotEmpty ? subOrder.subOrderCode : subOrder.id, prefix: 'SUB')}',
                                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.secondary),
                                       overflow: TextOverflow.ellipsis,
                                     ),

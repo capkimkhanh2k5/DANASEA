@@ -387,20 +387,21 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
                 ),
               ),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.auto_awesome, color: AppColors.secondary, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'AI Chấm điểm & Tối ưu bài đăng',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.onSurface),
-                      ),
-                    ],
+                  const Icon(Icons.auto_awesome, color: AppColors.secondary, size: 20),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: LocalizedText(
+                      'AI Chấm điểm & Tối ưu bài đăng',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: result.listingQualityScore >= 75
                           ? AppColors.secondaryContainer
@@ -408,8 +409,8 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      'Điểm chuẩn SEO: ${result.listingQualityScore}/100',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondary),
+                      'Điểm SEO: ${result.listingQualityScore}/100',
+                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.secondary),
                     ),
                   ),
                 ],
@@ -2170,10 +2171,10 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
 
   Widget _buildStickySectionBar() {
     final sections = [
-      (title: '📝 Thông tin', key: _section1Key, icon: Icons.edit_note_rounded),
-      (title: '🏷️ Giá & Gói', key: _section2Key, icon: Icons.sell_outlined),
-      (title: '📍 Điểm đón', key: _section3Key, icon: Icons.location_on_outlined),
-      (title: '📸 Hình ảnh', key: _section4Key, icon: Icons.photo_library_outlined),
+      (title: 'Thông tin', key: _section1Key, icon: Icons.edit_note_rounded),
+      (title: 'Giá & Gói', key: _section2Key, icon: Icons.sell_outlined),
+      (title: 'Điểm đón', key: _section3Key, icon: Icons.location_on_outlined),
+      (title: 'Hình ảnh', key: _section4Key, icon: Icons.photo_library_outlined),
     ];
     return Container(
       width: double.infinity,
@@ -2220,7 +2221,7 @@ class _ServiceCreateEditScreenState extends State<ServiceCreateEditScreen> {
                         color: active ? Colors.white : AppColors.secondary,
                       ),
                       const SizedBox(width: 5),
-                      Text(
+                      LocalizedText(
                         s.title,
                         style: TextStyle(
                           fontSize: 12,

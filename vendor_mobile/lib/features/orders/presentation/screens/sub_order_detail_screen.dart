@@ -7,6 +7,7 @@ import '../../../../core/data/vendor_store.dart';
 import '../../../../core/data/vendor_repositories.dart';
 import '../../../../core/models/vendor_models.dart';
 import '../../../../core/widgets/toast_notification.dart';
+import '../../../../core/utils/display_code.dart';
 import '../../../../core/widgets/vendor_button.dart';
 import 'qr_checkin_screen.dart';
 import 'refund_detail_screen.dart';
@@ -731,7 +732,7 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
                             onPressed: () {
                               Navigator.of(context).push(
                                 MaterialPageRoute(
-                                  builder: (_) => QrCheckinScreen(initialLookupCode: _order.subOrderCode),
+                                  builder: (_) => const QrCheckinScreen(),
                                 ),
                               );
                             },
@@ -1124,14 +1125,14 @@ class _SubOrderDetailScreenState extends State<SubOrderDetailScreen> {
                     _buildOrderInfoRow(
                       context,
                       label: 'Mã đơn con:',
-                      value: _order.subOrderCode,
+                      value: formatDisplayCodeWithHash(_order.subOrderCode.isNotEmpty ? _order.subOrderCode : _order.id, prefix: 'SUB'),
                       canCopy: true,
                     ),
                     const SizedBox(height: 8),
                     _buildOrderInfoRow(
                       context,
                       label: 'Mã đơn gốc:',
-                      value: _order.masterOrderCode,
+                      value: formatDisplayCodeWithHash(_order.masterOrderCode.isNotEmpty ? _order.masterOrderCode : _order.masterOrderId, prefix: 'ORD'),
                       canCopy: true,
                     ),
                     const SizedBox(height: 8),

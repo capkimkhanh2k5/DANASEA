@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:vendor_mobile/core/l10n/app_localizations.dart';
 import '../../../../core/data/vendor_repositories.dart';
 import '../../../../core/models/vendor_models.dart';
@@ -23,6 +23,28 @@ class _VendorEquipmentScreenState extends State<VendorEquipmentScreen> {
   void initState() {
     super.initState();
     _loadEquipment();
+  }
+
+  String _formatGroup(String group) {
+    if (group.startsWith('demo:')) {
+      return 'Phương tiện bến bãi';
+    }
+    switch (group.toUpperCase()) {
+      case 'WATER_SPORTS':
+        return 'SUP / Kayak';
+      case 'BOAT_CRUISE':
+      case 'SPEEDBOAT':
+        return 'Cano / Tàu du lịch';
+      case 'DIVING':
+        return 'Đồ lặn / Áo phao';
+      case 'SURFING':
+        return 'Ván lướt / Dù bay';
+      default:
+        if (group.length > 20) {
+          return 'Phương tiện bến bãi';
+        }
+        return group;
+    }
   }
 
   Future<void> _loadEquipment() async {
@@ -196,7 +218,7 @@ class _VendorEquipmentScreenState extends State<VendorEquipmentScreen> {
                 DropdownButtonFormField<String>(
                   value: group,
                   decoration: InputDecoration(
-                    labelText: 'Nhóm tương thích (Compatibility Group)',
+                    labelText: 'Loại phương tiện / Dụng cụ',
                     filled: true,
                     fillColor: AppColors.surfaceContainerLow,
                     border: OutlineInputBorder(
@@ -205,10 +227,10 @@ class _VendorEquipmentScreenState extends State<VendorEquipmentScreen> {
                     ),
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'WATER_SPORTS', child: Text('SUP / Kayak (WATER_SPORTS)')),
-                    DropdownMenuItem(value: 'BOAT_CRUISE', child: Text('Cano / Tàu du lịch (BOAT_CRUISE)')),
-                    DropdownMenuItem(value: 'DIVING', child: Text('Thiết bị lặn / Áo phao (DIVING)')),
-                    DropdownMenuItem(value: 'SURFING', child: Text('Ván lướt sóng / Dù bay (SURFING)')),
+                    DropdownMenuItem(value: 'WATER_SPORTS', child: Text('🛶 SUP / Thuyền Kayak')),
+                    DropdownMenuItem(value: 'BOAT_CRUISE', child: Text('🚤 Cano / Tàu cao tốc')),
+                    DropdownMenuItem(value: 'DIVING', child: Text('🤿 Thiết bị lặn / Áo phao')),
+                    DropdownMenuItem(value: 'SURFING', child: Text('🏄 Ván lướt sóng / Dù bay')),
                   ],
                   onChanged: (v) {
                     if (v != null) setSheetState(() => group = v);
@@ -581,7 +603,7 @@ class _VendorEquipmentScreenState extends State<VendorEquipmentScreen> {
                                               ),
                                               const SizedBox(height: 2),
                                               Text(
-                                                'Nhóm: ${eq.compatibilityGroup} • Sức chứa: ${eq.capacity} khách',
+                                                '${_formatGroup(eq.compatibilityGroup)} • Sức chứa: ${eq.capacity} khách',
                                                 style: const TextStyle(
                                                     fontSize: 12,
                                                     color: AppColors.tertiary),
@@ -648,3 +670,4 @@ class _VendorEquipmentScreenState extends State<VendorEquipmentScreen> {
     );
   }
 }
+
