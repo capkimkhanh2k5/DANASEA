@@ -22,10 +22,11 @@ import {
   CheckCheck,
   LifeBuoy,
   Star,
-  Bot
+  Sparkles
 } from "lucide-react";
 import { AtlasAvatar } from "../components/vendor/atlas/AtlasDesignSystem";
 import { toast } from "../store/useToastStore";
+import { formatDisplayCode } from "../utils/displayCode";
 import { useVendorCopilotStore } from "../store/useVendorCopilotStore";
 import { VendorCopilotDrawer } from "../components/vendor/copilot/VendorCopilotDrawer";
 
@@ -46,7 +47,7 @@ const NAV_GROUPS: NavGroup[] = [
     groupTitle: "VẬN HÀNH & ĐIỀU PHỐI",
     items: [
       { to: "/vendor", label: "Tổng quan", icon: LayoutDashboard, exact: true },
-      { to: "/vendor/copilot", label: "Trợ lý Copilot", icon: Bot },
+      { to: "/vendor/copilot", label: "Trợ lý Copilot", icon: Sparkles },
       { to: "/vendor/analytics", label: "Phân tích kinh doanh", icon: TrendingUp },
       { to: "/vendor/orders", label: "Đơn đặt chỗ & Vé", icon: Ticket },
       { to: "/vendor/messages", label: "Tin nhắn khách hàng", icon: MessageSquare },
@@ -76,6 +77,7 @@ const VENDOR_PAGE_ORDER: Record<string, number> = {
   "/vendor": 0,
   "/vendor/copilot": 0.5,
   "/vendor/analytics": 1,
+  "/vendor/reports": 1,
   "/vendor/orders": 2,
   "/vendor/messages": 2.5,
   "/vendor/schedule": 3,
@@ -269,8 +271,8 @@ export function VendorLayout() {
                 <span className="font-extrabold text-base tracking-tight text-slate-900 leading-none">
                   DANASEA
                 </span>
-                <span className="text-[10px] text-slate-400 font-bold tracking-wider uppercase mt-1 whitespace-nowrap">
-                  KÊNH ĐỐI TÁC
+                <span className="text-[11px] text-slate-500 font-medium mt-1 whitespace-nowrap">
+                  Kênh đối tác
                 </span>
               </div>
             </div>
@@ -303,7 +305,7 @@ export function VendorLayout() {
                 {/* Group Title / Divider */}
                 {isExpanded ? (
                   <div className="pt-2 pb-1 px-3">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400 select-none">
+                    <span className="text-xs font-semibold text-slate-500 select-none">
                       {group.groupTitle}
                     </span>
                   </div>
@@ -548,20 +550,20 @@ export function VendorLayout() {
           className="fixed bottom-6 right-6 z-40 flex flex-col items-center select-none print:hidden"
         >
           <div className="relative group/btn flex items-center">
-            <span className="absolute right-full mr-2.5 px-2.5 py-1 rounded-lg bg-slate-900/90 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none shadow-md">
+            <span className="absolute right-full mr-3 px-2.5 py-1 rounded-lg bg-slate-900/90 text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover/btn:opacity-100 transition-opacity pointer-events-none shadow-md">
               DANASEA Copilot
             </span>
             <button
               type="button"
               onClick={toggleCopilot}
               aria-label="Trợ lý kinh doanh DANASEA Copilot"
-              className={`relative w-11 h-11 rounded-2xl flex items-center justify-center border shadow-md transition-all cursor-pointer ${
+              className={`relative w-14 h-14 rounded-full flex items-center justify-center border shadow-xl transition-all duration-150 cursor-pointer active:scale-95 ${
                 isCopilotOpen
-                  ? "bg-slate-900 text-white border-slate-900 shadow-slate-900/20"
-                  : "bg-white text-slate-900 border-slate-200/90 hover:border-slate-400 hover:shadow-lg"
+                  ? "bg-slate-900 text-white border-slate-900 ring-2 ring-sky-500/30 shadow-slate-900/25"
+                  : "bg-slate-900 text-white border-slate-800 hover:bg-slate-800"
               }`}
             >
-              <Bot className="w-5 h-5 text-current transition-transform group-hover/btn:scale-110" />
+              <Sparkles className="w-6 h-6 text-white transition-transform duration-150 group-hover/btn:scale-105" />
             </button>
           </div>
         </aside>
@@ -598,7 +600,7 @@ export function VendorLayout() {
               {/* Related entity link */}
               {selectedNoti.relatedEntityId && (
                 <div className="p-2.5 rounded-xl bg-sky-50 text-sky-900 text-[12px] flex items-center justify-between">
-                  <span>Thực thể liên quan: <strong>{selectedNoti.relatedEntityType || 'Đối tượng'} #{selectedNoti.relatedEntityId.slice(0, 8)}</strong></span>
+                  <span>Thực thể liên quan: <strong>{selectedNoti.relatedEntityType || 'Đối tượng'} #{formatDisplayCode(selectedNoti.relatedEntityId, selectedNoti.relatedEntityType === 'ORDER' ? 'ORD' : 'SUB')}</strong></span>
                   <button 
                     onClick={() => {
                       setSelectedNoti(null);

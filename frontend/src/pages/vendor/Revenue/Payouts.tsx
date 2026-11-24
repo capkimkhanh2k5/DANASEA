@@ -22,6 +22,7 @@ import {
   AtlasBadge, 
   AtlasButton 
 } from "../../../components/vendor/atlas/AtlasDesignSystem";
+import { formatDisplayCode } from "../../../utils/displayCode";
 
 export function Payouts() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -135,7 +136,7 @@ export function Payouts() {
         note: payoutNote.trim() || undefined,
       });
 
-      showToast(`Tạo lệnh rút ${numericAmount.toLocaleString("vi-VN")} đ thành công (Mã #${created.id.slice(0, 8).toUpperCase()}).`);
+      showToast(`Tạo lệnh rút ${numericAmount.toLocaleString("vi-VN")} đ thành công (Mã #${formatDisplayCode(created.id, 'PAY')}).`);
       setPayoutNote("");
       await loadData();
     } catch (err: unknown) {
@@ -201,7 +202,7 @@ export function Payouts() {
           <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs space-y-4">
             {/* Linked Bank Card */}
             <div className="space-y-2">
-              <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider block">
+              <span className="text-xs text-slate-600 font-semibold block">
                 Tài khoản ngân hàng thụ hưởng
               </span>
               <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 flex items-center justify-between">
@@ -365,10 +366,10 @@ export function Payouts() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm border-collapse">
               <thead>
-                <tr className="bg-[#f8f9fa] border-b border-slate-200/80 text-slate-500 font-semibold text-xs uppercase tracking-wider">
-                  <th className="py-3 px-4">MÃ &amp; KỲ</th>
-                  <th className="py-3 px-3 text-center">TRẠNG THÁI</th>
-                  <th className="py-3 px-4 text-right">SỐ TIỀN RÚT</th>
+                <tr className="bg-[#f8f9fa] border-b border-slate-200/80 text-slate-600 font-semibold text-xs">
+                  <th className="py-3 px-4">Mã &amp; kỳ</th>
+                  <th className="py-3 px-3 text-center">Trạng thái</th>
+                  <th className="py-3 px-4 text-right">Số tiền rút</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -389,12 +390,12 @@ export function Payouts() {
                   </tr>
                 ) : (
                   history.map((item) => {
-                    const shortId = item.id.replace(/-/g, '').slice(0, 8).toUpperCase();
+                    const displayCode = formatDisplayCode(item.id, 'PAY');
                     const createdDate = item.createdAt ? item.createdAt.slice(0, 10) : "—";
                     return (
                       <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="py-3.5 px-4">
-                          <div className="font-mono font-bold text-slate-900 text-sm">#PAY-{shortId}</div>
+                          <div className="font-mono font-bold text-slate-900 text-sm">#{displayCode}</div>
                           <div className="text-xs text-slate-500 font-mono mt-0.5">{createdDate}</div>
                           {item.bankReference && (
                             <div className="text-[11px] text-emerald-600 font-mono font-semibold mt-0.5">

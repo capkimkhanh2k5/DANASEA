@@ -10,7 +10,7 @@ export type OptionType = 'SHARED' | 'PRIVATE';
 export type PricingUnit = 'PER_PERSON' | 'PER_PACKAGE';
 export type OptionStatus = 'ACTIVE' | 'INACTIVE';
 export type InventoryType = 'PERSON_LIMIT' | 'SHARED_CAPACITY_UNITS';
-export type SlotStatus = 'OPEN' | 'CLOSED';
+export type SlotStatus = 'OPEN' | 'CLOSED' | 'BLOCKED' | 'CANCELLED';
 export type SafetyDocStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface ServiceImageDto {

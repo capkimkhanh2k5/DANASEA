@@ -13,7 +13,7 @@ import {
   AtlasButton 
 } from "../../../components/vendor/atlas/AtlasDesignSystem";
 
-export function AnalyticsDashboard() {
+export function BusinessReportDashboard() {
   const [timeRange, setTimeRange] = useState<"7d" | "30d" | "90d" | "12m">("30d");
   const [metrics, setMetrics] = useState<VendorDashboardResponse | null>(null);
   const [services, setServices] = useState<VendorServiceDto[]>([]);
@@ -389,14 +389,14 @@ export function AnalyticsDashboard() {
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-[#f8f9fa] border-b border-slate-200/80 text-xs uppercase tracking-wider text-slate-500 font-semibold">
+            <thead className="bg-[#f8f9fa] border-b border-slate-200/80 text-xs font-semibold text-slate-600">
               <tr>
-                <th className="py-3.5 px-4">TÊN TOUR / DỊCH VỤ</th>
-                <th className="py-3.5 px-4">ĐỊA ĐIỂM</th>
-                <th className="py-3.5 px-4 text-center">LƯỢT KHÁCH</th>
-                <th className="py-3.5 px-4 text-right">DOANH THU</th>
-                <th className="py-3.5 px-4 text-center">CÔNG SUẤT</th>
-                <th className="py-3.5 px-4 text-center">TRẠNG THÁI</th>
+                <th className="py-3.5 px-4">Tên tour / Dịch vụ</th>
+                <th className="py-3.5 px-4">Địa điểm</th>
+                <th className="py-3.5 px-4 text-center">Lượt khách</th>
+                <th className="py-3.5 px-4 text-right">Doanh thu</th>
+                <th className="py-3.5 px-4 text-center">Công suất</th>
+                <th className="py-3.5 px-4 text-center">Trạng thái</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
