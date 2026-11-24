@@ -184,6 +184,40 @@ const AUDIT_RULES = [
       return violations;
     },
   },
+  {
+    id: 'SLOP-010-MAGIC-WAND-TROPE',
+    name: 'Banned AI Magic Wand Icon (Rule 6, Rule 8)',
+    description: 'Banned Wand2 / magic wand icon used as decorative AI trope.',
+    test: (content) => {
+      const violations = [];
+      const regex = /\bWand2\b/g;
+      let match;
+      while ((match = regex.exec(content)) !== null) {
+        violations.push({ text: match[0], detail: `Banned AI magic wand icon (Wand2): "${match[0]}"` });
+      }
+      return violations;
+    },
+  },
+  {
+    id: 'SLOP-011-MARKETING-PUFFERY',
+    name: 'Banned AI Marketing Buzzwords in UI & Microcopy (Rule 8, 9)',
+    description: 'Banned marketing buzzwords like "chuẩn SEO", "AI viết và", "phép thuật".',
+    test: (content) => {
+      const violations = [];
+      const bannedBuzzwords = [
+        'chuẩn SEO',
+        'AI viết và',
+        'phép thuật',
+        'phép màu',
+      ];
+      for (const phrase of bannedBuzzwords) {
+        if (content.includes(phrase)) {
+          violations.push({ text: phrase, detail: `Banned AI marketing puffery: "${phrase}"` });
+        }
+      }
+      return violations;
+    },
+  },
 ];
 
 // Recursive scanner for frontend files

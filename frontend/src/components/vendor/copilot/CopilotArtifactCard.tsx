@@ -2,7 +2,7 @@ import {
   TrendingUp, 
   Star, 
   CalendarClock, 
-  Wand2, 
+  FileCheck, 
   CheckCircle2, 
   AlertTriangle,
   ShieldAlert,
@@ -182,7 +182,7 @@ export function CopilotArtifactCard({ artifact }: CopilotArtifactCardProps) {
       <div className="mt-3 p-3.5 bg-white border border-slate-200/90 rounded-xl shadow-xs text-xs flex flex-col gap-2.5">
         <div className="flex items-center justify-between border-b border-slate-100 pb-2">
           <div className="flex items-center gap-1.5 font-bold text-slate-900">
-            <Wand2 className="w-3.5 h-3.5 text-sky-600" />
+            <FileCheck className="w-3.5 h-3.5 text-slate-700" />
             <span>Đánh giá tối ưu bài đăng</span>
           </div>
           <span className="text-xs font-bold text-sky-700 font-mono tabular-nums">

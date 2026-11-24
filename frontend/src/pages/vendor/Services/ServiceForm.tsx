@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Loader2, 
-  Wand2,
   ArrowLeft,
   Save,
   Eye,
@@ -178,7 +177,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
         setWaiverContent(draftVi.safetyAdvisory);
       }
 
-      toast.success('Đã tối ưu hóa tiêu đề, mô tả chuẩn SEO và song ngữ cho tour!');
+      toast.success('Đã cập nhật tiêu đề và mô tả song ngữ.');
     } catch (err) {
       console.error('[ListingOptimizer] AI fallback:', err);
       // Fallback từ điển du lịch biển chính xác cao
@@ -642,25 +641,15 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                       <h2 className="text-base font-bold text-slate-900 font-display">
                         Thông tin cơ bản
                       </h2>
-                      <button
-                        type="button"
+                      <AtlasButton
+                        variant="outline"
+                        size="sm"
                         onClick={handleAiOptimizeListing}
                         disabled={isOptimizingAi || !nameVi.trim()}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-40"
-                        title="AI viết và tối ưu hóa tiêu đề, mô tả chuẩn SEO du lịch biển & song ngữ"
+                        icon={isOptimizingAi ? <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" /> : <FileText className="w-3.5 h-3.5 text-slate-500" />}
                       >
-                        {isOptimizingAi ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-300" />
-                            <span>Đang tối ưu...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Wand2 className="w-3.5 h-3.5 text-sky-400" />
-                            <span>Tối ưu nội dung tour</span>
-                          </>
-                        )}
-                      </button>
+                        {isOptimizingAi ? 'Đang tạo...' : 'Gợi ý tiêu đề & mô tả'}
+                      </AtlasButton>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1077,7 +1066,7 @@ function ServiceFormPage({ serviceId }: { serviceId: string | undefined }) {
                             <td className="py-3 px-4 font-bold text-slate-900">{opt.name}</td>
                             <td className="py-3 px-4">
                               <span className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold ${
-                                opt.optionType === 'PRIVATE' ? 'bg-purple-50 text-purple-700 border border-purple-200/80' : 'bg-sky-50 text-sky-700 border border-sky-200/80'
+                                opt.optionType === 'PRIVATE' ? 'bg-slate-100 text-slate-800 border border-slate-200/80' : 'bg-sky-50 text-sky-700 border border-sky-200/80'
                               }`}>
                                 {opt.optionType === 'PRIVATE' ? 'Bao trọn gói' : 'Ghép đoàn'}
                               </span>
