@@ -1,6 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
+import { useAuthStore } from "../../../store/useAuthStore";
+import { useAuthHydrated } from "../../../hooks/useAuthHydrated";
 import { useLanguageStore } from "../../../store/useLanguageStore";
+import { authService } from "../../../services/authService";
+import { toast } from "../../../store/useToastStore";
 import {
   KeyRound,
   Lock,
@@ -15,6 +19,8 @@ import {
 
 export function ChangePassword() {
   const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuthStore();
+  const hydrated = useAuthHydrated();
   const { language } = useLanguageStore();
   const isEn = language === 'en';
   const [success, setSuccess] = useState(false);
@@ -22,13 +28,40 @@ export function ChangePassword() {
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSuccess(true);
-    setTimeout(() => {
-      navigate('/profile');
-    }, 2000);
+    if (submitting) return;
+    if (newPassword !== confirmPassword) {
+      toast.error(isEn ? "New passwords do not match!" : "Mật khẩu xác nhận không khớp!");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await authService.changePassword({ currentPassword, newPassword });
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/profile');
+      }, 2000);
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg || (isEn ? "Could not change password. Check your current password." : "Không thể đổi mật khẩu. Vui lòng kiểm tra lại mật khẩu hiện tại."));
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  if (!hydrated) {
+    return <main className="w-full pt-24 pb-16 bg-slate-50 min-h-[calc(100vh-80px)] flex-1 flex flex-col" />;
+  }
+
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/auth" replace state={{ returnTo: "/profile/change-password" }} />;
+  }
 
   return (
     <main className="w-full pt-24 pb-16 bg-slate-50 min-h-[calc(100vh-80px)] flex-1 flex flex-col">
@@ -80,6 +113,9 @@ export function ChangePassword() {
                     <input 
                       required 
                       type={showCurrentPass ? "text" : "password"} 
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      autoComplete="current-password"
                       placeholder={isEn ? "Enter current password" : "Nhập mật khẩu hiện tại"} 
                       className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors font-medium" 
                     />
@@ -100,6 +136,9 @@ export function ChangePassword() {
                     <input 
                       required 
                       type={showNewPass ? "text" : "password"} 
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      autoComplete="new-password"
                       placeholder={isEn ? "Minimum 8 chars, uppercase and numbers" : "Tối thiểu 8 ký tự, gồm chữ hoa và số"} 
                       className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors font-medium" 
                     />
@@ -120,6 +159,9 @@ export function ChangePassword() {
                     <input 
                       required 
                       type={showConfirmPass ? "text" : "password"} 
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      autoComplete="new-password"
                       placeholder={isEn ? "Re-enter new password" : "Nhập lại mật khẩu mới"} 
                       className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm text-slate-900 outline-none focus:border-slate-400 focus:bg-white transition-colors font-medium" 
                     />
@@ -151,9 +193,10 @@ export function ChangePassword() {
                   </button>
                   <button 
                     type="submit" 
-                    className="px-6 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] text-white font-semibold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer"
+                    disabled={submitting}
+                    className="px-6 py-2.5 rounded-xl bg-[#0284c7] hover:bg-[#0369a1] disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer"
                   >
-                    {isEn ? "Update Password" : "Cập nhật mật khẩu"}
+                    {submitting ? (isEn ? "Updating..." : "Đang cập nhật...") : (isEn ? "Update Password" : "Cập nhật mật khẩu")}
                   </button>
                 </div>
               </form>

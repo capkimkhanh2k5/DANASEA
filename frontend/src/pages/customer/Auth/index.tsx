@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthStore } from "../../../store/useAuthStore";
 import { authService } from "../../../services/authService";
+import { syncProfile } from "../../../services/sessionService";
+import { resolveSafeReturnTo } from "../../../services/sessionEvents";
 import { AuthCinematicBackdrop } from "../../../components/customer/AuthCinematicBackdrop";
 import { GoogleLoginButton } from "../../../components/customer/GoogleLoginButton";
 import type { User, Role } from "../../../types";
@@ -30,7 +32,9 @@ const DEFAULT_AVATARS: Record<Role, string> = {
   CUSTOMER: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
 };
 
-function getLoginDestination(role: Role, paymentReturnTo: unknown) {
+function getLoginDestination(role: Role, paymentReturnTo: unknown, returnTo?: unknown) {
+  const safeReturnTo = resolveSafeReturnTo(returnTo, role);
+  if (safeReturnTo) return safeReturnTo;
   if (role === 'ADMIN') return '/admin';
   if (role === 'VENDOR') return '/vendor';
   if (typeof paymentReturnTo === 'string'
@@ -43,6 +47,7 @@ function getLoginDestination(role: Role, paymentReturnTo: unknown) {
 export function Auth() {
   const { state } = useLocation();
   const paymentReturnTo: unknown = state?.paymentReturnTo;
+  const returnTo: unknown = state?.returnTo ?? state?.from;
 
   const [activeTab, setActiveTab] = useState<"login" | "register" | "forgot_password">("login");
   
@@ -223,8 +228,10 @@ export function Auth() {
       };
 
       setAuth(userModel, authRes.accessToken);
+      // Replace the guessed profile (hardcoded names / email prefix) with the real one.
+      await syncProfile();
 
-      const destination = getLoginDestination(role, paymentReturnTo);
+      const destination = getLoginDestination(role, paymentReturnTo, returnTo);
       setToastMessage("Đăng nhập thành công");
       setShowSuccessToast(true);
 
@@ -360,7 +367,7 @@ export function Auth() {
 
       setAuth(userModel, authRes.accessToken);
 
-      const destination = getLoginDestination(userModel.role, paymentReturnTo);
+      const destination = getLoginDestination(userModel.role, paymentReturnTo, returnTo);
       setToastMessage("Đăng nhập Google thành công");
       setShowSuccessToast(true);
 
@@ -527,6 +534,7 @@ export function Auth() {
 
       if (pendingUser) {
         setAuth({ ...pendingUser, isEmailVerified: true }, useAuthStore.getState().accessToken || '');
+        await syncProfile();
       }
 
       setToastMessage('Đăng ký & Kích hoạt thành công!');
