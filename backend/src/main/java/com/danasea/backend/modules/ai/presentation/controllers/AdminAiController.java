@@ -44,7 +44,7 @@ public class AdminAiController {
 
     public record RiskRequest(UUID orderId, String complaint) {}
     public record ResolutionRequest(String resolution, String note) {}
-    public record CopilotChatRequestDto(UUID conversationId, String message, String contextType, UUID contextId) {}
+    public record CopilotChatRequestDto(UUID conversationId, String message, String contextType, UUID contextId, String contextLabel) {}
     public record UpdateConversationMetaDto(String title, Boolean pinned, Boolean archived) {}
 
     private final AnalyzeTransactionRiskUseCase risks;
@@ -114,7 +114,7 @@ public class AdminAiController {
         String ctxType = request != null ? request.contextType() : null;
         UUID ctxId = request != null ? request.contextId() : null;
 
-        return roleCopilotUseCase.processMessage(adminId, "ADMIN", null, convId, msg, ctxType, ctxId, lang);
+        return roleCopilotUseCase.processMessage(adminId, "ADMIN", null, convId, msg, ctxType, ctxId, request != null ? request.contextLabel() : null, lang);
     }
 
     @GetMapping("/copilot/conversations")

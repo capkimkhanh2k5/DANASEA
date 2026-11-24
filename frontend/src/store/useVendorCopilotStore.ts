@@ -150,6 +150,13 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
         // Parse legacy or backend-saved prefix "[Tệp đính kèm: ...]" and "[Về ...]" out of user text into clean UI elements
         let displayContent = m.content;
         let extractedContext: AttachedContext | undefined;
+        if (m.contextType && m.contextId && m.role.toLowerCase() === 'user') {
+          extractedContext = {
+            type: m.contextType as VendorContextType,
+            id: m.contextId,
+            label: m.contextLabel || m.contextType,
+          };
+        }
         const extractedMedia: AttachedMedia[] = [];
 
         // Check for media attachment prefix
@@ -169,7 +176,7 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
 
         // Check for context prefix
         const prefixMatch = displayContent.match(/^\[Về (?:\[(.+?)\] )?(.+?) \(ID: ([a-f0-9-]+)\)\] (.*)$/s);
-        if (prefixMatch && m.role.toLowerCase() === 'user') {
+        if (!extractedContext && prefixMatch && m.role.toLowerCase() === 'user') {
           const typeStr = prefixMatch[1] || 'SERVICE';
           const labelStr = prefixMatch[2];
           const idStr = prefixMatch[3];
@@ -252,6 +259,7 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
         message: effectiveText, // Send clean user message
         contextType: attachedContext?.type,
         contextId: attachedContext?.id,
+        contextLabel: attachedContext?.label,
       }, detectedLang);
 
       const assistantMsg: ChatUiMessage = {
