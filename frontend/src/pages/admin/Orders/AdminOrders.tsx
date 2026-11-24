@@ -112,8 +112,8 @@ export function OrderDetailContent({
               <button
                 type="button"
                 className="admin-copy-mini-btn"
-                onClick={() => navigator.clipboard.writeText(master.id)}
-                title="Sao chép UUID đơn hàng"
+                onClick={() => navigator.clipboard.writeText(formatDisplayCode(master.id, 'ORD'))}
+                title="Sao chép mã đơn hàng"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--admin-muted, #737373)' }}
               >
                 <Copy size={12} />
@@ -200,7 +200,18 @@ export function OrderDetailContent({
                   <div className="admin-orders-sub-heading">
                     <div>
                       <h4>{serviceTitle}</h4>
-                      <p>Số lượng: {sub.quantity} khách · Mã đơn con: #{formatDisplayCode(sub.id, 'SUB')}</p>
+                      <p style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        Số lượng: {sub.quantity} khách · Mã đơn con: <strong>#{formatDisplayCode(sub.id, 'SUB')}</strong>
+                        <button
+                          type="button"
+                          className="admin-copy-mini-btn"
+                          onClick={() => navigator.clipboard.writeText(formatDisplayCode(sub.id, 'SUB'))}
+                          title="Sao chép mã đơn con"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--admin-muted, #737373)' }}
+                        >
+                          <Copy size={11} />
+                        </button>
+                      </p>
                     </div>
                     <OrderStatus status={sub.status} />
                   </div>
@@ -713,9 +724,25 @@ export function AdminOrders() {
                   return (
                     <tr key={order.id} data-selected={drawerOpen && order.id === selectedOrderId}>
                       <td>
-                        <strong className="admin-orders-id" title={order.id}>
-                          #{formatDisplayCode(order.id, 'ORD')}
-                        </strong>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <strong className="admin-orders-id" title={order.id}>
+                            #{formatDisplayCode(order.id, 'ORD')}
+                          </strong>
+                          <button
+                            type="button"
+                            className="admin-copy-mini-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const code = formatDisplayCode(order.id, 'ORD');
+                              navigator.clipboard.writeText(code);
+                              setNotice('Đã sao chép mã đơn hàng: ' + code);
+                            }}
+                            title="Sao chép mã đơn hàng"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--admin-muted, #737373)' }}
+                          >
+                            <Copy size={11} />
+                          </button>
+                        </div>
                         <small>{dateTime(order.createdAt)}</small>
                       </td>
                       <td>
