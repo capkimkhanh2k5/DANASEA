@@ -12,7 +12,32 @@ import {
   extractQueueOverviewData,
   extractOrderRiskAssessmentData,
   extractContentAssessmentData,
+  formatVendorIssueLabel,
+  formatAssessmentStatusLabel,
+  formatRiskSignalLabel,
+  formatContentReasonLabel,
+  formatEvidenceTypeLabel,
 } from '../copilotArtifactHelpers';
+
+describe('formatVendorIssueLabel & enum label mappers', () => {
+  it('maps known vendor issue enums to Vietnamese labels and humanises unknown ones', () => {
+    assert.equal(formatVendorIssueLabel('HIGH_CANCELLATION'), 'Tỷ lệ hủy cao');
+    assert.equal(formatVendorIssueLabel('LOW_RATING'), 'Đánh giá thấp');
+    assert.equal(formatVendorIssueLabel('UNDERPERFORMING'), 'Hiệu suất thấp');
+    assert.equal(formatVendorIssueLabel('OVERLOADED'), 'Quá tải');
+    assert.equal(formatVendorIssueLabel('SOME_NEW_ISSUE'), 'Some new issue');
+    assert.equal(formatVendorIssueLabel(''), '');
+  });
+
+  it('maps assessment statuses, risk signals, content reasons, and evidence types cleanly', () => {
+    assert.equal(formatAssessmentStatusLabel('NEEDS_REVIEW'), 'Cần kiểm duyệt');
+    assert.equal(formatAssessmentStatusLabel('NO_RULE_SIGNAL'), 'Chưa phát hiện vi phạm');
+    assert.equal(formatRiskSignalLabel('THREE_FAILED_PAYMENTS_IN_24H'), '≥ 3 lần thanh toán thất bại trong 24 giờ');
+    assert.equal(formatRiskSignalLabel('FIVE_ORDERS_IN_1H'), '≥ 5 đơn hàng trong 1 giờ');
+    assert.equal(formatContentReasonLabel('EXTERNAL_CONTACT_DETECTED'), 'Phát hiện thông tin liên hệ ngoài nền tảng');
+    assert.equal(formatEvidenceTypeLabel('TEXT_ONLY'), 'Văn bản');
+  });
+});
 
 describe('Copilot Artifact Helpers & Safety Handlers', () => {
   describe('formatVND & formatCompactVND', () => {
