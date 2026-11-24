@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,21 +21,20 @@ import com.danasea.backend.modules.operation.infrastructure.persistence.reposito
 import com.danasea.backend.modules.report.application.usecases.GetVendorPerformanceReportUseCase;
 import com.danasea.backend.modules.report.domain.models.TimeRange;
 import com.danasea.backend.modules.report.domain.models.VendorPerformanceItem;
+import com.danasea.backend.modules.service.domain.models.OptionStatus;
 import com.danasea.backend.modules.service.domain.models.ServiceStatus;
 import com.danasea.backend.modules.service.domain.models.SlotStatus;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.CategoryJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.entities.ServiceJpaEntity;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaCategoryRepository;
+import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceOptionRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceRepository;
 import com.danasea.backend.modules.service.infrastructure.persistence.repositories.JpaServiceSlotRepository;
 import com.danasea.backend.modules.vendor.application.api.VendorInternalApi;
 import com.danasea.backend.modules.vendor.domain.models.BadgeTier;
 import com.danasea.backend.modules.vendor.domain.models.Vendor;
 
-import lombok.RequiredArgsConstructor;
-
 @Component
-@RequiredArgsConstructor
 public class JpaVendorAiDataAdapter implements VendorAiDataPort {
 
     private final VendorInternalApi vendorInternalApi;
@@ -43,6 +43,37 @@ public class JpaVendorAiDataAdapter implements VendorAiDataPort {
     private final JpaServiceSlotRepository slotRepo;
     private final JpaReviewRepository reviewRepo;
     private final GetVendorPerformanceReportUseCase vendorPerformanceReportUseCase;
+    private final JpaServiceOptionRepository optionRepo;
+
+    public JpaVendorAiDataAdapter(
+            VendorInternalApi vendorInternalApi,
+            JpaServiceRepository serviceRepo,
+            JpaCategoryRepository categoryRepo,
+            JpaServiceSlotRepository slotRepo,
+            JpaReviewRepository reviewRepo,
+            GetVendorPerformanceReportUseCase vendorPerformanceReportUseCase
+    ) {
+        this(vendorInternalApi, serviceRepo, categoryRepo, slotRepo, reviewRepo, vendorPerformanceReportUseCase, null);
+    }
+
+    @Autowired
+    public JpaVendorAiDataAdapter(
+            VendorInternalApi vendorInternalApi,
+            JpaServiceRepository serviceRepo,
+            JpaCategoryRepository categoryRepo,
+            JpaServiceSlotRepository slotRepo,
+            JpaReviewRepository reviewRepo,
+            GetVendorPerformanceReportUseCase vendorPerformanceReportUseCase,
+            @Autowired(required = false) JpaServiceOptionRepository optionRepo
+    ) {
+        this.vendorInternalApi = vendorInternalApi;
+        this.serviceRepo = serviceRepo;
+        this.categoryRepo = categoryRepo;
+        this.slotRepo = slotRepo;
+        this.reviewRepo = reviewRepo;
+        this.vendorPerformanceReportUseCase = vendorPerformanceReportUseCase;
+        this.optionRepo = optionRepo;
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -67,6 +98,14 @@ public class JpaVendorAiDataAdapter implements VendorAiDataPort {
 
     @Override
     @Transactional(readOnly = true)
+    public List<VendorServiceItem> listAllOwnedServices(UUID vendorId) {
+        return serviceRepo.findByVendorIdOrderByCreatedAtDesc(vendorId).stream()
+                .map(this::toServiceItem)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Map<String, Long> countServicesByStatus(UUID vendorId) {
         return serviceRepo.countServicesByStatusForVendor(vendorId).stream()
                 .collect(Collectors.toMap(row -> row.getStatus().name(), JpaServiceRepository.StatusCount::getTotal));
@@ -76,6 +115,43 @@ public class JpaVendorAiDataAdapter implements VendorAiDataPort {
     @Transactional(readOnly = true)
     public Optional<VendorServiceItem> getService(UUID vendorId, UUID serviceId) {
         return findOwnedService(vendorId, serviceId).map(this::toServiceItem);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<VendorServiceDetail> getServiceDetail(UUID vendorId, UUID serviceId) {
+        return findOwnedService(vendorId, serviceId).map(service -> {
+            String categoryName = Optional.ofNullable(service.getCategoryId())
+                    .flatMap(categoryRepo::findById)
+                    .map(CategoryJpaEntity::getName)
+                    .orElse("Du lịch biển");
+            List<VendorServicePriceOption> options = optionRepo == null
+                    ? List.of()
+                    : optionRepo.findByServiceIdAndStatusOrderByCreatedAtAsc(service.getId(), OptionStatus.ACTIVE)
+                            .stream()
+                            .map(opt -> new VendorServicePriceOption(
+                                    opt.getId(),
+                                    opt.getName(),
+                                    opt.getPricingUnit() != null ? opt.getPricingUnit().name() : "PER_PERSON",
+                                    opt.getPrice(),
+                                    opt.getMaxPaxPerPackage(),
+                                    opt.getStatus() != null ? opt.getStatus().name() : "ACTIVE"
+                            ))
+                            .toList();
+            return new VendorServiceDetail(
+                    service.getId(),
+                    service.getVendorId(),
+                    service.getName(),
+                    categoryName,
+                    service.getStatus() != null ? service.getStatus().name() : "PUBLISHED",
+                    service.getPrice(),
+                    service.getDurationMinutes(),
+                    service.getCapacityPerSlot(),
+                    service.getAvgRating() != null ? service.getAvgRating() : BigDecimal.ZERO,
+                    service.getRatingCount() != null ? service.getRatingCount() : 0,
+                    options
+            );
+        });
     }
 
     @Override

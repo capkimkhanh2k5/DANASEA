@@ -2,6 +2,7 @@ package com.danasea.backend.modules.ai.application.usecases;
 
 import java.math.BigDecimal;
 import java.text.NumberFormat;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -605,6 +606,10 @@ final class CopilotReportAnswer {
     }
 
     static String vendorSlotAdvisor(JsonNode data, String normalizedQuestion, boolean english) {
+        return vendorSlotAdvisor(data, normalizedQuestion, null, english);
+    }
+
+    static String vendorSlotAdvisor(JsonNode data, String normalizedQuestion, LocalDate targetDate, boolean english) {
         if (!data.has("totalSlotsEvaluated")) return unavailable(english);
         int evaluated = data.path("totalSlotsEvaluated").asInt(0);
         long highDemand = data.path("highDemandSlotsCount").asLong(0);
@@ -613,11 +618,27 @@ final class CopilotReportAnswer {
         String q = normalizedQuestion != null ? normalizedQuestion : "";
 
         StringBuilder sb = new StringBuilder();
-        sb.append(english
-                ? "Evaluated %d upcoming slot(s) (high demand: %d, low demand: %d, weather watch/risk: %d)."
-                        .formatted(evaluated, highDemand, lowDemand, weatherRisk)
-                : "Đã kiểm tra %d ca sắp tới (nhu cầu cao: %d, công suất thấp: %d, cần lưu ý thời tiết: %d)."
-                        .formatted(evaluated, highDemand, lowDemand, weatherRisk));
+        if (targetDate != null) {
+            String dateLabel = targetDate.format(english ? DateTimeFormatter.ISO_LOCAL_DATE : VI_DATE);
+            if (evaluated == 0) {
+                return english
+                        ? "There are currently 0 scheduled slots on %s for this scope. See the advisory card below for details."
+                                .formatted(dateLabel)
+                        : "Ngày %s hiện có 0 ca hoạt động được mở cho phạm vi tra cứu này. Chi tiết xem thẻ bên dưới."
+                                .formatted(dateLabel);
+            }
+            sb.append(english
+                    ? "On %s, there are %d scheduled slot(s) (high demand: %d, low demand: %d, weather watch/risk: %d)."
+                            .formatted(dateLabel, evaluated, highDemand, lowDemand, weatherRisk)
+                    : "Ngày %s có %d ca hoạt động (nhu cầu cao: %d, công suất thấp: %d, cần lưu ý thời tiết: %d)."
+                            .formatted(dateLabel, evaluated, highDemand, lowDemand, weatherRisk));
+        } else {
+            sb.append(english
+                    ? "Evaluated %d upcoming slot(s) (high demand: %d, low demand: %d, weather watch/risk: %d)."
+                            .formatted(evaluated, highDemand, lowDemand, weatherRisk)
+                    : "Đã kiểm tra %d ca sắp tới (nhu cầu cao: %d, công suất thấp: %d, cần lưu ý thời tiết: %d)."
+                            .formatted(evaluated, highDemand, lowDemand, weatherRisk));
+        }
 
         boolean hasRiskyOrUnknownSlot = false;
         JsonNode recs = data.path("recommendations");
@@ -644,12 +665,14 @@ final class CopilotReportAnswer {
                     hasRiskyOrUnknownSlot = true;
                 }
                 if (count++ < 3) {
+                    String dateStr = formatJsonDate(rec.path("date"));
+                    String timeStr = formatJsonTime(rec.path("startTime"));
                     lines.add(english
                             ? "- %s (%s %s): %d/%d (%.1f%%) — weather: %s, suggestion: %s."
                                     .formatted(
                                             rec.path("serviceTitle").asText("Service"),
-                                            rec.path("date").asText(""),
-                                            rec.path("startTime").asText(""),
+                                            dateStr,
+                                            timeStr,
                                             rec.path("bookedCount").asInt(0),
                                             rec.path("capacity").asInt(0),
                                             rec.path("occupancyRate").asDouble(0.0),
@@ -658,8 +681,8 @@ final class CopilotReportAnswer {
                             : "- %s (%s %s): %d/%d (%.1f%%) — thời tiết %s, gợi ý %s."
                                     .formatted(
                                             rec.path("serviceTitle").asText("Dịch vụ"),
-                                            rec.path("date").asText(""),
-                                            rec.path("startTime").asText(""),
+                                            dateStr,
+                                            timeStr,
                                             rec.path("bookedCount").asInt(0),
                                             rec.path("capacity").asInt(0),
                                             rec.path("occupancyRate").asDouble(0.0),
@@ -713,6 +736,64 @@ final class CopilotReportAnswer {
             case "KEEP_OPTIMAL" -> english ? "maintain current schedule" : "duy trì lịch hiện tại";
             default -> english ? "review slot status" : "kiểm tra thêm tình trạng ca";
         };
+    }
+
+    private static String formatJsonDate(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) return "";
+        if (node.isArray() && node.size() >= 3) {
+            return "%04d-%02d-%02d".formatted(node.get(0).asInt(), node.get(1).asInt(), node.get(2).asInt());
+        }
+        return node.asText("");
+    }
+
+    private static String formatJsonTime(JsonNode node) {
+        if (node == null || node.isMissingNode() || node.isNull()) return "";
+        if (node.isArray() && node.size() >= 2) {
+            return "%02d:%02d".formatted(node.get(0).asInt(), node.get(1).asInt());
+        }
+        String raw = node.asText("");
+        return raw.length() >= 5 ? raw.substring(0, 5) : raw;
+    }
+
+    static String vendorServiceDetail(JsonNode data, boolean english) {
+        if (!data.has("title")) return unavailable(english);
+        String title = data.path("title").asText(english ? "Service" : "Dịch vụ");
+        JsonNode options = data.path("options");
+        List<BigDecimal> optionPrices = new ArrayList<>();
+        if (options.isArray()) {
+            for (JsonNode opt : options) {
+                if (opt.path("price").isNumber()) {
+                    optionPrices.add(opt.path("price").decimalValue());
+                }
+            }
+        }
+        BigDecimal basePrice = data.path("basePrice").isNumber() ? data.path("basePrice").decimalValue() : null;
+
+        if (!optionPrices.isEmpty()) {
+            BigDecimal min = optionPrices.stream().min(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
+            BigDecimal max = optionPrices.stream().max(BigDecimal::compareTo).orElse(min);
+            String priceText = min.compareTo(max) == 0
+                    ? money(min, english)
+                    : (english ? "%s – %s".formatted(money(min, true), money(max, true))
+                            : "từ %s đến %s".formatted(money(min, false), money(max, false)));
+            return english
+                    ? "Service \"%s\" currently has %d active pricing option(s) priced at %s. See the service card below for full package details."
+                            .formatted(title, optionPrices.size(), priceText)
+                    : "Dịch vụ \"%s\" hiện có %d gói đang áp dụng với mức giá %s. Chi tiết từng gói xem thẻ bên dưới."
+                            .formatted(title, optionPrices.size(), priceText);
+        }
+        if (basePrice != null) {
+            return english
+                    ? "Service \"%s\" has a listed base price of %s. See the service card below for full details."
+                            .formatted(title, money(basePrice, true))
+                    : "Dịch vụ \"%s\" có giá niêm yết %s. Chi tiết xem thẻ bên dưới."
+                            .formatted(title, money(basePrice, false));
+        }
+        return english
+                ? "Service \"%s\" does not have a listed price yet. See the service card below for details."
+                        .formatted(title)
+                : "Dịch vụ \"%s\" hiện chưa có mức giá niêm yết. Chi tiết xem thẻ bên dưới."
+                        .formatted(title);
     }
 
     static String vendorListingOptimization(JsonNode data, boolean english) {

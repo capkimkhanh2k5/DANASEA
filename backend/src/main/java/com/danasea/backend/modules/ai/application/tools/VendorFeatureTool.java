@@ -116,10 +116,21 @@ public class VendorFeatureTool implements ToolExecutor {
                     var counts = vendorAiData.countServicesByStatus(vendorId);
                     yield Map.of("total", counts.values().stream().mapToLong(Long::longValue).sum(), "byStatus", counts);
                 }
+                case "vendor_service_detail" -> {
+                    if (serviceId == null) {
+                        throw new IllegalArgumentException("serviceId is required for vendor_service_detail");
+                    }
+                    yield vendorAiData.getServiceDetail(vendorId, serviceId)
+                            .orElseThrow(() -> new IllegalArgumentException("Service is unavailable to this vendor"));
+                }
                 case "vendor_review_coaching" -> reviewCoaching.execute(userId, serviceId, null, null, language);
                 case "vendor_review_reply_draft" -> reviewCoaching.draftReply(userId,
                         UUID.fromString(args.path("reviewId").asText()), "EMPATHETIC", null, language);
-                case "vendor_slot_advisor" -> slotAdvisor.execute(userId, serviceId, args.path("horizonDays").asInt(7), language);
+                case "vendor_slot_advisor" -> {
+                    LocalDate targetDate = args.hasNonNull("targetDate")
+                            ? LocalDate.parse(args.get("targetDate").asText()) : null;
+                    yield slotAdvisor.execute(userId, serviceId, args.path("horizonDays").asInt(7), targetDate, language);
+                }
                 case "vendor_optimize_listing" -> {
                     String title = args.path("title").asText("");
                     String desc = args.path("description").asText("");

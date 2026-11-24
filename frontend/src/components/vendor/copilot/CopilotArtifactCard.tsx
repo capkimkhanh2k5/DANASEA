@@ -6,7 +6,8 @@ import {
   CheckCircle2, 
   AlertTriangle,
   ShieldAlert,
-  Layers
+  Layers,
+  Tag
 } from 'lucide-react';
 import type { CopilotArtifact } from '../../../types/vendorAi';
 import {
@@ -37,6 +38,11 @@ const SERVICE_STATUS_LABELS: Record<string, string> = {
   PENDING_REVIEW: 'Chờ duyệt',
   REJECTED: 'Bị từ chối',
   PAUSED: 'Tạm dừng',
+};
+
+const PRICING_UNIT_LABELS: Record<string, string> = {
+  PER_PERSON: 'mỗi khách',
+  PER_PACKAGE: 'mỗi gói',
 };
 
 interface CopilotArtifactCardProps {
@@ -179,9 +185,13 @@ export function CopilotArtifactCard({ artifact }: CopilotArtifactCardProps) {
         </div>
 
         {recommendations.length === 0 ? (
-          <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-800 flex items-center gap-1.5">
+          <div className="p-2 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-600 flex items-center gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span>Tất cả các ca tour đều có tỷ lệ lấp đầy tối ưu và thời tiết an toàn.</span>
+            <span>
+              {totalSlots === 0
+                ? 'Chưa có ca hoạt động nào được mở trong khoảng thời gian tra cứu.'
+                : 'Tất cả các ca tour đều có tỷ lệ lấp đầy tối ưu và thời tiết an toàn.'}
+            </span>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -302,23 +312,105 @@ export function CopilotArtifactCard({ artifact }: CopilotArtifactCardProps) {
 
     return (
       <div className="mt-3 p-3.5 bg-white border border-slate-200/90 rounded-xl shadow-xs text-xs flex flex-col gap-2.5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <div className="flex items-center gap-1.5 font-bold text-slate-900">
-            <Layers className="w-3.5 h-3.5 text-sky-600" />
-            <span>Thống kê dịch vụ đối tác</span>
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+          <div className="flex items-center gap-1.5 font-bold text-slate-900 min-w-0">
+            <Layers className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+            <span className="truncate">Thống kê dịch vụ đối tác</span>
           </div>
-          <span className="font-mono font-bold text-slate-800">{total} dịch vụ</span>
+          <span className="font-mono font-bold text-slate-800 shrink-0 whitespace-nowrap">
+            {total} dịch vụ
+          </span>
         </div>
         {entries.length > 0 && (
           <div className="grid grid-cols-2 gap-1.5">
             {entries.map(([statusKey, countVal]) => (
-              <div key={statusKey} title={statusKey} className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-lg px-2 py-1 text-[11px]">
-                <span className="text-slate-600 font-medium">
+              <div key={statusKey} title={statusKey} className="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200/80 rounded-lg px-2 py-1 text-[11px]">
+                <span className="text-slate-600 font-medium truncate">
                   {SERVICE_STATUS_LABELS[statusKey.toUpperCase()] || statusKey}
                 </span>
-                <span className="font-mono font-bold text-slate-900">{Number(countVal || 0)}</span>
+                <span className="font-mono font-bold text-slate-900 shrink-0">{Number(countVal || 0)}</span>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 7. Service Detail & Pricing Card
+  if (type === 'VENDOR_SERVICE_DETAIL_CARD' || artifact.tool === 'vendor_service_detail') {
+    const title = String(data.title || 'Dịch vụ');
+    const categoryName = String(data.categoryName || '');
+    const status = String(data.status || 'PUBLISHED');
+    const basePrice = data.basePrice !== null && data.basePrice !== undefined ? Number(data.basePrice) : null;
+    const durationMinutes = data.durationMinutes ? Number(data.durationMinutes) : null;
+    const capacityPerSlot = data.capacityPerSlot ? Number(data.capacityPerSlot) : null;
+    const options = Array.isArray(data.options)
+      ? (data.options as Array<{ id?: string; name?: string; pricingUnit?: string; price?: number; maxPaxPerPackage?: number | null }>)
+      : [];
+
+    return (
+      <div className="mt-3 p-3.5 bg-white border border-slate-200/90 rounded-xl shadow-xs text-xs flex flex-col gap-2.5">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+          <div className="flex items-center gap-1.5 font-bold text-slate-900 min-w-0">
+            <Tag className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+            <span className="truncate" title={title}>{title}</span>
+          </div>
+          <span
+            title={status}
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border shrink-0 whitespace-nowrap ${
+              status.toUpperCase() === 'PUBLISHED'
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : status.toUpperCase() === 'PENDING_REVIEW'
+                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                  : 'bg-slate-100 text-slate-700 border-slate-200'
+            }`}
+          >
+            {SERVICE_STATUS_LABELS[status.toUpperCase()] || status}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          {basePrice !== null && Number.isFinite(basePrice) && (
+            <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+              <span className="text-[10px] text-slate-500 font-medium block">Giá niêm yết</span>
+              <span className="text-sm font-bold text-sky-700 font-mono tabular-nums">
+                {basePrice.toLocaleString('vi-VN')} ₫
+              </span>
+            </div>
+          )}
+          {(durationMinutes || capacityPerSlot || categoryName) && (
+            <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex flex-col justify-center gap-0.5 text-[11px] text-slate-700">
+              {categoryName && <span className="font-semibold text-slate-800 truncate">{categoryName}</span>}
+              <span>
+                {[
+                  durationMinutes ? `${durationMinutes} phút` : null,
+                  capacityPerSlot ? `${capacityPerSlot} khách/ca` : null,
+                ].filter(Boolean).join(' · ') || 'Thông tin vận hành'}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {options.length > 0 && (
+          <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-100">
+            <span className="text-[11px] font-semibold text-slate-700">Các gói giá đang áp dụng:</span>
+            {options.map((opt, idx) => {
+              const unitKey = String(opt.pricingUnit || 'PER_PERSON').toUpperCase();
+              const unitLabel = PRICING_UNIT_LABELS[unitKey] || unitKey;
+              return (
+                <div
+                  key={opt.id || idx}
+                  className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-200/80 rounded-lg px-2.5 py-1.5 text-[11px]"
+                >
+                  <span className="font-medium text-slate-800 truncate">{opt.name || `Gói #${idx + 1}`}</span>
+                  <span className="font-mono font-bold text-sky-700 shrink-0 whitespace-nowrap">
+                    {Number(opt.price || 0).toLocaleString('vi-VN')} ₫{' '}
+                    <span className="text-[10px] font-sans font-normal text-slate-500">/ {unitLabel}</span>
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

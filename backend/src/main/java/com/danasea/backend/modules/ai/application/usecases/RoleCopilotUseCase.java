@@ -3,6 +3,7 @@ package com.danasea.backend.modules.ai.application.usecases;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -79,6 +80,7 @@ public class RoleCopilotUseCase {
     private static final Pattern ADMIN_OVERVIEW = CopilotRequest.words("dashboard|tong quan|tong hop tinh hinh|suc khoe|overview");
     private static final Pattern ADMIN_QUEUE = CopilotRequest.words("rui ro|risk|hang doi|queue|yeu cau ho tro|cho xu ly|pending");
     private static final Pattern UUID_REGEX = Pattern.compile("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+    private static final Pattern SHORT_ENTITY_CODE = Pattern.compile("#(?:ORD|SRV|SVC)-([0-9a-fA-F]{8})\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern VENDOR_REVIEW = CopilotRequest.words(
             "reviews?|danh gia|diem yeu|diem manh|phan tich chat luong|coaching|"
                     + "phan nan|che|khach keu|thoi gian cho|cho cano|cham tre|den tre|don tre|cho doi|complain|complaints?|waiting time");
@@ -211,6 +213,7 @@ public class RoleCopilotUseCase {
         registerVendorTool("vendor_dashboard_summary", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
         registerVendorTool("vendor_revenue_and_bookings", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
         registerVendorTool("vendor_service_count", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
+        registerVendorTool("vendor_service_detail", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
         registerVendorTool("vendor_review_coaching", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
         registerVendorTool("vendor_review_reply_draft", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
         registerVendorTool("vendor_slot_advisor", vendorAiData, reviewCoaching, slotAdvisor, listingOptimizer, assessTextUseCase);
@@ -366,14 +369,16 @@ public class RoleCopilotUseCase {
             String attachmentType, UUID attachmentId,
             List<Map<String, Object>> artifacts, List<String> toolsUsed
     ) {
+        String strippedMessage = CopilotRequest.stripAttachedContextPrefix(message);
         String normalized = CopilotRequest.normalize(message);
+        String intentNormalized = CopilotRequest.normalize(strippedMessage);
         LocalDate today = LocalDate.now(TimeRange.VIETNAM_ZONE);
-        if (!admin && CopilotRequest.isOutsideVendorScope(normalized)) {
+        if (!admin && CopilotRequest.isOutsideVendorScope(intentNormalized)) {
             return english
                     ? "I can show data for your shop. Platform-wide reports and other vendors' data are available to administrators."
                     : "Tôi có thể tra cứu số liệu của gian hàng bạn. Báo cáo toàn sàn và số liệu của gian hàng khác dành cho quản trị viên.";
         }
-        var policyReply = policyAnswers.resolve(message, context.language(), context.userId(), vendorId, admin,
+        var policyReply = policyAnswers.resolve(strippedMessage, context.language(), context.userId(), vendorId, admin,
                 "ORDER".equalsIgnoreCase(attachmentType) ? attachmentId : null);
         if (policyReply != null) {
             if (policyReply.tool() != null) {
@@ -384,25 +389,25 @@ public class RoleCopilotUseCase {
             }
             return policyReply.message();
         }
-        if (CopilotRequest.isPersonalBooking(normalized)) {
+        if (CopilotRequest.isPersonalBooking(intentNormalized)) {
             return english ? "Use the Customer Assistant to find or book a tour."
                     : "Bạn có thể tìm và đặt tour trong Trợ lý khách hàng.";
         }
-        if (CopilotRequest.isDateQuestion(normalized) && !CopilotRequest.isRevenue(normalized)
-                && !CopilotRequest.isServiceCount(normalized)) {
+        if (CopilotRequest.isDateQuestion(intentNormalized) && !CopilotRequest.isRevenue(intentNormalized)
+                && !CopilotRequest.isServiceCount(intentNormalized)) {
             var format = DateTimeFormatter.ofPattern(english ? "'Today is' EEEE, MMMM d, uuuu." : "'Hôm nay là' EEEE, dd/MM/uuuu.",
                     english ? Locale.ENGLISH : Locale.forLanguageTag("vi-VN"));
             return today.format(format);
         }
 
         UUID messageReference = PolicyChatAnswer.reference(message);
-        String ruleReply = resolveOperationalRuleReply(normalized, admin, vendorId, english, attachmentType, attachmentId, messageReference);
+        String ruleReply = resolveOperationalRuleReply(intentNormalized, admin, vendorId, english, attachmentType, attachmentId, messageReference);
         if (ruleReply != null) {
             return ruleReply;
         }
 
-        String tool = selectTool(normalized, admin, message, attachmentType, attachmentId);
-        if (tool == null && CopilotRequest.isPeriodFollowUp(normalized)) {
+        String tool = selectTool(intentNormalized, admin, message, attachmentType, attachmentId);
+        if (tool == null && CopilotRequest.isPeriodFollowUp(intentNormalized)) {
             String revenueTool = admin ? "admin_revenue_timeseries" : "vendor_dashboard_summary";
             if (lastReplyUsedTool(context.conversationId(), revenueTool)) tool = revenueTool;
         }
@@ -487,28 +492,65 @@ public class RoleCopilotUseCase {
             }
             args.put("reviewId", reviewId.toString());
         }
+        if (!admin && "vendor_service_detail".equals(tool)) {
+            UUID serviceId = messageReference != null ? messageReference
+                    : "SERVICE".equalsIgnoreCase(attachmentType) ? attachmentId : null;
+            if (serviceId == null) {
+                serviceId = findMentionedService(vendorId, normalized, message);
+            }
+            if (serviceId == null) {
+                var shopServices = vendorAiData.listAllOwnedServices(vendorId);
+                if (shopServices == null || shopServices.isEmpty()) {
+                    shopServices = vendorAiData.listServices(vendorId);
+                }
+                if (shopServices.size() == 1) {
+                    serviceId = shopServices.getFirst().id();
+                } else {
+                    return english
+                            ? "Which service would you like to check the price for? Please attach the service or specify its name."
+                            : "Bạn muốn tra cứu giá của dịch vụ nào? Hãy ghim dịch vụ đó hoặc nêu rõ tên dịch vụ trong gian hàng.";
+                }
+            }
+            args.put("serviceId", serviceId.toString());
+        }
         if (!admin && Set.of("vendor_review_coaching", "vendor_optimize_listing", "vendor_slot_advisor").contains(tool)) {
             UUID serviceId = messageReference != null ? messageReference
                     : "SERVICE".equalsIgnoreCase(attachmentType) ? attachmentId : null;
             if (serviceId == null && normalized.length() > 20) {
-                serviceId = findMentionedService(vendorId, normalized);
+                serviceId = findMentionedService(vendorId, normalized, message);
             }
             if ("vendor_optimize_listing".equals(tool) && serviceId == null && normalized.length() > 20) {
-                if (LISTING_AUDIT_ONLY.matcher(normalized).find()) {
+                if (LISTING_AUDIT_ONLY.matcher(intentNormalized).find()) {
                     return english ? "Attach a service from your shop so I can review its actual listing."
                             : "Hãy đính kèm dịch vụ thuộc gian hàng để tôi xem đúng nội dung bài đăng.";
                 }
-                args.put("title", message);
-                args.put("description", message);
+                args.put("title", strippedMessage);
+                args.put("description", strippedMessage);
             }
             if (serviceId != null) args.put("serviceId", serviceId.toString());
         }
+        LocalDate slotTargetDate = null;
         if ("vendor_slot_advisor".equals(tool)) {
-            var horizon = SLOT_HORIZON.matcher(normalized);
-            int days = horizon.find() ? Integer.parseInt(horizon.group(1)) : 7;
-            if (days < 1 || days > 14) return english ? "Choose a slot advisory period between 1 and 14 days."
-                    : "Hãy chọn khoảng thời gian cố vấn từ 1 đến 14 ngày.";
-            args.put("horizonDays", days);
+            var horizon = SLOT_HORIZON.matcher(intentNormalized);
+            if (horizon.find()) {
+                int days = Integer.parseInt(horizon.group(1));
+                if (days < 1 || days > 14) return english ? "Choose a slot advisory period between 1 and 14 days."
+                        : "Hãy chọn khoảng thời gian cố vấn từ 1 đến 14 ngày.";
+                args.put("horizonDays", days);
+            } else {
+                slotTargetDate = CopilotRequest.slotTargetDate(strippedMessage, intentNormalized, today);
+                if (slotTargetDate != null) {
+                    long delta = ChronoUnit.DAYS.between(today, slotTargetDate);
+                    if (delta < 0 || delta > 14) {
+                        return english ? "Choose a slot advisory date within the next 14 days."
+                                : "Hãy chọn ngày tra cứu ca trong vòng 14 ngày tới.";
+                    }
+                    args.put("horizonDays", Math.max(1, (int) delta + 1));
+                    args.put("targetDate", slotTargetDate.toString());
+                } else {
+                    args.put("horizonDays", 7);
+                }
+            }
         }
 
         TimeRange period = null;
@@ -583,13 +625,14 @@ public class RoleCopilotUseCase {
             case "admin_risk_and_support_queue_overview" -> CopilotReportAnswer.adminQueue(data, english);
             case "admin_dispute_summarize" -> english ? "I found the dispute evidence below. An administrator must review it before deciding."
                     : "Tôi đã tra cứu bằng chứng của tranh chấp bên dưới. Quản trị viên cần thẩm định trước khi quyết định.";
-            case "vendor_review_coaching" -> CopilotReportAnswer.vendorReviewCoaching(data, normalized, english);
-            case "vendor_slot_advisor" -> CopilotReportAnswer.vendorSlotAdvisor(data, normalized, english);
+            case "vendor_review_coaching" -> CopilotReportAnswer.vendorReviewCoaching(data, intentNormalized, english);
+            case "vendor_slot_advisor" -> CopilotReportAnswer.vendorSlotAdvisor(data, intentNormalized, slotTargetDate, english);
+            case "vendor_service_detail" -> CopilotReportAnswer.vendorServiceDetail(data, english);
             case "vendor_optimize_listing" -> CopilotReportAnswer.vendorListingOptimization(data, english);
             case "vendor_text_assessment", "admin_text_assessment" -> CopilotReportAnswer.contentAssessment(data, english);
             case "vendor_review_reply_draft" -> data.path("draftedReply").asText(CopilotReportAnswer.unavailable(english));
             case "vendor_service_count" -> CopilotReportAnswer.vendorServices(data,
-                    CopilotRequest.isPublishedCount(normalized), english);
+                    CopilotRequest.isPublishedCount(intentNormalized), english);
             default -> english ? "I retrieved the operational data. See the details below."
                     : "Tôi đã tra cứu dữ liệu vận hành. Bạn có thể xem chi tiết bên dưới.";
         };
@@ -693,8 +736,27 @@ public class RoleCopilotUseCase {
     }
 
     private UUID findMentionedService(UUID vendorId, String question) {
-        List<VendorAiDataPort.VendorServiceItem> services = vendorAiData.listServices(vendorId);
-        if (services.isEmpty()) return null;
+        return findMentionedService(vendorId, question, null);
+    }
+
+    private UUID findMentionedService(UUID vendorId, String question, String rawMessage) {
+        List<VendorAiDataPort.VendorServiceItem> services = vendorAiData.listAllOwnedServices(vendorId);
+        if (services == null || services.isEmpty()) {
+            services = vendorAiData.listServices(vendorId);
+        }
+        if (services == null || services.isEmpty()) return null;
+
+        if (rawMessage != null) {
+            Matcher codeMatcher = SHORT_ENTITY_CODE.matcher(rawMessage);
+            if (codeMatcher.find()) {
+                String prefix = codeMatcher.group(1).toLowerCase(Locale.ROOT);
+                var codeMatches = services.stream()
+                        .filter(service -> service.id() != null
+                                && service.id().toString().replace("-", "").toLowerCase(Locale.ROOT).startsWith(prefix))
+                        .toList();
+                if (codeMatches.size() == 1) return codeMatches.getFirst().id();
+            }
+        }
 
         var exactMatches = services.stream()
                 .filter(service -> service.title() != null && !service.title().isBlank()
@@ -790,10 +852,11 @@ public class RoleCopilotUseCase {
         } else {
             if (CONTENT_MODERATION.matcher(text).find()) return "vendor_text_assessment";
             if (CopilotRequest.isRevenue(text)) return "vendor_dashboard_summary";
+            if (CopilotRequest.matches(VENDOR_SLOT, text)) return "vendor_slot_advisor";
+            if (CopilotRequest.isServicePrice(text)) return "vendor_service_detail";
             if (CopilotRequest.isServiceCount(text)) return "vendor_service_count";
             if (VENDOR_REVIEW_REPLY.matcher(text).find() && REVIEW_CONTEXT.matcher(text).find()) return "vendor_review_reply_draft";
             if (CopilotRequest.matches(VENDOR_REVIEW, text)) return "vendor_review_coaching";
-            if (CopilotRequest.matches(VENDOR_SLOT, text)) return "vendor_slot_advisor";
             if (CopilotRequest.matches(VENDOR_LISTING, text)) return "vendor_optimize_listing";
             if (CopilotRequest.matches(VENDOR_OVERVIEW, text)) return "vendor_dashboard_summary";
         }
@@ -992,6 +1055,7 @@ public class RoleCopilotUseCase {
             case "vendor_text_assessment", "admin_text_assessment" -> "COPILOT_CONTENT_ASSESSMENT_CARD";
             case "vendor_dashboard_summary", "vendor_revenue_and_bookings" -> "VENDOR_KPI_SUMMARY_CARD";
             case "vendor_service_count" -> "VENDOR_SERVICE_COUNT_CARD";
+            case "vendor_service_detail" -> "VENDOR_SERVICE_DETAIL_CARD";
             case "vendor_review_coaching" -> "VENDOR_REVIEW_COACHING_CARD";
             case "vendor_slot_advisor" -> "VENDOR_SLOT_ADVISORY_CARD";
             case "vendor_optimize_listing" -> "VENDOR_LISTING_DRAFT_CARD";
