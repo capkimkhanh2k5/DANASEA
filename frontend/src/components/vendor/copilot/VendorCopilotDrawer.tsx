@@ -8,7 +8,8 @@ import {
   Pin, 
   Trash2, 
   MoreVertical,
-  Plus
+  Plus,
+  FileText
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from './CopilotArtifactCard';
@@ -256,6 +257,27 @@ export const VendorCopilotDrawer: React.FC = () => {
                     {m.context && (
                       <div className="mb-1.5 self-end w-full flex justify-end">
                         <ContextPreviewCard context={m.context} />
+                      </div>
+                    )}
+                    {m.media && m.media.length > 0 && (
+                      <div className="mb-1.5 flex flex-wrap gap-1.5 justify-end">
+                        {m.media.map((med) => (
+                          <div key={med.id} className="rounded-lg overflow-hidden border border-slate-200/80 bg-slate-50 max-w-[160px] shadow-2xs">
+                            {med.type === 'image' && (med.previewUrl || med.url) ? (
+                              <img
+                                src={med.previewUrl || med.url}
+                                alt={med.name}
+                                className="w-full max-h-[110px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(med.url || med.previewUrl, '_blank')}
+                              />
+                            ) : (
+                              <div className="p-1.5 text-[10px] font-mono text-slate-700 truncate max-w-[130px] flex items-center gap-1">
+                                <FileText className="w-3 h-3 text-slate-400 shrink-0" />
+                                <span className="truncate">{med.name}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                     <div className="w-full bg-sky-700 text-white rounded-xl rounded-tr-xs px-3.5 py-2.5 text-xs font-normal leading-relaxed shadow-xs">

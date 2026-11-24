@@ -11,6 +11,7 @@ export interface ChatUiMessage {
   role: 'user' | 'assistant';
   content: string;
   context?: AttachedContext;
+  media?: AttachedMedia[];
   artifacts?: CopilotArtifact[];
   toolsUsed?: string[];
   createdAt: string;
@@ -146,10 +147,28 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
         }
         const toolsUsedList = m.toolsUsed ? m.toolsUsed.split(',').filter(Boolean) : undefined;
 
-        // Parse legacy or backend-saved prefix "[Về [Dịch vụ...] (ID: ...)]" out of user text into clean context chip
+        // Parse legacy or backend-saved prefix "[Tệp đính kèm: ...]" and "[Về ...]" out of user text into clean UI elements
         let displayContent = m.content;
         let extractedContext: AttachedContext | undefined;
-        const prefixMatch = m.content.match(/^\[Về (?:\[(.+?)\] )?(.+?) \(ID: ([a-f0-9-]+)\)\] (.*)$/s);
+        const extractedMedia: AttachedMedia[] = [];
+
+        // Check for media attachment prefix
+        const mediaMatches = displayContent.matchAll(/\[Tệp đính kèm: (.+?)(?: \((https?:\/\/[^\s)]+)\))?\]\n*/g);
+        for (const match of mediaMatches) {
+          const fileName = match[1];
+          const fileUrl = match[2];
+          extractedMedia.push({
+            id: 'hist-media-' + Math.random().toString(36).substring(2, 9),
+            type: fileName.match(/\.(png|jpe?g|webp|gif)$/i) ? 'image' : 'file',
+            name: fileName,
+            url: fileUrl,
+            previewUrl: fileUrl,
+          });
+        }
+        displayContent = displayContent.replace(/\[Tệp đính kèm: .+?\]\n*/g, '').trim();
+
+        // Check for context prefix
+        const prefixMatch = displayContent.match(/^\[Về (?:\[(.+?)\] )?(.+?) \(ID: ([a-f0-9-]+)\)\] (.*)$/s);
         if (prefixMatch && m.role.toLowerCase() === 'user') {
           const typeStr = prefixMatch[1] || 'SERVICE';
           const labelStr = prefixMatch[2];
@@ -167,6 +186,7 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
           role: m.role.toLowerCase() === 'user' ? 'user' : 'assistant',
           content: displayContent,
           context: extractedContext,
+          media: extractedMedia.length > 0 ? extractedMedia : undefined,
           artifacts: parsedArtifacts,
           toolsUsed: toolsUsedList,
           createdAt: m.createdAt,
@@ -211,8 +231,9 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
     const userMsg: ChatUiMessage = {
       id: userMsgId,
       role: 'user',
-      content: effectiveText, // Pure user text, zero prefix strings
+      content: trimmed, // Clean user text without raw bracketed url prefixes
       context: attachedContext, // Clean context chip rendered above or inside message
+      media: attachedMedia.length > 0 ? [...attachedMedia] : undefined,
       createdAt: new Date().toISOString(),
     };
 

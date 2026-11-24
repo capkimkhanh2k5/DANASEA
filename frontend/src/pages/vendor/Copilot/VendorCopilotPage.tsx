@@ -4,7 +4,8 @@ import {
   Plus, 
   Pin, 
   Trash2, 
-  MoreVertical
+  MoreVertical,
+  FileText
 } from 'lucide-react';
 import { useVendorCopilotStore } from '../../../store/useVendorCopilotStore';
 import { CopilotArtifactCard } from '../../../components/vendor/copilot/CopilotArtifactCard';
@@ -187,6 +188,28 @@ export function VendorCopilotPage() {
                     {isUser && m.context && (
                       <div className="mb-2 self-end w-full flex justify-end">
                         <ContextPreviewCard context={m.context} />
+                      </div>
+                    )}
+
+                    {isUser && m.media && m.media.length > 0 && (
+                      <div className="mb-2 flex flex-wrap gap-2 justify-end">
+                        {m.media.map((med) => (
+                          <div key={med.id} className="rounded-xl overflow-hidden border border-slate-200/80 bg-slate-50 max-w-[200px] shadow-2xs">
+                            {med.type === 'image' && (med.previewUrl || med.url) ? (
+                              <img
+                                src={med.previewUrl || med.url}
+                                alt={med.name}
+                                className="w-full max-h-[140px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(med.url || med.previewUrl, '_blank')}
+                              />
+                            ) : (
+                              <div className="p-2 text-[11px] font-mono text-slate-700 truncate max-w-[160px] flex items-center gap-1.5">
+                                <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="truncate">{med.name}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
 
