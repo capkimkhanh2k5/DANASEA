@@ -1,10 +1,10 @@
-import { Bot, Building2, FolderKanban, LayoutDashboard, Scale, ScrollText, Settings2, ShieldCheck, ShoppingBag, TicketPercent, UserCheck, Users, Wallet } from 'lucide-react';
+import { Sparkles, Building2, FolderKanban, LayoutDashboard, Scale, ScrollText, Settings2, ShieldCheck, ShoppingBag, TicketPercent, UserCheck, Users, Wallet } from 'lucide-react';
 
 export const adminNavigation = [
   {
     id: 'overview', label: 'Điều hành', icon: LayoutDashboard, items: [
       { to: '/admin', label: 'Tổng quan', pageTitle: 'Dashboard', icon: LayoutDashboard },
-      { to: '/admin/copilot', label: 'Trợ lý DaNaBot', pageTitle: 'Trợ lý AI DaNaBot', icon: Bot },
+      { to: '/admin/copilot', label: 'Trợ lý DaNaBot', pageTitle: 'Trợ lý AI DaNaBot', icon: Sparkles },
     ]
   },
   {

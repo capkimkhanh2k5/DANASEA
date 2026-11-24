@@ -1215,17 +1215,11 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                   </h2>
                 )}
               </div>
-
-              {/* Verified Guest Badge */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50/80 border border-emerald-200 text-xs font-semibold text-emerald-800 self-start sm:self-auto">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>100% đánh giá từ khách đã hoàn thành chuyến đi</span>
-              </div>
             </div>
 
             {/* Shimmer Skeleton Loader when fetching reviews */}
             {isLoadingReviews ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex flex-col gap-4 max-w-3xl">
                 {[1, 2].map((idx) => (
                   <div key={idx} className="p-5 rounded-2xl border border-slate-200/80 bg-white animate-pulse space-y-3">
                     <div className="flex items-center gap-3">
@@ -1244,8 +1238,8 @@ function ExperienceDetailPage({ id }: { id: string | undefined }) {
                 ))}
               </div>
             ) : reviews.length > 0 ? (
-              /* Review Cards Grid */
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+              /* Review Cards List (1 column) */
+              <div className="flex flex-col gap-4 max-w-3xl">
                 {reviews.map((rev) => {
                   const reviewDate = rev.createdAt
                     ? new Date(rev.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'vi-VN', {

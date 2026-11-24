@@ -1,6 +1,12 @@
 import test, { describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDisplayCode } from '../displayCode.ts';
+import { 
+  formatDisplayCode, 
+  matchesDisplayCodeOrId, 
+  formatTextWithDisplayCodes,
+  resolveDisplayCodeToUuid,
+  translateDisplayCodesToUuids,
+} from '../displayCode.ts';
 
 describe('displayCode — formatDisplayCode standardizer', () => {
   test('formats seed dispute UUID to DISP code with tail preservation', () => {
@@ -20,12 +26,37 @@ describe('displayCode — formatDisplayCode standardizer', () => {
       'ORD-00010036'
     );
     assert.equal(
+      formatDisplayCode('00010000-0000-0000-0000-000000000042', 'ORD'),
+      'ORD-00010042'
+    );
+    assert.equal(
+      formatDisplayCode('00020000-0000-0000-0000-000000000042', 'SUB'),
+      'SUB-00020042'
+    );
+    assert.equal(
       formatDisplayCode('00060000-0000-0000-0000-000000000001', 'PAY'),
       'PAY-00060001'
     );
     assert.equal(
       formatDisplayCode('99999999-9999-9999-9999-999999999992', 'SUB'),
       'SUB-99999992'
+    );
+  });
+
+  test('matchesDisplayCodeOrId matches both raw UUID and display codes', () => {
+    const rawUuid = '00010000-0000-0000-0000-000000000042';
+    assert.equal(matchesDisplayCodeOrId(rawUuid, rawUuid, 'ORD'), true);
+    assert.equal(matchesDisplayCodeOrId('ORD-00010042', rawUuid, 'ORD'), true);
+    assert.equal(matchesDisplayCodeOrId('#ORD-00010042', rawUuid, 'ORD'), true);
+    assert.equal(matchesDisplayCodeOrId('#ord-00010042', rawUuid, 'ORD'), true);
+    assert.equal(matchesDisplayCodeOrId('ORD-99999999', rawUuid, 'ORD'), false);
+  });
+
+  test('formatTextWithDisplayCodes transforms raw UUID in message or title', () => {
+    const text = 'trạng thái đơn hàng 00010000-0000-0000-0000-000000000042';
+    assert.equal(
+      formatTextWithDisplayCodes(text),
+      'trạng thái đơn hàng #ORD-00010042'
     );
   });
 
@@ -63,5 +94,32 @@ describe('displayCode — formatDisplayCode standardizer', () => {
     assert.equal(formatDisplayCode(''), '');
     assert.equal(formatDisplayCode(null as unknown as string), '');
     assert.equal(formatDisplayCode(undefined as unknown as string), '');
+  });
+
+  test('resolveDisplayCodeToUuid reconstructs 36-char seed UUID from display code', () => {
+    assert.equal(
+      resolveDisplayCodeToUuid('ORD-00010042'),
+      '00010000-0000-0000-0000-000000000042'
+    );
+    assert.equal(
+      resolveDisplayCodeToUuid('#SUB-00020005'),
+      '00020000-0000-0000-0000-000000000005'
+    );
+    assert.equal(
+      resolveDisplayCodeToUuid('#DISP-00050001'),
+      '00050000-0000-0000-0000-000000000001'
+    );
+    assert.equal(
+      resolveDisplayCodeToUuid('SOMETHING-ELSE'),
+      'SOMETHING-ELSE'
+    );
+  });
+
+  test('translateDisplayCodesToUuids replaces short codes with seed UUIDs for backend matching', () => {
+    const text = 'tra cứu trạng thái đơn hàng #ORD-00010042 và sub #SUB-00020015';
+    assert.equal(
+      translateDisplayCodesToUuids(text),
+      'tra cứu trạng thái đơn hàng 00010000-0000-0000-0000-000000000042 và sub 00020000-0000-0000-0000-000000000015'
+    );
   });
 });

@@ -6,6 +6,7 @@ import { communicationService, type ConversationItem, type MessageItem } from ".
 import { useAuthStore } from "../../../store/useAuthStore";
 import { useLanguageStore } from "../../../store/useLanguageStore";
 import { localizeNotificationTitle, localizeNotificationBody } from "../../../utils/notificationLocalization";
+import { formatDisplayCode } from "../../../utils/displayCode";
 import {
   MessageSquare,
   Bell,
@@ -177,7 +178,7 @@ export function Inbox() {
     if (!activeConvId || sending) return;
     setSending(true);
     try {
-      const saved = await communicationService.sendMessage(activeConvId, "👍");
+      const saved = await communicationService.sendMessage(activeConvId, "👍"); // taste-skill-ignore
       setMessages((prev) => [...prev, saved]);
       setConversations((prev) =>
         prev.map((c) =>
@@ -364,7 +365,7 @@ export function Inbox() {
                             </div>
                             {conv.masterOrderId && (
                               <p className="text-[11px] font-mono text-sky-700 truncate">
-                                {isEn ? `Order #${conv.masterOrderId.slice(0, 8)}` : `Đơn #${conv.masterOrderId.slice(0, 8)}`}
+                                {isEn ? `Order #${formatDisplayCode(conv.masterOrderId, 'ORD')}` : `Đơn #${formatDisplayCode(conv.masterOrderId, 'ORD')}`}
                               </p>
                             )}
                             <p className={`text-xs truncate mt-0.5 ${conv.unreadCount && conv.unreadCount > 0 ? "font-bold text-slate-900" : "text-slate-500"}`}>
@@ -426,7 +427,7 @@ export function Inbox() {
                             <span>{isEn ? "Active now" : "Đang hoạt động"}</span>
                             {activeConversation.masterOrderId && (
                               <span className="text-slate-400 font-mono ml-1">
-                                • {isEn ? `Order #${activeConversation.masterOrderId.slice(0, 8)}` : `Đơn #${activeConversation.masterOrderId.slice(0, 8)}`}
+                                • {isEn ? `Order #${formatDisplayCode(activeConversation.masterOrderId, 'ORD')}` : `Đơn #${formatDisplayCode(activeConversation.masterOrderId, 'ORD')}`}
                               </span>
                             )}
                           </p>
@@ -457,7 +458,7 @@ export function Inbox() {
                       ) : (
                         messages.map((m) => {
                           const isUser = m.senderId === user?.id;
-                          const isLikeEmoji = m.content === "👍";
+                          const isLikeEmoji = m.content === "👍"; // taste-skill-ignore
 
                           return (
                             <div
@@ -475,7 +476,7 @@ export function Inbox() {
                               <div className={`flex flex-col gap-0.5 ${isUser ? "items-end" : "items-start"}`}>
                                 {isLikeEmoji ? (
                                   <span className="text-3xl py-1 px-2 select-none" role="img" aria-label="Like">
-                                    👍
+                                    👍 {/* taste-skill-ignore */}
                                   </span>
                                 ) : (
                                   <div
@@ -657,11 +658,11 @@ export function Inbox() {
                           <Link
                             to={
                               isProposal && notif.relatedEntityId
-                                ? `/profile/orders?rescheduleSubOrderId=${notif.relatedEntityId}`
+                                ? `/profile/orders?rescheduleSubOrderId=${encodeURIComponent(formatDisplayCode(notif.relatedEntityId, 'SUB'))}`
                                 : isReviewReply && notif.relatedEntityId
-                                ? `/profile/orders?subOrderId=${notif.relatedEntityId}`
+                                ? `/profile/orders?subOrderId=${encodeURIComponent(formatDisplayCode(notif.relatedEntityId, 'SUB'))}`
                                 : notif.relatedEntityType === "ORDER" && notif.relatedEntityId
-                                ? `/profile/orders?orderId=${notif.relatedEntityId}`
+                                ? `/profile/orders?orderId=${encodeURIComponent(formatDisplayCode(notif.relatedEntityId, 'ORD'))}`
                                 : "/profile/orders"
                             }
                             className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors flex items-center gap-1.5"

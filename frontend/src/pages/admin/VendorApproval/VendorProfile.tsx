@@ -27,7 +27,7 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
 }) {
   return <div className="admin-vendors-profile">
     <section className="admin-detail-section admin-vendors-profile-summary" aria-label="Thông tin chính">
-      <div className="admin-vendors-profile-heading"><img src={vendor.avatarUrl} alt="" width="56" height="56" /><div><span className="admin-vendors-mono">{vendor.id}</span>
+      <div className="admin-vendors-profile-heading"><img src={vendor.avatarUrl} alt="" width="56" height="56" /><div><span className="admin-vendors-mono" title={vendor.id}>#{formatDisplayCode(vendor.id, 'VND')}</span>
         <div className="admin-vendors-profile-badges"><VendorStatus status={vendor.verificationStatus} /><AdminBadge tone="neutral">{vendor.badgeTier}</AdminBadge></div></div></div>
       <p>{vendor.address}</p>
       {vendor.verificationStatus === 'REJECTED' && vendor.rejectionReason && (
@@ -75,7 +75,7 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
                       onClick={() => onPreview(doc.fileUrl, docTitle)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                     >
-                      🔍 Xem ảnh scan gốc
+                      (Xem ảnh scan gốc)
                     </button>
                     {!demo && doc.status === 'PENDING' && onApproveDoc && (
                       <button
@@ -84,7 +84,7 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
                         onClick={() => onApproveDoc(doc.id)}
                         style={{ marginLeft: 'auto', background: '#059669', color: '#fff', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
                       >
-                        ✔ Duyệt chứng từ
+                        Duyệt chứng từ
                       </button>
                     )}
                     {!demo && doc.status === 'PENDING' && onRejectDoc && (
@@ -97,7 +97,7 @@ export function VendorProfile({ vendor, timeline, tier, onTierChange, onPreview,
                         }}
                         style={{ background: '#f43f5e', color: '#fff', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
                       >
-                        ✖ Từ chối
+                        Từ chối
                       </button>
                     )}
                   </div>

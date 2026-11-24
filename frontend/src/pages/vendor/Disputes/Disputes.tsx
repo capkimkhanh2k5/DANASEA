@@ -9,6 +9,7 @@ import {
   AtlasButton,
   AtlasPagination
 } from '../../../components/vendor/atlas/AtlasDesignSystem';
+import { formatDisplayCode } from '../../../utils/displayCode';
 
 export function Disputes() {
   const navigate = useNavigate();
@@ -116,13 +117,13 @@ export function Disputes() {
         <div className="overflow-x-auto scrollbar-thin">
           <table className="w-full text-left border-collapse table-auto text-sm">
             <thead>
-              <tr className="bg-[#f8f9fa] text-slate-500 text-xs uppercase tracking-wider font-semibold border-b border-slate-200/80">
-                <th className="py-3.5 px-4">MÃ KHIẾU NẠI</th>
-                <th className="py-3.5 px-3">ĐƠN HÀNG</th>
-                <th className="py-3.5 px-3">NGUYÊN NHÂN</th>
-                <th className="py-3.5 px-3">TRẠNG THÁI</th>
-                <th className="py-3.5 px-3">NGÀY TIẾP NHẬN</th>
-                <th className="py-3.5 px-4 text-center">THAO TÁC</th>
+              <tr className="bg-[#f8f9fa] text-slate-600 text-xs font-semibold border-b border-slate-200/80">
+                <th className="py-3.5 px-4">Mã khiếu nại</th>
+                <th className="py-3.5 px-3">Đơn hàng con</th>
+                <th className="py-3.5 px-3">Nguyên nhân</th>
+                <th className="py-3.5 px-3">Trạng thái</th>
+                <th className="py-3.5 px-3">Ngày tiếp nhận</th>
+                <th className="py-3.5 px-4 text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -141,10 +142,10 @@ export function Disputes() {
                 disputes.map((d) => (
                   <tr key={d.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3.5 px-4 font-mono font-bold text-sm text-slate-900">
-                      #DIS-{d.id.slice(0, 8).toUpperCase()}
+                      #{formatDisplayCode(d.id, 'DISP')}
                     </td>
                     <td className="py-3.5 px-3 font-mono text-sm text-slate-700">
-                      #VE-{d.subOrderId.slice(0, 8).toUpperCase()}
+                      #{formatDisplayCode(d.subOrderId, 'SUB')}
                     </td>
                     <td className="py-3.5 px-3 text-sm text-slate-700">
                       {getReasonLabel(d.reason)}

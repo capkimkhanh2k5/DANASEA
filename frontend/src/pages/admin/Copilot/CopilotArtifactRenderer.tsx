@@ -407,7 +407,7 @@ const VendorDiagnosticsTableCard: React.FC<{ artifact: CopilotArtifact }> = ({ a
                   <td style={{ textAlign: 'center' }}>
                     {v.ratingAvg > 0 ? (
                       <span>
-                        ★ {v.ratingAvg.toFixed(1)} <small>({v.ratingCount})</small>
+                        {v.ratingAvg.toFixed(1)} sao <small>({v.ratingCount})</small>
                       </span>
                     ) : (
                       <span style={{ color: '#94a3b8' }}>Chưa có</span>
@@ -499,7 +499,7 @@ const CancellationBreakdownCard: React.FC<{ artifact: CopilotArtifact }> = ({ ar
       label: 'Tranh chấp khiếu nại bồi hoàn',
       count: data.disputeCancellations,
       icon: ShieldAlert,
-      color: '#9333ea',
+      color: '#e11d48',
     },
     {
       label: 'Can thiệp từ Quản trị viên sàn',
@@ -779,7 +779,7 @@ const OrderRiskAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ arti
             <ShieldAlert size={12} />
             Đánh giá rủi ro
           </span>
-          <span className="copilot-artifact-title">Đơn #{risk.orderId.slice(0, 8)}</span>
+          <span className="copilot-artifact-title">Đơn #{formatDisplayCode(risk.orderId, 'ORD')}</span>
         </div>
         <div className="copilot-artifact-period">
           {risk.ruleVersion} · {risk.status}
@@ -798,7 +798,7 @@ const OrderRiskAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ arti
         {risk.caseId && (
           <div>
             <span className="copilot-info-label">Mã case:</span>{' '}
-            <code>#{risk.caseId.slice(0, 8)}</code>
+            <code>#{formatDisplayCode(risk.caseId, 'CASE')}</code>
           </div>
         )}
       </div>
@@ -852,7 +852,7 @@ const ContentAssessmentCard: React.FC<{ artifact: CopilotArtifact }> = ({ artifa
         {assessment.serviceId && (
           <div>
             <span className="copilot-info-label">Dịch vụ:</span>{' '}
-            <code>#{assessment.serviceId.slice(0, 8)}</code>
+            <code>#{formatDisplayCode(assessment.serviceId, 'SRV')}</code>
           </div>
         )}
         {assessment.suggestedCategory && (

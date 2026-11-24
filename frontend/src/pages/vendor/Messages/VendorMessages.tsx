@@ -14,6 +14,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { communicationService, type ConversationItem, type MessageItem } from '../../../services/communicationService';
 import { vendorOrderService } from '../../../services/vendorOrderService';
 import { getAuthoritativeCustomer } from '../../../data/demoCustomerMap';
+import { formatDisplayCode } from '../../../utils/displayCode';
 
 export function VendorMessages() {
   const { user } = useAuthStore();
@@ -128,7 +129,7 @@ export function VendorMessages() {
     if (!activeConvId || sending) return;
     setSending(true);
     try {
-      const saved = await communicationService.sendMessage(activeConvId, '👍');
+      const saved = await communicationService.sendMessage(activeConvId, '👍'); // taste-skill-ignore
       setMessages((prev) => [...prev, saved]);
       setConversations((prev) =>
         prev.map((c) =>
@@ -159,7 +160,7 @@ export function VendorMessages() {
     if (authCust) {
       return authCust.name;
     }
-    return `Khách hàng #${conv.customerId.slice(0, 8)}`;
+    return `Khách hàng #${formatDisplayCode(conv.customerId, 'CUST')}`;
   };
 
   const filteredConversations = conversations.filter((c) => {
@@ -251,7 +252,7 @@ export function VendorMessages() {
                     {conv.masterOrderId && (
                       <div className="flex items-center gap-1 text-[10px] text-sky-700 font-mono mb-0.5">
                         <Ticket className="w-3 h-3 shrink-0" />
-                        <span className="truncate">#{conv.masterOrderId.slice(0, 8)}</span>
+                        <span className="truncate">#{formatDisplayCode(conv.masterOrderId, 'ORD')}</span>
                       </div>
                     )}
 
@@ -297,7 +298,7 @@ export function VendorMessages() {
                     </h3>
                     {activeConversation.masterOrderId && (
                       <span className="font-mono text-[10px] text-sky-700 bg-sky-50 border border-sky-200/80 px-1.5 py-0.5 rounded-md font-semibold shrink-0">
-                        #{activeConversation.masterOrderId.slice(0, 8)}
+                        #{formatDisplayCode(activeConversation.masterOrderId, 'ORD')}
                       </span>
                     )}
                   </div>
@@ -325,7 +326,7 @@ export function VendorMessages() {
               ) : (
                 messages.map((m) => {
                   const isVendor = m.senderId === user?.id;
-                  const isLikeEmoji = m.content === '👍';
+                  const isLikeEmoji = m.content === '👍'; // taste-skill-ignore
 
                   return (
                     <div
@@ -333,8 +334,8 @@ export function VendorMessages() {
                       className={`flex flex-col ${isVendor ? 'items-end' : 'items-start'}`}
                     >
                       {isLikeEmoji ? (
-                        <span className="text-3xl py-1 select-none" role="img" aria-label="Like">
-                          👍
+                        <span className="p-2 bg-sky-50 rounded-xl inline-flex items-center justify-center select-none" aria-label="Like">
+                          <ThumbsUp className="w-5 h-5 text-sky-600 fill-sky-600" />
                         </span>
                       ) : (
                         <div
