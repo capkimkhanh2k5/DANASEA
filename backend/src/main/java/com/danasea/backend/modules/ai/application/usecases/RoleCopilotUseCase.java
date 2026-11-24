@@ -292,14 +292,23 @@ public class RoleCopilotUseCase {
             UUID actorUserId, String actorRole, UUID vendorId, UUID conversationId,
             String messageContent, String contextType, UUID contextId, SupportedLanguage language
     ) {
+        return processMessage(actorUserId, actorRole, vendorId, conversationId, messageContent,
+                contextType, contextId, null, language);
+    }
+
+    public CopilotChatResponse processMessage(
+            UUID actorUserId, String actorRole, UUID vendorId, UUID conversationId,
+            String messageContent, String contextType, UUID contextId, String contextLabel, SupportedLanguage language
+    ) {
         try (var budget = AiExecutionBudget.open(AiExecutionBudget.LLM_REQUEST_TIMEOUT, 6)) {
-            return processWithinBudget(actorUserId, actorRole, vendorId, conversationId, messageContent, contextType, contextId, language);
+            return processWithinBudget(actorUserId, actorRole, vendorId, conversationId, messageContent,
+                    contextType, contextId, contextLabel, language);
         }
     }
 
     private CopilotChatResponse processWithinBudget(
             UUID actorUserId, String actorRole, UUID vendorId, UUID conversationId,
-            String messageContent, String contextType, UUID contextId, SupportedLanguage language
+            String messageContent, String contextType, UUID contextId, String contextLabel, SupportedLanguage language
     ) {
         boolean admin = "ADMIN".equals(actorRole);
         if (!admin && (!"VENDOR".equals(actorRole) || vendorId == null)) {
@@ -334,7 +343,8 @@ public class RoleCopilotUseCase {
         insightStore.autoGenerateCopilotTitleIfEmpty(convId, effectiveContent);
 
         // 3. Append User Message
-        insightStore.appendCopilotMessage(convId, "USER", effectiveContent, null, null, true);
+        insightStore.appendCopilotMessage(convId, "USER", effectiveContent, null, null, true,
+                contextType, contextId, contextLabel);
 
         List<Map<String, Object>> artifacts = new ArrayList<>();
         List<String> toolsUsed = new ArrayList<>();
@@ -342,7 +352,7 @@ public class RoleCopilotUseCase {
         String attachmentType = contextType != null ? contextType : conversation.contextType();
         UUID attachmentId = contextId != null ? contextId : conversation.contextId();
         String assistantResponse = answer(effectiveContent, admin, vendorId, isEn, toolContext,
-                attachmentType, attachmentId, artifacts, toolsUsed);
+                attachmentType, attachmentId, contextLabel, artifacts, toolsUsed);
 
         // 6. Persist Assistant Message
         String artifactsJson = null;
@@ -366,7 +376,7 @@ public class RoleCopilotUseCase {
 
     private String answer(
             String message, boolean admin, UUID vendorId, boolean english, ToolExecutionContext context,
-            String attachmentType, UUID attachmentId,
+            String attachmentType, UUID attachmentId, String attachmentLabel,
             List<Map<String, Object>> artifacts, List<String> toolsUsed
     ) {
         String strippedMessage = CopilotRequest.stripAttachedContextPrefix(message);
@@ -411,7 +421,10 @@ public class RoleCopilotUseCase {
             String revenueTool = admin ? "admin_revenue_timeseries" : "vendor_dashboard_summary";
             if (lastReplyUsedTool(context.conversationId(), revenueTool)) tool = revenueTool;
         }
-        if (tool == null) return generateText(admin, english, context, today);
+        if (tool == null) {
+            return generateText(admin, english, context, today,
+                    describeAttachment(admin, vendorId, attachmentType, attachmentId, attachmentLabel));
+        }
 
         var args = mapper.createObjectNode();
         if ("admin_dispute_summarize".equals(tool)) {
@@ -986,7 +999,46 @@ public class RoleCopilotUseCase {
         return contextId;
     }
 
-    private String generateText(boolean admin, boolean english, ToolExecutionContext context, LocalDate today) {
+    private String describeAttachment(boolean admin, UUID vendorId, String attachmentType, UUID attachmentId,
+                                      String attachmentLabel) {
+        if (attachmentType == null || attachmentId == null) return null;
+        if (!admin && "SERVICE".equalsIgnoreCase(attachmentType)) {
+            try {
+                var detail = vendorAiData.getServiceDetail(vendorId, attachmentId);
+                if (detail.isPresent()) {
+                    var d = detail.get();
+                    var sb = new StringBuilder("title=").append(d.title());
+                    if (d.categoryName() != null) sb.append("; category=").append(d.categoryName());
+                    if (d.status() != null) sb.append("; status=").append(d.status());
+                    if (d.basePrice() != null) sb.append("; basePrice=").append(d.basePrice());
+                    if (d.durationMinutes() != null) sb.append("; durationMinutes=").append(d.durationMinutes());
+                    if (d.capacityPerSlot() != null) sb.append("; capacityPerSlot=").append(d.capacityPerSlot());
+                    if (d.averageRating() != null) sb.append("; averageRating=").append(d.averageRating());
+                    if (d.reviewCount() != null) sb.append("; reviewCount=").append(d.reviewCount());
+                    if (d.options() != null && !d.options().isEmpty()) {
+                        sb.append("; options=");
+                        sb.append(d.options().stream()
+                                .map(o -> o.name() + " " + o.price() + " (" + o.pricingUnit() + ", " + o.status() + ")")
+                                .collect(java.util.stream.Collectors.joining(" | ")));
+                    }
+                    return "SERVICE (verified, owned by this vendor): " + sb;
+                }
+                var item = vendorAiData.getService(vendorId, attachmentId);
+                if (item.isPresent()) {
+                    return "SERVICE (verified, owned by this vendor): title=" + item.get().title()
+                            + "; category=" + item.get().categoryName() + "; description=" + item.get().description();
+                }
+                return "SERVICE " + attachmentId + " is NOT found in this vendor's shop; say so.";
+            } catch (RuntimeException exception) {
+                log.info("Attached service lookup failed ({})", exception.getClass().getSimpleName());
+            }
+        }
+        return attachmentType.toUpperCase() + " id=" + attachmentId
+                + (attachmentLabel == null || attachmentLabel.isBlank() ? "" : "; label=" + attachmentLabel.strip());
+    }
+
+    private String generateText(boolean admin, boolean english, ToolExecutionContext context, LocalDate today,
+                                String attachmentFacts) {
         List<AiMessage> messages = insightStore.listCopilotMessages(context.conversationId()).stream()
                 .map(message -> {
                     var modelMessage = new AiMessage();
@@ -1001,6 +1053,9 @@ public class RoleCopilotUseCase {
                 + " Only provide guidance within your role. For finding or booking a personal tour, direct the user to the Customer Assistant."
                 + " For live data or a specific report, ask the user to specify the requested metric and period."
                 + " Do not invent figures, claim to have queried a report, or treat prior chat as a current data source."
+                + (attachmentFacts == null ? ""
+                    : " The user pinned this item to the question; 'this'/'này' refers to it. Answer from these verified facts only, "
+                    + "without inventing other figures: " + attachmentFacts + ".")
                 + (english ? " Reply concisely in English." : " Reply concisely in Vietnamese.");
         try {
             LlmResponse response = llmClient.generateText(messages, context.language(), systemPrompt);

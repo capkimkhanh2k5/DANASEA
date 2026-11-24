@@ -121,6 +121,7 @@ export interface CopilotChatRequest {
   message: string;
   contextType?: string;
   contextId?: string;
+  contextLabel?: string;
 }
 
 export interface CopilotArtifact {
@@ -165,6 +166,9 @@ export interface CopilotMessage {
   toolsUsed?: string | null;
   verified: boolean;
   createdAt: string;
+  contextType?: string | null;
+  contextId?: string | null;
+  contextLabel?: string | null;
 }
 
 export interface UpdateConversationMetaRequest {
