@@ -1,6 +1,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
-import { useAuthStore } from '../store/useAuthStore';
+import { getAuthEpoch, useAuthStore } from '../store/useAuthStore';
 import { useLanguageStore } from '../store/useLanguageStore';
+import { expireSession, getTokenExpiryMs } from './sessionEvents';
 
 /**
  * Production-ready API interaction telemetry record.
@@ -39,6 +40,99 @@ if (typeof window !== 'undefined') {
   };
 }
 
+const AUTH_PERSIST_KEY = 'danasea_auth_storage';
+const REFRESH_LOCK_NAME = 'danasea-token-refresh';
+/** Refresh proactively when the access token has less than this left. */
+export const TOKEN_REFRESH_SKEW_MS = 60_000;
+
+// Bare client (no interceptors) so a failing refresh can never recurse into itself.
+/** @internal Exported for unit tests. */
+export const refreshClient = axios.create({
+  baseURL: '/api',
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
+  timeout: 15000,
+});
+
+function isMockToken(token: string | null | undefined) {
+  return Boolean(token?.startsWith('mock_jwt_token_'));
+}
+
+/** Token persisted by another tab (shared localStorage), if any. */
+function readPersistedToken(): string | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(AUTH_PERSIST_KEY);
+    if (!raw) return null;
+    return (JSON.parse(raw) as { state?: { accessToken?: string | null } }).state?.accessToken ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function isTokenFresh(token: string | null | undefined, skewMs: number) {
+  const exp = getTokenExpiryMs(token);
+  return exp !== null && exp - Date.now() > skewMs;
+}
+
+async function performRefresh(staleToken: string | null, startEpoch: number): Promise<string> {
+  if (getAuthEpoch() !== startEpoch || !useAuthStore.getState().isAuthenticated) {
+    throw new Error('Session changed before refresh started');
+  }
+  // Another tab may have rotated the refresh token already; reuse its access token.
+  // (Refresh tokens rotate with reuse-detection, so two tabs refreshing = family revoked.)
+  const persisted = readPersistedToken();
+  if (persisted && persisted !== staleToken && isTokenFresh(persisted, 5_000)) {
+    if (getAuthEpoch() === startEpoch && useAuthStore.getState().isAuthenticated) {
+      useAuthStore.getState().setAccessToken(persisted);
+    }
+    return persisted;
+  }
+  const res = await refreshClient.post<{ accessToken: string }>('/auth/refresh');
+  const token = res.data?.accessToken;
+  if (!token) throw new Error('Refresh response missing accessToken');
+  // Never overwrite state if user logged out or switched accounts while the refresh was in flight.
+  if (getAuthEpoch() !== startEpoch || !useAuthStore.getState().isAuthenticated) {
+    throw new Error('Session changed during refresh');
+  }
+  useAuthStore.getState().setAccessToken(token);
+  return token;
+}
+
+let refreshInFlight: Promise<string> | null = null;
+
+/**
+ * Single-flight access-token refresh: concurrent callers (in this tab) share one request,
+ * and a Web Lock serializes refreshes across tabs.
+ */
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshInFlight) {
+    const stale = useAuthStore.getState().accessToken;
+    const startEpoch = getAuthEpoch();
+    const run = () => performRefresh(stale, startEpoch);
+    const locked =
+      typeof navigator !== 'undefined' && 'locks' in navigator
+        ? navigator.locks.request(REFRESH_LOCK_NAME, run)
+        : run();
+    refreshInFlight = Promise.resolve(locked).finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+/** True only when the server definitively rejected the refresh token (not on network errors). */
+function isRefreshRejected(err: unknown) {
+  const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+  return status === 401 || status === 403;
+}
+
+/** True when a 401 on /change-password actually means the user mistyped their current password (not an expired JWT). */
+function isPasswordMismatch401(url: string, responseData: unknown) {
+  const code = (responseData as { code?: string } | null | undefined)?.code;
+  return url.includes('/change-password') && code === 'INVALID_CREDENTIALS';
+}
+
 export const apiClient = axios.create({
   baseURL: '/api',
   headers: {
@@ -50,7 +144,7 @@ export const apiClient = axios.create({
 
 // Request Interceptor: Attach JWT Bearer Token, Correlation ID & Structured Logging
 apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig & { _startTime?: number; _correlationId?: string }) => {
+  async (config: InternalAxiosRequestConfig & { _startTime?: number; _correlationId?: string }) => {
     // Generate Correlation ID for distributed tracing (frontend ⇄ backend)
     const correlationId = typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
@@ -63,11 +157,28 @@ apiClient.interceptors.request.use(
       config.headers['X-Correlation-Id'] = correlationId;
     }
 
-    const token = useAuthStore.getState().accessToken;
-    const isMockToken = token?.startsWith('mock_jwt_token_');
+    // Proactive refresh: avoid sending a request with a token that is about to expire.
+    const authState = useAuthStore.getState();
+    if (
+      authState.isAuthenticated &&
+      authState.accessToken &&
+      !isMockToken(authState.accessToken) &&
+      !config.url?.includes('/auth/') &&
+      getTokenExpiryMs(authState.accessToken) !== null &&
+      !isTokenFresh(authState.accessToken, TOKEN_REFRESH_SKEW_MS)
+    ) {
+      try {
+        await refreshAccessToken();
+      } catch {
+        // Let the request go out; the 401 handler decides whether the session is really over.
+      }
+    }
 
-    if (token && !isMockToken && config.headers) {
+    const token = useAuthStore.getState().accessToken;
+
+    if (token && !isMockToken(token) && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+      config._sentToken = token;
     }
 
     // Vendor and Admin backoffice portals default to Vietnamese ('vi') for local operators.
@@ -93,6 +204,7 @@ apiClient.interceptors.request.use(
         const copy = { ...(config.data as Record<string, unknown>) };
         if ('password' in copy) copy.password = '******';
         if ('oldPassword' in copy) copy.oldPassword = '******';
+        if ('currentPassword' in copy) copy.currentPassword = '******';
         if ('newPassword' in copy) copy.newPassword = '******';
         sanitizedData = copy;
       } else {
@@ -126,6 +238,8 @@ apiClient.interceptors.request.use(
 declare module 'axios' {
   export interface AxiosRequestConfig {
     silent?: boolean;
+    _retry?: boolean;
+    _sentToken?: string;
     _startTime?: number;
     _correlationId?: string;
   }
@@ -171,8 +285,8 @@ apiClient.interceptors.response.use(
 
     return response;
   },
-  (error: AxiosError) => {
-    const config = (error.config || {}) as InternalAxiosRequestConfig & { _startTime?: number; _correlationId?: string; silent?: boolean };
+  async (error: AxiosError) => {
+    const config = (error.config || {}) as InternalAxiosRequestConfig & { _startTime?: number; _correlationId?: string; silent?: boolean; _retry?: boolean };
     const method = (config.method || 'GET').toUpperCase();
     const url = config.url || '';
     const status = error.response?.status;
@@ -184,6 +298,37 @@ apiClient.interceptors.response.use(
     // Gracefully ignore intentional request cancellations
     if (axios.isCancel(error) || error.name === 'CanceledError' || error.message === 'canceled') {
       return Promise.reject(error);
+    }
+
+    const authState = useAuthStore.getState();
+    const currentToken = authState.accessToken;
+    const canHandle401 =
+      status === 401 &&
+      !url.includes('/auth/') &&
+      !isPasswordMismatch401(url, responseData) &&
+      Boolean(currentToken) &&
+      authState.isAuthenticated &&
+      !isMockToken(currentToken);
+
+    // Handle token expiration: silently refresh once, replay the request, only then give up.
+    if (canHandle401 && !config._retry) {
+      config._retry = true;
+      try {
+        // Another concurrent request may have already rotated the access token; replay directly.
+        if (!config._sentToken || currentToken === config._sentToken) {
+          await refreshAccessToken();
+        }
+        return apiClient(config);
+      } catch (refreshErr) {
+        if (isRefreshRejected(refreshErr)) {
+          console.warn('[API Auth] Refresh token rejected. Ending session...');
+          expireSession();
+        }
+        // Network/5xx during refresh: keep the session, surface the original error below.
+      }
+    } else if (canHandle401 && config._retry) {
+      console.warn('[API Auth] Still 401 after token refresh. Ending session...');
+      expireSession();
     }
 
     // Record error in global telemetry buffer
@@ -213,23 +358,6 @@ apiClient.interceptors.response.use(
       console.error('Error Message:', error.message);
       console.error('Backend Response:', responseData);
       console.groupEnd();
-    }
-
-    // Handle token expiration or unauthorized access
-    const currentToken = useAuthStore.getState().accessToken;
-    const isMock = currentToken?.startsWith('mock_jwt_token_');
-    if (status === 401 && !url.includes('/auth/') && currentToken && !isMock) {
-      console.warn('[API Auth] Session expired or unauthorized (401). Clearing credentials...');
-      useAuthStore.getState().logout();
-      if (typeof window !== 'undefined') {
-        if (
-          window.location.pathname.startsWith('/vendor') ||
-          window.location.pathname.startsWith('/admin') ||
-          window.location.pathname.startsWith('/profile')
-        ) {
-          window.location.href = '/auth';
-        }
-      }
     }
 
     return Promise.reject(error);

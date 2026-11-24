@@ -3,11 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { User, Ship, ShieldAlert, ArrowLeftRight, X, ChevronUp, LogOut } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { authService } from '../../services/authService';
+import { logoutSession } from '../../services/sessionService';
 import type { Role } from '../../types';
 
 export function DevRoleSwitcher() {
   const [isOpen, setIsOpen] = useState(false);
-  const { user, switchRole, logout } = useAuthStore();
+  const { user, switchRole } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -100,10 +101,10 @@ export function DevRoleSwitcher() {
     navigate(path);
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
     setIsOpen(false);
-    navigate('/auth');
+    await logoutSession();
+    navigate('/auth', { replace: true });
   };
 
   const activeMeta = roleConfig[currentRole] || roleConfig.CUSTOMER;

@@ -8,6 +8,7 @@ spring:
 app:
   jwt:
     secret: ${APP_JWT_SECRET}
+    cookie-secure: true
   checkin:
     qr-secret: ${APP_CHECKIN_QR_SECRET}
   payment:

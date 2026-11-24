@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, Navigate, Link, useNavigate } from 'react-router-dom';
 import { FlaskConical, Menu, PanelLeftClose, PanelLeft, ShieldAlert, X } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
+import { useAuthHydrated } from '../hooks/useAuthHydrated';
 import { adminPages } from '../components/admin/adminRoutes';
 import { AdminNavigation } from '../components/admin/AdminNavigation';
 import { AdminAccount } from '../components/admin/AdminAccount';
@@ -18,10 +19,7 @@ export function AdminLayout() {
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
 
   // Hydration state check: do not prematurely redirect while Zustand persist is loading from localStorage
-  const [hydrated, setHydrated] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return useAuthStore.persist?.hasHydrated?.() ?? true;
-  });
+  const hydrated = useAuthHydrated();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -41,16 +39,6 @@ export function AdminLayout() {
   const [days, setDays] = useState<7 | 30>(7);
   const sidebarRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const unsub = useAuthStore.persist?.onFinishHydration?.(() => {
-      setHydrated(true);
-    });
-    return () => {
-      unsub?.();
-    };
-  }, []);
 
   function closeOverlays() {
     setMobileOpen(false);

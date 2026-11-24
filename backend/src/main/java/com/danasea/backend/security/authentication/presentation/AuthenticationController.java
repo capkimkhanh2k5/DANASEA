@@ -68,7 +68,8 @@ public class AuthenticationController {
     public AuthenticationResponse googleLogin(@Valid @RequestBody GoogleOAuth2Request request, HttpServletResponse response) {
         LoginResult result = googleOAuth2LoginUseCase.execute(request.getEffectiveToken());
 
-        CookieUtils.addRefreshTokenCookie(response, result.refreshToken(), jwtProperties.refreshTokenMaxAgeSeconds());
+        CookieUtils.addRefreshTokenCookie(response, result.refreshToken(), jwtProperties.refreshTokenMaxAgeSeconds(),
+                jwtProperties.cookieSecure());
 
         return new AuthenticationResponse(
                 result.accessToken(),
@@ -84,7 +85,8 @@ public class AuthenticationController {
                 request.email(),
                 request.password());
 
-        CookieUtils.addRefreshTokenCookie(response, result.refreshToken(), jwtProperties.refreshTokenMaxAgeSeconds());
+        CookieUtils.addRefreshTokenCookie(response, result.refreshToken(), jwtProperties.refreshTokenMaxAgeSeconds(),
+                jwtProperties.cookieSecure());
 
         return new AuthenticationResponse(
                 result.accessToken(),
@@ -103,7 +105,8 @@ public class AuthenticationController {
                 SupportedLanguage.fromTag(LocaleContextHolder.getLocale().toLanguageTag())
                         .orElse(SupportedLanguage.DEFAULT));
 
-        CookieUtils.addRefreshTokenCookie(response, result.refreshToken(), jwtProperties.refreshTokenMaxAgeSeconds());
+        CookieUtils.addRefreshTokenCookie(response, result.refreshToken(), jwtProperties.refreshTokenMaxAgeSeconds(),
+                jwtProperties.cookieSecure());
 
         return new AuthenticationResponse(
                 result.accessToken(),
@@ -125,7 +128,8 @@ public class AuthenticationController {
         LoginResult authResponse = refreshTokenUseCase.execute(refreshToken);
 
         CookieUtils.addRefreshTokenCookie(
-                response, authResponse.refreshToken(), jwtProperties.refreshTokenMaxAgeSeconds());
+                response, authResponse.refreshToken(), jwtProperties.refreshTokenMaxAgeSeconds(),
+                jwtProperties.cookieSecure());
 
         return ResponseEntity.ok(new RefreshResponse(authResponse.accessToken()));
     }
@@ -137,7 +141,7 @@ public class AuthenticationController {
             HttpServletResponse response) {
 
         logoutUseCase.execute(refreshToken);
-        CookieUtils.clearRefreshTokenCookie(response);
+        CookieUtils.clearRefreshTokenCookie(response, jwtProperties.cookieSecure());
         return ResponseEntity.ok().build();
     }
 

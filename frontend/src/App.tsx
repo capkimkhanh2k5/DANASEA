@@ -5,6 +5,7 @@ import { Home } from "./pages/customer/Home";
 
 import { ScrollToTop } from "./components/common/ScrollToTop";
 import { ToastContainer } from "./components/common/ToastContainer";
+import { SessionBridge } from "./components/common/SessionBridge";
 
 // Lazy-loaded layouts & routes to keep the initial Homepage bundle small and fast
 const VendorLayout = lazy(() => import("./layouts/VendorLayout").then((m) => ({ default: m.VendorLayout })));
@@ -62,6 +63,7 @@ function App() {
   return (
     <BrowserRouter>
       <ScrollToTop />
+      <SessionBridge />
       <ToastContainer />
 
       <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>

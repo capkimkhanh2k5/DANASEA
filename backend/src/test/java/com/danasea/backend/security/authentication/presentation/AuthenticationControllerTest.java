@@ -111,7 +111,41 @@ class AuthenticationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
                 .andExpect(cookie().exists("refresh_token"))
-                .andExpect(cookie().httpOnly("refresh_token", true));
+                .andExpect(cookie().httpOnly("refresh_token", true))
+                .andExpect(cookie().secure("refresh_token", true));
+    }
+
+    @Test
+    void shouldRespectCookieSecureFalseForLocalHttpDevelopment() throws Exception {
+        JwtProperties insecureCookieProps = new JwtProperties(
+                "test-secret-key-for-unit-tests-minimum-256-bits-long-enough", 60, 7, false);
+        AuthenticationController controller = new AuthenticationController(
+                loginUseCase,
+                registerUseCase,
+                refreshTokenUseCase,
+                logoutUseCase,
+                sendVerificationOtpUseCase,
+                verifyOtpUseCase,
+                googleOAuth2LoginUseCase,
+                forgotPasswordUseCase,
+                resetPasswordUseCase,
+                insecureCookieProps);
+        MockMvc localMockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new AuthenticationExceptionHandler(), new GlobalExceptionHandler())
+                .build();
+
+        LoginRequest request = new LoginRequest("test@example.com", "Password1!");
+        LoginResult result = new LoginResult("access-token", "refresh-token", UUID.randomUUID(), "test@example.com",
+                "CUSTOMER");
+        when(loginUseCase.execute(anyString(), anyString())).thenReturn(result);
+
+        localMockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(cookie().exists("refresh_token"))
+                .andExpect(cookie().httpOnly("refresh_token", true))
+                .andExpect(cookie().secure("refresh_token", false));
     }
 
     @Test

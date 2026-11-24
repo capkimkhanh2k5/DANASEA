@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { LogOut, Settings2 } from 'lucide-react';
 import type { User } from '../../types';
 import { useAuthStore } from '../../store/useAuthStore';
-import { authService } from '../../services/authService';
+import { logoutSession } from '../../services/sessionService';
 
 interface AdminAccountProps {
   user: Pick<User, 'fullName' | 'role'> | null;
@@ -33,17 +33,13 @@ export function AdminAccount({
     : 'Đăng nhập để xem dữ liệu hệ thống';
 
   const handleLogout = async () => {
-    try {
-      if (!demo && token && !token.startsWith('mock_jwt_token_')) {
-        await authService.logout();
-      }
-    } catch (err) {
-      console.warn('[AdminAccount] Logout notification error, proceeding with local cleanup:', err);
-    } finally {
+    if (demo) {
       useAuthStore.getState().logout();
-      onNavigate();
-      navigate('/auth');
+    } else {
+      await logoutSession();
     }
+    onNavigate();
+    navigate('/auth', { replace: true });
   };
 
   if (!isExpanded) {
