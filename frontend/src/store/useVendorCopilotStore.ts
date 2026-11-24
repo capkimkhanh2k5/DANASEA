@@ -199,6 +199,7 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
     set((state) => ({
       messages: [...state.messages, userMsg],
       isLoading: true,
+      attachedContext: undefined, // Consume pinned context on send like LLM attachments
       attachedMedia: [],
       error: null,
     }));
@@ -242,7 +243,7 @@ export const useVendorCopilotStore = create<VendorCopilotState>((set, get) => ({
           {
             id: 'err-' + Date.now(),
             role: 'assistant',
-            content: `⚠️ ${errorText}`,
+            content: errorText,
             createdAt: new Date().toISOString(),
           },
         ],
